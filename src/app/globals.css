@@ -180,6 +180,57 @@ body {
   animation: twinkle 2s ease-in-out infinite;
 }
 
+/* Double-tap-to-Hype: big center star that pops and fades */
+@keyframes hype-pop {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  35% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+.animate-hype-pop {
+  animation: hype-pop 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Small stars that fly outward on Hype. Direction set via --dx / --dy. */
+@keyframes hype-particle {
+  0% {
+    transform: translate(0, 0) scale(0.4);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx, 0), var(--dy, -28px)) scale(1);
+    opacity: 0;
+  }
+}
+.animate-hype-particle {
+  animation: hype-particle 0.6s ease-out forwards;
+}
+
+/* Slow rotation for the dashed HypefyMark (loaders / empty states) */
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-hype-burst,
   .animate-drift,
@@ -189,7 +240,10 @@ body {
   .animate-float-y,
   .animate-glow-pulse,
   .animate-star-pop,
-  .animate-twinkle {
+  .animate-twinkle,
+  .animate-hype-pop,
+  .animate-hype-particle,
+  .animate-spin-slow {
     animation: none;
   }
   .animate-rise {

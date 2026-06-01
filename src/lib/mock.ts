@@ -122,6 +122,60 @@ export const currentUser: CurrentUser = {
   stats: { posts: 48, hypes: 8900, rooms: 6 },
 };
 
+export type Comment = {
+  id: string;
+  name: string;
+  handle: string;
+  hue: number;
+  verified: boolean;
+  text: string;
+  hypes: number;
+  time: string;
+};
+
+export const comments: Comment[] = [
+  {
+    id: "c1",
+    name: "riya",
+    handle: "@riya.k",
+    hue: 200,
+    verified: false,
+    text: "this is so clean 🔥🔥",
+    hypes: 24,
+    time: "1h",
+  },
+  {
+    id: "c2",
+    name: "dev",
+    handle: "@devbuilds",
+    hue: 150,
+    verified: true,
+    text: "the vibe is immaculate",
+    hypes: 12,
+    time: "1h",
+  },
+  {
+    id: "c3",
+    name: "zoya",
+    handle: "@zoya",
+    hue: 95,
+    verified: false,
+    text: "okay where is this 👀",
+    hypes: 5,
+    time: "45m",
+  },
+  {
+    id: "c4",
+    name: "kabir",
+    handle: "@kabir",
+    hue: 330,
+    verified: false,
+    text: "hyped ⭐",
+    hypes: 2,
+    time: "20m",
+  },
+];
+
 export function formatCount(n: number): string {
   if (n >= 1000) {
     const v = n / 1000;

@@ -3,44 +3,50 @@
 import { useState } from "react";
 import { Star } from "lucide-react";
 import { formatCount } from "@/lib/mock";
+import { HypeParticles } from "@/components/feed/HypeParticles";
 
+/** Controlled Hype button — state lives in the parent (PostCard). */
 export function HypeButton({
-  initialHyped,
-  initialCount,
+  hyped,
+  count,
+  onToggle,
 }: {
-  initialHyped: boolean;
-  initialCount: number;
+  hyped: boolean;
+  count: number;
+  onToggle: () => void;
 }) {
-  const [hyped, setHyped] = useState(initialHyped);
-  const [count, setCount] = useState(initialCount);
   const [burst, setBurst] = useState(false);
+  const [particles, setParticles] = useState(false);
 
-  function toggle() {
-    const next = !hyped;
-    setHyped(next);
-    setCount((c) => c + (next ? 1 : -1));
-    if (next) {
+  function handle() {
+    if (!hyped) {
       setBurst(true);
+      setParticles(true);
       setTimeout(() => setBurst(false), 360);
+      setTimeout(() => setParticles(false), 600);
     }
+    onToggle();
   }
 
   return (
     <button
       type="button"
-      onClick={toggle}
+      onClick={handle}
       aria-pressed={hyped}
       aria-label="Hype"
       className="flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-colors"
     >
-      <Star
-        size={24}
-        strokeWidth={2.2}
-        className={`${burst ? "animate-hype-burst" : ""} transition-colors ${
-          hyped ? "text-hype" : "text-foreground"
-        }`}
-        fill={hyped ? "currentColor" : "none"}
-      />
+      <span className="relative">
+        <Star
+          size={24}
+          strokeWidth={2.2}
+          className={`${burst ? "animate-hype-burst" : ""} transition-colors ${
+            hyped ? "text-hype" : "text-foreground"
+          }`}
+          fill={hyped ? "currentColor" : "none"}
+        />
+        {particles && <HypeParticles size={9} />}
+      </span>
       <span className={hyped ? "text-hype" : "text-foreground"}>
         {formatCount(count)}
       </span>
