@@ -79,10 +79,49 @@ body {
   animation: drift 20s ease-in-out infinite reverse;
 }
 
+/* Gentle entrance for the auth card + staggered fields */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  opacity: 0;
+  animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Slow sweep of the light beam on the auth background */
+@keyframes beam {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: translateX(0) rotate(18deg);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-4%) rotate(14deg);
+  }
+}
+
+.animate-beam {
+  animation: beam 9s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-hype-burst,
   .animate-drift,
-  .animate-drift-slow {
+  .animate-drift-slow,
+  .animate-rise,
+  .animate-beam {
     animation: none;
+  }
+  .animate-rise {
+    opacity: 1;
   }
 }
