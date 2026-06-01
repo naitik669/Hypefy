@@ -58,6 +58,7 @@ export async function updateSession(request: NextRequest) {
   // Gate the in-app routes. Unauthenticated users are sent to the landing.
   const protectedPrefixes = [
     "/home",
+    "/shows",
     "/discover",
     "/messages",
     "/profile",

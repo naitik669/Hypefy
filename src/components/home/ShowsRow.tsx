@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import type { Show } from "@/lib/mock";
 
-/** Horizontal row of Shows (24h content). First tile creates your own. */
+/** Horizontal row of Shows (24h content). Tapping navigates to /shows/[id]. */
 export function ShowsRow({ shows }: { shows: Show[] }) {
   return (
     <div className="no-scrollbar flex gap-4 overflow-x-auto px-4 py-4">
@@ -17,18 +18,16 @@ export function ShowsRow({ shows }: { shows: Show[] }) {
         <span className="max-w-full truncate text-xs text-muted">Your Show</span>
       </button>
 
-      {/* Friends' shows */}
+      {/* Friends' shows — link to /shows/[id] */}
       {shows.map((s) => (
-        <button
+        <Link
           key={s.id}
-          type="button"
+          href={`/shows/${s.id}`}
           className="flex w-16 shrink-0 flex-col items-center gap-1.5"
         >
           <div
             className={`rounded-[22px] p-[2.5px] ${
-              s.seen
-                ? "bg-border"
-                : "bg-white"
+              s.seen ? "bg-border" : "bg-accent"
             }`}
           >
             <div className="rounded-[20px] bg-background p-[2px]">
@@ -36,7 +35,7 @@ export function ShowsRow({ shows }: { shows: Show[] }) {
             </div>
           </div>
           <span className="max-w-full truncate text-xs text-muted">{s.name}</span>
-        </button>
+        </Link>
       ))}
     </div>
   );
