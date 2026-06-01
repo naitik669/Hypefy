@@ -31,7 +31,7 @@ export function BottomNav() {
       <Link
         href="/create"
         aria-label="Create"
-        className="flex h-11 w-[68px] -translate-y-3 items-center justify-center rounded-[20px] bg-accent text-accent-ink shadow-[0_8px_24px_-6px_rgba(200,255,0,0.6)] transition-transform active:scale-95"
+        className="flex h-11 w-[68px] -translate-y-1.5 items-center justify-center rounded-[20px] bg-accent text-accent-ink shadow-[0_8px_24px_-6px_rgba(200,255,0,0.6)] transition-transform active:scale-95"
       >
         <Plus size={26} strokeWidth={2.6} />
       </Link>
