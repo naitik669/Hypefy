@@ -12,6 +12,13 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      // In production we sit behind a proxy (Vercel), so `origin` can be the
+      // internal host. Prefer the forwarded host to redirect to the real URL.
+      const forwardedHost = request.headers.get("x-forwarded-host");
+      const isLocalEnv = process.env.NODE_ENV === "development";
+      if (!isLocalEnv && forwardedHost) {
+        return NextResponse.redirect(`https://${forwardedHost}${next}`);
+      }
       return NextResponse.redirect(`${origin}${next}`);
     }
   }
