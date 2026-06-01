@@ -100,6 +100,28 @@ export const posts: Post[] = [
   },
 ];
 
+export type CurrentUser = {
+  name: string;
+  handle: string;
+  hue: number;
+  verified: boolean;
+  bio: string;
+  link: string;
+  vibe: string;
+  stats: { posts: number; hypes: number; rooms: number };
+};
+
+export const currentUser: CurrentUser = {
+  name: "AMAN",
+  handle: "@aman",
+  hue: 280,
+  verified: true,
+  bio: "building hypefy in public · chronically online",
+  link: "hypefy.chat/aman",
+  vibe: "building quietly",
+  stats: { posts: 48, hypes: 8900, rooms: 6 },
+};
+
 export function formatCount(n: number): string {
   if (n >= 1000) {
     const v = n / 1000;
