@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Link2, Zap, Repeat2, Check } from "lucide-react";
+import { Link2, Zap, Repeat2, Check, Search } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
+import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { threads } from "@/lib/mock-messages";
 
 export function ShareSheet({
@@ -13,40 +14,84 @@ export function ShareSheet({
   open: boolean;
   onClose: () => void;
 }) {
-  const [sent, setSent] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [sent, setSent] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
+
+  const filtered = threads.filter(
+    (t) =>
+      query.trim() === "" ||
+      t.name.toLowerCase().includes(query.toLowerCase()) ||
+      t.handle.toLowerCase().includes(query.toLowerCase()),
+  );
+
+  function toggleSend(id: string) {
+    setSent((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
 
   async function copyLink() {
     try {
       await navigator.clipboard.writeText("https://www.hypefy.chat/p/aman");
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    }
+    } catch {}
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   }
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Share">
-      {/* Send to */}
-      <p className="pb-2 pt-1 text-xs font-semibold text-muted">Send to</p>
-      <div className="no-scrollbar flex gap-4 overflow-x-auto pb-4">
-        {threads.slice(0, 6).map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setSent(sent === t.id ? null : t.id)}
-            className="flex w-14 shrink-0 flex-col items-center gap-1.5"
-          >
-            <div
-              className={`rounded-[18px] p-[2px] ${sent === t.id ? "bg-accent" : "bg-transparent"}`}
+      {/* Search */}
+      <div className="mb-3 flex h-10 items-center gap-2 rounded-pill border border-border bg-surface px-3">
+        <Search size={16} className="shrink-0 text-faint" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search friends…"
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
+        />
+      </div>
+
+      {/* People list — vertical scroll */}
+      <div className="mb-1 flex max-h-56 flex-col overflow-y-auto">
+        {filtered.length === 0 && (
+          <p className="py-8 text-center text-sm text-faint">No results</p>
+        )}
+        {filtered.map((t) => {
+          const selected = sent.has(t.id);
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => toggleSend(t.id)}
+              className={`flex items-center gap-3 rounded-xl px-1 py-2.5 transition-colors ${
+                selected ? "bg-accent/10" : "hover:bg-white/[0.04]"
+              }`}
             >
-              <Avatar name={t.name} hue={t.hue} size={52} className="rounded-[16px]" />
-            </div>
-            <span className="max-w-full truncate text-xs text-muted">{t.name}</span>
-          </button>
-        ))}
+              <Avatar name={t.name} hue={t.hue} size={44} />
+              <div className="min-w-0 flex-1 text-left">
+                <div className="flex items-center gap-1">
+                  <span className="truncate text-sm font-semibold">{t.name}</span>
+                  {t.verified && (
+                    <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />
+                  )}
+                </div>
+                <p className="truncate text-xs text-muted">{t.handle}</p>
+              </div>
+              <span
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold transition-colors ${
+                  selected
+                    ? "border-accent bg-accent text-accent-ink"
+                    : "border-border"
+                }`}
+              >
+                {selected && "✓"}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Actions */}
@@ -59,7 +104,7 @@ export function ShareSheet({
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface">
             {copied ? <Check size={18} className="text-accent" /> : <Link2 size={18} />}
           </span>
-          {copied ? "Link copied" : "Copy link"}
+          {copied ? "Link copied!" : "Copy link"}
         </button>
         <button
           type="button"

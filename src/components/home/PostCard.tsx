@@ -2,6 +2,101 @@
 
 import { useRef, useState } from "react";
 import { Star, MessageCircle, Send, Bookmark, MoreHorizontal } from "lucide-react";
+
+/* ── Carousel ──────────────────────────────────────────────────── */
+function MediaCarousel({
+  post,
+  blowingUp,
+  pop,
+  onMediaClick,
+  onPopEnd,
+}: {
+  post: Post;
+  blowingUp: boolean;
+  pop: boolean;
+  onMediaClick: () => void;
+  onPopEnd: () => void;
+}) {
+  const count = Math.min(post.mediaCount, 10);
+  const [idx, setIdx] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  function onScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    const newIdx = Math.round(el.scrollLeft / el.clientWidth);
+    if (newIdx !== idx) setIdx(newIdx);
+  }
+
+  // Generate per-slide gradients by rotating hue slightly.
+  function slideGradient(i: number) {
+    const offset = i * 18;
+    const from = (post.mediaFrom + offset) % 360;
+    const to = (post.mediaTo + offset) % 360;
+    return `radial-gradient(120% 90% at 20% 10%, hsl(${from} 80% 55% / 0.95), hsl(${to} 70% 22%))`;
+  }
+
+  return (
+    <div className="relative mx-4 select-none overflow-hidden rounded-2xl">
+      {/* Scroll container */}
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        onClick={onMediaClick}
+        className="no-scrollbar flex snap-x snap-mandatory overflow-x-scroll"
+        style={{ scrollBehavior: "smooth" }}
+      >
+        {Array.from({ length: count }).map((_, i) => (
+          <div
+            key={i}
+            className="aspect-[4/5] w-full shrink-0 snap-start"
+            style={{ background: slideGradient(i) }}
+          />
+        ))}
+      </div>
+
+      {/* Blowing up label */}
+      {blowingUp && (
+        <span className="pointer-events-none absolute left-3 top-3 rounded-pill bg-black/45 px-2 py-0.5 text-[11px] font-bold text-accent backdrop-blur-sm">
+          Blowing up 🔥
+        </span>
+      )}
+
+      {/* Counter + dots (only for multi-slide) */}
+      {count > 1 && (
+        <>
+          <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/45 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
+            {idx + 1}/{count}
+          </span>
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
+            {Array.from({ length: count }).map((_, i) => (
+              <span
+                key={i}
+                className={`rounded-full transition-all duration-300 ${
+                  i === idx ? "h-1.5 w-4 bg-white" : "h-1.5 w-1.5 bg-white/50"
+                }`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Double-tap burst */}
+      {pop && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <Star
+            size={88}
+            className="animate-hype-pop text-hype drop-shadow-[0_4px_20px_rgba(255,208,0,0.5)]"
+            fill="currentColor"
+            onAnimationEnd={onPopEnd}
+          />
+          <HypeParticles size={16} />
+        </div>
+      )}
+    </div>
+  );
+}
+/* ─────────────────────────────────────────────────────────────── */
 import { Avatar } from "@/components/ui/Avatar";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { HypeButton } from "@/components/home/HypeButton";
@@ -80,55 +175,14 @@ export function PostCard({ post }: { post: Post }) {
         </button>
       </div>
 
-      {/* Media (double-tap to Hype) */}
-      <div
-        className="relative mx-4 select-none overflow-hidden rounded-2xl"
-        onClick={onMediaClick}
-      >
-        <div
-          className="aspect-[4/5] w-full"
-          style={{
-            background: `radial-gradient(120% 90% at 20% 10%, hsl(${post.mediaFrom} 80% 55% / 0.95), hsl(${post.mediaTo} 70% 22%))`,
-          }}
-        />
-
-        {blowingUp && (
-          <span className="absolute left-3 top-3 rounded-pill bg-black/45 px-2 py-0.5 text-[11px] font-bold text-accent backdrop-blur-sm">
-            Blowing up 🔥
-          </span>
-        )}
-
-        {post.mediaCount > 1 && (
-          <>
-            <span className="absolute right-3 top-3 rounded-full bg-black/45 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
-              1/{post.mediaCount}
-            </span>
-            <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
-              {Array.from({ length: post.mediaCount }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`h-1.5 rounded-full transition-all ${
-                    i === 0 ? "w-4 bg-white" : "w-1.5 bg-white/50"
-                  }`}
-                />
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Double-tap burst */}
-        {pop && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <Star
-              size={88}
-              className="animate-hype-pop text-hype drop-shadow-[0_4px_20px_rgba(255,208,0,0.5)]"
-              fill="currentColor"
-              onAnimationEnd={() => setPop(false)}
-            />
-            <HypeParticles size={16} />
-          </div>
-        )}
-      </div>
+      {/* Media — swipeable carousel (up to 10 slides, snap-based) */}
+      <MediaCarousel
+        post={post}
+        blowingUp={blowingUp}
+        pop={pop}
+        onMediaClick={onMediaClick}
+        onPopEnd={() => setPop(false)}
+      />
 
       {/* Actions */}
       <div className="flex items-center justify-between px-4 pt-3">
