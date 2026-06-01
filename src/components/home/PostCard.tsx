@@ -18,7 +18,7 @@ export function PostCard({ post }: { post: Post }) {
         <Avatar name={post.username} hue={post.hue} size={40} />
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <span className="truncate text-sm font-semibold">{post.username}</span>
-          {post.verified && <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-hype" />}
+          {post.verified && <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />}
           <span className="ml-1 truncate text-xs text-faint">· {post.timeAgo}</span>
         </div>
 

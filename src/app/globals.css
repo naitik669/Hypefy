@@ -18,7 +18,8 @@
 
   --color-accent: #c8ff00; /* brand: electric lime */
   --color-accent-ink: #0a0a0a; /* text on accent fills */
-  --color-hype: #ffd000; /* active Hype star + Verified Star */
+  --color-hype: #ffd000; /* active Hype star */
+  --color-verified: #3897f0; /* Verified Star (blue) */
   --color-danger: #ff4545;
 
   --font-sans: var(--font-jakarta), system-ui, sans-serif;
