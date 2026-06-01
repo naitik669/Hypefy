@@ -23,7 +23,7 @@ export function RoomCard({ room }: { room: Room }) {
             <p className="truncate text-sm font-bold">{room.name}</p>
             <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
               <Users size={11} />
-              {formatCount(room.members)} members
+              {formatCount(room.members)} members · Community
             </p>
           </div>
           <button

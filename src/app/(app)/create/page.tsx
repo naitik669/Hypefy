@@ -25,8 +25,8 @@ const actions = [
   {
     key: "Room",
     icon: Users,
-    title: "Create Room",
-    text: "Start a space for your people.",
+    title: "Create Community",
+    text: "Build a space where your people belong.",
     from: 30,
     to: 70,
   },
@@ -67,9 +67,12 @@ export default function CreatePage() {
             <div className="mx-auto mb-5 h-1.5 w-10 rounded-full bg-border" />
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-bold">{active} composer</h2>
+                <h2 className="text-xl font-bold">
+                {active === "Room" ? "Community" : active} composer
+              </h2>
                 <p className="mt-1 text-sm text-muted">
-                  Coming soon — this is where you’ll create your {active.toLowerCase()}.
+                  Coming soon — this is where you’ll create your{" "}
+                  {active === "Room" ? "community" : active.toLowerCase()}.
                 </p>
               </div>
               <button
