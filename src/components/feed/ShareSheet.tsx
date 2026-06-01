@@ -94,35 +94,35 @@ export function ShareSheet({
         })}
       </div>
 
-      {/* Actions */}
-      <div className="flex flex-col gap-1 border-t border-border pt-2">
+      {/* Actions — horizontal row */}
+      <div className="flex items-start justify-around border-t border-border pt-4 pb-1">
         <button
           type="button"
           onClick={copyLink}
-          className="flex items-center gap-3 rounded-xl px-2 py-3 text-sm font-medium transition-colors hover:bg-white/5"
+          className="flex flex-col items-center gap-2 rounded-xl px-3 py-1 transition-colors active:opacity-70"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface">
-            {copied ? <Check size={18} className="text-accent" /> : <Link2 size={18} />}
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface">
+            {copied ? <Check size={20} className="text-accent" /> : <Link2 size={20} />}
           </span>
-          {copied ? "Link copied!" : "Copy link"}
+          <span className="text-xs text-muted">{copied ? "Copied!" : "Copy link"}</span>
         </button>
         <button
           type="button"
-          className="flex items-center gap-3 rounded-xl px-2 py-3 text-sm font-medium transition-colors hover:bg-white/5"
+          className="flex flex-col items-center gap-2 rounded-xl px-3 py-1 transition-colors active:opacity-70"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface">
-            <Zap size={18} className="text-hype" />
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface">
+            <Zap size={20} className="text-hype" />
           </span>
-          Share to your Shot
+          <span className="text-xs text-muted">Shot</span>
         </button>
         <button
           type="button"
-          className="flex items-center gap-3 rounded-xl px-2 py-3 text-sm font-medium transition-colors hover:bg-white/5"
+          className="flex flex-col items-center gap-2 rounded-xl px-3 py-1 transition-colors active:opacity-70"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface">
-            <Repeat2 size={18} />
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface">
+            <Repeat2 size={20} />
           </span>
-          Repost
+          <span className="text-xs text-muted">Repost</span>
         </button>
       </div>
     </BottomSheet>
