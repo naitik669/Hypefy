@@ -13,7 +13,9 @@ export function TopBar() {
         <Search size={22} strokeWidth={2.2} />
       </Link>
 
-      <span className="text-xl font-extrabold tracking-tight">Hypefy</span>
+      <span className="text-xl font-extrabold tracking-tight">
+        Hypefy<span className="text-accent">.</span>
+      </span>
 
       <button
         type="button"

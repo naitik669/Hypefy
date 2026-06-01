@@ -13,7 +13,7 @@ export default function LandingPage() {
       {/* Wordmark + tagline */}
       <div className="relative z-10 flex flex-1 flex-col items-center justify-center text-center">
         <h1 className="text-6xl font-extrabold tracking-tight text-foreground sm:text-7xl">
-          Hypefy
+          Hypefy<span className="text-accent">.</span>
         </h1>
         <p className="mt-4 max-w-xs text-lg font-medium text-muted">
           Where your personality lives.
