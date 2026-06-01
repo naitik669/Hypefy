@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/*
+  Hypefy design system — dark-first, Gen Z energy.
+  Single brand pop (electric lime), gold for Hype + Verified Star,
+  everything else near-black + white. Tailwind v4 @theme tokens
+  generate utilities: --color-surface -> bg-surface, text-surface, etc.
+*/
+@theme {
+  --color-background: #0a0a0a; /* near-black app bg */
+  --color-surface: #141414; /* cards */
+  --color-elevated: #1e1e1e; /* raised cards / sheets */
+  --color-border: #2a2a2a; /* dividers, outlines */
+
+  --color-foreground: #ffffff; /* primary text */
+  --color-muted: #8a8a8a; /* secondary text */
+  --color-faint: #555555; /* tertiary / inactive icons */
+
+  --color-accent: #c8ff00; /* brand: electric lime */
+  --color-accent-ink: #0a0a0a; /* text on accent fills */
+  --color-hype: #ffd000; /* active Hype star + Verified Star */
+  --color-danger: #ff4545;
+
+  --font-sans: var(--font-jakarta), system-ui, sans-serif;
+
+  --radius-card: 16px;
+  --radius-show: 18px;
+  --radius-pill: 100px;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  /* Prevent text inflation on mobile orientation change */
+  text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Hype star burst — used on tap */
+@keyframes hype-burst {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-hype-burst {
+  animation: hype-burst 0.35s ease-out;
+}
+
+/* Slow drifting glow for the landing background */
+@keyframes drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(6%, -4%) scale(1.15);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+.animate-drift {
+  animation: drift 14s ease-in-out infinite;
+}
+
+.animate-drift-slow {
+  animation: drift 20s ease-in-out infinite reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-hype-burst,
+  .animate-drift,
+  .animate-drift-slow {
+    animation: none;
+  }
+}
