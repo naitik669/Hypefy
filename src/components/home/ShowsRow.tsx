@@ -28,7 +28,7 @@ export function ShowsRow({ shows }: { shows: Show[] }) {
             className={`rounded-[22px] p-[2.5px] ${
               s.seen
                 ? "bg-border"
-                : "bg-white shadow-[0_0_12px_2px_rgba(255,255,255,0.45)]"
+                : "bg-white"
             }`}
           >
             <div className="rounded-[20px] bg-background p-[2px]">
