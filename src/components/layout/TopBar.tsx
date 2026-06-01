@@ -1,16 +1,16 @@
 import Link from "next/link";
-import { Search, Bell } from "lucide-react";
+import { Compass, Bell } from "lucide-react";
 
-/** Home top bar: search · Hypefy wordmark · notifications. */
+/** Home top bar: discover · Hypefy wordmark · notifications. */
 export function TopBar() {
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-xl">
       <Link
-        href="/search"
-        aria-label="Search"
+        href="/discover"
+        aria-label="Discover"
         className="flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5"
       >
-        <Search size={22} strokeWidth={2.2} />
+        <Compass size={22} strokeWidth={2.2} />
       </Link>
 
       <span className="text-xl font-extrabold tracking-tight">

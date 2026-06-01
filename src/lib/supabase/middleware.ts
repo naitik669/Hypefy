@@ -17,6 +17,18 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // Skip session refresh on Next.js prefetch requests. Link prefetching fires
+  // many concurrent requests; if each refreshes the token at once, the rotation
+  // race can invalidate the session and log the user out. Only real navigations
+  // (and the client's own timer) should refresh.
+  const isPrefetch =
+    request.headers.get("next-router-prefetch") !== null ||
+    request.headers.get("purpose") === "prefetch" ||
+    request.headers.get("x-middleware-prefetch") !== null;
+  if (isPrefetch) {
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -44,7 +56,16 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Gate the in-app routes. Unauthenticated users are sent to the landing.
-  const protectedPrefixes = ["/home", "/discover", "/messages", "/profile"];
+  const protectedPrefixes = [
+    "/home",
+    "/discover",
+    "/messages",
+    "/profile",
+    "/shots",
+    "/create",
+    "/notifications",
+    "/search",
+  ];
   const isProtected = protectedPrefixes.some((p) =>
     request.nextUrl.pathname.startsWith(p),
   );
@@ -52,7 +73,12 @@ export async function updateSession(request: NextRequest) {
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
-    return NextResponse.redirect(url);
+    const redirectResponse = NextResponse.redirect(url);
+    // Carry over any refreshed cookies so we never drop the session on redirect.
+    supabaseResponse.cookies.getAll().forEach((c) => {
+      redirectResponse.cookies.set(c.name, c.value);
+    });
+    return redirectResponse;
   }
 
   return supabaseResponse;
