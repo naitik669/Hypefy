@@ -39,12 +39,10 @@ export function AuthCard({ mode }: { mode: Mode }) {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setNotice(null);
     setLoading(true);
 
     try {
@@ -65,12 +63,13 @@ export function AuthCard({ mode }: { mode: Mode }) {
           },
         });
         if (error) throw error;
-        // If email confirmation is on, there's no active session yet.
+        // If email confirmation is on, there's no active session yet —
+        // send them to the branded "check your inbox" screen.
         if (data.session) {
           router.push("/home");
           router.refresh();
         } else {
-          setNotice("Check your email to confirm your account.");
+          router.push(`/check-email?email=${encodeURIComponent(email)}`);
         }
       }
     } catch (err) {
@@ -150,11 +149,6 @@ export function AuthCard({ mode }: { mode: Mode }) {
           {error && (
             <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
               {error}
-            </p>
-          )}
-          {notice && (
-            <p className="rounded-lg bg-accent/10 px-3 py-2 text-xs text-accent">
-              {notice}
             </p>
           )}
 

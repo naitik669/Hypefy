@@ -113,12 +113,73 @@ body {
   animation: beam 9s ease-in-out infinite;
 }
 
+/* Check-email screen — branded mail animation */
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+.animate-float-y {
+  animation: float-y 3.2s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.14);
+  }
+}
+.animate-glow-pulse {
+  animation: glow-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes star-pop {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.2) rotate(10deg);
+  }
+}
+.animate-star-pop {
+  animation: star-pop 2.4s ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+.animate-twinkle {
+  animation: twinkle 2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-hype-burst,
   .animate-drift,
   .animate-drift-slow,
   .animate-rise,
-  .animate-beam {
+  .animate-beam,
+  .animate-float-y,
+  .animate-glow-pulse,
+  .animate-star-pop,
+  .animate-twinkle {
     animation: none;
   }
   .animate-rise {
