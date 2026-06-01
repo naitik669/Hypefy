@@ -28,7 +28,7 @@ export function ShowsRow({ shows }: { shows: Show[] }) {
             className={`rounded-[22px] p-[2.5px] ${
               s.seen
                 ? "bg-border"
-                : "bg-gradient-to-tr from-accent via-fuchsia-500 to-violet-500"
+                : "bg-gradient-to-tr from-[#f3ff7a] via-accent to-[#3fd06a]"
             }`}
           >
             <div className="rounded-[20px] bg-background p-[2px]">
