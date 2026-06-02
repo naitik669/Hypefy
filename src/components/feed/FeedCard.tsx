@@ -142,7 +142,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   if (deleted) return null;
 
   return (
-    <article className="border-b border-border/50 pb-3">
+    <article className="relative border-b border-border/50 pb-3">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3">
         <Link href={profileHref}><Avatar name={name} hue={hue} size={40} /></Link>
