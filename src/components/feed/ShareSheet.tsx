@@ -31,7 +31,8 @@ export function ShareSheet({
   const [copied, setCopied] = useState(false);
   const [reposted, setReposted] = useState(false);
 
-  // Fetch real friends (people current user follows)
+  // Fetch everyone the user has a connection with:
+  // following + followers + notification interaction partners (hypers, commenters, etc.)
   useEffect(() => {
     if (!open) return;
     setLoading(true);
@@ -39,20 +40,39 @@ export function ShareSheet({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
 
-      const { data } = await supabase
-        .from("follows")
-        .select("profiles!following_id(id, display_name, username, avatar_hue)")
-        .eq("follower_id", user.id)
-        .limit(50);
+      // Run all three queries in parallel
+      const [followingRes, followerRes, notifRes] = await Promise.all([
+        // People I follow
+        supabase.from("follows").select("following_id").eq("follower_id", user.id).limit(100),
+        // People who follow me
+        supabase.from("follows").select("follower_id").eq("following_id", user.id).limit(100),
+        // Recent interaction partners (actors of my notifications)
+        supabase.from("notifications")
+          .select("actor_id")
+          .eq("user_id", user.id)
+          .not("actor_id", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(50),
+      ]);
 
-      const list: Friend[] = (data ?? [])
-        .map((r: any) => {
-          const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
-          return p as Friend;
-        })
-        .filter(Boolean);
+      // Merge all unique IDs, exclude self
+      const allIds = new Set<string>();
+      followingRes.data?.forEach((r: any) => allIds.add(r.following_id));
+      followerRes.data?.forEach((r: any) => allIds.add(r.follower_id));
+      notifRes.data?.forEach((r: any) => r.actor_id && allIds.add(r.actor_id));
+      allIds.delete(user.id);
 
-      setFriends(list);
+      if (allIds.size === 0) { setFriends([]); setLoading(false); return; }
+
+      // Fetch profiles for all merged IDs
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, display_name, username, avatar_hue")
+        .in("id", [...allIds])
+        .eq("profile_completed", true)
+        .limit(80);
+
+      setFriends((profiles ?? []) as Friend[]);
       setLoading(false);
     }
     load();
@@ -124,7 +144,7 @@ export function ShareSheet({
         ) : filtered.length === 0 ? (
           <p className="py-6 text-center text-sm text-faint">
             {friends.length === 0
-              ? "Follow people to share with them."
+              ? "Follow people or interact with posts to see connections here."
               : "No results"}
           </p>
         ) : (
