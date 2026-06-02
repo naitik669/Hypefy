@@ -1,40 +1,57 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Loader2 } from "lucide-react";
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export function FollowButton({
-  targetUserId,
   currentUserId,
+  targetUserId,
+  targetUsername,
   initialFollowing,
+  className = "",
 }: {
-  targetUserId: string;
   currentUserId: string;
+  targetUserId: string;
+  targetUsername: string | null;
   initialFollowing: boolean;
+  className?: string;
 }) {
   const supabase = createClient();
   const [following, setFollowing] = useState(initialFollowing);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
 
-  function toggle() {
-    const was = following;
-    setFollowing(!was); // optimistic
-    startTransition(async () => {
-      if (was) {
-        const { error } = await supabase
-          .from("follows")
-          .delete()
-          .eq("follower_id", currentUserId)
-          .eq("following_id", targetUserId);
-        if (error) setFollowing(was); // rollback
+  async function toggle() {
+    if (pending) return;
+    const prev = following;
+    setFollowing(!prev);
+    setPending(true);
+
+    if (!prev) {
+      const { error } = await supabase
+        .from("follows")
+        .insert({ follower_id: currentUserId, following_id: targetUserId });
+      if (!error) {
+        // Create follow notification
+        await supabase.from("notifications").insert({
+          user_id: targetUserId,
+          actor_id: currentUserId,
+          type: "follow",
+          target_type: "profile",
+          target_id: targetUserId,
+          body: "started following you",
+        });
       } else {
-        const { error } = await supabase
-          .from("follows")
-          .insert({ follower_id: currentUserId, following_id: targetUserId });
-        if (error) setFollowing(was); // rollback
+        setFollowing(prev);
       }
-    });
+    } else {
+      const { error } = await supabase
+        .from("follows")
+        .delete()
+        .eq("follower_id", currentUserId)
+        .eq("following_id", targetUserId);
+      if (error) setFollowing(prev);
+    }
+    setPending(false);
   }
 
   return (
@@ -42,13 +59,12 @@ export function FollowButton({
       type="button"
       onClick={toggle}
       disabled={pending}
-      className={`flex h-10 items-center justify-center gap-1.5 rounded-xl px-5 text-sm font-bold transition-colors disabled:opacity-60 ${
+      className={`flex h-10 flex-1 items-center justify-center rounded-xl text-sm font-bold transition-colors disabled:opacity-60 ${
         following
-          ? "border border-border bg-transparent text-foreground hover:bg-white/5"
-          : "bg-accent text-accent-ink hover:bg-accent/90"
-      }`}
+          ? "border border-border bg-surface text-foreground hover:bg-elevated"
+          : "bg-accent text-accent-ink"
+      } ${className}`}
     >
-      {pending && <Loader2 size={14} className="animate-spin" />}
       {following ? "Following" : "Follow"}
     </button>
   );

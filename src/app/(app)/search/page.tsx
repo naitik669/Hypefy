@@ -1,34 +1,66 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, SearchX, Clock } from "lucide-react";
+import { ChevronLeft, SearchX, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { FilterPills } from "@/components/ui/FilterPills";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { UserSuggestionCard } from "@/components/discover/UserSuggestionCard";
-import { RoomCard } from "@/components/discover/RoomCard";
-import { TrendingCard } from "@/components/discover/TrendingCard";
-import { people, rooms, trending } from "@/lib/mock-discover";
+import { Avatar } from "@/components/ui/Avatar";
+import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
+import Link from "next/link";
 
-const recents = ["aman", "Meme Lab", "design", "late night"];
+type Profile = {
+  id: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_hue: number | null;
+  bio: string | null;
+};
 
 export default function SearchPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState("Top");
+  const [people, setPeople] = useState<Profile[]>([]);
+  const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [searched, setSearched] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
-  const q = query.trim().toLowerCase();
-  const peopleR = people.filter(
-    (u) => u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q),
-  );
-  const roomsR = rooms.filter((r) => r.name.toLowerCase().includes(q));
-  const postsR = trending.filter((p) => p.username.toLowerCase().includes(q));
-  const hasResults = peopleR.length + roomsR.length + postsR.length > 0;
+  async function runSearch(q: string) {
+    if (!q.trim()) { setPeople([]); setPosts([]); setSearched(false); return; }
+    setSearched(true);
+    startTransition(async () => {
+      const term = q.trim().toLowerCase();
+      const [peopleRes, postsRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, display_name, username, avatar_hue, bio")
+          .eq("profile_completed", true)
+          .or(`username.ilike.%${term}%,display_name.ilike.%${term}%`)
+          .limit(20),
+        supabase
+          .from("posts")
+          .select("*, profiles(id, display_name, username, avatar_hue, profile_tags)")
+          .or(`caption.ilike.%${term}%,body.ilike.%${term}%`)
+          .order("hype_count", { ascending: false })
+          .limit(20),
+      ]);
+      setPeople(peopleRes.data ?? []);
+      const normPosts = (postsRes.data ?? []).map((p: any) => ({
+        ...p,
+        profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles,
+      })) as FeedPost[];
+      setPosts(normPosts);
+    });
+  }
 
   const showPeople = tab === "Top" || tab === "People";
-  const showRooms = tab === "Top" || tab === "Rooms";
   const showPosts = tab === "Top" || tab === "Posts";
+  const hasResults = people.length > 0 || posts.length > 0;
 
   return (
     <>
@@ -46,96 +78,67 @@ export default function SearchPage() {
           <SearchBar
             placeholder="Search Hypefy"
             autoFocus
-            onChange={setQuery}
+            onChange={(q) => { setQuery(q); runSearch(q); }}
           />
         </div>
       </header>
 
-      {q.length === 0 ? (
-        // Recents + suggestions
-        <div className="pb-4">
-          <h2 className="px-4 pb-1 pt-4 text-sm font-bold text-muted">
-            Recent
-          </h2>
-          <div className="flex flex-col">
-            {recents.map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setQuery(r)}
-                className="flex items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/[0.03]"
-              >
-                <Clock size={18} className="text-faint" />
-                {r}
-              </button>
-            ))}
-          </div>
-
-          <h2 className="px-4 pb-2 pt-4 text-sm font-bold text-muted">
-            Suggested rooms
-          </h2>
-          <div className="no-scrollbar flex gap-3 overflow-x-auto px-4">
-            {rooms.slice(0, 4).map((r) => (
-              <div key={r.id} className="w-56 shrink-0">
-                <RoomCard room={r} />
-              </div>
-            ))}
-          </div>
-
-          <h2 className="px-4 pb-1 pt-5 text-sm font-bold text-muted">
-            Trending people
-          </h2>
-          <div className="flex flex-col">
-            {people.slice(0, 4).map((u) => (
-              <UserSuggestionCard key={u.id} user={u} />
-            ))}
-          </div>
+      {query.trim().length > 0 && (
+        <div className="pt-3">
+          <FilterPills options={["Top", "People", "Posts"]} onChange={setTab} />
         </div>
-      ) : (
-        <>
-          <div className="pt-3">
-            <FilterPills options={["Top", "People", "Rooms", "Posts"]} onChange={setTab} />
-          </div>
+      )}
 
-          {hasResults ? (
-            <div className="pb-4">
-              {showPeople && peopleR.length > 0 && (
-                <>
-                  <h2 className="px-4 pb-1 pt-3 text-sm font-bold text-muted">People</h2>
-                  {peopleR.map((u) => (
-                    <UserSuggestionCard key={u.id} user={u} />
-                  ))}
-                </>
-              )}
-              {showRooms && roomsR.length > 0 && (
-                <>
-                  <h2 className="px-4 pb-2 pt-4 text-sm font-bold text-muted">Rooms</h2>
-                  <div className="flex flex-col gap-3 px-4">
-                    {roomsR.map((r) => (
-                      <RoomCard key={r.id} room={r} />
-                    ))}
+      {isPending && (
+        <div className="flex items-center justify-center py-10">
+          <Loader2 size={22} className="animate-spin text-muted" />
+        </div>
+      )}
+
+      {!isPending && searched && !hasResults && (
+        <EmptyState icon={SearchX} title="No results found" text="Try searching a name or post." />
+      )}
+
+      {!isPending && !searched && (
+        <div className="px-4 py-6 text-center text-sm text-faint">
+          Search people or posts
+        </div>
+      )}
+
+      {!isPending && hasResults && (
+        <div className="pb-4">
+          {/* People */}
+          {showPeople && people.length > 0 && (
+            <>
+              <h2 className="px-4 pb-1 pt-3 text-sm font-bold text-muted">People</h2>
+              {people.map((u) => (
+                <Link
+                  key={u.id}
+                  href={u.username ? `/u/${u.username}` : "#"}
+                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03]"
+                >
+                  <Avatar name={u.display_name ?? u.username ?? "U"} hue={u.avatar_hue ?? 280} size={44} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{u.display_name ?? u.username}</p>
+                    <p className="truncate text-xs text-muted">@{u.username}</p>
                   </div>
-                </>
-              )}
-              {showPosts && postsR.length > 0 && (
-                <>
-                  <h2 className="px-4 pb-2 pt-4 text-sm font-bold text-muted">Posts</h2>
-                  <div className="grid grid-cols-2 gap-3 px-4">
-                    {postsR.map((p) => (
-                      <TrendingCard key={p.id} post={p} />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <EmptyState
-              icon={SearchX}
-              title="No results found"
-              text="Try searching a name, room, or post."
-            />
+                </Link>
+              ))}
+            </>
           )}
-        </>
+
+          {/* Posts */}
+          {showPosts && posts.length > 0 && (
+            <>
+              <h2 className="px-4 pb-2 pt-4 text-sm font-bold text-muted">Posts</h2>
+              <div className="flex flex-col">
+                {posts.map((p) => (
+                  <FeedCard key={p.id} post={p} currentUserId="" />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       )}
     </>
   );

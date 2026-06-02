@@ -6,9 +6,8 @@ import { ShowsRow } from "@/components/home/ShowsRow";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FeedCard } from "@/components/feed/FeedCard";
 
-/** Flatten Supabase join (profiles comes back as array). */
-function normalise(rawPosts: unknown[] | null) {
-  return (rawPosts ?? []).map((p: any) => ({
+function normalise(raw: unknown[] | null) {
+  return (raw ?? []).map((p: any) => ({
     ...p,
     profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles,
   }));
@@ -19,16 +18,16 @@ export default async function HomePage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
 
-  // ── 1. Who does this user follow? ─────────────────────────
+  // Who the user follows
   const { data: followRows } = await supabase
     .from("follows")
     .select("following_id")
     .eq("follower_id", user.id);
 
   const followingIds = (followRows ?? []).map((r: any) => r.following_id as string);
-  const feedUserIds = [...followingIds, user.id]; // own posts always included
+  const feedUserIds = [...followingIds, user.id];
 
-  // ── 2. Personalised feed (following + self) ────────────────
+  // Personalised feed
   const { data: rawPosts } = await supabase
     .from("posts")
     .select("*, profiles(id, display_name, username, avatar_hue, profile_tags)")
@@ -36,18 +35,42 @@ export default async function HomePage() {
     .order("created_at", { ascending: false })
     .limit(30);
 
-  // ── 3. Global fallback for new users with empty feed ───────
   let posts = normalise(rawPosts);
+
+  // Global fallback for new users
   if (posts.length === 0) {
-    const { data: globalPosts } = await supabase
+    const { data: global } = await supabase
       .from("posts")
       .select("*, profiles(id, display_name, username, avatar_hue, profile_tags)")
       .order("created_at", { ascending: false })
       .limit(30);
-    posts = normalise(globalPosts);
+    posts = normalise(global);
   }
 
-  // ── Active shots for the Shows row (others only) ───────────
+  // Fetch which posts current user has hyped/saved — for initial state
+  const postIds = posts.map((p: any) => p.id);
+  const [hypesRes, savedRes] = await Promise.all(
+    postIds.length > 0
+      ? [
+          supabase
+            .from("hypes")
+            .select("target_id")
+            .eq("user_id", user.id)
+            .eq("target_type", "post")
+            .in("target_id", postIds),
+          supabase
+            .from("saved_posts")
+            .select("post_id")
+            .eq("user_id", user.id)
+            .in("post_id", postIds),
+        ]
+      : [{ data: [] }, { data: [] }],
+  );
+
+  const hypedIds = new Set((hypesRes.data ?? []).map((h: any) => h.target_id));
+  const savedIds = new Set((savedRes.data ?? []).map((s: any) => s.post_id));
+
+  // Active shots for Shows row
   const { data: activeShots } = await supabase
     .from("shots")
     .select("id, user_id, media_url, profiles(display_name, avatar_hue, username)")
@@ -57,13 +80,8 @@ export default async function HomePage() {
     .limit(20);
 
   const shows = (activeShots ?? []).map((s: any) => {
-    const profile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
-    return {
-      id: s.id,
-      name: profile?.display_name ?? profile?.username ?? "User",
-      hue: profile?.avatar_hue ?? 280,
-      seen: false,
-    };
+    const p = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
+    return { id: s.id, name: p?.display_name ?? p?.username ?? "User", hue: p?.avatar_hue ?? 280, seen: false };
   });
 
   return (
@@ -81,8 +99,12 @@ export default async function HomePage() {
         />
       ) : (
         <div className="flex flex-col">
-          {posts.map((post) => (
-            <FeedCard key={post.id} post={post} currentUserId={user.id} />
+          {posts.map((post: any) => (
+            <FeedCard
+              key={post.id}
+              post={{ ...post, initialHyped: hypedIds.has(post.id), initialSaved: savedIds.has(post.id) }}
+              currentUserId={user.id}
+            />
           ))}
         </div>
       )}

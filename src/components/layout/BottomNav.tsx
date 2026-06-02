@@ -30,7 +30,7 @@ export function BottomNav() {
           type="button"
           aria-label={createOpen ? "Close" : "Create"}
           onClick={() => setCreateOpen((v) => !v)}
-          className="flex h-11 w-[68px] -translate-y-1.5 items-center justify-center rounded-[20px] bg-accent text-accent-ink shadow-[0_0_22px_4px_rgba(200,255,0,0.45)] transition-all active:scale-95"
+          className="flex h-11 w-[68px] -translate-y-1.5 items-center justify-center rounded-[20px] bg-accent text-accent-ink shadow-md transition-all active:scale-95"
         >
           {createOpen ? (
             <X size={24} weight="bold" aria-hidden />
