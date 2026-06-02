@@ -5,18 +5,18 @@ import { RealShotsViewer } from "@/components/shots/RealShotsViewer";
 
 export default async function ShotsPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  // Fetch all active shots (not expired), with basic profile info.
   const { data: shots } = await supabase
     .from("shots")
-    .select("id, user_id, media_url, caption, created_at, profiles(display_name, avatar_hue, username)")
+    .select("id, user_id, media_url, caption, created_at, expires_at, in_showcase, profiles(display_name, avatar_hue, username)")
     .gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false })
     .limit(50);
 
-  // Supabase returns profiles as array from join — normalise to object
   const normalized = (shots ?? []).map((s) => ({
     ...s,
+    in_showcase: s.in_showcase as boolean,
     profiles: Array.isArray(s.profiles) ? s.profiles[0] ?? null : s.profiles,
   }));
 
@@ -32,5 +32,11 @@ export default async function ShotsPage() {
     );
   }
 
-  return <RealShotsViewer shots={normalized} />;
+  return (
+    <RealShotsViewer
+      shots={normalized}
+      startIdx={0}
+      currentUserId={user?.id ?? null}
+    />
+  );
 }

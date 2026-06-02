@@ -1,8 +1,8 @@
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getProfile, hueFromId, bannerGradient } from "@/lib/profile";
+import { getProfile, hueFromId } from "@/lib/profile";
 import { Avatar } from "@/components/ui/Avatar";
-import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -35,8 +35,20 @@ export default async function ProfilePage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const profile = await getProfile(supabase);
-  const stats = await fetchStats(supabase, user.id);
+  const [profile, stats, showcaseRes] = await Promise.all([
+    getProfile(supabase),
+    fetchStats(supabase, user.id),
+    // Showcase shots — no expires_at filter (they persist on profile)
+    supabase
+      .from("shots")
+      .select("id, media_url, caption")
+      .eq("user_id", user.id)
+      .eq("in_showcase", true)
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+
+  const showcaseShots = showcaseRes.data ?? [];
 
   const name = profile?.displayName || "Hypefy User";
   const handle = profile?.username ? `@${profile.username}` : null;
@@ -51,7 +63,7 @@ export default async function ProfilePage() {
       <ProfileBanner bannerId={bannerId} className="h-32" />
 
       <div className="px-4">
-        {/* Avatar + stats row */}
+        {/* Avatar + stats */}
         <div className="flex items-end gap-4">
           <div className="-mt-11">
             <Avatar name={name} hue={hue} size={84} className="rounded-[26px] ring-4 ring-background" />
@@ -65,25 +77,59 @@ export default async function ProfilePage() {
 
         {/* Identity */}
         <div className="mt-3">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-base font-bold leading-tight">{name}</span>
-            {/* Verified badge — can be added when backend supports it */}
-          </div>
+          <span className="text-base font-bold leading-tight">{name}</span>
           {handle && <p className="mt-0.5 text-sm text-muted">{handle}</p>}
           {bio && <p className="mt-1.5 text-sm leading-snug">{bio}</p>}
         </div>
 
-        {/* Profile tags (replaces vibe) */}
+        {/* Profile tags */}
         {profileTags.length > 0 && (
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             {profileTags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-medium text-foreground"
-              >
+              <span key={tag} className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-medium text-foreground">
                 {tag}
               </span>
             ))}
+          </div>
+        )}
+
+        {/* Showcase row (Instagram-style highlights) */}
+        {showcaseShots.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold text-muted tracking-wide uppercase">Showcase</p>
+            <div className="no-scrollbar flex gap-4 overflow-x-auto pb-1">
+              {showcaseShots.map((shot) => (
+                <Link
+                  key={shot.id}
+                  href={`/shows/${shot.id}`}
+                  className="flex w-16 shrink-0 flex-col items-center gap-1.5"
+                >
+                  {/* Circular thumbnail with accent ring */}
+                  <div className="h-16 w-16 overflow-hidden rounded-full ring-2 ring-accent ring-offset-2 ring-offset-background">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={shot.media_url}
+                      alt={shot.caption ?? "Showcase"}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <span className="max-w-full truncate text-center text-[10px] text-muted leading-tight">
+                    {shot.caption ?? "Show"}
+                  </span>
+                </Link>
+              ))}
+
+              {/* Add to Showcase shortcut */}
+              <Link
+                href="/shows/add"
+                className="flex w-16 shrink-0 flex-col items-center gap-1.5"
+              >
+                <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-border bg-surface">
+                  <Plus size={22} className="text-faint" />
+                </div>
+                <span className="text-[10px] text-faint">Add</span>
+              </Link>
+            </div>
           </div>
         )}
 
@@ -99,7 +145,7 @@ export default async function ProfilePage() {
         </div>
       </div>
 
-      {/* Tabs: Posts | Shots | Saved — no Rooms */}
+      {/* Tabs: Posts | Shots | Saved */}
       <ProfileTabs userId={user.id} />
     </>
   );

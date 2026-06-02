@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { ShowsViewer } from "@/components/home/ShowsViewer";
-import { shows } from "@/lib/mock";
+import { createClient } from "@/lib/supabase/server";
+import { RealShotsViewer } from "@/components/shots/RealShotsViewer";
 
 export default async function ShowPage({
   params,
@@ -8,8 +8,41 @@ export default async function ShowPage({
   params: Promise<{ showId: string }>;
 }) {
   const { showId } = await params;
-  const startIdx = shows.findIndex((s) => s.id === showId);
-  if (startIdx === -1) notFound();
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  return <ShowsViewer shows={shows} startIdx={startIdx} />;
+  // 1. Get the target shot to know whose shows to fetch
+  const { data: target } = await supabase
+    .from("shots")
+    .select("id, user_id")
+    .eq("id", showId)
+    .maybeSingle();
+
+  if (!target) notFound();
+
+  // 2. Fetch all active shots from same user (for swipe navigation)
+  const { data: raw } = await supabase
+    .from("shots")
+    .select("id, user_id, media_url, caption, created_at, expires_at, in_showcase, profiles(display_name, avatar_hue, username)")
+    .eq("user_id", target.user_id)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: true });
+
+  const shots = (raw ?? []).map((s) => ({
+    ...s,
+    in_showcase: s.in_showcase as boolean,
+    profiles: Array.isArray(s.profiles) ? s.profiles[0] ?? null : s.profiles,
+  }));
+
+  if (shots.length === 0) notFound();
+
+  const startIdx = Math.max(shots.findIndex((s) => s.id === showId), 0);
+
+  return (
+    <RealShotsViewer
+      shots={shots}
+      startIdx={startIdx}
+      currentUserId={user?.id ?? null}
+    />
+  );
 }
