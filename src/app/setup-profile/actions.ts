@@ -9,8 +9,6 @@ export type SaveProfileInput = {
   bio: string;
   currentVibe: string;
   avatarHue: number;
-  bannerId: string;
-  interests: string[];
 };
 
 export async function saveProfile(
@@ -39,8 +37,7 @@ export async function saveProfile(
       bio: input.bio.trim() || null,
       current_vibe: input.currentVibe.trim() || null,
       avatar_hue: input.avatarHue,
-      banner_id: input.bannerId,
-      interests: input.interests,
+      // Banner not set during onboarding — uses default lime-pulse
       profile_completed: true,
     })
     .eq("id", user.id);
@@ -53,4 +50,21 @@ export async function saveProfile(
   }
 
   redirect("/home");
+}
+
+export async function checkUsername(
+  username: string,
+  userId: string,
+): Promise<"available" | "taken" | "invalid"> {
+  if (!/^[a-z0-9_.]{3,20}$/.test(username)) return "invalid";
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (data && data.id !== userId) return "taken";
+  return "available";
 }

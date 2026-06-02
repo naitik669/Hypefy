@@ -9,7 +9,9 @@ export type MascotMood =
   | "watching"
   | "calm"
   | "shocked"
-  | "sleepy";
+  | "sleepy"
+  | "thinking"
+  | "welcome";
 
 export type Profile = {
   id: string;

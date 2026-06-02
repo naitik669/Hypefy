@@ -1,19 +1,24 @@
+import { Compass } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchBar } from "@/components/ui/SearchBar";
-import { TrendingCard } from "@/components/discover/TrendingCard";
-import { RoomCard } from "@/components/discover/RoomCard";
-import { UserSuggestionCard } from "@/components/discover/UserSuggestionCard";
-import { trending, rooms, people } from "@/lib/mock-discover";
+import { EmptyState } from "@/components/ui/EmptyState";
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="px-4 pb-2 pt-5 text-base font-bold tracking-tight">
-      {children}
-    </h2>
-  );
-}
-
+/**
+ * Discover — real data placeholder.
+ * No fake users (AMAN/riya/dev), no mock rooms or trending posts.
+ * When `posts`, `rooms`, and `profiles` tables are wired:
+ *   - Fetch trending posts (high hype_count)
+ *   - Fetch suggested rooms
+ *   - Fetch people to follow (not yet followed)
+ * For now: clean empty state so new users don't see fake content.
+ */
 export default function DiscoverPage() {
+  // TODO: real Supabase queries once posts/rooms tables exist.
+  const hasTrending = false;
+  const hasRooms = false;
+  const hasPeople = false;
+  const isEmpty = !hasTrending && !hasRooms && !hasPeople;
+
   return (
     <>
       <PageHeader title="Discover" />
@@ -22,31 +27,17 @@ export default function DiscoverPage() {
         <SearchBar placeholder="Search people, rooms, posts" href="/search" />
       </div>
 
-      {/* Blowing up */}
-      <SectionTitle>Blowing up 🔥</SectionTitle>
-      <div className="no-scrollbar flex gap-3 overflow-x-auto px-4 pb-1">
-        {trending.map((p) => (
-          <TrendingCard key={p.id} post={p} />
-        ))}
-      </div>
-
-      {/* Rooms you might like */}
-      <SectionTitle>Rooms you might like</SectionTitle>
-      <div className="no-scrollbar flex gap-3 overflow-x-auto px-4 pb-1">
-        {rooms.map((r) => (
-          <div key={r.id} className="w-60 shrink-0">
-            <RoomCard room={r} />
-          </div>
-        ))}
-      </div>
-
-      {/* People to hype */}
-      <SectionTitle>People to hype</SectionTitle>
-      <div className="flex flex-col pb-2">
-        {people.map((u) => (
-          <UserSuggestionCard key={u.id} user={u} />
-        ))}
-      </div>
+      {isEmpty ? (
+        <EmptyState
+          icon={Compass}
+          title="Nothing here yet"
+          text="Hypefy gets better as real people join. Check back soon."
+        />
+      ) : (
+        <div>
+          {/* Real trending, rooms, people sections go here */}
+        </div>
+      )}
     </>
   );
 }

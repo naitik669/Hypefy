@@ -1,11 +1,16 @@
 import type { MascotMood } from "@/lib/profile";
 
-const SIZES = { sm: 44, md: 80, lg: 128 } as const;
+const SIZES = { sm: 52, md: 88, lg: 136 } as const;
 
 /**
- * Hype Buddy — Hypefy's original mascot.
- * A dark rounded blob with a lime spark crown and mood-driven eyes/mouth.
- * Visual only, CSS-animated. Use sparingly (onboarding, setup, empty states).
+ * Hype Buddy — Hypefy's flame mascot.
+ *
+ * Original character inspired by simple expressive flat-design flame characters
+ * (see design reference sheet). Adapted to Hypefy: dark body, lime flame tips.
+ * Not red. Not generic. Belongs in a dark social app.
+ *
+ * Shape: flame-body silhouette with 3 lime tips, dark rounded body,
+ * arm nubs, expressive white eyes + minimal mouth.
  */
 export function HypeMascot({
   mood = "friendly",
@@ -19,65 +24,68 @@ export function HypeMascot({
   className?: string;
 }) {
   const px = SIZES[size];
-  const eyesOpen = !["proud", "calm", "sleepy"].includes(mood);
+  const h = Math.round(px * 1.12);
 
   return (
     <div
+      aria-hidden
       className={`relative inline-flex items-center justify-center ${
         animated ? "animate-mascot-float" : ""
       } ${className}`}
-      style={{ width: px, height: px }}
-      aria-hidden
+      style={{ width: px, height: h }}
     >
-      {/* Soft lime glow */}
-      <div className="absolute inset-2 rounded-full bg-accent/25 blur-xl" />
+      {/* Soft ambient glow */}
+      <div
+        className="pointer-events-none absolute inset-0 rounded-full blur-2xl"
+        style={{
+          background:
+            "radial-gradient(circle, rgba(200,255,0,0.20) 0%, transparent 70%)",
+        }}
+      />
 
       <svg
-        viewBox="0 0 100 100"
+        viewBox="0 0 100 112"
         width={px}
-        height={px}
+        height={h}
         className="relative"
         fill="none"
       >
-        {/* Spark crown */}
+        {/* ── Lime flame tips ──────────────────────────── */}
         <path
-          d="M50 6 C45 17 44 25 50 30 C56 25 55 17 50 6 Z"
+          d="M26 43 Q21 29 27 13 Q32 27 38 43 Z"
+          fill="var(--color-accent)"
+          opacity="0.88"
+        />
+        <path
+          d="M44 41 Q46 17 50 2 Q54 17 56 41 Z"
           fill="var(--color-accent)"
         />
         <path
-          d="M37 15 C34 22 34 28 40 31 C43 26 42 20 37 15 Z"
+          d="M74 43 Q79 29 73 13 Q68 27 62 43 Z"
           fill="var(--color-accent)"
-          opacity="0.85"
-        />
-        <path
-          d="M63 15 C66 22 66 28 60 31 C57 26 58 20 63 15 Z"
-          fill="var(--color-accent)"
-          opacity="0.85"
+          opacity="0.88"
         />
 
-        {/* Body */}
-        <path
-          d="M50 28 C73 28 85 44 85 63 C85 83 71 91 50 91 C29 91 15 83 15 63 C15 44 27 28 50 28 Z"
-          fill="#242424"
-          stroke="rgba(200,255,0,0.25)"
-          strokeWidth="1.5"
-        />
+        {/* ── Dark body ────────────────────────────────── */}
+        <rect x="14" y="38" width="72" height="68" rx="24" fill="#1E1E1E" />
 
-        {/* Eyes */}
-        <g
-          className={animated && eyesOpen ? "animate-mascot-blink" : ""}
-          style={{ transformOrigin: "center", transformBox: "fill-box" }}
-        >
-          <Eyes mood={mood} />
-        </g>
+        {/* ── Arm nubs ─────────────────────────────────── */}
+        <ellipse cx="8"  cy="74" rx="10" ry="7.5" fill="#1E1E1E" />
+        <ellipse cx="92" cy="74" rx="10" ry="7.5" fill="#1E1E1E" />
 
-        {/* Mouth */}
-        <Mouth mood={mood} />
+        {/* ── Eyes ─────────────────────────────────────── */}
+        <EyeLayer mood={mood} animated={animated} />
 
-        {/* Hype mood: sparkle */}
-        {mood === "hype" && (
+        {/* ── Mouth ────────────────────────────────────── */}
+        <MouthLayer mood={mood} />
+
+        {/* Hype sparkle (hype / welcome only) */}
+        {(mood === "hype" || mood === "welcome") && (
           <g className={animated ? "animate-mascot-sparkle" : ""}>
-            <path d="M82 40 l2 4 4 2 -4 2 -2 4 -2 -4 -4 -2 4 -2 z" fill="var(--color-hype)" />
+            <path
+              d="M82 38 l2 4 4 2 -4 2 -2 4 -2 -4 -4 -2 4 -2 z"
+              fill="var(--color-hype)"
+            />
           </g>
         )}
       </svg>
@@ -85,84 +93,186 @@ export function HypeMascot({
   );
 }
 
-function Eyes({ mood }: { mood: MascotMood }) {
-  const W = "#ffffff";
-  const P = "#0f0f0f";
-
-  // Closed/curved-eye moods
-  if (mood === "proud") {
-    // happy upward arcs (^ ^)
-    return (
-      <>
-        <path d="M31 60 Q39 52 47 60" stroke={W} strokeWidth="3.2" strokeLinecap="round" fill="none" />
-        <path d="M53 60 Q61 52 69 60" stroke={W} strokeWidth="3.2" strokeLinecap="round" fill="none" />
-      </>
-    );
-  }
-  if (mood === "calm" || mood === "sleepy") {
-    // gentle downward closed lids
-    return (
-      <>
-        <path d="M31 58 Q39 63 47 58" stroke={W} strokeWidth="3.2" strokeLinecap="round" fill="none" />
-        <path d="M53 58 Q61 63 69 58" stroke={W} strokeWidth="3.2" strokeLinecap="round" fill="none" />
-      </>
-    );
-  }
-
-  // Open-eye moods → pupil position / size varies
-  const dy = mood === "curious" ? -2.5 : 0; // looking up
-  const pr = mood === "shocked" ? 3 : 4; // pupil radius
-  const er = mood === "shocked" || mood === "hype" ? 9 : 8; // eye radius
-
-  if (mood === "confused") {
-    return (
-      <>
-        {/* small brow over left eye */}
-        <path d="M32 47 L46 50" stroke={W} strokeWidth="2" strokeLinecap="round" />
-        <circle cx="39" cy="58" r="7" fill={W} />
-        <circle cx="39" cy="58" r="3.5" fill={P} />
-        <circle cx="61" cy="57" r="9" fill={W} />
-        <circle cx="61" cy="57" r="4" fill={P} />
-      </>
-    );
-  }
+/* ─── Eye layer ──────────────────────────────────────────────── */
+function EyeLayer({
+  mood,
+  animated,
+}: {
+  mood: MascotMood;
+  animated: boolean;
+}) {
+  const shouldBlink =
+    animated &&
+    !["proud", "calm", "sleepy", "welcome", "hype"].includes(mood);
 
   return (
-    <>
-      <circle cx="39" cy="58" r={er} fill={W} />
-      <circle cx={39} cy={58 + dy} r={pr} fill={P} />
-      <circle cx="61" cy="58" r={er} fill={W} />
-      <circle cx={61} cy={58 + dy} r={pr} fill={P} />
-    </>
+    <g
+      className={shouldBlink ? "animate-mascot-blink" : ""}
+      style={{ transformOrigin: "center", transformBox: "fill-box" }}
+    >
+      <EyeShape mood={mood} />
+    </g>
   );
 }
 
-function Mouth({ mood }: { mood: MascotMood }) {
+function EyeShape({ mood }: { mood: MascotMood }) {
   const W = "#ffffff";
+  const P = "#0a0a0a";
+
   switch (mood) {
+    // ── Happy / satisfied (arc eyes)
     case "hype":
-      return <path d="M38 70 Q50 86 62 70 Z" fill={W} />;
+    case "welcome":
     case "proud":
-    case "friendly":
       return (
-        <path d="M40 71 Q50 79 60 71" stroke={W} strokeWidth="3.2" strokeLinecap="round" fill="none" />
+        <>
+          <path d="M28 66 Q37 57 46 66" stroke={W} strokeWidth="3.4" strokeLinecap="round" fill="none" />
+          <path d="M54 66 Q63 57 72 66" stroke={W} strokeWidth="3.4" strokeLinecap="round" fill="none" />
+        </>
       );
+
+    // ── Calm / sleepy (drooping lids)
     case "calm":
+    case "sleepy":
       return (
-        <path d="M44 73 Q50 77 56 73" stroke={W} strokeWidth="3" strokeLinecap="round" fill="none" />
+        <>
+          <path d="M28 63 Q37 68 46 63" stroke={W} strokeWidth="3.2" strokeLinecap="round" fill="none" />
+          <path d="M54 63 Q63 68 72 63" stroke={W} strokeWidth="3.2" strokeLinecap="round" fill="none" />
+        </>
       );
+
+    // ── Shocked (big wide eyes)
     case "shocked":
-      return <ellipse cx="50" cy="73" rx="5" ry="6" fill={W} />;
+      return (
+        <>
+          <circle cx="34" cy="63" r="11"   fill={W} />
+          <circle cx="66" cy="63" r="11"   fill={W} />
+          <circle cx="34" cy="63" r="5.5"  fill={P} />
+          <circle cx="66" cy="63" r="5.5"  fill={P} />
+        </>
+      );
+
+    // ── Confused (one squint + one open)
     case "confused":
       return (
-        <path d="M42 73 q4 -5 8 0 t8 0" stroke={W} strokeWidth="2.8" strokeLinecap="round" fill="none" />
+        <>
+          <path d="M26 61 Q35 56 44 63" stroke={W} strokeWidth="3" strokeLinecap="round" fill="none" />
+          <circle cx="66" cy="63" r="9"   fill={W} />
+          <circle cx="66" cy="63" r="4.5" fill={P} />
+        </>
       );
-    case "sleepy":
-      return <circle cx="50" cy="73" r="3" fill={W} />;
+
+    // ── Thinking (pupils up-right)
+    case "thinking":
+      return (
+        <>
+          <circle cx="34" cy="63" r="8.5" fill={W} />
+          <circle cx="66" cy="63" r="8.5" fill={W} />
+          <circle cx="36" cy="60" r="4.5" fill={P} />
+          <circle cx="68" cy="60" r="4.5" fill={P} />
+        </>
+      );
+
+    // ── Curious (pupils slightly up)
     case "curious":
-      return <ellipse cx="50" cy="73" rx="3.5" ry="4" fill={W} />;
+      return (
+        <>
+          <circle cx="34" cy="63" r="8.5" fill={W} />
+          <circle cx="66" cy="63" r="8.5" fill={W} />
+          <circle cx="34" cy="61" r="4.5" fill={P} />
+          <circle cx="66" cy="61" r="4.5" fill={P} />
+        </>
+      );
+
+    // ── Watching (alert, centered pupils)
     case "watching":
+      return (
+        <>
+          <circle cx="34" cy="64" r="9"   fill={W} />
+          <circle cx="66" cy="64" r="9"   fill={W} />
+          <circle cx="34" cy="64" r="4.5" fill={P} />
+          <circle cx="66" cy="64" r="4.5" fill={P} />
+        </>
+      );
+
+    // ── Friendly / default (normal open eyes)
     default:
-      return <path d="M44 73 H56" stroke={W} strokeWidth="3" strokeLinecap="round" />;
+      return (
+        <>
+          <circle cx="34" cy="64" r="8.5" fill={W} />
+          <circle cx="66" cy="64" r="8.5" fill={W} />
+          <circle cx="34" cy="64" r="4.5" fill={P} />
+          <circle cx="66" cy="64" r="4.5" fill={P} />
+        </>
+      );
+  }
+}
+
+/* ─── Mouth layer ────────────────────────────────────────────── */
+function MouthLayer({ mood }: { mood: MascotMood }) {
+  const W = "#ffffff";
+
+  switch (mood) {
+    case "hype":
+    case "welcome":
+      // Big open grin
+      return <path d="M36 78 Q50 95 64 78 Z" fill={W} />;
+
+    case "proud":
+    case "friendly":
+      // Gentle smile arc
+      return (
+        <path
+          d="M38 79 Q50 89 62 79"
+          stroke={W}
+          strokeWidth="3.4"
+          strokeLinecap="round"
+          fill="none"
+        />
+      );
+
+    case "calm":
+      // Small content smile
+      return (
+        <path
+          d="M42 80 Q50 86 58 80"
+          stroke={W}
+          strokeWidth="3"
+          strokeLinecap="round"
+          fill="none"
+        />
+      );
+
+    case "sleepy":
+      // Tiny dot mouth
+      return <circle cx="50" cy="80" r="3" fill={W} />;
+
+    case "shocked":
+      // Open O
+      return <ellipse cx="50" cy="80" rx="6" ry="7.5" fill={W} />;
+
+    case "confused":
+    case "thinking":
+      // Wavy/uncertain
+      return (
+        <path
+          d="M40 80 q4 -5 8 0 t8 0"
+          stroke={W}
+          strokeWidth="3"
+          strokeLinecap="round"
+          fill="none"
+        />
+      );
+
+    // watching / curious / default: neutral flat line
+    default:
+      return (
+        <path
+          d="M43 80 H57"
+          stroke={W}
+          strokeWidth="3.2"
+          strokeLinecap="round"
+        />
+      );
   }
 }

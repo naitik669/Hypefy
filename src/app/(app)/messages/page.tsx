@@ -3,11 +3,19 @@ import { PenSquare, MessageCircle } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { FilterPills } from "@/components/ui/FilterPills";
-import { MessageListItem } from "@/components/messages/MessageListItem";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { threads } from "@/lib/mock-messages";
 
+/**
+ * Messages inbox — real data placeholder.
+ * The `messages` table has not been wired yet.
+ * When ready: fetch threads from Supabase and render MessageListItem rows.
+ * No mock users (AMAN/riya/dev) shown in production.
+ */
 export default function MessagesPage() {
+  // TODO: fetch real message threads once `messages` table is live.
+  // const threads = await getRealThreads(userId);
+  const threads: unknown[] = [];
+
   return (
     <>
       <PageHeader
@@ -31,16 +39,14 @@ export default function MessagesPage() {
 
       {threads.length > 0 ? (
         <div className="flex flex-col">
-          {threads.map((t) => (
-            <MessageListItem key={t.id} thread={t} />
-          ))}
+          {/* Real MessageListItem rows go here */}
         </div>
       ) : (
         <EmptyState
           icon={MessageCircle}
           title="No messages yet"
-          text="Start a room, post something, or say hi to someone."
-          ctaLabel="Discover people"
+          text="Start a conversation when you find your people."
+          ctaLabel="Discover"
           ctaHref="/discover"
         />
       )}

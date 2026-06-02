@@ -86,8 +86,6 @@ export function ProfileSetupForm({
         bio,
         currentVibe: vibe,
         avatarHue,
-        bannerId,
-        interests,
       });
       if (res?.error) setError(res.error);
     });
