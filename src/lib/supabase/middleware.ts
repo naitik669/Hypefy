@@ -63,6 +63,7 @@ export async function updateSession(request: NextRequest) {
     "/messages",
     "/profile",
     "/shots",
+    "/shows",
     "/create",
     "/notifications",
     "/search",
