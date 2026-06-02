@@ -66,7 +66,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
         // If email confirmation is on, there's no active session yet —
         // send them to the branded "check your inbox" screen.
         if (data.session) {
-          router.push("/home");
+          router.push("/setup-profile");
           router.refresh();
         } else {
           router.push(`/check-email?email=${encodeURIComponent(email)}`);

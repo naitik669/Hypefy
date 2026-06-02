@@ -42,6 +42,25 @@ html {
   display: none;
 }
 
+/* Shared form input style (profile setup, etc.) */
+.input {
+  width: 100%;
+  min-height: 3rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--color-foreground);
+  outline: none;
+}
+.input::placeholder {
+  color: var(--color-faint);
+}
+.input:focus {
+  border-color: rgba(200, 255, 0, 0.4);
+}
+
 body {
   background: var(--color-background);
   color: var(--color-foreground);
@@ -231,6 +250,51 @@ body {
   animation: spin-slow 8s linear infinite;
 }
 
+/* Mascot — gentle float, blink, sparkle */
+@keyframes mascot-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.animate-mascot-float {
+  animation: mascot-float 3.5s ease-in-out infinite;
+}
+
+@keyframes mascot-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+.animate-mascot-blink {
+  animation: mascot-blink 4.2s ease-in-out infinite;
+}
+
+@keyframes mascot-sparkle {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15) rotate(20deg);
+  }
+}
+.animate-mascot-sparkle {
+  animation: mascot-sparkle 2.2s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-hype-burst,
   .animate-drift,
@@ -243,7 +307,10 @@ body {
   .animate-twinkle,
   .animate-hype-pop,
   .animate-hype-particle,
-  .animate-spin-slow {
+  .animate-spin-slow,
+  .animate-mascot-float,
+  .animate-mascot-blink,
+  .animate-mascot-sparkle {
     animation: none;
   }
   .animate-rise {
