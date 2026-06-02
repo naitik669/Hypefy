@@ -69,7 +69,31 @@ export default async function HomePage() {
   const hypedIds = new Set((hypesRes.data ?? []).map((h: any) => h.target_id));
   const savedIds = new Set((savedRes.data ?? []).map((s: any) => s.post_id));
 
-  // Active shots for Shows row
+  // Current user profile for "Your Show" bubble
+  const { data: myProfile } = await supabase
+    .from("profiles")
+    .select("display_name, username, avatar_hue")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  // Check if the current user already has an active (unexpired) show
+  const { data: myActiveShow } = await supabase
+    .from("shots")
+    .select("id")
+    .eq("user_id", user.id)
+    .gt("expires_at", new Date().toISOString())
+    .limit(1)
+    .maybeSingle();
+
+  const currentUserForRow = myProfile
+    ? {
+        name: myProfile.display_name ?? myProfile.username ?? "You",
+        hue: myProfile.avatar_hue ?? 280,
+        hasActiveShow: !!myActiveShow,
+      }
+    : undefined;
+
+  // Active shots from OTHERS for Shows row
   const { data: activeShots } = await supabase
     .from("shots")
     .select("id, user_id, media_url, profiles(display_name, avatar_hue, username)")
@@ -86,7 +110,7 @@ export default async function HomePage() {
   return (
     <>
       <TopBar />
-      <ShowsRow shows={shows} />
+      <ShowsRow shows={shows} currentUser={currentUserForRow} />
 
       {posts.length === 0 ? (
         <EmptyState
