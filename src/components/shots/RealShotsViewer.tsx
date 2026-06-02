@@ -82,6 +82,10 @@ function ShotScreen({
   const name = shot.profiles?.display_name ?? shot.profiles?.username ?? "User";
   const hue = shot.profiles?.avatar_hue ?? 280;
 
+  // ── Hype state ───────────────────────────────────────────
+  const [hyped, setHyped] = useState(false);
+  const [hypePending, setHypePending] = useState(false);
+
   // Auto-advance progress bar
   useEffect(() => {
     progressRef.current = 0;
@@ -215,8 +219,35 @@ function ShotScreen({
             placeholder={`Reply to ${name}…`}
             className="h-11 flex-1 rounded-pill border border-white/30 bg-white/10 px-4 text-sm text-white outline-none placeholder:text-white/50 backdrop-blur-sm"
           />
-          <button type="button" aria-label="Hype" onClick={(e) => e.stopPropagation()}>
-            <Star size={26} className="text-hype" fill="currentColor" />
+          <button
+            type="button"
+            aria-label="Hype this Show"
+            disabled={hypePending}
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (hypePending) return;
+              const prev = hyped;
+              setHyped(!prev);
+              setHypePending(true);
+              try {
+                await supabase.rpc("toggle_hype", {
+                  p_target_type: "shot",
+                  p_target_id: shot.id,
+                  p_owner_id: shot.user_id,
+                });
+              } catch {
+                setHyped(prev);
+              } finally {
+                setHypePending(false);
+              }
+            }}
+            className="flex flex-col items-center gap-0.5 transition-transform active:scale-90 disabled:opacity-60"
+          >
+            <Star
+              size={28}
+              className={`transition-colors ${hyped ? "text-hype" : "text-white"}`}
+              fill={hyped ? "currentColor" : "none"}
+            />
           </button>
           <button type="button" aria-label="Send" onClick={(e) => { e.stopPropagation(); setReply(""); }}
             className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink">

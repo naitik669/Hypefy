@@ -10,20 +10,9 @@ import type { Show } from "@/lib/mock";
 type CurrentUser = {
   name: string;
   hue: number;
-  hasActiveShow: boolean; // whether the user already has an unexpired show
+  hasActiveShow: boolean;
 };
 
-/**
- * Horizontal Shows row.
- *
- * - "Your Show" shows the signed-in user's own avatar (not just a "+" icon).
- *   If they have an active show the bubble gets the same green ring so they
- *   know one exists; always has a small "+" badge to add a new one.
- *
- * - Unseen shows from friends get a bright green (accent) stroke.
- *   After tapping, the stroke turns grey locally so it's clear you've seen it.
- *   Proper server-side seen tracking can replace this later.
- */
 export function ShowsRow({
   shows,
   currentUser,
@@ -32,7 +21,6 @@ export function ShowsRow({
   currentUser?: CurrentUser;
 }) {
   const router = useRouter();
-  // Track locally which shows the user has tapped this session
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
 
   function handleShowTap(id: string) {
@@ -40,23 +28,30 @@ export function ShowsRow({
     router.push(`/shows/${id}`);
   }
 
+  // Unseen first (left), seen shift to the right
+  const unseen = shows.filter((s) => !seenIds.has(s.id) && !s.seen);
+  const seen   = shows.filter((s) =>  seenIds.has(s.id) ||  s.seen);
+  const sorted = [...unseen, ...seen];
+
   return (
     <div className="no-scrollbar flex gap-4 overflow-x-auto px-4 py-4">
 
-      {/* ── Your Show ──────────────────────────────────────── */}
-      <Link
-        href="/shows/add"
-        className="flex w-16 shrink-0 flex-col items-center gap-1.5"
-      >
+      {/* ── Your Show ───────────────────────────── */}
+      <Link href="/shows/add" className="flex w-16 shrink-0 flex-col items-center gap-1.5">
         <div className="relative">
           {currentUser ? (
-            /* Show the user's own avatar */
             <div
               className={`rounded-[22px] p-[2.5px] ${
-                currentUser.hasActiveShow ? "bg-accent" : "bg-border"
+                currentUser.hasActiveShow
+                  ? "bg-accent"          // green ring: you have an active show
+                  : "bg-transparent"     // no ring: no active show
               }`}
             >
-              <div className="rounded-[20px] bg-background p-[2px]">
+              <div
+                className={`rounded-[20px] bg-background ${
+                  currentUser.hasActiveShow ? "p-[2px]" : ""
+                }`}
+              >
                 <Avatar
                   name={currentUser.name}
                   hue={currentUser.hue}
@@ -66,45 +61,47 @@ export function ShowsRow({
               </div>
             </div>
           ) : (
-            /* Fallback: no profile loaded yet */
-            <div className="flex h-[62px] w-[62px] items-center justify-center rounded-[20px] border-2 border-dashed border-border bg-surface">
-              <Plus size={22} className="text-muted" strokeWidth={2.4} />
+            <div className="flex h-[60px] w-[60px] items-center justify-center rounded-[20px] border-2 border-dashed border-border bg-surface">
+              <Plus size={20} className="text-muted" strokeWidth={2.4} />
             </div>
           )}
 
-          {/* Always show the "+" add badge */}
+          {/* Add-show badge */}
           <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-ink ring-4 ring-background">
-            <Plus size={14} strokeWidth={3} />
+            <Plus size={13} strokeWidth={3} />
           </span>
         </div>
         <span className="max-w-full truncate text-xs text-muted">Your Show</span>
       </Link>
 
-      {/* ── Friends' shows ─────────────────────────────────── */}
-      {shows.map((s) => {
-        const seen = seenIds.has(s.id) || s.seen;
+      {/* ── Sorted shows (unseen first, seen right) ── */}
+      {sorted.map((s) => {
+        const isSeen = seenIds.has(s.id) || s.seen;
         return (
           <button
             key={s.id}
             type="button"
             onClick={() => handleShowTap(s.id)}
-            className="flex w-16 shrink-0 flex-col items-center gap-1.5 active:opacity-75"
+            className="flex w-16 shrink-0 flex-col items-center gap-1.5 active:opacity-70"
           >
-            <div
-              className={`rounded-[22px] p-[2.5px] transition-colors duration-300 ${
-                seen ? "bg-border" : "bg-accent"
+            {isSeen ? (
+              /* ── Seen: plain avatar, no coloured ring, slightly dimmed ── */
+              <div className="rounded-[20px] opacity-50">
+                <Avatar name={s.name} hue={s.hue} size={60} className="rounded-[18px]" />
+              </div>
+            ) : (
+              /* ── Unseen: bold green ring ── */
+              <div className="rounded-[22px] p-[2.5px] bg-accent shadow-[0_0_0_0px_rgba(200,255,0,0)]">
+                <div className="rounded-[20px] bg-background p-[2px]">
+                  <Avatar name={s.name} hue={s.hue} size={56} className="rounded-[18px]" />
+                </div>
+              </div>
+            )}
+            <span
+              className={`max-w-full truncate text-xs transition-colors ${
+                isSeen ? "text-faint" : "text-muted"
               }`}
             >
-              <div className="rounded-[20px] bg-background p-[2px]">
-                <Avatar
-                  name={s.name}
-                  hue={s.hue}
-                  size={56}
-                  className="rounded-[18px]"
-                />
-              </div>
-            </div>
-            <span className="max-w-full truncate text-xs text-muted">
               {s.name}
             </span>
           </button>
