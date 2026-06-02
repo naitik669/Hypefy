@@ -8,6 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
+import { ShareSheet } from "@/components/feed/ShareSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { formatCount } from "@/lib/mock";
 
@@ -64,6 +65,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const [imgIdx, setImgIdx] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [deleted, setDeleted] = useState(false);
 
@@ -216,7 +218,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
             {formatCount(post.comment_count)}
           </button>
 
-          <button type="button" onClick={share} aria-label="Share" className="text-foreground">
+          <button type="button" onClick={() => setShareOpen(true)} aria-label="Share" className="text-foreground">
             <Send size={21} strokeWidth={2.2} />
           </button>
         </div>
@@ -245,6 +247,8 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
       {/* Sheets */}
       <CommentsSheet open={commentsOpen} onClose={() => setCommentsOpen(false)}
         postId={post.id} postOwnerId={post.user_id} currentUserId={currentUserId} />
+
+      <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} postId={post.id} />
 
       <PostActionsSheet open={actionsOpen} onClose={() => setActionsOpen(false)}
         postId={post.id} postUserId={post.user_id} postUsername={username ?? null}
