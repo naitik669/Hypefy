@@ -7,8 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
-import { formatCount } from "@/lib/mock";
+import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
+import { formatCount } from "@/lib/mock";
 
 export type FeedPost = {
   id: string;
@@ -16,6 +17,7 @@ export type FeedPost = {
   caption: string | null;
   body: string | null;
   image_url: string | null;
+  image_urls?: string[];
   hashtags: string[];
   mentions: string[];
   hype_count: number;
@@ -32,39 +34,39 @@ export type FeedPost = {
   initialSaved?: boolean;
 };
 
-function timeAgo(iso: string): string {
-  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (sec < 60) return "now";
-  if (sec < 3600) return `${Math.floor(sec / 60)}m`;
-  if (sec < 86400) return `${Math.floor(sec / 3600)}h`;
-  return `${Math.floor(sec / 86400)}d`;
+function timeAgo(iso: string) {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "now";
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  return `${Math.floor(s / 86400)}d`;
 }
 
-export function FeedCard({
-  post,
-  currentUserId,
-}: {
-  post: FeedPost;
-  currentUserId: string;
-}) {
-  const supabase = createClient();
+/** Deduplicate and merge single/multi image fields */
+function getImages(post: FeedPost): string[] {
+  const urls = post.image_urls?.length ? post.image_urls : post.image_url ? [post.image_url] : [];
+  return [...new Set(urls)];
+}
 
-  // ── Hype state ─────────────────────────────────────────────
+export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserId: string }) {
+  const supabase = createClient();
+  const images = getImages(post);
+
   const [hyped, setHyped] = useState(post.initialHyped ?? false);
   const [hypeCount, setHypeCount] = useState(post.hype_count);
-  const [hypePending, setHypePending] = useState(false); // guard against race conditions
+  const [hypePending, setHypePending] = useState(false);
   const [hypeBurst, setHypeBurst] = useState(false);
   const [showParticles, setShowParticles] = useState(false);
 
-  // ── Save state ─────────────────────────────────────────────
   const [saved, setSaved] = useState(post.initialSaved ?? false);
   const [savePending, setSavePending] = useState(false);
 
-  // ── UI state ───────────────────────────────────────────────
+  const [imgIdx, setImgIdx] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [deleted, setDeleted] = useState(false);
 
-  // ── Double-tap detection ───────────────────────────────────
   const lastTapRef = useRef(0);
 
   const profile = post.profiles;
@@ -78,213 +80,154 @@ export function FeedCard({
     setTimeout(() => setToast(null), 1500);
   }
 
-  // ── Hype toggle — guarded, single-flight ──────────────────
   async function toggleHype() {
-    if (hypePending) return; // block until current request completes
+    if (hypePending) return;
     if (!currentUserId) { showToast("Sign in to hype"); return; }
-
-    const prev = hyped;
-    const prevCount = hypeCount;
-
-    // Optimistic update
+    const prev = hyped, prevCount = hypeCount;
     setHypePending(true);
     setHyped(!prev);
     setHypeCount((c) => c + (prev ? -1 : 1));
-
     if (!prev) {
-      setHypeBurst(true);
-      setShowParticles(true);
+      setHypeBurst(true); setShowParticles(true);
       setTimeout(() => setHypeBurst(false), 380);
       setTimeout(() => setShowParticles(false), 640);
     }
-
     try {
       const { data, error } = await supabase.rpc("toggle_hype", {
-        p_target_type: "post",
-        p_target_id: post.id,
-        p_owner_id: post.user_id,
+        p_target_type: "post", p_target_id: post.id, p_owner_id: post.user_id,
       });
-
       if (error) throw error;
-
-      // Sync with server truth
       if (data && typeof data === "object") {
         setHyped(Boolean(data.hyped));
         setHypeCount(Number(data.hype_count));
       }
-    } catch (err) {
-      // Revert on error
-      setHyped(prev);
-      setHypeCount(prevCount);
+    } catch {
+      setHyped(prev); setHypeCount(prevCount);
       showToast("Couldn't hype. Try again.");
     } finally {
       setHypePending(false);
     }
   }
 
-  // ── Double-tap on image to Hype ────────────────────────────
   function handleImageTap(e: React.MouseEvent) {
     const now = Date.now();
-    const diff = now - lastTapRef.current;
+    if (now - lastTapRef.current < 300) { e.preventDefault(); toggleHype(); }
     lastTapRef.current = now;
-
-    if (diff < 300) {
-      e.preventDefault(); // stop Link navigation
-      toggleHype();
-    }
-    // single tap: Link navigates to /p/[id]
   }
 
-  // ── Save toggle — guarded ──────────────────────────────────
   async function toggleSave() {
     if (savePending) return;
     if (!currentUserId) { showToast("Sign in to save"); return; }
-
     const prev = saved;
-    setSavePending(true);
-    setSaved(!prev);
-
+    setSavePending(true); setSaved(!prev);
     if (!prev) {
-      const { error } = await supabase
-        .from("saved_posts")
-        .insert({ user_id: currentUserId, post_id: post.id });
-      if (error) {
-        setSaved(prev);
-        if (!/duplicate|unique/i.test(error.message)) showToast("Couldn't save");
-      } else {
-        showToast("Saved ✓");
-      }
+      const { error } = await supabase.from("saved_posts").insert({ user_id: currentUserId, post_id: post.id });
+      if (error) { setSaved(prev); if (!/duplicate|unique/i.test(error.message)) showToast("Couldn't save"); }
+      else showToast("Saved ✓");
     } else {
-      const { error } = await supabase
-        .from("saved_posts")
-        .delete()
-        .eq("user_id", currentUserId)
-        .eq("post_id", post.id);
-      if (error) {
-        setSaved(prev);
-        showToast("Couldn't unsave");
-      } else {
-        showToast("Removed");
-      }
+      const { error } = await supabase.from("saved_posts").delete().eq("user_id", currentUserId).eq("post_id", post.id);
+      if (error) { setSaved(prev); showToast("Couldn't unsave"); }
+      else showToast("Removed");
     }
     setSavePending(false);
   }
 
-  // ── Share ──────────────────────────────────────────────────
   async function share() {
     const url = `${window.location.origin}/p/${post.id}`;
-    try {
-      if (navigator.share) { await navigator.share({ title: "Hypefy post", url }); return; }
-    } catch {}
+    try { if (navigator.share) { await navigator.share({ title: "Hypefy post", url }); return; } } catch {}
     await navigator.clipboard.writeText(url).catch(() => {});
     showToast("Link copied");
   }
+
+  if (deleted) return null;
 
   return (
     <article className="border-b border-border/50 pb-3">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <Link href={profileHref}>
-          <Avatar name={name} hue={hue} size={40} />
-        </Link>
+        <Link href={profileHref}><Avatar name={name} hue={hue} size={40} /></Link>
         <div className="flex min-w-0 flex-1 items-center gap-1">
-          <Link href={profileHref} className="truncate text-sm font-semibold hover:underline">
-            {name}
-          </Link>
+          <Link href={profileHref} className="truncate text-sm font-semibold hover:underline">{name}</Link>
           <span className="ml-1 text-xs text-faint">· {timeAgo(post.created_at)}</span>
         </div>
-        <button type="button" aria-label="More" className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-white/5">
+        {/* THREE DOTS — fully functional */}
+        <button type="button" aria-label="More" onClick={() => setActionsOpen(true)}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-white/5">
           <MoreHorizontal size={20} />
         </button>
       </div>
 
-      {/* Image — single tap navigates, double tap Hypes */}
-      {post.image_url && (
-        <Link
-          href={`/p/${post.id}`}
-          className="relative mx-4 block overflow-hidden rounded-2xl"
-          onClick={handleImageTap}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.image_url} alt={post.caption ?? "Post"} className="w-full object-cover" />
+      {/* Image carousel */}
+      {images.length > 0 && (
+        <div className="relative mx-4 overflow-hidden rounded-2xl">
+          <Link href={`/p/${post.id}`} onClick={handleImageTap} className="block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={images[imgIdx]} alt={post.caption ?? "Post"} className="w-full object-cover" />
 
-          {/* Double-tap Hype burst */}
-          {hypeBurst && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <Star
-                size={88}
-                className="animate-hype-pop text-hype drop-shadow-[0_4px_20px_rgba(255,208,0,0.5)]"
-                fill="currentColor"
-              />
-            </div>
+            {/* Double-tap burst */}
+            {hypeBurst && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <Star size={88} className="animate-hype-pop text-hype drop-shadow-[0_4px_20px_rgba(255,208,0,0.5)]" fill="currentColor" />
+              </div>
+            )}
+            {showParticles && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <HypeParticles size={16} />
+              </div>
+            )}
+          </Link>
+
+          {/* Multi-image dots + counter */}
+          {images.length > 1 && (
+            <>
+              <span className="absolute right-2.5 top-2.5 rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
+                {imgIdx + 1}/{images.length}
+              </span>
+              <div className="absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5">
+                {images.map((_, i) => (
+                  <button key={i} type="button" onClick={() => setImgIdx(i)}
+                    className={`h-1.5 rounded-full transition-all ${i === imgIdx ? "w-4 bg-white" : "w-1.5 bg-white/50"}`}
+                  />
+                ))}
+              </div>
+            </>
           )}
-          {showParticles && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <HypeParticles size={16} />
-            </div>
-          )}
-        </Link>
+        </div>
       )}
 
       {/* Actions */}
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-5">
-          {/* Hype button */}
-          <button
-            type="button"
-            onClick={toggleHype}
-            disabled={hypePending}
-            aria-pressed={hyped}
-            aria-label="Hype"
-            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums disabled:opacity-70"
-          >
+          <button type="button" onClick={toggleHype} disabled={hypePending}
+            aria-pressed={hyped} aria-label="Hype"
+            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums disabled:opacity-70">
             <span className="relative">
-              <Star
-                size={23}
-                strokeWidth={2.2}
+              <Star size={23} strokeWidth={2.2}
                 className={`${hypeBurst ? "animate-hype-burst" : ""} transition-colors ${hyped ? "text-hype" : "text-foreground"}`}
-                fill={hyped ? "currentColor" : "none"}
-              />
+                fill={hyped ? "currentColor" : "none"} />
               {showParticles && <HypeParticles size={9} />}
             </span>
             <span className={hyped ? "text-hype" : "text-foreground"}>{formatCount(hypeCount)}</span>
           </button>
 
-          {/* Comments */}
-          <button
-            type="button"
-            onClick={() => setCommentsOpen(true)}
-            aria-label="Comments"
-            className="flex items-center gap-1.5 text-sm font-semibold text-foreground"
-          >
+          <button type="button" onClick={() => setCommentsOpen(true)} aria-label="Comments"
+            className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
             <MessageCircle size={22} strokeWidth={2.2} />
             {formatCount(post.comment_count)}
           </button>
 
-          {/* Share */}
           <button type="button" onClick={share} aria-label="Share" className="text-foreground">
             <Send size={21} strokeWidth={2.2} />
           </button>
         </div>
 
-        {/* Save */}
-        <button
-          type="button"
-          onClick={toggleSave}
-          disabled={savePending}
-          aria-label="Save"
-          className="text-foreground disabled:opacity-70"
-        >
-          <Bookmark
-            size={21}
-            strokeWidth={2.2}
-            className={saved ? "text-accent" : ""}
-            fill={saved ? "currentColor" : "none"}
-          />
+        <button type="button" onClick={toggleSave} disabled={savePending} aria-label="Save"
+          className="text-foreground disabled:opacity-70">
+          <Bookmark size={21} strokeWidth={2.2} className={saved ? "text-accent" : ""} fill={saved ? "currentColor" : "none"} />
         </button>
       </div>
 
-      {/* Caption + body */}
+      {/* Caption */}
       {(post.caption || post.body) && (
         <div className="px-4 pt-2 text-sm leading-snug">
           {post.caption && (
@@ -295,22 +238,17 @@ export function FeedCard({
               <RichPostText text={post.caption} />
             </p>
           )}
-          {post.body && (
-            <p className="mt-1 text-foreground/85">
-              <RichPostText text={post.body} />
-            </p>
-          )}
+          {post.body && <p className="mt-1 text-foreground/85"><RichPostText text={post.body} /></p>}
         </div>
       )}
 
-      {/* Comments sheet */}
-      <CommentsSheet
-        open={commentsOpen}
-        onClose={() => setCommentsOpen(false)}
-        postId={post.id}
-        postOwnerId={post.user_id}
-        currentUserId={currentUserId}
-      />
+      {/* Sheets */}
+      <CommentsSheet open={commentsOpen} onClose={() => setCommentsOpen(false)}
+        postId={post.id} postOwnerId={post.user_id} currentUserId={currentUserId} />
+
+      <PostActionsSheet open={actionsOpen} onClose={() => setActionsOpen(false)}
+        postId={post.id} postUserId={post.user_id} postUsername={username ?? null}
+        currentUserId={currentUserId} onDelete={() => setDeleted(true)} />
 
       {/* Toast */}
       {toast && (

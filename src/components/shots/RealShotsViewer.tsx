@@ -2,89 +2,73 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Send, Star, MoreHorizontal, Bookmark, BookmarkCheck } from "lucide-react";
+import { X, Send, Star, MoreHorizontal, Bookmark, BookmarkCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 
-type ShotProfile = {
-  display_name: string | null;
-  avatar_hue: number | null;
-  username: string | null;
-} | null;
+type ShotProfile = { display_name: string | null; avatar_hue: number | null; username: string | null } | null;
 
 export type RealShot = {
-  id: string;
-  user_id: string;
-  media_url: string;
-  caption: string | null;
-  created_at: string;
-  expires_at?: string;
-  in_showcase: boolean;
-  profiles: ShotProfile;
+  id: string; user_id: string; media_url: string; caption: string | null;
+  created_at: string; expires_at?: string; in_showcase: boolean; profiles: ShotProfile;
 };
 
 const DURATION = 5000;
 
-function timeAgo(iso: string): string {
-  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (sec < 60) return "just now";
-  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
-  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
-  return `${Math.floor(sec / 86400)}d ago`;
+function timeAgo(iso: string) {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
 }
 
+/**
+ * State-based shots viewer — renders ONE shot at a time.
+ * No scroll-snap: eliminates the multi-swipe bug where one gesture
+ * skips multiple shots. Navigation is purely via state (tap zones / buttons).
+ */
 export function RealShotsViewer({
-  shots,
-  startIdx = 0,
-  currentUserId,
+  shots, startIdx = 0, currentUserId,
 }: {
-  shots: RealShot[];
-  startIdx?: number;
-  currentUserId: string | null;
+  shots: RealShot[]; startIdx?: number; currentUserId: string | null;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const [idx, setIdx] = useState(startIdx);
 
-  // Scroll to startIdx on mount
-  useEffect(() => {
-    if (startIdx > 0 && scrollRef.current) {
-      const h = scrollRef.current.clientHeight;
-      scrollRef.current.scrollTop = startIdx * h;
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const shot = shots[idx];
+  if (!shot) return null;
+
+  function goNext() {
+    if (idx < shots.length - 1) setIdx((i) => i + 1);
+    else router.back();
+  }
+  function goPrev() {
+    if (idx > 0) setIdx((i) => i - 1);
+  }
 
   return (
-    <div className="fixed inset-x-0 top-0 bottom-[72px] z-20 mx-auto max-w-[480px]">
-      <div
-        ref={scrollRef}
-        className="no-scrollbar h-full snap-y snap-mandatory overflow-y-scroll"
-      >
-        {shots.map((shot, i) => (
-          <RealShotItem
-            key={shot.id}
-            shot={shot}
-            total={shots.length}
-            idx={i}
-            currentUserId={currentUserId}
-          />
-        ))}
-      </div>
+    <div className="fixed inset-0 z-50 bg-black">
+      <ShotScreen
+        key={shot.id}          // remount on shot change → resets progress timer
+        shot={shot}
+        total={shots.length}
+        idx={idx}
+        currentUserId={currentUserId}
+        onNext={goNext}
+        onPrev={goPrev}
+        onClose={() => router.back()}
+      />
     </div>
   );
 }
 
-function RealShotItem({
-  shot,
-  total,
-  idx,
-  currentUserId,
+function ShotScreen({
+  shot, total, idx, currentUserId, onNext, onPrev, onClose,
 }: {
-  shot: RealShot;
-  total: number;
-  idx: number;
-  currentUserId: string | null;
+  shot: RealShot; total: number; idx: number; currentUserId: string | null;
+  onNext: () => void; onPrev: () => void; onClose: () => void;
 }) {
-  const router = useRouter();
   const supabase = createClient();
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -98,7 +82,12 @@ function RealShotItem({
   const name = shot.profiles?.display_name ?? shot.profiles?.username ?? "User";
   const hue = shot.profiles?.avatar_hue ?? 280;
 
-  const goBack = useCallback(() => router.back(), [router]);
+  // Auto-advance progress bar
+  useEffect(() => {
+    progressRef.current = 0;
+    startRef.current = 0;
+    setProgress(0);
+  }, [shot.id]);
 
   useEffect(() => {
     if (paused) return;
@@ -109,48 +98,37 @@ function RealShotItem({
       const p = Math.min((now - startRef.current) / DURATION, 1);
       progressRef.current = p;
       setProgress(p);
-      if (p < 1) {
-        rafRef.current = requestAnimationFrame(tick);
-      } else {
-        goBack();
-      }
+      if (p < 1) rafRef.current = requestAnimationFrame(tick);
+      else onNext();
     }
     rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [idx, paused, goBack]);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [shot.id, paused, onNext]);
 
-  // Reset progress bar when idx changes (new shot scrolled into view)
-  useEffect(() => {
-    progressRef.current = 0;
-    startRef.current = 0;
-    setProgress(0);
-  }, [idx]);
+  // Tap zones: left third = prev, right two-thirds = next
+  function handleTap(e: React.MouseEvent<HTMLDivElement>) {
+    if (paused) return;
+    if (e.clientX < window.innerWidth / 3) onPrev();
+    else onNext();
+  }
 
   async function toggleShowcase() {
     const next = !inShowcase;
     setInShowcase(next);
-    await supabase
-      .from("shots")
-      .update({ in_showcase: next })
-      .eq("id", shot.id);
+    await supabase.from("shots").update({ in_showcase: next }).eq("id", shot.id);
   }
 
   return (
-    <section className="relative flex h-full w-full snap-start overflow-hidden bg-black">
+    <div className="relative h-full w-full overflow-hidden bg-black">
       {/* Media */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={shot.media_url}
-        alt={shot.caption ?? "Show"}
-        className="absolute inset-0 h-full w-full object-cover"
-      />
+      <img src={shot.media_url} alt={shot.caption ?? "Show"} className="absolute inset-0 h-full w-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
 
-      {/* Tap to pause */}
+      {/* Tap zone overlay */}
       <div
         className="absolute inset-0 z-10"
+        onClick={handleTap}
         onMouseDown={() => setPaused(true)}
         onMouseUp={() => setPaused(false)}
         onTouchStart={() => setPaused(true)}
@@ -163,10 +141,7 @@ function RealShotItem({
           <div key={i} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/30">
             <div
               className="h-full rounded-full bg-white"
-              style={{
-                width: i < idx ? "100%" : i === idx ? `${progress * 100}%` : "0%",
-                transition: i === idx ? "none" : undefined,
-              }}
+              style={{ width: i < idx ? "100%" : i === idx ? `${progress * 100}%` : "0%", transition: "none" }}
             />
           </div>
         ))}
@@ -179,8 +154,6 @@ function RealShotItem({
           <span className="text-sm font-bold text-white">{name}</span>
           <span className="text-xs text-white/60">{timeAgo(shot.created_at)}</span>
         </div>
-
-        {/* Add to Showcase — only for own shows */}
         {isOwn && (
           <button
             type="button"
@@ -188,38 +161,38 @@ function RealShotItem({
             onClick={(e) => { e.stopPropagation(); toggleShowcase(); }}
             className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm"
           >
-            {inShowcase ? (
-              <BookmarkCheck size={20} className="text-accent" />
-            ) : (
-              <Bookmark size={20} />
-            )}
+            {inShowcase ? <BookmarkCheck size={20} className="text-accent" /> : <Bookmark size={20} />}
           </button>
         )}
-
-        <button
-          type="button"
-          aria-label="More"
-          className="pointer-events-auto flex h-8 w-8 items-center justify-center text-white"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <button type="button" aria-label="More" onClick={(e) => e.stopPropagation()}
+          className="pointer-events-auto flex h-8 w-8 items-center justify-center text-white">
           <MoreHorizontal size={22} />
         </button>
-        <button
-          type="button"
-          aria-label="Close"
-          className="pointer-events-auto flex h-8 w-8 items-center justify-center text-white"
-          onClick={(e) => { e.stopPropagation(); goBack(); }}
-        >
+        <button type="button" aria-label="Close" onClick={(e) => { e.stopPropagation(); onClose(); }}
+          className="pointer-events-auto flex h-8 w-8 items-center justify-center text-white">
           <X size={22} />
         </button>
       </div>
 
+      {/* Nav arrows (desktop / large screen) */}
+      {idx > 0 && (
+        <button type="button" onClick={(e) => { e.stopPropagation(); onPrev(); }}
+          className="pointer-events-auto absolute left-2 top-1/2 z-20 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm">
+          <ChevronLeft size={22} />
+        </button>
+      )}
+      {idx < total - 1 && (
+        <button type="button" onClick={(e) => { e.stopPropagation(); onNext(); }}
+          className="pointer-events-auto absolute right-2 top-1/2 z-20 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm">
+          <ChevronRight size={22} />
+        </button>
+      )}
+
       {/* Showcase badge */}
       {inShowcase && (
         <div className="pointer-events-none absolute left-3 top-20 z-20">
-          <span className="flex items-center gap-1 rounded-pill bg-accent/90 px-2 py-0.5 text-[10px] font-bold text-accent-ink backdrop-blur-sm">
-            <BookmarkCheck size={11} />
-            In Showcase
+          <span className="flex items-center gap-1 rounded-pill bg-accent/90 px-2 py-0.5 text-[10px] font-bold text-accent-ink">
+            <BookmarkCheck size={11} /> In Showcase
           </span>
         </div>
       )}
@@ -242,24 +215,15 @@ function RealShotItem({
             placeholder={`Reply to ${name}…`}
             className="h-11 flex-1 rounded-pill border border-white/30 bg-white/10 px-4 text-sm text-white outline-none placeholder:text-white/50 backdrop-blur-sm"
           />
-          <button
-            type="button"
-            aria-label="Hype this Show"
-            onClick={(e) => e.stopPropagation()}
-            className="flex flex-col items-center gap-0.5"
-          >
+          <button type="button" aria-label="Hype" onClick={(e) => e.stopPropagation()}>
             <Star size={26} className="text-hype" fill="currentColor" />
           </button>
-          <button
-            type="button"
-            aria-label="Send reply"
-            onClick={(e) => { e.stopPropagation(); setReply(""); }}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink"
-          >
+          <button type="button" aria-label="Send" onClick={(e) => { e.stopPropagation(); setReply(""); }}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink">
             <Send size={18} />
           </button>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
