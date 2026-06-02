@@ -1,8 +1,22 @@
 import Link from "next/link";
 import { Compass, Bell } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
 
-/** Home top bar: discover · Hypefy wordmark · notifications. */
-export function TopBar() {
+/** Home top bar — server component so it can check real unread count. */
+export async function TopBar() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  let hasUnread = false;
+  if (user) {
+    const { count } = await supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("is_read", false);
+    hasUnread = (count ?? 0) > 0;
+  }
+
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-xl">
       <Link
@@ -23,7 +37,9 @@ export function TopBar() {
         className="relative flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5"
       >
         <Bell size={22} strokeWidth={2.2} />
-        <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent ring-2 ring-background" />
+        {hasUnread && (
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent ring-2 ring-background" />
+        )}
       </Link>
     </header>
   );
