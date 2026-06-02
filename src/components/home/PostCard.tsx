@@ -230,7 +230,7 @@ export function PostCard({ post }: { post: Post }) {
       {/* Sheets */}
       {/* CommentsSheet replaced by FeedCard's CommentsSheet — legacy PostCard */}
       {commentsOpen && <div className="hidden" />}
-      <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} />
+      <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} postId={post.id} />
 
       {/* Save toast */}
       {toast && (
