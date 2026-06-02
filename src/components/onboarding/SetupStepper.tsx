@@ -6,28 +6,18 @@ import { createClient } from "@/lib/supabase/client";
 import { HypeMascot } from "@/components/mascot/HypeMascot";
 import { Avatar } from "@/components/ui/Avatar";
 import { saveProfile } from "@/app/setup-profile/actions";
+import { PROFILE_TAGS } from "@/lib/profile";
 import type { MascotMood } from "@/lib/profile";
 
 const TOTAL_STEPS = 6;
 const HUES = [280, 200, 150, 30, 330, 95, 250, 10, 180, 45];
-
-const VIBES = [
-  "Creator mode",
-  "Chill",
-  "Building",
-  "Studying",
-  "Gaming",
-  "Meme mood",
-  "Offline-ish",
-  "Late night",
-];
 
 type FormState = {
   displayName: string;
   username: string;
   avatarHue: number;
   bio: string;
-  vibe: string;
+  tags: string[];   // replaces vibe — stored as profile_tags
 };
 
 type UsernameStatus = "idle" | "invalid" | "checking" | "available" | "taken";
@@ -37,7 +27,7 @@ const stepMoods: MascotMood[] = [
   "thinking",   // 1: Username
   "curious",    // 2: Avatar
   "watching",   // 3: Bio
-  "hype",       // 4: Vibe
+  "hype",       // 4: Tags
   "welcome",    // 5: Complete
 ];
 
@@ -55,9 +45,7 @@ export function SetupStepper({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [slideDir, setSlideDir] = useState<"in" | "back">("in");
 
-  /* ── field helpers ───────────────────────────────────────── */
   function set<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: val }));
     setError(null);
@@ -82,26 +70,20 @@ export function SetupStepper({
     }, 450);
   }
 
-  /* ── navigation ─────────────────────────────────────────── */
   function canAdvance() {
     switch (step) {
       case 0: return form.displayName.trim().length >= 2;
-      case 1:
-        return (
-          /^[a-z0-9_.]{3,20}$/.test(form.username) && uStatus === "available"
-        );
+      case 1: return /^[a-z0-9_.]{3,20}$/.test(form.username) && uStatus === "available";
       default: return true;
     }
   }
 
   function next() {
-    setSlideDir("in");
     setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
     setError(null);
   }
 
   function back() {
-    setSlideDir("back");
     setStep((s) => Math.max(s - 1, 0));
     setError(null);
   }
@@ -113,7 +95,7 @@ export function SetupStepper({
         displayName: form.displayName,
         username: form.username,
         bio: form.bio,
-        currentVibe: form.vibe,
+        profileTags: form.tags,
         avatarHue: form.avatarHue,
       });
       if (res?.error) setError(res.error);
@@ -121,18 +103,17 @@ export function SetupStepper({
   }
 
   const mood = stepMoods[step] ?? "friendly";
+  const isLast = step === TOTAL_STEPS - 1;
+  const isSecondLast = step === TOTAL_STEPS - 2;
 
   return (
     <div className="flex min-h-dvh flex-col">
-      {/* ── Progress bar ────────────────────────────────── */}
+      {/* Progress bar */}
       <div className="sticky top-0 z-10 bg-background/90 px-5 pb-3 pt-4 backdrop-blur-xl">
-        {step < TOTAL_STEPS - 1 && (
+        {!isLast && (
           <div className="flex gap-1">
             {Array.from({ length: TOTAL_STEPS - 1 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-1 flex-1 overflow-hidden rounded-full bg-border"
-              >
+              <div key={i} className="h-1 flex-1 overflow-hidden rounded-full bg-border">
                 <div
                   className="h-full rounded-full bg-accent transition-all duration-500 ease-out"
                   style={{ width: i <= step ? "100%" : "0%" }}
@@ -143,85 +124,49 @@ export function SetupStepper({
         )}
       </div>
 
-      {/* ── Step content ─────────────────────────────────── */}
+      {/* Step content */}
       <div className="flex flex-1 flex-col px-5 pb-32">
-        {/* Mascot */}
         <div className="flex justify-center py-6">
           <HypeMascot mood={mood} size="md" animated />
         </div>
 
-        {/* Step body */}
-        {step === 0 && (
-          <StepName value={form.displayName} onChange={(v) => set("displayName", v)} />
-        )}
-        {step === 1 && (
-          <StepUsername
-            value={form.username}
-            status={uStatus}
-            onChange={onUsernameChange}
-          />
-        )}
-        {step === 2 && (
-          <StepAvatar
-            displayName={form.displayName}
-            avatarHue={form.avatarHue}
-            onChange={(h) => set("avatarHue", h)}
-          />
-        )}
-        {step === 3 && (
-          <StepBio value={form.bio} onChange={(v) => set("bio", v)} />
-        )}
-        {step === 4 && (
-          <StepVibe value={form.vibe} onChange={(v) => set("vibe", v)} />
-        )}
-        {step === 5 && (
-          <StepComplete form={form} />
-        )}
+        {step === 0 && <StepName value={form.displayName} onChange={(v) => set("displayName", v)} />}
+        {step === 1 && <StepUsername value={form.username} status={uStatus} onChange={onUsernameChange} />}
+        {step === 2 && <StepAvatar displayName={form.displayName} avatarHue={form.avatarHue} onChange={(h) => set("avatarHue", h)} />}
+        {step === 3 && <StepBio value={form.bio} onChange={(v) => set("bio", v)} />}
+        {step === 4 && <StepTags selected={form.tags} onChange={(v) => set("tags", v)} />}
+        {step === 5 && <StepComplete form={form} />}
       </div>
 
-      {/* ── Bottom CTA ───────────────────────────────────── */}
+      {/* CTA */}
       <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[480px] bg-gradient-to-t from-background via-background to-transparent px-5 pb-8 pt-4">
         {error && (
-          <p className="mb-2 rounded-xl bg-danger/10 px-3 py-2 text-center text-xs text-danger">
-            {error}
-          </p>
+          <p className="mb-2 rounded-xl bg-danger/10 px-3 py-2 text-center text-xs text-danger">{error}</p>
         )}
         <div className="flex gap-2">
-          {step > 0 && step < TOTAL_STEPS - 1 && (
+          {step > 0 && !isLast && (
             <button
               type="button"
               onClick={back}
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-pill border border-border text-muted transition-colors hover:text-foreground"
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-pill border border-border text-muted hover:text-foreground"
             >
               <ArrowLeft size={20} />
             </button>
           )}
           <button
             type="button"
-            onClick={step === TOTAL_STEPS - 1 ? finish : next}
+            onClick={isLast ? finish : next}
             disabled={!canAdvance() || pending}
             className="flex h-14 flex-1 items-center justify-center gap-2 rounded-pill bg-accent text-base font-bold text-accent-ink shadow-[0_0_24px_2px_rgba(200,255,0,0.3)] transition-transform active:scale-[0.98] disabled:opacity-50"
           >
             {pending ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                Setting up…
-              </>
-            ) : step === TOTAL_STEPS - 1 ? (
-              <>
-                Enter Hypefy
-                <ArrowRight size={20} strokeWidth={2.6} />
-              </>
-            ) : step === TOTAL_STEPS - 2 ? (
-              <>
-                Finish
-                <ArrowRight size={20} strokeWidth={2.6} />
-              </>
+              <><Loader2 size={18} className="animate-spin" /> Setting up…</>
+            ) : isLast ? (
+              <>Enter Hypefy <ArrowRight size={20} strokeWidth={2.6} /></>
+            ) : isSecondLast ? (
+              <>Finish <ArrowRight size={20} strokeWidth={2.6} /></>
             ) : (
-              <>
-                Next
-                <ArrowRight size={20} strokeWidth={2.6} />
-              </>
+              <>Next <ArrowRight size={20} strokeWidth={2.6} /></>
             )}
           </button>
         </div>
@@ -230,210 +175,106 @@ export function SetupStepper({
   );
 }
 
-/* ─── Step 0 — Name ─────────────────────────────────────────── */
+/* ─── Step components ────────────────────────────────────────── */
+
 function StepName({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <StepHeader
-        title="What should people call you?"
-        sub="This is how your name appears across Hypefy."
-      />
-      <input
-        autoFocus
-        value={value}
-        onChange={(e) => onChange(e.target.value.slice(0, 30))}
-        maxLength={30}
-        placeholder="Your name"
-        className="input mt-4"
-      />
+      <StepHeader title="What should people call you?" sub="This is how your name appears across Hypefy." />
+      <input autoFocus value={value} onChange={(e) => onChange(e.target.value.slice(0, 30))} maxLength={30} placeholder="Your name" className="input mt-4" />
       <p className="mt-1 text-right text-xs text-faint">{value.length}/30</p>
     </div>
   );
 }
 
-/* ─── Step 1 — Username ─────────────────────────────────────── */
-function StepUsername({
-  value,
-  status,
-  onChange,
-}: {
-  value: string;
-  status: UsernameStatus;
-  onChange: (v: string) => void;
-}) {
+function StepUsername({ value, status, onChange }: { value: string; status: UsernameStatus; onChange: (v: string) => void }) {
   return (
     <div>
-      <StepHeader
-        title="Claim your Hypefy name"
-        sub="Pick a username people can find you with."
-      />
-
+      <StepHeader title="Claim your Hypefy name" sub="Pick a username people can find you with." />
       <div className="mt-4 flex h-12 items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-accent/40">
         <span className="shrink-0 text-sm text-faint">hypefy.chat/@</span>
-        <input
-          autoFocus
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="username"
-          className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-faint"
-        />
-        {status === "checking" && (
-          <Loader2 size={16} className="shrink-0 animate-spin text-muted" />
-        )}
-        {status === "available" && (
-          <Check size={16} className="shrink-0 text-accent" />
-        )}
+        <input autoFocus value={value} onChange={(e) => onChange(e.target.value)} placeholder="username" className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-faint" />
+        {status === "checking" && <Loader2 size={16} className="shrink-0 animate-spin text-muted" />}
+        {status === "available" && <Check size={16} className="shrink-0 text-accent" />}
       </div>
-
-      {status === "taken" && (
-        <p className="mt-1 text-xs text-danger">That username is taken.</p>
-      )}
-      {status === "invalid" && value.length > 0 && (
-        <p className="mt-1 text-xs text-muted">
-          3–20 characters: a–z, 0–9, dot, underscore.
-        </p>
-      )}
+      {status === "taken" && <p className="mt-1 text-xs text-danger">That username is taken.</p>}
+      {status === "invalid" && value.length > 0 && <p className="mt-1 text-xs text-muted">3–20 characters: a–z, 0–9, dot, underscore.</p>}
     </div>
   );
 }
 
-/* ─── Step 2 — Avatar ───────────────────────────────────────── */
-function StepAvatar({
-  displayName,
-  avatarHue,
-  onChange,
-}: {
-  displayName: string;
-  avatarHue: number;
-  onChange: (h: number) => void;
-}) {
+function StepAvatar({ displayName, avatarHue, onChange }: { displayName: string; avatarHue: number; onChange: (h: number) => void }) {
   return (
     <div>
-      <StepHeader
-        title="Choose your face card"
-        sub="Pick a color — you can update your photo later."
-      />
-
-      {/* Preview */}
+      <StepHeader title="Choose your face card" sub="Pick a color — you can update your photo later." />
       <div className="mt-4 flex justify-center">
         <Avatar name={displayName || "?"} hue={avatarHue} size={88} className="rounded-[28px]" />
       </div>
-
-      {/* Color picker */}
       <div className="mt-5 flex flex-wrap justify-center gap-3">
         {HUES.map((h) => (
-          <button
-            key={h}
-            type="button"
-            onClick={() => onChange(h)}
-            className="h-12 w-12 rounded-2xl transition-all"
-            style={{
-              background: `linear-gradient(140deg, hsl(${h} 75% 52%), hsl(${(h + 50) % 360} 70% 38%))`,
-              outline: avatarHue === h ? "3px solid var(--color-accent)" : "none",
-              outlineOffset: "2px",
-            }}
-            aria-label={`Color ${h}`}
-          />
+          <button key={h} type="button" onClick={() => onChange(h)} className="h-12 w-12 rounded-2xl transition-all" style={{ background: `linear-gradient(140deg, hsl(${h} 75% 52%), hsl(${(h + 50) % 360} 70% 38%))`, outline: avatarHue === h ? "3px solid var(--color-accent)" : "none", outlineOffset: "2px" }} aria-label={`Color ${h}`} />
         ))}
       </div>
     </div>
   );
 }
 
-/* ─── Step 3 — Bio ──────────────────────────────────────────── */
 function StepBio({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <StepHeader
-        title="Add your vibe"
-        sub="A short line that tells people what you are about."
-      />
-      <textarea
-        autoFocus
-        value={value}
-        onChange={(e) => onChange(e.target.value.slice(0, 160))}
-        rows={3}
-        placeholder="creator mode, late night energy, building quietly..."
-        className="input mt-4 resize-none"
-      />
+      <StepHeader title="Add your vibe" sub="A short line that tells people what you are about." />
+      <textarea autoFocus value={value} onChange={(e) => onChange(e.target.value.slice(0, 160))} rows={3} placeholder="creator mode, late night energy, building quietly..." className="input mt-4 resize-none" />
       <p className="mt-1 text-right text-xs text-faint">{value.length}/160</p>
     </div>
   );
 }
 
-/* ─── Step 4 — Vibe ─────────────────────────────────────────── */
-function StepVibe({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function StepTags({ selected, onChange }: { selected: string[]; onChange: (v: string[]) => void }) {
+  function toggle(tag: string) {
+    onChange(
+      selected.includes(tag)
+        ? selected.filter((t) => t !== tag)
+        : [...selected, tag].slice(0, 3) // max 3 tags
+    );
+  }
+
   return (
     <div>
-      <StepHeader
-        title="What is your current vibe?"
-        sub="This can change anytime."
-      />
-
-      {/* Quick-select pills */}
+      <StepHeader title="What describes you?" sub="Pick up to 3 tags. You can change these anytime." />
       <div className="mt-4 flex flex-wrap gap-2">
-        {VIBES.map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => onChange(value === v ? "" : v)}
-            className={`rounded-pill border px-4 py-2 text-sm font-medium transition-colors ${
-              value === v
-                ? "border-accent bg-accent text-accent-ink"
-                : "border-border text-muted hover:text-foreground"
-            }`}
-          >
-            {v}
-          </button>
-        ))}
+        {PROFILE_TAGS.map((tag) => {
+          const on = selected.includes(tag);
+          return (
+            <button key={tag} type="button" onClick={() => toggle(tag)} className={`rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${on ? "border-accent bg-accent text-accent-ink" : "border-border text-muted hover:text-foreground"}`}>
+              {tag}
+            </button>
+          );
+        })}
       </div>
-
-      {/* Custom text */}
-      <input
-        value={VIBES.includes(value) ? "" : value}
-        onChange={(e) => onChange(e.target.value.slice(0, 40))}
-        placeholder="Or type your own…"
-        className="input mt-4"
-      />
+      {selected.length > 0 && <p className="mt-3 text-xs text-muted">{selected.join(" · ")}</p>}
     </div>
   );
 }
 
-/* ─── Step 5 — Complete ──────────────────────────────────────── */
 function StepComplete({ form }: { form: FormState }) {
   return (
     <div>
-      <StepHeader
-        title="You're in."
-        sub="Your space is ready. Start the hype."
-      />
-
-      {/* Mini profile preview */}
+      <StepHeader title="You're in." sub="Your space is ready. Start the hype." />
       <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-surface">
-        {/* Default lime-pulse banner */}
-        <div
-          className="h-16 w-full"
-          style={{
-            background:
-              "radial-gradient(120% 150% at 25% -20%, rgba(200,255,0,0.4), transparent 55%), #0d0d0d",
-          }}
-        />
+        <div className="h-16 w-full" style={{ background: "radial-gradient(120% 150% at 25% -20%, rgba(200,255,0,0.4), transparent 55%), #0d0d0d" }} />
         <div className="px-4 pb-4">
           <div className="-mt-7 mb-2">
-            <Avatar
-              name={form.displayName || "?"}
-              hue={form.avatarHue}
-              size={52}
-              className="rounded-[18px] ring-4 ring-surface"
-            />
+            <Avatar name={form.displayName || "?"} hue={form.avatarHue} size={52} className="rounded-[18px] ring-4 ring-surface" />
           </div>
           <p className="font-bold">{form.displayName || "Your name"}</p>
           <p className="text-sm text-muted">@{form.username || "username"}</p>
           {form.bio && <p className="mt-1.5 text-sm">{form.bio}</p>}
-          {form.vibe && (
-            <span className="mt-2 inline-block rounded-pill border border-border bg-elevated px-2.5 py-1 text-xs text-muted">
-              {form.vibe}
-            </span>
+          {form.tags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {form.tags.map((t) => (
+                <span key={t} className="rounded-lg bg-elevated px-2.5 py-1 text-xs font-medium text-muted">{t}</span>
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -441,7 +282,6 @@ function StepComplete({ form }: { form: FormState }) {
   );
 }
 
-/* ─── Shared step header ─────────────────────────────────────── */
 function StepHeader({ title, sub }: { title: string; sub: string }) {
   return (
     <div>

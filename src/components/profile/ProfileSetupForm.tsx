@@ -84,7 +84,7 @@ export function ProfileSetupForm({
         username,
         displayName,
         bio,
-        currentVibe: vibe,
+        profileTags: [],
         avatarHue,
       });
       if (res?.error) setError(res.error);

@@ -1,25 +1,73 @@
 "use client";
 
-import { useState } from "react";
-import { Grid3x3, Zap, Users } from "lucide-react";
-import { posts, shows } from "@/lib/mock";
-import { rooms } from "@/lib/mock-discover";
-import { RoomCard } from "@/components/discover/RoomCard";
+import { useEffect, useState } from "react";
+import { Grid3x3, Zap, Bookmark, PlusCircle, Camera } from "lucide-react";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { RichPostText } from "@/components/ui/RichPostText";
 
-const tabs = [
+type Tab = "Posts" | "Shots" | "Saved";
+
+const tabs: { key: Tab; Icon: typeof Grid3x3 }[] = [
   { key: "Posts", Icon: Grid3x3 },
   { key: "Shots", Icon: Zap },
-  { key: "Rooms", Icon: Users },
-] as const;
+  { key: "Saved", Icon: Bookmark },
+];
 
-type TabKey = (typeof tabs)[number]["key"];
+type PostRow = { id: string; image_url: string | null; caption: string | null; created_at: string };
+type ShotRow = { id: string; media_url: string; caption: string | null; created_at: string };
 
-export function ProfileTabs() {
-  const [tab, setTab] = useState<TabKey>("Posts");
+export function ProfileTabs({ userId }: { userId: string }) {
+  const [tab, setTab] = useState<Tab>("Posts");
+  const [posts, setPosts] = useState<PostRow[] | null>(null);
+  const [shots, setShots] = useState<ShotRow[] | null>(null);
+  const [saved, setSaved] = useState<PostRow[] | null>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    if (tab === "Posts" && posts === null) loadPosts();
+    if (tab === "Shots" && shots === null) loadShots();
+    if (tab === "Saved" && saved === null) loadSaved();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  async function loadPosts() {
+    const { data } = await supabase
+      .from("posts")
+      .select("id, image_url, caption, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    setPosts(data ?? []);
+  }
+
+  async function loadShots() {
+    const { data } = await supabase
+      .from("shots")
+      .select("id, media_url, caption, created_at")
+      .eq("user_id", userId)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false });
+    setShots(data ?? []);
+  }
+
+  async function loadSaved() {
+    const { data } = await supabase
+      .from("saved_posts")
+      .select("post_id, posts(id, image_url, caption, created_at)")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    const rows = (data ?? []).flatMap((row: { posts: PostRow | PostRow[] | null }) => {
+      const p = row.posts;
+      if (!p) return [];
+      return Array.isArray(p) ? p : [p];
+    });
+    setSaved(rows);
+  }
 
   return (
     <div className="mt-2">
+      {/* Tab bar */}
       <div className="sticky top-14 z-10 flex border-y border-border bg-background/90 backdrop-blur-xl">
         {tabs.map(({ key, Icon }) => (
           <button
@@ -27,9 +75,7 @@ export function ProfileTabs() {
             type="button"
             onClick={() => setTab(key)}
             className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 py-3 text-sm font-semibold transition-colors ${
-              tab === key
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted"
+              tab === key ? "border-accent text-foreground" : "border-transparent text-muted"
             }`}
           >
             <Icon size={16} />
@@ -38,56 +84,98 @@ export function ProfileTabs() {
         ))}
       </div>
 
+      {/* Posts grid */}
       {tab === "Posts" && (
-        <div className="grid grid-cols-3 gap-0.5">
-          {posts.map((p) => (
-            <div
-              key={p.id}
-              className="aspect-square"
-              style={{
-                background: `radial-gradient(120% 90% at 25% 15%, hsl(${p.mediaFrom} 80% 55%), hsl(${p.mediaTo} 70% 22%))`,
-              }}
-            />
-          ))}
-          {posts.slice(0, 2).map((p) => (
-            <div
-              key={`${p.id}-b`}
-              className="aspect-square"
-              style={{
-                background: `radial-gradient(120% 90% at 75% 25%, hsl(${p.mediaTo} 80% 50%), hsl(${p.mediaFrom} 70% 20%))`,
-              }}
-            />
-          ))}
-        </div>
-      )}
-
-      {tab === "Shots" && (
-        <div className="grid grid-cols-3 gap-0.5">
-          {shows.map((s) => (
-            <div
-              key={s.id}
-              className="aspect-[3/4]"
-              style={{
-                background: `linear-gradient(150deg, hsl(${s.hue} 75% 52%), hsl(${(s.hue + 50) % 360} 70% 28%))`,
-              }}
-            />
-          ))}
-        </div>
-      )}
-
-      {tab === "Rooms" &&
-        (rooms.length > 0 ? (
-          <div className="flex flex-col gap-3 p-4">
-            {rooms.slice(0, 3).map((r) => (
-              <RoomCard key={r.id} room={r} />
+        posts === null ? (
+          <GridSkeleton />
+        ) : posts.length === 0 ? (
+          <EmptyState
+            icon={PlusCircle}
+            title="No posts yet"
+            text="Your posts will show up here."
+            ctaLabel="Create Post"
+            ctaHref="/create/post"
+          />
+        ) : (
+          <div className="grid grid-cols-3 gap-0.5">
+            {posts.map((p) => (
+              <PostThumb key={p.id} post={p} />
             ))}
           </div>
-        ) : (
+        )
+      )}
+
+      {/* Shots grid */}
+      {tab === "Shots" && (
+        shots === null ? (
+          <GridSkeleton />
+        ) : shots.length === 0 ? (
           <EmptyState
-            title="No rooms yet"
-            text="Rooms you create or join will show up here."
+            icon={Camera}
+            title="No Shots yet"
+            text="Share a moment that lasts 24 hours."
+            ctaLabel="Add Shot"
+            ctaHref="/create/shot"
           />
-        ))}
+        ) : (
+          <div className="grid grid-cols-3 gap-0.5">
+            {shots.map((s) => (
+              <Link key={s.id} href={`/shots`} className="aspect-[3/4] block overflow-hidden bg-surface">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={s.media_url} alt={s.caption ?? "Shot"} className="h-full w-full object-cover" />
+              </Link>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Saved */}
+      {tab === "Saved" && (
+        saved === null ? (
+          <GridSkeleton />
+        ) : saved.length === 0 ? (
+          <EmptyState
+            icon={Bookmark}
+            title="No saved posts yet"
+            text="Save posts you want to revisit."
+          />
+        ) : (
+          <div className="grid grid-cols-3 gap-0.5">
+            {saved.map((p) => (
+              <PostThumb key={p.id} post={p} />
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+function PostThumb({ post }: { post: PostRow }) {
+  if (post.image_url) {
+    return (
+      <div className="aspect-square overflow-hidden bg-surface">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={post.image_url} alt={post.caption ?? "Post"} className="h-full w-full object-cover" />
+      </div>
+    );
+  }
+  // Text-only post — show caption preview
+  return (
+    <div className="aspect-square overflow-hidden bg-elevated p-2 flex items-start">
+      <p className="line-clamp-4 text-[10px] leading-snug text-muted">
+        <RichPostText text={post.caption ?? ""} />
+      </p>
+    </div>
+  );
+}
+
+function GridSkeleton() {
+  return (
+    <div className="grid grid-cols-3 gap-0.5">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="aspect-square animate-pulse bg-surface" />
+      ))}
     </div>
   );
 }

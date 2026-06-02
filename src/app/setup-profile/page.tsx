@@ -21,7 +21,7 @@ export default async function SetupProfilePage() {
     displayName: profile?.displayName ?? "",
     username: profile?.username ?? emailSeed,
     bio: profile?.bio ?? "",
-    vibe: profile?.currentVibe ?? "",
+    tags: profile?.profileTags ?? [],
     avatarHue: profile?.avatarHue ?? hueFromId(user.id),
   };
 

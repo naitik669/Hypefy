@@ -24,6 +24,7 @@ export type Profile = {
   bannerUrl: string | null;
   currentVibe: string | null;
   interests: string[];
+  profileTags: string[];
   profileCompleted: boolean;
 };
 
@@ -70,6 +71,23 @@ export function bannerGradient(id?: string | null): string {
   );
 }
 
+/** Selectable identity/role tags shown as pills on profile. */
+export const PROFILE_TAGS = [
+  "Developer",
+  "Designer",
+  "Creator",
+  "Gamer",
+  "Founder",
+  "Student",
+  "Artist",
+  "Photographer",
+  "Animator",
+  "Editor",
+  "Writer",
+  "Musician",
+  "Meme Creator",
+] as const;
+
 export const INTERESTS = [
   "Memes",
   "Music",
@@ -107,6 +125,7 @@ function mapProfile(row: any): Profile {
     bannerUrl: row.banner_url,
     currentVibe: row.current_vibe,
     interests: row.interests ?? [],
+    profileTags: row.profile_tags ?? [],
     profileCompleted: row.profile_completed ?? false,
   };
 }

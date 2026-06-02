@@ -1,0 +1,143 @@
+"use client";
+
+import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Camera, X, Loader2, Send, Link2, Check } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+
+const MAX_SIZE_MB = 20;
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+export function ShotComposer({ userId }: { userId: string }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [caption, setCaption] = useState("");
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [postError, setPostError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [copied, setCopied] = useState(false);
+  const [postedId, setPostedId] = useState<string | null>(null);
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFileError(null);
+    if (!ALLOWED_TYPES.includes(f.type)) {
+      setFileError("Allowed: JPEG, PNG, WebP, GIF.");
+      return;
+    }
+    if (f.size > MAX_SIZE_MB * 1024 * 1024) {
+      setFileError(`Max size ${MAX_SIZE_MB}MB.`);
+      return;
+    }
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
+  }
+
+  function removeFile() {
+    setFile(null);
+    if (preview) URL.revokeObjectURL(preview);
+    setPreview(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  async function copyLink() {
+    if (!postedId) return;
+    const url = `${window.location.origin}/shots/${postedId}`;
+    await navigator.clipboard.writeText(url).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  function handlePost() {
+    if (!file) return;
+    setPostError(null);
+    startTransition(async () => {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `${userId}/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from("shot-media")
+        .upload(path, file, { contentType: file.type, upsert: false });
+
+      if (uploadErr) {
+        setPostError("Upload failed: " + uploadErr.message);
+        return;
+      }
+      const { data: pub } = supabase.storage.from("shot-media").getPublicUrl(path);
+
+      const { data: shot, error: insertErr } = await supabase
+        .from("shots")
+        .insert({ user_id: userId, media_url: pub.publicUrl, caption: caption.trim() || null })
+        .select("id")
+        .single();
+
+      if (insertErr) {
+        setPostError(insertErr.message);
+        return;
+      }
+      setPostedId(shot.id);
+    });
+  }
+
+  // ── Success state ──────────────────────────────────────────
+  if (postedId) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-6 px-6 py-16 text-center">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-accent/20">
+          <Send size={36} className="text-accent" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-extrabold">Shot posted!</h2>
+          <p className="mt-1 text-sm text-muted">It'll disappear in 24 hours.</p>
+        </div>
+        <button type="button" onClick={copyLink} className="flex h-12 w-full max-w-xs items-center justify-center gap-2 rounded-xl border border-border bg-surface text-sm font-semibold transition-colors hover:bg-elevated">
+          {copied ? <><Check size={16} className="text-accent" /> Link copied!</> : <><Link2 size={16} /> Copy Shot link</>}
+        </button>
+        <button type="button" onClick={() => { router.push("/home"); router.refresh(); }} className="flex h-12 w-full max-w-xs items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-ink">
+          Back to home
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 px-4 pb-8 pt-2">
+      {/* Media picker */}
+      <div
+        className="relative flex min-h-[260px] cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-border bg-surface hover:border-accent/50"
+        onClick={() => !preview && fileRef.current?.click()}
+      >
+        {preview ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={preview} alt="Preview" className="max-h-80 w-full object-cover" />
+            <button type="button" onClick={(e) => { e.stopPropagation(); removeFile(); }} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white">
+              <X size={16} />
+            </button>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <Camera size={40} className="text-faint" />
+            <p className="text-sm text-muted">Tap to choose media</p>
+          </div>
+        )}
+      </div>
+      <input ref={fileRef} type="file" accept={ALLOWED_TYPES.join(",")} className="hidden" onChange={onFileChange} />
+      {fileError && <p className="text-xs text-danger">{fileError}</p>}
+
+      {/* Caption */}
+      <textarea value={caption} onChange={(e) => setCaption(e.target.value.slice(0, 150))} rows={2} placeholder="Add a caption… (optional)" className="input resize-none" />
+      <p className="-mt-2 text-right text-xs text-faint">{caption.length}/150</p>
+
+      {postError && <p className="rounded-xl bg-danger/10 px-3 py-2 text-xs text-danger">{postError}</p>}
+
+      <button type="button" onClick={handlePost} disabled={!file || pending} className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-accent text-base font-bold text-accent-ink shadow-[0_0_24px_2px_rgba(200,255,0,0.3)] transition-transform active:scale-[0.99] disabled:opacity-50">
+        {pending ? <><Loader2 size={18} className="animate-spin" /> Posting…</> : <><Send size={18} /> Post Shot</>}
+      </button>
+    </div>
+  );
+}

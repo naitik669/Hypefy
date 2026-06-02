@@ -7,7 +7,7 @@ export type SaveProfileInput = {
   username: string;
   displayName: string;
   bio: string;
-  currentVibe: string;
+  profileTags: string[];
   avatarHue: number;
 };
 
@@ -35,9 +35,8 @@ export async function saveProfile(
       username,
       display_name: input.displayName.trim(),
       bio: input.bio.trim() || null,
-      current_vibe: input.currentVibe.trim() || null,
+      profile_tags: input.profileTags,
       avatar_hue: input.avatarHue,
-      // Banner not set during onboarding — uses default lime-pulse
       profile_completed: true,
     })
     .eq("id", user.id);
