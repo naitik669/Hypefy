@@ -129,12 +129,25 @@ function ShotScreen({
       <img src={shot.media_url} alt={shot.caption ?? "Show"} className="absolute inset-0 h-full w-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
 
-      {/* Tap zone overlay */}
+      {/* Split tap zones — only cover the middle area (not header or reply bar).
+          This prevents the X/close button and reply input from being blocked. */}
+      {/* Left third → prev */}
       <div
-        className="absolute inset-0 z-10"
-        onClick={handleTap}
+        className="absolute left-0 z-10 w-1/3"
+        style={{ top: 88, bottom: 88 }}
+        onClick={(e) => { e.stopPropagation(); if (!paused) onPrev(); }}
         onMouseDown={() => setPaused(true)}
-        onMouseUp={() => setPaused(false)}
+        onMouseUp={() => { setPaused(false); }}
+        onTouchStart={() => setPaused(true)}
+        onTouchEnd={() => setPaused(false)}
+      />
+      {/* Right two-thirds → next */}
+      <div
+        className="absolute right-0 z-10 w-2/3"
+        style={{ top: 88, bottom: 88 }}
+        onClick={(e) => { e.stopPropagation(); if (!paused) onNext(); }}
+        onMouseDown={() => setPaused(true)}
+        onMouseUp={() => { setPaused(false); }}
         onTouchStart={() => setPaused(true)}
         onTouchEnd={() => setPaused(false)}
       />

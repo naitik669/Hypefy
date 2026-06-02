@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, UserCheck, Link2, Flag, Trash2, Check, Loader2 } from "lucide-react";
+import { UserPlus, UserCheck, Link2, Flag, Trash2, Check, Loader2, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -18,6 +18,7 @@ export function PostActionsSheet({
   postUsername,
   currentUserId,
   onDelete,
+  onEdit,
 }: {
   open: boolean;
   onClose: () => void;
@@ -26,6 +27,7 @@ export function PostActionsSheet({
   postUsername: string | null;
   currentUserId: string;
   onDelete?: () => void;
+  onEdit?: () => void;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -163,6 +165,12 @@ export function PostActionsSheet({
           {isOwn && (
             <>
               <div className="mx-3 my-1 h-px bg-border" />
+              <button type="button" onClick={() => { onClose(); onEdit?.(); }}
+                className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/5"
+              >
+                <Pencil size={17} className="text-muted" />
+                Edit post
+              </button>
               <button type="button" onClick={deletePost}
                 className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-danger hover:bg-danger/5"
               >

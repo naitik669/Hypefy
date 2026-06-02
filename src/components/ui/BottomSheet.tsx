@@ -1,8 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
-/** Reusable slide-up bottom sheet, constrained to the app column width. */
+/**
+ * Slide-up bottom sheet rendered via createPortal at document.body.
+ * This avoids stacking context issues — the sheet always overlays
+ * everything regardless of where in the component tree it lives.
+ */
 export function BottomSheet({
   open,
   onClose,
@@ -14,17 +20,21 @@ export function BottomSheet({
   title?: string;
   children: React.ReactNode;
 }) {
-  if (!open) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
-  return (
+  if (!mounted || !open) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 mx-auto flex max-w-[480px] items-end bg-black/60"
+      className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60"
       onClick={onClose}
     >
       <div
-        className="animate-rise max-h-[80dvh] w-full overflow-y-auto rounded-t-3xl border-t border-border bg-elevated pb-[calc(env(safe-area-inset-bottom)+12px)]"
+        className="animate-rise w-full max-w-[480px] max-h-[85dvh] overflow-y-auto rounded-t-3xl border-t border-border bg-elevated pb-[calc(env(safe-area-inset-bottom)+12px)]"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Header */}
         <div className="sticky top-0 z-10 bg-elevated/95 px-5 pb-2 pt-3 backdrop-blur-sm">
           <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-border" />
           {title && (
@@ -43,6 +53,7 @@ export function BottomSheet({
         </div>
         <div className="px-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

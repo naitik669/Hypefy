@@ -9,6 +9,7 @@ import { RichPostText } from "@/components/ui/RichPostText";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
+import { EditPostSheet } from "@/components/feed/EditPostSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { formatCount } from "@/lib/mock";
 
@@ -67,7 +68,10 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [deleted, setDeleted] = useState(false);
+  const [liveCaption, setLiveCaption] = useState(post.caption);
+  const [liveBody, setLiveBody] = useState(post.body);
 
   const lastTapRef = useRef(0);
 
@@ -232,15 +236,15 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
       {/* Caption */}
       {(post.caption || post.body) && (
         <div className="px-4 pt-2 text-sm leading-snug">
-          {post.caption && (
+          {liveCaption && (
             <p>
               <Link href={profileHref} className="font-semibold hover:underline">
                 {username ? `@${username}` : name}
               </Link>{" "}
-              <RichPostText text={post.caption} />
+              <RichPostText text={liveCaption} />
             </p>
           )}
-          {post.body && <p className="mt-1 text-foreground/85"><RichPostText text={post.body} /></p>}
+          {liveBody && <p className="mt-1 text-foreground/85"><RichPostText text={liveBody} /></p>}
         </div>
       )}
 
@@ -252,7 +256,13 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
 
       <PostActionsSheet open={actionsOpen} onClose={() => setActionsOpen(false)}
         postId={post.id} postUserId={post.user_id} postUsername={username ?? null}
-        currentUserId={currentUserId} onDelete={() => setDeleted(true)} />
+        currentUserId={currentUserId}
+        onDelete={() => setDeleted(true)}
+        onEdit={() => setEditOpen(true)} />
+
+      <EditPostSheet open={editOpen} onClose={() => setEditOpen(false)}
+        postId={post.id} initialCaption={liveCaption} initialBody={liveBody}
+        onSaved={(c, b) => { setLiveCaption(c || null); setLiveBody(b || null); }} />
 
       {/* Toast */}
       {toast && (

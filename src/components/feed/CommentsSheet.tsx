@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Star, Send, Loader2, Flag, Check, ChevronDown } from "lucide-react";
+import { Star, Send, Loader2, Flag, Check, ChevronDown, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
@@ -10,6 +10,7 @@ import { formatCount } from "@/lib/mock";
 /* ─── Types ──────────────────────────────────────────────────── */
 type RawComment = {
   id: string;
+  user_id: string;
   body: string;
   hype_count: number;
   created_at: string;
@@ -71,7 +72,7 @@ export function CommentsSheet({
     setLoading(true);
     supabase
       .from("comments")
-      .select("id, body, hype_count, created_at, parent_id, profiles(display_name, username, avatar_hue)")
+      .select("id, user_id, body, hype_count, created_at, parent_id, profiles(display_name, username, avatar_hue)")
       .eq("post_id", postId)
       .is("deleted_at", null)
       .order("created_at", { ascending: true })
@@ -117,6 +118,18 @@ export function CommentsSheet({
     setTimeout(() => mutateFn(id, (x) => ({ ...x, reported: false })), 1500);
   }
 
+  async function deleteComment(id: string) {
+    // Soft-delete: set deleted_at
+    await supabase.from("comments").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+    // Remove from tree immediately
+    function removeById(list: Comment[]): Comment[] {
+      return list
+        .filter((c) => c.id !== id)
+        .map((c) => ({ ...c, replies: removeById(c.replies) }));
+    }
+    setTree((prev) => removeById(prev));
+  }
+
   function toggleReplies(id: string) {
     mutateFn(id, (x) => ({ ...x, showReplies: !x.showReplies }));
   }
@@ -135,7 +148,7 @@ export function CommentsSheet({
 
     const { data: row } = await supabase
       .from("comments")
-      .select("id, body, hype_count, created_at, parent_id, profiles(display_name, username, avatar_hue)")
+      .select("id, user_id, body, hype_count, created_at, parent_id, profiles(display_name, username, avatar_hue)")
       .eq("id", data)
       .single();
 
@@ -182,9 +195,11 @@ export function CommentsSheet({
             <CommentItem
               key={c.id}
               comment={c}
+              currentUserId={currentUserId}
               onHype={hypeComment}
               onReply={startReply}
               onReport={reportComment}
+              onDelete={deleteComment}
               onToggleReplies={toggleReplies}
             />
           ))}
@@ -226,18 +241,21 @@ export function CommentsSheet({
 
 /* ─── Single comment + its thread ────────────────────────────── */
 function CommentItem({
-  comment, onHype, onReply, onReport, onToggleReplies,
+  comment, currentUserId, onHype, onReply, onReport, onDelete, onToggleReplies,
 }: {
   comment: Comment;
+  currentUserId: string;
   onHype: (c: Comment) => void;
   onReply: (id: string, username: string) => void;
   onReport: (id: string) => void;
+  onDelete: (id: string) => void;
   onToggleReplies: (id: string) => void;
 }) {
   const n = comment.profiles?.display_name ?? comment.profiles?.username ?? "User";
   const uname = comment.profiles?.username;
   const hue = comment.profiles?.avatar_hue ?? 280;
   const hasReplies = comment.replies.length > 0;
+  const isOwnComment = comment.user_id === currentUserId;
 
   return (
     <div>
@@ -271,11 +289,19 @@ function CommentItem({
                 Reply
               </button>
             )}
-            <button type="button" onClick={() => onReport(comment.id)}
-              className={`flex items-center gap-0.5 text-xs font-medium ${comment.reported ? "text-accent" : "text-faint hover:text-muted"}`}>
-              {comment.reported ? <Check size={11} /> : <Flag size={11} />}
-              {comment.reported ? "Reported" : "Report"}
-            </button>
+            {!isOwnComment && (
+              <button type="button" onClick={() => onReport(comment.id)}
+                className={`flex items-center gap-0.5 text-xs font-medium ${comment.reported ? "text-accent" : "text-faint hover:text-muted"}`}>
+                {comment.reported ? <Check size={11} /> : <Flag size={11} />}
+                {comment.reported ? "Reported" : "Report"}
+              </button>
+            )}
+            {isOwnComment && (
+              <button type="button" onClick={() => onDelete(comment.id)}
+                className="flex items-center gap-0.5 text-xs font-medium text-danger">
+                <Trash2 size={11} /> Delete
+              </button>
+            )}
           </div>
 
           {/* Show/hide replies toggle */}
