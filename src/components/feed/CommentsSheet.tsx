@@ -45,7 +45,7 @@ export function CommentsSheet({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1">
                 <span className="text-sm font-semibold">{c.name}</span>
-                {c.verified && <VerifiedStar className="h-3 w-3 text-verified" />}
+                {c.verified && <VerifiedStar className="h-4.5 w-4.5 text-verified" />}
                 <span className="text-xs text-faint">· {c.time}</span>
               </div>
               <p className="text-sm text-foreground/90">{c.text}</p>

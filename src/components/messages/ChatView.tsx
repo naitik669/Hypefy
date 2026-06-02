@@ -70,7 +70,7 @@ export function ChatView({
           <div className="flex items-center gap-1">
             <span className="truncate text-sm font-semibold">{thread.name}</span>
             {thread.verified && (
-              <VerifiedStar className="h-3 w-3 shrink-0 text-verified" />
+              <VerifiedStar className="h-4.5 w-4.5 shrink-0 text-verified" />
             )}
           </div>
           <p className="text-xs text-muted">

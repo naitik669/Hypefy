@@ -23,7 +23,7 @@ export function MessageListItem({ thread }: { thread: Thread }) {
         <div className="flex items-center gap-1">
           <span className="truncate text-sm font-semibold">{thread.name}</span>
           {thread.verified && (
-            <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />
+            <VerifiedStar className="h-5 w-5 shrink-0 text-verified" />
           )}
           {thread.isRoom && (
             <span className="ml-1 flex shrink-0 items-center gap-1 rounded-full bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted">

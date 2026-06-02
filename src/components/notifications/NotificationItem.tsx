@@ -37,7 +37,7 @@ export function NotificationItem({ notif }: { notif: Notif }) {
         <span className="inline-flex items-center gap-1 font-semibold">
           {notif.actor.name}
           {notif.actor.verified && (
-            <VerifiedStar className="h-3 w-3 text-verified" />
+            <VerifiedStar className="h-4.5 w-4.5 text-verified" />
           )}
         </span>{" "}
         <span className="text-muted">{notif.text}</span>{" "}

@@ -57,7 +57,7 @@ function ShotItem({ shot }: { shot: Shot }) {
           <Avatar name={shot.username} hue={shot.hue} size={36} />
           <span className="flex items-center gap-1 text-sm font-bold">
             {shot.username}
-            {shot.verified && <VerifiedStar className="h-3.5 w-3.5 text-verified" />}
+            {shot.verified && <VerifiedStar className="h-5 w-5 text-verified" />}
           </span>
           <button
             type="button"

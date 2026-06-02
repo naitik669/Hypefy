@@ -37,7 +37,7 @@ export default function ProfilePage() {
         <div className="mt-3">
           <div className="flex items-center gap-1">
             <span className="font-bold">{u.name}</span>
-            {u.verified && <VerifiedStar className="h-4 w-4 text-verified" />}
+            {u.verified && <VerifiedStar className="h-6 w-6 text-verified" />}
           </div>
           <p className="text-sm text-muted">{u.handle}</p>
           <p className="mt-1.5 text-sm leading-snug">{u.bio}</p>

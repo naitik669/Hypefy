@@ -75,7 +75,7 @@ export function ShareSheet({
                 <div className="flex items-center gap-1">
                   <span className="truncate text-sm font-semibold">{t.name}</span>
                   {t.verified && (
-                    <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />
+                    <VerifiedStar className="h-5 w-5 shrink-0 text-verified" />
                   )}
                 </div>
                 <p className="truncate text-xs text-muted">{t.handle}</p>
