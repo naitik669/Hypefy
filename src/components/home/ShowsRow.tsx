@@ -85,13 +85,11 @@ export function ShowsRow({
             className="flex w-16 shrink-0 flex-col items-center gap-1.5 active:opacity-70"
           >
             {isSeen ? (
-              /* ── Seen: plain avatar, no coloured ring, slightly dimmed ── */
-              <div className="rounded-[20px] opacity-50">
-                <Avatar name={s.name} hue={s.hue} size={60} className="rounded-[18px]" />
-              </div>
+              /* ── Seen: no ring at all, dimmed ── */
+              <Avatar name={s.name} hue={s.hue} size={60} className="rounded-[18px] opacity-40" />
             ) : (
-              /* ── Unseen: bold green ring ── */
-              <div className="rounded-[22px] p-[2.5px] bg-accent shadow-[0_0_0_0px_rgba(200,255,0,0)]">
+              /* ── Unseen: green ring ── */
+              <div className="rounded-[22px] p-[2.5px] bg-accent">
                 <div className="rounded-[20px] bg-background p-[2px]">
                   <Avatar name={s.name} hue={s.hue} size={56} className="rounded-[18px]" />
                 </div>
