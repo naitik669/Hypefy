@@ -35,6 +35,11 @@ function timeAgo(iso: string) {
   return `${Math.floor(s / 86400)}d`;
 }
 
+/** Total comments including replies (every node in the tree). */
+function countAll(list: Comment[]): number {
+  return list.reduce((n, c) => n + 1 + countAll(c.replies), 0);
+}
+
 function buildTree(flat: RawComment[]): Comment[] {
   const map = new Map<string, Comment>();
   const roots: Comment[] = [];
@@ -92,11 +97,12 @@ export function CommentsSheet({
 
   useEffect(() => { if (!open) { setReplyTo(null); setText(""); } }, [open]);
 
-  // Keep the parent post's comment badge in sync with the live root count.
+  // Keep the parent's comment badge in sync — counts replies too.
+  const totalCount = countAll(tree);
   useEffect(() => {
-    if (open) onCountChange?.(tree.length);
+    if (open) onCountChange?.(totalCount);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tree.length]);
+  }, [totalCount, open]);
 
   function startReply(id: string, username: string) {
     setReplyTo({ id, username });
@@ -202,10 +208,8 @@ export function CommentsSheet({
     setReplyTo(null);
   }
 
-  const totalVisible = tree.length;
-
   return (
-    <BottomSheet open={open} onClose={onClose} title={`Comments · ${totalVisible}`}>
+    <BottomSheet open={open} onClose={onClose} title={`Comments · ${totalCount}`}>
       {loading ? (
         <div className="flex items-center justify-center py-10">
           <Loader2 size={22} className="animate-spin text-muted" />

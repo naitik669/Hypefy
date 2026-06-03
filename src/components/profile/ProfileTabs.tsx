@@ -23,6 +23,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
   const [posts, setPosts] = useState<PostRow[] | null>(null);
   const [shots, setShots] = useState<ShotRow[] | null>(null);
   const [saved, setSaved] = useState<PostRow[] | null>(null);
+  const [savedShots, setSavedShots] = useState<ShotRow[] | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -51,17 +52,30 @@ export function ProfileTabs({ userId }: { userId: string }) {
   }
 
   async function loadSaved() {
-    const { data } = await supabase
-      .from("saved_posts")
-      .select("post_id, posts(id, image_url, caption, created_at)")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
-    const rows = (data ?? []).flatMap((row: { posts: PostRow | PostRow[] | null }) => {
+    const [postsRes, shotsRes] = await Promise.all([
+      supabase
+        .from("saved_posts")
+        .select("post_id, created_at, posts(id, image_url, caption, created_at)")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("saved_shots")
+        .select("shot_id, created_at, shots(id, media_url, caption, created_at)")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
+    ]);
+    const postRows = (postsRes.data ?? []).flatMap((row: { posts: PostRow | PostRow[] | null }) => {
       const p = row.posts;
       if (!p) return [];
       return Array.isArray(p) ? p : [p];
     });
-    setSaved(rows);
+    setSaved(postRows);
+    const shotRows = (shotsRes.data ?? []).flatMap((row: { shots: ShotRow | ShotRow[] | null }) => {
+      const s = row.shots;
+      if (!s) return [];
+      return Array.isArray(s) ? s : [s];
+    });
+    setSavedShots(shotRows);
   }
 
   return (
@@ -136,20 +150,38 @@ export function ProfileTabs({ userId }: { userId: string }) {
         )
       )}
 
-      {/* Saved */}
+      {/* Saved — posts + shots */}
       {tab === "Saved" && (
-        saved === null ? (
+        saved === null || savedShots === null ? (
           <GridSkeleton />
-        ) : saved.length === 0 ? (
+        ) : saved.length === 0 && savedShots.length === 0 ? (
           <EmptyState
             icon={Bookmark}
-            title="No saved posts yet"
-            text="Save posts you want to revisit."
+            title="Nothing saved yet"
+            text="Save posts and Shots you want to revisit."
           />
         ) : (
           <div className="grid grid-cols-3 gap-0.5">
             {saved.map((p) => (
-              <PostThumb key={p.id} post={p} />
+              <PostThumb key={`p-${p.id}`} post={p} />
+            ))}
+            {savedShots.map((s) => (
+              <Link
+                key={`s-${s.id}`}
+                href={`/shots/${s.id}`}
+                className="relative block aspect-square overflow-hidden bg-surface"
+              >
+                <video
+                  src={s.media_url}
+                  className="h-full w-full object-cover"
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+                <span className="absolute right-1.5 top-1.5 text-white drop-shadow">
+                  <Play size={14} className="fill-white" />
+                </span>
+              </Link>
             ))}
           </div>
         )
