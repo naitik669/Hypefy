@@ -23,7 +23,7 @@ export function HypeMascot({
   className?: string;
 }) {
   const px = SIZES[size];
-  const h = Math.round(px * 1.12);
+  const h = Math.round(px * 1.16);
   const gid = `mascot-grad-${size}`;
 
   return (
@@ -38,24 +38,39 @@ export function HypeMascot({
         style={{ background: "radial-gradient(circle, rgba(200,255,0,0.30) 0%, transparent 68%)" }}
       />
 
-      <svg viewBox="0 0 100 112" width={px} height={h} className="relative" fill="none">
+      <svg viewBox="0 0 100 116" width={px} height={h} className="relative" fill="none">
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#e7ff6e" />
+            <stop offset="0%" stopColor="#eaff85" />
+            <stop offset="55%" stopColor="#d8ff3a" />
             <stop offset="100%" stopColor="var(--color-accent)" />
           </linearGradient>
         </defs>
 
-        {/* Flame tips */}
-        <path d="M26 43 Q21 28 27 12 Q33 27 38 43 Z" fill="#eaff85" />
-        <path d="M44 41 Q46 16 50 1  Q54 16 56 41 Z" fill="#eaff85" />
-        <path d="M74 43 Q79 28 73 12 Q67 27 62 43 Z" fill="#eaff85" />
+        {/* Little stubby arms (behind body) */}
+        <path d="M14 72 q-12 -1 -13 9 q9 4 15 -2 z" fill="var(--color-accent)" />
+        <path d="M86 72 q12 -1 13 9 q-9 4 -15 -2 z" fill="var(--color-accent)" />
 
-        {/* Body */}
-        <rect x="14" y="38" width="72" height="68" rx="24" fill={`url(#${gid})`} />
-        {/* Arm nubs */}
-        <ellipse cx="8" cy="74" rx="10" ry="7.5" fill="var(--color-accent)" />
-        <ellipse cx="92" cy="74" rx="10" ry="7.5" fill="var(--color-accent)" />
+        {/* Little feet (behind body) */}
+        <ellipse cx="38" cy="107" rx="9" ry="6" fill="#bfe600" />
+        <ellipse cx="62" cy="107" rx="9" ry="6" fill="#bfe600" />
+
+        {/* Organic flame body — soft wavy licks + chubby round belly */}
+        <path
+          d="M50 5
+             C 55 19 57 27 60 33
+             C 64 26 71 24 76 31
+             C 82 42 89 54 89 71
+             C 89 93 73 107 50 107
+             C 27 107 11 93 11 71
+             C 11 54 18 42 24 31
+             C 29 24 36 26 40 33
+             C 43 27 45 19 50 5 Z"
+          fill={`url(#${gid})`}
+        />
+
+        {/* Soft glossy belly highlight */}
+        <ellipse cx="36" cy="52" rx="15" ry="9" fill="#ffffff" opacity="0.12" />
 
         {/* Eyes */}
         <EyeLayer mood={mood} animated={animated} />
