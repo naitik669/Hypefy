@@ -23,17 +23,12 @@ export default async function SetupProfilePage() {
     bio: profile?.bio ?? "",
     tags: profile?.profileTags ?? [],
     avatarHue: profile?.avatarHue ?? hueFromId(user.id),
+    avatarUrl: profile?.avatarUrl ?? null,
   };
 
   return (
     <main className="relative mx-auto w-full max-w-[480px] bg-background">
-      {/* Subtle glow */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 max-w-[480px]">
-        <div className="animate-drift absolute -left-24 top-1/4 h-72 w-72 rounded-full bg-accent/10 blur-[120px]" />
-      </div>
-      <div className="relative z-10">
-        <SetupStepper userId={user.id} initial={initial} />
-      </div>
+      <SetupStepper userId={user.id} initial={initial} />
     </main>
   );
 }

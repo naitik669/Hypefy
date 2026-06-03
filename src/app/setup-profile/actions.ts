@@ -9,6 +9,7 @@ export type SaveProfileInput = {
   bio: string;
   profileTags: string[];
   avatarHue: number;
+  avatarUrl?: string | null;
 };
 
 export async function saveProfile(
@@ -37,6 +38,7 @@ export async function saveProfile(
       bio: input.bio.trim() || null,
       profile_tags: input.profileTags,
       avatar_hue: input.avatarHue,
+      avatar_url: input.avatarUrl ?? null,
       profile_completed: true,
     })
     .eq("id", user.id);
