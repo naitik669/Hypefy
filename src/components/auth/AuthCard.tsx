@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -39,6 +39,19 @@ export function AuthCard({ mode }: { mode: Mode }) {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Prefill email + show a notice when redirected here (e.g. from signup
+  // because the email is already registered). Read from the URL directly
+  // so the page can stay static (no useSearchParams Suspense boundary).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const prefill = params.get("email");
+    if (prefill) setEmail(prefill);
+    if (mode === "signin" && params.get("exists") === "1") {
+      setNotice("That email is already registered. Sign in to continue.");
+    }
+  }, [mode]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,9 +75,22 @@ export function AuthCard({ mode }: { mode: Mode }) {
             emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
         });
-        if (error) throw error;
-        // If email confirmation is on, there's no active session yet —
-        // send them to the branded "check your inbox" screen.
+        if (error) {
+          // Confirmations off: Supabase returns an explicit error.
+          if (/already registered|already exists|already in use/i.test(error.message)) {
+            router.push(`/signin?exists=1&email=${encodeURIComponent(email)}`);
+            return;
+          }
+          throw error;
+        }
+        // Confirmations on: Supabase hides existing emails (enumeration
+        // protection) by returning a user with an empty identities array.
+        if (data.user && (data.user.identities?.length ?? 0) === 0) {
+          router.push(`/signin?exists=1&email=${encodeURIComponent(email)}`);
+          return;
+        }
+        // New account. If a session exists, go straight to setup; otherwise
+        // confirmation is required — show the branded "check your inbox" screen.
         if (data.session) {
           router.push("/setup-profile");
           router.refresh();
@@ -114,8 +140,15 @@ export function AuthCard({ mode }: { mode: Mode }) {
           <p className="mt-1 text-[13px] text-muted">{t.subtitle}</p>
         </div>
 
+        {/* Notice (e.g. redirected from signup — email already registered) */}
+        {notice && (
+          <p className="mt-5 rounded-xl border border-accent/20 bg-accent/10 px-3 py-2.5 text-center text-xs font-medium text-accent">
+            {notice}
+          </p>
+        )}
+
         {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className={`flex flex-col gap-3 ${notice ? "mt-3" : "mt-6"}`}>
           <input
             type="email"
             inputMode="email"
