@@ -47,6 +47,7 @@ function notifHref(n: Notif): string {
   if (n.type === "follow") return n.actor?.username ? `/u/${n.actor.username}` : "#";
   if (n.target_type === "post" && n.target_id) return `/p/${n.target_id}`;
   if (n.target_type === "shot" && n.target_id) return `/shows/${n.target_id}`;
+  if (n.target_type === "conversation" && n.target_id) return `/messages/${n.target_id}`;
   return "#";
 }
 

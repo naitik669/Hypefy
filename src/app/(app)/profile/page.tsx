@@ -5,8 +5,8 @@ import { getProfile, hueFromId } from "@/lib/profile";
 import { Avatar } from "@/components/ui/Avatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
+import { FollowStats } from "@/components/profile/FollowStats";
 import { SignOutButton } from "@/components/SignOutButton";
-import { formatCount } from "@/lib/mock";
 
 async function fetchStats(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const [postsRes, followersRes, followingRes] = await Promise.all([
@@ -19,15 +19,6 @@ async function fetchStats(supabase: Awaited<ReturnType<typeof createClient>>, us
     followers: followersRes.count ?? 0,
     following: followingRes.count ?? 0,
   };
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex flex-1 flex-col items-center gap-0.5">
-      <span className="text-lg font-bold tabular-nums leading-none">{formatCount(value)}</span>
-      <span className="text-xs text-muted">{label}</span>
-    </div>
-  );
 }
 
 export default async function ProfilePage() {
@@ -68,11 +59,13 @@ export default async function ProfilePage() {
           <div className="-mt-11">
             <Avatar name={name} hue={hue} size={84} className="rounded-[26px] ring-4 ring-background" />
           </div>
-          <div className="flex flex-1 pb-1">
-            <Stat label="Posts" value={stats.posts} />
-            <Stat label="Followers" value={stats.followers} />
-            <Stat label="Following" value={stats.following} />
-          </div>
+          <FollowStats
+            userId={user.id}
+            currentUserId={user.id}
+            posts={stats.posts}
+            followers={stats.followers}
+            following={stats.following}
+          />
         </div>
 
         {/* Identity */}

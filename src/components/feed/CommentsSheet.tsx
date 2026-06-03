@@ -120,8 +120,13 @@ export function CommentsSheet({
     await supabase.rpc("toggle_hype", { p_target_type: "comment", p_target_id: c.id, p_owner_id: null });
   }
 
-  function reportComment(id: string) {
+  async function reportComment(id: string) {
     mutateFn(id, (x) => ({ ...x, reported: true }));
+    if (currentUserId) {
+      await supabase
+        .from("reports")
+        .insert({ reporter_id: currentUserId, target_type: "comment", target_id: id, reason: "comment" });
+    }
     setTimeout(() => mutateFn(id, (x) => ({ ...x, reported: false })), 1500);
   }
 

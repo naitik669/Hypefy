@@ -1,15 +1,14 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/ui/Avatar";
-import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { PublicProfileTabs } from "@/components/profile/PublicProfileTabs";
 import { FollowButton } from "@/components/profile/FollowButton";
+import { MessageButton } from "@/components/profile/MessageButton";
+import { FollowStats } from "@/components/profile/FollowStats";
 import { SignOutButton } from "@/components/SignOutButton";
-import { hueFromId, bannerGradient } from "@/lib/profile";
-import { formatCount } from "@/lib/mock";
+import { hueFromId } from "@/lib/profile";
 
 async function fetchStats(supabase: any, userId: string) {
   const [postsRes, followersRes, followingRes] = await Promise.all([
@@ -18,15 +17,6 @@ async function fetchStats(supabase: any, userId: string) {
     supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", userId),
   ]);
   return { posts: postsRes.count ?? 0, followers: followersRes.count ?? 0, following: followingRes.count ?? 0 };
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex flex-1 flex-col items-center gap-0.5">
-      <span className="text-lg font-bold tabular-nums leading-none">{formatCount(value)}</span>
-      <span className="text-xs text-muted">{label}</span>
-    </div>
-  );
 }
 
 export default async function PublicProfilePage({
@@ -87,11 +77,13 @@ export default async function PublicProfilePage({
           <div className="-mt-11">
             <Avatar name={name} hue={hue} size={84} className="rounded-[26px] ring-4 ring-background" />
           </div>
-          <div className="flex flex-1 pb-1">
-            <Stat label="Posts" value={stats.posts} />
-            <Stat label="Followers" value={stats.followers} />
-            <Stat label="Following" value={stats.following} />
-          </div>
+          <FollowStats
+            userId={profile.id}
+            currentUserId={currentUser?.id ?? null}
+            posts={stats.posts}
+            followers={stats.followers}
+            following={stats.following}
+          />
         </div>
 
         {/* Identity */}
@@ -140,12 +132,15 @@ export default async function PublicProfilePage({
               <SignOutButton />
             </>
           ) : currentUser ? (
-            <FollowButton
-              currentUserId={currentUser.id}
-              targetUserId={profile.id}
-              targetUsername={profile.username}
-              initialFollowing={isFollowing}
-            />
+            <>
+              <FollowButton
+                currentUserId={currentUser.id}
+                targetUserId={profile.id}
+                targetUsername={profile.username}
+                initialFollowing={isFollowing}
+              />
+              <MessageButton currentUserId={currentUser.id} targetUserId={profile.id} />
+            </>
           ) : (
             <Link href="/signin" className="flex h-10 flex-1 items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-ink">
               Sign in to follow

@@ -30,6 +30,8 @@ export function ShareSheet({
   const [sent, setSent] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const [reposted, setReposted] = useState(false);
+  const [sendingDm, setSendingDm] = useState(false);
+  const [dmDone, setDmDone] = useState(false);
 
   // Fetch everyone the user has a connection with:
   // following + followers + notification interaction partners (hypers, commenters, etc.)
@@ -122,6 +124,26 @@ export function ShareSheet({
     setTimeout(() => { setReposted(false); onClose(); }, 900);
   }
 
+  // Actually send the post into DMs for each selected friend
+  async function sendToSelected() {
+    if (sendingDm || sent.size === 0) return;
+    setSendingDm(true);
+    const ids = [...sent];
+    await Promise.all(
+      ids.map(async (uid) => {
+        const { data: convId, error } = await supabase.rpc("get_or_create_dm", { p_other: uid });
+        if (error || !convId) return;
+        await supabase.rpc("send_message", {
+          p_conversation_id: convId, p_body: null, p_kind: "post",
+          p_post_id: postId, p_reply_to_id: null,
+        });
+      }),
+    );
+    setSendingDm(false);
+    setDmDone(true);
+    setTimeout(() => { setDmDone(false); setSent(new Set()); onClose(); }, 900);
+  }
+
   return (
     <BottomSheet open={open} onClose={onClose} title="Send to">
       {/* ── Search ────────────────────────────────────────── */}
@@ -186,10 +208,17 @@ export function ShareSheet({
       {sent.size > 0 && (
         <button
           type="button"
-          onClick={() => { setSent(new Set()); onClose(); }}
-          className="mt-3 flex h-11 w-full items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99]"
+          onClick={sendToSelected}
+          disabled={sendingDm}
+          className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-60"
         >
-          Send to {sent.size} {sent.size === 1 ? "person" : "people"}
+          {sendingDm ? (
+            <><Loader2 size={16} className="animate-spin" /> Sending…</>
+          ) : dmDone ? (
+            <><Check size={16} /> Sent</>
+          ) : (
+            <>Send to {sent.size} {sent.size === 1 ? "person" : "people"}</>
+          )}
         </button>
       )}
 

@@ -97,8 +97,11 @@ export function PostActionsSheet({
     setTimeout(() => { setCopied(false); onClose(); }, 800);
   }
 
-  function report() {
+  async function report() {
     setReported(true);
+    await supabase
+      .from("reports")
+      .insert({ reporter_id: currentUserId, target_type: "post", target_id: postId, reason: "post" });
     setTimeout(() => { setReported(false); onClose(); }, 900);
   }
 
