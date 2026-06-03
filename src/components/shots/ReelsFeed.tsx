@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
+import { HypeParticles } from "@/components/feed/HypeParticles";
 import { formatCount } from "@/lib/mock";
 
 type ReelProfile = { display_name: string | null; avatar_hue: number | null; username: string | null } | null;
@@ -79,8 +80,9 @@ function ReelCard({
   const [saved, setSaved] = useState(false);
   const [savePending, setSavePending] = useState(false);
 
-  // Double-tap-to-Hype
-  const [burst, setBurst] = useState(false);
+  // Double-tap-to-Hype (animations mirror the feed: 380ms burst + 640ms particles)
+  const [hypeBurst, setHypeBurst] = useState(false);
+  const [showParticles, setShowParticles] = useState(false);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTap = useRef(0);
 
@@ -145,6 +147,12 @@ function ReelCard({
     setHypePending(true);
     setHyped(!prev);
     setHypeCount((c) => c + (prev ? -1 : 1));
+    if (!prev) {
+      setHypeBurst(true);
+      setShowParticles(true);
+      setTimeout(() => setHypeBurst(false), 380);
+      setTimeout(() => setShowParticles(false), 640);
+    }
     try {
       const { data, error } = await supabase.rpc("toggle_hype", {
         p_target_type: "shot",
@@ -193,10 +201,12 @@ function ReelCard({
     }
   }
 
+  // Replay the burst without un-hyping (already hyped).
   function playBurst() {
-    setBurst(false);
-    requestAnimationFrame(() => setBurst(true));
-    setTimeout(() => setBurst(false), 750);
+    setHypeBurst(true);
+    setShowParticles(true);
+    setTimeout(() => setHypeBurst(false), 380);
+    setTimeout(() => setShowParticles(false), 640);
   }
 
   // Single tap → play/pause (slight delay), double tap → Hype (add-only)
@@ -208,8 +218,11 @@ function ReelCard({
         tapTimer.current = null;
       }
       lastTap.current = 0;
-      if (!hyped && !hypePending && currentUserId) toggleHype();
-      playBurst();
+      if (!hyped && !hypePending && currentUserId) {
+        toggleHype(); // burst handled inside
+      } else {
+        playBurst(); // already hyped → replay burst, do NOT un-hype
+      }
     } else {
       lastTap.current = now;
       if (tapTimer.current) clearTimeout(tapTimer.current);
@@ -233,10 +246,14 @@ function ReelCard({
         onClick={handleTap}
       />
 
-      {/* Double-tap Hype burst */}
-      {burst && (
+      {/* Double-tap Hype burst — matches the feed */}
+      {hypeBurst && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <Star size={120} className="animate-hype-pop text-hype" fill="currentColor" />
+          <Star
+            size={88}
+            className="animate-hype-pop text-hype drop-shadow-[0_4px_20px_rgba(255,208,0,0.5)]"
+            fill="currentColor"
+          />
         </div>
       )}
 
@@ -272,7 +289,14 @@ function ReelCard({
           onClick={toggleHype}
           disabled={hypePending}
         >
-          <Star size={32} className={hyped ? "text-hype" : "text-white"} fill={hyped ? "currentColor" : "none"} />
+          <span className="relative">
+            <Star
+              size={32}
+              className={`${hypeBurst ? "animate-hype-burst" : ""} ${hyped ? "text-hype" : "text-white"}`}
+              fill={hyped ? "currentColor" : "none"}
+            />
+            {showParticles && <HypeParticles size={10} />}
+          </span>
         </RailButton>
 
         <RailButton
