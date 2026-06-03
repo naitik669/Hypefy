@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { HypefyMark } from "@/components/HypefyMark";
+import { FeatureCarousel } from "@/components/auth/FeatureCarousel";
 
 type Mode = "signin" | "signup";
 
@@ -97,6 +98,9 @@ export function AuthCard({ mode }: { mode: Mode }) {
 
   return (
     <div className="animate-rise w-full max-w-[360px]">
+      {/* What Hypefy does — scrollable personality cards */}
+      <FeatureCarousel />
+
       {/* Frosted glass card */}
       <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04] p-7 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)] backdrop-blur-2xl">
         {/* top inner highlight */}
