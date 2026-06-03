@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, Camera, ChevronRight } from "lucide-react";
+import { Image as ImageIcon, Video, Clock, ChevronRight } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 
 const options = [
   { key: "post", icon: ImageIcon, title: "New Post", text: "Share a photo and your thoughts.", from: 265, to: 320, href: "/create/post" },
-  { key: "shot", icon: Camera, title: "Add Shot", text: "A quick moment — gone in 24 hours.", from: 150, to: 190, href: "/create/shot" },
+  { key: "shot", icon: Video, title: "Add Shot", text: "A short video reel for the Shots feed.", from: 150, to: 190, href: "/create/shot" },
+  { key: "show", icon: Clock, title: "Add Show", text: "A moment that disappears in 24 hours.", from: 30, to: 350, href: "/shows/add" },
 ] as const;
 
 export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => void }) {

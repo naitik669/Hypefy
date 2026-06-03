@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, Camera } from "lucide-react";
+import { Image as ImageIcon, Video, Clock } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { CreateActionCard } from "@/components/create/CreateActionCard";
 
@@ -17,12 +17,21 @@ const actions = [
   },
   {
     key: "shot",
-    icon: Camera,
+    icon: Video,
     title: "Add Shot",
-    text: "A quick moment — gone in 24 hours.",
+    text: "A short video reel for the Shots feed.",
     from: 150,
     to: 190,
     href: "/create/shot",
+  },
+  {
+    key: "show",
+    icon: Clock,
+    title: "Add Show",
+    text: "A moment that disappears in 24 hours.",
+    from: 30,
+    to: 350,
+    href: "/shows/add",
   },
 ] as const;
 

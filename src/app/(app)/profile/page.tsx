@@ -94,16 +94,17 @@ export default async function ProfilePage() {
               {showcaseShots.map((shot) => (
                 <Link
                   key={shot.id}
-                  href={`/shows/${shot.id}`}
+                  href="/shots"
                   className="flex w-16 shrink-0 flex-col items-center gap-1.5"
                 >
-                  {/* Circular thumbnail with accent ring */}
+                  {/* Circular video thumbnail with accent ring */}
                   <div className="h-16 w-16 overflow-hidden rounded-full ring-2 ring-accent ring-offset-2 ring-offset-background">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <video
                       src={shot.media_url}
-                      alt={shot.caption ?? "Showcase"}
                       className="h-full w-full object-cover"
+                      muted
+                      playsInline
+                      preload="metadata"
                     />
                   </div>
                   <span className="max-w-full truncate text-center text-[10px] text-muted leading-tight">

@@ -57,15 +57,15 @@ export default function AddShowPage() {
       const ext = capturedFile.name.split(".").pop() ?? "jpg";
       const path = `${user.id}/${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage
-        .from("shot-media")
+        .from("show-media")
         .upload(path, capturedFile, { contentType: capturedFile.type, upsert: false });
 
       if (uploadErr) { setError("Upload failed: " + uploadErr.message); return; }
 
-      const { data: pub } = supabase.storage.from("shot-media").getPublicUrl(path);
+      const { data: pub } = supabase.storage.from("show-media").getPublicUrl(path);
 
-      // 3. Insert into shots table
-      const { error: insertErr } = await supabase.from("shots").insert({
+      // 3. Insert into shows table (a 24-hour Story)
+      const { error: insertErr } = await supabase.from("shows").insert({
         user_id: user.id,
         media_url: pub.publicUrl,
         caption: caption.trim() || null,
@@ -193,7 +193,7 @@ export default function AddShowPage() {
               type="button"
               onClick={share}
               disabled={pending}
-              className="flex h-14 items-center gap-2 rounded-pill bg-accent px-8 text-sm font-bold text-accent-ink shadow-[0_0_24px_4px_rgba(200,255,0,0.4)] transition-transform active:scale-95 disabled:opacity-60"
+              className="flex h-14 items-center gap-2 rounded-pill bg-accent px-8 text-sm font-bold text-accent-ink transition-transform active:scale-95 disabled:opacity-60"
             >
               {pending ? (
                 <><Loader2 size={18} className="animate-spin" /> Sharing…</>

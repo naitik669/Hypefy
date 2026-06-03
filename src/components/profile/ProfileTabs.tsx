@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Grid3x3, Zap, Bookmark, PlusCircle, Camera } from "lucide-react";
+import { Grid3x3, Zap, Bookmark, PlusCircle, Video, Play } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -46,7 +46,6 @@ export function ProfileTabs({ userId }: { userId: string }) {
       .from("shots")
       .select("id, media_url, caption, created_at")
       .eq("user_id", userId)
-      .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false });
     setShots(data ?? []);
   }
@@ -111,18 +110,26 @@ export function ProfileTabs({ userId }: { userId: string }) {
           <GridSkeleton />
         ) : shots.length === 0 ? (
           <EmptyState
-            icon={Camera}
+            icon={Video}
             title="No Shots yet"
-            text="Share a moment that lasts 24 hours."
+            text="Shots are short video reels."
             ctaLabel="Add Shot"
             ctaHref="/create/shot"
           />
         ) : (
           <div className="grid grid-cols-3 gap-0.5">
             {shots.map((s) => (
-              <Link key={s.id} href={`/shots`} className="aspect-[3/4] block overflow-hidden bg-surface">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={s.media_url} alt={s.caption ?? "Shot"} className="h-full w-full object-cover" />
+              <Link key={s.id} href="/shots" className="relative block aspect-[3/4] overflow-hidden bg-surface">
+                <video
+                  src={s.media_url}
+                  className="h-full w-full object-cover"
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+                <span className="absolute right-1.5 top-1.5 text-white drop-shadow">
+                  <Play size={14} className="fill-white" />
+                </span>
               </Link>
             ))}
           </div>

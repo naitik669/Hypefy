@@ -76,9 +76,9 @@ export default async function HomePage() {
     .eq("id", user.id)
     .maybeSingle();
 
-  // Check if the current user already has an active (unexpired) show
+  // Check if the current user already has an active (unexpired) Show (story)
   const { data: myActiveShow } = await supabase
-    .from("shots")
+    .from("shows")
     .select("id")
     .eq("user_id", user.id)
     .gt("expires_at", new Date().toISOString())
@@ -93,16 +93,16 @@ export default async function HomePage() {
       }
     : undefined;
 
-  // Active shots from OTHERS for Shows row
-  const { data: activeShots } = await supabase
-    .from("shots")
+  // Active Shows (stories) from OTHERS for the Shows row
+  const { data: activeShows } = await supabase
+    .from("shows")
     .select("id, user_id, media_url, profiles(display_name, avatar_hue, username)")
     .gt("expires_at", new Date().toISOString())
     .neq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(20);
 
-  const shows = (activeShots ?? []).map((s: any) => {
+  const shows = (activeShows ?? []).map((s: any) => {
     const p = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
     return { id: s.id, name: p?.display_name ?? p?.username ?? "User", hue: p?.avatar_hue ?? 280, seen: false };
   });

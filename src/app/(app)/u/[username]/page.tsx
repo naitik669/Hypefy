@@ -110,12 +110,11 @@ export default async function PublicProfilePage({
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Showcase</p>
             <div className="no-scrollbar flex gap-4 overflow-x-auto pb-1">
               {(showcaseShots ?? []).map((shot: any) => (
-                <Link key={shot.id} href={`/shows/${shot.id}`} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+                <Link key={shot.id} href="/shots" className="flex w-16 shrink-0 flex-col items-center gap-1.5">
                   <div className="h-16 w-16 overflow-hidden rounded-full ring-2 ring-accent ring-offset-2 ring-offset-background">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={shot.media_url} alt={shot.caption ?? "Show"} className="h-full w-full object-cover" />
+                    <video src={shot.media_url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
                   </div>
-                  <span className="max-w-full truncate text-center text-[10px] text-muted">{shot.caption ?? "Show"}</span>
+                  <span className="max-w-full truncate text-center text-[10px] text-muted">{shot.caption ?? "Shot"}</span>
                 </Link>
               ))}
             </div>

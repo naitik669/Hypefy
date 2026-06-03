@@ -1,42 +1,37 @@
-import { Zap } from "lucide-react";
+import { Video } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { RealShotsViewer } from "@/components/shots/RealShotsViewer";
+import { ReelsFeed } from "@/components/shots/ReelsFeed";
 
 export default async function ShotsPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
+  // Shots = permanent video reels (newest first)
   const { data: shots } = await supabase
     .from("shots")
-    .select("id, user_id, media_url, caption, created_at, expires_at, in_showcase, hype_count, profiles(display_name, avatar_hue, username)")
-    .gt("expires_at", new Date().toISOString())
+    .select("id, user_id, media_url, caption, created_at, hype_count, profiles(display_name, avatar_hue, username)")
     .order("created_at", { ascending: false })
     .limit(50);
 
-  const normalized = (shots ?? []).map((s) => ({
+  const reels = (shots ?? []).map((s) => ({
     ...s,
-    in_showcase: s.in_showcase as boolean,
     profiles: Array.isArray(s.profiles) ? s.profiles[0] ?? null : s.profiles,
   }));
 
-  if (normalized.length === 0) {
+  if (reels.length === 0) {
     return (
       <EmptyState
-        icon={Zap}
+        icon={Video}
         title="No Shots yet"
-        text="Be the first to share a 24-hour moment."
+        text="Shots are short video reels. Post the first one."
         ctaLabel="Add Shot"
         ctaHref="/create/shot"
       />
     );
   }
 
-  return (
-    <RealShotsViewer
-      shots={normalized}
-      startIdx={0}
-      currentUserId={user?.id ?? null}
-    />
-  );
+  return <ReelsFeed reels={reels} currentUserId={user?.id ?? null} />;
 }

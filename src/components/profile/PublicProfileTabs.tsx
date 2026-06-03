@@ -151,16 +151,15 @@ export function PublicProfileTabs({
           <EmptyState
             icon={Zap}
             title="No Shots yet"
-            text="24-hour moments will show here."
+            text="Short video reels will show here."
             ctaLabel={isOwn ? "Add Shot" : undefined}
-            ctaHref={isOwn ? "/shows/add" : undefined}
+            ctaHref={isOwn ? "/create/shot" : undefined}
           />
         ) : (
           <div className="grid grid-cols-3 gap-0.5">
             {shots.map((s) => (
-              <Link key={s.id} href={`/shows/${s.id}`} className="aspect-[3/4] block overflow-hidden bg-surface">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={s.media_url} alt={s.caption ?? "Shot"} className="h-full w-full object-cover" />
+              <Link key={s.id} href="/shots" className="relative block aspect-[3/4] overflow-hidden bg-surface">
+                <video src={s.media_url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
               </Link>
             ))}
           </div>

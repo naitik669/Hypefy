@@ -2,12 +2,15 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, X, Loader2, Send, Link2, Check } from "lucide-react";
+import { Video, X, Loader2, Send, Link2, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-const MAX_SIZE_MB = 20;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const MAX_SIZE_MB = 60;
+const ALLOWED_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/ogg"];
 
+/**
+ * Shot composer — Shots are short VIDEO reels (permanent, vertical feed).
+ */
 export function ShotComposer({ userId }: { userId: string }) {
   const router = useRouter();
   const supabase = createClient();
@@ -27,7 +30,7 @@ export function ShotComposer({ userId }: { userId: string }) {
     if (!f) return;
     setFileError(null);
     if (!ALLOWED_TYPES.includes(f.type)) {
-      setFileError("Allowed: JPEG, PNG, WebP, GIF.");
+      setFileError("Shots are videos. Allowed: MP4, WebM, MOV.");
       return;
     }
     if (f.size > MAX_SIZE_MB * 1024 * 1024) {
@@ -47,7 +50,7 @@ export function ShotComposer({ userId }: { userId: string }) {
 
   async function copyLink() {
     if (!postedId) return;
-    const url = `${window.location.origin}/shots/${postedId}`;
+    const url = `${window.location.origin}/shots`;
     await navigator.clipboard.writeText(url).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
@@ -57,7 +60,7 @@ export function ShotComposer({ userId }: { userId: string }) {
     if (!file) return;
     setPostError(null);
     startTransition(async () => {
-      const ext = file.name.split(".").pop() ?? "jpg";
+      const ext = file.name.split(".").pop() ?? "mp4";
       const path = `${userId}/${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage
         .from("shot-media")
@@ -92,13 +95,32 @@ export function ShotComposer({ userId }: { userId: string }) {
         </div>
         <div>
           <h2 className="text-2xl font-extrabold">Shot posted!</h2>
-          <p className="mt-1 text-sm text-muted">It'll disappear in 24 hours.</p>
+          <p className="mt-1 text-sm text-muted">Your reel is live in the Shots feed.</p>
         </div>
-        <button type="button" onClick={copyLink} className="flex h-12 w-full max-w-xs items-center justify-center gap-2 rounded-xl border border-border bg-surface text-sm font-semibold transition-colors hover:bg-elevated">
-          {copied ? <><Check size={16} className="text-accent" /> Link copied!</> : <><Link2 size={16} /> Copy Shot link</>}
+        <button
+          type="button"
+          onClick={copyLink}
+          className="flex h-12 w-full max-w-xs items-center justify-center gap-2 rounded-xl border border-border bg-surface text-sm font-semibold transition-colors hover:bg-elevated"
+        >
+          {copied ? (
+            <>
+              <Check size={16} className="text-accent" /> Link copied!
+            </>
+          ) : (
+            <>
+              <Link2 size={16} /> Copy Shots link
+            </>
+          )}
         </button>
-        <button type="button" onClick={() => { router.push("/home"); router.refresh(); }} className="flex h-12 w-full max-w-xs items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-ink">
-          Back to home
+        <button
+          type="button"
+          onClick={() => {
+            router.push("/shots");
+            router.refresh();
+          }}
+          className="flex h-12 w-full max-w-xs items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-ink"
+        >
+          Watch Shots
         </button>
       </div>
     );
@@ -106,23 +128,35 @@ export function ShotComposer({ userId }: { userId: string }) {
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-8 pt-2">
-      {/* Media picker */}
+      {/* Video picker */}
       <div
-        className="relative flex min-h-[260px] cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-border bg-surface hover:border-accent/50"
+        className="relative flex min-h-[300px] cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-border bg-surface hover:border-accent/50"
         onClick={() => !preview && fileRef.current?.click()}
       >
         {preview ? (
           <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={preview} alt="Preview" className="max-h-80 w-full object-cover" />
-            <button type="button" onClick={(e) => { e.stopPropagation(); removeFile(); }} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white">
+            <video
+              src={preview}
+              className="max-h-[60vh] w-full bg-black object-contain"
+              controls
+              playsInline
+            />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeFile();
+              }}
+              className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white"
+            >
               <X size={16} />
             </button>
           </>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <Camera size={40} className="text-faint" />
-            <p className="text-sm text-muted">Tap to choose media</p>
+            <Video size={40} className="text-faint" />
+            <p className="text-sm text-muted">Tap to choose a video</p>
+            <p className="text-xs text-faint">MP4 · WebM · MOV — up to {MAX_SIZE_MB}MB</p>
           </div>
         )}
       </div>
@@ -130,13 +164,32 @@ export function ShotComposer({ userId }: { userId: string }) {
       {fileError && <p className="text-xs text-danger">{fileError}</p>}
 
       {/* Caption */}
-      <textarea value={caption} onChange={(e) => setCaption(e.target.value.slice(0, 150))} rows={2} placeholder="Add a caption… (optional)" className="input resize-none" />
+      <textarea
+        value={caption}
+        onChange={(e) => setCaption(e.target.value.slice(0, 150))}
+        rows={2}
+        placeholder="Add a caption… (optional)"
+        className="input resize-none"
+      />
       <p className="-mt-2 text-right text-xs text-faint">{caption.length}/150</p>
 
       {postError && <p className="rounded-xl bg-danger/10 px-3 py-2 text-xs text-danger">{postError}</p>}
 
-      <button type="button" onClick={handlePost} disabled={!file || pending} className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-accent text-base font-bold text-accent-ink shadow-[0_0_24px_2px_rgba(200,255,0,0.3)] transition-transform active:scale-[0.99] disabled:opacity-50">
-        {pending ? <><Loader2 size={18} className="animate-spin" /> Posting…</> : <><Send size={18} /> Post Shot</>}
+      <button
+        type="button"
+        onClick={handlePost}
+        disabled={!file || pending}
+        className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-accent text-base font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-50"
+      >
+        {pending ? (
+          <>
+            <Loader2 size={18} className="animate-spin" /> Posting…
+          </>
+        ) : (
+          <>
+            <Send size={18} /> Post Shot
+          </>
+        )}
       </button>
     </div>
   );
