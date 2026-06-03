@@ -48,20 +48,23 @@ export function FeatureCarousel() {
   return (
     <div className="-mx-1 mb-5 w-[calc(100%+0.5rem)]">
       <div className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1">
-        {FEATURES.map((f) => {
+        {FEATURES.map((f, i) => {
           const Icon = f.icon;
           return (
             <div
               key={f.title}
-              className="relative flex min-w-[68%] snap-center flex-col gap-3 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.05] p-4 backdrop-blur-xl"
+              style={{ animationDelay: `${i * 90}ms` }}
+              className="animate-rise relative flex min-w-[68%] snap-center flex-col gap-3 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.05] p-4 backdrop-blur-xl transition-transform duration-300 hover:-translate-y-0.5 active:scale-[0.98]"
             >
-              {/* soft corner glow */}
+              {/* soft corner glow — gently breathes */}
               <div
                 aria-hidden
-                className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full blur-2xl ${f.glow}`}
+                style={{ animationDelay: `${i * 400}ms` }}
+                className={`animate-glow-pulse pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full blur-2xl ${f.glow}`}
               />
               <span
-                className={`relative flex h-11 w-11 items-center justify-center rounded-2xl ${f.chip}`}
+                style={{ animationDelay: `${i * 500}ms` }}
+                className={`animate-float-y relative flex h-11 w-11 items-center justify-center rounded-2xl ${f.chip}`}
               >
                 <Icon size={22} strokeWidth={2.2} />
               </span>
