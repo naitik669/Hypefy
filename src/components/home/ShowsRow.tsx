@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
@@ -13,6 +13,17 @@ type CurrentUser = {
   hasActiveShow: boolean;
 };
 
+const STORAGE_KEY = "hypefy_seen_shows";
+
+function readSeen(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
 export function ShowsRow({
   shows,
   currentUser,
@@ -21,10 +32,22 @@ export function ShowsRow({
   currentUser?: CurrentUser;
 }) {
   const router = useRouter();
+  // Persisted across navigation via localStorage (resolved after mount to
+  // avoid hydration mismatch).
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
 
+  useEffect(() => {
+    setSeenIds(readSeen());
+  }, []);
+
   function handleShowTap(id: string) {
-    setSeenIds((prev) => new Set([...prev, id]));
+    setSeenIds((prev) => {
+      const next = new Set([...prev, id]);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
     router.push(`/shows/${id}`);
   }
 
