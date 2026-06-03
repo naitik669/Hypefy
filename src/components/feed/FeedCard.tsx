@@ -156,9 +156,23 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
     }
   }
 
-  function handleImageTap(e: React.MouseEvent) {
+  // Double-tap to Hype — only ever ADDS a hype, never removes one.
+  function playBurst() {
+    setHypeBurst(true);
+    setShowParticles(true);
+    setTimeout(() => setHypeBurst(false), 380);
+    setTimeout(() => setShowParticles(false), 640);
+  }
+
+  function handleImageTap() {
     const now = Date.now();
-    if (now - lastTapRef.current < 300) { e.preventDefault(); toggleHype(); }
+    if (now - lastTapRef.current < 300) {
+      if (!hyped && !hypePending) {
+        toggleHype(); // hypes (burst handled inside)
+      } else {
+        playBurst(); // already hyped → replay heart, do NOT unhype
+      }
+    }
     lastTapRef.current = now;
   }
 
@@ -197,12 +211,12 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         </button>
       </div>
 
-      {/* Image carousel */}
+      {/* Image carousel — double-tap to Hype (no navigation) */}
       {images.length > 0 && (
         <div className="relative mx-4 overflow-hidden rounded-2xl">
-          <Link href={`/p/${post.id}`} onClick={handleImageTap} className="block">
+          <div onClick={handleImageTap} className="block cursor-pointer select-none">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={images[imgIdx]} alt={post.caption ?? "Post"} className="w-full object-cover" />
+            <img src={images[imgIdx]} alt={post.caption ?? "Post"} className="w-full object-cover" draggable={false} />
 
             {/* Double-tap burst */}
             {hypeBurst && (
@@ -215,7 +229,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
                 <HypeParticles size={16} />
               </div>
             )}
-          </Link>
+          </div>
 
           {/* Multi-image dots + counter */}
           {images.length > 1 && (
