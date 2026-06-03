@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Star, MessageCircle, Send, Bookmark, MoreHorizontal } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -54,6 +54,10 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const supabase = createClient();
   const images = getImages(post);
 
+  // Resolve the current user ourselves when the parent didn't pass one,
+  // so hype/save work on every surface (profile modal, search, discover…).
+  const [uid, setUid] = useState(currentUserId);
+
   const [hyped, setHyped] = useState(post.initialHyped ?? false);
   const [hypeCount, setHypeCount] = useState(post.hype_count);
   const [hypePending, setHypePending] = useState(false);
@@ -66,6 +70,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const [imgIdx, setImgIdx] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentCount, setCommentCount] = useState(post.comment_count);
   const [shareOpen, setShareOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -74,6 +79,42 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const [liveBody, setLiveBody] = useState(post.body);
 
   const lastTapRef = useRef(0);
+
+  // ── Self-sync: resolve user + fetch hype/save/comment state ──
+  useEffect(() => {
+    let active = true;
+    async function sync() {
+      let id = uid;
+      if (!id) {
+        const { data } = await supabase.auth.getUser();
+        id = data.user?.id ?? "";
+        if (active && id) setUid(id);
+      }
+      if (!id) return;
+
+      // Always re-fetch the authoritative hype count + comment count
+      const [hypeRow, savedRow, countRow] = await Promise.all([
+        post.initialHyped === undefined
+          ? supabase.from("hypes").select("id").eq("user_id", id).eq("target_type", "post").eq("target_id", post.id).maybeSingle()
+          : Promise.resolve({ data: post.initialHyped ? { id: "x" } : null }),
+        post.initialSaved === undefined
+          ? supabase.from("saved_posts").select("id").eq("user_id", id).eq("post_id", post.id).maybeSingle()
+          : Promise.resolve({ data: post.initialSaved ? { id: "x" } : null }),
+        supabase.from("posts").select("hype_count, comment_count").eq("id", post.id).maybeSingle(),
+      ]);
+
+      if (!active) return;
+      setHyped(!!hypeRow.data);
+      setSaved(!!savedRow.data);
+      if (countRow.data) {
+        setHypeCount(countRow.data.hype_count ?? post.hype_count);
+        setCommentCount(countRow.data.comment_count ?? post.comment_count);
+      }
+    }
+    sync();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post.id]);
 
   const profile = post.profiles;
   const name = profile?.display_name ?? profile?.username ?? "User";
@@ -88,7 +129,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
 
   async function toggleHype() {
     if (hypePending) return;
-    if (!currentUserId) { showToast("Sign in to hype"); return; }
+    if (!uid) { showToast("Sign in to hype"); return; }
     const prev = hyped, prevCount = hypeCount;
     setHypePending(true);
     setHyped(!prev);
@@ -123,26 +164,19 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
 
   async function toggleSave() {
     if (savePending) return;
-    if (!currentUserId) { showToast("Sign in to save"); return; }
+    if (!uid) { showToast("Sign in to save"); return; }
     const prev = saved;
     setSavePending(true); setSaved(!prev);
     if (!prev) {
-      const { error } = await supabase.from("saved_posts").insert({ user_id: currentUserId, post_id: post.id });
+      const { error } = await supabase.from("saved_posts").insert({ user_id: uid, post_id: post.id });
       if (error) { setSaved(prev); if (!/duplicate|unique/i.test(error.message)) showToast("Couldn't save"); }
       else showToast("Saved ✓");
     } else {
-      const { error } = await supabase.from("saved_posts").delete().eq("user_id", currentUserId).eq("post_id", post.id);
+      const { error } = await supabase.from("saved_posts").delete().eq("user_id", uid).eq("post_id", post.id);
       if (error) { setSaved(prev); showToast("Couldn't unsave"); }
       else showToast("Removed");
     }
     setSavePending(false);
-  }
-
-  async function share() {
-    const url = `${window.location.origin}/p/${post.id}`;
-    try { if (navigator.share) { await navigator.share({ title: "Hypefy post", url }); return; } } catch {}
-    await navigator.clipboard.writeText(url).catch(() => {});
-    showToast("Link copied");
   }
 
   if (deleted) return null;
@@ -219,7 +253,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
           <button type="button" onClick={() => setCommentsOpen(true)} aria-label="Comments"
             className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
             <MessageCircle size={22} strokeWidth={2.2} />
-            {formatCount(post.comment_count)}
+            {formatCount(commentCount)}
           </button>
 
           <button type="button" onClick={() => setShareOpen(true)} aria-label="Share" className="text-foreground">
@@ -234,7 +268,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
       </div>
 
       {/* Caption */}
-      {(post.caption || post.body) && (
+      {(liveCaption || liveBody) && (
         <div className="px-4 pt-2 text-sm leading-snug">
           {liveCaption && (
             <p>
@@ -250,13 +284,14 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
 
       {/* Sheets */}
       <CommentsSheet open={commentsOpen} onClose={() => setCommentsOpen(false)}
-        postId={post.id} postOwnerId={post.user_id} currentUserId={currentUserId} />
+        postId={post.id} postOwnerId={post.user_id} currentUserId={uid}
+        onCountChange={(n) => setCommentCount(n)} />
 
       <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} postId={post.id} />
 
       <PostActionsSheet open={actionsOpen} onClose={() => setActionsOpen(false)}
         postId={post.id} postUserId={post.user_id} postUsername={username ?? null}
-        currentUserId={currentUserId}
+        currentUserId={uid}
         onDelete={() => setDeleted(true)}
         onEdit={() => setEditOpen(true)} />
 

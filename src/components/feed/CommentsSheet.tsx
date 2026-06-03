@@ -54,10 +54,11 @@ function buildTree(flat: RawComment[]): Comment[] {
 
 /* ─── Main component ─────────────────────────────────────────── */
 export function CommentsSheet({
-  open, onClose, postId, postOwnerId, currentUserId,
+  open, onClose, postId, postOwnerId, currentUserId, onCountChange,
 }: {
   open: boolean; onClose: () => void;
   postId: string; postOwnerId: string; currentUserId: string;
+  onCountChange?: (count: number) => void;
 }) {
   const supabase = createClient();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -87,6 +88,12 @@ export function CommentsSheet({
   }, [open, postId, supabase]);
 
   useEffect(() => { if (!open) { setReplyTo(null); setText(""); } }, [open]);
+
+  // Keep the parent post's comment badge in sync with the live root count.
+  useEffect(() => {
+    if (open) onCountChange?.(tree.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tree.length]);
 
   function startReply(id: string, username: string) {
     setReplyTo({ id, username });

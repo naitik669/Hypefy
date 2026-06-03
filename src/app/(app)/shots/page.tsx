@@ -9,7 +9,7 @@ export default async function ShotsPage() {
 
   const { data: shots } = await supabase
     .from("shots")
-    .select("id, user_id, media_url, caption, created_at, expires_at, in_showcase, profiles(display_name, avatar_hue, username)")
+    .select("id, user_id, media_url, caption, created_at, expires_at, in_showcase, hype_count, profiles(display_name, avatar_hue, username)")
     .gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false })
     .limit(50);

@@ -23,7 +23,7 @@ export default async function ShowPage({
   // 2. Fetch all active shots from same user (for swipe navigation)
   const { data: raw } = await supabase
     .from("shots")
-    .select("id, user_id, media_url, caption, created_at, expires_at, in_showcase, profiles(display_name, avatar_hue, username)")
+    .select("id, user_id, media_url, caption, created_at, expires_at, in_showcase, hype_count, profiles(display_name, avatar_hue, username)")
     .eq("user_id", target.user_id)
     .gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: true });

@@ -10,7 +10,8 @@ type ShotProfile = { display_name: string | null; avatar_hue: number | null; use
 
 export type RealShot = {
   id: string; user_id: string; media_url: string; caption: string | null;
-  created_at: string; expires_at?: string; in_showcase: boolean; profiles: ShotProfile;
+  created_at: string; expires_at?: string; in_showcase: boolean;
+  hype_count?: number; profiles: ShotProfile;
 };
 
 const DURATION = 5000;
@@ -84,7 +85,49 @@ function ShotScreen({
 
   // ── Hype state ───────────────────────────────────────────
   const [hyped, setHyped] = useState(false);
+  const [hypeCount, setHypeCount] = useState(shot.hype_count ?? 0);
   const [hypePending, setHypePending] = useState(false);
+
+  // Fetch whether current user already hyped this shot + live count
+  useEffect(() => {
+    let active = true;
+    async function loadHype() {
+      if (!currentUserId) return;
+      const [mine, total] = await Promise.all([
+        supabase.from("hypes").select("id").eq("user_id", currentUserId)
+          .eq("target_type", "shot").eq("target_id", shot.id).maybeSingle(),
+        supabase.from("shots").select("hype_count").eq("id", shot.id).maybeSingle(),
+      ]);
+      if (!active) return;
+      setHyped(!!mine.data);
+      if (total.data) setHypeCount(total.data.hype_count ?? 0);
+    }
+    loadHype();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shot.id, currentUserId]);
+
+  async function toggleShotHype() {
+    if (hypePending || !currentUserId) return;
+    const prev = hyped, prevCount = hypeCount;
+    setHypePending(true);
+    setHyped(!prev);
+    setHypeCount((c) => c + (prev ? -1 : 1));
+    try {
+      const { data, error } = await supabase.rpc("toggle_hype", {
+        p_target_type: "shot", p_target_id: shot.id, p_owner_id: shot.user_id,
+      });
+      if (error) throw error;
+      if (data && typeof data === "object") {
+        setHyped(Boolean(data.hyped));
+        setHypeCount(Number(data.hype_count));
+      }
+    } catch {
+      setHyped(prev); setHypeCount(prevCount);
+    } finally {
+      setHypePending(false);
+    }
+  }
 
   // Auto-advance progress bar
   useEffect(() => {
@@ -236,24 +279,7 @@ function ShotScreen({
             type="button"
             aria-label="Hype this Show"
             disabled={hypePending}
-            onClick={async (e) => {
-              e.stopPropagation();
-              if (hypePending) return;
-              const prev = hyped;
-              setHyped(!prev);
-              setHypePending(true);
-              try {
-                await supabase.rpc("toggle_hype", {
-                  p_target_type: "shot",
-                  p_target_id: shot.id,
-                  p_owner_id: shot.user_id,
-                });
-              } catch {
-                setHyped(prev);
-              } finally {
-                setHypePending(false);
-              }
-            }}
+            onClick={(e) => { e.stopPropagation(); toggleShotHype(); }}
             className="flex flex-col items-center gap-0.5 transition-transform active:scale-90 disabled:opacity-60"
           >
             <Star
@@ -261,6 +287,9 @@ function ShotScreen({
               className={`transition-colors ${hyped ? "text-hype" : "text-white"}`}
               fill={hyped ? "currentColor" : "none"}
             />
+            {hypeCount > 0 && (
+              <span className="text-[11px] font-semibold text-white tabular-nums">{hypeCount}</span>
+            )}
           </button>
           <button type="button" aria-label="Send" onClick={(e) => { e.stopPropagation(); setReply(""); }}
             className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink">
