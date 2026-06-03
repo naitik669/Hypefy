@@ -79,6 +79,11 @@ function ReelCard({
   const [saved, setSaved] = useState(false);
   const [savePending, setSavePending] = useState(false);
 
+  // Double-tap-to-Hype
+  const [burst, setBurst] = useState(false);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTap = useRef(0);
+
   // Autoplay when scrolled into view; pause otherwise.
   useEffect(() => {
     const el = videoRef.current;
@@ -188,6 +193,33 @@ function ReelCard({
     }
   }
 
+  function playBurst() {
+    setBurst(false);
+    requestAnimationFrame(() => setBurst(true));
+    setTimeout(() => setBurst(false), 750);
+  }
+
+  // Single tap → play/pause (slight delay), double tap → Hype (add-only)
+  function handleTap() {
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      if (tapTimer.current) {
+        clearTimeout(tapTimer.current);
+        tapTimer.current = null;
+      }
+      lastTap.current = 0;
+      if (!hyped && !hypePending && currentUserId) toggleHype();
+      playBurst();
+    } else {
+      lastTap.current = now;
+      if (tapTimer.current) clearTimeout(tapTimer.current);
+      tapTimer.current = setTimeout(() => {
+        togglePlay();
+        tapTimer.current = null;
+      }, 280);
+    }
+  }
+
   return (
     <section className="relative h-full w-full snap-start snap-always">
       <video
@@ -198,8 +230,15 @@ function ReelCard({
         muted={muted}
         playsInline
         preload="metadata"
-        onClick={togglePlay}
+        onClick={handleTap}
       />
+
+      {/* Double-tap Hype burst */}
+      {burst && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+          <Star size={120} className="animate-hype-pop text-hype" fill="currentColor" />
+        </div>
+      )}
 
       {!playing && (
         <button
