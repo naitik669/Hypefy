@@ -2,9 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Star, Volume2, VolumeX, Play } from "lucide-react";
+import { Star, MessageCircle, Send, Bookmark, Volume2, VolumeX, Play } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
+import { CommentsSheet } from "@/components/feed/CommentsSheet";
+import { ShareSheet } from "@/components/feed/ShareSheet";
+import { formatCount } from "@/lib/mock";
 
 type ReelProfile = { display_name: string | null; avatar_hue: number | null; username: string | null } | null;
 
@@ -15,6 +18,7 @@ export type Reel = {
   caption: string | null;
   created_at: string;
   hype_count?: number;
+  comment_count?: number;
   profiles: ReelProfile;
 };
 
@@ -68,6 +72,13 @@ function ReelCard({
   const [hypeCount, setHypeCount] = useState(reel.hype_count ?? 0);
   const [hypePending, setHypePending] = useState(false);
 
+  const [commentCount, setCommentCount] = useState(reel.comment_count ?? 0);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+
+  const [saved, setSaved] = useState(false);
+  const [savePending, setSavePending] = useState(false);
+
   // Autoplay when scrolled into view; pause otherwise.
   useEffect(() => {
     const el = videoRef.current;
@@ -86,12 +97,12 @@ function ReelCard({
     return () => io.disconnect();
   }, []);
 
-  // Load current user's hype state.
+  // Load hype + saved state for the current user.
   useEffect(() => {
     let active = true;
     async function load() {
       if (!currentUserId) return;
-      const [mine, total] = await Promise.all([
+      const [mine, total, savedRow] = await Promise.all([
         supabase
           .from("hypes")
           .select("id")
@@ -99,11 +110,21 @@ function ReelCard({
           .eq("target_type", "shot")
           .eq("target_id", reel.id)
           .maybeSingle(),
-        supabase.from("shots").select("hype_count").eq("id", reel.id).maybeSingle(),
+        supabase.from("shots").select("hype_count, comment_count").eq("id", reel.id).maybeSingle(),
+        supabase
+          .from("saved_shots")
+          .select("id")
+          .eq("user_id", currentUserId)
+          .eq("shot_id", reel.id)
+          .maybeSingle(),
       ]);
       if (!active) return;
       setHyped(!!mine.data);
-      if (total.data) setHypeCount(total.data.hype_count ?? 0);
+      if (total.data) {
+        setHypeCount(total.data.hype_count ?? 0);
+        setCommentCount(total.data.comment_count ?? 0);
+      }
+      setSaved(!!savedRow.data);
     }
     load();
     return () => {
@@ -138,6 +159,24 @@ function ReelCard({
     }
   }
 
+  async function toggleSave() {
+    if (savePending || !currentUserId) return;
+    const prev = saved;
+    setSavePending(true);
+    setSaved(!prev);
+    try {
+      if (prev) {
+        await supabase.from("saved_shots").delete().eq("user_id", currentUserId).eq("shot_id", reel.id);
+      } else {
+        await supabase.from("saved_shots").insert({ user_id: currentUserId, shot_id: reel.id });
+      }
+    } catch {
+      setSaved(prev);
+    } finally {
+      setSavePending(false);
+    }
+  }
+
   function togglePlay() {
     const el = videoRef.current;
     if (!el) return;
@@ -162,7 +201,6 @@ function ReelCard({
         onClick={togglePlay}
       />
 
-      {/* Tap-to-resume overlay when paused */}
       {!playing && (
         <button
           type="button"
@@ -190,20 +228,28 @@ function ReelCard({
 
       {/* Right action rail */}
       <div className="absolute bottom-6 right-3 z-20 flex flex-col items-center gap-5">
-        <button
-          type="button"
-          aria-label="Hype"
-          disabled={hypePending}
+        <RailButton
+          label={hypeCount > 0 ? formatCount(hypeCount) : "Hype"}
           onClick={toggleHype}
-          className="flex flex-col items-center gap-1 transition-transform active:scale-90 disabled:opacity-60"
+          disabled={hypePending}
         >
-          <Star
-            size={34}
-            className={hyped ? "text-hype" : "text-white"}
-            fill={hyped ? "currentColor" : "none"}
-          />
-          <span className="text-xs font-semibold tabular-nums text-white">{hypeCount}</span>
-        </button>
+          <Star size={32} className={hyped ? "text-hype" : "text-white"} fill={hyped ? "currentColor" : "none"} />
+        </RailButton>
+
+        <RailButton
+          label={commentCount > 0 ? formatCount(commentCount) : "Comment"}
+          onClick={() => setCommentsOpen(true)}
+        >
+          <MessageCircle size={31} className="text-white" />
+        </RailButton>
+
+        <RailButton label="Share" onClick={() => setShareOpen(true)}>
+          <Send size={29} className="text-white" />
+        </RailButton>
+
+        <RailButton label="Save" onClick={toggleSave} disabled={savePending}>
+          <Bookmark size={30} className={saved ? "text-accent" : "text-white"} fill={saved ? "currentColor" : "none"} />
+        </RailButton>
       </div>
 
       {/* Author + caption */}
@@ -214,10 +260,53 @@ function ReelCard({
             {handle ? `@${handle}` : name}
           </span>
         </Link>
-        {reel.caption && (
-          <p className="line-clamp-3 text-sm text-white/90 drop-shadow">{reel.caption}</p>
-        )}
+        {reel.caption && <p className="line-clamp-3 text-sm text-white/90 drop-shadow">{reel.caption}</p>}
       </div>
+
+      {/* Sheets */}
+      {currentUserId && (
+        <>
+          <CommentsSheet
+            open={commentsOpen}
+            onClose={() => setCommentsOpen(false)}
+            targetType="shot"
+            postId={reel.id}
+            postOwnerId={reel.user_id}
+            currentUserId={currentUserId}
+            onCountChange={setCommentCount}
+          />
+          <ShareSheet
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            targetType="shot"
+            postId={reel.id}
+          />
+        </>
+      )}
     </section>
+  );
+}
+
+function RailButton({
+  children,
+  label,
+  onClick,
+  disabled,
+}: {
+  children: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex flex-col items-center gap-1 transition-transform active:scale-90 disabled:opacity-60"
+    >
+      {children}
+      <span className="text-xs font-semibold tabular-nums text-white drop-shadow">{label}</span>
+    </button>
   );
 }

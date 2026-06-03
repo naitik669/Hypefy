@@ -55,10 +55,13 @@ function buildTree(flat: RawComment[]): Comment[] {
 /* ─── Main component ─────────────────────────────────────────── */
 export function CommentsSheet({
   open, onClose, postId, postOwnerId, currentUserId, onCountChange,
+  targetType = "post",
 }: {
   open: boolean; onClose: () => void;
   postId: string; postOwnerId: string; currentUserId: string;
   onCountChange?: (count: number) => void;
+  /** Whether comments belong to a post (default) or a shot/reel. */
+  targetType?: "post" | "shot";
 }) {
   const supabase = createClient();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -74,7 +77,7 @@ export function CommentsSheet({
     supabase
       .from("comments")
       .select("id, user_id, body, hype_count, created_at, parent_id, profiles(display_name, username, avatar_hue)")
-      .eq("post_id", postId)
+      .eq(targetType === "shot" ? "shot_id" : "post_id", postId)
       .is("deleted_at", null)
       .order("created_at", { ascending: true })
       .then(({ data }) => {
@@ -85,7 +88,7 @@ export function CommentsSheet({
         setTree(buildTree(flat));
         setLoading(false);
       });
-  }, [open, postId, supabase]);
+  }, [open, postId, targetType, supabase]);
 
   useEffect(() => { if (!open) { setReplyTo(null); setText(""); } }, [open]);
 
@@ -149,12 +152,20 @@ export function CommentsSheet({
   async function submitComment() {
     if (!text.trim() || posting) return;
     setPosting(true);
-    const { data, error } = await supabase.rpc("create_comment", {
-      p_post_id: postId,
-      p_body: text.trim(),
-      p_owner_id: postOwnerId,
-      p_parent_id: replyTo?.id ?? null,
-    });
+    const { data, error } =
+      targetType === "shot"
+        ? await supabase.rpc("create_shot_comment", {
+            p_shot_id: postId,
+            p_body: text.trim(),
+            p_owner_id: postOwnerId,
+            p_parent_id: replyTo?.id ?? null,
+          })
+        : await supabase.rpc("create_comment", {
+            p_post_id: postId,
+            p_body: text.trim(),
+            p_owner_id: postOwnerId,
+            p_parent_id: replyTo?.id ?? null,
+          });
     setPosting(false);
     if (error || !data) return;
 

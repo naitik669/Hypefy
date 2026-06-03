@@ -12,7 +12,7 @@ export default async function ShotsPage() {
   // Shots = permanent video reels (newest first)
   const { data: shots } = await supabase
     .from("shots")
-    .select("id, user_id, media_url, caption, created_at, hype_count, profiles(display_name, avatar_hue, username)")
+    .select("id, user_id, media_url, caption, created_at, hype_count, comment_count, profiles(display_name, avatar_hue, username)")
     .order("created_at", { ascending: false })
     .limit(50);
 
