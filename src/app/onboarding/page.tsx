@@ -35,20 +35,27 @@ export default function OnboardingPage() {
 
       {/* Hero — centered with balanced rhythm */}
       <div className="relative z-10 flex flex-1 flex-col items-center justify-center text-center">
-        {/* Mascot in a glowing disc */}
-        <div style={rise(0)} className="relative mb-9">
+        {/* Mascot in a glowing disc — pops in with an expanding ring */}
+        <div className="animate-disc-in relative mb-9">
           <div
             aria-hidden
             className="absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/15 blur-2xl"
           />
+          {/* Expanding ring burst on land */}
+          <div
+            aria-hidden
+            className="animate-ring-burst absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-accent/40"
+          />
           <div className="relative flex h-32 w-32 items-center justify-center rounded-full border border-white/5 bg-white/[0.03]">
-            <HypeMascot mood="welcome" size="md" animated />
+            <div className="animate-mascot-pop">
+              <HypeMascot mood="welcome" size="md" animated />
+            </div>
           </div>
         </div>
 
-        {/* Wordmark */}
+        {/* Wordmark — slides up, period pops on a beat */}
         <h1 style={rise(1)} className="text-6xl font-extrabold tracking-tight text-foreground">
-          Hypefy<span className="text-accent">.</span>
+          Hypefy<span className="animate-dot-pop text-accent">.</span>
         </h1>
 
         {/* Tagline */}
