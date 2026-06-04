@@ -2,10 +2,11 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, X, Loader2, Send } from "lucide-react";
+import { Image as ImageIcon, X, Loader2, Send, Crop } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
 import { RichPostText } from "@/components/ui/RichPostText";
+import { ImageCropper } from "@/components/post/ImageCropper";
 
 const MAX_SIZE_MB = 10;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -17,6 +18,8 @@ export function PostComposer({ userId }: { userId: string }) {
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [origSrc, setOrigSrc] = useState<string | null>(null); // raw image, for (re)cropping
+  const [cropOpen, setCropOpen] = useState(false);
   const [caption, setCaption] = useState("");
   const [body, setBody] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
@@ -40,14 +43,31 @@ export function PostComposer({ userId }: { userId: string }) {
       setFileError(`Image must be under ${MAX_SIZE_MB}MB.`);
       return;
     }
-    setImageFile(file);
-    setPreview(URL.createObjectURL(file));
+    // Step 1: crop the selected image to a square before composing.
+    if (origSrc) URL.revokeObjectURL(origSrc);
+    setOrigSrc(URL.createObjectURL(file));
+    setCropOpen(true);
+  }
+
+  function onCropDone(blob: Blob, url: string) {
+    if (preview) URL.revokeObjectURL(preview);
+    setImageFile(new File([blob], "post.jpg", { type: "image/jpeg" }));
+    setPreview(url);
+    setCropOpen(false);
+  }
+
+  function onCropCancel() {
+    setCropOpen(false);
+    // If there's no committed crop yet, drop the pending selection.
+    if (!imageFile && fileRef.current) fileRef.current.value = "";
   }
 
   function removeImage() {
     setImageFile(null);
     if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
+    if (origSrc) URL.revokeObjectURL(origSrc);
+    setOrigSrc(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -105,14 +125,26 @@ export function PostComposer({ userId }: { userId: string }) {
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={preview} alt="Preview" className="aspect-square w-full object-cover" />
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); removeImage(); }}
-              className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm"
-              aria-label="Remove image"
-            >
-              <X size={16} />
-            </button>
+            <div className="absolute right-2 top-2 flex gap-2">
+              {origSrc && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setCropOpen(true); }}
+                  className="flex h-8 items-center gap-1.5 rounded-full bg-black/60 px-3 text-xs font-semibold text-white backdrop-blur-sm"
+                  aria-label="Re-crop image"
+                >
+                  <Crop size={14} /> Crop
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); removeImage(); }}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm"
+                aria-label="Remove image"
+              >
+                <X size={16} />
+              </button>
+            </div>
           </>
         ) : (
           <div className="flex flex-col items-center gap-2 text-center">
@@ -124,6 +156,10 @@ export function PostComposer({ userId }: { userId: string }) {
       </div>
       <input ref={fileRef} type="file" accept={ALLOWED_TYPES.join(",")} className="hidden" onChange={onFileChange} />
       {fileError && <p className="text-xs text-danger">{fileError}</p>}
+
+      {cropOpen && origSrc && (
+        <ImageCropper src={origSrc} onCancel={onCropCancel} onDone={onCropDone} />
+      )}
 
       {/* Caption */}
       <div>

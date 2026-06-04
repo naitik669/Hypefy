@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Star, MessageCircle, Send, Bookmark, MoreHorizontal } from "lucide-react";
+import { Star, MessageCircle, Send, Bookmark, MoreHorizontal, Maximize2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
+import { ZoomViewer } from "@/components/ui/ZoomViewer";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
@@ -75,6 +76,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const [actionsOpen, setActionsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleted, setDeleted] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
   const [liveCaption, setLiveCaption] = useState(post.caption);
   const [liveBody, setLiveBody] = useState(post.body);
 
@@ -231,6 +233,16 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
             )}
           </div>
 
+          {/* Expand → full-screen pinch-to-zoom viewer */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setZoomOpen(true); }}
+            aria-label="View full image"
+            className="absolute bottom-2.5 right-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+          >
+            <Maximize2 size={15} />
+          </button>
+
           {/* Multi-image dots + counter */}
           {images.length > 1 && (
             <>
@@ -302,6 +314,10 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         onCountChange={(n) => setCommentCount(n)} />
 
       <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} postId={post.id} />
+
+      {zoomOpen && images[imgIdx] && (
+        <ZoomViewer src={images[imgIdx]} onClose={() => setZoomOpen(false)} />
+      )}
 
       <PostActionsSheet open={actionsOpen} onClose={() => setActionsOpen(false)}
         postId={post.id} postUserId={post.user_id} postUsername={username ?? null}
