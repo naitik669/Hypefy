@@ -505,15 +505,15 @@ type Bubble = {
 // 10 profiles evenly around the disc; distinct dur/delay so neighbours never sync.
 const DISCOVER_BUBBLES: Bubble[] = [
   { deg: -90, size: 52, r: 40, dur: "3.6s", delay: "0s", img: "/onboarding/maya.webp", pos: "50% 18%" },
-  { deg: -54, size: 46, r: 41, dur: "4.4s", delay: "0.9s", name: "Mara", hue: 280 },
-  { deg: -18, size: 48, r: 39, dur: "3.1s", delay: "0.4s", name: "Eli", hue: 200 },
+  { deg: -54, size: 46, r: 41, dur: "4.4s", delay: "0.9s", img: "/onboarding/disc6.webp", pos: "50% 38%" },
+  { deg: -18, size: 48, r: 39, dur: "3.1s", delay: "0.4s", img: "/onboarding/disc9.webp", pos: "50% 32%" },
   { deg: 18, size: 58, r: 40, dur: "4.7s", delay: "1.3s", img: "/onboarding/ada-pfp.webp", pos: "50% 22%" },
-  { deg: 54, size: 46, r: 41, dur: "3.4s", delay: "0.2s", name: "Noa", hue: 30 },
+  { deg: 54, size: 46, r: 41, dur: "3.4s", delay: "0.2s", img: "/onboarding/disc7.webp", pos: "50% 38%" },
   { deg: 90, size: 50, r: 40, dur: "4.1s", delay: "0.7s", img: "/onboarding/jay-pfp.webp", pos: "50% 16%" },
-  { deg: 126, size: 48, r: 41, dur: "3s", delay: "0.5s", name: "Rai", hue: 150 },
-  { deg: 162, size: 46, r: 39, dur: "4.6s", delay: "1.1s", name: "Sky", hue: 330 },
-  { deg: 198, size: 50, r: 40, dur: "3.8s", delay: "0.3s", name: "Kit", hue: 95 },
-  { deg: 234, size: 44, r: 41, dur: "4.2s", delay: "1.5s", name: "Zo", hue: 250 },
+  { deg: 126, size: 48, r: 41, dur: "3s", delay: "0.5s", img: "/onboarding/disc1.webp", pos: "50% 52%" },
+  { deg: 162, size: 46, r: 39, dur: "4.6s", delay: "1.1s", img: "/onboarding/disc3.webp", pos: "50% 45%" },
+  { deg: 198, size: 50, r: 40, dur: "3.8s", delay: "0.3s", img: "/onboarding/disc4.jpg", pos: "50% 48%" },
+  { deg: 234, size: 44, r: 41, dur: "4.2s", delay: "1.5s", img: "/onboarding/disc5.webp", pos: "55% 45%" },
 ];
 
 /** Orbiting avatars around a central Hypefy hub — "your people" constellation. */
