@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Star, MessageCircle, Send, Camera, Plus } from "lucide-react";
+import { ArrowRight, Star, MessageCircle, Send, Camera, Play } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { ProfilePreviewCard } from "@/components/onboarding/ProfilePreviewCard";
 
@@ -11,8 +11,8 @@ const SLIDES = ["welcome", "posts", "shots", "discover", "identity"] as const;
 
 /**
  * Enter/exit transition for a slide's content. Active → focused (sharp,
- * settled). Inactive → faded, blurred, nudged down + scaled back. Tapping
- * Next plays the incoming slide's "in" while the outgoing plays the reverse.
+ * settled). Inactive → faded, blurred, nudged down + scaled back. Moving to
+ * the next slide plays the incoming "in" while the outgoing plays the reverse.
  */
 function slideAnim(active: boolean, delay = 0): React.CSSProperties {
   return {
@@ -26,21 +26,12 @@ function slideAnim(active: boolean, delay = 0): React.CSSProperties {
 
 export function IntroCarousel() {
   const router = useRouter();
-  const scroller = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
+  const startX = useRef<number | null>(null);
   const isLast = index === SLIDES.length - 1;
 
-  function onScroll() {
-    const el = scroller.current;
-    if (!el) return;
-    const i = Math.round(el.scrollLeft / el.clientWidth);
-    if (i !== index) setIndex(i);
-  }
-
   function goTo(i: number) {
-    const el = scroller.current;
-    if (!el) return;
-    el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+    setIndex(Math.max(0, Math.min(SLIDES.length - 1, i)));
   }
 
   function advance() {
@@ -48,10 +39,22 @@ export function IntroCarousel() {
     else goTo(index + 1);
   }
 
+  // Controlled swipe — one slide per gesture, no momentum skipping.
+  function onPointerDown(e: React.PointerEvent) {
+    startX.current = e.clientX;
+  }
+  function onPointerUp(e: React.PointerEvent) {
+    if (startX.current === null) return;
+    const dx = e.clientX - startX.current;
+    startX.current = null;
+    if (dx <= -45) goTo(index + 1);
+    else if (dx >= 45) goTo(index - 1);
+  }
+
   return (
-    <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
+    <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] select-none flex-col overflow-hidden bg-background">
       {/* Top bar — wordmark + Skip */}
-      <div className="flex items-center justify-between px-6 pt-5">
+      <div className="z-10 flex items-center justify-between px-6 pt-5">
         <span className="text-lg font-extrabold tracking-tight">
           Hypefy<span className="text-accent">.</span>
         </span>
@@ -62,36 +65,42 @@ export function IntroCarousel() {
         )}
       </div>
 
-      {/* Swipeable slides */}
+      {/* Pager — transform-based, one slide at a time */}
       <div
-        ref={scroller}
-        onScroll={onScroll}
-        className="no-scrollbar flex flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
+        className="relative flex-1 overflow-hidden"
+        style={{ touchAction: "pan-y" }}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
       >
-        {SLIDES.map((s, i) => {
-          const active = i === index;
-          return (
-            <section
-              key={s}
-              className="flex w-full shrink-0 snap-center flex-col px-7"
-            >
-              {/* Visual — animates in/out, floats while idle */}
-              <div className="flex flex-[1.1] items-center justify-center">
-                <div style={slideAnim(active, 0)}>
-                  <div className={active ? "animate-float-y" : ""}>
-                    <Visual slide={s} />
+        <div
+          className="flex h-full"
+          style={{
+            transform: `translateX(-${index * 100}%)`,
+            transition: "transform 0.55s cubic-bezier(0.16,1,0.3,1)",
+          }}
+        >
+          {SLIDES.map((s, i) => {
+            const active = i === index;
+            return (
+              <section key={s} className="flex h-full w-full shrink-0 flex-col px-7">
+                {/* Visual — animates in/out, floats while idle */}
+                <div className="flex flex-[1.15] items-center justify-center">
+                  <div style={slideAnim(active, 0)}>
+                    <div className={active ? "animate-float-y" : ""}>
+                      <Visual slide={s} />
+                    </div>
                   </div>
                 </div>
-              </div>
-              {/* Copy — same in/out, slightly delayed for a layered feel */}
-              <div className="flex flex-1 flex-col justify-start pt-2">
-                <div style={slideAnim(active, 110)}>
-                  <Copy slide={s} />
+                {/* Copy — same in/out, slightly delayed for a layered feel */}
+                <div className="flex flex-1 flex-col justify-start pt-1">
+                  <div style={slideAnim(active, 110)}>
+                    <Copy slide={s} />
+                  </div>
                 </div>
-              </div>
-            </section>
-          );
-        })}
+              </section>
+            );
+          })}
+        </div>
       </div>
 
       {/* Footer — dots + CTA */}
@@ -151,8 +160,8 @@ function Copy({ slide }: { slide: (typeof SLIDES)[number] }) {
     },
     shots: {
       title: <>Share quick Shots</>,
-      lead: "Fast moments, big energy.",
-      text: "Post quick Shots that keep your people updated in the moment.",
+      lead: "Short video, big energy.",
+      text: "Post short video reels your people can't stop watching.",
     },
     discover: {
       title: <>Find your people</>,
@@ -183,19 +192,18 @@ function Visual({ slide }: { slide: (typeof SLIDES)[number] }) {
     case "posts":
       return <MockPostCard />;
     case "shots":
-      return <MockShots />;
+      return <MockReel />;
     case "discover":
       return <MockDiscover />;
     case "identity":
       return (
-        <div className="w-full max-w-[280px]">
+        <div className="w-[300px]">
           <ProfilePreviewCard
             displayName="Maya Rivera"
             username="maya"
             bio="creator mode · late night energy"
             tags={["Creator", "Designer"]}
             avatarHue={280}
-            compact
           />
         </div>
       );
@@ -204,24 +212,23 @@ function Visual({ slide }: { slide: (typeof SLIDES)[number] }) {
 
 function WelcomeVisual() {
   return (
-    <div className="relative h-56 w-56">
-      {/* Stacked mock chips arranged playfully */}
-      <div className="absolute left-2 top-6 flex w-40 items-center gap-2 rounded-2xl border border-border bg-surface p-2.5 shadow-xl">
-        <Avatar name="Jay" hue={200} size={30} />
+    <div className="relative h-72 w-72">
+      <div className="absolute left-1 top-6 flex w-48 items-center gap-2.5 rounded-2xl border border-border bg-surface p-3 shadow-2xl">
+        <Avatar name="Jay" hue={200} size={34} />
         <div className="flex-1">
-          <div className="h-2 w-16 rounded-full bg-elevated" />
-          <div className="mt-1.5 h-2 w-10 rounded-full bg-elevated/70" />
+          <div className="h-2.5 w-20 rounded-full bg-elevated" />
+          <div className="mt-1.5 h-2.5 w-12 rounded-full bg-elevated/70" />
         </div>
       </div>
-      <div className="absolute right-1 top-24 flex items-center gap-2 rounded-2xl border border-accent/30 bg-surface px-3 py-2.5 shadow-xl">
-        <Star size={18} className="fill-hype text-hype" />
+      <div className="absolute right-0 top-28 flex items-center gap-2 rounded-2xl border border-accent/30 bg-surface px-3.5 py-3 shadow-2xl">
+        <Star size={20} className="fill-hype text-hype" />
         <span className="text-sm font-bold">2.4k Hypes</span>
       </div>
-      <div className="absolute bottom-2 left-6 flex w-36 items-center gap-2 rounded-2xl border border-border bg-surface p-2.5 shadow-xl">
-        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500/15 text-violet-300">
-          <Camera size={16} />
+      <div className="absolute bottom-2 left-7 flex w-44 items-center gap-2.5 rounded-2xl border border-border bg-surface p-3 shadow-2xl">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/15 text-violet-300">
+          <Camera size={18} />
         </span>
-        <div className="h-2 w-16 rounded-full bg-elevated" />
+        <div className="h-2.5 w-24 rounded-full bg-elevated" />
       </div>
     </div>
   );
@@ -229,57 +236,60 @@ function WelcomeVisual() {
 
 function MockPostCard() {
   return (
-    <div className="w-full max-w-[260px] rounded-3xl border border-border bg-surface p-3 shadow-xl">
-      <div className="flex items-center gap-2.5">
-        <Avatar name="Maya" hue={280} size={36} />
+    <div className="w-[300px] rounded-[28px] border border-border bg-surface p-4 shadow-2xl">
+      <div className="flex items-center gap-3">
+        <Avatar name="Maya" hue={280} size={42} />
         <div className="flex-1">
-          <p className="text-sm font-bold leading-tight">maya</p>
+          <p className="text-[15px] font-bold leading-tight">maya</p>
           <p className="text-xs text-muted">2m ago</p>
         </div>
       </div>
       <div
-        className="mt-3 aspect-[4/3] w-full rounded-2xl"
+        className="mt-3.5 aspect-[4/5] w-full rounded-3xl"
         style={{ background: "linear-gradient(135deg, #6d28d9, #2563eb)" }}
       />
-      <div className="mt-3 flex items-center gap-4">
+      <div className="mt-3.5 flex items-center gap-5">
         <span className="flex items-center gap-1.5">
-          <Star size={20} className="fill-hype text-hype" />
-          <span className="text-sm font-bold">2.4k</span>
+          <Star size={24} className="fill-hype text-hype" />
+          <span className="text-[15px] font-bold">2.4k</span>
         </span>
-        <MessageCircle size={20} className="text-muted" />
-        <Send size={19} className="text-muted" />
+        <MessageCircle size={23} className="text-muted" />
+        <Send size={22} className="text-muted" />
       </div>
     </div>
   );
 }
 
-function MockShots() {
-  const people = [
-    { n: "You", h: 95, add: true },
-    { n: "Jay", h: 200 },
-    { n: "Nia", h: 330 },
-    { n: "Leo", h: 30 },
-    { n: "Ada", h: 150 },
-  ];
+function MockReel() {
   return (
-    <div className="w-full max-w-[290px] rounded-3xl border border-border bg-surface p-4 shadow-xl">
-      <div className="flex justify-between gap-3">
-        {people.map((p) => (
-          <div key={p.n} className="flex flex-col items-center gap-1.5">
-            <div className="relative rounded-full p-[2px]" style={{ background: p.add ? "transparent" : "linear-gradient(135deg, var(--color-accent), #6d28d9)" }}>
-              <div className="rounded-full bg-surface p-[2px]">
-                {p.add ? (
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed border-border text-faint">
-                    <Plus size={18} />
-                  </span>
-                ) : (
-                  <Avatar name={p.n} hue={p.h} size={48} className="rounded-full" />
-                )}
-              </div>
-            </div>
-            <span className="text-[10px] text-muted">{p.n}</span>
-          </div>
-        ))}
+    <div
+      className="relative h-[340px] w-[192px] overflow-hidden rounded-[30px] border border-border shadow-2xl"
+      style={{ background: "linear-gradient(160deg, #3b2a6d, #1b2b6b 55%, #0c1430)" }}
+    >
+      {/* Play glyph */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm">
+          <Play size={26} className="ml-0.5 fill-white text-white" />
+        </span>
+      </div>
+
+      {/* Right action rail */}
+      <div className="absolute bottom-16 right-3 flex flex-col items-center gap-4 text-white">
+        <span className="flex flex-col items-center gap-0.5">
+          <Star size={26} className="fill-hype text-hype" />
+          <span className="text-[10px] font-semibold">4.1k</span>
+        </span>
+        <MessageCircle size={24} />
+        <Send size={22} />
+      </div>
+
+      {/* Author + caption */}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 pr-14">
+        <div className="flex items-center gap-2">
+          <Avatar name="Leo" hue={30} size={26} className="ring-2 ring-white/60" />
+          <span className="text-xs font-bold text-white">@leo</span>
+        </div>
+        <p className="mt-1 text-[11px] text-white/85">late night skate ✦</p>
       </div>
     </div>
   );
@@ -293,15 +303,15 @@ function MockDiscover() {
     { n: "Ada", h: 150, tag: "Creator" },
   ];
   return (
-    <div className="grid w-full max-w-[290px] grid-cols-2 gap-3">
+    <div className="grid w-[320px] grid-cols-2 gap-3.5">
       {tiles.map((t) => (
-        <div key={t.n} className="flex flex-col items-center gap-2 rounded-3xl border border-border bg-surface p-3.5 shadow-lg">
-          <Avatar name={t.n} hue={t.h} size={48} />
+        <div key={t.n} className="flex flex-col items-center gap-2.5 rounded-[26px] border border-border bg-surface p-4 shadow-xl">
+          <Avatar name={t.n} hue={t.h} size={56} />
           <div className="text-center">
-            <p className="text-sm font-bold leading-tight">{t.n}</p>
-            <p className="text-[11px] text-muted">{t.tag}</p>
+            <p className="text-[15px] font-bold leading-tight">{t.n}</p>
+            <p className="text-xs text-muted">{t.tag}</p>
           </div>
-          <span className="rounded-pill bg-accent px-4 py-1 text-xs font-bold text-accent-ink">Follow</span>
+          <span className="rounded-pill bg-accent px-5 py-1.5 text-xs font-bold text-accent-ink">Follow</span>
         </div>
       ))}
     </div>
