@@ -100,7 +100,7 @@ export function IntroCarousel() {
                 <div className="flex flex-[1.15] items-center justify-center">
                   <div style={slideAnim(active, 0)}>
                     <div className={active ? "animate-float-y" : ""}>
-                      <Visual slide={s} />
+                      <Visual slide={s} active={active} />
                     </div>
                   </div>
                 </div>
@@ -202,12 +202,12 @@ function Copy({ slide }: { slide: (typeof SLIDES)[number] }) {
 }
 
 /* ─── Slide visuals (clean mock UI, no neon) ─────────────────── */
-function Visual({ slide }: { slide: (typeof SLIDES)[number] }) {
+function Visual({ slide, active }: { slide: (typeof SLIDES)[number]; active: boolean }) {
   switch (slide) {
     case "welcome":
       return <WelcomeVisual />;
     case "posts":
-      return <MockPostStack />;
+      return <MockPostStack active={active} />;
     case "shots":
       return <MockReel />;
     case "discover":
@@ -264,28 +264,47 @@ const BG_POSTS = [
  * right edges in two staggered columns (upper + lower per side) — a feed wall.
  * Their inner edges tuck behind the opaque hero card, so nothing collides.
  */
-function MockPostStack() {
+function MockPostStack({ active }: { active: boolean }) {
+  // Staggered reveal when the slide becomes active:
+  // maya (0) → jay (1) → leo + nia (2) → ada (3). Quick + clean.
+  const reveal = (order: number): React.CSSProperties => ({
+    opacity: active ? 1 : 0,
+    transform: active ? "translateY(0) scale(1)" : "translateY(14px) scale(0.97)",
+    transition: `opacity 0.45s ease ${order * 120}ms, transform 0.5s cubic-bezier(0.16,1,0.3,1) ${order * 120}ms`,
+    willChange: "opacity, transform",
+  });
+
   return (
     <div className="relative">
       {/* Behind the hero — leo (up-left), jay (down-left), nia (right) */}
       <div aria-hidden className="absolute -left-28 -top-8 w-40 opacity-60">
-        <BgPost post={BG_POSTS[0]} />
+        <div style={reveal(2)}>
+          <BgPost post={BG_POSTS[0]} />
+        </div>
       </div>
       <div aria-hidden className="absolute -left-28 -bottom-6 w-40 opacity-50">
-        <BgPost post={BG_POSTS[2]} />
+        <div style={reveal(1)}>
+          <BgPost post={BG_POSTS[2]} />
+        </div>
       </div>
       <div aria-hidden className="absolute -right-24 top-3 w-36 opacity-60">
-        <BgPost post={BG_POSTS[1]} />
+        <div style={reveal(2)}>
+          <BgPost post={BG_POSTS[1]} />
+        </div>
       </div>
 
-      {/* Hero post — nudged slightly up + left */}
+      {/* Hero post — nudged slightly up + left, revealed first */}
       <div className="relative z-20" style={{ transform: "translate(-12px, -10px)" }}>
-        <MockPostCard />
+        <div style={reveal(0)}>
+          <MockPostCard />
+        </div>
       </div>
 
-      {/* In front of the hero, bigger, shifted down-right, free to bleed off frame */}
+      {/* In front of the hero, bigger, shifted down-right, revealed last */}
       <div aria-hidden className="absolute -right-32 -bottom-5 z-30 w-48">
-        <BgPost post={BG_POSTS[3]} />
+        <div style={reveal(3)}>
+          <BgPost post={BG_POSTS[3]} />
+        </div>
       </div>
 
       {/* Top-most black fade — every post (hero + neighbours + ada) dissolves
