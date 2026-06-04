@@ -115,9 +115,9 @@ export function IntroCarousel() {
                 {/* Visual — animates in/out, floats while idle */}
                 <div className="flex flex-[1.15] items-center justify-center">
                   <div style={slideAnim(active, 0)}>
-                    {/* Posts slide floats each post individually (see MockPostStack);
+                    {/* Posts + discover slides float each element individually;
                         other slides float as one piece. */}
-                    <div className={active && s !== "posts" ? "animate-float-y" : ""}>
+                    <div className={active && s !== "posts" && s !== "discover" ? "animate-float-y" : ""}>
                       <Visual slide={s} active={active} />
                     </div>
                   </div>
@@ -490,22 +490,32 @@ function MockReel() {
   );
 }
 
-type Bubble = { deg: number; size: number; img?: string; pos?: string; name?: string; hue?: number };
+type Bubble = {
+  deg: number;
+  size: number;
+  r?: number; // orbit radius (% of container)
+  dur: string; // float duration
+  delay: string; // float delay
+  img?: string;
+  pos?: string;
+  name?: string;
+  hue?: number;
+};
 
+// Distinct dur/delay per bubble so neighbours never bob in sync.
 const DISCOVER_BUBBLES: Bubble[] = [
-  { deg: -90, size: 56, img: "/onboarding/maya.webp", pos: "50% 18%" },
-  { deg: -42, size: 46, name: "Nia", hue: 330 },
-  { deg: 6, size: 60, img: "/onboarding/ada-pfp.webp", pos: "50% 22%" },
-  { deg: 52, size: 44, name: "Leo", hue: 30 },
-  { deg: 96, size: 52, img: "/onboarding/jay-pfp.webp", pos: "50% 16%" },
-  { deg: 140, size: 46, name: "Kai", hue: 200 },
-  { deg: 184, size: 58, name: "Zoe", hue: 280 },
-  { deg: 226, size: 44, name: "Sam", hue: 150 },
+  { deg: -90, size: 56, r: 39, dur: "3.6s", delay: "0s", img: "/onboarding/maya.webp", pos: "50% 18%" },
+  { deg: -42, size: 46, r: 41, dur: "4.4s", delay: "0.9s", name: "Nia", hue: 330 },
+  { deg: 6, size: 60, r: 38, dur: "3.1s", delay: "0.4s", img: "/onboarding/ada-pfp.webp", pos: "50% 22%" },
+  { deg: 52, size: 44, r: 40, dur: "4.7s", delay: "1.3s", name: "Leo", hue: 30 },
+  { deg: 96, size: 52, r: 39, dur: "3.4s", delay: "0.2s", img: "/onboarding/jay-pfp.webp", pos: "50% 16%" },
+  { deg: 140, size: 46, r: 41, dur: "4.1s", delay: "0.7s", name: "Kai", hue: 200 },
+  { deg: 184, size: 58, r: 38, dur: "3s", delay: "0.5s", name: "Zoe", hue: 280 },
+  { deg: 226, size: 44, r: 40, dur: "4.6s", delay: "1.1s", name: "Sam", hue: 150 },
 ];
 
 /** Orbiting avatars around a central Hypefy hub — "your people" constellation. */
 function MockDiscover() {
-  const R = 39; // orbit radius (% of container)
   return (
     <div className="relative h-[290px] w-[290px]">
       {/* Orbit track */}
@@ -518,17 +528,19 @@ function MockDiscover() {
         </span>
       </div>
 
-      {/* Avatar bubbles */}
+      {/* Avatar bubbles — each floats on its own clock */}
       {DISCOVER_BUBBLES.map((b, i) => {
         const a = (b.deg * Math.PI) / 180;
-        const x = 50 + R * Math.cos(a);
-        const y = 50 + R * Math.sin(a);
+        const r = b.r ?? 39;
+        const x = 50 + r * Math.cos(a);
+        const y = 50 + r * Math.sin(a);
         return (
           <div
             key={i}
             className="absolute"
             style={{ left: `${x}%`, top: `${y}%`, transform: "translate(-50%, -50%)" }}
           >
+            <Float dur={b.dur} delay={b.delay}>
             <div
               className="overflow-hidden rounded-full bg-elevated shadow-xl ring-2 ring-white/10"
               style={{ width: b.size, height: b.size }}
@@ -554,6 +566,7 @@ function MockDiscover() {
                 </div>
               )}
             </div>
+            </Float>
           </div>
         );
       })}
