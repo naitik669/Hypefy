@@ -526,9 +526,12 @@ function MockDiscover() {
         style={{ background: "radial-gradient(circle at 50% 44%, #1d1d1d 0%, #121212 55%, #0b0b0b 100%)" }}
       />
 
-      {/* Center hub */}
-      <div className="absolute left-1/2 top-1/2 z-10 flex h-[68px] w-[68px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[22px] bg-white shadow-2xl">
-        <span className="text-3xl font-extrabold tracking-tight text-background">
+      {/* Center hub — dark (not pitch black) so it stays distinct from the disc */}
+      <div
+        className="absolute left-1/2 top-1/2 z-10 flex h-[68px] w-[68px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[22px] shadow-2xl ring-1 ring-white/15"
+        style={{ background: "#262626" }}
+      >
+        <span className="text-3xl font-extrabold tracking-tight text-white">
           h<span className="text-accent">.</span>
         </span>
       </div>
