@@ -9,6 +9,7 @@ import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { formatCount } from "@/lib/mock";
+import { ExpandableText } from "@/components/ui/ExpandableText";
 
 type ReelProfile = { display_name: string | null; avatar_hue: number | null; username: string | null } | null;
 
@@ -323,7 +324,11 @@ function ReelCard({
             {handle ? `@${handle}` : name}
           </span>
         </Link>
-        {reel.caption && <p className="line-clamp-3 text-sm text-white/90 drop-shadow">{reel.caption}</p>}
+        {reel.caption && (
+          <ExpandableText clampClass="line-clamp-2" className="text-sm text-white/90 drop-shadow" moreClassName="text-white/80">
+            {reel.caption}
+          </ExpandableText>
+        )}
       </div>
 
       {/* Sheets */}

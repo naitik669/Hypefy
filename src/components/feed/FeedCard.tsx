@@ -6,6 +6,7 @@ import { Star, MessageCircle, Send, Bookmark, MoreHorizontal, Maximize2 } from "
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ZoomViewer } from "@/components/ui/ZoomViewer";
+import { ExpandableText } from "@/components/ui/ExpandableText";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
@@ -293,9 +294,9 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         </button>
       </div>
 
-      {/* Caption */}
+      {/* Caption — clamps long text with a more / less toggle */}
       {(liveCaption || liveBody) && (
-        <div className="px-4 pt-2 text-sm leading-snug">
+        <ExpandableText className="px-4 pt-2 text-sm leading-snug" clampClass="line-clamp-2">
           {liveCaption && (
             <p>
               <Link href={profileHref} className="font-semibold hover:underline">
@@ -305,7 +306,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
             </p>
           )}
           {liveBody && <p className="mt-1 text-foreground/85"><RichPostText text={liveBody} /></p>}
-        </div>
+        </ExpandableText>
       )}
 
       {/* Sheets */}
