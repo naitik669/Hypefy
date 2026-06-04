@@ -24,6 +24,22 @@ function slideAnim(active: boolean, delay = 0): React.CSSProperties {
   };
 }
 
+/**
+ * Sequenced reveal for the posts slide — a clean fade + rise per element.
+ * Shared timeline (order × gap): header 0 → body 1 → maya 2 → jay 3 →
+ * rest of the background posts 4 → ada 5.
+ */
+const REVEAL_GAP = 170;
+function revealStyle(active: boolean, order: number): React.CSSProperties {
+  const d = order * REVEAL_GAP;
+  return {
+    opacity: active ? 1 : 0,
+    transform: active ? "translateY(0)" : "translateY(16px)",
+    transition: `opacity 0.5s ease ${d}ms, transform 0.55s cubic-bezier(0.16,1,0.3,1) ${d}ms`,
+    willChange: "opacity, transform",
+  };
+}
+
 export function IntroCarousel() {
   const router = useRouter();
   const [index, setIndex] = useState(0);
@@ -104,11 +120,9 @@ export function IntroCarousel() {
                     </div>
                   </div>
                 </div>
-                {/* Copy — same in/out, slightly delayed for a layered feel */}
+                {/* Copy — header then body lead the reveal sequence */}
                 <div className="flex flex-1 flex-col justify-start pt-1">
-                  <div style={slideAnim(active, 110)}>
-                    <Copy slide={s} />
-                  </div>
+                  <Copy slide={s} active={active} />
                 </div>
               </section>
             );
@@ -159,7 +173,7 @@ export function IntroCarousel() {
 }
 
 /* ─── Slide copy ─────────────────────────────────────────────── */
-function Copy({ slide }: { slide: (typeof SLIDES)[number] }) {
+function Copy({ slide, active }: { slide: (typeof SLIDES)[number]; active: boolean }) {
   const data = {
     welcome: {
       title: (
@@ -194,9 +208,15 @@ function Copy({ slide }: { slide: (typeof SLIDES)[number] }) {
 
   return (
     <div>
-      <h1 className="text-[2rem] font-extrabold leading-[1.1] tracking-tight">{data.title}</h1>
-      <p className="mt-2 text-base font-semibold text-foreground">{data.lead}</p>
-      <p className="mt-2 max-w-[300px] text-sm leading-relaxed text-muted">{data.text}</p>
+      {/* Header reveals first */}
+      <h1 style={revealStyle(active, 0)} className="text-[2rem] font-extrabold leading-[1.1] tracking-tight">
+        {data.title}
+      </h1>
+      {/* Body reveals second */}
+      <div style={revealStyle(active, 1)}>
+        <p className="mt-2 text-base font-semibold text-foreground">{data.lead}</p>
+        <p className="mt-2 max-w-[300px] text-sm leading-relaxed text-muted">{data.text}</p>
+      </div>
     </div>
   );
 }
@@ -265,44 +285,36 @@ const BG_POSTS = [
  * Their inner edges tuck behind the opaque hero card, so nothing collides.
  */
 function MockPostStack({ active }: { active: boolean }) {
-  // Staggered reveal when the slide becomes active:
-  // maya (0) → jay (1) → leo + nia (2) → ada (3). Quick + clean.
-  const reveal = (order: number): React.CSSProperties => ({
-    opacity: active ? 1 : 0,
-    transform: active ? "translateY(0) scale(1)" : "translateY(14px) scale(0.97)",
-    transition: `opacity 0.45s ease ${order * 120}ms, transform 0.5s cubic-bezier(0.16,1,0.3,1) ${order * 120}ms`,
-    willChange: "opacity, transform",
-  });
-
+  // Reveal order (after header + body): maya (2) → jay (3) → leo + nia (4) → ada (5).
   return (
     <div className="relative">
       {/* Behind the hero — leo (up-left), jay (down-left), nia (right) */}
       <div aria-hidden className="absolute -left-28 -top-8 w-40 opacity-60">
-        <div style={reveal(2)}>
+        <div style={revealStyle(active, 4)}>
           <BgPost post={BG_POSTS[0]} />
         </div>
       </div>
       <div aria-hidden className="absolute -left-28 -bottom-6 w-40 opacity-50">
-        <div style={reveal(1)}>
+        <div style={revealStyle(active, 3)}>
           <BgPost post={BG_POSTS[2]} />
         </div>
       </div>
       <div aria-hidden className="absolute -right-24 top-3 w-36 opacity-60">
-        <div style={reveal(2)}>
+        <div style={revealStyle(active, 4)}>
           <BgPost post={BG_POSTS[1]} />
         </div>
       </div>
 
-      {/* Hero post — nudged slightly up + left, revealed first */}
+      {/* Hero post — nudged slightly up + left, revealed after the copy */}
       <div className="relative z-20" style={{ transform: "translate(-12px, -10px)" }}>
-        <div style={reveal(0)}>
+        <div style={revealStyle(active, 2)}>
           <MockPostCard />
         </div>
       </div>
 
       {/* In front of the hero, bigger, shifted down-right, revealed last */}
       <div aria-hidden className="absolute -right-32 -bottom-5 z-30 w-48">
-        <div style={reveal(3)}>
+        <div style={revealStyle(active, 5)}>
           <BgPost post={BG_POSTS[3]} />
         </div>
       </div>
