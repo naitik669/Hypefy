@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Star, MessageCircle, Send, Camera, Play } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
-import { ProfilePreviewCard } from "@/components/onboarding/ProfilePreviewCard";
+import { VerifiedStar } from "@/components/ui/VerifiedStar";
 
 const SLIDES = ["welcome", "posts", "shots", "discover", "identity"] as const;
 
@@ -242,18 +242,101 @@ function Visual({ slide, active }: { slide: (typeof SLIDES)[number]; active: boo
     case "discover":
       return <MockDiscover />;
     case "identity":
-      return (
-        <div className="w-[300px]">
-          <ProfilePreviewCard
-            displayName="Maya Rivera"
-            username="maya"
-            bio="creator mode · late night energy"
-            tags={["Creator", "Designer"]}
-            avatarHue={280}
-          />
-        </div>
-      );
+      return <MockProfile />;
   }
+}
+
+function ProfileStat({ n, l }: { n: string; l: string }) {
+  return (
+    <div className="text-center">
+      <p className="text-sm font-bold leading-tight">{n}</p>
+      <p className="text-[10px] text-muted">{l}</p>
+    </div>
+  );
+}
+
+/** Rich profile card for the identity slide — banner, avatar, stats, tags,
+ *  recent posts and actions, so it feels like a real, lived-in profile. */
+function MockProfile() {
+  const tags = ["Creator", "Designer", "Photographer"];
+  const thumbs = [
+    "/onboarding/post-sample.jpg",
+    "/onboarding/ada-post.webp",
+    "/onboarding/nia-post.jpg",
+    "/onboarding/jay-post.jpg",
+  ];
+  return (
+    <div className="w-[300px] overflow-hidden rounded-[26px] border border-border bg-surface shadow-2xl">
+      {/* Banner */}
+      <div
+        className="h-16 w-full"
+        style={{ background: "linear-gradient(115deg, rgba(200,255,0,0.20), rgba(109,40,217,0.28) 75%), #121212" }}
+      />
+
+      <div className="px-4 pb-4">
+        {/* Avatar + stats */}
+        <div className="flex items-end justify-between">
+          <div className="-mt-9 h-[68px] w-[68px] shrink-0 overflow-hidden rounded-[22px] ring-4 ring-surface">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/onboarding/maya.webp"
+              alt=""
+              className="h-full w-full object-cover"
+              style={{ objectPosition: "50% 16%" }}
+              draggable={false}
+            />
+          </div>
+          <div className="flex gap-4 pb-0.5">
+            <ProfileStat n="128" l="Posts" />
+            <ProfileStat n="12.4k" l="Hypes" />
+            <ProfileStat n="843" l="Friends" />
+          </div>
+        </div>
+
+        {/* Identity */}
+        <div className="mt-2.5 flex items-center gap-1.5">
+          <span className="text-[17px] font-bold leading-tight">Maya Rivera</span>
+          <VerifiedStar className="h-4 w-4 text-verified" />
+        </div>
+        <p className="text-sm text-muted">@maya</p>
+        <p className="mt-1.5 text-sm leading-snug text-foreground/90">
+          creator mode · late night energy ✦
+        </p>
+
+        {/* Tags */}
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {tags.map((t) => (
+            <span
+              key={t}
+              className="rounded-lg border border-border bg-elevated px-2.5 py-1 text-xs font-medium"
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+
+        {/* Recent posts */}
+        <div className="mt-3 flex gap-1.5">
+          {thumbs.map((src, i) => (
+            <div key={i} className="aspect-square flex-1 overflow-hidden rounded-lg bg-elevated">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt="" className="h-full w-full object-cover" draggable={false} />
+            </div>
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div className="mt-3 flex gap-2">
+          <div className="flex h-9 flex-1 items-center justify-center rounded-xl bg-accent text-xs font-bold text-accent-ink">
+            Edit profile
+          </div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted">
+            <Send size={15} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function WelcomeVisual() {
