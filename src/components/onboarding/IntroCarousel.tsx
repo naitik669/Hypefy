@@ -115,9 +115,15 @@ export function IntroCarousel() {
                 {/* Visual — animates in/out, floats while idle */}
                 <div className="flex flex-[1.15] items-center justify-center">
                   <div style={slideAnim(active, 0)}>
-                    {/* Posts + discover slides float each element individually;
+                    {/* Posts, shots + discover slides float each element individually;
                         other slides float as one piece. */}
-                    <div className={active && s !== "posts" && s !== "discover" ? "animate-float-y" : ""}>
+                    <div
+                      className={
+                        active && s !== "posts" && s !== "discover" && s !== "shots"
+                          ? "animate-float-y"
+                          : ""
+                      }
+                    >
                       <Visual slide={s} active={active} />
                     </div>
                   </div>
@@ -231,7 +237,7 @@ function Visual({ slide, active }: { slide: (typeof SLIDES)[number]; active: boo
     case "posts":
       return <MockPostStack active={active} />;
     case "shots":
-      return <MockReel />;
+      return <MockReel active={active} />;
     case "discover":
       return <MockDiscover />;
     case "identity":
@@ -455,36 +461,119 @@ function MockPostCard() {
   );
 }
 
-function MockReel() {
+type ReelData = {
+  img: string;
+  imgPos?: string;
+  pfp?: string;
+  pfpPos?: string;
+  handle: string;
+  caption: string;
+  hypes: string;
+  hue?: number;
+};
+
+const HERO_REEL: ReelData = {
+  img: "/onboarding/jay-post.jpg",
+  imgPos: "50% 45%",
+  pfp: "/onboarding/disc9.webp",
+  pfpPos: "50% 30%",
+  handle: "leo",
+  caption: "golden hour ✦",
+  hypes: "4.1k",
+};
+
+const BG_REELS: ReelData[] = [
+  { img: "/onboarding/nia-post.jpg", imgPos: "50% 45%", handle: "mara", caption: "park days", hypes: "2.3k", hue: 280 },
+  { img: "/onboarding/ada-post.webp", imgPos: "50% 42%", handle: "kit", caption: "sun nap ☀️", hypes: "3.1k", hue: 150 },
+];
+
+/** One reel card (real image still, play glyph, hype rail, author). */
+function ReelCard({ data, w, h, active = false }: { data: ReelData; w: number; h: number; active?: boolean }) {
+  const big = w > 150;
   return (
     <div
-      className="relative h-[340px] w-[192px] overflow-hidden rounded-[30px] border border-border shadow-2xl"
-      style={{ background: "linear-gradient(160deg, #3b2a6d, #1b2b6b 55%, #0c1430)" }}
+      className="relative overflow-hidden rounded-[26px] border border-border bg-elevated shadow-2xl"
+      style={{ width: w, height: h }}
     >
-      {/* Play glyph */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={data.img}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover"
+        style={{ objectPosition: data.imgPos }}
+        draggable={false}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/10" />
+
+      {/* Play */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm">
-          <Play size={26} className="ml-0.5 fill-white text-white" />
+        <span
+          className="flex items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm"
+          style={{ width: w * 0.26, height: w * 0.26 }}
+        >
+          <Play size={w * 0.13} className="ml-0.5 fill-white" />
         </span>
       </div>
 
-      {/* Right action rail */}
-      <div className="absolute bottom-16 right-3 flex flex-col items-center gap-4 text-white">
+      {/* Hype rail */}
+      <div className="absolute bottom-12 right-2.5 flex flex-col items-center gap-3 text-white">
         <span className="flex flex-col items-center gap-0.5">
-          <Star size={26} className="fill-hype text-hype" />
-          <span className="text-[10px] font-semibold">4.1k</span>
+          <Star
+            size={big ? 26 : 20}
+            className={`fill-hype text-hype ${active ? "animate-hype-burst" : ""}`}
+          />
+          <span className="text-[10px] font-semibold">{data.hypes}</span>
         </span>
-        <MessageCircle size={24} />
-        <Send size={22} />
+        <MessageCircle size={big ? 22 : 18} />
+        <Send size={big ? 20 : 16} />
       </div>
 
       {/* Author + caption */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 pr-14">
+      <div className="absolute inset-x-0 bottom-0 p-3 pr-11">
         <div className="flex items-center gap-2">
-          <Avatar name="Leo" hue={30} size={26} className="ring-2 ring-white/60" />
-          <span className="text-xs font-bold text-white">@leo</span>
+          {data.pfp ? (
+            <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full ring-2 ring-white/60">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={data.pfp}
+                alt=""
+                className="h-full w-full object-cover"
+                style={{ objectPosition: data.pfpPos }}
+                draggable={false}
+              />
+            </div>
+          ) : (
+            <Avatar name={data.handle} hue={data.hue ?? 280} size={26} className="rounded-full ring-2 ring-white/60" />
+          )}
+          <span className="text-xs font-bold text-white">@{data.handle}</span>
         </div>
-        <p className="mt-1 text-[11px] text-white/85">late night skate ✦</p>
+        <p className="mt-1 line-clamp-1 text-[11px] text-white/85">{data.caption}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Hero reel over a couple of others so the Shots scene feels populated. */
+function MockReel({ active }: { active: boolean }) {
+  return (
+    <div className="relative">
+      {/* Background reels peeking from behind, floating on their own clocks */}
+      <div className="absolute -left-20 top-7 opacity-50">
+        <Float dur="4.3s" delay="0.6s">
+          <ReelCard data={BG_REELS[0]} w={134} h={238} />
+        </Float>
+      </div>
+      <div className="absolute -right-20 top-12 opacity-45">
+        <Float dur="3.6s" delay="0.2s">
+          <ReelCard data={BG_REELS[1]} w={130} h={230} />
+        </Float>
+      </div>
+
+      {/* Hero reel */}
+      <div className="relative z-10">
+        <Float dur="3.9s" delay="0s">
+          <ReelCard data={HERO_REEL} w={188} h={332} active={active} />
+        </Float>
       </div>
     </div>
   );
