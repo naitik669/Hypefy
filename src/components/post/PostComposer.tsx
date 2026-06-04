@@ -104,7 +104,7 @@ export function PostComposer({ userId }: { userId: string }) {
         {preview ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={preview} alt="Preview" className="h-full max-h-72 w-full object-cover" />
+            <img src={preview} alt="Preview" className="aspect-square w-full object-cover" />
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); removeImage(); }}

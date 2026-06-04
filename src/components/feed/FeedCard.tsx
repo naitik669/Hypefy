@@ -216,7 +216,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         <div className="relative mx-4 overflow-hidden rounded-2xl">
           <div onClick={handleImageTap} className="block cursor-pointer select-none">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={images[imgIdx]} alt={post.caption ?? "Post"} className="w-full object-cover" draggable={false} />
+            <img src={images[imgIdx]} alt={post.caption ?? "Post"} className="aspect-square w-full object-cover" draggable={false} />
 
             {/* Double-tap burst */}
             {hypeBurst && (
