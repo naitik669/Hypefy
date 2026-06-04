@@ -76,36 +76,48 @@ export default async function HomePage() {
     .eq("id", user.id)
     .maybeSingle();
 
-  // Check if the current user already has an active (unexpired) Show (story)
-  const { data: myActiveShow } = await supabase
+  // Current user's own active Shows — oldest first so tapping plays them all forward
+  const { data: myShows } = await supabase
     .from("shows")
     .select("id")
     .eq("user_id", user.id)
     .gt("expires_at", new Date().toISOString())
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: true });
 
   const currentUserForRow = myProfile
     ? {
         name: myProfile.display_name ?? myProfile.username ?? "You",
         hue: myProfile.avatar_hue ?? 280,
-        hasActiveShow: !!myActiveShow,
+        hasActiveShow: (myShows?.length ?? 0) > 0,
+        showId: myShows?.[0]?.id as string | undefined, // entry = oldest
       }
     : undefined;
 
-  // Active Shows (stories) from OTHERS for the Shows row
+  // Active Shows (stories) from OTHERS — newest first, ONE bubble per user
   const { data: activeShows } = await supabase
     .from("shows")
-    .select("id, user_id, media_url, profiles(display_name, avatar_hue, username)")
+    .select("id, user_id, profiles(display_name, avatar_hue, username)")
     .gt("expires_at", new Date().toISOString())
     .neq("user_id", user.id)
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(50);
 
-  const shows = (activeShows ?? []).map((s: any) => {
+  // Group by user: keep most-recent-activity order, but enter at their OLDEST show.
+  const byUser = new Map<string, { id: string; name: string; hue: number }>();
+  for (const s of (activeShows ?? []) as any[]) {
     const p = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
-    return { id: s.id, name: p?.display_name ?? p?.username ?? "User", hue: p?.avatar_hue ?? 280, seen: false };
-  });
+    const existing = byUser.get(s.user_id);
+    if (!existing) {
+      byUser.set(s.user_id, {
+        id: s.id,
+        name: p?.display_name ?? p?.username ?? "User",
+        hue: p?.avatar_hue ?? 280,
+      });
+    } else {
+      existing.id = s.id; // iterating newest→oldest, so this ends as the oldest
+    }
+  }
+  const shows = [...byUser.values()].map((v) => ({ ...v, seen: false }));
 
   return (
     <>

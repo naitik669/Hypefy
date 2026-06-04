@@ -11,6 +11,7 @@ type CurrentUser = {
   name: string;
   hue: number;
   hasActiveShow: boolean;
+  showId?: string; // entry show to watch your own
 };
 
 const STORAGE_KEY = "hypefy_seen_shows";
@@ -60,42 +61,50 @@ export function ShowsRow({
     <div className="no-scrollbar flex gap-4 overflow-x-auto px-4 py-4">
 
       {/* ── Your Show ───────────────────────────── */}
-      <Link href="/shows/add" className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+      <div className="flex w-16 shrink-0 flex-col items-center gap-1.5">
         <div className="relative">
-          {currentUser ? (
-            <div
-              className={`rounded-[22px] p-[2.5px] ${
-                currentUser.hasActiveShow
-                  ? "bg-accent"          // green ring: you have an active show
-                  : "bg-transparent"     // no ring: no active show
-              }`}
-            >
+          <button
+            type="button"
+            onClick={() =>
+              currentUser?.hasActiveShow && currentUser.showId
+                ? router.push(`/shows/${currentUser.showId}`)
+                : router.push("/shows/add")
+            }
+            aria-label={currentUser?.hasActiveShow ? "Watch your Show" : "Add a Show"}
+            className="block active:opacity-70"
+          >
+            {currentUser ? (
               <div
-                className={`rounded-[20px] bg-background ${
-                  currentUser.hasActiveShow ? "p-[2px]" : ""
+                className={`rounded-[22px] p-[2.5px] ${
+                  currentUser.hasActiveShow ? "bg-accent" : "bg-transparent"
                 }`}
               >
-                <Avatar
-                  name={currentUser.name}
-                  hue={currentUser.hue}
-                  size={56}
-                  className="rounded-[18px]"
-                />
+                <div
+                  className={`rounded-[20px] bg-background ${
+                    currentUser.hasActiveShow ? "p-[2px]" : ""
+                  }`}
+                >
+                  <Avatar name={currentUser.name} hue={currentUser.hue} size={56} className="rounded-[18px]" />
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="flex h-[60px] w-[60px] items-center justify-center rounded-[20px] border-2 border-dashed border-border bg-surface">
-              <Plus size={20} className="text-muted" strokeWidth={2.4} />
-            </div>
-          )}
+            ) : (
+              <div className="flex h-[60px] w-[60px] items-center justify-center rounded-[20px] border-2 border-dashed border-border bg-surface">
+                <Plus size={20} className="text-muted" strokeWidth={2.4} />
+              </div>
+            )}
+          </button>
 
-          {/* Add-show badge */}
-          <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-ink ring-4 ring-background">
+          {/* Add-show badge — always opens the camera */}
+          <Link
+            href="/shows/add"
+            aria-label="Add a Show"
+            className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-ink ring-4 ring-background"
+          >
             <Plus size={13} strokeWidth={3} />
-          </span>
+          </Link>
         </div>
         <span className="max-w-full truncate text-xs text-muted">Your Show</span>
-      </Link>
+      </div>
 
       {/* ── Sorted shows (unseen first, seen right) ── */}
       {sorted.map((s) => {
@@ -108,8 +117,12 @@ export function ShowsRow({
             className="flex w-16 shrink-0 flex-col items-center gap-1.5 active:opacity-70"
           >
             {isSeen ? (
-              /* ── Seen: no ring at all, dimmed ── */
-              <Avatar name={s.name} hue={s.hue} size={60} className="rounded-[18px] opacity-40" />
+              /* ── Seen: grey ring, avatar stays full opacity ── */
+              <div className="rounded-[22px] p-[2.5px]" style={{ background: "#3a3a3a" }}>
+                <div className="rounded-[20px] bg-background p-[2px]">
+                  <Avatar name={s.name} hue={s.hue} size={56} className="rounded-[18px]" />
+                </div>
+              </div>
             ) : (
               /* ── Unseen: green ring ── */
               <div className="rounded-[22px] p-[2.5px] bg-accent">
