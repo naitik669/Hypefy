@@ -259,25 +259,31 @@ const BG_POSTS = [
   { name: "ada", hue: 150, time: "2h", hypes: "2.1k", gradient: "linear-gradient(135deg, #f59e0b, #ef4444)" },
 ] as const;
 
-/** The main post surrounded by other users' posts so it reads like a feed. */
+/**
+ * The hero post surrounded by other users' posts that bleed off the left and
+ * right edges in two staggered columns (upper + lower per side) — a feed wall.
+ * Their inner edges tuck behind the opaque hero card, so nothing collides.
+ */
 function MockPostStack() {
   return (
     <div className="relative">
-      {/* Other people's posts, peeking from behind — present, not loud */}
-      <div aria-hidden className="absolute -left-24 -top-4 w-[176px] -rotate-3 opacity-55">
+      {/* Left column */}
+      <div aria-hidden className="absolute -left-24 -top-2 w-36 opacity-60">
         <BgPost post={BG_POSTS[0]} />
       </div>
-      <div aria-hidden className="absolute -right-20 -top-8 w-[168px] rotate-3 opacity-50">
-        <BgPost post={BG_POSTS[1]} />
-      </div>
-      <div aria-hidden className="absolute -left-20 bottom-0 w-[164px] -rotate-2 opacity-45">
+      <div aria-hidden className="absolute -left-20 bottom-0 w-32 opacity-50">
         <BgPost post={BG_POSTS[2]} />
       </div>
-      <div aria-hidden className="absolute -right-24 bottom-2 w-[176px] rotate-2 opacity-50">
+
+      {/* Right column */}
+      <div aria-hidden className="absolute -right-24 top-3 w-36 opacity-60">
+        <BgPost post={BG_POSTS[1]} />
+      </div>
+      <div aria-hidden className="absolute -right-20 -bottom-3 w-32 opacity-50">
         <BgPost post={BG_POSTS[3]} />
       </div>
 
-      {/* Hero post */}
+      {/* Hero post (opaque — covers the inner edges of the neighbours) */}
       <div className="relative">
         <MockPostCard />
       </div>
