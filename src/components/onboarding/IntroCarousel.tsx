@@ -533,48 +533,53 @@ function MockDiscover() {
         </span>
       </div>
 
-      {/* Avatar bubbles — each floats on its own clock */}
-      {DISCOVER_BUBBLES.map((b, i) => {
-        const a = (b.deg * Math.PI) / 180;
-        const r = b.r ?? 39;
-        const x = 50 + r * Math.cos(a);
-        const y = 50 + r * Math.sin(a);
-        return (
-          <div
-            key={i}
-            className="absolute"
-            style={{ left: `${x}%`, top: `${y}%`, transform: "translate(-50%, -50%)" }}
-          >
-            <Float dur={b.dur} delay={b.delay}>
+      {/* Slowly orbiting ring — avatars counter-rotate to stay upright,
+          and each still floats on its own clock */}
+      <div className="absolute inset-0 animate-orbit">
+        {DISCOVER_BUBBLES.map((b, i) => {
+          const a = (b.deg * Math.PI) / 180;
+          const r = b.r ?? 39;
+          const x = 50 + r * Math.cos(a);
+          const y = 50 + r * Math.sin(a);
+          return (
             <div
-              className="overflow-hidden rounded-[28%] bg-elevated shadow-xl ring-2 ring-white/10"
-              style={{ width: b.size, height: b.size }}
+              key={i}
+              className="absolute"
+              style={{ left: `${x}%`, top: `${y}%`, transform: "translate(-50%, -50%)" }}
             >
-              {b.img ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={b.img}
-                  alt=""
-                  className="h-full w-full object-cover"
-                  style={{ objectPosition: b.pos }}
-                  draggable={false}
-                />
-              ) : (
-                <div
-                  className="flex h-full w-full items-center justify-center font-bold text-white/95"
-                  style={{
-                    fontSize: b.size * 0.4,
-                    background: `linear-gradient(140deg, hsl(${b.hue} 75% 52%), hsl(${((b.hue ?? 0) + 50) % 360} 70% 38%))`,
-                  }}
-                >
-                  {b.name?.[0]}
-                </div>
-              )}
+              <div className="animate-orbit-reverse">
+                <Float dur={b.dur} delay={b.delay}>
+                  <div
+                    className="overflow-hidden rounded-[28%] bg-elevated shadow-xl ring-2 ring-white/10"
+                    style={{ width: b.size, height: b.size }}
+                  >
+                    {b.img ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={b.img}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        style={{ objectPosition: b.pos }}
+                        draggable={false}
+                      />
+                    ) : (
+                      <div
+                        className="flex h-full w-full items-center justify-center font-bold text-white/95"
+                        style={{
+                          fontSize: b.size * 0.4,
+                          background: `linear-gradient(140deg, hsl(${b.hue} 75% 52%), hsl(${((b.hue ?? 0) + 50) % 360} 70% 38%))`,
+                        }}
+                      >
+                        {b.name?.[0]}
+                      </div>
+                    )}
+                  </div>
+                </Float>
+              </div>
             </div>
-            </Float>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -250,6 +250,25 @@ body {
   animation: spin-slow 8s linear infinite;
 }
 
+/* Slowly orbiting avatar ring (onboarding "Find your people").
+   The ring rotates; each avatar counter-rotates to stay upright. */
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes orbit-reverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+.animate-orbit {
+  animation: orbit 48s linear infinite;
+}
+.animate-orbit-reverse {
+  animation: orbit-reverse 48s linear infinite;
+}
+
 /* Mascot — gentle float, blink, sparkle */
 @keyframes mascot-float {
   0%,
@@ -424,7 +443,9 @@ body {
   .animate-disc-in,
   .animate-ring-burst,
   .animate-dot-pop,
-  .animate-dot-bounce {
+  .animate-dot-bounce,
+  .animate-orbit,
+  .animate-orbit-reverse {
     animation: none;
   }
   .animate-rise {
