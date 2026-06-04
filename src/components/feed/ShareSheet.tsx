@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Link2, Zap, Repeat2, Check, Search, Loader2 } from "lucide-react";
+import { Link2, PlusCircle, Repeat2, Check, Search, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
@@ -33,6 +33,8 @@ export function ShareSheet({
   const [sent, setSent] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const [reposted, setReposted] = useState(false);
+  const [showAdded, setShowAdded] = useState(false);
+  const [addingShow, setAddingShow] = useState(false);
   const [sendingDm, setSendingDm] = useState(false);
   const [dmDone, setDmDone] = useState(false);
 
@@ -114,13 +116,30 @@ export function ShareSheet({
     setTimeout(() => setCopied(false), 1500);
   }
 
-  async function nativeShare() {
+  // Add this post/shot's media to your own Show (24h story).
+  async function shareToShow() {
+    if (addingShow || showAdded) return;
+    setAddingShow(true);
     try {
-      if (navigator.share) {
-        await navigator.share({ title: "Hypefy post", url: postUrl });
-        onClose();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      let mediaUrl: string | null = null;
+      if (targetType === "shot") {
+        const { data } = await supabase.from("shots").select("media_url").eq("id", postId).maybeSingle();
+        mediaUrl = data?.media_url ?? null;
+      } else {
+        const { data } = await supabase.from("posts").select("image_url, image_urls").eq("id", postId).maybeSingle();
+        mediaUrl = (data?.image_urls?.[0] as string | undefined) ?? data?.image_url ?? null;
       }
-    } catch {}
+      if (!mediaUrl) return;
+
+      await supabase.from("shows").insert({ user_id: user.id, media_url: mediaUrl });
+      setShowAdded(true);
+      setTimeout(() => { setShowAdded(false); onClose(); }, 1100);
+    } finally {
+      setAddingShow(false);
+    }
   }
 
   function repost() {
@@ -237,43 +256,52 @@ export function ShareSheet({
       {/* ── Divider ────────────────────────────────────── */}
       <div className="my-3 h-px bg-border" />
 
-      {/* ── Actions at bottom ─────────────────────────── */}
-      <div className="flex flex-col gap-0.5 pb-1">
+      {/* ── Actions at bottom — horizontal row ──────────── */}
+      <div className="grid grid-cols-3 gap-2 pb-1">
         <button
           type="button"
           onClick={copyLink}
-          className="flex items-center gap-4 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-white/5"
+          className="flex flex-col items-center gap-2 rounded-2xl px-2 py-3 transition-colors hover:bg-white/5"
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface">
-            {copied ? <Check size={18} className="text-accent" /> : <Link2 size={18} />}
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface">
+            {copied ? <Check size={20} className="text-accent" /> : <Link2 size={20} />}
           </span>
-          <span className={copied ? "text-accent" : "text-foreground"}>
-            {copied ? "Link copied!" : "Copy link"}
+          <span className={`text-xs font-medium ${copied ? "text-accent" : "text-foreground"}`}>
+            {copied ? "Copied!" : "Copy link"}
           </span>
         </button>
 
         <button
           type="button"
           onClick={repost}
-          className="flex items-center gap-4 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-white/5"
+          className="flex flex-col items-center gap-2 rounded-2xl px-2 py-3 transition-colors hover:bg-white/5"
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface">
-            {reposted ? <Check size={18} className="text-accent" /> : <Repeat2 size={18} />}
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface">
+            {reposted ? <Check size={20} className="text-accent" /> : <Repeat2 size={20} />}
           </span>
-          <span className={reposted ? "text-accent" : "text-foreground"}>
+          <span className={`text-xs font-medium ${reposted ? "text-accent" : "text-foreground"}`}>
             {reposted ? "Reposted!" : "Repost"}
           </span>
         </button>
 
         <button
           type="button"
-          onClick={nativeShare}
-          className="flex items-center gap-4 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-white/5"
+          onClick={shareToShow}
+          disabled={addingShow}
+          className="flex flex-col items-center gap-2 rounded-2xl px-2 py-3 transition-colors hover:bg-white/5 disabled:opacity-60"
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface">
-            <Zap size={18} className="text-hype" />
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface">
+            {addingShow ? (
+              <Loader2 size={20} className="animate-spin text-muted" />
+            ) : showAdded ? (
+              <Check size={20} className="text-accent" />
+            ) : (
+              <PlusCircle size={20} className="text-hype" />
+            )}
           </span>
-          <span className="text-foreground">Share to Shot</span>
+          <span className={`text-xs font-medium ${showAdded ? "text-accent" : "text-foreground"}`}>
+            {showAdded ? "Added!" : "Share to Show"}
+          </span>
         </button>
       </div>
     </BottomSheet>
