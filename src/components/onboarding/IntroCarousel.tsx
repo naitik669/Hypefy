@@ -267,25 +267,35 @@ const BG_POSTS = [
 function MockPostStack() {
   return (
     <div className="relative">
-      {/* Left column */}
-      <div aria-hidden className="absolute -left-24 -top-2 w-36 opacity-60">
+      {/* Behind the hero — leo (up-left), jay (down-left), nia (right) */}
+      <div aria-hidden className="absolute -left-28 -top-8 w-40 opacity-60">
         <BgPost post={BG_POSTS[0]} />
       </div>
-      <div aria-hidden className="absolute -left-20 bottom-0 w-32 opacity-50">
+      <div aria-hidden className="absolute -left-28 -bottom-6 w-40 opacity-50">
         <BgPost post={BG_POSTS[2]} />
       </div>
-
-      {/* Right column */}
       <div aria-hidden className="absolute -right-24 top-3 w-36 opacity-60">
         <BgPost post={BG_POSTS[1]} />
       </div>
-      {/* Hero post (opaque — covers the inner edges of the neighbours) */}
-      <div className="relative">
+
+      {/* Black fade so the background posts dissolve before the copy —
+          above the background posts, below the hero. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-32 -right-32 -bottom-10 z-10 h-40"
+        style={{
+          background:
+            "linear-gradient(to top, var(--color-background) 0%, var(--color-background) 45%, transparent 100%)",
+        }}
+      />
+
+      {/* Hero post — above the fade, always fully visible */}
+      <div className="relative z-20">
         <MockPostCard />
       </div>
 
-      {/* This one sits IN FRONT of the hero, overlapping its corner */}
-      <div aria-hidden className="absolute -right-20 -bottom-3 z-10 w-32">
+      {/* In front of the hero, bigger, free to bleed off the frame */}
+      <div aria-hidden className="absolute -right-20 -bottom-3 z-30 w-40">
         <BgPost post={BG_POSTS[3]} />
       </div>
     </div>
