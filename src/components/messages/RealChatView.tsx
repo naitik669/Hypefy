@@ -76,6 +76,25 @@ export function RealChatView({
     supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
   }, [conversationId, supabase]);
 
+  // Fetch the shared post for a message so its embed renders (realtime/optimistic).
+  async function hydratePost(msgId: string, postId: string) {
+    const { data } = await supabase
+      .from("posts")
+      .select("id, caption, image_url, image_urls, profiles(username, display_name, avatar_hue)")
+      .eq("id", postId)
+      .maybeSingle();
+    if (!data) return;
+    const d = data as any;
+    const pr = Array.isArray(d.profiles) ? d.profiles[0] : d.profiles;
+    setMessages((prev) =>
+      prev.map((x) =>
+        x.id === msgId
+          ? { ...x, post: { id: d.id, caption: d.caption, image_url: d.image_url, image_urls: d.image_urls }, postProfile: pr }
+          : x,
+      ),
+    );
+  }
+
   // Realtime: INSERT + UPDATE (unsend)
   useEffect(() => {
     const channel = supabase
@@ -85,6 +104,7 @@ export function RealChatView({
         (payload) => {
           const m = payload.new as ChatMsg;
           setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, { ...m, post: null }]));
+          if (m.kind === "post" && m.post_id) hydratePost(m.id, m.post_id);
           if (m.sender_id !== currentUserId) {
             supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
           }
