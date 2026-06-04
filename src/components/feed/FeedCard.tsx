@@ -70,6 +70,13 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const [savePending, setSavePending] = useState(false);
 
   const [imgIdx, setImgIdx] = useState(0);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  function onGalleryScroll() {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const i = Math.round(el.scrollLeft / el.clientWidth);
+    setImgIdx((prev) => (i !== prev ? i : prev));
+  }
   const [toast, setToast] = useState<string | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState(post.comment_count);
@@ -214,25 +221,37 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         </button>
       </div>
 
-      {/* Image carousel — double-tap to Hype (no navigation) */}
+      {/* Image gallery — swipe/scroll between images; double-tap to Hype */}
       {images.length > 0 && (
         <div className="relative mx-4 overflow-hidden rounded-2xl">
-          <div onClick={handleImageTap} className="block cursor-pointer select-none">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={images[imgIdx]} alt={post.caption ?? "Post"} className="aspect-square w-full object-cover" draggable={false} />
-
-            {/* Double-tap burst */}
-            {hypeBurst && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <Star size={88} className="animate-hype-pop text-hype drop-shadow-[0_4px_20px_rgba(255,208,0,0.5)]" fill="currentColor" />
+          <div
+            ref={scrollerRef}
+            onScroll={onGalleryScroll}
+            className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto"
+          >
+            {images.map((src, i) => (
+              <div
+                key={i}
+                onClick={handleImageTap}
+                className="w-full shrink-0 cursor-pointer snap-center select-none"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt={post.caption ?? "Post"} className="aspect-square w-full object-cover" draggable={false} />
               </div>
-            )}
-            {showParticles && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <HypeParticles size={16} />
-              </div>
-            )}
+            ))}
           </div>
+
+          {/* Double-tap burst (centred over the gallery) */}
+          {hypeBurst && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <Star size={88} className="animate-hype-pop text-hype drop-shadow-[0_4px_20px_rgba(255,208,0,0.5)]" fill="currentColor" />
+            </div>
+          )}
+          {showParticles && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <HypeParticles size={16} />
+            </div>
+          )}
 
           {/* Expand → full-screen pinch-to-zoom viewer */}
           <button
@@ -252,7 +271,10 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
               </span>
               <div className="absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5">
                 {images.map((_, i) => (
-                  <button key={i} type="button" onClick={() => setImgIdx(i)}
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => scrollerRef.current?.scrollTo({ left: i * scrollerRef.current.clientWidth, behavior: "smooth" })}
                     className={`h-1.5 rounded-full transition-all ${i === imgIdx ? "w-4 bg-white" : "w-1.5 bg-white/50"}`}
                   />
                 ))}
