@@ -283,8 +283,8 @@ function MockPostStack() {
         <MockPostCard />
       </div>
 
-      {/* In front of the hero, bigger, shifted right, free to bleed off frame */}
-      <div aria-hidden className="absolute -right-28 -bottom-3 z-30 w-48">
+      {/* In front of the hero, bigger, shifted down-right, free to bleed off frame */}
+      <div aria-hidden className="absolute -right-32 -bottom-5 z-30 w-48">
         <BgPost post={BG_POSTS[3]} />
       </div>
 
