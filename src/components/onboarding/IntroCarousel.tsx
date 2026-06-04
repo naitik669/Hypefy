@@ -490,25 +490,73 @@ function MockReel() {
   );
 }
 
+type Bubble = { deg: number; size: number; img?: string; pos?: string; name?: string; hue?: number };
+
+const DISCOVER_BUBBLES: Bubble[] = [
+  { deg: -90, size: 56, img: "/onboarding/maya.webp", pos: "50% 18%" },
+  { deg: -42, size: 46, name: "Nia", hue: 330 },
+  { deg: 6, size: 60, img: "/onboarding/ada-pfp.webp", pos: "50% 22%" },
+  { deg: 52, size: 44, name: "Leo", hue: 30 },
+  { deg: 96, size: 52, img: "/onboarding/jay-pfp.webp", pos: "50% 16%" },
+  { deg: 140, size: 46, name: "Kai", hue: 200 },
+  { deg: 184, size: 58, name: "Zoe", hue: 280 },
+  { deg: 226, size: 44, name: "Sam", hue: 150 },
+];
+
+/** Orbiting avatars around a central Hypefy hub — "your people" constellation. */
 function MockDiscover() {
-  const tiles = [
-    { n: "Jay", h: 200, tag: "Developer" },
-    { n: "Nia", h: 330, tag: "Artist" },
-    { n: "Leo", h: 30, tag: "Gamer" },
-    { n: "Ada", h: 150, tag: "Creator" },
-  ];
+  const R = 39; // orbit radius (% of container)
   return (
-    <div className="grid w-[320px] grid-cols-2 gap-3.5">
-      {tiles.map((t) => (
-        <div key={t.n} className="flex flex-col items-center gap-2.5 rounded-[26px] border border-border bg-surface p-4 shadow-xl">
-          <Avatar name={t.n} hue={t.h} size={56} />
-          <div className="text-center">
-            <p className="text-[15px] font-bold leading-tight">{t.n}</p>
-            <p className="text-xs text-muted">{t.tag}</p>
+    <div className="relative h-[290px] w-[290px]">
+      {/* Orbit track */}
+      <div className="absolute inset-7 rounded-full border border-border bg-surface/50" />
+
+      {/* Center hub */}
+      <div className="absolute left-1/2 top-1/2 z-10 flex h-[68px] w-[68px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[22px] bg-white shadow-2xl">
+        <span className="text-3xl font-extrabold tracking-tight text-background">
+          h<span className="text-accent">.</span>
+        </span>
+      </div>
+
+      {/* Avatar bubbles */}
+      {DISCOVER_BUBBLES.map((b, i) => {
+        const a = (b.deg * Math.PI) / 180;
+        const x = 50 + R * Math.cos(a);
+        const y = 50 + R * Math.sin(a);
+        return (
+          <div
+            key={i}
+            className="absolute"
+            style={{ left: `${x}%`, top: `${y}%`, transform: "translate(-50%, -50%)" }}
+          >
+            <div
+              className="overflow-hidden rounded-full bg-elevated shadow-xl ring-2 ring-white/10"
+              style={{ width: b.size, height: b.size }}
+            >
+              {b.img ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={b.img}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  style={{ objectPosition: b.pos }}
+                  draggable={false}
+                />
+              ) : (
+                <div
+                  className="flex h-full w-full items-center justify-center font-bold text-white/95"
+                  style={{
+                    fontSize: b.size * 0.4,
+                    background: `linear-gradient(140deg, hsl(${b.hue} 75% 52%), hsl(${((b.hue ?? 0) + 50) % 360} 70% 38%))`,
+                  }}
+                >
+                  {b.name?.[0]}
+                </div>
+              )}
+            </div>
           </div>
-          <span className="rounded-pill bg-accent px-5 py-1.5 text-xs font-bold text-accent-ink">Follow</span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
