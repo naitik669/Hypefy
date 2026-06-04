@@ -245,9 +245,20 @@ function MockPostCard() {
         </div>
       </div>
       <div
-        className="mt-3.5 aspect-[4/5] w-full rounded-3xl"
+        className="mt-3.5 aspect-square w-full overflow-hidden rounded-3xl"
         style={{ background: "linear-gradient(135deg, #6d28d9, #2563eb)" }}
-      />
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/onboarding/post-sample.jpg"
+          alt=""
+          className="h-full w-full object-cover"
+          draggable={false}
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+      </div>
       <div className="mt-3.5 flex items-center gap-5">
         <span className="flex items-center gap-1.5">
           <Star size={24} className="fill-hype text-hype" />
