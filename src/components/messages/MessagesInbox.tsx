@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, MessageCircle } from "lucide-react";
+import { Search, MessageCircle, Users } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -11,13 +11,27 @@ export type InboxRow = {
   name: string;
   username: string | null;
   hue: number;
+  isGroup: boolean;
+  memberCount: number;
   lastBody: string | null;
   lastKind: string | null;
   lastAt: string | null;
   lastMine: boolean;
+  lastSenderName: string | null;
   unread: boolean;
   isRequest: boolean;
 };
+
+function GroupAvatar() {
+  return (
+    <div
+      className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[30%]"
+      style={{ background: "linear-gradient(140deg, hsl(210 70% 52%), hsl(260 65% 42%))" }}
+    >
+      <Users size={24} className="text-white/95" />
+    </div>
+  );
+}
 
 type Tab = "all" | "unread" | "requests";
 
@@ -30,8 +44,12 @@ function timeAgo(iso: string) {
 }
 
 function preview(r: InboxRow) {
-  if (!r.lastAt) return "Say hi 👋";
+  if (!r.lastAt) return r.isGroup ? "New group" : "Say hi 👋";
   const body = r.lastKind === "post" ? "Shared a post" : r.lastBody ?? "Sent a message";
+  if (r.isGroup) {
+    const who = r.lastMine ? "You" : r.lastSenderName;
+    return who ? `${who}: ${body}` : body;
+  }
   return (r.lastMine ? "You: " : "") + body;
 }
 
@@ -133,10 +151,11 @@ export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
               href={`/messages/${r.id}`}
               className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.03]"
             >
-              <Avatar name={r.name} hue={r.hue} size={52} />
+              {r.isGroup ? <GroupAvatar /> : <Avatar name={r.name} hue={r.hue} size={52} />}
               <div className="min-w-0 flex-1">
                 <p className={`truncate text-sm ${r.unread ? "font-bold text-foreground" : "font-semibold"}`}>
                   {r.name}
+                  {r.isGroup && <span className="ml-1.5 text-xs font-normal text-faint">· {r.memberCount}</span>}
                 </p>
                 <p className={`truncate text-sm ${r.unread ? "font-semibold text-foreground" : "text-muted"}`}>
                   {preview(r)}

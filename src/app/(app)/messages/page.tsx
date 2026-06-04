@@ -13,7 +13,7 @@ export default async function MessagesPage() {
   // Conversations I'm a member of (RLS filters to mine), newest first
   const { data: convs } = await supabase
     .from("conversations")
-    .select("id, last_message_at")
+    .select("id, last_message_at, type, title")
     .order("last_message_at", { ascending: false })
     .limit(50);
 
@@ -44,10 +44,14 @@ export default async function MessagesPage() {
       supabase.from("follows").select("following_id").eq("follower_id", user.id),
     ]);
 
-    const otherByConv = new Map<string, any>();
+    // All other members per conversation (for groups we need everyone)
+    const membersByConv = new Map<string, { id: string; name: string; username: string | null; hue: number }[]>();
     (membersRes.data ?? []).forEach((m: any) => {
       const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
-      if (!otherByConv.has(m.conversation_id)) otherByConv.set(m.conversation_id, p);
+      if (!p) return;
+      const arr = membersByConv.get(m.conversation_id) ?? [];
+      arr.push({ id: p.id, name: p.display_name ?? p.username ?? "User", username: p.username ?? null, hue: p.avatar_hue ?? 280 });
+      membersByConv.set(m.conversation_id, arr);
     });
 
     const lastByConv = new Map<string, any>();
@@ -62,25 +66,39 @@ export default async function MessagesPage() {
 
     rows = (convs ?? [])
       .map((c: any) => {
-        const other = otherByConv.get(c.id);
-        if (!other) return null;
+        const members = membersByConv.get(c.id) ?? [];
+        if (members.length === 0) return null;
+        const isGroup = c.type === "group";
         const last = lastByConv.get(c.id);
         const lastRead = readByConv.get(c.id) ?? null;
         const unread =
           !!last &&
           last.sender_id !== user.id &&
           (!lastRead || new Date(last.created_at) > new Date(lastRead));
+
+        const groupName =
+          c.title ||
+          members.slice(0, 3).map((m) => m.name).join(", ") +
+            (members.length > 3 ? ` +${members.length - 3}` : "");
+        const lastSenderName =
+          isGroup && last && last.sender_id !== user.id
+            ? members.find((m) => m.id === last.sender_id)?.name ?? null
+            : null;
+
         return {
           id: c.id,
-          name: other.display_name ?? other.username ?? "User",
-          username: other.username ?? null,
-          hue: other.avatar_hue ?? 280,
+          name: isGroup ? groupName : members[0].name,
+          username: isGroup ? null : members[0].username,
+          hue: isGroup ? 210 : members[0].hue,
+          isGroup,
+          memberCount: members.length + 1,
           lastBody: last?.body ?? null,
           lastKind: last?.kind ?? null,
           lastAt: last?.created_at ?? null,
           lastMine: last?.sender_id === user.id,
+          lastSenderName,
           unread,
-          isRequest: !following.has(other.id),
+          isRequest: isGroup ? false : !following.has(members[0].id),
         } as InboxRow;
       })
       .filter(Boolean) as InboxRow[];
@@ -92,7 +110,7 @@ export default async function MessagesPage() {
         title="Messages"
         right={
           <Link
-            href="/search"
+            href="/messages/new"
             aria-label="New message"
             className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5"
           >

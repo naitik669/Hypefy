@@ -12,19 +12,40 @@ export default async function ThreadPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
 
-  // Membership + other participant (RLS already blocks non-members)
-  const { data: members } = await supabase
-    .from("conversation_members")
-    .select("user_id, profiles(id, display_name, username, avatar_hue)")
-    .eq("conversation_id", threadId);
+  // Membership + participants (RLS already blocks non-members)
+  const [{ data: members }, { data: conv }] = await Promise.all([
+    supabase
+      .from("conversation_members")
+      .select("user_id, profiles(id, display_name, username, avatar_hue)")
+      .eq("conversation_id", threadId),
+    supabase.from("conversations").select("type, title").eq("id", threadId).maybeSingle(),
+  ]);
 
   if (!members || members.length === 0) notFound();
   const me = members.find((m: any) => m.user_id === user.id);
   if (!me) notFound();
 
-  const otherRow = members.find((m: any) => m.user_id !== user.id);
-  const op = otherRow
-    ? (Array.isArray((otherRow as any).profiles) ? (otherRow as any).profiles[0] : (otherRow as any).profiles)
+  const isGroup = conv?.type === "group";
+
+  const others = members
+    .filter((m: any) => m.user_id !== user.id)
+    .map((m: any) => (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles))
+    .filter(Boolean);
+  const op = others[0] ?? null;
+
+  // Sender lookup + group meta
+  const membersMap: Record<string, { name: string; hue: number }> = {};
+  others.forEach((p: any) => {
+    membersMap[p.id] = { name: p.display_name ?? p.username ?? "User", hue: p.avatar_hue ?? 280 };
+  });
+  const group = isGroup
+    ? {
+        title:
+          conv?.title ||
+          others.slice(0, 3).map((p: any) => p.display_name ?? p.username ?? "User").join(", ") +
+            (others.length > 3 ? ` +${others.length - 3}` : ""),
+        memberCount: members.length,
+      }
     : null;
 
   // Messages with post previews
@@ -56,6 +77,8 @@ export default async function ThreadPage({
         username: op?.username ?? null,
         hue: op?.avatar_hue ?? 280,
       }}
+      group={group}
+      members={membersMap}
       initialMessages={messages}
     />
   );

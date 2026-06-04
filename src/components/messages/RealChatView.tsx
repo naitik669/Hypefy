@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -40,13 +40,20 @@ export function RealChatView({
   conversationId,
   currentUserId,
   other,
+  group,
+  members,
   initialMessages,
 }: {
   conversationId: string;
   currentUserId: string;
   other: Other;
+  group?: { title: string; memberCount: number } | null;
+  members?: Record<string, { name: string; hue: number }>;
   initialMessages: ChatMsg[];
 }) {
+  const isGroup = !!group;
+  const senderName = (id: string) =>
+    id === currentUserId ? "You" : members?.[id]?.name ?? other.name;
   const supabase = createClient();
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMsg[]>(initialMessages);
@@ -176,37 +183,65 @@ export function RealChatView({
           className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5">
           <ChevronLeft size={24} />
         </button>
-        <Link href={other.username ? `/u/${other.username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
-          <Avatar name={other.name} hue={other.hue} size={36} />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{other.name}</p>
-            {other.username && <p className="truncate text-xs text-muted">@{other.username}</p>}
+        {isGroup ? (
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[30%]"
+              style={{ background: "linear-gradient(140deg, hsl(210 70% 52%), hsl(260 65% 42%))" }}
+            >
+              <Users size={18} className="text-white/95" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{group!.title}</p>
+              <p className="truncate text-xs text-muted">{group!.memberCount} members</p>
+            </div>
           </div>
-        </Link>
+        ) : (
+          <Link href={other.username ? `/u/${other.username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
+            <Avatar name={other.name} hue={other.hue} size={36} />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{other.name}</p>
+              {other.username && <p className="truncate text-xs text-muted">@{other.username}</p>}
+            </div>
+          </Link>
+        )}
       </header>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-            <Avatar name={other.name} hue={other.hue} size={64} />
-            <p className="mt-2 text-sm font-semibold">{other.name}</p>
-            <p className="text-xs text-muted">This is the start of your conversation.</p>
+            {isGroup ? (
+              <span
+                className="flex h-16 w-16 items-center justify-center rounded-[30%]"
+                style={{ background: "linear-gradient(140deg, hsl(210 70% 52%), hsl(260 65% 42%))" }}
+              >
+                <Users size={30} className="text-white/95" />
+              </span>
+            ) : (
+              <Avatar name={other.name} hue={other.hue} size={64} />
+            )}
+            <p className="mt-2 text-sm font-semibold">{isGroup ? group!.title : other.name}</p>
+            <p className="text-xs text-muted">
+              {isGroup ? `${group!.memberCount} members` : "This is the start of your conversation."}
+            </p>
           </div>
         ) : (
           <div className="flex flex-col gap-1.5">
-            {messages.map((m) => {
+            {messages.map((m, i) => {
               const mine = m.sender_id === currentUserId;
               const replied = m.reply_to_id ? byId.get(m.reply_to_id) : null;
+              const showSender = isGroup && !mine && (i === 0 || messages[i - 1].sender_id !== m.sender_id);
               return (
                 <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                   <div className={`flex max-w-[80%] flex-col ${mine ? "items-end" : "items-start"}`}>
+                    {showSender && (
+                      <span className="mb-0.5 px-1 text-[11px] font-semibold text-muted">{senderName(m.sender_id)}</span>
+                    )}
                     {/* Reply quote */}
                     {replied && (
                       <div className="mb-0.5 max-w-full truncate rounded-lg border-l-2 border-accent/60 bg-surface px-2 py-1 text-[11px] text-muted">
-                        <span className="font-semibold">
-                          {replied.sender_id === currentUserId ? "You" : other.name}
-                        </span>
+                        <span className="font-semibold">{senderName(replied.sender_id)}</span>
                         {": "}
                         {replied.is_unsent ? "Unsent message" : replied.body ?? "Post"}
                       </div>
