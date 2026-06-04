@@ -278,26 +278,26 @@ function MockPostStack() {
         <BgPost post={BG_POSTS[1]} />
       </div>
 
-      {/* Black fade so the background posts dissolve before the copy —
-          above the background posts, below the hero. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -left-32 -right-32 -bottom-10 z-10 h-40"
-        style={{
-          background:
-            "linear-gradient(to top, var(--color-background) 0%, var(--color-background) 45%, transparent 100%)",
-        }}
-      />
-
-      {/* Hero post — above the fade, always fully visible */}
+      {/* Hero post */}
       <div className="relative z-20">
         <MockPostCard />
       </div>
 
-      {/* In front of the hero, bigger, free to bleed off the frame */}
-      <div aria-hidden className="absolute -right-20 -bottom-3 z-30 w-40">
+      {/* In front of the hero, bigger, shifted right, free to bleed off frame */}
+      <div aria-hidden className="absolute -right-28 -bottom-3 z-30 w-48">
         <BgPost post={BG_POSTS[3]} />
       </div>
+
+      {/* Top-most black fade — every post (hero + neighbours + ada) dissolves
+          into black as it nears the copy below. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-32 -right-32 -bottom-10 z-40 h-44"
+        style={{
+          background:
+            "linear-gradient(to top, var(--color-background) 0%, var(--color-background) 42%, transparent 100%)",
+        }}
+      />
     </div>
   );
 }
