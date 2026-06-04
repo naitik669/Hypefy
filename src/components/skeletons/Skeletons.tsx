@@ -1,5 +1,31 @@
 import { Skeleton, SkeletonCircle, SkeletonLine } from "@/components/ui/Skeleton";
 
+/** Full-screen Shots (reels) skeleton — matches the ReelsFeed layout. */
+export function ReelSkeleton() {
+  return (
+    <div className="fixed inset-x-0 top-0 bottom-[72px] z-10 mx-auto max-w-[480px] overflow-hidden bg-black">
+      <Skeleton rounded="rounded-none" className="absolute inset-0" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent" />
+
+      {/* Right action rail */}
+      <div className="absolute bottom-24 right-3 flex flex-col items-center gap-5">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <SkeletonCircle key={i} size={32} />
+        ))}
+      </div>
+
+      {/* Author + caption */}
+      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-4 pr-16">
+        <div className="flex items-center gap-2.5">
+          <SkeletonCircle size={38} />
+          <SkeletonLine width={110} height={12} />
+        </div>
+        <SkeletonLine width="60%" height={10} />
+      </div>
+    </div>
+  );
+}
+
 /** Static header bar skeleton (matches TopBar height/layout). */
 export function HeaderSkeleton({ centerWordmark = false }: { centerWordmark?: boolean }) {
   return (

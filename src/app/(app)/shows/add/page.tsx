@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { X, Images, Type, Send, Loader2 } from "lucide-react";
+import { X, Images, Type, Send, Loader2, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { LiveCamera } from "@/components/shows/LiveCamera";
 
@@ -165,41 +165,57 @@ export default function AddShowPage() {
             </button>
           </div>
 
-          {/* Caption input overlay */}
-          {showCaption && (
-            <div className="absolute inset-x-6 top-1/2 z-20 -translate-y-1/2">
+          {/* Caption — sits just above the action bar */}
+          <div className="absolute inset-x-4 bottom-24 z-20">
+            {showCaption ? (
               <input
                 autoFocus
                 value={caption}
                 onChange={(e) => setCaption(e.target.value.slice(0, 150))}
+                onBlur={() => { if (!caption.trim()) setShowCaption(false); }}
                 placeholder="Add a caption…"
-                className="w-full bg-transparent text-center text-xl font-bold text-white outline-none placeholder:text-white/40 drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]"
+                className="w-full rounded-2xl bg-black/35 px-4 py-3 text-base text-white outline-none backdrop-blur-sm placeholder:text-white/55"
               />
-            </div>
-          )}
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowCaption(true)}
+                className="flex items-center gap-2 text-base font-medium text-white/70 drop-shadow"
+              >
+                <Type size={18} /> {caption || "Add a caption…"}
+              </button>
+            )}
+          </div>
 
           {/* Error */}
           {error && (
-            <div className="absolute inset-x-4 bottom-32 z-20">
+            <div className="absolute inset-x-4 bottom-36 z-20">
               <p className="rounded-xl bg-danger/80 px-3 py-2 text-center text-xs text-white backdrop-blur-sm">
                 {error}
               </p>
             </div>
           )}
 
-          {/* Share button */}
-          <div className="absolute inset-x-0 bottom-0 z-20 flex items-center justify-center pb-12">
+          {/* Bottom action bar — audience pills + send */}
+          <div className="absolute inset-x-0 bottom-0 z-20 flex items-center gap-2.5 px-4 pb-9 pt-4">
+            <span className="flex items-center gap-2 rounded-pill bg-white/15 py-1.5 pl-1.5 pr-3.5 backdrop-blur-sm">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/25 text-white">
+                <User size={15} />
+              </span>
+              <span className="text-sm font-semibold text-white">Your Show</span>
+            </span>
+            <span className="rounded-pill bg-white/15 px-3.5 py-2 text-sm font-semibold text-white/75 backdrop-blur-sm">
+              24h
+            </span>
+            <div className="flex-1" />
             <button
               type="button"
               onClick={share}
               disabled={pending}
-              className="flex h-14 items-center gap-2 rounded-pill bg-accent px-8 text-sm font-bold text-accent-ink transition-transform active:scale-95 disabled:opacity-60"
+              aria-label="Share to your Show"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-ink shadow-lg transition-transform active:scale-95 disabled:opacity-60"
             >
-              {pending ? (
-                <><Loader2 size={18} className="animate-spin" /> Sharing…</>
-              ) : (
-                <><Send size={18} /> Share to Show</>
-              )}
+              {pending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
             </button>
           </div>
         </>
