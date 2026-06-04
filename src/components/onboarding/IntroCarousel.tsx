@@ -278,8 +278,8 @@ function MockPostStack() {
         <BgPost post={BG_POSTS[1]} />
       </div>
 
-      {/* Hero post */}
-      <div className="relative z-20">
+      {/* Hero post — nudged slightly up + left */}
+      <div className="relative z-20" style={{ transform: "translate(-12px, -10px)" }}>
         <MockPostCard />
       </div>
 
