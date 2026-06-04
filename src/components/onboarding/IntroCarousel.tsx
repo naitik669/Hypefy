@@ -115,7 +115,9 @@ export function IntroCarousel() {
                 {/* Visual — animates in/out, floats while idle */}
                 <div className="flex flex-[1.15] items-center justify-center">
                   <div style={slideAnim(active, 0)}>
-                    <div className={active ? "animate-float-y" : ""}>
+                    {/* Posts slide floats each post individually (see MockPostStack);
+                        other slides float as one piece. */}
+                    <div className={active && s !== "posts" ? "animate-float-y" : ""}>
                       <Visual slide={s} active={active} />
                     </div>
                   </div>
@@ -272,12 +274,23 @@ function WelcomeVisual() {
 }
 
 /** Background posts — real-looking, different users, so the feed feels alive. */
-const BG_POSTS = [
-  { name: "leo", hue: 30, time: "5m", hypes: "1.2k", gradient: "linear-gradient(135deg, #2dd4bf, #22c55e)" },
-  { name: "nia", hue: 330, time: "12m", hypes: "3.4k", gradient: "linear-gradient(135deg, #f472b6, #fb923c)" },
-  { name: "jay", hue: 200, time: "1h", hypes: "890", gradient: "linear-gradient(135deg, #22d3ee, #6366f1)" },
-  { name: "ada", hue: 150, time: "2h", hypes: "2.1k", gradient: "linear-gradient(135deg, #f59e0b, #ef4444)" },
-] as const;
+type BgPostData = {
+  name: string;
+  hue: number;
+  time: string;
+  hypes: string;
+  img: string;
+  imgPos: string;
+  avatar?: string;
+  avatarPos?: string;
+};
+
+const BG_POSTS: BgPostData[] = [
+  { name: "leo", hue: 30, time: "5m", hypes: "1.2k", img: "/onboarding/leo-post.jpg", imgPos: "50% 50%" },
+  { name: "nia", hue: 330, time: "12m", hypes: "3.4k", img: "/onboarding/nia-post.jpg", imgPos: "50% 45%" },
+  { name: "jay", hue: 200, time: "1h", hypes: "890", img: "/onboarding/jay-post.jpg", imgPos: "50% 45%", avatar: "/onboarding/jay-pfp.webp", avatarPos: "50% 16%" },
+  { name: "ada", hue: 150, time: "2h", hypes: "2.1k", img: "/onboarding/ada-post.webp", imgPos: "50% 42%", avatar: "/onboarding/ada-pfp.webp", avatarPos: "50% 22%" },
+];
 
 /**
  * The hero post surrounded by other users' posts that bleed off the left and
@@ -291,31 +304,41 @@ function MockPostStack({ active }: { active: boolean }) {
       {/* Behind the hero — leo (up-left), jay (down-left), nia (right) */}
       <div aria-hidden className="absolute -left-28 -top-8 w-40 opacity-60">
         <div style={revealStyle(active, 4)}>
-          <BgPost post={BG_POSTS[0]} />
+          <Float dur="4.1s" delay="0.7s">
+            <BgPost post={BG_POSTS[0]} />
+          </Float>
         </div>
       </div>
       <div aria-hidden className="absolute -left-28 -bottom-6 w-40 opacity-50">
         <div style={revealStyle(active, 3)}>
-          <BgPost post={BG_POSTS[2]} />
+          <Float dur="4.4s" delay="1s">
+            <BgPost post={BG_POSTS[2]} />
+          </Float>
         </div>
       </div>
       <div aria-hidden className="absolute -right-24 top-3 w-36 opacity-60">
         <div style={revealStyle(active, 4)}>
-          <BgPost post={BG_POSTS[1]} />
+          <Float dur="3.7s" delay="0.3s">
+            <BgPost post={BG_POSTS[1]} />
+          </Float>
         </div>
       </div>
 
       {/* Hero post — nudged slightly up + left, revealed after the copy */}
       <div className="relative z-20" style={{ transform: "translate(-12px, -10px)" }}>
         <div style={revealStyle(active, 2)}>
-          <MockPostCard />
+          <Float dur="3.4s" delay="0s">
+            <MockPostCard />
+          </Float>
         </div>
       </div>
 
       {/* In front of the hero, bigger, shifted down-right, revealed last */}
       <div aria-hidden className="absolute -right-32 -bottom-5 z-30 w-48">
         <div style={revealStyle(active, 5)}>
-          <BgPost post={BG_POSTS[3]} />
+          <Float dur="3.2s" delay="0.5s">
+            <BgPost post={BG_POSTS[3]} />
+          </Float>
         </div>
       </div>
 
@@ -333,17 +356,48 @@ function MockPostStack({ active }: { active: boolean }) {
   );
 }
 
-function BgPost({ post }: { post: (typeof BG_POSTS)[number] }) {
+/** Gentle bob with a per-instance duration + delay so posts float out of sync. */
+function Float({ dur, delay, children }: { dur: string; delay: string; children: React.ReactNode }) {
+  return (
+    <div className="animate-float-y" style={{ animationDuration: dur, animationDelay: delay }}>
+      {children}
+    </div>
+  );
+}
+
+function BgPost({ post }: { post: BgPostData }) {
   return (
     <div className="rounded-[20px] border border-border bg-surface p-2.5 shadow-xl">
       <div className="flex items-center gap-2">
-        <Avatar name={post.name} hue={post.hue} size={26} />
+        {post.avatar ? (
+          <div className="h-[26px] w-[26px] shrink-0 overflow-hidden rounded-[30%]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={post.avatar}
+              alt=""
+              className="h-full w-full object-cover"
+              style={{ objectPosition: post.avatarPos }}
+              draggable={false}
+            />
+          </div>
+        ) : (
+          <Avatar name={post.name} hue={post.hue} size={26} />
+        )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-bold leading-tight">{post.name}</p>
           <p className="text-[9px] text-muted">{post.time}</p>
         </div>
       </div>
-      <div className="mt-2 aspect-square w-full rounded-xl" style={{ background: post.gradient }} />
+      <div className="mt-2 aspect-square w-full overflow-hidden rounded-xl bg-elevated">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={post.img}
+          alt=""
+          className="h-full w-full object-cover"
+          style={{ objectPosition: post.imgPos }}
+          draggable={false}
+        />
+      </div>
       <div className="mt-2 flex items-center gap-2">
         <Star size={13} className="fill-hype text-hype" />
         <span className="text-[10px] font-bold">{post.hypes}</span>
