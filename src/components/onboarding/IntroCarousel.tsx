@@ -114,7 +114,8 @@ export function IntroCarousel() {
               <section key={s} className="flex h-full w-full shrink-0 flex-col px-7">
                 {/* Visual — animates in/out, floats while idle */}
                 <div className="flex flex-[1.15] items-center justify-center">
-                  <div style={slideAnim(active, 0)}>
+                  {/* Shots handles its own per-reel reveal (see MockReel). */}
+                  <div style={s === "shots" ? undefined : slideAnim(active, 0)}>
                     {/* Posts, shots + discover slides float each element individually;
                         other slides float as one piece. */}
                     <div
@@ -483,9 +484,21 @@ const HERO_REEL: ReelData = {
 };
 
 const BG_REELS: ReelData[] = [
-  { img: "/onboarding/nia-post.jpg", imgPos: "50% 45%", handle: "mara", caption: "park days", hypes: "2.3k", hue: 280 },
-  { img: "/onboarding/ada-post.webp", imgPos: "50% 42%", handle: "kit", caption: "sun nap ☀️", hypes: "3.1k", hue: 150 },
+  { img: "/onboarding/nia-post.jpg", imgPos: "50% 45%", pfp: "/onboarding/disc6.webp", pfpPos: "50% 35%", handle: "mara", caption: "park days", hypes: "2.3k" },
+  { img: "/onboarding/ada-post.webp", imgPos: "50% 42%", pfp: "/onboarding/disc7.webp", pfpPos: "50% 38%", handle: "kit", caption: "sun nap ☀️", hypes: "3.1k" },
 ];
+
+/** Per-reel in-animation: blur + fade + rise, staggered by order. */
+function reelReveal(active: boolean, order: number): React.CSSProperties {
+  const d = order * 170;
+  return {
+    opacity: active ? 1 : 0,
+    filter: active ? "blur(0px)" : "blur(8px)",
+    transform: active ? "translateY(0) scale(1)" : "translateY(22px) scale(0.95)",
+    transition: `opacity 0.55s ease ${d}ms, filter 0.6s ease ${d}ms, transform 0.6s cubic-bezier(0.16,1,0.3,1) ${d}ms`,
+    willChange: "opacity, transform, filter",
+  };
+}
 
 /** One reel card (real image still, play glyph, hype rail, author). */
 function ReelCard({ data, w, h, active = false }: { data: ReelData; w: number; h: number; active?: boolean }) {
@@ -520,7 +533,7 @@ function ReelCard({ data, w, h, active = false }: { data: ReelData; w: number; h
         <span className="flex flex-col items-center gap-0.5">
           <Star
             size={big ? 26 : 20}
-            className={`fill-hype text-hype ${active ? "animate-hype-burst" : ""}`}
+            className={`fill-hype text-hype ${active ? "animate-star-pop" : ""}`}
           />
           <span className="text-[10px] font-semibold">{data.hypes}</span>
         </span>
@@ -553,27 +566,34 @@ function ReelCard({ data, w, h, active = false }: { data: ReelData; w: number; h
   );
 }
 
-/** Hero reel over a couple of others so the Shots scene feels populated. */
+/** Hero reel over a couple of others so the Shots scene feels populated.
+ *  Each reel reveals (blur + fade + rise) with relative latency, then floats. */
 function MockReel({ active }: { active: boolean }) {
   return (
     <div className="relative">
       {/* Background reels peeking from behind, floating on their own clocks */}
       <div className="absolute -left-20 top-7 opacity-50">
-        <Float dur="4.3s" delay="0.6s">
-          <ReelCard data={BG_REELS[0]} w={134} h={238} />
-        </Float>
+        <div style={reelReveal(active, 3)}>
+          <Float dur="4.3s" delay="0.6s">
+            <ReelCard data={BG_REELS[0]} w={134} h={238} />
+          </Float>
+        </div>
       </div>
       <div className="absolute -right-20 top-12 opacity-45">
-        <Float dur="3.6s" delay="0.2s">
-          <ReelCard data={BG_REELS[1]} w={130} h={230} />
-        </Float>
+        <div style={reelReveal(active, 4)}>
+          <Float dur="3.6s" delay="0.2s">
+            <ReelCard data={BG_REELS[1]} w={130} h={230} />
+          </Float>
+        </div>
       </div>
 
-      {/* Hero reel */}
+      {/* Hero reel — leads the reveal (after the copy) */}
       <div className="relative z-10">
-        <Float dur="3.9s" delay="0s">
-          <ReelCard data={HERO_REEL} w={188} h={332} active={active} />
-        </Float>
+        <div style={reelReveal(active, 2)}>
+          <Float dur="3.9s" delay="0s">
+            <ReelCard data={HERO_REEL} w={188} h={332} active={active} />
+          </Float>
+        </div>
       </div>
     </div>
   );
