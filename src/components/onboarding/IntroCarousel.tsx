@@ -28,6 +28,7 @@ export function IntroCarousel() {
   const router = useRouter();
   const [index, setIndex] = useState(0);
   const startX = useRef<number | null>(null);
+  const wheelLock = useRef(false);
   const isLast = index === SLIDES.length - 1;
 
   function goTo(i: number) {
@@ -51,6 +52,17 @@ export function IntroCarousel() {
     else if (dx >= 45) goTo(index - 1);
   }
 
+  // Trackpad / wheel — one slide per gesture (locked during a short cooldown)
+  function onWheel(e: React.WheelEvent) {
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (Math.abs(d) < 8 || wheelLock.current) return;
+    wheelLock.current = true;
+    goTo(index + (d > 0 ? 1 : -1));
+    setTimeout(() => {
+      wheelLock.current = false;
+    }, 650);
+  }
+
   return (
     <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] select-none flex-col overflow-hidden bg-background">
       {/* Top bar — wordmark + Skip */}
@@ -71,6 +83,7 @@ export function IntroCarousel() {
         style={{ touchAction: "pan-y" }}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
+        onWheel={onWheel}
       >
         <div
           className="flex h-full"
@@ -122,10 +135,14 @@ export function IntroCarousel() {
         <button
           type="button"
           onClick={advance}
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-pill bg-accent text-base font-bold text-accent-ink transition-transform active:scale-[0.98]"
+          className="group flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-accent text-base font-bold text-accent-ink transition-transform duration-150 active:scale-[0.96]"
         >
           {isLast ? "Get Hyped" : "Next"}
-          <ArrowRight size={20} strokeWidth={2.6} />
+          <ArrowRight
+            size={20}
+            strokeWidth={2.6}
+            className="transition-transform duration-200 group-active:translate-x-1.5"
+          />
         </button>
 
         {isLast && (
@@ -190,7 +207,7 @@ function Visual({ slide }: { slide: (typeof SLIDES)[number] }) {
     case "welcome":
       return <WelcomeVisual />;
     case "posts":
-      return <MockPostCard />;
+      return <MockPostStack />;
     case "shots":
       return <MockReel />;
     case "discover":
@@ -234,11 +251,65 @@ function WelcomeVisual() {
   );
 }
 
+/** The main post stacked over a few dimmed posts so it reads like a feed. */
+function MockPostStack() {
+  return (
+    <div className="relative">
+      {/* Background posts — present but not begging for attention */}
+      <div aria-hidden className="absolute -left-14 top-10 w-[210px] -rotate-6 opacity-25 blur-[1.5px]">
+        <GhostPost />
+      </div>
+      <div aria-hidden className="absolute -right-14 top-16 w-[200px] rotate-6 opacity-[0.18] blur-[1.5px]">
+        <GhostPost />
+      </div>
+      <div aria-hidden className="absolute left-1/2 -top-8 w-[170px] -translate-x-1/2 opacity-[0.14] blur-[2px]">
+        <GhostPost />
+      </div>
+
+      {/* Hero post */}
+      <div className="relative">
+        <MockPostCard />
+      </div>
+    </div>
+  );
+}
+
+/** A dimmed, detail-light post used for background depth. */
+function GhostPost() {
+  return (
+    <div className="rounded-[22px] border border-border bg-surface p-3">
+      <div className="flex items-center gap-2">
+        <div className="h-8 w-8 rounded-[30%] bg-elevated" />
+        <div className="flex-1">
+          <div className="h-2 w-16 rounded-full bg-elevated" />
+          <div className="mt-1.5 h-2 w-10 rounded-full bg-elevated/60" />
+        </div>
+      </div>
+      <div className="mt-2.5 aspect-square w-full rounded-2xl bg-elevated" />
+      <div className="mt-2.5 flex gap-3">
+        <div className="h-3 w-3 rounded-full bg-elevated" />
+        <div className="h-3 w-3 rounded-full bg-elevated" />
+        <div className="h-3 w-3 rounded-full bg-elevated" />
+      </div>
+    </div>
+  );
+}
+
 function MockPostCard() {
   return (
     <div className="w-[300px] rounded-[28px] border border-border bg-surface p-4 shadow-2xl">
       <div className="flex items-center gap-3">
-        <Avatar name="Maya" hue={280} size={42} />
+        {/* Face-focused square pfp */}
+        <div className="h-[42px] w-[42px] shrink-0 overflow-hidden rounded-[30%]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/onboarding/maya.webp"
+            alt=""
+            className="h-full w-full object-cover"
+            style={{ objectPosition: "50% 18%" }}
+            draggable={false}
+          />
+        </div>
         <div className="flex-1">
           <p className="text-[15px] font-bold leading-tight">maya</p>
           <p className="text-xs text-muted">2m ago</p>
