@@ -279,13 +279,14 @@ function MockPostStack() {
       <div aria-hidden className="absolute -right-24 top-3 w-36 opacity-60">
         <BgPost post={BG_POSTS[1]} />
       </div>
-      <div aria-hidden className="absolute -right-20 -bottom-3 w-32 opacity-50">
-        <BgPost post={BG_POSTS[3]} />
-      </div>
-
       {/* Hero post (opaque — covers the inner edges of the neighbours) */}
       <div className="relative">
         <MockPostCard />
+      </div>
+
+      {/* This one sits IN FRONT of the hero, overlapping its corner */}
+      <div aria-hidden className="absolute -right-20 -bottom-3 z-10 w-32">
+        <BgPost post={BG_POSTS[3]} />
       </div>
     </div>
   );
