@@ -9,6 +9,21 @@ import { ProfilePreviewCard } from "@/components/onboarding/ProfilePreviewCard";
 
 const SLIDES = ["welcome", "posts", "shots", "discover", "identity"] as const;
 
+/**
+ * Enter/exit transition for a slide's content. Active → focused (sharp,
+ * settled). Inactive → faded, blurred, nudged down + scaled back. Tapping
+ * Next plays the incoming slide's "in" while the outgoing plays the reverse.
+ */
+function slideAnim(active: boolean, delay = 0): React.CSSProperties {
+  return {
+    opacity: active ? 1 : 0,
+    filter: active ? "blur(0px)" : "blur(10px)",
+    transform: active ? "translateY(0) scale(1)" : "translateY(28px) scale(0.94)",
+    transition: `opacity 0.5s ease ${delay}ms, filter 0.55s ease ${delay}ms, transform 0.6s cubic-bezier(0.16,1,0.3,1) ${delay}ms`,
+    willChange: "opacity, transform, filter",
+  };
+}
+
 export function IntroCarousel() {
   const router = useRouter();
   const scroller = useRef<HTMLDivElement>(null);
@@ -53,21 +68,30 @@ export function IntroCarousel() {
         onScroll={onScroll}
         className="no-scrollbar flex flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
       >
-        {SLIDES.map((s) => (
-          <section
-            key={s}
-            className="flex w-full shrink-0 snap-center flex-col px-7"
-          >
-            {/* Visual */}
-            <div className="flex flex-[1.1] items-center justify-center">
-              <Visual slide={s} />
-            </div>
-            {/* Copy */}
-            <div className="flex flex-1 flex-col justify-start pt-2">
-              <Copy slide={s} />
-            </div>
-          </section>
-        ))}
+        {SLIDES.map((s, i) => {
+          const active = i === index;
+          return (
+            <section
+              key={s}
+              className="flex w-full shrink-0 snap-center flex-col px-7"
+            >
+              {/* Visual — animates in/out, floats while idle */}
+              <div className="flex flex-[1.1] items-center justify-center">
+                <div style={slideAnim(active, 0)}>
+                  <div className={active ? "animate-float-y" : ""}>
+                    <Visual slide={s} />
+                  </div>
+                </div>
+              </div>
+              {/* Copy — same in/out, slightly delayed for a layered feel */}
+              <div className="flex flex-1 flex-col justify-start pt-2">
+                <div style={slideAnim(active, 110)}>
+                  <Copy slide={s} />
+                </div>
+              </div>
+            </section>
+          );
+        })}
       </div>
 
       {/* Footer — dots + CTA */}
