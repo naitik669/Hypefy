@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { HypefyMark } from "@/components/HypefyMark";
 
@@ -40,6 +41,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Prefill email + show a notice when redirected here (e.g. from signup
   // because the email is already registered). Read from the URL directly
@@ -159,16 +161,27 @@ export function AuthCard({ mode }: { mode: Mode }) {
             onChange={(e) => setEmail(e.target.value)}
             className="h-12 w-full rounded-xl border border-white/5 bg-white/[0.06] px-4 text-sm text-foreground placeholder:text-faint outline-none transition focus:border-accent/40 focus:ring-2 focus:ring-accent/30"
           />
-          <input
-            type="password"
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            required
-            minLength={6}
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="h-12 w-full rounded-xl border border-white/5 bg-white/[0.06] px-4 text-sm text-foreground placeholder:text-faint outline-none transition focus:border-accent/40 focus:ring-2 focus:ring-accent/30"
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              required
+              minLength={6}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-12 w-full rounded-xl border border-white/5 bg-white/[0.06] pl-4 pr-11 text-sm text-foreground placeholder:text-faint outline-none transition focus:border-accent/40 focus:ring-2 focus:ring-accent/30"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-faint transition-colors hover:text-foreground"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
 
           {mode === "signin" && (
             <Link
