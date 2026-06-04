@@ -502,24 +502,29 @@ type Bubble = {
   hue?: number;
 };
 
-// Distinct dur/delay per bubble so neighbours never bob in sync.
+// 10 profiles evenly around the disc; distinct dur/delay so neighbours never sync.
 const DISCOVER_BUBBLES: Bubble[] = [
-  { deg: -90, size: 56, r: 39, dur: "3.6s", delay: "0s", img: "/onboarding/maya.webp", pos: "50% 18%" },
-  { deg: -42, size: 46, r: 41, dur: "4.4s", delay: "0.9s", name: "Nia", hue: 330 },
-  { deg: 6, size: 60, r: 38, dur: "3.1s", delay: "0.4s", img: "/onboarding/ada-pfp.webp", pos: "50% 22%" },
-  { deg: 52, size: 44, r: 40, dur: "4.7s", delay: "1.3s", name: "Leo", hue: 30 },
-  { deg: 96, size: 52, r: 39, dur: "3.4s", delay: "0.2s", img: "/onboarding/jay-pfp.webp", pos: "50% 16%" },
-  { deg: 140, size: 46, r: 41, dur: "4.1s", delay: "0.7s", name: "Kai", hue: 200 },
-  { deg: 184, size: 58, r: 38, dur: "3s", delay: "0.5s", name: "Zoe", hue: 280 },
-  { deg: 226, size: 44, r: 40, dur: "4.6s", delay: "1.1s", name: "Sam", hue: 150 },
+  { deg: -90, size: 52, r: 40, dur: "3.6s", delay: "0s", img: "/onboarding/maya.webp", pos: "50% 18%" },
+  { deg: -54, size: 46, r: 41, dur: "4.4s", delay: "0.9s", name: "Mara", hue: 280 },
+  { deg: -18, size: 48, r: 39, dur: "3.1s", delay: "0.4s", name: "Eli", hue: 200 },
+  { deg: 18, size: 58, r: 40, dur: "4.7s", delay: "1.3s", img: "/onboarding/ada-pfp.webp", pos: "50% 22%" },
+  { deg: 54, size: 46, r: 41, dur: "3.4s", delay: "0.2s", name: "Noa", hue: 30 },
+  { deg: 90, size: 50, r: 40, dur: "4.1s", delay: "0.7s", img: "/onboarding/jay-pfp.webp", pos: "50% 16%" },
+  { deg: 126, size: 48, r: 41, dur: "3s", delay: "0.5s", name: "Rai", hue: 150 },
+  { deg: 162, size: 46, r: 39, dur: "4.6s", delay: "1.1s", name: "Sky", hue: 330 },
+  { deg: 198, size: 50, r: 40, dur: "3.8s", delay: "0.3s", name: "Kit", hue: 95 },
+  { deg: 234, size: 44, r: 41, dur: "4.2s", delay: "1.5s", name: "Zo", hue: 250 },
 ];
 
 /** Orbiting avatars around a central Hypefy hub — "your people" constellation. */
 function MockDiscover() {
   return (
-    <div className="relative h-[290px] w-[290px]">
-      {/* Orbit track */}
-      <div className="absolute inset-7 rounded-full border border-border bg-surface/50" />
+    <div className="relative h-[300px] w-[300px]">
+      {/* Filled dark disc */}
+      <div
+        className="absolute inset-3 rounded-full"
+        style={{ background: "radial-gradient(circle at 50% 44%, #1d1d1d 0%, #121212 55%, #0b0b0b 100%)" }}
+      />
 
       {/* Center hub */}
       <div className="absolute left-1/2 top-1/2 z-10 flex h-[68px] w-[68px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[22px] bg-white shadow-2xl">
@@ -542,7 +547,7 @@ function MockDiscover() {
           >
             <Float dur={b.dur} delay={b.delay}>
             <div
-              className="overflow-hidden rounded-full bg-elevated shadow-xl ring-2 ring-white/10"
+              className="overflow-hidden rounded-[28%] bg-elevated shadow-xl ring-2 ring-white/10"
               style={{ width: b.size, height: b.size }}
             >
               {b.img ? (
