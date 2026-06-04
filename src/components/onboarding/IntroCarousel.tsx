@@ -251,19 +251,30 @@ function WelcomeVisual() {
   );
 }
 
-/** The main post stacked over a few dimmed posts so it reads like a feed. */
+/** Background posts — real-looking, different users, so the feed feels alive. */
+const BG_POSTS = [
+  { name: "leo", hue: 30, time: "5m", hypes: "1.2k", gradient: "linear-gradient(135deg, #2dd4bf, #22c55e)" },
+  { name: "nia", hue: 330, time: "12m", hypes: "3.4k", gradient: "linear-gradient(135deg, #f472b6, #fb923c)" },
+  { name: "jay", hue: 200, time: "1h", hypes: "890", gradient: "linear-gradient(135deg, #22d3ee, #6366f1)" },
+  { name: "ada", hue: 150, time: "2h", hypes: "2.1k", gradient: "linear-gradient(135deg, #f59e0b, #ef4444)" },
+] as const;
+
+/** The main post surrounded by other users' posts so it reads like a feed. */
 function MockPostStack() {
   return (
     <div className="relative">
-      {/* Background posts — present but not begging for attention */}
-      <div aria-hidden className="absolute -left-14 top-10 w-[210px] -rotate-6 opacity-25 blur-[1.5px]">
-        <GhostPost />
+      {/* Other people's posts, peeking from behind — present, not loud */}
+      <div aria-hidden className="absolute -left-24 -top-4 w-[176px] -rotate-3 opacity-55">
+        <BgPost post={BG_POSTS[0]} />
       </div>
-      <div aria-hidden className="absolute -right-14 top-16 w-[200px] rotate-6 opacity-[0.18] blur-[1.5px]">
-        <GhostPost />
+      <div aria-hidden className="absolute -right-20 -top-8 w-[168px] rotate-3 opacity-50">
+        <BgPost post={BG_POSTS[1]} />
       </div>
-      <div aria-hidden className="absolute left-1/2 -top-8 w-[170px] -translate-x-1/2 opacity-[0.14] blur-[2px]">
-        <GhostPost />
+      <div aria-hidden className="absolute -left-20 bottom-0 w-[164px] -rotate-2 opacity-45">
+        <BgPost post={BG_POSTS[2]} />
+      </div>
+      <div aria-hidden className="absolute -right-24 bottom-2 w-[176px] rotate-2 opacity-50">
+        <BgPost post={BG_POSTS[3]} />
       </div>
 
       {/* Hero post */}
@@ -274,22 +285,22 @@ function MockPostStack() {
   );
 }
 
-/** A dimmed, detail-light post used for background depth. */
-function GhostPost() {
+function BgPost({ post }: { post: (typeof BG_POSTS)[number] }) {
   return (
-    <div className="rounded-[22px] border border-border bg-surface p-3">
+    <div className="rounded-[20px] border border-border bg-surface p-2.5 shadow-xl">
       <div className="flex items-center gap-2">
-        <div className="h-8 w-8 rounded-[30%] bg-elevated" />
-        <div className="flex-1">
-          <div className="h-2 w-16 rounded-full bg-elevated" />
-          <div className="mt-1.5 h-2 w-10 rounded-full bg-elevated/60" />
+        <Avatar name={post.name} hue={post.hue} size={26} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-bold leading-tight">{post.name}</p>
+          <p className="text-[9px] text-muted">{post.time}</p>
         </div>
       </div>
-      <div className="mt-2.5 aspect-square w-full rounded-2xl bg-elevated" />
-      <div className="mt-2.5 flex gap-3">
-        <div className="h-3 w-3 rounded-full bg-elevated" />
-        <div className="h-3 w-3 rounded-full bg-elevated" />
-        <div className="h-3 w-3 rounded-full bg-elevated" />
+      <div className="mt-2 aspect-square w-full rounded-xl" style={{ background: post.gradient }} />
+      <div className="mt-2 flex items-center gap-2">
+        <Star size={13} className="fill-hype text-hype" />
+        <span className="text-[10px] font-bold">{post.hypes}</span>
+        <MessageCircle size={12} className="text-muted" />
+        <Send size={11} className="text-muted" />
       </div>
     </div>
   );
