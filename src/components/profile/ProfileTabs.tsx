@@ -110,7 +110,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
             ctaHref="/create/post"
           />
         ) : (
-          <div className="grid grid-cols-3 gap-0.5">
+          <div className="grid grid-cols-3 gap-1.5 px-1.5">
             {posts.map((p) => (
               <PostThumb key={p.id} post={p} />
             ))}
@@ -131,9 +131,9 @@ export function ProfileTabs({ userId }: { userId: string }) {
             ctaHref="/create/shot"
           />
         ) : (
-          <div className="grid grid-cols-3 gap-0.5">
+          <div className="grid grid-cols-3 gap-1.5 px-1.5">
             {shots.map((s) => (
-              <Link key={s.id} href="/shots" className="relative block aspect-[3/4] overflow-hidden bg-surface">
+              <Link key={s.id} href={`/shots/${s.id}`} className="relative block aspect-[3/4] overflow-hidden rounded-xl bg-surface">
                 <video
                   src={s.media_url}
                   className="h-full w-full object-cover"
@@ -161,7 +161,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
             text="Save posts and Shots you want to revisit."
           />
         ) : (
-          <div className="grid grid-cols-3 gap-0.5">
+          <div className="grid grid-cols-3 gap-1.5 px-1.5">
             {saved.map((p) => (
               <PostThumb key={`p-${p.id}`} post={p} />
             ))}
@@ -169,7 +169,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
               <Link
                 key={`s-${s.id}`}
                 href={`/shots/${s.id}`}
-                className="relative block aspect-square overflow-hidden bg-surface"
+                className="relative block aspect-square overflow-hidden rounded-xl bg-surface"
               >
                 <video
                   src={s.media_url}
@@ -191,29 +191,27 @@ export function ProfileTabs({ userId }: { userId: string }) {
 }
 
 function PostThumb({ post }: { post: PostRow }) {
-  if (post.image_url) {
-    return (
-      <div className="aspect-square overflow-hidden bg-surface">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={post.image_url} alt={post.caption ?? "Post"} className="h-full w-full object-cover" />
-      </div>
-    );
-  }
-  // Text-only post — show caption preview
   return (
-    <div className="aspect-square overflow-hidden bg-elevated p-2 flex items-start">
-      <p className="line-clamp-4 text-[10px] leading-snug text-muted">
-        <RichPostText text={post.caption ?? ""} />
-      </p>
-    </div>
+    <Link href={`/p/${post.id}`} className="block aspect-square overflow-hidden rounded-xl bg-surface">
+      {post.image_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={post.image_url} alt={post.caption ?? "Post"} className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full items-start bg-elevated p-2">
+          <p className="line-clamp-4 text-[10px] leading-snug text-muted">
+            <RichPostText text={post.caption ?? ""} />
+          </p>
+        </div>
+      )}
+    </Link>
   );
 }
 
 function GridSkeleton() {
   return (
-    <div className="grid grid-cols-3 gap-0.5">
+    <div className="grid grid-cols-3 gap-1.5 px-1.5">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="aspect-square animate-pulse bg-surface" />
+        <div key={i} className="aspect-square animate-pulse rounded-xl bg-surface" />
       ))}
     </div>
   );

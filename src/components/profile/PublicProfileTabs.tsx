@@ -107,7 +107,7 @@ export function PublicProfileTabs({
         ) : (
           <>
             {/* 3-column thumbnail grid */}
-            <div className="grid grid-cols-3 gap-0.5">
+            <div className="grid grid-cols-3 gap-1.5 px-1.5">
               {activePosts.map((p, i) => {
                 const thumb = getThumb(p);
                 const multi = ((p as any).image_urls?.length ?? 0) > 1;
@@ -116,7 +116,7 @@ export function PublicProfileTabs({
                     key={p.id}
                     type="button"
                     onClick={() => setViewerIdx(i)}
-                    className="relative aspect-square overflow-hidden bg-surface"
+                    className="relative aspect-square overflow-hidden rounded-xl bg-surface"
                   >
                     {thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -156,9 +156,9 @@ export function PublicProfileTabs({
             ctaHref={isOwn ? "/create/shot" : undefined}
           />
         ) : (
-          <div className="grid grid-cols-3 gap-0.5">
+          <div className="grid grid-cols-3 gap-1.5 px-1.5">
             {shots.map((s) => (
-              <Link key={s.id} href="/shots" className="relative block aspect-[3/4] overflow-hidden bg-surface">
+              <Link key={s.id} href={`/shots/${s.id}`} className="relative block aspect-[3/4] overflow-hidden rounded-xl bg-surface">
                 <video src={s.media_url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
               </Link>
             ))}
