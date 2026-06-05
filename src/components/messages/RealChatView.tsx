@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, Mic, MicOff, VideoOff, UserCircle, BellOff, Ban } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { useCall } from "@/lib/useCall";
+import { useCallControls } from "@/components/calls/CallProvider";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 
@@ -38,7 +38,7 @@ type ReactionRow = { message_id: string; user_id: string; emoji: string };
 type Other = { id: string; name: string; username: string | null; hue: number };
 
 const REPORT_REASONS = ["Spam", "Harassment", "Hate or abuse", "Scam", "Inappropriate content", "Other"];
-const QUICK = ["❤️", "🔥", "😂", "👍", "😮", "😢"];
+const QUICK = ["â¤ï¸", "ðŸ”¥", "ðŸ˜‚", "ðŸ‘", "ðŸ˜®", "ðŸ˜¢"];
 
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -94,8 +94,10 @@ export function RealChatView({
   const [toast, setToast] = useState<string | null>(null);
   const [callChooser, setCallChooser] = useState(false);
   const [headerMenu, setHeaderMenu] = useState(false);
-  const { call, localStream, remoteStream, error: callError, startCall, acceptCall, endCall, clearError } =
-    useCall({ conversationId, userId: currentUserId, enabled: !isGroup });
+  const { startCall } = useCallControls();
+  function placeCall(type: "audio" | "video") {
+    startCall({ conversationId, peerId: other.id, peerName: other.name, peerHue: other.hue, type });
+  }
   const endRef = useRef<HTMLDivElement>(null);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressClick = useRef(false);
@@ -108,7 +110,7 @@ export function RealChatView({
     return m;
   }, [messages]);
 
-  // emoji → { count, mine } per message
+  // emoji â†’ { count, mine } per message
   const reactionsByMsg = useMemo(() => {
     const out = new Map<string, { emoji: string; count: number; mine: boolean }[]>();
     const tmp = new Map<string, Map<string, { count: number; mine: boolean }>>();
@@ -273,7 +275,7 @@ export function RealChatView({
     if (m.body) { navigator.clipboard.writeText(m.body).catch(() => {}); showToast("Copied"); }
   }
 
-  // Long-press → context menu
+  // Long-press â†’ context menu
   function onPressStart(m: ChatMsg, e: React.PointerEvent) {
     if (m.is_unsent) return;
     suppressClick.current = false;
@@ -320,27 +322,29 @@ export function RealChatView({
 
         {/* Right actions: call + options */}
         <div className="relative flex shrink-0 items-center gap-0.5">
-          <button type="button" onClick={() => { setHeaderMenu(false); setCallChooser((v) => !v); }} aria-label="Call"
-            className={`flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/5 ${callChooser ? "text-accent" : "text-foreground"}`}>
-            <Phone size={20} />
-          </button>
+          {!isGroup && (
+            <button type="button" onClick={() => { setHeaderMenu(false); setCallChooser((v) => !v); }} aria-label="Call"
+              className={`flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/5 ${callChooser ? "text-accent" : "text-foreground"}`}>
+              <Phone size={20} />
+            </button>
+          )}
           <button type="button" onClick={() => { setCallChooser(false); setHeaderMenu((v) => !v); }} aria-label="Options"
             className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5">
             <MoreVertical size={20} />
           </button>
 
-          {/* Call type popover — anchored to the phone icon */}
+          {/* Call type popover â€” anchored to the phone icon */}
           {callChooser && (
             <>
               <div className="fixed inset-0 z-40" onPointerDown={() => setCallChooser(false)} />
               <div className="absolute right-9 top-12 z-50 w-44 overflow-hidden rounded-2xl border border-border bg-elevated py-1 shadow-2xl">
                 <button type="button"
-                  onClick={() => { setCallChooser(false); startCall("audio"); }}
+                  onClick={() => { setCallChooser(false); placeCall("audio"); }}
                   className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/5">
                   <Phone size={17} className="text-accent" /> Audio call
                 </button>
                 <button type="button"
-                  onClick={() => { setCallChooser(false); startCall("video"); }}
+                  onClick={() => { setCallChooser(false); placeCall("video"); }}
                   className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/5">
                   <Video size={17} className="text-accent" /> Video call
                 </button>
@@ -533,7 +537,7 @@ export function RealChatView({
               </span>
               : {replyTo.is_unsent ? "Unsent" : replyTo.body ?? (replyTo.kind === "shot" ? "Shot" : "Post")}
             </span>
-            <button onClick={() => setReplyTo(null)} className="text-faint hover:text-muted">✕</button>
+            <button onClick={() => setReplyTo(null)} className="text-faint hover:text-muted">âœ•</button>
           </div>
         )}
         <div className="flex items-center gap-2">
@@ -541,7 +545,7 @@ export function RealChatView({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-            placeholder="Message…"
+            placeholder="Messageâ€¦"
             className="h-11 flex-1 rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
           />
           <button type="button" onClick={send} disabled={!text.trim() || sending} aria-label="Send"
@@ -610,28 +614,6 @@ export function RealChatView({
         </BottomSheet>
       )}
 
-      {/* Active call screen */}
-      {call && (
-        <CallScreen
-          type={call.type}
-          status={call.status}
-          name={other.name}
-          hue={other.hue}
-          localStream={localStream}
-          remoteStream={remoteStream}
-          onAccept={acceptCall}
-          onEnd={endCall}
-        />
-      )}
-
-      {/* Call error toast */}
-      {callError && (
-        <div className="fixed bottom-24 left-1/2 z-[230] -translate-x-1/2 rounded-pill bg-red-500 px-4 py-2 text-sm font-semibold text-white shadow-lg"
-          onClick={clearError}>
-          {callError}
-        </div>
-      )}
-
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-24 left-1/2 z-[210] -translate-x-1/2 rounded-pill bg-elevated px-4 py-2 text-sm font-semibold shadow-lg ring-1 ring-border">
@@ -642,124 +624,6 @@ export function RealChatView({
   );
 }
 
-function CallScreen({
-  type, status, name, hue, localStream, remoteStream, onAccept, onEnd,
-}: {
-  type: "audio" | "video";
-  status: "outgoing" | "incoming" | "connected";
-  name: string;
-  hue: number;
-  localStream: MediaStream | null;
-  remoteStream: MediaStream | null;
-  onAccept: () => void;
-  onEnd: () => void;
-}) {
-  const [secs, setSecs] = useState(0);
-  const [muted, setMuted] = useState(false);
-  const [camOff, setCamOff] = useState(false);
-  const localRef = useRef<HTMLVideoElement>(null);
-  const remoteRef = useRef<HTMLVideoElement>(null);
-
-  // Bind streams to media elements.
-  useEffect(() => { if (localRef.current && localStream) localRef.current.srcObject = localStream; }, [localStream]);
-  useEffect(() => { if (remoteRef.current && remoteStream) remoteRef.current.srcObject = remoteStream; }, [remoteStream]);
-
-  // Call duration once connected.
-  useEffect(() => {
-    if (status !== "connected") return;
-    const id = setInterval(() => setSecs((s) => s + 1), 1000);
-    return () => clearInterval(id);
-  }, [status]);
-
-  function toggleMute() {
-    const next = !muted;
-    setMuted(next);
-    localStream?.getAudioTracks().forEach((t) => (t.enabled = !next));
-  }
-  function toggleCam() {
-    const next = !camOff;
-    setCamOff(next);
-    localStream?.getVideoTracks().forEach((t) => (t.enabled = !next));
-  }
-
-  const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
-  const statusText =
-    status === "incoming" ? `Incoming ${type} call…`
-    : status === "outgoing" ? "Ringing…"
-    : clock;
-  const showRemoteVideo = type === "video" && status === "connected" && !!remoteStream;
-
-  return (
-    <div className="fixed inset-0 z-[220] flex flex-col items-center justify-between overflow-hidden bg-black px-6 py-14">
-      {/* Remote video fills the screen when connected */}
-      {showRemoteVideo && (
-        <video ref={remoteRef} autoPlay playsInline className="absolute inset-0 h-full w-full object-cover" />
-      )}
-      {/* Remote audio (audio calls) */}
-      {type === "audio" && <video ref={remoteRef} autoPlay playsInline className="hidden" />}
-
-      {/* Local self-view (picture-in-picture) */}
-      {type === "video" && (
-        <video ref={localRef} autoPlay playsInline muted
-          className={`absolute right-4 top-14 z-10 h-40 w-28 rounded-2xl border border-white/15 object-cover shadow-xl ${camOff ? "hidden" : ""}`} />
-      )}
-
-      <div className="z-10 flex flex-1 flex-col items-center justify-center gap-5">
-        {!showRemoteVideo && (
-          <>
-            <Avatar name={name} hue={hue} size={128} />
-            <div className="text-center">
-              <p className="text-xl font-bold text-white">{name}</p>
-              <p className="mt-1 text-sm text-white/60">{statusText}</p>
-            </div>
-          </>
-        )}
-        {showRemoteVideo && (
-          <div className="absolute left-1/2 top-16 -translate-x-1/2 rounded-pill bg-black/40 px-3 py-1 text-center backdrop-blur-sm">
-            <span className="text-sm font-semibold text-white">{name} · {clock}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Controls */}
-      <div className="z-10 flex items-center gap-5">
-        {status === "incoming" ? (
-          <>
-            <button type="button" onClick={onEnd} aria-label="Decline"
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white transition-transform active:scale-95">
-              <Phone size={26} className="rotate-[135deg]" />
-            </button>
-            <button type="button" onClick={onAccept} aria-label="Accept"
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500 text-white transition-transform active:scale-95">
-              <Phone size={26} />
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"}
-              className={`flex h-14 w-14 items-center justify-center rounded-full transition-colors ${muted ? "bg-white text-black" : "bg-white/10 text-white"}`}>
-              {muted ? <MicOff size={22} /> : <Mic size={22} />}
-            </button>
-            <button type="button" onClick={onEnd} aria-label="End call"
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white transition-transform active:scale-95">
-              <Phone size={26} className="rotate-[135deg]" />
-            </button>
-            {type === "video" ? (
-              <button type="button" onClick={toggleCam} aria-label={camOff ? "Camera on" : "Camera off"}
-                className={`flex h-14 w-14 items-center justify-center rounded-full transition-colors ${camOff ? "bg-white text-black" : "bg-white/10 text-white"}`}>
-                {camOff ? <VideoOff size={22} /> : <Video size={22} />}
-              </button>
-            ) : (
-              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-white/40">
-                <Video size={22} />
-              </span>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function MenuItem({ icon, label, onClick, danger }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
   return (
