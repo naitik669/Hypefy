@@ -31,9 +31,27 @@ type StartArgs = {
   type: CallType;
 };
 
-const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }],
-};
+// ICE servers: Google STUN always, plus a TURN relay if configured via env.
+// TURN is required for calls to connect on cellular / strict (symmetric) NATs.
+//   NEXT_PUBLIC_TURN_URLS=turn:host:3478?transport=udp,turns:host:5349?transport=tcp
+//   NEXT_PUBLIC_TURN_USERNAME=...
+//   NEXT_PUBLIC_TURN_CREDENTIAL=...
+function buildRtcConfig(): RTCConfiguration {
+  const iceServers: RTCIceServer[] = [
+    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+  ];
+  const turnUrls = process.env.NEXT_PUBLIC_TURN_URLS;
+  if (turnUrls) {
+    iceServers.push({
+      urls: turnUrls.split(",").map((u) => u.trim()).filter(Boolean),
+      username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+      credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
+    });
+  }
+  return { iceServers };
+}
+
+const RTC_CONFIG: RTCConfiguration = buildRtcConfig();
 
 const RING_TIMEOUT = 30_000;
 
