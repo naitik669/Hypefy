@@ -13,7 +13,7 @@ import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
 import { EditPostSheet } from "@/components/feed/EditPostSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
-import { formatCount } from "@/lib/mock";
+import { formatCount } from "@/lib/format";
 
 export type FeedPost = {
   id: string;
@@ -57,7 +57,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const images = getImages(post);
 
   // Resolve the current user ourselves when the parent didn't pass one,
-  // so hype/save work on every surface (profile modal, search, discover…).
+  // so hype/save work on every surface (profile modal, search, discoverâ€¦).
   const [uid, setUid] = useState(currentUserId);
 
   const [hyped, setHyped] = useState(post.initialHyped ?? false);
@@ -90,7 +90,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
 
   const lastTapRef = useRef(0);
 
-  // ── Self-sync: resolve user + fetch hype/save/comment state ──
+  // â”€â”€ Self-sync: resolve user + fetch hype/save/comment state â”€â”€
   useEffect(() => {
     let active = true;
     async function sync() {
@@ -166,7 +166,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
     }
   }
 
-  // Double-tap to Hype — only ever ADDS a hype, never removes one.
+  // Double-tap to Hype â€” only ever ADDS a hype, never removes one.
   function playBurst() {
     setHypeBurst(true);
     setShowParticles(true);
@@ -180,7 +180,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
       if (!hyped && !hypePending) {
         toggleHype(); // hypes (burst handled inside)
       } else {
-        playBurst(); // already hyped → replay heart, do NOT unhype
+        playBurst(); // already hyped â†’ replay heart, do NOT unhype
       }
     }
     lastTapRef.current = now;
@@ -194,7 +194,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
     if (!prev) {
       const { error } = await supabase.from("saved_posts").insert({ user_id: uid, post_id: post.id });
       if (error) { setSaved(prev); if (!/duplicate|unique/i.test(error.message)) showToast("Couldn't save"); }
-      else showToast("Saved ✓");
+      else showToast("Saved âœ“");
     } else {
       const { error } = await supabase.from("saved_posts").delete().eq("user_id", uid).eq("post_id", post.id);
       if (error) { setSaved(prev); showToast("Couldn't unsave"); }
@@ -212,16 +212,16 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         <Link href={profileHref}><Avatar name={name} hue={hue} size={40} /></Link>
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <Link href={profileHref} className="truncate text-sm font-semibold hover:underline">{name}</Link>
-          <span className="ml-1 text-xs text-faint">· {timeAgo(post.created_at)}</span>
+          <span className="ml-1 text-xs text-faint">Â· {timeAgo(post.created_at)}</span>
         </div>
-        {/* THREE DOTS — fully functional */}
+        {/* THREE DOTS â€” fully functional */}
         <button type="button" aria-label="More" onClick={() => setActionsOpen(true)}
           className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-white/5">
           <MoreHorizontal size={20} />
         </button>
       </div>
 
-      {/* Image gallery — swipe/scroll between images; double-tap to Hype */}
+      {/* Image gallery â€” swipe/scroll between images; double-tap to Hype */}
       {images.length > 0 && (
         <div className="relative mx-4 overflow-hidden rounded-2xl">
           <div
@@ -253,7 +253,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
             </div>
           )}
 
-          {/* Expand → full-screen pinch-to-zoom viewer */}
+          {/* Expand â†’ full-screen pinch-to-zoom viewer */}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setZoomOpen(true); }}
@@ -316,7 +316,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         </button>
       </div>
 
-      {/* Caption — clamps long text with a more / less toggle */}
+      {/* Caption â€” clamps long text with a more / less toggle */}
       {(liveCaption || liveBody) && (
         <ExpandableText className="px-4 pt-2 text-sm leading-snug" clampClass="line-clamp-2">
           {liveCaption && (

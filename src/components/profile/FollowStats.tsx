@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FollowListSheet } from "@/components/profile/FollowListSheet";
-import { formatCount } from "@/lib/mock";
+import { formatCount } from "@/lib/format";
 
 export function FollowStats({
   userId,

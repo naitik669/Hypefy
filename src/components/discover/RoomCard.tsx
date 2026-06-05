@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Users } from "lucide-react";
 import { HypeMeter } from "@/components/ui/HypeMeter";
-import { formatCount } from "@/lib/mock";
+import { formatCount } from "@/lib/format";
 import type { Room } from "@/lib/mock-discover";
 
 export function RoomCard({ room }: { room: Room }) {
@@ -23,7 +23,7 @@ export function RoomCard({ room }: { room: Room }) {
             <p className="truncate text-sm font-bold">{room.name}</p>
             <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
               <Users size={11} />
-              {formatCount(room.members)} members · Community
+              {formatCount(room.members)} members Â· Community
             </p>
           </div>
           <button

@@ -1,7 +1,7 @@
 import { Star } from "lucide-react";
-import { formatCount } from "@/lib/mock";
+import { formatCount } from "@/lib/format";
 
-/** A shared post rendered inside a chat bubble — links messaging to the feed. */
+/** A shared post rendered inside a chat bubble â€” links messaging to the feed. */
 export function PostPreviewCard({
   post,
 }: {

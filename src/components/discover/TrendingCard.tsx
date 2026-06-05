@@ -1,5 +1,5 @@
 import { Star } from "lucide-react";
-import { formatCount } from "@/lib/mock";
+import { formatCount } from "@/lib/format";
 import type { TrendingPost } from "@/lib/mock-discover";
 
 /** A trending post tile for the "Blowing up" rail. */

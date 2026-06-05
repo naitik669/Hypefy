@@ -6,9 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { Avatar } from "@/components/ui/Avatar";
-import { formatCount } from "@/lib/mock";
+import { formatCount } from "@/lib/format";
 
-/* ─── Types ──────────────────────────────────────────────────── */
+/* â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 type RawComment = {
   id: string;
   user_id: string;
@@ -27,7 +27,7 @@ type Comment = RawComment & {
   showReplies: boolean;
 };
 
-/* ─── Helpers ─────────────────────────────────────────────────── */
+/* â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 60) return "now";
@@ -58,7 +58,7 @@ function buildTree(flat: RawComment[]): Comment[] {
   return roots;
 }
 
-/* ─── Main component ─────────────────────────────────────────── */
+/* â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 export function CommentsSheet({
   open, onClose, postId, postOwnerId, currentUserId, onCountChange,
   targetType = "post",
@@ -99,7 +99,7 @@ export function CommentsSheet({
 
   useEffect(() => { if (!open) { setReplyTo(null); setText(""); } }, [open]);
 
-  // Keep the parent's comment badge in sync — counts replies too.
+  // Keep the parent's comment badge in sync â€” counts replies too.
   const totalCount = countAll(tree);
   useEffect(() => {
     if (open) onCountChange?.(totalCount);
@@ -207,7 +207,7 @@ export function CommentsSheet({
 
   return (
     <>
-    <BottomSheet open={open} onClose={onClose} title={`Comments · ${totalCount}`}>
+    <BottomSheet open={open} onClose={onClose} title={`Comments Â· ${totalCount}`}>
       {loading ? (
         <div className="flex items-center justify-center py-10">
           <Loader2 size={22} className="animate-spin text-muted" />
@@ -235,10 +235,10 @@ export function CommentsSheet({
       <div className="sticky bottom-0 -mx-5 border-t border-border bg-elevated px-5 py-3">
         {replyTo && (
           <div className="mb-2 flex items-center gap-2 text-xs text-muted">
-            <span className="text-faint">↩</span>
+            <span className="text-faint">â†©</span>
             Replying to{" "}
             <span className="font-semibold text-foreground">@{replyTo.username}</span>
-            <button onClick={cancelReply} className="ml-auto text-faint hover:text-muted">✕</button>
+            <button onClick={cancelReply} className="ml-auto text-faint hover:text-muted">âœ•</button>
           </div>
         )}
         <div className="flex items-center gap-2">
@@ -247,7 +247,7 @@ export function CommentsSheet({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && submitComment()}
-            placeholder={replyTo ? `Reply to @${replyTo.username}…` : "Add a comment…"}
+            placeholder={replyTo ? `Reply to @${replyTo.username}â€¦` : "Add a commentâ€¦"}
             className="h-10 flex-1 rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
           />
           <button
@@ -276,7 +276,7 @@ export function CommentsSheet({
   );
 }
 
-/* ─── Single comment + its thread ────────────────────────────── */
+/* â”€â”€â”€ Single comment + its thread â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function CommentItem({
   comment, currentUserId, onHype, onReply, onReport, onDelete, onToggleReplies,
 }: {
@@ -296,9 +296,9 @@ function CommentItem({
 
   return (
     <div>
-      {/* ── Parent comment ───────────────────────── */}
+      {/* â”€â”€ Parent comment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="flex gap-3">
-        {/* Avatar column — shows the vertical thread line below if replies are open */}
+        {/* Avatar column â€” shows the vertical thread line below if replies are open */}
         <div className="flex flex-col items-center">
           <Avatar name={n} hue={hue} size={34} />
           {hasReplies && comment.showReplies && (
@@ -309,7 +309,7 @@ function CommentItem({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-semibold">{n}</span>
-            <span className="text-xs text-faint">· {timeAgo(comment.created_at)}</span>
+            <span className="text-xs text-faint">Â· {timeAgo(comment.created_at)}</span>
           </div>
           <p className="mt-0.5 text-sm text-foreground/90">{comment.body}</p>
 
@@ -360,7 +360,7 @@ function CommentItem({
         </div>
       </div>
 
-      {/* ── Replies — indented with left border ──── */}
+      {/* â”€â”€ Replies â€” indented with left border â”€â”€â”€â”€ */}
       {hasReplies && comment.showReplies && (
         <div className="ml-[17px] mt-1.5 border-l-2 border-border/60 pl-5">
           <div className="flex flex-col gap-4">
@@ -374,7 +374,7 @@ function CommentItem({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-semibold">{rn}</span>
-                      <span className="text-xs text-faint">· {timeAgo(reply.created_at)}</span>
+                      <span className="text-xs text-faint">Â· {timeAgo(reply.created_at)}</span>
                     </div>
                     <p className="mt-0.5 text-sm text-foreground/90">{reply.body}</p>
                     <div className="mt-1.5 flex items-center gap-4">

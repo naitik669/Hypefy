@@ -8,7 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
-import { formatCount } from "@/lib/mock";
+import { formatCount } from "@/lib/format";
 import { ExpandableText } from "@/components/ui/ExpandableText";
 
 type ReelProfile = { display_name: string | null; avatar_hue: number | null; username: string | null } | null;
@@ -210,7 +210,7 @@ function ReelCard({
     setTimeout(() => setShowParticles(false), 640);
   }
 
-  // Single tap → play/pause (slight delay), double tap → Hype (add-only)
+  // Single tap â†’ play/pause (slight delay), double tap â†’ Hype (add-only)
   function handleTap() {
     const now = Date.now();
     if (now - lastTap.current < 300) {
@@ -222,7 +222,7 @@ function ReelCard({
       if (!hyped && !hypePending && currentUserId) {
         toggleHype(); // burst handled inside
       } else {
-        playBurst(); // already hyped → replay burst, do NOT un-hype
+        playBurst(); // already hyped â†’ replay burst, do NOT un-hype
       }
     } else {
       lastTap.current = now;
@@ -247,7 +247,7 @@ function ReelCard({
         onClick={handleTap}
       />
 
-      {/* Double-tap Hype burst — matches the feed */}
+      {/* Double-tap Hype burst â€” matches the feed */}
       {hypeBurst && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
           <Star

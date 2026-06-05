@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Star, MessageCircle, Send, Music2 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
-import { formatCount } from "@/lib/mock";
+import { formatCount } from "@/lib/format";
 import type { Shot } from "@/lib/mock-shots";
 
 export function ShotsViewer({ shots }: { shots: Shot[] }) {
@@ -69,7 +69,7 @@ function ShotItem({ shot }: { shot: Shot }) {
         <p className="mt-2 text-sm leading-snug">{shot.caption}</p>
         <p className="mt-2 flex items-center gap-1.5 text-xs text-white/80">
           <Music2 size={13} />
-          original audio · {shot.handle}
+          original audio Â· {shot.handle}
         </p>
       </div>
 

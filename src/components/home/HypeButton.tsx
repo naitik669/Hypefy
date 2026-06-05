@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { Star } from "lucide-react";
-import { formatCount } from "@/lib/mock";
+import { formatCount } from "@/lib/format";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 
-/** Controlled Hype button — state lives in the parent (PostCard). */
+/** Controlled Hype button â€” state lives in the parent (PostCard). */
 export function HypeButton({
   hyped,
   count,
