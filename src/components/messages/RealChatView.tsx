@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, MicOff, VideoOff, UserCircle, BellOff, Ban } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, Mic, MicOff, VideoOff, UserCircle, BellOff, Ban } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -318,14 +318,33 @@ export function RealChatView({
 
         {/* Right actions: call + options */}
         <div className="relative flex shrink-0 items-center gap-0.5">
-          <button type="button" onClick={() => setCallChooser(true)} aria-label="Call"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5">
+          <button type="button" onClick={() => { setHeaderMenu(false); setCallChooser((v) => !v); }} aria-label="Call"
+            className={`flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/5 ${callChooser ? "text-accent" : "text-foreground"}`}>
             <Phone size={20} />
           </button>
-          <button type="button" onClick={() => setHeaderMenu((v) => !v)} aria-label="Options"
+          <button type="button" onClick={() => { setCallChooser(false); setHeaderMenu((v) => !v); }} aria-label="Options"
             className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5">
             <MoreVertical size={20} />
           </button>
+
+          {/* Call type popover — anchored to the phone icon */}
+          {callChooser && (
+            <>
+              <div className="fixed inset-0 z-40" onPointerDown={() => setCallChooser(false)} />
+              <div className="absolute right-9 top-12 z-50 w-44 overflow-hidden rounded-2xl border border-border bg-elevated py-1 shadow-2xl">
+                <button type="button"
+                  onClick={() => { setCallChooser(false); setCall({ type: "audio" }); }}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/5">
+                  <Phone size={17} className="text-accent" /> Audio call
+                </button>
+                <button type="button"
+                  onClick={() => { setCallChooser(false); setCall({ type: "video" }); }}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/5">
+                  <Video size={17} className="text-accent" /> Video call
+                </button>
+              </div>
+            </>
+          )}
 
           {headerMenu && (
             <>
@@ -589,61 +608,14 @@ export function RealChatView({
         </BottomSheet>
       )}
 
-      {/* Call type chooser */}
-      {callChooser && (
-        <BottomSheet open onClose={() => setCallChooser(false)} title={`Call ${isGroup ? group!.title : other.name}`}>
-          <div className="grid grid-cols-2 gap-3 pb-2 pt-1">
-            <button type="button"
-              onClick={() => { setCallChooser(false); setCall({ type: "audio" }); }}
-              className="flex flex-col items-center gap-2.5 rounded-2xl border border-border bg-surface py-5 transition-colors hover:bg-white/5">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent">
-                <Phone size={22} />
-              </span>
-              <span className="text-sm font-semibold">Audio call</span>
-            </button>
-            <button type="button"
-              onClick={() => { setCallChooser(false); setCall({ type: "video" }); }}
-              className="flex flex-col items-center gap-2.5 rounded-2xl border border-border bg-surface py-5 transition-colors hover:bg-white/5">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent">
-                <Video size={22} />
-              </span>
-              <span className="text-sm font-semibold">Video call</span>
-            </button>
-          </div>
-        </BottomSheet>
-      )}
-
       {/* Active call screen */}
       {call && (
-        <div className="fixed inset-0 z-[220] flex flex-col items-center justify-between bg-black/95 px-6 py-16 backdrop-blur-xl">
-          <div className="flex flex-1 flex-col items-center justify-center gap-5">
-            {call.type === "video" ? (
-              <div className="flex h-32 w-32 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10">
-                <Video size={42} className="text-white/70" />
-              </div>
-            ) : (
-              <Avatar name={isGroup ? group!.title : other.name} hue={other.hue} size={128} />
-            )}
-            <div className="text-center">
-              <p className="text-xl font-bold text-white">{isGroup ? group!.title : other.name}</p>
-              <p className="mt-1 text-sm text-white/60">
-                {call.type === "video" ? "Video" : "Audio"} call · Ringing…
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-5">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-white">
-              {call.type === "video" ? <VideoOff size={22} /> : <MicOff size={22} />}
-            </span>
-            <button type="button" onClick={() => setCall(null)} aria-label="End call"
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white transition-transform active:scale-95">
-              <Phone size={26} className="rotate-[135deg]" />
-            </button>
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-white">
-              <MicOff size={22} />
-            </span>
-          </div>
-        </div>
+        <CallScreen
+          type={call.type}
+          name={isGroup ? group!.title : other.name}
+          hue={other.hue}
+          onEnd={() => setCall(null)}
+        />
       )}
 
       {/* Toast */}
@@ -652,6 +624,69 @@ export function RealChatView({
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+function CallScreen({ type, name, hue, onEnd }: { type: "audio" | "video"; name: string; hue: number; onEnd: () => void }) {
+  const [status, setStatus] = useState<"ringing" | "connected">("ringing");
+  const [secs, setSecs] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const [camOff, setCamOff] = useState(type === "audio");
+
+  // Ring for ~2.5s, then "connect" and start the timer.
+  useEffect(() => {
+    const t = setTimeout(() => setStatus("connected"), 2500);
+    return () => clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    if (status !== "connected") return;
+    const id = setInterval(() => setSecs((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [status]);
+
+  const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+  const showVideo = type === "video" && !camOff;
+
+  return (
+    <div className="fixed inset-0 z-[220] flex flex-col items-center justify-between bg-black/95 px-6 py-16 backdrop-blur-xl">
+      <div className="flex flex-1 flex-col items-center justify-center gap-5">
+        {showVideo ? (
+          <div className="flex h-40 w-40 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10">
+            <Video size={48} className="text-white/70" />
+          </div>
+        ) : (
+          <Avatar name={name} hue={hue} size={128} />
+        )}
+        <div className="text-center">
+          <p className="text-xl font-bold text-white">{name}</p>
+          <p className="mt-1 text-sm text-white/60">
+            {status === "ringing"
+              ? `${type === "video" ? "Video" : "Audio"} call · Ringing…`
+              : clock}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-5">
+        <button type="button" onClick={() => setMuted((v) => !v)} aria-label={muted ? "Unmute" : "Mute"}
+          className={`flex h-14 w-14 items-center justify-center rounded-full transition-colors ${muted ? "bg-white text-black" : "bg-white/10 text-white"}`}>
+          {muted ? <MicOff size={22} /> : <Mic size={22} />}
+        </button>
+        <button type="button" onClick={onEnd} aria-label="End call"
+          className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white transition-transform active:scale-95">
+          <Phone size={26} className="rotate-[135deg]" />
+        </button>
+        {type === "video" ? (
+          <button type="button" onClick={() => setCamOff((v) => !v)} aria-label={camOff ? "Camera on" : "Camera off"}
+            className={`flex h-14 w-14 items-center justify-center rounded-full transition-colors ${camOff ? "bg-white text-black" : "bg-white/10 text-white"}`}>
+            {camOff ? <VideoOff size={22} /> : <Video size={22} />}
+          </button>
+        ) : (
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-white/40">
+            <Video size={22} />
+          </span>
+        )}
+      </div>
     </div>
   );
 }
