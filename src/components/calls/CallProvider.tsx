@@ -59,6 +59,8 @@ export function CallProvider({ userId, children }: { userId: string; children: R
   const [error, setError] = useState<string | null>(null);
 
   const chanRef = useRef<RealtimeChannel | null>(null);
+  const chanReadyRef = useRef(false);
+  const sendQueueRef = useRef<{ type: "broadcast"; event: string; payload: Record<string, unknown> }[]>([]);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localRef = useRef<MediaStream | null>(null);
   const pendingIce = useRef<RTCIceCandidateInit[]>([]);
@@ -78,12 +80,21 @@ export function CallProvider({ userId, children }: { userId: string; children: R
     pendingIce.current = [];
     offerRef.current = null;
     if (chanRef.current) { supabase.removeChannel(chanRef.current); chanRef.current = null; }
+    chanReadyRef.current = false;
+    sendQueueRef.current = [];
     setLocalStream(null);
     setRemoteStream(null);
   }, [supabase]);
 
+  // Subscribe-gated send: queue signals until the channel is SUBSCRIBED, then
+  // flush — so the offer / answer / ICE are never dropped due to join timing.
   const send = useCallback((payload: Record<string, unknown>) => {
-    chanRef.current?.send({ type: "broadcast", event: "signal", payload: { ...payload, from: userId } });
+    const msg = { type: "broadcast" as const, event: "signal", payload: { ...payload, from: userId } };
+    if (chanReadyRef.current && chanRef.current) {
+      chanRef.current.send(msg);
+    } else {
+      sendQueueRef.current.push(msg);
+    }
   }, [userId]);
 
   const getMedia = useCallback(async (type: CallType) => {
@@ -111,10 +122,20 @@ export function CallProvider({ userId, children }: { userId: string; children: R
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [send]);
 
-  function openChannel(conversationId: string, onSignal: (s: any) => void) {
-    const ch = supabase.channel(`call:${conversationId}`, { config: { broadcast: { self: false } } });
+  // Channel is keyed by the call SESSION id (not conversation) to avoid
+  // crossing signals between an old and a new call in the same DM.
+  function openChannel(callSessionId: string, onSignal: (s: any) => void) {
+    chanReadyRef.current = false;
+    const ch = supabase.channel(`call:${callSessionId}`, { config: { broadcast: { self: false } } });
     ch.on("broadcast", { event: "signal" }, ({ payload }) => onSignal(payload));
-    ch.subscribe();
+    ch.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        chanReadyRef.current = true;
+        const queued = sendQueueRef.current;
+        sendQueueRef.current = [];
+        for (const m of queued) ch.send(m);
+      }
+    });
     chanRef.current = ch;
     return ch;
   }
@@ -158,12 +179,12 @@ export function CallProvider({ userId, children }: { userId: string; children: R
       };
       setCall(active);
 
-      openChannel(a.conversationId, async (s: any) => {
+      openChannel(createdId, async (s: any) => {
         if (s.from === userId) return;
         if (s.kind === "ready") {
           send({ kind: "offer", sdp: offer, callType: a.type });
         } else if (s.kind === "answer") {
-          await pc.setRemoteDescription(s.sdp).catch(() => {});
+          if (!pc.currentRemoteDescription) await pc.setRemoteDescription(s.sdp).catch(() => {});
           for (const c of pendingIce.current) await pc.addIceCandidate(c).catch(() => {});
           pendingIce.current = [];
         } else if (s.kind === "ice") {
@@ -173,7 +194,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
           cleanup(); setCall(null);
         }
       });
-      // Nudge: also send the offer immediately in case callee already subscribed
+      // Offer is queued and flushed once SUBSCRIBED; also resent on the callee's 'ready'.
       send({ kind: "offer", sdp: offer, callType: a.type });
 
       ringTimer.current = setTimeout(async () => {
@@ -192,46 +213,57 @@ export function CallProvider({ userId, children }: { userId: string; children: R
   // ── incoming: subscribe to channel & wait for offer ─────────
   const beginIncoming = useCallback((c: ActiveCall) => {
     setCall(c);
-    openChannel(c.conversationId, async (s: any) => {
+    openChannel(c.id, async (s: any) => {
       if (s.from === userId) return;
       const pc = pcRef.current;
       if (s.kind === "offer") {
         offerRef.current = s.sdp;
+        if (pc && !pc.currentRemoteDescription) {
+          // Already accepted and waiting for the offer — apply it now.
+          await pc.setRemoteDescription(s.sdp).catch(() => {});
+          for (const cand of pendingIce.current) await pc.addIceCandidate(cand).catch(() => {});
+          pendingIce.current = [];
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          send({ kind: "answer", sdp: answer });
+        }
       } else if (s.kind === "ice") {
         if (pc?.remoteDescription) await pc.addIceCandidate(s.candidate).catch(() => {});
         else pendingIce.current.push(s.candidate);
-      } else if (s.kind === "end") {
+      } else if (s.kind === "end" || s.kind === "decline") {
         cleanup(); setCall(null);
       }
     });
-    // tell caller we're here so it (re)sends the offer
-    setTimeout(() => send({ kind: "ready" }), 250);
+    // Announce readiness so the caller (re)sends the offer. Queued until SUBSCRIBED.
+    send({ kind: "ready" });
   }, [userId, send, cleanup]);
 
   const acceptCall = useCallback(async () => {
     const c = callRef.current;
     if (!c) return;
     try {
-      // ensure we have the offer (caller resends on 'ready')
-      let tries = 0;
-      while (!offerRef.current && tries < 20) { send({ kind: "ready" }); await wait(150); tries++; }
-      if (!offerRef.current) throw new Error("no offer");
-
-      const stream = await getMedia(c.type);
-      const pc = makePeer(stream);
-      await pc.setRemoteDescription(offerRef.current);
-      for (const cand of pendingIce.current) await pc.addIceCandidate(cand).catch(() => {});
-      pendingIce.current = [];
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      send({ kind: "answer", sdp: answer });
       await supabase.rpc("accept_call", { p_call_id: c.id });
+      const stream = await getMedia(c.type);   // mic/camera only on accept
+      const pc = makePeer(stream);
+
+      if (offerRef.current) {
+        // Offer already arrived — answer immediately.
+        await pc.setRemoteDescription(offerRef.current);
+        for (const cand of pendingIce.current) await pc.addIceCandidate(cand).catch(() => {});
+        pendingIce.current = [];
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        send({ kind: "answer", sdp: answer });
+      } else {
+        // Offer not here yet — nudge the caller; the channel handler answers on arrival.
+        send({ kind: "ready" });
+      }
       setCall({ ...c, status: "connected" });
     } catch {
       await supabase.rpc("decline_call", { p_call_id: c.id });
       send({ kind: "end" });
       cleanup(); setCall(null);
-      setError("Couldn't connect the call.");
+      setError("Camera/microphone permission is required to answer.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getMedia, makePeer, send, supabase, cleanup]);
@@ -333,7 +365,6 @@ export function CallProvider({ userId, children }: { userId: string; children: R
   );
 }
 
-function wait(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
 /* ─── Call UI: incoming / outgoing / connected ─────────────── */
 function CallUI({
