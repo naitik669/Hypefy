@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, SearchX, Loader2 } from "lucide-react";
+import { ChevronLeft, SearchX, Loader2, Hash } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { FilterPills } from "@/components/ui/FilterPills";
@@ -23,44 +23,96 @@ type Profile = {
 export default function SearchPage() {
   const router = useRouter();
   const supabase = createClient();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() =>
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("q") ?? "" : "",
+  );
   const [tab, setTab] = useState("Top");
   const [people, setPeople] = useState<Profile[]>([]);
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
   const [searched, setSearched] = useState(false);
+  const [userId, setUserId] = useState("");
   const [isPending, startTransition] = useTransition();
 
+  // Resolve current user (for FeedCard hype/save attribution) + seed from ?q=
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? ""));
+    if (query) {
+      if (query.startsWith("#")) setTab("Tags");
+      runSearch(query);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function normPosts(rows: any[]): FeedPost[] {
+    return (rows ?? []).map((p: any) => ({
+      ...p,
+      profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles,
+    })) as FeedPost[];
+  }
+
+  function tagsFrom(rows: FeedPost[], filter?: string) {
+    const counts = new Map<string, number>();
+    for (const p of rows) {
+      for (const raw of ((p as any).hashtags ?? []) as string[]) {
+        const tag = raw.replace(/^#/, "").toLowerCase();
+        if (!tag) continue;
+        if (filter && !tag.includes(filter)) continue;
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([tag, count]) => ({ tag, count }));
+  }
+
   async function runSearch(q: string) {
-    if (!q.trim()) { setPeople([]); setPosts([]); setSearched(false); return; }
+    const trimmed = q.trim();
+    if (!trimmed) { setPeople([]); setPosts([]); setTags([]); setSearched(false); return; }
     setSearched(true);
+    const isTag = trimmed.startsWith("#");
+    const isUser = trimmed.startsWith("@");
+    const term = trimmed.replace(/^[#@]/, "").toLowerCase();
+    if (!term) return;
+
     startTransition(async () => {
-      const term = q.trim().toLowerCase();
-      const [peopleRes, postsRes] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, display_name, username, avatar_hue, bio")
-          .eq("profile_completed", true)
-          .or(`username.ilike.%${term}%,display_name.ilike.%${term}%`)
-          .limit(20),
-        supabase
-          .from("posts")
-          .select("*, profiles(id, display_name, username, avatar_hue, profile_tags)")
-          .or(`caption.ilike.%${term}%,body.ilike.%${term}%`)
-          .order("hype_count", { ascending: false })
-          .limit(20),
-      ]);
+      // People (skip when explicitly searching a hashtag)
+      const peopleRes = isTag
+        ? { data: [] as Profile[] }
+        : await supabase
+            .from("profiles")
+            .select("id, display_name, username, avatar_hue, bio")
+            .eq("profile_completed", true)
+            .or(`username.ilike.%${term}%,display_name.ilike.%${term}%`)
+            .limit(20);
+
+      // Posts — by hashtag (array contains) or by text
+      const postsRes = isUser
+        ? { data: [] as any[] }
+        : isTag
+          ? await supabase
+              .from("posts")
+              .select("*, profiles(id, display_name, username, avatar_hue, profile_tags)")
+              .contains("hashtags", [term])
+              .order("hype_count", { ascending: false })
+              .limit(20)
+          : await supabase
+              .from("posts")
+              .select("*, profiles(id, display_name, username, avatar_hue, profile_tags)")
+              .or(`caption.ilike.%${term}%,body.ilike.%${term}%`)
+              .order("hype_count", { ascending: false })
+              .limit(20);
+
       setPeople(peopleRes.data ?? []);
-      const normPosts = (postsRes.data ?? []).map((p: any) => ({
-        ...p,
-        profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles,
-      })) as FeedPost[];
-      setPosts(normPosts);
+      const np = normPosts(postsRes.data ?? []);
+      setPosts(np);
+      setTags(isUser ? [] : tagsFrom(np, isTag ? undefined : term));
+      if (isTag) setTab((t) => (t === "People" ? "Posts" : t));
     });
   }
 
   const showPeople = tab === "Top" || tab === "People";
   const showPosts = tab === "Top" || tab === "Posts";
-  const hasResults = people.length > 0 || posts.length > 0;
+  const showTags = tab === "Top" || tab === "Tags";
+  const hasResults = people.length > 0 || posts.length > 0 || tags.length > 0;
 
   return (
     <>
@@ -76,8 +128,9 @@ export default function SearchPage() {
         </button>
         <div className="flex-1">
           <SearchBar
-            placeholder="Search Hypefy"
+            placeholder="Search people, posts, #tags"
             autoFocus
+            defaultValue={query}
             onChange={(q) => { setQuery(q); runSearch(q); }}
           />
         </div>
@@ -85,7 +138,7 @@ export default function SearchPage() {
 
       {query.trim().length > 0 && (
         <div className="pt-3">
-          <FilterPills options={["Top", "People", "Posts"]} onChange={setTab} />
+          <FilterPills options={["Top", "People", "Posts", "Tags"]} onChange={setTab} />
         </div>
       )}
 
@@ -107,6 +160,31 @@ export default function SearchPage() {
 
       {!isPending && hasResults && (
         <div className="pb-4">
+          {/* Tags */}
+          {showTags && tags.length > 0 && (
+            <>
+              <h2 className="px-4 pb-1 pt-3 text-sm font-bold text-muted">Tags</h2>
+              <div className="flex flex-col">
+                {tags.map((t) => (
+                  <button
+                    key={t.tag}
+                    type="button"
+                    onClick={() => { setQuery(`#${t.tag}`); setTab("Posts"); runSearch(`#${t.tag}`); }}
+                    className="flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/[0.03]"
+                  >
+                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface">
+                      <Hash size={18} className="text-accent" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">#{t.tag}</p>
+                      <p className="truncate text-xs text-muted">{t.count} {t.count === 1 ? "post" : "posts"}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
           {/* People */}
           {showPeople && people.length > 0 && (
             <>
@@ -133,7 +211,7 @@ export default function SearchPage() {
               <h2 className="px-4 pb-2 pt-4 text-sm font-bold text-muted">Posts</h2>
               <div className="flex flex-col">
                 {posts.map((p) => (
-                  <FeedCard key={p.id} post={p} currentUserId="" />
+                  <FeedCard key={p.id} post={p} currentUserId={userId} />
                 ))}
               </div>
             </>

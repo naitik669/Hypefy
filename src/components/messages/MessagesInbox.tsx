@@ -84,9 +84,9 @@ export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
       <EmptyState
         icon={MessageCircle}
         title="No messages yet"
-        text="Open someone's profile and tap Message to start a chat."
-        ctaLabel="Discover people"
-        ctaHref="/discover"
+        text="Start a DM or create a group chat."
+        ctaLabel="New message"
+        ctaHref="/messages/new"
       />
     );
   }
