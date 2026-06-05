@@ -28,12 +28,32 @@ export type ChatMsg = {
   postProfile?: { username: string | null; display_name: string | null; avatar_hue: number | null } | null;
 };
 
+type ReactionRow = { message_id: string; user_id: string; emoji: string };
 type Other = { id: string; name: string; username: string | null; hue: number };
 
 const REPORT_REASONS = ["Spam", "Harassment", "Hate or abuse", "Scam", "Inappropriate content", "Other"];
+const QUICK = ["❤️", "🔥", "😂", "👍", "😮", "😢"];
 
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+function sameDay(a: string, b: string) {
+  const x = new Date(a), y = new Date(b);
+  return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate();
+}
+function dayLabel(iso: string) {
+  const d = new Date(iso), now = new Date();
+  const start = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((start(now) - start(d)) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  if (diff === -1) return "Tomorrow";
+  if (diff > 1 && diff < 7) return d.toLocaleDateString([], { weekday: "long" });
+  return d.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
+  });
 }
 
 export function RealChatView({
@@ -43,6 +63,7 @@ export function RealChatView({
   group,
   members,
   initialMessages,
+  initialReactions = [],
 }: {
   conversationId: string;
   currentUserId: string;
@@ -50,26 +71,47 @@ export function RealChatView({
   group?: { title: string; memberCount: number } | null;
   members?: Record<string, { name: string; hue: number }>;
   initialMessages: ChatMsg[];
+  initialReactions?: ReactionRow[];
 }) {
   const isGroup = !!group;
-  const senderName = (id: string) =>
-    id === currentUserId ? "You" : members?.[id]?.name ?? other.name;
+  const senderName = (id: string) => (id === currentUserId ? "You" : members?.[id]?.name ?? other.name);
   const supabase = createClient();
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMsg[]>(initialMessages);
+  const [reactions, setReactions] = useState<ReactionRow[]>(initialReactions);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMsg | null>(null);
-  const [actionMsg, setActionMsg] = useState<ChatMsg | null>(null);
+  const [menu, setMenu] = useState<{ msg: ChatMsg; rect: DOMRect } | null>(null);
   const [reportMsg, setReportMsg] = useState<ChatMsg | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressClick = useRef(false);
+  const idsRef = useRef<string[]>([]);
+  idsRef.current = messages.map((m) => m.id);
 
   const byId = useMemo(() => {
     const m = new Map<string, ChatMsg>();
     messages.forEach((x) => m.set(x.id, x));
     return m;
   }, [messages]);
+
+  // emoji → { count, mine } per message
+  const reactionsByMsg = useMemo(() => {
+    const out = new Map<string, { emoji: string; count: number; mine: boolean }[]>();
+    const tmp = new Map<string, Map<string, { count: number; mine: boolean }>>();
+    for (const r of reactions) {
+      if (!tmp.has(r.message_id)) tmp.set(r.message_id, new Map());
+      const em = tmp.get(r.message_id)!;
+      const cur = em.get(r.emoji) ?? { count: 0, mine: false };
+      cur.count += 1;
+      if (r.user_id === currentUserId) cur.mine = true;
+      em.set(r.emoji, cur);
+    }
+    for (const [mid, em] of tmp) out.set(mid, [...em.entries()].map(([emoji, v]) => ({ emoji, ...v })));
+    return out;
+  }, [reactions, currentUserId]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -78,12 +120,10 @@ export function RealChatView({
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  // Mark read on open
   useEffect(() => {
     supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
   }, [conversationId, supabase]);
 
-  // Fetch the shared post for a message so its embed renders (realtime/optimistic).
   async function hydratePost(msgId: string, postId: string) {
     const { data } = await supabase
       .from("posts")
@@ -102,7 +142,7 @@ export function RealChatView({
     );
   }
 
-  // Realtime: INSERT + UPDATE (unsend)
+  // Realtime: messages
   useEffect(() => {
     const channel = supabase
       .channel(`chat:${conversationId}`)
@@ -112,9 +152,7 @@ export function RealChatView({
           const m = payload.new as ChatMsg;
           setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, { ...m, post: null }]));
           if (m.kind === "post" && m.post_id) hydratePost(m.id, m.post_id);
-          if (m.sender_id !== currentUserId) {
-            supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
-          }
+          if (m.sender_id !== currentUserId) supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
         })
       .on("postgres_changes",
         { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
@@ -125,6 +163,33 @@ export function RealChatView({
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [conversationId, currentUserId, supabase]);
+
+  // Realtime: reactions (refetch the affected set on any change)
+  useEffect(() => {
+    const ch = supabase
+      .channel(`reacts:${conversationId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, () => {
+        const ids = idsRef.current;
+        if (!ids.length) return;
+        supabase
+          .from("message_reactions")
+          .select("message_id, user_id, emoji")
+          .in("message_id", ids)
+          .then(({ data }) => setReactions((data ?? []) as ReactionRow[]));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [conversationId, supabase]);
+
+  function toggleReaction(messageId: string, emoji: string) {
+    setReactions((prev) => {
+      const mineRow = prev.find((r) => r.message_id === messageId && r.user_id === currentUserId);
+      const without = prev.filter((r) => !(r.message_id === messageId && r.user_id === currentUserId));
+      if (mineRow && mineRow.emoji === emoji) return without;
+      return [...without, { message_id: messageId, user_id: currentUserId, emoji }];
+    });
+    supabase.rpc("toggle_reaction", { p_message_id: messageId, p_emoji: emoji });
+  }
 
   async function send() {
     const body = text.trim();
@@ -142,8 +207,7 @@ export function RealChatView({
     setMessages((p) => [...p, optimistic]);
 
     const { data, error } = await supabase.rpc("send_message", {
-      p_conversation_id: conversationId, p_body: body, p_kind: "text",
-      p_post_id: null, p_reply_to_id: replyId,
+      p_conversation_id: conversationId, p_body: body, p_kind: "text", p_post_id: null, p_reply_to_id: replyId,
     });
     if (error || !data) {
       setMessages((p) => p.filter((m) => m.id !== tempId));
@@ -156,10 +220,9 @@ export function RealChatView({
   }
 
   async function unsend(m: ChatMsg) {
-    setActionMsg(null);
     setMessages((p) => p.map((x) => (x.id === m.id ? { ...x, is_unsent: true, body: null } : x)));
     const { error } = await supabase.rpc("unsend_message", { p_message_id: m.id });
-    if (error) { showToast("Couldn't unsend"); }
+    if (error) showToast("Couldn't unsend");
   }
 
   async function submitReport(reason: string) {
@@ -171,8 +234,23 @@ export function RealChatView({
   }
 
   function copy(m: ChatMsg) {
-    setActionMsg(null);
     if (m.body) { navigator.clipboard.writeText(m.body).catch(() => {}); showToast("Copied"); }
+  }
+
+  // Long-press → context menu
+  function onPressStart(m: ChatMsg, e: React.PointerEvent) {
+    if (m.is_unsent) return;
+    suppressClick.current = false;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    pressTimer.current = setTimeout(() => {
+      pressTimer.current = null;
+      suppressClick.current = true;
+      setMenu({ msg: m, rect });
+      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
+    }, 420);
+  }
+  function onPressEnd() {
+    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
   }
 
   return (
@@ -185,10 +263,8 @@ export function RealChatView({
         </button>
         {isGroup ? (
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <span
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[30%]"
-              style={{ background: "linear-gradient(140deg, hsl(210 70% 52%), hsl(260 65% 42%))" }}
-            >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[30%]"
+              style={{ background: "linear-gradient(140deg, hsl(210 70% 52%), hsl(260 65% 42%))" }}>
               <Users size={18} className="text-white/95" />
             </span>
             <div className="min-w-0">
@@ -212,10 +288,8 @@ export function RealChatView({
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
             {isGroup ? (
-              <span
-                className="flex h-16 w-16 items-center justify-center rounded-[30%]"
-                style={{ background: "linear-gradient(140deg, hsl(210 70% 52%), hsl(260 65% 42%))" }}
-              >
+              <span className="flex h-16 w-16 items-center justify-center rounded-[30%]"
+                style={{ background: "linear-gradient(140deg, hsl(210 70% 52%), hsl(260 65% 42%))" }}>
                 <Users size={30} className="text-white/95" />
               </span>
             ) : (
@@ -230,54 +304,101 @@ export function RealChatView({
           <div className="flex flex-col gap-1.5">
             {messages.map((m, i) => {
               const mine = m.sender_id === currentUserId;
+              const prev = messages[i - 1];
+              const next = messages[i + 1];
               const replied = m.reply_to_id ? byId.get(m.reply_to_id) : null;
-              const showSender = isGroup && !mine && (i === 0 || messages[i - 1].sender_id !== m.sender_id);
-              return (
-                <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                  <div className={`flex max-w-[80%] flex-col ${mine ? "items-end" : "items-start"}`}>
-                    {showSender && (
-                      <span className="mb-0.5 px-1 text-[11px] font-semibold text-muted">{senderName(m.sender_id)}</span>
-                    )}
-                    {/* Reply quote */}
-                    {replied && (
-                      <div className="mb-0.5 max-w-full truncate rounded-lg border-l-2 border-accent/60 bg-surface px-2 py-1 text-[11px] text-muted">
-                        <span className="font-semibold">{senderName(replied.sender_id)}</span>
-                        {": "}
-                        {replied.is_unsent ? "Unsent message" : replied.body ?? "Post"}
-                      </div>
-                    )}
+              const newDay = !prev || !sameDay(prev.created_at, m.created_at);
+              const showSender = isGroup && !mine && (!prev || prev.sender_id !== m.sender_id || newDay);
+              const showTime =
+                !next ||
+                next.sender_id !== m.sender_id ||
+                !sameDay(next.created_at, m.created_at) ||
+                new Date(next.created_at).getTime() - new Date(m.created_at).getTime() > 5 * 60 * 1000;
+              const reacts = reactionsByMsg.get(m.id) ?? [];
 
-                    {/* Bubble */}
-                    {m.is_unsent ? (
-                      <div className={`rounded-2xl border border-border px-3.5 py-2 text-sm italic text-faint ${mine ? "rounded-br-md" : "rounded-bl-md"}`}>
-                        {mine ? "You unsent this message" : "This message was unsent"}
-                      </div>
-                    ) : m.kind === "post" && m.post ? (
-                      <Link href={`/p/${m.post.id}`}
-                        className="block w-56 overflow-hidden rounded-2xl border border-border bg-surface">
-                        {(m.post.image_urls?.[0] || m.post.image_url) && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={m.post.image_urls?.[0] || m.post.image_url || ""} alt="" className="aspect-square w-full object-cover" />
-                        )}
-                        <div className="p-2.5">
-                          {m.postProfile?.username && (
-                            <p className="text-xs font-semibold">@{m.postProfile.username}</p>
-                          )}
-                          {m.post.caption && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{m.post.caption}</p>}
+              return (
+                <div key={m.id}>
+                  {newDay && (
+                    <div className="flex justify-center py-2">
+                      <span className="rounded-full bg-surface px-3 py-1 text-[11px] font-semibold text-muted">
+                        {dayLabel(m.created_at)}
+                      </span>
+                    </div>
+                  )}
+                  <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                    <div className={`flex max-w-[80%] flex-col ${mine ? "items-end" : "items-start"}`}>
+                      {showSender && (
+                        <span className="mb-0.5 px-1 text-[11px] font-semibold text-muted">{senderName(m.sender_id)}</span>
+                      )}
+                      {replied && (
+                        <div className="mb-0.5 max-w-full truncate rounded-lg border-l-2 border-accent/60 bg-surface px-2 py-1 text-[11px] text-muted">
+                          <span className="font-semibold">{senderName(replied.sender_id)}</span>
+                          {": "}
+                          {replied.is_unsent ? "Unsent message" : replied.body ?? "Post"}
                         </div>
-                      </Link>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setActionMsg(m)}
-                        className={`rounded-2xl px-3.5 py-2 text-left text-sm ${
-                          mine ? "rounded-br-md bg-accent text-accent-ink" : "rounded-bl-md bg-surface text-foreground"
-                        }`}
-                      >
-                        {m.body}
-                      </button>
-                    )}
-                    <span className="px-1 pt-0.5 text-[10px] text-faint">{timeLabel(m.created_at)}</span>
+                      )}
+
+                      {/* Bubble */}
+                      {m.is_unsent ? (
+                        <div className={`rounded-2xl border border-border px-3.5 py-2 text-sm italic text-faint ${mine ? "rounded-br-md" : "rounded-bl-md"}`}>
+                          {mine ? "You unsent this message" : "This message was unsent"}
+                        </div>
+                      ) : m.kind === "post" && m.post ? (
+                        <Link
+                          href={`/p/${m.post.id}`}
+                          onPointerDown={(e) => onPressStart(m, e)}
+                          onPointerUp={onPressEnd}
+                          onPointerMove={onPressEnd}
+                          onPointerLeave={onPressEnd}
+                          onClick={(e) => { if (suppressClick.current) { e.preventDefault(); suppressClick.current = false; } }}
+                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          className="block w-56 overflow-hidden rounded-2xl border border-border bg-surface"
+                        >
+                          {(m.post.image_urls?.[0] || m.post.image_url) && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={m.post.image_urls?.[0] || m.post.image_url || ""} alt="" className="aspect-square w-full object-cover" />
+                          )}
+                          <div className="p-2.5">
+                            {m.postProfile?.username && <p className="text-xs font-semibold">@{m.postProfile.username}</p>}
+                            {m.post.caption && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{m.post.caption}</p>}
+                          </div>
+                        </Link>
+                      ) : (
+                        <div
+                          onPointerDown={(e) => onPressStart(m, e)}
+                          onPointerUp={onPressEnd}
+                          onPointerMove={onPressEnd}
+                          onPointerLeave={onPressEnd}
+                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          className={`max-w-full cursor-default select-none rounded-2xl px-3.5 py-2 text-sm ${
+                            mine ? "rounded-br-md bg-accent text-accent-ink" : "rounded-bl-md bg-surface text-foreground"
+                          }`}
+                        >
+                          {m.body}
+                        </div>
+                      )}
+
+                      {/* Reaction chips */}
+                      {reacts.length > 0 && (
+                        <div className={`mt-1 flex flex-wrap gap-1 ${mine ? "justify-end" : "justify-start"}`}>
+                          {reacts.map((r) => (
+                            <button
+                              key={r.emoji}
+                              type="button"
+                              onClick={() => toggleReaction(m.id, r.emoji)}
+                              className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[12px] leading-none ${
+                                r.mine ? "bg-accent/20 ring-1 ring-accent/40" : "bg-surface ring-1 ring-border"
+                              }`}
+                            >
+                              <span>{r.emoji}</span>
+                              {r.count > 1 && <span className="font-semibold text-foreground">{r.count}</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {showTime && <span className="px-1 pt-0.5 text-[10px] text-faint">{timeLabel(m.created_at)}</span>}
+                    </div>
                   </div>
                 </div>
               );
@@ -295,7 +416,7 @@ export function RealChatView({
             <span className="min-w-0 flex-1 truncate text-muted">
               Replying to{" "}
               <span className="font-semibold text-foreground">
-                {replyTo.sender_id === currentUserId ? "yourself" : other.name}
+                {replyTo.sender_id === currentUserId ? "yourself" : senderName(replyTo.sender_id)}
               </span>
               : {replyTo.is_unsent ? "Unsent" : replyTo.body ?? "Post"}
             </span>
@@ -317,34 +438,55 @@ export function RealChatView({
         </div>
       </div>
 
-      {/* Per-message action sheet */}
-      {actionMsg && (
-        <BottomSheet open onClose={() => setActionMsg(null)}>
-          <div className="flex flex-col pb-2">
-            <ActionRow icon={<Reply size={18} />} label="Reply"
-              onClick={() => { setReplyTo(actionMsg); setActionMsg(null); }} />
-            {actionMsg.body && (
-              <ActionRow icon={<Copy size={18} />} label="Copy" onClick={() => copy(actionMsg)} />
-            )}
-            {actionMsg.sender_id === currentUserId ? (
-              <ActionRow danger icon={<Trash2 size={18} />} label="Unsend" onClick={() => unsend(actionMsg)} />
-            ) : (
-              <ActionRow danger icon={<Flag size={18} />} label="Report"
-                onClick={() => { setReportMsg(actionMsg); setActionMsg(null); }} />
-            )}
-          </div>
-        </BottomSheet>
-      )}
+      {/* Long-press context menu (reactions + actions), anchored to the message */}
+      {menu && (() => {
+        const r = menu.rect;
+        const mine = menu.msg.sender_id === currentUserId;
+        const above = r.top > 240;
+        const vw = typeof window !== "undefined" ? window.innerWidth : 480;
+        const pos: React.CSSProperties = { top: above ? r.top : r.bottom };
+        if (mine) pos.right = Math.max(8, vw - r.right);
+        else pos.left = Math.max(8, r.left);
+        return (
+          <>
+            <div className="fixed inset-0 z-[205]" onClick={() => setMenu(null)} />
+            <div className="fixed z-[206]" style={pos}>
+              <div className={above ? "-translate-y-full pb-2" : "pt-2"}>
+                {/* Quick reactions */}
+                <div className={`mb-2 flex w-fit gap-0.5 rounded-pill bg-elevated p-1 shadow-xl ring-1 ring-border ${mine ? "ml-auto" : ""}`}>
+                  {QUICK.map((e) => (
+                    <button key={e} type="button"
+                      onClick={() => { toggleReaction(menu.msg.id, e); setMenu(null); }}
+                      className="flex h-9 w-9 items-center justify-center rounded-full text-xl transition-transform hover:scale-125 active:scale-110">
+                      {e}
+                    </button>
+                  ))}
+                </div>
+                {/* Actions */}
+                <div className={`w-44 overflow-hidden rounded-2xl bg-elevated p-1 shadow-xl ring-1 ring-border ${mine ? "ml-auto" : ""}`}>
+                  <MenuItem icon={<Reply size={17} />} label="Reply" onClick={() => { setReplyTo(menu.msg); setMenu(null); }} />
+                  {menu.msg.body && <MenuItem icon={<Copy size={17} />} label="Copy" onClick={() => { copy(menu.msg); setMenu(null); }} />}
+                  {mine ? (
+                    <MenuItem danger icon={<Trash2 size={17} />} label="Unsend" onClick={() => { unsend(menu.msg); setMenu(null); }} />
+                  ) : (
+                    <MenuItem danger icon={<Flag size={17} />} label="Report" onClick={() => { setReportMsg(menu.msg); setMenu(null); }} />
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Report reason sheet */}
       {reportMsg && (
         <BottomSheet open onClose={() => setReportMsg(null)} title="Report message">
           <div className="flex flex-col gap-1 pb-3">
             <p className="pb-1 text-xs text-muted">Why are you reporting this?</p>
-            {REPORT_REASONS.map((r) => (
-              <button key={r} type="button" onClick={() => submitReport(r)}
+            {REPORT_REASONS.map((rr) => (
+              <button key={rr} type="button" onClick={() => submitReport(rr)}
                 className="flex items-center justify-between rounded-xl px-3 py-3 text-sm hover:bg-white/5">
-                {r}
+                {rr}
               </button>
             ))}
           </div>
@@ -361,11 +503,11 @@ export function RealChatView({
   );
 }
 
-function ActionRow({ icon, label, onClick, danger }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
+function MenuItem({ icon, label, onClick, danger }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
   return (
     <button type="button" onClick={onClick}
-      className={`flex items-center gap-4 rounded-xl px-2 py-3 text-sm font-medium hover:bg-white/5 ${danger ? "text-danger" : "text-foreground"}`}>
-      <span className={`flex h-9 w-9 items-center justify-center rounded-full bg-surface ${danger ? "text-danger" : ""}`}>{icon}</span>
+      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-white/5 ${danger ? "text-danger" : "text-foreground"}`}>
+      {icon}
       {label}
     </button>
   );

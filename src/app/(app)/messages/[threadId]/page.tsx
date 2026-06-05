@@ -67,6 +67,12 @@ export default async function ThreadPage({
       : null,
   }));
 
+  // Reactions for these messages
+  const msgIds = messages.map((m: any) => m.id);
+  const { data: reactRows } = msgIds.length
+    ? await supabase.from("message_reactions").select("message_id, user_id, emoji").in("message_id", msgIds)
+    : { data: [] as any[] };
+
   return (
     <RealChatView
       conversationId={threadId}
@@ -80,6 +86,7 @@ export default async function ThreadPage({
       group={group}
       members={membersMap}
       initialMessages={messages}
+      initialReactions={(reactRows ?? []) as any}
     />
   );
 }
