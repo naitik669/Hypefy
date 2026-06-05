@@ -59,14 +59,18 @@ function preview(r: InboxRow) {
 export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
+  // Conversations the user has just opened — clear their unread dot instantly.
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
 
-  const unreadCount = rows.filter((r) => r.unread && !r.isRequest).length;
+  const isUnread = (r: InboxRow) => r.unread && !readIds.has(r.id);
+
+  const unreadCount = rows.filter((r) => isUnread(r) && !r.isRequest).length;
   const requestCount = rows.filter((r) => r.isRequest).length;
 
   const filtered = useMemo(() => {
     let list =
       tab === "unread"
-        ? rows.filter((r) => r.unread && !r.isRequest)
+        ? rows.filter((r) => r.unread && !readIds.has(r.id) && !r.isRequest)
         : tab === "requests"
           ? rows.filter((r) => r.isRequest)
           : rows.filter((r) => !r.isRequest);
@@ -77,7 +81,7 @@ export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
       );
     }
     return list;
-  }, [rows, tab, q]);
+  }, [rows, tab, q, readIds]);
 
   if (rows.length === 0) {
     return (
@@ -148,28 +152,32 @@ export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
         </p>
       ) : (
         <div className="flex flex-col pt-1">
-          {filtered.map((r) => (
+          {filtered.map((r) => {
+            const unread = isUnread(r);
+            return (
             <Link
               key={r.id}
               href={`/messages/${r.id}`}
+              onClick={() => setReadIds((prev) => new Set(prev).add(r.id))}
               className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.03]"
             >
               {r.isGroup ? <GroupAvatar /> : <Avatar name={r.name} hue={r.hue} size={52} />}
               <div className="min-w-0 flex-1">
-                <p className={`truncate text-sm ${r.unread ? "font-bold text-foreground" : "font-semibold"}`}>
+                <p className={`truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
                   {r.name}
                   {r.isGroup && <span className="ml-1.5 text-xs font-normal text-faint">· {r.memberCount}</span>}
                 </p>
-                <p className={`truncate text-sm ${r.unread ? "font-semibold text-foreground" : "text-muted"}`}>
+                <p className={`truncate text-sm ${unread ? "font-semibold text-foreground" : "text-muted"}`}>
                   {preview(r)}
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
                 {r.lastAt && <span className="text-xs text-faint">{timeAgo(r.lastAt)}</span>}
-                {r.unread && <span className="h-2.5 w-2.5 rounded-full bg-accent" />}
+                {unread && <span className="h-2.5 w-2.5 rounded-full bg-accent" />}
               </div>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </>

@@ -20,6 +20,13 @@ export function NotificationBell({ userId, initialUnread }: { userId: string; in
       setUnread(count ?? 0);
     }
 
+    // Re-sync when the bar (re)mounts and when the tab regains focus — this
+    // clears the badge after the user has visited the notifications page.
+    refetch();
+    function onFocus() { refetch(); }
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
     const ch = supabase
       .channel(`notif-badge:${userId}`)
       .on("postgres_changes",
@@ -30,7 +37,11 @@ export function NotificationBell({ userId, initialUnread }: { userId: string; in
         () => refetch())
       .subscribe();
 
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+      supabase.removeChannel(ch);
+    };
   }, [supabase, userId]);
 
   return (

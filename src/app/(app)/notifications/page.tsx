@@ -77,12 +77,8 @@ export default function NotificationsPage() {
       setNotifs(mapped);
       setLoading(false);
 
-      // Mark all as read
-      await supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .eq("user_id", user.id)
-        .eq("is_read", false);
+      // Mark all as read (RPC fires the UPDATE that clears the TopBar badge)
+      await supabase.rpc("mark_notifications_read");
     }
     load();
   }, [supabase]);

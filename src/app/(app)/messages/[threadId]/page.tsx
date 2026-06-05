@@ -48,13 +48,15 @@ export default async function ThreadPage({
       }
     : null;
 
-  // Messages with post + shot previews
-  const { data: rawMsgs } = await supabase
+  // Latest 30 messages with post + shot previews (newest-first for the limit,
+  // then reversed to chronological order for rendering).
+  const { data: latestMsgs } = await supabase
     .from("messages")
     .select("id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, created_at, post:posts(id, caption, image_url, image_urls, profiles(username, display_name, avatar_hue)), shot:shots(id, media_url, caption, profiles(username, display_name, avatar_hue))")
     .eq("conversation_id", threadId)
-    .order("created_at", { ascending: true })
-    .limit(200);
+    .order("created_at", { ascending: false })
+    .limit(30);
+  const rawMsgs = (latestMsgs ?? []).slice().reverse();
 
   const one = (x: any) => (Array.isArray(x) ? x[0] : x);
   const profOf = (x: any) => { const p = one(x); return p ? one(p.profiles) : null; };

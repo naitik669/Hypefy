@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, hueFromId } from "@/lib/profile";
-import { Avatar } from "@/components/ui/Avatar";
+import { AvatarImg } from "@/components/ui/AvatarImg";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
 import { FollowStats } from "@/components/profile/FollowStats";
@@ -56,12 +56,7 @@ export default async function ProfilePage() {
         {/* Avatar + stats */}
         <div className="flex items-end gap-4">
           <div className="-mt-11">
-            {profile?.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.avatarUrl} alt={name} className="h-21 w-21 rounded-[26px] object-cover ring-4 ring-background" style={{ height: 84, width: 84 }} />
-            ) : (
-              <Avatar name={name} hue={hue} size={84} className="rounded-[26px] ring-4 ring-background" />
-            )}
+            <AvatarImg url={profile?.avatarUrl} name={name} hue={hue} size={84} className="rounded-[26px] ring-4 ring-background" />
           </div>
           <FollowStats
             userId={user.id}
