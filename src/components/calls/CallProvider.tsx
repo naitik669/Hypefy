@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Phone, Video, Mic, MicOff, VideoOff, MessageCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { startRing, stopRing } from "@/lib/ringtone";
 import { Avatar } from "@/components/ui/Avatar";
 
 type CallType = "audio" | "video";
@@ -132,6 +133,20 @@ export function CallProvider({ userId, children }: { userId: string; children: R
       if (rpcErr || !callId) { setError("Couldn't start the call."); return; }
       createdId = callId as string;
 
+      // Ring the receiver directly over broadcast (reliable, RLS-independent).
+      const ring = supabase.channel(`user-calls:${a.peerId}`);
+      ring.subscribe((status) => {
+        if (status !== "SUBSCRIBED") return;
+        ring.send({
+          type: "broadcast",
+          event: "incoming",
+          payload: {
+            id: createdId, conversationId: a.conversationId, callerId: userId, type: a.type,
+          },
+        });
+        setTimeout(() => supabase.removeChannel(ring), 1500);
+      });
+
       const stream = await getMedia(a.type);
       const pc = makePeer(stream);
       const offer = await pc.createOffer();
@@ -243,27 +258,52 @@ export function CallProvider({ userId, children }: { userId: string; children: R
   }
 
   // ── app-wide incoming-call listener ─────────────────────────
+  const ringIncoming = useCallback(async (info: { id: string; conversationId: string; callerId: string; type: CallType }) => {
+    if (callRef.current) return; // busy — ignore for MVP
+    const { data: p } = await supabase
+      .from("profiles").select("display_name, username, avatar_hue").eq("id", info.callerId).maybeSingle();
+    beginIncoming({
+      id: info.id, conversationId: info.conversationId, peerId: info.callerId,
+      peerName: p?.display_name ?? p?.username ?? "Someone", peerHue: p?.avatar_hue ?? 280,
+      type: info.type, role: "callee", status: "incoming",
+    });
+  }, [supabase, beginIncoming]);
+
   useEffect(() => {
-    const ch = supabase
+    // Primary: broadcast ping straight from the caller (reliable).
+    const bc = supabase
+      .channel(`user-calls:${userId}`)
+      .on("broadcast", { event: "incoming" }, ({ payload }) => {
+        const i = payload as any;
+        ringIncoming({ id: i.id, conversationId: i.conversationId, callerId: i.callerId, type: i.type });
+      })
+      .subscribe();
+
+    // Backup: postgres_changes on call_sessions (covers any missed broadcast).
+    const pg = supabase
       .channel(`incoming-calls:${userId}`)
       .on("postgres_changes",
         { event: "INSERT", schema: "public", table: "call_sessions", filter: `receiver_id=eq.${userId}` },
-        async (payload) => {
+        (payload) => {
           const row = payload.new as any;
           if (row.status !== "ringing") return;
-          if (callRef.current) return; // busy — ignore for MVP
-          const { data: p } = await supabase
-            .from("profiles").select("display_name, username, avatar_hue").eq("id", row.caller_id).maybeSingle();
-          beginIncoming({
-            id: row.id, conversationId: row.conversation_id, peerId: row.caller_id,
-            peerName: p?.display_name ?? p?.username ?? "Someone", peerHue: p?.avatar_hue ?? 280,
-            type: row.type, role: "callee", status: "incoming",
-          });
+          ringIncoming({ id: row.id, conversationId: row.conversation_id, callerId: row.caller_id, type: row.type });
         })
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+
+    return () => { supabase.removeChannel(bc); supabase.removeChannel(pg); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, ringIncoming]);
+
+  // Ringtone — rings on both outgoing (ringback) and incoming, stops on connect/end.
+  useEffect(() => {
+    if (call && (call.status === "outgoing" || call.status === "incoming")) {
+      startRing(call.status === "incoming" ? "incoming" : "outgoing");
+    } else {
+      stopRing();
+    }
+    return () => stopRing();
+  }, [call]);
 
   // clean up on unmount
   useEffect(() => cleanup, [cleanup]);
