@@ -50,7 +50,12 @@ export default async function DiscoverPage() {
     .map((p: any) => {
       const hoursOld = (now - new Date(p.created_at).getTime()) / 3_600_000;
       const recencyBoost = Math.max(0, 48 - hoursOld) / 8; // fresh posts get up to +6
-      const score = (p.hype_count ?? 0) * 3 + (p.comment_count ?? 0) * 2 + recencyBoost;
+      const score =
+        (p.hype_count ?? 0) * 3 +
+        (p.comment_count ?? 0) * 2 +
+        (p.save_count ?? 0) * 2 +
+        (p.share_count ?? 0) * 2 +
+        recencyBoost;
       return { ...p, _score: score };
     })
     .sort((a: any, b: any) => b._score - a._score);
