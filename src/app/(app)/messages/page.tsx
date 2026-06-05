@@ -21,7 +21,7 @@ export default async function MessagesPage() {
 
   let rows: InboxRow[] = [];
   if (convIds.length > 0) {
-    const [membersRes, msgsRes, myMemberRes, followRes] = await Promise.all([
+    const [membersRes, msgsRes, myMemberRes] = await Promise.all([
       // The other participant in each conversation
       supabase
         .from("conversation_members")
@@ -34,14 +34,12 @@ export default async function MessagesPage() {
         .select("conversation_id, body, kind, created_at, sender_id")
         .in("conversation_id", convIds)
         .order("created_at", { ascending: false }),
-      // My read state per conversation
+      // My membership state per conversation (read + request + block)
       supabase
         .from("conversation_members")
-        .select("conversation_id, last_read_at")
+        .select("conversation_id, last_read_at, request_accepted, blocked_at")
         .in("conversation_id", convIds)
         .eq("user_id", user.id),
-      // Who I follow (to classify requests)
-      supabase.from("follows").select("following_id").eq("follower_id", user.id),
     ]);
 
     // All other members per conversation (for groups we need everyone)
@@ -60,11 +58,16 @@ export default async function MessagesPage() {
     });
 
     const readByConv = new Map<string, string | null>();
-    (myMemberRes.data ?? []).forEach((m: any) => readByConv.set(m.conversation_id, m.last_read_at));
-
-    const following = new Set((followRes.data ?? []).map((r: any) => r.following_id as string));
+    const requestByConv = new Map<string, boolean>();
+    const blockedByConv = new Set<string>();
+    (myMemberRes.data ?? []).forEach((m: any) => {
+      readByConv.set(m.conversation_id, m.last_read_at);
+      requestByConv.set(m.conversation_id, m.request_accepted !== false);
+      if (m.blocked_at) blockedByConv.add(m.conversation_id);
+    });
 
     rows = (convs ?? [])
+      .filter((c: any) => !blockedByConv.has(c.id)) // hide conversations I've blocked
       .map((c: any) => {
         const members = membersByConv.get(c.id) ?? [];
         if (members.length === 0) return null;
@@ -98,7 +101,7 @@ export default async function MessagesPage() {
           lastMine: last?.sender_id === user.id,
           lastSenderName,
           unread,
-          isRequest: isGroup ? false : !following.has(members[0].id),
+          isRequest: !isGroup && requestByConv.get(c.id) === false,
         } as InboxRow;
       })
       .filter(Boolean) as InboxRow[];

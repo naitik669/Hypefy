@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, MessageCircle, Users } from "lucide-react";
+import { Search, MessageCircle, Users, Check, Ban, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -57,23 +58,43 @@ function preview(r: InboxRow) {
 }
 
 export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
+  const supabase = createClient();
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
   // Conversations the user has just opened — clear their unread dot instantly.
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  // Optimistic request handling.
+  const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const isUnread = (r: InboxRow) => r.unread && !readIds.has(r.id);
+  // A row is a live request only if still pending and not yet acted on.
+  const isPendingRequest = (r: InboxRow) => r.isRequest && !approvedIds.has(r.id) && !removedIds.has(r.id);
 
-  const unreadCount = rows.filter((r) => isUnread(r) && !r.isRequest).length;
-  const requestCount = rows.filter((r) => r.isRequest).length;
+  async function approveRequest(id: string) {
+    setBusyId(id);
+    const { error } = await supabase.rpc("approve_message_request", { p_conversation_id: id });
+    setBusyId(null);
+    if (!error) setApprovedIds((p) => new Set(p).add(id)); // moves to All
+  }
+  async function blockRequest(id: string) {
+    setBusyId(id);
+    const { error } = await supabase.rpc("block_message_request", { p_conversation_id: id });
+    setBusyId(null);
+    if (!error) setRemovedIds((p) => new Set(p).add(id)); // hidden
+  }
+
+  const unreadCount = rows.filter((r) => isUnread(r) && !isPendingRequest(r) && !removedIds.has(r.id)).length;
+  const requestCount = rows.filter((r) => isPendingRequest(r)).length;
 
   const filtered = useMemo(() => {
     let list =
       tab === "unread"
-        ? rows.filter((r) => r.unread && !readIds.has(r.id) && !r.isRequest)
+        ? rows.filter((r) => r.unread && !readIds.has(r.id) && !isPendingRequest(r) && !removedIds.has(r.id))
         : tab === "requests"
-          ? rows.filter((r) => r.isRequest)
-          : rows.filter((r) => !r.isRequest);
+          ? rows.filter((r) => isPendingRequest(r))
+          : rows.filter((r) => !isPendingRequest(r) && !removedIds.has(r.id));
     const query = q.trim().toLowerCase();
     if (query) {
       list = list.filter(
@@ -81,7 +102,8 @@ export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
       );
     }
     return list;
-  }, [rows, tab, q, readIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, tab, q, readIds, approvedIds, removedIds]);
 
   if (rows.length === 0) {
     return (
@@ -154,28 +176,52 @@ export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
         <div className="flex flex-col pt-1">
           {filtered.map((r) => {
             const unread = isUnread(r);
+            const pending = isPendingRequest(r);
             return (
-            <Link
-              key={r.id}
-              href={`/messages/${r.id}`}
-              onClick={() => setReadIds((prev) => new Set(prev).add(r.id))}
-              className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.03]"
-            >
-              {r.isGroup ? <GroupAvatar /> : <Avatar name={r.name} hue={r.hue} size={52} />}
-              <div className="min-w-0 flex-1">
-                <p className={`truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
-                  {r.name}
-                  {r.isGroup && <span className="ml-1.5 text-xs font-normal text-faint">· {r.memberCount}</span>}
-                </p>
-                <p className={`truncate text-sm ${unread ? "font-semibold text-foreground" : "text-muted"}`}>
-                  {preview(r)}
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1.5">
-                {r.lastAt && <span className="text-xs text-faint">{timeAgo(r.lastAt)}</span>}
-                {unread && <span className="h-2.5 w-2.5 rounded-full bg-accent" />}
-              </div>
-            </Link>
+            <div key={r.id} className={pending ? "px-4 py-3" : ""}>
+              <Link
+                href={`/messages/${r.id}`}
+                onClick={() => setReadIds((prev) => new Set(prev).add(r.id))}
+                className={`flex items-center gap-3 transition-colors hover:bg-white/[0.03] ${pending ? "" : "px-4 py-3"}`}
+              >
+                {r.isGroup ? <GroupAvatar /> : <Avatar name={r.name} hue={r.hue} size={52} />}
+                <div className="min-w-0 flex-1">
+                  <p className={`truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
+                    {r.name}
+                    {r.isGroup && <span className="ml-1.5 text-xs font-normal text-faint">· {r.memberCount}</span>}
+                  </p>
+                  <p className={`truncate text-sm ${unread ? "font-semibold text-foreground" : "text-muted"}`}>
+                    {preview(r)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  {r.lastAt && <span className="text-xs text-faint">{timeAgo(r.lastAt)}</span>}
+                  {unread && !pending && <span className="h-2.5 w-2.5 rounded-full bg-accent" />}
+                </div>
+              </Link>
+
+              {/* Request actions */}
+              {pending && (
+                <div className="mt-2.5 flex gap-2 pl-[64px]">
+                  <button
+                    type="button"
+                    onClick={() => approveRequest(r.id)}
+                    disabled={busyId === r.id}
+                    className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.98] disabled:opacity-60"
+                  >
+                    {busyId === r.id ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => blockRequest(r.id)}
+                    disabled={busyId === r.id}
+                    className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface text-sm font-semibold text-red-400 transition-colors hover:bg-white/5 disabled:opacity-60"
+                  >
+                    <Ban size={15} /> Block
+                  </button>
+                </div>
+              )}
+            </div>
             );
           })}
         </div>
