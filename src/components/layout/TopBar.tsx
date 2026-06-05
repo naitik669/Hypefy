@@ -1,20 +1,21 @@
 import Link from "next/link";
-import { Compass, Bell } from "lucide-react";
+import { Compass } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 
-/** Home top bar — server component so it can check real unread count. */
+/** Home top bar — server component so it can seed the real unread count. */
 export async function TopBar() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  let hasUnread = false;
+  let unread = 0;
   if (user) {
     const { count } = await supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("is_read", false);
-    hasUnread = (count ?? 0) > 0;
+    unread = count ?? 0;
   }
 
   return (
@@ -31,16 +32,11 @@ export async function TopBar() {
         Hypefy<span className="text-accent">.</span>
       </span>
 
-      <Link
-        href="/notifications"
-        aria-label="Notifications"
-        className="relative flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5"
-      >
-        <Bell size={22} strokeWidth={2.2} />
-        {hasUnread && (
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent ring-2 ring-background" />
-        )}
-      </Link>
+      {user ? (
+        <NotificationBell userId={user.id} initialUnread={unread} />
+      ) : (
+        <span className="h-9 w-9" />
+      )}
     </header>
   );
 }
