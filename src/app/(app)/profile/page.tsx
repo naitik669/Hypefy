@@ -107,7 +107,7 @@ export default async function ProfilePage() {
                     />
                   </div>
                   <span className="max-w-full truncate text-center text-[10px] text-muted leading-tight">
-                    {shot.caption ?? "Show"}
+                    {shot.caption ?? "Shot"}
                   </span>
                 </Link>
               ))}
