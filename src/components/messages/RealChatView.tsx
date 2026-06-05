@@ -53,7 +53,8 @@ function dayLabel(iso: string) {
   if (diff === 0) return "Today";
   if (diff === 1) return "Yesterday";
   if (diff === -1) return "Tomorrow";
-  if (diff > 1 && diff < 7) return d.toLocaleDateString([], { weekday: "long" });
+  if (diff > 1 && diff < 7)
+    return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
   return d.toLocaleDateString([], {
     month: "short",
     day: "numeric",
@@ -406,9 +407,6 @@ export function RealChatView({
                         >
                           <video src={m.shot.media_url} className="aspect-[3/4] w-full object-cover" muted playsInline preload="metadata" />
                           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
-                          <span className="absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm">
-                            <Play size={18} className="ml-0.5 fill-white" />
-                          </span>
                           <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
                             <Play size={9} className="fill-white" /> Shot
                           </span>
