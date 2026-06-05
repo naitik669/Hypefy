@@ -48,23 +48,23 @@ export default async function ThreadPage({
       }
     : null;
 
-  // Messages with post previews
+  // Messages with post + shot previews
   const { data: rawMsgs } = await supabase
     .from("messages")
-    .select("id, body, sender_id, kind, post_id, reply_to_id, is_unsent, created_at, post:posts(id, caption, image_url, image_urls, profiles(username, display_name, avatar_hue))")
+    .select("id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, created_at, post:posts(id, caption, image_url, image_urls, profiles(username, display_name, avatar_hue)), shot:shots(id, media_url, caption, profiles(username, display_name, avatar_hue))")
     .eq("conversation_id", threadId)
     .order("created_at", { ascending: true })
     .limit(200);
 
+  const one = (x: any) => (Array.isArray(x) ? x[0] : x);
+  const profOf = (x: any) => { const p = one(x); return p ? one(p.profiles) : null; };
+
   const messages = (rawMsgs ?? []).map((m: any) => ({
     ...m,
-    post: m.post
-      ? { ...(Array.isArray(m.post) ? m.post[0] : m.post),
-          profiles: undefined }
-      : null,
-    postProfile: m.post
-      ? (() => { const p = Array.isArray(m.post) ? m.post[0] : m.post; const pr = Array.isArray(p?.profiles) ? p.profiles[0] : p?.profiles; return pr; })()
-      : null,
+    post: m.post ? { ...one(m.post), profiles: undefined } : null,
+    postProfile: m.post ? profOf(m.post) : null,
+    shot: m.shot ? { ...one(m.shot), profiles: undefined } : null,
+    shotProfile: m.shot ? profOf(m.shot) : null,
   }));
 
   // Reactions for these messages

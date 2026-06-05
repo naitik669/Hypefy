@@ -157,10 +157,9 @@ export function ShareSheet({
         const { data: convId, error } = await supabase.rpc("get_or_create_dm", { p_other: uid });
         if (error || !convId) return;
         if (targetType === "shot") {
-          // Shots don't have a rich DM card yet — send the reel link.
           await supabase.rpc("send_message", {
-            p_conversation_id: convId, p_body: postUrl, p_kind: "text",
-            p_post_id: null, p_reply_to_id: null,
+            p_conversation_id: convId, p_body: null, p_kind: "shot",
+            p_post_id: null, p_shot_id: postId, p_reply_to_id: null,
           });
         } else {
           await supabase.rpc("send_message", {

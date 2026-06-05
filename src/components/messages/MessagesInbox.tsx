@@ -45,7 +45,10 @@ function timeAgo(iso: string) {
 
 function preview(r: InboxRow) {
   if (!r.lastAt) return r.isGroup ? "New group" : "Say hi 👋";
-  const body = r.lastKind === "post" ? "Shared a post" : r.lastBody ?? "Sent a message";
+  const body =
+    r.lastKind === "post" ? "Shared a post"
+    : r.lastKind === "shot" ? "Shared a Shot"
+    : r.lastBody ?? "Sent a message";
   if (r.isGroup) {
     const who = r.lastMine ? "You" : r.lastSenderName;
     return who ? `${who}: ${body}` : body;

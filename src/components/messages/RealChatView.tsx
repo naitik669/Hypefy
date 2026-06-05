@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -14,6 +14,8 @@ type PostPreview = {
   image_url: string | null;
   image_urls?: string[] | null;
 };
+type ShotPreview = { id: string; media_url: string; caption: string | null };
+type ShareProfile = { username: string | null; display_name: string | null; avatar_hue: number | null };
 
 export type ChatMsg = {
   id: string;
@@ -21,11 +23,14 @@ export type ChatMsg = {
   sender_id: string;
   kind: string;
   post_id: string | null;
+  shot_id?: string | null;
   reply_to_id: string | null;
   is_unsent: boolean;
   created_at: string;
   post?: PostPreview | null;
-  postProfile?: { username: string | null; display_name: string | null; avatar_hue: number | null } | null;
+  postProfile?: ShareProfile | null;
+  shot?: ShotPreview | null;
+  shotProfile?: ShareProfile | null;
 };
 
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
@@ -150,6 +155,22 @@ export function RealChatView({
     );
   }
 
+  async function hydrateShot(msgId: string, shotId: string) {
+    const { data } = await supabase
+      .from("shots")
+      .select("id, media_url, caption, profiles(username, display_name, avatar_hue)")
+      .eq("id", shotId)
+      .maybeSingle();
+    if (!data) return;
+    const d = data as any;
+    const pr = Array.isArray(d.profiles) ? d.profiles[0] : d.profiles;
+    setMessages((prev) =>
+      prev.map((x) =>
+        x.id === msgId ? { ...x, shot: { id: d.id, media_url: d.media_url, caption: d.caption }, shotProfile: pr } : x,
+      ),
+    );
+  }
+
   // Realtime: messages
   useEffect(() => {
     const channel = supabase
@@ -160,6 +181,7 @@ export function RealChatView({
           const m = payload.new as ChatMsg;
           setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, { ...m, post: null }]));
           if (m.kind === "post" && m.post_id) hydratePost(m.id, m.post_id);
+          if (m.kind === "shot" && m.shot_id) hydrateShot(m.id, m.shot_id);
           if (m.sender_id !== currentUserId) supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
         })
       .on("postgres_changes",
@@ -342,7 +364,7 @@ export function RealChatView({
                         <div className="mb-0.5 max-w-full truncate rounded-lg border-l-2 border-accent/60 bg-surface px-2 py-1 text-[11px] text-muted">
                           <span className="font-semibold">{senderName(replied.sender_id)}</span>
                           {": "}
-                          {replied.is_unsent ? "Unsent message" : replied.body ?? "Post"}
+                          {replied.is_unsent ? "Unsent message" : replied.body ?? (replied.kind === "shot" ? "Shot" : "Post")}
                         </div>
                       )}
 
@@ -369,6 +391,30 @@ export function RealChatView({
                           <div className="p-2.5">
                             {m.postProfile?.username && <p className="text-xs font-semibold">@{m.postProfile.username}</p>}
                             {m.post.caption && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{m.post.caption}</p>}
+                          </div>
+                        </Link>
+                      ) : m.kind === "shot" && m.shot ? (
+                        <Link
+                          href={`/shots/${m.shot.id}`}
+                          onPointerDown={(e) => onPressStart(m, e)}
+                          onPointerUp={onPressEnd}
+                          onPointerMove={onPressEnd}
+                          onPointerLeave={onPressEnd}
+                          onClick={(e) => { if (suppressClick.current) { e.preventDefault(); suppressClick.current = false; } }}
+                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          className="relative block w-40 overflow-hidden rounded-2xl border border-border bg-black"
+                        >
+                          <video src={m.shot.media_url} className="aspect-[3/4] w-full object-cover" muted playsInline preload="metadata" />
+                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
+                          <span className="absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm">
+                            <Play size={18} className="ml-0.5 fill-white" />
+                          </span>
+                          <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+                            <Play size={9} className="fill-white" /> Shot
+                          </span>
+                          <div className="absolute inset-x-0 bottom-0 p-2.5">
+                            {m.shotProfile?.username && <p className="text-xs font-bold text-white drop-shadow">@{m.shotProfile.username}</p>}
+                            {m.shot.caption && <p className="line-clamp-1 text-[11px] text-white/85 drop-shadow">{m.shot.caption}</p>}
                           </div>
                         </Link>
                       ) : (
@@ -426,7 +472,7 @@ export function RealChatView({
               <span className="font-semibold text-foreground">
                 {replyTo.sender_id === currentUserId ? "yourself" : senderName(replyTo.sender_id)}
               </span>
-              : {replyTo.is_unsent ? "Unsent" : replyTo.body ?? "Post"}
+              : {replyTo.is_unsent ? "Unsent" : replyTo.body ?? (replyTo.kind === "shot" ? "Shot" : "Post")}
             </span>
             <button onClick={() => setReplyTo(null)} className="text-faint hover:text-muted">✕</button>
           </div>
