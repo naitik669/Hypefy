@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Star, Send, Loader2, Flag, Check, ChevronDown, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { ReportSheet } from "@/components/ui/ReportSheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatCount } from "@/lib/mock";
 
@@ -75,6 +76,7 @@ export function CommentsSheet({
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const [replyTo, setReplyTo] = useState<{ id: string; username: string } | null>(null);
+  const [reportTarget, setReportTarget] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -129,14 +131,9 @@ export function CommentsSheet({
     await supabase.rpc("toggle_hype", { p_target_type: "comment", p_target_id: c.id, p_owner_id: null });
   }
 
-  async function reportComment(id: string) {
-    mutateFn(id, (x) => ({ ...x, reported: true }));
-    if (currentUserId) {
-      await supabase
-        .from("reports")
-        .insert({ reporter_id: currentUserId, target_type: "comment", target_id: id, reason: "comment" });
-    }
-    setTimeout(() => mutateFn(id, (x) => ({ ...x, reported: false })), 1500);
+  function reportComment(id: string) {
+    if (!currentUserId) return;
+    setReportTarget(id);
   }
 
   async function deleteComment(id: string) {
@@ -209,6 +206,7 @@ export function CommentsSheet({
   }
 
   return (
+    <>
     <BottomSheet open={open} onClose={onClose} title={`Comments · ${totalCount}`}>
       {loading ? (
         <div className="flex items-center justify-center py-10">
@@ -263,6 +261,18 @@ export function CommentsSheet({
         </div>
       </div>
     </BottomSheet>
+
+    {reportTarget && currentUserId && (
+      <ReportSheet
+        open
+        onClose={() => setReportTarget(null)}
+        targetType="comment"
+        targetId={reportTarget}
+        currentUserId={currentUserId}
+        onReported={() => mutateFn(reportTarget, (x) => ({ ...x, reported: true }))}
+      />
+    )}
+    </>
   );
 }
 

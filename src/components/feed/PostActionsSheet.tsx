@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserPlus, UserCheck, Link2, Flag, Trash2, Check, Loader2, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { ReportSheet } from "@/components/ui/ReportSheet";
 
 /**
  * Floating dropdown popover that appears near the ··· button.
@@ -37,7 +38,7 @@ export function PostActionsSheet({
   const [following, setFollowing] = useState(false);
   const [followPending, setFollowPending] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [reported, setReported] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   // Fetch follow state when opened
@@ -56,11 +57,12 @@ export function PostActionsSheet({
   useEffect(() => {
     if (!open) return;
     function handle(e: MouseEvent) {
+      if (showReport) return; // report sheet is portaled outside the menu
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
     }
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
-  }, [open, onClose]);
+  }, [open, onClose, showReport]);
 
   if (!open) return null;
 
@@ -95,14 +97,6 @@ export function PostActionsSheet({
     await navigator.clipboard.writeText(url).catch(() => {});
     setCopied(true);
     setTimeout(() => { setCopied(false); onClose(); }, 800);
-  }
-
-  async function report() {
-    setReported(true);
-    await supabase
-      .from("reports")
-      .insert({ reporter_id: currentUserId, target_type: "post", target_id: postId, reason: "post" });
-    setTimeout(() => { setReported(false); onClose(); }, 900);
   }
 
   async function deletePost() {
@@ -155,11 +149,11 @@ export function PostActionsSheet({
           {!isOwn && (
             <>
               <div className="mx-3 my-1 h-px bg-border" />
-              <button type="button" onClick={report}
+              <button type="button" onClick={() => setShowReport(true)}
                 className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-danger hover:bg-danger/5"
               >
-                {reported ? <Check size={17} /> : <Flag size={17} />}
-                {reported ? "Reported" : "Report"}
+                <Flag size={17} />
+                Report
               </button>
             </>
           )}
@@ -184,6 +178,14 @@ export function PostActionsSheet({
           )}
         </div>
       </div>
+
+      <ReportSheet
+        open={showReport}
+        onClose={() => { setShowReport(false); onClose(); }}
+        targetType="post"
+        targetId={postId}
+        currentUserId={currentUserId}
+      />
     </>
   );
 }
