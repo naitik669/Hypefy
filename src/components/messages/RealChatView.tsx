@@ -120,6 +120,14 @@ export function RealChatView({
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
+  // Close the long-press menu on Escape.
+  useEffect(() => {
+    if (!menu) return;
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setMenu(null); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menu]);
+
   useEffect(() => {
     supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
   }, [conversationId, supabase]);
@@ -449,7 +457,11 @@ export function RealChatView({
         else pos.left = Math.max(8, r.left);
         return (
           <>
-            <div className="fixed inset-0 z-[205]" onClick={() => setMenu(null)} />
+            <div
+              className="fixed inset-0 z-[205]"
+              onPointerDown={() => setMenu(null)}
+              onClick={() => setMenu(null)}
+            />
             <div className="fixed z-[206]" style={pos}>
               <div className={above ? "-translate-y-full pb-2" : "pt-2"}>
                 {/* Quick reactions */}
