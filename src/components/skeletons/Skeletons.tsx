@@ -89,6 +89,67 @@ export function FeedCardSkeleton() {
   );
 }
 
+/** Full-screen Show (story) skeleton — matches the ShowViewer layout. */
+export function ShowSkeleton() {
+  return (
+    <div className="fixed inset-0 z-30 mx-auto max-w-[480px] bg-black">
+      <Skeleton rounded="rounded-none" className="absolute inset-0" />
+      {/* Progress bars */}
+      <div className="absolute inset-x-0 top-0 flex gap-1 p-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <SkeletonLine key={i} width="100%" height={3} />
+        ))}
+      </div>
+      {/* Author */}
+      <div className="absolute inset-x-0 top-7 flex items-center gap-2.5 p-4">
+        <SkeletonCircle size={36} />
+        <SkeletonLine width={110} height={11} />
+      </div>
+    </div>
+  );
+}
+
+/** Generic app-shell skeleton (header + feed) — neutral route fallback. */
+export function AppShellSkeleton() {
+  return (
+    <>
+      <HeaderSkeleton centerWordmark />
+      <ShowsRowSkeleton />
+      <div className="flex flex-col">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <FeedCardSkeleton key={i} />
+        ))}
+      </div>
+    </>
+  );
+}
+
+/** Centered single-post (permalink) skeleton. */
+export function PostDetailSkeleton() {
+  return (
+    <>
+      <HeaderSkeleton />
+      <FeedCardSkeleton />
+    </>
+  );
+}
+
+/** Search page skeleton — search bar + result rows. */
+export function SearchSkeleton() {
+  return (
+    <>
+      <div className="sticky top-0 z-20 border-b border-border/60 bg-background/80 px-4 py-3 backdrop-blur-xl">
+        <Skeleton className="h-11 w-full" rounded="rounded-pill" />
+      </div>
+      <div className="flex flex-col pt-1">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <ListRowSkeleton key={i} avatarSize={46} />
+        ))}
+      </div>
+    </>
+  );
+}
+
 /** A conversation / list row skeleton (avatar + two lines). */
 export function ListRowSkeleton({ avatarSize = 52 }: { avatarSize?: number }) {
   return (

@@ -18,23 +18,41 @@ export default async function HomePage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
 
-  // Who the user follows (for future ranking boost)
-  const { data: followRows } = await supabase
-    .from("follows")
-    .select("following_id")
-    .eq("follower_id", user.id);
+  const nowIso = new Date().toISOString();
+
+  // Fire all independent queries concurrently (was 5 sequential round-trips).
+  const [
+    { data: followRows },
+    { data: rawPosts },
+    { data: myProfile },
+    { data: myShows },
+    { data: activeShows },
+  ] = await Promise.all([
+    // Who the user follows (for ranking boost)
+    supabase.from("follows").select("following_id").eq("follower_id", user.id),
+    // Global feed — show ALL posts so early users always see content.
+    supabase
+      .from("posts")
+      .select("*, profiles(id, display_name, username, avatar_hue, profile_tags)")
+      .order("created_at", { ascending: false })
+      .limit(50),
+    // Current user profile for "Your Show" bubble
+    supabase.from("profiles").select("display_name, username, avatar_hue").eq("id", user.id).maybeSingle(),
+    // Current user's own active Shows — oldest first
+    supabase.from("shows").select("id").eq("user_id", user.id).gt("expires_at", nowIso).order("created_at", { ascending: true }),
+    // Active Shows from OTHERS — newest first
+    supabase
+      .from("shows")
+      .select("id, user_id, profiles(display_name, avatar_hue, username)")
+      .gt("expires_at", nowIso)
+      .neq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50),
+  ]);
 
   const followingIds = new Set(
     (followRows ?? []).map((r: any) => r.following_id as string),
   );
-
-  // Global feed — show ALL posts so early users always see content.
-  // Followed users + own posts appear first (client-side re-sort below).
-  const { data: rawPosts } = await supabase
-    .from("posts")
-    .select("*, profiles(id, display_name, username, avatar_hue, profile_tags)")
-    .order("created_at", { ascending: false })
-    .limit(50);
 
   // Soft-boost: own posts + followed user posts float to the top
   const all = normalise(rawPosts);
@@ -69,21 +87,6 @@ export default async function HomePage() {
   const hypedIds = new Set((hypesRes.data ?? []).map((h: any) => h.target_id));
   const savedIds = new Set((savedRes.data ?? []).map((s: any) => s.post_id));
 
-  // Current user profile for "Your Show" bubble
-  const { data: myProfile } = await supabase
-    .from("profiles")
-    .select("display_name, username, avatar_hue")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  // Current user's own active Shows — oldest first so tapping plays them all forward
-  const { data: myShows } = await supabase
-    .from("shows")
-    .select("id")
-    .eq("user_id", user.id)
-    .gt("expires_at", new Date().toISOString())
-    .order("created_at", { ascending: true });
-
   const currentUserForRow = myProfile
     ? {
         name: myProfile.display_name ?? myProfile.username ?? "You",
@@ -92,15 +95,6 @@ export default async function HomePage() {
         showId: myShows?.[0]?.id as string | undefined, // entry = oldest
       }
     : undefined;
-
-  // Active Shows (stories) from OTHERS — newest first, ONE bubble per user
-  const { data: activeShows } = await supabase
-    .from("shows")
-    .select("id, user_id, profiles(display_name, avatar_hue, username)")
-    .gt("expires_at", new Date().toISOString())
-    .neq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(50);
 
   // Group by user: keep most-recent-activity order, but enter at their OLDEST show.
   const byUser = new Map<string, { id: string; name: string; hue: number }>();

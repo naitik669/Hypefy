@@ -236,7 +236,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
                 className="w-full shrink-0 cursor-pointer snap-center select-none"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt={post.caption ?? "Post"} className="aspect-square w-full object-cover" draggable={false} />
+                <img src={src} alt={post.caption ?? "Post"} className="aspect-square w-full object-cover" draggable={false} loading="lazy" decoding="async" />
               </div>
             ))}
           </div>
