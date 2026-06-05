@@ -59,6 +59,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
   const [error, setError] = useState<string | null>(null);
 
   const chanRef = useRef<RealtimeChannel | null>(null);
+  const statusChanRef = useRef<RealtimeChannel | null>(null);
   const chanReadyRef = useRef(false);
   const sendQueueRef = useRef<{ type: "broadcast"; event: string; payload: Record<string, unknown> }[]>([]);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -80,6 +81,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
     pendingIce.current = [];
     offerRef.current = null;
     if (chanRef.current) { supabase.removeChannel(chanRef.current); chanRef.current = null; }
+    if (statusChanRef.current) { supabase.removeChannel(statusChanRef.current); statusChanRef.current = null; }
     chanReadyRef.current = false;
     sendQueueRef.current = [];
     setLocalStream(null);
@@ -187,6 +189,10 @@ export function CallProvider({ userId, children }: { userId: string; children: R
           if (!pc.currentRemoteDescription) await pc.setRemoteDescription(s.sdp).catch(() => {});
           for (const c of pendingIce.current) await pc.addIceCandidate(c).catch(() => {});
           pendingIce.current = [];
+          // The answer means the callee picked up — sync the caller off "Ringing"
+          // immediately, regardless of how long ICE/media take to finish.
+          if (ringTimer.current) { clearTimeout(ringTimer.current); ringTimer.current = null; }
+          setCall((c) => (c && c.status === "outgoing" ? { ...c, status: "connected" } : c));
         } else if (s.kind === "ice") {
           if (pc.remoteDescription) await pc.addIceCandidate(s.candidate).catch(() => {});
           else pendingIce.current.push(s.candidate);
@@ -196,6 +202,23 @@ export function CallProvider({ userId, children }: { userId: string; children: R
       });
       // Offer is queued and flushed once SUBSCRIBED; also resent on the callee's 'ready'.
       send({ kind: "offer", sdp: offer, callType: a.type });
+
+      // DB-driven sync backup: react to the receiver's status change even if the
+      // answer broadcast is missed (accepted → connected, declined/ended → close).
+      statusChanRef.current = supabase
+        .channel(`call-status:${createdId}`)
+        .on("postgres_changes",
+          { event: "UPDATE", schema: "public", table: "call_sessions", filter: `id=eq.${createdId}` },
+          (payload) => {
+            const st = (payload.new as any).status as string;
+            if (st === "accepted") {
+              if (ringTimer.current) { clearTimeout(ringTimer.current); ringTimer.current = null; }
+              setCall((c) => (c && c.status === "outgoing" ? { ...c, status: "connected" } : c));
+            } else if (st === "declined" || st === "missed" || st === "ended" || st === "busy") {
+              cleanup(); setCall(null);
+            }
+          })
+        .subscribe();
 
       ringTimer.current = setTimeout(async () => {
         await supabase.rpc("mark_call_missed", { p_call_id: callId });
