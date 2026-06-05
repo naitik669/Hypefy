@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Star, MessageCircle, Send, Camera, Play } from "lucide-react";
+import { ArrowRight, Star, MessageCircle, Send, Play, Compass, Bell } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 
@@ -339,25 +339,75 @@ function MockProfile() {
   );
 }
 
+/** A cohesive mini "Hypefy app" preview — wordmark, Shows row, a real post
+ *  with Hype — so the welcome scene reads as the product, not loose chips. */
 function WelcomeVisual() {
+  const rings = [
+    { n: "Jay", h: 200 },
+    { n: "Nia", h: 330 },
+    { n: "Leo", h: 30 },
+    { n: "Ada", h: 150 },
+  ];
   return (
-    <div className="relative h-72 w-72">
-      <div className="absolute left-1 top-6 flex w-48 items-center gap-2.5 rounded-2xl border border-border bg-surface p-3 shadow-2xl">
-        <Avatar name="Jay" hue={200} size={34} />
-        <div className="flex-1">
-          <div className="h-2.5 w-20 rounded-full bg-elevated" />
-          <div className="mt-1.5 h-2.5 w-12 rounded-full bg-elevated/70" />
+    <div className="relative">
+      {/* Energy glow */}
+      <div aria-hidden className="absolute -inset-7 rounded-[44px] bg-accent/10 blur-3xl" />
+
+      {/* App preview card */}
+      <div className="relative w-[212px] overflow-hidden rounded-[28px] border border-border bg-surface shadow-2xl">
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-3 pb-1.5 pt-3">
+          <span className="text-[13px] font-extrabold tracking-tight">
+            Hypefy<span className="text-accent">.</span>
+          </span>
+          <div className="flex items-center gap-2 text-faint">
+            <Compass size={13} />
+            <span className="relative">
+              <Bell size={13} />
+              <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-accent" />
+            </span>
+          </div>
+        </div>
+
+        {/* Shows row */}
+        <div className="flex gap-2.5 px-3 pb-2">
+          {rings.map((r) => (
+            <div key={r.n} className="rounded-full p-[1.5px]" style={{ background: "linear-gradient(135deg, var(--color-accent), #6d28d9)" }}>
+              <div className="rounded-full bg-surface p-[1.5px]">
+                <Avatar name={r.n} hue={r.h} size={26} className="rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* A post */}
+        <div className="px-3 pb-3">
+          <div className="flex items-center gap-2 py-1.5">
+            <Avatar name="maya" hue={280} size={22} className="rounded-full" />
+            <div className="flex-1">
+              <div className="h-1.5 w-16 rounded-full bg-elevated" />
+              <div className="mt-1 h-1.5 w-9 rounded-full bg-elevated/70" />
+            </div>
+          </div>
+          <div className="aspect-square w-full overflow-hidden rounded-xl bg-elevated">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/onboarding/post-sample.jpg" alt="" className="h-full w-full object-cover" draggable={false} />
+          </div>
+          <div className="flex items-center gap-3.5 pt-2">
+            <span className="flex items-center gap-1">
+              <Star size={17} className="fill-hype text-hype" />
+              <span className="text-[11px] font-bold">2.4k</span>
+            </span>
+            <MessageCircle size={15} className="text-muted" />
+            <Send size={14} className="text-muted" />
+          </div>
         </div>
       </div>
-      <div className="absolute right-0 top-28 flex items-center gap-2 rounded-2xl border border-accent/30 bg-surface px-3.5 py-3 shadow-2xl">
-        <Star size={20} className="fill-hype text-hype" />
-        <span className="text-sm font-bold">2.4k Hypes</span>
-      </div>
-      <div className="absolute bottom-2 left-7 flex w-44 items-center gap-2.5 rounded-2xl border border-border bg-surface p-3 shadow-2xl">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/15 text-violet-300">
-          <Camera size={18} />
-        </span>
-        <div className="h-2.5 w-24 rounded-full bg-elevated" />
+
+      {/* Hype badge popping off the corner */}
+      <div className="absolute -right-6 top-[42%] flex items-center gap-1.5 rounded-pill border border-accent/30 bg-surface px-3 py-2 shadow-2xl">
+        <Star size={15} className="fill-hype text-hype" />
+        <span className="text-xs font-bold">2.4k Hypes</span>
       </div>
     </div>
   );
