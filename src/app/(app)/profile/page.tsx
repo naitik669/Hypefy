@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, hueFromId } from "@/lib/profile";
 import { Avatar } from "@/components/ui/Avatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
 import { FollowStats } from "@/components/profile/FollowStats";
-import { SignOutButton } from "@/components/SignOutButton";
 
 async function fetchStats(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const [postsRes, followersRes, followingRes] = await Promise.all([
@@ -57,7 +56,12 @@ export default async function ProfilePage() {
         {/* Avatar + stats */}
         <div className="flex items-end gap-4">
           <div className="-mt-11">
-            <Avatar name={name} hue={hue} size={84} className="rounded-[26px] ring-4 ring-background" />
+            {profile?.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.avatarUrl} alt={name} className="h-21 w-21 rounded-[26px] object-cover ring-4 ring-background" style={{ height: 84, width: 84 }} />
+            ) : (
+              <Avatar name={name} hue={hue} size={84} className="rounded-[26px] ring-4 ring-background" />
+            )}
           </div>
           <FollowStats
             userId={user.id}
@@ -130,12 +134,18 @@ export default async function ProfilePage() {
         {/* Action buttons */}
         <div className="mt-3 flex gap-2">
           <Link
-            href="/setup-profile"
+            href="/settings/profile"
             className="flex h-10 flex-1 items-center justify-center rounded-xl border border-border bg-surface text-sm font-semibold text-foreground transition-colors hover:bg-elevated active:scale-[0.99]"
           >
             Edit profile
           </Link>
-          <SignOutButton />
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface text-foreground transition-colors hover:bg-elevated active:scale-[0.99]"
+          >
+            <Settings size={18} />
+          </Link>
         </div>
       </div>
 
