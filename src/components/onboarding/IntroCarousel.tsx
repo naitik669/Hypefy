@@ -343,10 +343,10 @@ function MockProfile() {
  *  with Hype — so the welcome scene reads as the product, not loose chips. */
 function WelcomeVisual() {
   const rings = [
-    { n: "Jay", h: 200 },
-    { n: "Nia", h: 330 },
-    { n: "Leo", h: 30 },
-    { n: "Ada", h: 150 },
+    { img: "/onboarding/jay-pfp.webp", pos: "50% 16%" },
+    { img: "/onboarding/disc9.webp", pos: "50% 32%" },
+    { img: "/onboarding/ada-pfp.webp", pos: "50% 22%" },
+    { img: "/onboarding/disc6.webp", pos: "50% 35%" },
   ];
   return (
     <div className="relative">
@@ -372,9 +372,12 @@ function WelcomeVisual() {
         {/* Shows row */}
         <div className="flex gap-2.5 px-3 pb-2">
           {rings.map((r) => (
-            <div key={r.n} className="rounded-full p-[1.5px]" style={{ background: "linear-gradient(135deg, var(--color-accent), #6d28d9)" }}>
+            <div key={r.img} className="rounded-full p-[1.5px]" style={{ background: "linear-gradient(135deg, var(--color-accent), #6d28d9)" }}>
               <div className="rounded-full bg-surface p-[1.5px]">
-                <Avatar name={r.n} hue={r.h} size={26} className="rounded-full" />
+                <div className="h-[26px] w-[26px] overflow-hidden rounded-full">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={r.img} alt="" className="h-full w-full object-cover" style={{ objectPosition: r.pos }} draggable={false} />
+                </div>
               </div>
             </div>
           ))}
@@ -383,7 +386,10 @@ function WelcomeVisual() {
         {/* A post */}
         <div className="px-3 pb-3">
           <div className="flex items-center gap-2 py-1.5">
-            <Avatar name="maya" hue={280} size={22} className="rounded-full" />
+            <div className="h-[22px] w-[22px] shrink-0 overflow-hidden rounded-full">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/onboarding/maya.webp" alt="" className="h-full w-full object-cover" style={{ objectPosition: "50% 18%" }} draggable={false} />
+            </div>
             <div className="flex-1">
               <div className="h-1.5 w-16 rounded-full bg-elevated" />
               <div className="mt-1 h-1.5 w-9 rounded-full bg-elevated/70" />
