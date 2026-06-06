@@ -26,25 +26,8 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-
-  async redirects() {
-    return [
-      // Force HTTP → HTTPS (Vercel already does this, but belt-and-suspenders)
-      {
-        source: "/(.*)",
-        has: [{ type: "header", key: "x-forwarded-proto", value: "http" }],
-        destination: "https://hypefy.chat/:path*",
-        permanent: true,
-      },
-      // Canonicalise www → non-www
-      {
-        source: "/(.*)",
-        has: [{ type: "host", value: "www.hypefy.chat" }],
-        destination: "https://hypefy.chat/:path*",
-        permanent: true,
-      },
-    ];
-  },
+  // Note: www→root and HTTP→HTTPS redirects are handled by Vercel's CDN layer.
+  // Adding them here too causes ERR_TOO_MANY_REDIRECTS.
 };
 
 export default nextConfig;
