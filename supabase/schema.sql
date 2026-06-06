@@ -667,6 +667,13 @@ create trigger trg_messages_share_count after insert on public.messages
 -- ─── Realtime ───────────────────────────────────────────────────────────────
 -- Add to the supabase_realtime publication (ignore if already present):
 --   messages, message_reactions, notifications, call_sessions
+--
+-- IMPORTANT: tables whose RLS policy references non-PK columns (caller_id,
+-- receiver_id, user_id) need REPLICA IDENTITY FULL, otherwise Realtime cannot
+-- evaluate RLS on UPDATE/DELETE and silently drops those events (e.g. the
+-- caller never learns the call was 'accepted'/'declined').
+alter table public.call_sessions replica identity full;
+alter table public.notifications replica identity full;
 
 -- ─── Storage buckets ────────────────────────────────────────────────────────
 -- Public read; size + mime limits enforced. Create via dashboard or:
