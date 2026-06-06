@@ -70,7 +70,7 @@ export function ShowsRow({
                 ? router.push(`/shows/${currentUser.showId}`)
                 : router.push("/shows/add")
             }
-            aria-label={currentUser?.hasActiveShow ? "Watch your Show" : "Add a Show"}
+            aria-label={currentUser?.hasActiveShow ? "Watch your Shot" : "Add a Shot"}
             className="block active:opacity-70"
           >
             {currentUser ? (
@@ -97,13 +97,13 @@ export function ShowsRow({
           {/* Add-show badge — always opens the camera */}
           <Link
             href="/shows/add"
-            aria-label="Add a Show"
+            aria-label="Add a Shot"
             className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-ink ring-4 ring-background"
           >
             <Plus size={13} strokeWidth={3} />
           </Link>
         </div>
-        <span className="max-w-full truncate text-xs text-muted">Your Show</span>
+        <span className="max-w-full truncate text-xs text-muted">Your Shot</span>
       </div>
 
       {/* ── Sorted shows (unseen first, seen right) ── */}

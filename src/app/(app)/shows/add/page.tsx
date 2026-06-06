@@ -229,7 +229,7 @@ export default function AddShowPage() {
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
             <LayoutGrid size={40} className="text-white/25" />
             <p className="text-sm text-white/50">No posts yet</p>
-            <p className="text-xs text-white/35">Create a post first, then share it to your Show.</p>
+            <p className="text-xs text-white/35">Create a post first, then share it to your Shot.</p>
           </div>
         ) : (
           <div className="no-scrollbar grid flex-1 grid-cols-3 gap-0.5 overflow-y-auto">
@@ -325,7 +325,7 @@ export default function AddShowPage() {
               className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm">
               <X size={20} />
             </button>
-            <span className="text-base font-extrabold tracking-tight text-white">Your Show</span>
+            <span className="text-base font-extrabold tracking-tight text-white">Your Shot</span>
             <span className="rounded-pill border border-white/30 px-2.5 py-0.5 text-xs text-white/60">24h</span>
           </div>
 
@@ -357,10 +357,19 @@ export default function AddShowPage() {
           {/* Background — dark gradient for post-share, image for camera/gallery */}
           <div className="absolute inset-0">
             {selectedFlat ? (
-              <div className="h-full w-full bg-gradient-to-br from-[#0f0f1a] via-[#12122a] to-[#0a0a14]" />
+              // Post-share: blurred image background or dark gradient
+              selectedFlat.imageUrl ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={selectedFlat.imageUrl} alt="" aria-hidden className="h-full w-full scale-110 object-cover blur-3xl" style={{ opacity: 0.35 }} />
+                  <div className="absolute inset-0 bg-black/60" />
+                </>
+              ) : (
+                <div className="h-full w-full bg-gradient-to-br from-[#0d0d1e] via-[#111128] to-[#08080f]" />
+              )
             ) : previewUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={previewUrl} alt="Show preview" className="h-full w-full object-cover" />
+              <img src={previewUrl} alt="Shot preview" className="h-full w-full object-cover" />
             ) : (
               <div className="h-full w-full bg-gradient-to-br from-accent/30 to-[hsl(280deg_80%_20%)]" />
             )}
@@ -380,35 +389,57 @@ export default function AddShowPage() {
             </button>
           </div>
 
-          {/* ── Instagram-style post card embed (preview) ── */}
+          {/* ── Hypefy embed card preview — matches the viewer exactly ── */}
           {selectedFlat && (
-            <div className="absolute inset-x-8 z-20 overflow-hidden rounded-2xl bg-white shadow-2xl"
-              style={{ top: "18%", maxHeight: "58%" }}>
-              {/* Card header */}
-              <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2.5">
-                <Avatar name={authorName} hue={authorHue} size={22} src={authorAvatarUrl} />
-                <span className="flex-1 truncate text-xs font-bold text-gray-900">{authorName}</span>
-                <ExternalLink size={13} className="shrink-0 text-gray-400" />
+            <div
+              className="absolute inset-x-6 z-20 overflow-hidden rounded-2xl border border-white/[0.12] bg-black/50 shadow-2xl backdrop-blur-2xl"
+              style={{ top: "17%", maxHeight: "60%" }}
+            >
+              {/* Author row */}
+              <div className="flex items-center gap-2.5 px-3.5 py-3">
+                <Avatar name={authorName} hue={authorHue} size={26} src={authorAvatarUrl} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-bold leading-tight text-white">{authorName}</p>
+                  {selectedFlat.profiles?.username && (
+                    <p className="truncate text-[10px] text-white/45">@{selectedFlat.profiles.username}</p>
+                  )}
+                </div>
+                <span className="shrink-0 rounded-full border border-white/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-white/50">
+                  Hypefy
+                </span>
               </div>
-              {/* Selected image */}
+              <div className="h-px bg-white/[0.08]" />
+
+              {/* Image or text-only fallback */}
               {selectedFlat.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={selectedFlat.imageUrl} alt="" className="aspect-square w-full object-cover" />
+                <img src={selectedFlat.imageUrl} alt="" className="w-full object-cover" style={{ maxHeight: "52vw" }} />
               ) : (
-                <div className="flex aspect-square w-full items-center justify-center bg-gray-50">
-                  <Type size={28} className="text-gray-300" />
+                <div className="flex min-h-[80px] items-center justify-center bg-white/[0.04] px-4 py-5">
+                  {selectedFlat.caption ? (
+                    <p className="line-clamp-4 text-center text-sm leading-snug text-white/75">
+                      {selectedFlat.caption}
+                    </p>
+                  ) : (
+                    <Type size={28} className="text-white/20" />
+                  )}
                 </div>
               )}
-              {/* Caption */}
-              {selectedFlat.caption && (
-                <p className="line-clamp-2 px-3 py-2 text-[11px] leading-snug text-gray-700">
-                  {selectedFlat.caption}
-                </p>
+
+              {/* Caption snippet (only when image shown) */}
+              {selectedFlat.imageUrl && selectedFlat.caption && (
+                <>
+                  <div className="h-px bg-white/[0.08]" />
+                  <p className="line-clamp-2 px-3.5 py-2.5 text-[12px] leading-snug text-white/70">
+                    {selectedFlat.caption}
+                  </p>
+                </>
               )}
+
               {/* Footer */}
-              <div className="flex items-center justify-between border-t border-gray-100 px-3 py-2">
-                <span className="text-[10px] font-semibold tracking-wide text-gray-400 uppercase">Hypefy Post</span>
-                <span className="text-[10px] font-semibold text-blue-500">View post →</span>
+              <div className="flex items-center justify-between border-t border-white/[0.08] px-3.5 py-2.5">
+                <span className="text-[11px] font-semibold text-white/40">Tap to view post</span>
+                <ExternalLink size={13} className="text-white/40" />
               </div>
             </div>
           )}
@@ -440,11 +471,11 @@ export default function AddShowPage() {
           <div className="absolute inset-x-0 bottom-0 z-20 flex items-center gap-2.5 px-4 pb-9 pt-4">
             <span className="flex items-center gap-2 rounded-pill bg-white/15 py-1.5 pl-1.5 pr-3.5 backdrop-blur-sm">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/25 text-white"><User size={15} /></span>
-              <span className="text-sm font-semibold text-white">Your Show</span>
+              <span className="text-sm font-semibold text-white">Your Shot</span>
             </span>
             <span className="rounded-pill bg-white/15 px-3.5 py-2 text-sm font-semibold text-white/75 backdrop-blur-sm">24h</span>
             <div className="flex-1" />
-            <button type="button" onClick={share} disabled={pending} aria-label="Share to your Show"
+            <button type="button" onClick={share} disabled={pending} aria-label="Share to your Shot"
               className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-ink shadow-lg transition-transform active:scale-95 disabled:opacity-60">
               {pending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
             </button>
