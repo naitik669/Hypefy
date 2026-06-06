@@ -26,17 +26,19 @@ export function AvatarImg({
     return <Avatar name={name} hue={hue} size={size} className={className} />;
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={url}
-      alt={name}
-      width={size}
-      height={size}
-      loading="lazy"
-      decoding="async"
-      onError={() => setBroken(true)}
+    <div
+      className={`relative shrink-0 overflow-hidden ${className}`}
       style={{ width: size, height: size }}
-      className={`object-cover ${className}`}
-    />
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt={name}
+        loading="lazy"
+        decoding="async"
+        onError={() => setBroken(true)}
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+    </div>
   );
 }
