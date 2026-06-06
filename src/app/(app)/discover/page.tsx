@@ -36,12 +36,12 @@ export default async function DiscoverPage() {
   const [postsRes, shotsRes, followRes] = await Promise.all([
     supabase
       .from("posts")
-      .select("id, caption, body, image_url, image_urls, hashtags, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles(id, display_name, username, avatar_hue)")
+      .select("id, caption, body, image_url, image_urls, hashtags, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles(id, display_name, username, avatar_hue, avatar_url)")
       .order("created_at", { ascending: false })
       .limit(60),
     supabase
       .from("shots")
-      .select("id, media_url, poster_url, caption, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles(id, display_name, username, avatar_hue)")
+      .select("id, media_url, poster_url, caption, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles(id, display_name, username, avatar_hue, avatar_url)")
       .order("created_at", { ascending: false })
       .limit(40),
     supabase.from("follows").select("following_id").eq("follower_id", user.id),
@@ -70,7 +70,7 @@ export default async function DiscoverPage() {
   // Creators to follow
   let peopleQuery = supabase
     .from("profiles")
-    .select("id, display_name, username, avatar_hue, bio, profile_tags")
+    .select("id, display_name, username, avatar_hue, avatar_url, bio, profile_tags")
     .eq("profile_completed", true)
     .neq("id", user.id)
     .limit(12);

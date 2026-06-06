@@ -17,6 +17,7 @@ type Profile = {
   display_name: string | null;
   username: string | null;
   avatar_hue: number | null;
+  avatar_url: string | null;
   bio: string | null;
 };
 
@@ -79,24 +80,24 @@ export default function SearchPage() {
         ? { data: [] as Profile[] }
         : await supabase
             .from("profiles")
-            .select("id, display_name, username, avatar_hue, bio")
+            .select("id, display_name, username, avatar_hue, avatar_url, bio")
             .eq("profile_completed", true)
             .or(`username.ilike.%${term}%,display_name.ilike.%${term}%`)
             .limit(20);
 
-      // Posts — by hashtag (array contains) or by text
+      // Posts â€” by hashtag (array contains) or by text
       const postsRes = isUser
         ? { data: [] as any[] }
         : isTag
           ? await supabase
               .from("posts")
-              .select("*, profiles(id, display_name, username, avatar_hue, profile_tags)")
+              .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags)")
               .contains("hashtags", [term])
               .order("hype_count", { ascending: false })
               .limit(20)
           : await supabase
               .from("posts")
-              .select("*, profiles(id, display_name, username, avatar_hue, profile_tags)")
+              .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags)")
               .or(`caption.ilike.%${term}%,body.ilike.%${term}%`)
               .order("hype_count", { ascending: false })
               .limit(20);
@@ -195,7 +196,7 @@ export default function SearchPage() {
                   href={u.username ? `/u/${u.username}` : "#"}
                   className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03]"
                 >
-                  <Avatar name={u.display_name ?? u.username ?? "U"} hue={u.avatar_hue ?? 280} size={44} />
+                  <Avatar name={u.display_name ?? u.username ?? "U"} hue={u.avatar_hue ?? 280} size={44} src={u.avatar_url ?? undefined} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{u.display_name ?? u.username}</p>
                     <p className="truncate text-xs text-muted">@{u.username}</p>

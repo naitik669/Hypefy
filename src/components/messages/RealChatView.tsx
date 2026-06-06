@@ -35,10 +35,10 @@ export type ChatMsg = {
 };
 
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
-type Other = { id: string; name: string; username: string | null; hue: number };
+type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null };
 
 const REPORT_REASONS = ["Spam", "Harassment", "Hate or abuse", "Scam", "Inappropriate content", "Other"];
-const QUICK = ["â¤ï¸", "ðŸ”¥", "ðŸ˜‚", "ðŸ‘", "ðŸ˜®", "ðŸ˜¢"];
+const QUICK = ["Ã¢ÂÂ¤Ã¯Â¸Â", "Ã°Å¸â€Â¥", "Ã°Å¸Ëœâ€š", "Ã°Å¸â€˜Â", "Ã°Å¸ËœÂ®", "Ã°Å¸ËœÂ¢"];
 
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -110,7 +110,7 @@ export function RealChatView({
     return m;
   }, [messages]);
 
-  // emoji â†’ { count, mine } per message
+  // emoji Ã¢â€ â€™ { count, mine } per message
   const reactionsByMsg = useMemo(() => {
     const out = new Map<string, { emoji: string; count: number; mine: boolean }[]>();
     const tmp = new Map<string, Map<string, { count: number; mine: boolean }>>();
@@ -142,14 +142,14 @@ export function RealChatView({
   }, [menu]);
 
   useEffect(() => {
-    // NOTE: supabase.rpc() is lazy — it only fires when awaited/then'd.
+    // NOTE: supabase.rpc() is lazy â€” it only fires when awaited/then'd.
     supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId }).then(() => {});
   }, [conversationId, supabase]);
 
   async function hydratePost(msgId: string, postId: string) {
     const { data } = await supabase
       .from("posts")
-      .select("id, caption, image_url, image_urls, profiles(username, display_name, avatar_hue)")
+      .select("id, caption, image_url, image_urls, profiles(username, display_name, avatar_hue, avatar_url)")
       .eq("id", postId)
       .maybeSingle();
     if (!data) return;
@@ -167,7 +167,7 @@ export function RealChatView({
   async function hydrateShot(msgId: string, shotId: string) {
     const { data } = await supabase
       .from("shots")
-      .select("id, media_url, caption, profiles(username, display_name, avatar_hue)")
+      .select("id, media_url, caption, profiles(username, display_name, avatar_hue, avatar_url)")
       .eq("id", shotId)
       .maybeSingle();
     if (!data) return;
@@ -276,7 +276,7 @@ export function RealChatView({
     if (m.body) { navigator.clipboard.writeText(m.body).catch(() => {}); showToast("Copied"); }
   }
 
-  // Long-press â†’ context menu
+  // Long-press Ã¢â€ â€™ context menu
   function onPressStart(m: ChatMsg, e: React.PointerEvent) {
     if (m.is_unsent) return;
     suppressClick.current = false;
@@ -313,7 +313,7 @@ export function RealChatView({
           </div>
         ) : (
           <Link href={other.username ? `/u/${other.username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
-            <Avatar name={other.name} hue={other.hue} size={36} />
+            <Avatar name={other.name} hue={other.hue} size={36} src={other.avatarUrl ?? undefined} />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{other.name}</p>
               {other.username && <p className="truncate text-xs text-muted">@{other.username}</p>}
@@ -334,7 +334,7 @@ export function RealChatView({
             <MoreVertical size={20} />
           </button>
 
-          {/* Call type popover â€” anchored to the phone icon */}
+          {/* Call type popover Ã¢â‚¬â€ anchored to the phone icon */}
           {callChooser && (
             <>
               <div className="fixed inset-0 z-40" onPointerDown={() => setCallChooser(false)} />
@@ -390,7 +390,7 @@ export function RealChatView({
                 <Users size={30} className="text-white/95" />
               </span>
             ) : (
-              <Avatar name={other.name} hue={other.hue} size={64} />
+              <Avatar name={other.name} hue={other.hue} size={64} src={other.avatarUrl ?? undefined} />
             )}
             <p className="mt-2 text-sm font-semibold">{isGroup ? group!.title : other.name}</p>
             <p className="text-xs text-muted">
@@ -538,7 +538,7 @@ export function RealChatView({
               </span>
               : {replyTo.is_unsent ? "Unsent" : replyTo.body ?? (replyTo.kind === "shot" ? "Shot" : "Post")}
             </span>
-            <button onClick={() => setReplyTo(null)} className="text-faint hover:text-muted">âœ•</button>
+            <button onClick={() => setReplyTo(null)} className="text-faint hover:text-muted">Ã¢Å“â€¢</button>
           </div>
         )}
         <div className="flex items-center gap-2">
@@ -546,7 +546,7 @@ export function RealChatView({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-            placeholder="Messageâ€¦"
+            placeholder="MessageÃ¢â‚¬Â¦"
             className="h-11 flex-1 rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
           />
           <button type="button" onClick={send} disabled={!text.trim() || sending} aria-label="Send"

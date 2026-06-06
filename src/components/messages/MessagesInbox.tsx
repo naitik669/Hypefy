@@ -12,6 +12,7 @@ export type InboxRow = {
   name: string;
   username: string | null;
   hue: number;
+  avatarUrl?: string | null;
   isGroup: boolean;
   memberCount: number;
   lastBody: string | null;
@@ -184,7 +185,7 @@ export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
                 onClick={() => setReadIds((prev) => new Set(prev).add(r.id))}
                 className={`flex items-center gap-3 transition-colors hover:bg-white/[0.03] ${pending ? "" : "px-4 py-3"}`}
               >
-                {r.isGroup ? <GroupAvatar /> : <Avatar name={r.name} hue={r.hue} size={52} />}
+                {r.isGroup ? <GroupAvatar /> : <Avatar name={r.name} hue={r.hue} size={52} src={r.avatarUrl ?? undefined} />}
                 <div className="min-w-0 flex-1">
                   <p className={`truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
                     {r.name}

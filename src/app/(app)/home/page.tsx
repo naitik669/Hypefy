@@ -30,20 +30,20 @@ export default async function HomePage() {
   ] = await Promise.all([
     // Who the user follows (for ranking boost)
     supabase.from("follows").select("following_id").eq("follower_id", user.id),
-    // Global feed — show ALL posts so early users always see content.
+    // Global feed â€” show ALL posts so early users always see content.
     supabase
       .from("posts")
-      .select("*, profiles(id, display_name, username, avatar_hue, profile_tags)")
+      .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags)")
       .order("created_at", { ascending: false })
       .limit(50),
     // Current user profile for "Your Show" bubble
-    supabase.from("profiles").select("display_name, username, avatar_hue").eq("id", user.id).maybeSingle(),
-    // Current user's own active Shows — oldest first
+    supabase.from("profiles").select("display_name, username, avatar_hue, avatar_url").eq("id", user.id).maybeSingle(),
+    // Current user's own active Shows â€” oldest first
     supabase.from("shows").select("id").eq("user_id", user.id).gt("expires_at", nowIso).order("created_at", { ascending: true }),
-    // Active Shows from OTHERS — newest first
+    // Active Shows from OTHERS â€” newest first
     supabase
       .from("shows")
-      .select("id, user_id, profiles(display_name, avatar_hue, username)")
+      .select("id, user_id, profiles(display_name, avatar_hue, avatar_url, username)")
       .gt("expires_at", nowIso)
       .neq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -64,7 +64,7 @@ export default async function HomePage() {
   );
   const posts = [...boosted, ...rest].slice(0, 30);
 
-  // Fetch which posts current user has hyped/saved — for initial state
+  // Fetch which posts current user has hyped/saved â€” for initial state
   const postIds = posts.map((p: any) => p.id);
   const [hypesRes, savedRes] = await Promise.all(
     postIds.length > 0
@@ -108,7 +108,7 @@ export default async function HomePage() {
         hue: p?.avatar_hue ?? 280,
       });
     } else {
-      existing.id = s.id; // iterating newest→oldest, so this ends as the oldest
+      existing.id = s.id; // iterating newestâ†’oldest, so this ends as the oldest
     }
   }
   const shows = [...byUser.values()].map((v) => ({ ...v, seen: false }));

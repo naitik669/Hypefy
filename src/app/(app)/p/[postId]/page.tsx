@@ -14,7 +14,7 @@ export default async function PostDetailPage({
 
   const { data: raw } = await supabase
     .from("posts")
-    .select("*, profiles(id, display_name, username, avatar_hue, profile_tags)")
+    .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags)")
     .eq("id", postId)
     .maybeSingle();
 

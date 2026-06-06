@@ -37,14 +37,14 @@ export function FollowListSheet({
     if (!open) return;
     setLoading(true);
     async function load() {
-      // Followers: people who follow userId → join the follower's profile
-      // Following: people userId follows → join the following's profile
+      // Followers: people who follow userId â†’ join the follower's profile
+      // Following: people userId follows â†’ join the following's profile
       const joinCol = mode === "followers" ? "follower_id" : "following_id";
       const matchCol = mode === "followers" ? "following_id" : "follower_id";
 
       const { data } = await supabase
         .from("follows")
-        .select(`profile:profiles!${joinCol}(id, display_name, username, avatar_hue)`)
+        .select(`profile:profiles!${joinCol}(id, display_name, username, avatar_hue, avatar_url)`)
         .eq(matchCol, userId)
         .limit(100);
 

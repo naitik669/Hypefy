@@ -25,7 +25,7 @@ export default async function MessagesPage() {
       // The other participant in each conversation
       supabase
         .from("conversation_members")
-        .select("conversation_id, user_id, profiles(id, display_name, username, avatar_hue)")
+        .select("conversation_id, user_id, profiles(id, display_name, username, avatar_hue, avatar_url)")
         .in("conversation_id", convIds)
         .neq("user_id", user.id),
       // Latest messages across these conversations
@@ -43,12 +43,12 @@ export default async function MessagesPage() {
     ]);
 
     // All other members per conversation (for groups we need everyone)
-    const membersByConv = new Map<string, { id: string; name: string; username: string | null; hue: number }[]>();
+    const membersByConv = new Map<string, { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null }[]>();
     (membersRes.data ?? []).forEach((m: any) => {
       const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
       if (!p) return;
       const arr = membersByConv.get(m.conversation_id) ?? [];
-      arr.push({ id: p.id, name: p.display_name ?? p.username ?? "User", username: p.username ?? null, hue: p.avatar_hue ?? 280 });
+      arr.push({ id: p.id, name: p.display_name ?? p.username ?? "User", username: p.username ?? null, hue: p.avatar_hue ?? 280, avatarUrl: p.avatar_url ?? null });
       membersByConv.set(m.conversation_id, arr);
     });
 
@@ -93,6 +93,7 @@ export default async function MessagesPage() {
           name: isGroup ? groupName : members[0].name,
           username: isGroup ? null : members[0].username,
           hue: isGroup ? 210 : members[0].hue,
+          avatarUrl: isGroup ? null : members[0].avatarUrl,
           isGroup,
           memberCount: members.length + 1,
           lastBody: last?.body ?? null,

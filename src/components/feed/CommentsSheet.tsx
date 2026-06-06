@@ -8,7 +8,7 @@ import { ReportSheet } from "@/components/ui/ReportSheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatCount } from "@/lib/format";
 
-/* â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 type RawComment = {
   id: string;
   user_id: string;
@@ -16,7 +16,7 @@ type RawComment = {
   hype_count: number;
   created_at: string;
   parent_id: string | null;
-  profiles: { display_name: string | null; username: string | null; avatar_hue: number | null } | null;
+  profiles: { display_name: string | null; username: string | null; avatar_hue: number | null; avatar_url?: string | null } | null;
 };
 
 type Comment = RawComment & {
@@ -27,7 +27,7 @@ type Comment = RawComment & {
   showReplies: boolean;
 };
 
-/* â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 60) return "now";
@@ -58,7 +58,7 @@ function buildTree(flat: RawComment[]): Comment[] {
   return roots;
 }
 
-/* â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Main component Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 export function CommentsSheet({
   open, onClose, postId, postOwnerId, currentUserId, onCountChange,
   targetType = "post",
@@ -83,7 +83,7 @@ export function CommentsSheet({
     setLoading(true);
     supabase
       .from("comments")
-      .select("id, user_id, body, hype_count, created_at, parent_id, profiles(display_name, username, avatar_hue)")
+      .select("id, user_id, body, hype_count, created_at, parent_id, profiles(display_name, username, avatar_hue, avatar_url)")
       .eq(targetType === "shot" ? "shot_id" : "post_id", postId)
       .is("deleted_at", null)
       .order("created_at", { ascending: true })
@@ -99,7 +99,7 @@ export function CommentsSheet({
 
   useEffect(() => { if (!open) { setReplyTo(null); setText(""); } }, [open]);
 
-  // Keep the parent's comment badge in sync â€” counts replies too.
+  // Keep the parent's comment badge in sync Ã¢â‚¬â€ counts replies too.
   const totalCount = countAll(tree);
   useEffect(() => {
     if (open) onCountChange?.(totalCount);
@@ -174,7 +174,7 @@ export function CommentsSheet({
 
     const { data: row } = await supabase
       .from("comments")
-      .select("id, user_id, body, hype_count, created_at, parent_id, profiles(display_name, username, avatar_hue)")
+      .select("id, user_id, body, hype_count, created_at, parent_id, profiles(display_name, username, avatar_hue, avatar_url)")
       .eq("id", data)
       .single();
 
@@ -207,7 +207,7 @@ export function CommentsSheet({
 
   return (
     <>
-    <BottomSheet open={open} onClose={onClose} title={`Comments Â· ${totalCount}`}>
+    <BottomSheet open={open} onClose={onClose} title={`Comments Ã‚Â· ${totalCount}`}>
       {loading ? (
         <div className="flex items-center justify-center py-10">
           <Loader2 size={22} className="animate-spin text-muted" />
@@ -235,10 +235,10 @@ export function CommentsSheet({
       <div className="sticky bottom-0 -mx-5 border-t border-border bg-elevated px-5 py-3">
         {replyTo && (
           <div className="mb-2 flex items-center gap-2 text-xs text-muted">
-            <span className="text-faint">â†©</span>
+            <span className="text-faint">Ã¢â€ Â©</span>
             Replying to{" "}
             <span className="font-semibold text-foreground">@{replyTo.username}</span>
-            <button onClick={cancelReply} className="ml-auto text-faint hover:text-muted">âœ•</button>
+            <button onClick={cancelReply} className="ml-auto text-faint hover:text-muted">Ã¢Å“â€¢</button>
           </div>
         )}
         <div className="flex items-center gap-2">
@@ -247,7 +247,7 @@ export function CommentsSheet({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && submitComment()}
-            placeholder={replyTo ? `Reply to @${replyTo.username}â€¦` : "Add a commentâ€¦"}
+            placeholder={replyTo ? `Reply to @${replyTo.username}Ã¢â‚¬Â¦` : "Add a commentÃ¢â‚¬Â¦"}
             className="h-10 flex-1 rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
           />
           <button
@@ -276,7 +276,7 @@ export function CommentsSheet({
   );
 }
 
-/* â”€â”€â”€ Single comment + its thread â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Single comment + its thread Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 function CommentItem({
   comment, currentUserId, onHype, onReply, onReport, onDelete, onToggleReplies,
 }: {
@@ -296,11 +296,11 @@ function CommentItem({
 
   return (
     <div>
-      {/* â”€â”€ Parent comment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ Parent comment Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <div className="flex gap-3">
-        {/* Avatar column â€” shows the vertical thread line below if replies are open */}
+        {/* Avatar column Ã¢â‚¬â€ shows the vertical thread line below if replies are open */}
         <div className="flex flex-col items-center">
-          <Avatar name={n} hue={hue} size={34} />
+          <Avatar name={n} hue={hue} size={34} src={comment.profiles?.avatar_url ?? undefined} />
           {hasReplies && comment.showReplies && (
             <div className="mt-1.5 flex-1 w-px bg-border/70" />
           )}
@@ -309,7 +309,7 @@ function CommentItem({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-semibold">{n}</span>
-            <span className="text-xs text-faint">Â· {timeAgo(comment.created_at)}</span>
+            <span className="text-xs text-faint">Ã‚Â· {timeAgo(comment.created_at)}</span>
           </div>
           <p className="mt-0.5 text-sm text-foreground/90">{comment.body}</p>
 
@@ -360,7 +360,7 @@ function CommentItem({
         </div>
       </div>
 
-      {/* â”€â”€ Replies â€” indented with left border â”€â”€â”€â”€ */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ Replies Ã¢â‚¬â€ indented with left border Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       {hasReplies && comment.showReplies && (
         <div className="ml-[17px] mt-1.5 border-l-2 border-border/60 pl-5">
           <div className="flex flex-col gap-4">
@@ -370,11 +370,11 @@ function CommentItem({
               const rhue = reply.profiles?.avatar_hue ?? 280;
               return (
                 <div key={reply.id} className="flex gap-2.5">
-                  <Avatar name={rn} hue={rhue} size={28} />
+                  <Avatar name={rn} hue={rhue} size={28} src={reply.profiles?.avatar_url ?? undefined} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-semibold">{rn}</span>
-                      <span className="text-xs text-faint">Â· {timeAgo(reply.created_at)}</span>
+                      <span className="text-xs text-faint">Ã‚Â· {timeAgo(reply.created_at)}</span>
                     </div>
                     <p className="mt-0.5 text-sm text-foreground/90">{reply.body}</p>
                     <div className="mt-1.5 flex items-center gap-4">

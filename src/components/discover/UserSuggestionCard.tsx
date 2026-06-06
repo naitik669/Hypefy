@@ -7,7 +7,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import type { SuggestedUser } from "@/lib/mock-discover";
 
-export function UserSuggestionCard({ user }: { user: SuggestedUser }) {
+export function UserSuggestionCard({ user }: { user: SuggestedUser & { avatarUrl?: string | null } }) {
   const supabase = createClient();
   const [following, setFollowing] = useState(false);
   const [pending, setPending] = useState(false);
@@ -54,7 +54,7 @@ export function UserSuggestionCard({ user }: { user: SuggestedUser }) {
   return (
     <div className="flex items-center gap-3 px-4 py-2.5">
       <Link href={profileHref}>
-        <Avatar name={user.name} hue={user.hue} size={44} />
+        <Avatar name={user.name} hue={user.hue} size={44} src={user.avatarUrl ?? undefined} />
       </Link>
       <div className="min-w-0 flex-1">
         <Link href={profileHref} className="flex items-center gap-1 hover:underline">

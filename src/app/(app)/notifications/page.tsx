@@ -20,6 +20,7 @@ type Notif = {
     display_name: string | null;
     username: string | null;
     avatar_hue: number | null;
+    avatar_url: string | null;
   } | null;
 };
 
@@ -65,7 +66,7 @@ export default function NotificationsPage() {
 
       const { data } = await supabase
         .from("notifications")
-        .select("id, type, target_type, target_id, body, is_read, created_at, actor:actor_id(display_name, username, avatar_hue)")
+        .select("id, type, target_type, target_id, body, is_read, created_at, actor:actor_id(display_name, username, avatar_hue, avatar_url)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50);
@@ -130,7 +131,7 @@ export default function NotificationsPage() {
                 }`}
               >
                 <div className="relative shrink-0">
-                  <Avatar name={actorName} hue={hue} size={44} />
+                  <Avatar name={actorName} hue={hue} size={44} src={n.actor?.avatar_url ?? undefined} />
                   {!n.is_read && (
                     <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-background" />
                   )}

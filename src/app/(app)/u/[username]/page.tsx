@@ -75,7 +75,7 @@ export default async function PublicProfilePage({
         {/* Avatar + stats */}
         <div className="flex items-end gap-4">
           <div className="-mt-11">
-            <Avatar name={name} hue={hue} size={84} className="rounded-[26px] ring-4 ring-background" />
+            <Avatar name={name} hue={hue} size={84} src={profile.avatar_url ?? undefined} className="rounded-[26px] ring-4 ring-background" />
           </div>
           <FollowStats
             userId={profile.id}

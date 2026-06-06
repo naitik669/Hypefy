@@ -74,7 +74,7 @@ export function ShareSheet({
       // Fetch profiles for all merged IDs
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, display_name, username, avatar_hue")
+        .select("id, display_name, username, avatar_hue, avatar_url")
         .in("id", [...allIds])
         .eq("profile_completed", true)
         .limit(80);
@@ -176,18 +176,18 @@ export function ShareSheet({
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Send to">
-      {/* ── Search ────────────────────────────────────────── */}
+      {/* â”€â”€ Search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="mb-3 flex h-10 items-center gap-2 rounded-pill border border-border bg-surface px-3 focus-within:border-accent/40">
         <Search size={15} className="shrink-0 text-faint" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search people…"
+          placeholder="Search peopleâ€¦"
           className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
         />
       </div>
 
-      {/* ── Friends list — vertical scroll ─────────────── */}
+      {/* â”€â”€ Friends list â€” vertical scroll â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="flex flex-col overflow-y-auto" style={{ maxHeight: "42dvh" }}>
         {loading ? (
           <div className="flex items-center justify-center py-6">
@@ -226,7 +226,7 @@ export function ShareSheet({
                       : "border-border text-transparent"
                   }`}
                 >
-                  ✓
+                  âœ“
                 </span>
               </button>
             );
@@ -234,7 +234,7 @@ export function ShareSheet({
         )}
       </div>
 
-      {/* Send button — only when someone is selected */}
+      {/* Send button â€” only when someone is selected */}
       {sent.size > 0 && (
         <button
           type="button"
@@ -243,7 +243,7 @@ export function ShareSheet({
           className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-60"
         >
           {sendingDm ? (
-            <><Loader2 size={16} className="animate-spin" /> Sending…</>
+            <><Loader2 size={16} className="animate-spin" /> Sendingâ€¦</>
           ) : dmDone ? (
             <><Check size={16} /> Sent</>
           ) : (
@@ -252,10 +252,10 @@ export function ShareSheet({
         </button>
       )}
 
-      {/* ── Divider ────────────────────────────────────── */}
+      {/* â”€â”€ Divider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="my-3 h-px bg-border" />
 
-      {/* ── Actions at bottom — horizontal row ──────────── */}
+      {/* â”€â”€ Actions at bottom â€” horizontal row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="grid grid-cols-3 gap-2 pb-1">
         <button
           type="button"

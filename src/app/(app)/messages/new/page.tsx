@@ -36,7 +36,7 @@ export default function NewChatPage() {
       if (ids.size === 0) { setPeople([]); setLoading(false); return; }
       const { data } = await supabase
         .from("profiles")
-        .select("id, display_name, username, avatar_hue")
+        .select("id, display_name, username, avatar_hue, avatar_url")
         .in("id", [...ids])
         .eq("profile_completed", true)
         .limit(120);
@@ -112,7 +112,7 @@ export default function NewChatPage() {
               >
                 <Avatar name={p.display_name ?? p.username ?? "U"} hue={p.avatar_hue ?? 280} size={24} className="rounded-full" />
                 <span className="text-xs font-semibold">{p.display_name ?? p.username}</span>
-                <span className="text-faint">×</span>
+                <span className="text-faint">Ã—</span>
               </button>
             ))}
           </div>
@@ -172,9 +172,9 @@ export default function NewChatPage() {
             className="flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-accent py-3.5 text-base font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-60"
           >
             {creating ? (
-              <><Loader2 size={18} className="animate-spin" /> Starting…</>
+              <><Loader2 size={18} className="animate-spin" /> Startingâ€¦</>
             ) : isGroup ? (
-              <><Users size={18} /> Create group · {selected.size}</>
+              <><Users size={18} /> Create group Â· {selected.size}</>
             ) : (
               "Message"
             )}

@@ -32,6 +32,7 @@ export type FeedPost = {
     display_name: string | null;
     username: string | null;
     avatar_hue: number | null;
+    avatar_url?: string | null;
     profile_tags: string[] | null;
   } | null;
   initialHyped?: boolean;
@@ -209,7 +210,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
     <article className="relative border-b border-border/50 pb-3">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <Link href={profileHref}><Avatar name={name} hue={hue} size={40} /></Link>
+        <Link href={profileHref}><Avatar name={name} hue={hue} size={40} src={profile?.avatar_url ?? undefined} /></Link>
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <Link href={profileHref} className="truncate text-sm font-semibold hover:underline">{name}</Link>
           <span className="ml-1 text-xs text-faint">Â· {timeAgo(post.created_at)}</span>
