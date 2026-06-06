@@ -58,7 +58,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const images = getImages(post);
 
   // Resolve the current user ourselves when the parent didn't pass one,
-  // so hype/save work on every surface (profile modal, search, discoverâ€¦).
+  // so hype/save work on every surface (profile modal, search, discover...).
   const [uid, setUid] = useState(currentUserId);
 
   const [hyped, setHyped] = useState(post.initialHyped ?? false);
@@ -184,7 +184,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
     }
   }
 
-  // Double-tap to Hype â€” only ever ADDS a hype, never removes one.
+  // Double-tap to Hype -- only ever ADDS a hype, never removes one.
   function playBurst() {
     setHypeBurst(true);
     setShowParticles(true);
@@ -230,16 +230,16 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         <Link href={profileHref}><Avatar name={name} hue={hue} size={40} src={profile?.avatar_url ?? undefined} /></Link>
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <Link href={profileHref} className="truncate text-sm font-semibold hover:underline">{name}</Link>
-          <span className="ml-1 text-xs text-faint">Â· {timeAgo(post.created_at)}</span>
+          <span className="ml-1 text-xs text-faint">· {timeAgo(post.created_at)}</span>
         </div>
-        {/* THREE DOTS â€” fully functional */}
+        {/* THREE DOTS -- fully functional */}
         <button type="button" aria-label="More" onClick={() => setActionsOpen(true)}
           className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-white/5">
           <MoreHorizontal size={20} />
         </button>
       </div>
 
-      {/* Image gallery â€” swipe/scroll between images; double-tap to Hype */}
+      {/* Image gallery -- swipe/scroll between images; double-tap to Hype */}
       {images.length > 0 && (
         <div
           className="relative mx-4 overflow-hidden rounded-2xl"
@@ -335,7 +335,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         </button>
       </div>
 
-      {/* Caption â€” clamps long text with a more / less toggle */}
+      {/* Caption -- clamps long text with a more / less toggle */}
       {(liveCaption || liveBody) && (
         <ExpandableText className="px-4 pt-2 text-sm leading-snug" clampClass="line-clamp-2">
           {liveCaption && (

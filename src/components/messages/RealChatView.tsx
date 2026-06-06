@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban , X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { Avatar } from "@/components/ui/Avatar";
@@ -38,7 +38,7 @@ type ReactionRow = { message_id: string; user_id: string; emoji: string };
 type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null };
 
 const REPORT_REASONS = ["Spam", "Harassment", "Hate or abuse", "Scam", "Inappropriate content", "Other"];
-const QUICK = ["Ã¢ÂÂ¤Ã¯Â¸Â", "Ã°Å¸â€Â¥", "Ã°Å¸Ëœâ€š", "Ã°Å¸â€˜Â", "Ã°Å¸ËœÂ®", "Ã°Å¸ËœÂ¢"];
+const QUICK = ["❤️", "🥰", "😂", "👍", "😮", "😢"];
 
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -334,7 +334,7 @@ export function RealChatView({
             <MoreVertical size={20} />
           </button>
 
-          {/* Call type popover Ã¢â‚¬â€ anchored to the phone icon */}
+          {/* Call type popover -- anchored to the phone icon */}
           {callChooser && (
             <>
               <div className="fixed inset-0 z-40" onPointerDown={() => setCallChooser(false)} />
@@ -538,7 +538,7 @@ export function RealChatView({
               </span>
               : {replyTo.is_unsent ? "Unsent" : replyTo.body ?? (replyTo.kind === "shot" ? "Shot" : "Post")}
             </span>
-            <button onClick={() => setReplyTo(null)} className="text-faint hover:text-muted">Ã¢Å“â€¢</button>
+            <button onClick={() => setReplyTo(null)} className="text-faint hover:text-muted"><X size={14} /></button>
           </div>
         )}
         <div className="flex items-center gap-2">
@@ -546,7 +546,7 @@ export function RealChatView({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-            placeholder="MessageÃ¢â‚¬Â¦"
+            placeholder="Message..."
             className="h-11 flex-1 rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
           />
           <button type="button" onClick={send} disabled={!text.trim() || sending} aria-label="Send"

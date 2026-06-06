@@ -107,7 +107,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
   }, [supabase]);
 
   // Subscribe-gated send: queue signals until the channel is SUBSCRIBED, then
-  // flush â€” so the offer / answer / ICE are never dropped due to join timing.
+  // flush  --  so the offer / answer / ICE are never dropped due to join timing.
   const send = useCallback((payload: Record<string, unknown>) => {
     const msg = { type: "broadcast" as const, event: "signal", payload: { ...payload, from: userId } };
     if (chanReadyRef.current && chanRef.current) {
@@ -207,7 +207,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
           if (!pc.currentRemoteDescription) await pc.setRemoteDescription(s.sdp).catch(() => {});
           for (const c of pendingIce.current) await pc.addIceCandidate(c).catch(() => {});
           pendingIce.current = [];
-          // The answer means the callee picked up â€” sync the caller off "Ringing"
+          // The answer means the callee picked up  --  sync the caller off "Ringing"
           // immediately, regardless of how long ICE/media take to finish.
           if (ringTimer.current) { clearTimeout(ringTimer.current); ringTimer.current = null; }
           setCall((c) => (c && c.status === "outgoing" ? { ...c, status: "connected" } : c));
@@ -260,7 +260,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
       if (s.kind === "offer") {
         offerRef.current = s.sdp;
         if (pc && !pc.currentRemoteDescription) {
-          // Already accepted and waiting for the offer â€” apply it now.
+          // Already accepted and waiting for the offer  --  apply it now.
           await pc.setRemoteDescription(s.sdp).catch(() => {});
           for (const cand of pendingIce.current) await pc.addIceCandidate(cand).catch(() => {});
           pendingIce.current = [];
@@ -288,7 +288,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
       const pc = makePeer(stream);
 
       if (offerRef.current) {
-        // Offer already arrived â€” answer immediately.
+        // Offer already arrived  --  answer immediately.
         await pc.setRemoteDescription(offerRef.current);
         for (const cand of pendingIce.current) await pc.addIceCandidate(cand).catch(() => {});
         pendingIce.current = [];
@@ -296,7 +296,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
         await pc.setLocalDescription(answer);
         send({ kind: "answer", sdp: answer });
       } else {
-        // Offer not here yet â€” nudge the caller; the channel handler answers on arrival.
+        // Offer not here yet  --  nudge the caller; the channel handler answers on arrival.
         send({ kind: "ready" });
       }
       setCall({ ...c, status: "connected" });
@@ -332,7 +332,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
 
   // â”€â”€ app-wide incoming-call listener â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const ringIncoming = useCallback(async (info: { id: string; conversationId: string; callerId: string; type: CallType }) => {
-    if (callRef.current) return; // busy â€” ignore for MVP
+    if (callRef.current) return; // busy  --  ignore for MVP
     const { data: p } = await supabase
       .from("profiles").select("display_name, username, avatar_hue, avatar_url").eq("id", info.callerId).maybeSingle();
     beginIncoming({
@@ -368,7 +368,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, ringIncoming]);
 
-  // Ringtone â€” rings on both outgoing (ringback) and incoming, stops on connect/end.
+  // Ringtone  --  rings on both outgoing (ringback) and incoming, stops on connect/end.
   useEffect(() => {
     if (call && (call.status === "outgoing" || call.status === "incoming")) {
       startRing(call.status === "incoming" ? "incoming" : "outgoing");
@@ -441,7 +441,7 @@ function CallUI({
   const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
   const statusText =
     call.status === "incoming" ? `Incoming ${call.type} call`
-    : call.status === "outgoing" ? "Ringingâ€¦"
+    : call.status === "outgoing" ? "Ringing..."
     : clock;
   const showRemoteVideo = call.type === "video" && call.status === "connected" && !!remoteStream;
 

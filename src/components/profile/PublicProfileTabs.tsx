@@ -94,7 +94,7 @@ export function PublicProfileTabs({
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-sm text-faint">Loadingâ€¦</div>
+        <div className="py-12 text-center text-sm text-faint">Loading...</div>
       ) : tab === "Posts" || (tab === "Saved" && isOwn) ? (
         activePosts.length === 0 ? (
           <EmptyState

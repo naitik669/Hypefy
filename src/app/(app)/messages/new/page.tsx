@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Check, Loader2, Users } from "lucide-react";
+import { Search, Check, Loader2, Users , X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
@@ -112,7 +112,7 @@ export default function NewChatPage() {
               >
                 <Avatar name={p.display_name ?? p.username ?? "U"} hue={p.avatar_hue ?? 280} size={24} className="rounded-full" />
                 <span className="text-xs font-semibold">{p.display_name ?? p.username}</span>
-                <span className="text-faint">Ã—</span>
+                <X size={12} />
               </button>
             ))}
           </div>
@@ -172,9 +172,9 @@ export default function NewChatPage() {
             className="flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-accent py-3.5 text-base font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-60"
           >
             {creating ? (
-              <><Loader2 size={18} className="animate-spin" /> Startingâ€¦</>
+              <><Loader2 size={18} className="animate-spin" /> Starting...</>
             ) : isGroup ? (
-              <><Users size={18} /> Create group Â· {selected.size}</>
+              <><Users size={18} /> Create group · {selected.size}</>
             ) : (
               "Message"
             )}
