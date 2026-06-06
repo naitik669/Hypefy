@@ -22,9 +22,12 @@ export default async function ShowPage({
 
   if (!target) notFound();
 
-  // 2. Fetch all active Shows from the same user (for swipe navigation)
-  //    Join linked_post so the viewer can render the embed card without extra fetches.
-  const { data: raw } = await supabase
+  // 2. Fetch all active Shows from the same user (for swipe navigation).
+  //    Try the enhanced query (with linked_post join) first; fall back to
+  //    the basic query if the linked_post_id column doesn't exist yet.
+  let raw: any[] | null = null;
+
+  const enhanced = await supabase
     .from("shows")
     .select(`
       id, user_id, media_url, caption, created_at, hype_count, linked_post_id,
@@ -37,6 +40,19 @@ export default async function ShowPage({
     .eq("user_id", target.user_id)
     .gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: true });
+
+  if (!enhanced.error) {
+    raw = enhanced.data;
+  } else {
+    // linked_post_id column not yet migrated — fall back to basic query
+    const basic = await supabase
+      .from("shows")
+      .select("id, user_id, media_url, caption, created_at, hype_count, profiles(display_name, avatar_hue, username)")
+      .eq("user_id", target.user_id)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: true });
+    raw = basic.data;
+  }
 
   const shows = (raw ?? []).map((s: any) => ({
     ...s,
