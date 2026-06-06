@@ -325,7 +325,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
 
   function hangUp() {
     const c = callRef.current;
-    if (c) void supabase.rpc("end_call", { p_call_id: c.id });
+    if (c) supabase.rpc("end_call", { p_call_id: c.id }).then(() => {});
     send({ kind: "end" });
     cleanup(); setCall(null);
   }

@@ -142,7 +142,8 @@ export function RealChatView({
   }, [menu]);
 
   useEffect(() => {
-    supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
+    // NOTE: supabase.rpc() is lazy — it only fires when awaited/then'd.
+    supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId }).then(() => {});
   }, [conversationId, supabase]);
 
   async function hydratePost(msgId: string, postId: string) {
@@ -190,7 +191,7 @@ export function RealChatView({
           setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, { ...m, post: null }]));
           if (m.kind === "post" && m.post_id) hydratePost(m.id, m.post_id);
           if (m.kind === "shot" && m.shot_id) hydrateShot(m.id, m.shot_id);
-          if (m.sender_id !== currentUserId) supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
+          if (m.sender_id !== currentUserId) supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId }).then(() => {});
         })
       .on("postgres_changes",
         { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
@@ -226,7 +227,7 @@ export function RealChatView({
       if (mineRow && mineRow.emoji === emoji) return without;
       return [...without, { message_id: messageId, user_id: currentUserId, emoji }];
     });
-    supabase.rpc("toggle_reaction", { p_message_id: messageId, p_emoji: emoji });
+    supabase.rpc("toggle_reaction", { p_message_id: messageId, p_emoji: emoji }).then(() => {});
   }
 
   async function send() {
