@@ -2,19 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Check, Loader2 } from "lucide-react";
+import { X, Check, Loader2, FlipHorizontal2, FlipVertical2, RotateCcw } from "lucide-react";
 
 const OUT = 1080; // exported width
 
 /**
- * Image cropper. Pan (drag / one finger), zoom (pinch / wheel / slider), then
- * exports a centred crop as a JPEG blob via canvas. `aspect` = width / height
- * (1 = square avatar, 3 = wide banner, …).
+ * Image editor + cropper. Pan (drag), zoom (pinch / wheel / slider), mirror /
+ * flip, and adjust hue + saturation, then exports a centred crop as a JPEG blob.
+ * `aspect` = width / height (1 = square avatar, 3 = wide banner, …).
  */
 export function ImageCropper({
   src,
   aspect = 1,
-  label = "Crop",
+  label = "Edit",
   onCancel,
   onDone,
 }: {
@@ -25,24 +25,60 @@ export function ImageCropper({
   onDone: (blob: Blob, url: string) => void;
 }) {
   const frameRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement | null>(null);
+  const baseImgRef = useRef<HTMLImageElement | null>(null); // original
+  const workImgRef = useRef<HTMLImageElement | null>(null); // flipped version used for export
   const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
+  const [workSrc, setWorkSrc] = useState(src);
   const [D, setD] = useState(0);
   const [scale, setScale] = useState(1);
   const [t, setT] = useState({ x: 0, y: 0 });
   const [busy, setBusy] = useState(false);
 
+  // Editing controls
+  const [flipH, setFlipH] = useState(false);
+  const [flipV, setFlipV] = useState(false);
+  const [hue, setHue] = useState(0);      // degrees 0–360
+  const [sat, setSat] = useState(100);    // percent 0–200
+
   const drag = useRef<{ px: number; py: number; tx: number; ty: number } | null>(null);
   const pinch = useRef<{ dist: number; scale: number } | null>(null);
 
+  const filterCss = `saturate(${sat}%) hue-rotate(${hue}deg)`;
+
+  // Load the original image.
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
-      imgRef.current = img;
+      baseImgRef.current = img;
+      workImgRef.current = img;
       setNat({ w: img.naturalWidth, h: img.naturalHeight });
     };
     img.src = src;
   }, [src]);
+
+  // Re-derive a flipped working image whenever mirror/flip changes.
+  useEffect(() => {
+    const base = baseImgRef.current;
+    if (!base || !nat) return;
+    if (!flipH && !flipV) {
+      workImgRef.current = base;
+      setWorkSrc(src);
+      return;
+    }
+    const c = document.createElement("canvas");
+    c.width = nat.w;
+    c.height = nat.h;
+    const cx = c.getContext("2d");
+    if (!cx) return;
+    cx.translate(flipH ? nat.w : 0, flipV ? nat.h : 0);
+    cx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+    cx.drawImage(base, 0, 0);
+    const url = c.toDataURL("image/png");
+    setWorkSrc(url);
+    const wi = new Image();
+    wi.onload = () => { workImgRef.current = wi; };
+    wi.src = url;
+  }, [flipH, flipV, nat, src]);
 
   useEffect(() => {
     if (frameRef.current) setD(frameRef.current.clientWidth);
@@ -60,7 +96,6 @@ export function ImageCropper({
     return { x: Math.max(-maxX, Math.min(maxX, x)), y: Math.max(-maxY, Math.min(maxY, y)) };
   }
 
-  // Keep the image covering the frame whenever the zoom changes.
   useEffect(() => {
     setT((p) => clamp(p.x, p.y));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,9 +109,7 @@ export function ImageCropper({
     if (!drag.current || pinch.current) return;
     setT(clamp(drag.current.tx + (e.clientX - drag.current.px), drag.current.ty + (e.clientY - drag.current.py)));
   }
-  function onPointerUp() {
-    drag.current = null;
-  }
+  function onPointerUp() { drag.current = null; }
 
   function fingerDist(a: React.Touch, b: React.Touch) {
     return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
@@ -100,8 +133,12 @@ export function ImageCropper({
     setScale((s) => Math.max(1, Math.min(4, s * (e.deltaY < 0 ? 1.08 : 0.92))));
   }
 
+  function resetEdits() {
+    setFlipH(false); setFlipV(false); setHue(0); setSat(100); setScale(1); setT({ x: 0, y: 0 });
+  }
+
   function done() {
-    const img = imgRef.current;
+    const img = workImgRef.current ?? baseImgRef.current;
     if (!img || !nat || busy) return;
     setBusy(true);
     const imgLeft = (D - dispW) / 2 + t.x;
@@ -117,10 +154,9 @@ export function ImageCropper({
     canvas.width = outW;
     canvas.height = outH;
     const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      setBusy(false);
-      return;
-    }
+    if (!ctx) { setBusy(false); return; }
+    // Apply colour adjustments at export time (matches the live preview).
+    if (hue !== 0 || sat !== 100) ctx.filter = filterCss;
     ctx.drawImage(img, sx, sy, sW, sH, 0, 0, outW, outH);
     canvas.toBlob(
       (blob) => {
@@ -133,6 +169,8 @@ export function ImageCropper({
   }
 
   if (typeof document === "undefined") return null;
+
+  const edited = flipH || flipV || hue !== 0 || sat !== 100 || scale !== 1;
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex flex-col bg-black">
@@ -171,7 +209,7 @@ export function ImageCropper({
           {nat && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={src}
+              src={workSrc}
               alt=""
               draggable={false}
               className="pointer-events-none absolute max-w-none select-none"
@@ -181,6 +219,7 @@ export function ImageCropper({
                 width: dispW,
                 height: dispH,
                 transform: `translate(${t.x}px, ${t.y}px)`,
+                filter: filterCss,
               }}
             />
           )}
@@ -193,21 +232,75 @@ export function ImageCropper({
         </div>
       </div>
 
-      {/* Zoom slider */}
-      <div className="px-8 pb-12 pt-5">
-        <input
-          type="range"
-          min={1}
-          max={4}
-          step={0.01}
-          value={scale}
-          onChange={(e) => setScale(parseFloat(e.target.value))}
-          aria-label="Zoom"
-          className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/20 accent-[var(--color-accent)]"
-        />
-        <p className="mt-3 text-center text-xs text-white/50">Drag to reposition · pinch or slide to zoom</p>
+      {/* Controls */}
+      <div className="px-6 pb-10 pt-4">
+        {/* Tool buttons */}
+        <div className="mb-4 flex items-center justify-center gap-2.5">
+          <ToolButton active={flipH} onClick={() => setFlipH((v) => !v)} label="Mirror">
+            <FlipHorizontal2 size={18} />
+          </ToolButton>
+          <ToolButton active={flipV} onClick={() => setFlipV((v) => !v)} label="Flip">
+            <FlipVertical2 size={18} />
+          </ToolButton>
+          <ToolButton active={false} onClick={resetEdits} label="Reset" disabled={!edited}>
+            <RotateCcw size={18} />
+          </ToolButton>
+        </div>
+
+        {/* Sliders */}
+        <div className="mx-auto flex max-w-sm flex-col gap-3">
+          <Slider label="Zoom" min={1} max={4} step={0.01} value={scale} onChange={setScale} />
+          <Slider label="Hue" min={0} max={360} step={1} value={hue} onChange={setHue} suffix="°" />
+          <Slider label="Saturation" min={0} max={200} step={1} value={sat} onChange={setSat} suffix="%" />
+        </div>
+        <p className="mt-3 text-center text-xs text-white/45">Drag to reposition · pinch or scroll to zoom</p>
       </div>
     </div>,
     document.body,
+  );
+}
+
+function ToolButton({
+  active, disabled, onClick, label, children,
+}: {
+  active: boolean; disabled?: boolean; onClick: () => void; label: string; children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex flex-col items-center gap-1 rounded-2xl px-4 py-2 text-[11px] font-semibold transition-colors disabled:opacity-40 ${
+        active ? "bg-accent text-accent-ink" : "bg-white/10 text-white"
+      }`}
+    >
+      {children}
+      {label}
+    </button>
+  );
+}
+
+function Slider({
+  label, min, max, step, value, onChange, suffix = "",
+}: {
+  label: string; min: number; max: number; step: number; value: number; onChange: (n: number) => void; suffix?: string;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex justify-between text-[11px] font-medium text-white/55">
+        <span>{label}</span>
+        <span>{label === "Zoom" ? `${value.toFixed(1)}x` : `${Math.round(value)}${suffix}`}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        aria-label={label}
+        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/20 accent-[var(--color-accent)]"
+      />
+    </div>
   );
 }
