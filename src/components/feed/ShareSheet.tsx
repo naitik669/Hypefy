@@ -5,7 +5,6 @@ import { Link2, PlusCircle, Repeat2, Check, Search, Loader2 } from "lucide-react
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
-import { VerifiedStar } from "@/components/ui/VerifiedStar";
 
 type Friend = {
   id: string;
@@ -33,13 +32,11 @@ export function ShareSheet({
   const [sent, setSent] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const [reposted, setReposted] = useState(false);
-  const [showAdded, setShowAdded] = useState(false);
-  const [addingShow, setAddingShow] = useState(false);
+  const [addingShot, setAddingShot] = useState(false);
+  const [shotAdded, setShotAdded] = useState(false);
   const [sendingDm, setSendingDm] = useState(false);
   const [dmDone, setDmDone] = useState(false);
 
-  // Fetch everyone the user has a connection with:
-  // following + followers + notification interaction partners (hypers, commenters, etc.)
   useEffect(() => {
     if (!open) return;
     setLoading(true);
@@ -47,13 +44,9 @@ export function ShareSheet({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
 
-      // Run all three queries in parallel
       const [followingRes, followerRes, notifRes] = await Promise.all([
-        // People I follow
         supabase.from("follows").select("following_id").eq("follower_id", user.id).limit(100),
-        // People who follow me
         supabase.from("follows").select("follower_id").eq("following_id", user.id).limit(100),
-        // Recent interaction partners (actors of my notifications)
         supabase.from("notifications")
           .select("actor_id")
           .eq("user_id", user.id)
@@ -62,7 +55,6 @@ export function ShareSheet({
           .limit(50),
       ]);
 
-      // Merge all unique IDs, exclude self
       const allIds = new Set<string>();
       followingRes.data?.forEach((r: any) => allIds.add(r.following_id));
       followerRes.data?.forEach((r: any) => allIds.add(r.follower_id));
@@ -71,7 +63,6 @@ export function ShareSheet({
 
       if (allIds.size === 0) { setFriends([]); setLoading(false); return; }
 
-      // Fetch profiles for all merged IDs
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id, display_name, username, avatar_hue, avatar_url")
@@ -85,7 +76,6 @@ export function ShareSheet({
     load();
   }, [open, supabase]);
 
-  // Reset on close
   useEffect(() => { if (!open) { setQuery(""); setSent(new Set()); } }, [open]);
 
   const filtered = friends.filter((f) => {
@@ -108,7 +98,7 @@ export function ShareSheet({
   const path = targetType === "shot" ? `/shots/${postId}` : `/p/${postId}`;
   const postUrl = typeof window !== "undefined"
     ? `${window.location.origin}${path}`
-    : `https://www.hypefy.chat${path}`;
+    : `https://hypefy.chat${path}`;
 
   async function copyLink() {
     try { await navigator.clipboard.writeText(postUrl); } catch {}
@@ -116,29 +106,50 @@ export function ShareSheet({
     setTimeout(() => setCopied(false), 1500);
   }
 
-  // Add this post/shot's media to your own Show (24h story).
-  async function shareToShow() {
-    if (addingShow || showAdded) return;
-    setAddingShow(true);
+  /**
+   * Share post/shot to the user's Shot (story-style 24h content).
+   * For posts: stores linked_post_id so the viewer renders a proper embed card.
+   * For shots: copies media_url as a reference clip.
+   */
+  async function shareToShot() {
+    if (addingShot || shotAdded) return;
+    setAddingShot(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      let mediaUrl: string | null = null;
       if (targetType === "shot") {
+        // Sharing a Shot — copy its media as a clip
         const { data } = await supabase.from("shots").select("media_url").eq("id", postId).maybeSingle();
-        mediaUrl = data?.media_url ?? null;
+        const mediaUrl = data?.media_url ?? null;
+        if (!mediaUrl) return;
+        await supabase.from("shows").insert({ user_id: user.id, media_url: mediaUrl });
       } else {
-        const { data } = await supabase.from("posts").select("image_url, image_urls").eq("id", postId).maybeSingle();
-        mediaUrl = (data?.image_urls?.[0] as string | undefined) ?? data?.image_url ?? null;
-      }
-      if (!mediaUrl) return;
+        // Sharing a Post — store linked_post_id so ShowViewer renders an embed card
+        const { data } = await supabase
+          .from("posts")
+          .select("image_url, image_urls")
+          .eq("id", postId)
+          .maybeSingle();
+        const mediaUrl =
+          (data?.image_urls as string[] | null)?.[0] ?? data?.image_url ?? null;
 
-      await supabase.from("shows").insert({ user_id: user.id, media_url: mediaUrl });
-      setShowAdded(true);
-      setTimeout(() => { setShowAdded(false); onClose(); }, 1100);
+        // Try with linked_post_id (requires migration); fall back to media-only if column missing
+        const { error } = await supabase.from("shows").insert({
+          user_id: user.id,
+          media_url: mediaUrl,
+          linked_post_id: postId,
+        });
+        if (error) {
+          // Graceful fallback — column not yet migrated
+          await supabase.from("shows").insert({ user_id: user.id, media_url: mediaUrl });
+        }
+      }
+
+      setShotAdded(true);
+      setTimeout(() => { setShotAdded(false); onClose(); }, 1100);
     } finally {
-      setAddingShow(false);
+      setAddingShot(false);
     }
   }
 
@@ -147,7 +158,6 @@ export function ShareSheet({
     setTimeout(() => { setReposted(false); onClose(); }, 900);
   }
 
-  // Actually send the post into DMs for each selected friend
   async function sendToSelected() {
     if (sendingDm || sent.size === 0) return;
     setSendingDm(true);
@@ -176,18 +186,18 @@ export function ShareSheet({
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Send to">
-      {/* â”€â”€ Search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* Search */}
       <div className="mb-3 flex h-10 items-center gap-2 rounded-pill border border-border bg-surface px-3 focus-within:border-accent/40">
         <Search size={15} className="shrink-0 text-faint" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search peopleâ€¦"
+          placeholder="Search people…"
           className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
         />
       </div>
 
-      {/* â”€â”€ Friends list â€” vertical scroll â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* Friends list */}
       <div className="flex flex-col overflow-y-auto" style={{ maxHeight: "42dvh" }}>
         {loading ? (
           <div className="flex items-center justify-center py-6">
@@ -226,7 +236,7 @@ export function ShareSheet({
                       : "border-border text-transparent"
                   }`}
                 >
-                  âœ“
+                  ✓
                 </span>
               </button>
             );
@@ -234,7 +244,6 @@ export function ShareSheet({
         )}
       </div>
 
-      {/* Send button â€” only when someone is selected */}
       {sent.size > 0 && (
         <button
           type="button"
@@ -243,7 +252,7 @@ export function ShareSheet({
           className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-60"
         >
           {sendingDm ? (
-            <><Loader2 size={16} className="animate-spin" /> Sendingâ€¦</>
+            <><Loader2 size={16} className="animate-spin" /> Sending…</>
           ) : dmDone ? (
             <><Check size={16} /> Sent</>
           ) : (
@@ -252,10 +261,9 @@ export function ShareSheet({
         </button>
       )}
 
-      {/* â”€â”€ Divider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="my-3 h-px bg-border" />
 
-      {/* â”€â”€ Actions at bottom â€” horizontal row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* Action row */}
       <div className="grid grid-cols-3 gap-2 pb-1">
         <button
           type="button"
@@ -283,25 +291,28 @@ export function ShareSheet({
           </span>
         </button>
 
-        <button
-          type="button"
-          onClick={shareToShow}
-          disabled={addingShow}
-          className="flex flex-col items-center gap-2 rounded-2xl px-2 py-3 transition-colors hover:bg-white/5 disabled:opacity-60"
-        >
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface">
-            {addingShow ? (
-              <Loader2 size={20} className="animate-spin text-muted" />
-            ) : showAdded ? (
-              <Check size={20} className="text-accent" />
-            ) : (
-              <PlusCircle size={20} className="text-hype" />
-            )}
-          </span>
-          <span className={`text-xs font-medium ${showAdded ? "text-accent" : "text-foreground"}`}>
-            {showAdded ? "Added!" : "Share to Show"}
-          </span>
-        </button>
+        {/* Share to Shot — only available when sharing a post */}
+        {targetType === "post" && (
+          <button
+            type="button"
+            onClick={shareToShot}
+            disabled={addingShot}
+            className="flex flex-col items-center gap-2 rounded-2xl px-2 py-3 transition-colors hover:bg-white/5 disabled:opacity-60"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface">
+              {addingShot ? (
+                <Loader2 size={20} className="animate-spin text-muted" />
+              ) : shotAdded ? (
+                <Check size={20} className="text-accent" />
+              ) : (
+                <PlusCircle size={20} className="text-hype" />
+              )}
+            </span>
+            <span className={`text-xs font-medium ${shotAdded ? "text-accent" : "text-foreground"}`}>
+              {shotAdded ? "Added to Shot!" : "Share to Shot"}
+            </span>
+          </button>
+        )}
       </div>
     </BottomSheet>
   );

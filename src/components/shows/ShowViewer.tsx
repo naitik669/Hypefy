@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  X, Send, Star, ChevronLeft, ChevronRight, ExternalLink, Type,
-  MoreHorizontal, Trash2, Bookmark, BookmarkCheck, Loader2,
+  X, Send, Star, ChevronLeft, ChevronRight, ExternalLink,
+  MoreHorizontal, Trash2, Bookmark, BookmarkCheck, Loader2, FileText,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 
-type ShowProfile = { display_name: string | null; avatar_hue: number | null; username: string | null } | null;
+type ShowProfile = { display_name: string | null; avatar_hue: number | null; username: string | null; avatar_url?: string | null } | null;
 
 type LinkedPost = {
   id: string;
@@ -58,7 +58,6 @@ export function ShowViewer({
 }) {
   const router = useRouter();
   const [idx, setIdx] = useState(startIdx);
-  // Local showcase state so toggling updates UI instantly without re-fetch
   const [showcasedIds, setShowcasedIds] = useState<Set<string>>(
     () => new Set(shows.filter((s) => s.is_showcase).map((s) => s.id)),
   );
@@ -128,7 +127,6 @@ function ShowScreen({
   const startRef = useRef<number>(0);
   const progressRef = useRef(0);
 
-  // Owner actions menu
   const [menuOpen, setMenuOpen] = useState(false);
   const [actionPending, setActionPending] = useState<"delete" | "showcase" | null>(null);
 
@@ -141,9 +139,12 @@ function ShowScreen({
   const [hypePending, setHypePending] = useState(false);
 
   const linkedPost = show.linked_post ?? null;
-
   const postAuthorName = linkedPost?.profiles?.display_name ?? linkedPost?.profiles?.username ?? "User";
   const postAuthorHue = linkedPost?.profiles?.avatar_hue ?? 280;
+
+  // The specific image selected for the embed (stored in media_url for linked-post shots)
+  const embedImage = show.linked_post_id ? show.media_url : null;
+  const hasEmbedImage = !!embedImage;
 
   useEffect(() => {
     let active = true;
@@ -174,7 +175,6 @@ function ShowScreen({
     finally { setHypePending(false); }
   }
 
-  // ── Delete this show ──
   async function deleteShow() {
     setActionPending("delete");
     await supabase.from("shows").delete().eq("id", show.id);
@@ -183,7 +183,6 @@ function ShowScreen({
     onClose();
   }
 
-  // ── Toggle showcase ──
   async function toggleShowcase() {
     setActionPending("showcase");
     const next = !isShowcase;
@@ -219,18 +218,35 @@ function ShowScreen({
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
-      {/* Background — dark gradient for post-share shows, image/gradient for own shows */}
+
+      {/* ── Background ── */}
       {show.linked_post_id ? (
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0f0f1a] via-[#12122a] to-[#0a0a14]" />
+        // Post-share shot: blurred image or dark gradient
+        hasEmbedImage ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={embedImage!}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full scale-110 object-cover blur-3xl"
+              style={{ opacity: 0.35 }}
+            />
+            <div className="absolute inset-0 bg-black/60" />
+          </>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0d0d1e] via-[#111128] to-[#08080f]" />
+        )
       ) : show.media_url ? (
+        // Normal shot: full-bleed image
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={show.media_url} alt={show.caption ?? "Show"} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={show.media_url} alt={show.caption ?? "Shot"} className="absolute inset-0 h-full w-full object-cover" />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-accent/40 to-[hsl(280deg_80%_20%)]" />
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
 
-      {/* Tap zones — disabled when menu is open */}
+      {/* ── Tap zones (prev / next) ── */}
       {!menuOpen && (
         <>
           <div
@@ -250,28 +266,30 @@ function ShowScreen({
         </>
       )}
 
-      {/* Progress bars */}
+      {/* ── Progress bars ── */}
       <div className="pointer-events-none absolute left-0 right-0 top-0 z-20 flex gap-1 px-3 pt-3">
         {Array.from({ length: total }).map((_, i) => (
-          <div key={i} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/30">
-            <div className="h-full rounded-full bg-white" style={{ width: i < idx ? "100%" : i === idx ? `${progress * 100}%` : "0%", transition: "none" }} />
+          <div key={i} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/25">
+            <div
+              className="h-full rounded-full bg-white"
+              style={{ width: i < idx ? "100%" : i === idx ? `${progress * 100}%` : "0%", transition: "none" }}
+            />
           </div>
         ))}
       </div>
 
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="pointer-events-none absolute left-0 right-0 top-8 z-20 flex items-center gap-3 px-3 pt-1">
-        <Avatar name={name} hue={hue} size={36} />
+        <Avatar name={name} hue={hue} size={36} src={show.profiles?.avatar_url ?? undefined} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="text-sm font-bold text-white">{name}</span>
-          <span className="text-xs text-white/60">{timeAgo(show.created_at)}</span>
+          <span className="text-sm font-bold text-white drop-shadow">{name}</span>
+          <span className="text-xs text-white/55">{timeAgo(show.created_at)}</span>
         </div>
 
-        {/* Owner actions button */}
         {isOwner && (
           <button
             type="button"
-            aria-label="Show options"
+            aria-label="Shot options"
             onClick={(e) => { e.stopPropagation(); setMenuOpen(true); setPaused(true); }}
             className="pointer-events-auto flex h-8 w-8 items-center justify-center text-white"
           >
@@ -289,7 +307,7 @@ function ShowScreen({
         </button>
       </div>
 
-      {/* Nav arrows */}
+      {/* ── Nav arrows ── */}
       {idx > 0 && !menuOpen && (
         <button type="button" onClick={(e) => { e.stopPropagation(); onPrev(); }}
           className="pointer-events-auto absolute left-2 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm">
@@ -303,64 +321,94 @@ function ShowScreen({
         </button>
       )}
 
-      {/* ── Instagram-style post card embed ── */}
-      {show.linked_post_id && linkedPost && !menuOpen && (
+      {/* ── Hypefy Post Embed Card ── */}
+      {show.linked_post_id && !menuOpen && (
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); openLinkedPost(); }}
-          className="pointer-events-auto absolute inset-x-8 z-30 overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform active:scale-[0.97]"
-          style={{ top: "18%", maxHeight: "58%" }}
+          className="pointer-events-auto absolute inset-x-6 z-30 overflow-hidden rounded-2xl border border-white/[0.12] bg-black/50 shadow-2xl backdrop-blur-2xl transition-transform active:scale-[0.97]"
+          style={{ top: "17%", maxHeight: "60%" }}
         >
-          {/* Card header — author row */}
-          <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2.5">
-            <Avatar
-              name={postAuthorName}
-              hue={postAuthorHue}
-              size={22}
-              src={linkedPost.profiles?.avatar_url ?? undefined}
-            />
-            <span className="flex-1 truncate text-xs font-bold text-gray-900">{postAuthorName}</span>
-            <ExternalLink size={13} className="shrink-0 text-gray-400" />
-          </div>
+          {linkedPost ? (
+            <>
+              {/* Author row */}
+              <div className="flex items-center gap-2.5 px-3.5 py-3">
+                <Avatar
+                  name={postAuthorName}
+                  hue={postAuthorHue}
+                  size={26}
+                  src={linkedPost.profiles?.avatar_url ?? undefined}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-bold leading-tight text-white">{postAuthorName}</p>
+                  {linkedPost.profiles?.username && (
+                    <p className="truncate text-[10px] text-white/45">@{linkedPost.profiles.username}</p>
+                  )}
+                </div>
+                {/* Hypefy badge */}
+                <span className="shrink-0 rounded-full border border-white/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-white/50">
+                  Hypefy
+                </span>
+              </div>
 
-          {/* The specific selected image (stored as show.media_url for linked-post shows) */}
-          {show.media_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={show.media_url} alt="Post" className="aspect-square w-full object-cover" />
+              {/* Divider */}
+              <div className="h-px bg-white/[0.08]" />
+
+              {/* Post image OR text preview */}
+              {hasEmbedImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={embedImage!}
+                  alt="Post"
+                  className="w-full object-cover"
+                  style={{ maxHeight: "52vw" }}
+                />
+              ) : (
+                <div className="flex min-h-[80px] items-center justify-center bg-white/[0.04] px-4 py-5">
+                  {linkedPost.caption ? (
+                    <p className="line-clamp-4 text-center text-sm leading-snug text-white/75">
+                      {linkedPost.caption}
+                    </p>
+                  ) : (
+                    <FileText size={28} className="text-white/20" />
+                  )}
+                </div>
+              )}
+
+              {/* Caption snippet (only when image is shown) */}
+              {hasEmbedImage && linkedPost.caption && (
+                <>
+                  <div className="h-px bg-white/[0.08]" />
+                  <p className="line-clamp-2 px-3.5 py-2.5 text-[12px] leading-snug text-white/70">
+                    {linkedPost.caption}
+                  </p>
+                </>
+              )}
+
+              {/* Footer CTA */}
+              <div className="flex items-center justify-between border-t border-white/[0.08] px-3.5 py-2.5">
+                <span className="text-[11px] font-semibold text-white/40">Tap to view post</span>
+                <ExternalLink size={13} className="text-white/40" />
+              </div>
+            </>
           ) : (
-            <div className="flex aspect-square w-full items-center justify-center bg-gray-50">
-              <Type size={28} className="text-gray-300" />
+            /* Post deleted / not loaded */
+            <div className="flex items-center justify-center gap-2 px-4 py-6">
+              <FileText size={18} className="text-white/30" />
+              <span className="text-sm text-white/40">Post no longer available</span>
             </div>
           )}
-
-          {/* Caption snippet */}
-          {linkedPost.caption && (
-            <p className="line-clamp-2 px-3 py-2 text-[11px] leading-snug text-gray-700">
-              {linkedPost.caption}
-            </p>
-          )}
-
-          {/* Footer */}
-          <div className="flex items-center justify-between border-t border-gray-100 px-3 py-2">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-              Hypefy Post
-            </span>
-            <span className="text-[10px] font-semibold text-blue-500">View post →</span>
-          </div>
         </button>
       )}
 
-      {/* Caption — shown below card for post-share shows, above reply bar otherwise */}
+      {/* ── Caption ── */}
       {show.caption && !menuOpen && (
-        <div
-          className="pointer-events-none absolute inset-x-4 z-20"
-          style={{ bottom: 96 }}
-        >
+        <div className="pointer-events-none absolute inset-x-4 z-20" style={{ bottom: 96 }}>
           <p className="text-sm text-white/90 drop-shadow">{show.caption}</p>
         </div>
       )}
 
-      {/* Reply + Hype bar */}
+      {/* ── Reply + Hype bar ── */}
       {!menuOpen && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/70 to-transparent px-3 pb-6 pt-12">
           <div className="pointer-events-auto flex items-center gap-3">
@@ -370,17 +418,24 @@ function ShowScreen({
               onClick={(e) => { e.stopPropagation(); setPaused(true); }}
               onBlur={() => setPaused(false)}
               placeholder={`Reply to ${name}…`}
-              className="h-11 flex-1 rounded-pill border border-white/30 bg-white/10 px-4 text-sm text-white outline-none backdrop-blur-sm placeholder:text-white/50"
+              className="h-11 flex-1 rounded-pill border border-white/25 bg-white/10 px-4 text-sm text-white outline-none backdrop-blur-sm placeholder:text-white/45"
             />
-            <button type="button" aria-label="Hype this Show" disabled={hypePending}
+            <button
+              type="button"
+              aria-label="Hype this Shot"
+              disabled={hypePending}
               onClick={(e) => { e.stopPropagation(); toggleShowHype(); }}
-              className="flex flex-col items-center gap-0.5 transition-transform active:scale-90 disabled:opacity-60">
+              className="flex flex-col items-center gap-0.5 transition-transform active:scale-90 disabled:opacity-60"
+            >
               <Star size={28} className={`transition-colors ${hyped ? "text-hype" : "text-white"}`} fill={hyped ? "currentColor" : "none"} />
               {hypeCount > 0 && <span className="text-[11px] font-semibold tabular-nums text-white">{hypeCount}</span>}
             </button>
-            <button type="button" aria-label="Send"
+            <button
+              type="button"
+              aria-label="Send reply"
               onClick={(e) => { e.stopPropagation(); setReply(""); }}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink">
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink"
+            >
               <Send size={18} />
             </button>
           </div>
@@ -390,12 +445,10 @@ function ShowScreen({
       {/* ── Owner actions menu ── */}
       {menuOpen && (
         <>
-          {/* Backdrop */}
           <div
             className="absolute inset-0 z-40"
             onClick={() => { setMenuOpen(false); setPaused(false); }}
           />
-          {/* Sheet */}
           <div className="absolute inset-x-4 bottom-8 z-50 overflow-hidden rounded-2xl bg-elevated/95 backdrop-blur-xl ring-1 ring-border">
             {/* Showcase toggle */}
             <button
@@ -430,14 +483,13 @@ function ShowScreen({
                 ? <Loader2 size={20} className="animate-spin" />
                 : <Trash2 size={20} />}
               <div>
-                <p className="text-sm font-semibold">Delete Show</p>
-                <p className="text-xs opacity-70">Removes this Show permanently</p>
+                <p className="text-sm font-semibold">Delete Shot</p>
+                <p className="text-xs opacity-70">Removes this Shot permanently</p>
               </div>
             </button>
 
             <div className="mx-4 h-px bg-border" />
 
-            {/* Cancel */}
             <button
               type="button"
               onClick={() => { setMenuOpen(false); setPaused(false); }}

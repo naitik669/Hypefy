@@ -28,7 +28,6 @@ export default async function PublicProfilePage({
   const supabase = await createClient();
   const { data: { user: currentUser } } = await supabase.auth.getUser();
 
-  // Look up the target profile
   const { data: profile } = await supabase
     .from("profiles")
     .select("*")
@@ -41,7 +40,6 @@ export default async function PublicProfilePage({
   const isOwn = currentUser?.id === profile.id;
   const stats = await fetchStats(supabase, profile.id);
 
-  // Check if current user follows this profile
   let isFollowing = false;
   if (currentUser && !isOwn) {
     const { data: followRow } = await supabase
@@ -58,13 +56,14 @@ export default async function PublicProfilePage({
   const bannerId = profile.banner_id ?? "lime-pulse";
   const tags: string[] = profile.profile_tags ?? [];
 
-  // Showcase shots (videos) + shows (stories)
+  // Showcase: pinned video shots + story-shots
   const [showcaseShotsRes, showcaseShowsRes] = await Promise.all([
     supabase.from("shots").select("id, media_url, caption").eq("user_id", profile.id).eq("in_showcase", true).order("created_at", { ascending: false }).limit(20),
     supabase.from("shows").select("id, media_url, caption").eq("user_id", profile.id).eq("is_showcase", true).order("created_at", { ascending: false }).limit(20),
   ]);
   const showcaseShots = showcaseShotsRes.data ?? [];
   const showcaseShows = showcaseShowsRes.error ? [] : (showcaseShowsRes.data ?? []);
+  const hasShowcase = showcaseShows.length > 0 || showcaseShots.length > 0;
 
   return (
     <>
@@ -103,32 +102,43 @@ export default async function PublicProfilePage({
           </div>
         )}
 
-        {/* Showcase — pinned Shows (stories) + Shots (videos) */}
-        {(showcaseShows.length > 0 || showcaseShots.length > 0) && (
+        {/* ── Showcase — only shown when visitor has items ── */}
+        {hasShowcase && (
           <div className="mt-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Showcase</p>
-            <div className="no-scrollbar flex gap-4 overflow-x-auto pb-1">
-              {/* Pinned Shows */}
+            <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
+              {/* Pinned story-shots */}
               {showcaseShows.map((show: any) => (
-                <Link key={show.id} href={`/shows/${show.id}`} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
-                  <div className="h-16 w-16 overflow-hidden rounded-full ring-2 ring-accent ring-offset-2 ring-offset-background">
+                <Link key={show.id} href={`/shows/${show.id}`} className="flex w-[72px] shrink-0 flex-col items-center gap-1.5">
+                  <div className="relative h-[72px] w-[72px] overflow-hidden rounded-2xl ring-2 ring-accent ring-offset-2 ring-offset-background">
                     {show.media_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={show.media_url} alt={show.caption ?? "Show"} className="h-full w-full object-cover" />
+                      <img src={show.media_url} alt={show.caption ?? "Shot"} className="h-full w-full object-cover" />
                     ) : (
                       <div className="h-full w-full bg-gradient-to-br from-accent/50 to-[hsl(280deg_70%_30%)]" />
                     )}
+                    <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">
+                      Shot
+                    </span>
                   </div>
-                  <span className="max-w-full truncate text-center text-[10px] text-muted leading-tight">{show.caption ?? "Show"}</span>
+                  <span className="max-w-full truncate text-center text-[10px] leading-tight text-muted">
+                    {show.caption ?? "Shot"}
+                  </span>
                 </Link>
               ))}
-              {/* Pinned Shots */}
+
+              {/* Pinned video shots */}
               {showcaseShots.map((shot: any) => (
-                <Link key={shot.id} href="/shots" className="flex w-16 shrink-0 flex-col items-center gap-1.5">
-                  <div className="h-16 w-16 overflow-hidden rounded-full ring-2 ring-border ring-offset-2 ring-offset-background">
+                <Link key={shot.id} href={`/shots/${shot.id}`} className="flex w-[72px] shrink-0 flex-col items-center gap-1.5">
+                  <div className="relative h-[72px] w-[72px] overflow-hidden rounded-2xl ring-2 ring-border ring-offset-2 ring-offset-background">
                     <video src={shot.media_url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+                    <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">
+                      Reel
+                    </span>
                   </div>
-                  <span className="max-w-full truncate text-center text-[10px] text-muted">{shot.caption ?? "Shot"}</span>
+                  <span className="max-w-full truncate text-center text-[10px] leading-tight text-muted">
+                    {shot.caption ?? "Shot"}
+                  </span>
                 </Link>
               ))}
             </div>
