@@ -25,7 +25,9 @@ export type Reel = {
 };
 
 /**
- * Shots = Reels. Full-screen vertical, snap-scrolling autoplay video feed.
+ * Shots = Reels. Full-screen vertical autoplay feed.
+ * Uses JS-controlled swipe so each gesture advances exactly ONE reel —
+ * native scroll momentum cannot skip multiple shots.
  */
 export function ReelsFeed({
   reels,
@@ -35,17 +37,42 @@ export function ReelsFeed({
   currentUserId: string | null;
 }) {
   const [muted, setMuted] = useState(true);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const swipeTouchStartY = useRef(0);
+
+  function onSwipeTouchStart(e: React.TouchEvent) {
+    swipeTouchStartY.current = e.touches[0].clientY;
+  }
+  function onSwipeTouchEnd(e: React.TouchEvent) {
+    const dy = swipeTouchStartY.current - e.changedTouches[0].clientY;
+    if (Math.abs(dy) < 40) return; // too small — treat as tap, not swipe
+    // Move exactly ONE reel regardless of velocity
+    setActiveIdx((i) =>
+      dy > 0 ? Math.min(i + 1, reels.length - 1) : Math.max(i - 1, 0),
+    );
+  }
 
   return (
-    <div className="fixed inset-x-0 top-0 bottom-[72px] z-10 mx-auto max-w-[480px] snap-y snap-mandatory overflow-y-scroll bg-black no-scrollbar">
-      {reels.map((reel) => (
-        <ReelCard
+    <div
+      className="fixed inset-x-0 top-0 bottom-[72px] z-10 mx-auto max-w-[480px] overflow-hidden bg-black"
+      onTouchStart={onSwipeTouchStart}
+      onTouchEnd={onSwipeTouchEnd}
+    >
+      {/* Absolute-positioned reels: each fills the container, translated by index offset */}
+      {reels.map((reel, i) => (
+        <div
           key={reel.id}
-          reel={reel}
-          currentUserId={currentUserId}
-          muted={muted}
-          onToggleMute={() => setMuted((m) => !m)}
-        />
+          className={`absolute inset-0 transition-transform duration-300 ease-out will-change-transform ${i === activeIdx ? "" : "pointer-events-none"}`}
+          style={{ transform: `translateY(calc(${i - activeIdx} * 100%))` }}
+        >
+          <ReelCard
+            reel={reel}
+            currentUserId={currentUserId}
+            muted={muted}
+            onToggleMute={() => setMuted((m) => !m)}
+            isActive={i === activeIdx}
+          />
+        </div>
       ))}
     </div>
   );
@@ -56,11 +83,13 @@ function ReelCard({
   currentUserId,
   muted,
   onToggleMute,
+  isActive,
 }: {
   reel: Reel;
   currentUserId: string | null;
   muted: boolean;
   onToggleMute: () => void;
+  isActive: boolean;
 }) {
   const supabase = createClient();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -87,23 +116,18 @@ function ReelCard({
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTap = useRef(0);
 
-  // Autoplay when scrolled into view; pause otherwise.
+  // Autoplay the active reel; pause all others.
+  // isActive is driven by the parent's JS-controlled index — no IntersectionObserver needed.
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.intersectionRatio >= 0.6) {
-          el.play().then(() => setPlaying(true)).catch(() => {});
-        } else {
-          el.pause();
-        }
-      },
-      { threshold: [0, 0.6, 1] },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+    if (isActive) {
+      el.play().then(() => setPlaying(true)).catch(() => {});
+    } else {
+      el.pause();
+      setPlaying(false);
+    }
+  }, [isActive]);
 
   // Load hype + saved state for the current user.
   useEffect(() => {
@@ -235,7 +259,7 @@ function ReelCard({
   }
 
   return (
-    <section className="relative h-full w-full snap-start snap-always">
+    <section className="relative h-full w-full">
       <video
         ref={videoRef}
         src={reel.media_url}

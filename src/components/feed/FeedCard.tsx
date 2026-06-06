@@ -71,12 +71,29 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const [savePending, setSavePending] = useState(false);
 
   const [imgIdx, setImgIdx] = useState(0);
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  function onGalleryScroll() {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const i = Math.round(el.scrollLeft / el.clientWidth);
-    setImgIdx((prev) => (i !== prev ? i : prev));
+  // JS-controlled swipe: one image per gesture, no native scroll momentum
+  const galleryTouchStartX = useRef(0);
+  const galleryIsTouchEvent = useRef(false);
+
+  function onGalleryTouchStart(e: React.TouchEvent) {
+    galleryTouchStartX.current = e.touches[0].clientX;
+    galleryIsTouchEvent.current = true;
+  }
+  function onGalleryTouchEnd(e: React.TouchEvent) {
+    const dx = galleryTouchStartX.current - e.changedTouches[0].clientX;
+    if (Math.abs(dx) >= 30) {
+      // Swipe detected — advance exactly ONE image regardless of velocity
+      setImgIdx((i) =>
+        dx > 0 ? Math.min(i + 1, images.length - 1) : Math.max(i - 1, 0),
+      );
+    } else {
+      handleImageTap(); // small move = tap
+    }
+  }
+  function onGalleryClick() {
+    // On touch devices onTouchEnd already handled the tap; skip click synthesis.
+    if (galleryIsTouchEvent.current) return;
+    handleImageTap(); // desktop mouse click
   }
   const [toast, setToast] = useState<string | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -224,18 +241,19 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
 
       {/* Image gallery â€” swipe/scroll between images; double-tap to Hype */}
       {images.length > 0 && (
-        <div className="relative mx-4 overflow-hidden rounded-2xl">
+        <div
+          className="relative mx-4 overflow-hidden rounded-2xl"
+          onTouchStart={onGalleryTouchStart}
+          onTouchEnd={onGalleryTouchEnd}
+          onClick={onGalleryClick}
+        >
+          {/* Transform-based slide — no native scroll so velocity cannot skip frames */}
           <div
-            ref={scrollerRef}
-            onScroll={onGalleryScroll}
-            className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto"
+            className="flex transition-transform duration-300 ease-out will-change-transform"
+            style={{ transform: `translateX(-${imgIdx * 100}%)` }}
           >
             {images.map((src, i) => (
-              <div
-                key={i}
-                onClick={handleImageTap}
-                className="w-full shrink-0 cursor-pointer snap-center snap-always select-none"
-              >
+              <div key={i} className="w-full shrink-0 select-none">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={src} alt={post.caption ?? "Post"} className="aspect-square w-full object-cover" draggable={false} loading="lazy" decoding="async" />
               </div>
@@ -275,7 +293,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
                   <button
                     key={i}
                     type="button"
-                    onClick={() => scrollerRef.current?.scrollTo({ left: i * scrollerRef.current.clientWidth, behavior: "smooth" })}
+                    onClick={(e) => { e.stopPropagation(); setImgIdx(i); }}
                     className={`h-1.5 rounded-full transition-all ${i === imgIdx ? "w-4 bg-white" : "w-1.5 bg-white/50"}`}
                   />
                 ))}
