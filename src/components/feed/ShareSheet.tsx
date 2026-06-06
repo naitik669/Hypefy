@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Link2, PlusCircle, Repeat2, Check, Search, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link2, PlusCircle, Repeat2, Check, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
@@ -18,12 +18,17 @@ export function ShareSheet({
   onClose,
   postId,
   targetType = "post",
+  /** All image URLs for the post (enables square picker + index badge) */
+  imageUrls,
+  /** Which image was visible when share was opened — pre-selects that slot */
+  initialImageIdx = 0,
 }: {
   open: boolean;
   onClose: () => void;
   postId: string;
-  /** Share a post (default) or a shot/reel. */
   targetType?: "post" | "shot";
+  imageUrls?: string[];
+  initialImageIdx?: number;
 }) {
   const supabase = createClient();
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -36,6 +41,15 @@ export function ShareSheet({
   const [shotAdded, setShotAdded] = useState(false);
   const [sendingDm, setSendingDm] = useState(false);
   const [dmDone, setDmDone] = useState(false);
+
+  // Which image slot is selected for the Shot embed
+  const [selectedIdx, setSelectedIdx] = useState(initialImageIdx);
+  const imgSwipeStartX = useRef(0);
+
+  // Reset selected index when sheet opens with a new post/image
+  useEffect(() => {
+    if (open) setSelectedIdx(initialImageIdx);
+  }, [open, initialImageIdx]);
 
   useEffect(() => {
     if (!open) return;
@@ -108,8 +122,7 @@ export function ShareSheet({
 
   /**
    * Share post/shot to the user's Shot (story-style 24h content).
-   * For posts: stores linked_post_id so the viewer renders a proper embed card.
-   * For shots: copies media_url as a reference clip.
+   * Uses the currently selected image slot as the thumbnail/embed frame.
    */
   async function shareToShot() {
     if (addingShot || shotAdded) return;
@@ -119,30 +132,36 @@ export function ShareSheet({
       if (!user) return;
 
       if (targetType === "shot") {
-        // Sharing a Shot — copy its media as a clip
+        // Sharing a Shot -- copy its media as a clip
         const { data } = await supabase.from("shots").select("media_url").eq("id", postId).maybeSingle();
         const mediaUrl = data?.media_url ?? null;
         if (!mediaUrl) return;
         await supabase.from("shows").insert({ user_id: user.id, media_url: mediaUrl });
       } else {
-        // Sharing a Post — store linked_post_id so ShowViewer renders an embed card
-        const { data } = await supabase
-          .from("posts")
-          .select("image_url, image_urls")
-          .eq("id", postId)
-          .maybeSingle();
-        const mediaUrl =
-          (data?.image_urls as string[] | null)?.[0] ?? data?.image_url ?? null;
+        // Sharing a Post -- use the selected image slot as media_url thumbnail
+        const mediaUrl = imageUrls?.[selectedIdx] ?? imageUrls?.[0] ?? null;
 
-        // Try with linked_post_id (requires migration); fall back to media-only if column missing
+        // If we couldn't derive from passed images, fall back to fetching from DB
+        const resolvedUrl = mediaUrl ?? await (async () => {
+          const { data } = await supabase
+            .from("posts")
+            .select("image_url, image_urls")
+            .eq("id", postId)
+            .maybeSingle();
+          return (data?.image_urls as string[] | null)?.[selectedIdx]
+            ?? (data?.image_urls as string[] | null)?.[0]
+            ?? data?.image_url
+            ?? null;
+        })();
+
+        // Try with linked_post_id; fall back gracefully if column not yet migrated
         const { error } = await supabase.from("shows").insert({
           user_id: user.id,
-          media_url: mediaUrl,
+          media_url: resolvedUrl,
           linked_post_id: postId,
         });
         if (error) {
-          // Graceful fallback — column not yet migrated
-          await supabase.from("shows").insert({ user_id: user.id, media_url: mediaUrl });
+          await supabase.from("shows").insert({ user_id: user.id, media_url: resolvedUrl });
         }
       }
 
@@ -184,21 +203,110 @@ export function ShareSheet({
     setTimeout(() => { setDmDone(false); setSent(new Set()); onClose(); }, 900);
   }
 
+  // Image picker helpers
+  const imgs = imageUrls ?? [];
+  const hasMultiple = imgs.length > 1;
+  const safeIdx = Math.min(selectedIdx, imgs.length - 1);
+  const currentUrl = imgs[safeIdx] ?? null;
+
+  function prevImg() { setSelectedIdx((i) => Math.max(i - 1, 0)); }
+  function nextImg() { setSelectedIdx((i) => Math.min(i + 1, imgs.length - 1)); }
+
   return (
     <BottomSheet open={open} onClose={onClose} title="Send to">
+
+      {/* Square image picker -- only for posts with images */}
+      {targetType === "post" && currentUrl && (
+        <div className="mb-4">
+          {/* Square image with prev/next taps + index badge */}
+          <div
+            className="relative mx-auto aspect-square w-full max-w-[220px] overflow-hidden rounded-2xl bg-surface"
+            onTouchStart={(e) => { imgSwipeStartX.current = e.touches[0].clientX; }}
+            onTouchEnd={(e) => {
+              const dx = imgSwipeStartX.current - e.changedTouches[0].clientX;
+              if (Math.abs(dx) >= 28) dx > 0 ? nextImg() : prevImg();
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={currentUrl}
+              alt="Selected frame"
+              className="h-full w-full object-cover transition-opacity duration-150"
+            />
+
+            {/* Index badge */}
+            {hasMultiple && (
+              <span className="absolute right-2 top-2 rounded-lg bg-black/60 px-2 py-0.5 text-xs font-bold text-white backdrop-blur-sm">
+                {safeIdx + 1}/{imgs.length}
+              </span>
+            )}
+
+            {/* Prev / Next tap zones */}
+            {hasMultiple && (
+              <>
+                {safeIdx > 0 && (
+                  <button
+                    type="button"
+                    onClick={prevImg}
+                    aria-label="Previous image"
+                    className="absolute inset-y-0 left-0 flex w-10 items-center justify-center bg-gradient-to-r from-black/30 to-transparent"
+                  >
+                    <ChevronLeft size={18} className="text-white drop-shadow" />
+                  </button>
+                )}
+                {safeIdx < imgs.length - 1 && (
+                  <button
+                    type="button"
+                    onClick={nextImg}
+                    aria-label="Next image"
+                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center bg-gradient-to-l from-black/30 to-transparent"
+                  >
+                    <ChevronRight size={18} className="text-white drop-shadow" />
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Dot indicators */}
+          {hasMultiple && (
+            <div className="mt-2 flex justify-center gap-1.5">
+              {imgs.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSelectedIdx(i)}
+                  aria-label={`Select image ${i + 1}`}
+                  className={`h-1.5 rounded-full transition-all duration-200 ${
+                    i === safeIdx ? "w-4 bg-accent" : "w-1.5 bg-foreground/20"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* "Choose which frame to share to Shot" hint */}
+          {hasMultiple && (
+            <p className="mt-1.5 text-center text-[11px] text-faint">
+              Tap arrows to pick which image goes to your Shot
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Search */}
       <div className="mb-3 flex h-10 items-center gap-2 rounded-pill border border-border bg-surface px-3 focus-within:border-accent/40">
         <Search size={15} className="shrink-0 text-faint" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search people…"
+          placeholder="Search people..."
           className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
         />
       </div>
 
       {/* Friends list */}
-      <div className="flex flex-col overflow-y-auto" style={{ maxHeight: "42dvh" }}>
+      <div className="flex flex-col overflow-y-auto" style={{ maxHeight: "36dvh" }}>
         {loading ? (
           <div className="flex items-center justify-center py-6">
             <Loader2 size={20} className="animate-spin text-muted" />
@@ -252,7 +360,7 @@ export function ShareSheet({
           className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-60"
         >
           {sendingDm ? (
-            <><Loader2 size={16} className="animate-spin" /> Sending…</>
+            <><Loader2 size={16} className="animate-spin" /> Sending...</>
           ) : dmDone ? (
             <><Check size={16} /> Sent</>
           ) : (
@@ -291,7 +399,7 @@ export function ShareSheet({
           </span>
         </button>
 
-        {/* Share to Shot — only available when sharing a post */}
+        {/* Share to Shot -- available for all post types */}
         {targetType === "post" && (
           <button
             type="button"

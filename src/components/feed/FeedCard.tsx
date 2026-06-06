@@ -355,7 +355,13 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         postId={post.id} postOwnerId={post.user_id} currentUserId={uid}
         onCountChange={(n) => setCommentCount(n)} />
 
-      <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} postId={post.id} />
+      <ShareSheet
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        postId={post.id}
+        imageUrls={images.length > 0 ? images : undefined}
+        initialImageIdx={imgIdx}
+      />
 
       {zoomOpen && images[imgIdx] && (
         <ZoomViewer src={images[imgIdx]} onClose={() => setZoomOpen(false)} />
