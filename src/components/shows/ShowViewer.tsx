@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  X, Send, Star, ChevronLeft, ChevronRight, ExternalLink,
+  X, Send, Star, ChevronLeft, ChevronRight, ExternalLink, Type,
   MoreHorizontal, Trash2, Bookmark, BookmarkCheck, Loader2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -141,7 +141,7 @@ function ShowScreen({
   const [hypePending, setHypePending] = useState(false);
 
   const linkedPost = show.linked_post ?? null;
-  const postThumb = linkedPost?.image_urls?.[0] ?? linkedPost?.image_url ?? null;
+
   const postAuthorName = linkedPost?.profiles?.display_name ?? linkedPost?.profiles?.username ?? "User";
   const postAuthorHue = linkedPost?.profiles?.avatar_hue ?? 280;
 
@@ -219,8 +219,10 @@ function ShowScreen({
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
-      {/* Background */}
-      {show.media_url ? (
+      {/* Background — dark gradient for post-share shows, image/gradient for own shows */}
+      {show.linked_post_id ? (
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0f0f1a] via-[#12122a] to-[#0a0a14]" />
+      ) : show.media_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={show.media_url} alt={show.caption ?? "Show"} className="absolute inset-0 h-full w-full object-cover" />
       ) : (
@@ -301,38 +303,59 @@ function ShowScreen({
         </button>
       )}
 
-      {/* Linked Post Embed */}
-      {linkedPost && !menuOpen && (
+      {/* ── Instagram-style post card embed ── */}
+      {show.linked_post_id && linkedPost && !menuOpen && (
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); openLinkedPost(); }}
-          className="pointer-events-auto absolute inset-x-4 z-30 flex items-center gap-3 overflow-hidden rounded-2xl bg-black/55 p-3 backdrop-blur-md ring-1 ring-white/15 transition-transform active:scale-[0.98]"
-          style={{ bottom: 96 }}
+          className="pointer-events-auto absolute inset-x-8 z-30 overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform active:scale-[0.97]"
+          style={{ top: "18%", maxHeight: "58%" }}
         >
-          {postThumb ? (
+          {/* Card header — author row */}
+          <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2.5">
+            <Avatar
+              name={postAuthorName}
+              hue={postAuthorHue}
+              size={22}
+              src={linkedPost.profiles?.avatar_url ?? undefined}
+            />
+            <span className="flex-1 truncate text-xs font-bold text-gray-900">{postAuthorName}</span>
+            <ExternalLink size={13} className="shrink-0 text-gray-400" />
+          </div>
+
+          {/* The specific selected image (stored as show.media_url for linked-post shows) */}
+          {show.media_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={postThumb} alt="Post" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+            <img src={show.media_url} alt="Post" className="aspect-square w-full object-cover" />
           ) : (
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl" style={{ background: `hsl(${postAuthorHue}deg 70% 30%)` }}>
-              <span className="text-lg font-bold text-white">{postAuthorName[0]?.toUpperCase()}</span>
+            <div className="flex aspect-square w-full items-center justify-center bg-gray-50">
+              <Type size={28} className="text-gray-300" />
             </div>
           )}
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <div className="flex items-center gap-1.5">
-              <Avatar name={postAuthorName} hue={postAuthorHue} size={16} src={linkedPost.profiles?.avatar_url ?? undefined} />
-              <span className="truncate text-xs font-semibold text-white/80">{postAuthorName}</span>
-            </div>
-            {linkedPost.caption
-              ? <p className="line-clamp-2 text-left text-xs leading-snug text-white/70">{linkedPost.caption}</p>
-              : <p className="text-xs italic text-white/50">View post</p>}
+
+          {/* Caption snippet */}
+          {linkedPost.caption && (
+            <p className="line-clamp-2 px-3 py-2 text-[11px] leading-snug text-gray-700">
+              {linkedPost.caption}
+            </p>
+          )}
+
+          {/* Footer */}
+          <div className="flex items-center justify-between border-t border-gray-100 px-3 py-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+              Hypefy Post
+            </span>
+            <span className="text-[10px] font-semibold text-blue-500">View post →</span>
           </div>
-          <ExternalLink size={16} className="shrink-0 text-white/60" />
         </button>
       )}
 
-      {/* Caption */}
+      {/* Caption — shown below card for post-share shows, above reply bar otherwise */}
       {show.caption && !menuOpen && (
-        <div className="pointer-events-none absolute inset-x-4 z-20" style={{ bottom: linkedPost ? 180 : 96 }}>
+        <div
+          className="pointer-events-none absolute inset-x-4 z-20"
+          style={{ bottom: 96 }}
+        >
           <p className="text-sm text-white/90 drop-shadow">{show.caption}</p>
         </div>
       )}
