@@ -2,19 +2,34 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Send, Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Send, Star, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 
 type ShowProfile = { display_name: string | null; avatar_hue: number | null; username: string | null } | null;
 
+type LinkedPost = {
+  id: string;
+  caption: string | null;
+  image_url: string | null;
+  image_urls?: string[] | null;
+  profiles: {
+    display_name: string | null;
+    username: string | null;
+    avatar_hue: number | null;
+    avatar_url?: string | null;
+  } | null;
+} | null;
+
 export type ShowItem = {
   id: string;
   user_id: string;
-  media_url: string;
+  media_url: string | null;
   caption: string | null;
   created_at: string;
   hype_count?: number;
+  linked_post_id?: string | null;
+  linked_post?: LinkedPost;
   profiles: ShowProfile;
 };
 
@@ -30,7 +45,6 @@ function timeAgo(iso: string) {
 
 /**
  * Shows = Stories. Full-screen, auto-advancing, ephemeral (24h) viewer.
- * One Show at a time; tap zones / arrows to navigate.
  */
 export function ShowViewer({
   shows,
@@ -88,6 +102,7 @@ function ShowScreen({
   onPrev: () => void;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const supabase = createClient();
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -102,6 +117,14 @@ function ShowScreen({
   const [hyped, setHyped] = useState(false);
   const [hypeCount, setHypeCount] = useState(show.hype_count ?? 0);
   const [hypePending, setHypePending] = useState(false);
+
+  // Resolve linked post thumbnail
+  const linkedPost = show.linked_post ?? null;
+  const postThumb =
+    linkedPost?.image_urls?.[0] ?? linkedPost?.image_url ?? null;
+  const postAuthorName =
+    linkedPost?.profiles?.display_name ?? linkedPost?.profiles?.username ?? "User";
+  const postAuthorHue = linkedPost?.profiles?.avatar_hue ?? 280;
 
   useEffect(() => {
     let active = true;
@@ -122,16 +145,13 @@ function ShowScreen({
       if (total.data) setHypeCount(total.data.hype_count ?? 0);
     }
     loadHype();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show.id, currentUserId]);
 
   async function toggleShowHype() {
     if (hypePending || !currentUserId) return;
-    const prev = hyped,
-      prevCount = hypeCount;
+    const prev = hyped, prevCount = hypeCount;
     setHypePending(true);
     setHyped(!prev);
     setHypeCount((c) => c + (prev ? -1 : 1));
@@ -175,24 +195,32 @@ function ShowScreen({
     return () => cancelAnimationFrame(rafRef.current);
   }, [show.id, paused, onNext]);
 
+  function openLinkedPost() {
+    if (!linkedPost) return;
+    setPaused(true);
+    router.push(`/p/${linkedPost.id}`);
+  }
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={show.media_url}
-        alt={show.caption ?? "Show"}
-        className="absolute inset-0 h-full w-full object-cover"
-      />
+      {/* Background — image or gradient for text-only shows */}
+      {show.media_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={show.media_url}
+          alt={show.caption ?? "Show"}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--color-accent)/0.4)] to-[hsl(280deg_80%_20%)]" />
+      )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
 
       {/* Tap zones */}
       <div
         className="absolute left-0 z-10 w-1/3"
         style={{ top: 88, bottom: 88 }}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!paused) onPrev();
-        }}
+        onClick={(e) => { e.stopPropagation(); if (!paused) onPrev(); }}
         onMouseDown={() => setPaused(true)}
         onMouseUp={() => setPaused(false)}
         onTouchStart={() => setPaused(true)}
@@ -201,10 +229,7 @@ function ShowScreen({
       <div
         className="absolute right-0 z-10 w-2/3"
         style={{ top: 88, bottom: 88 }}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!paused) onNext();
-        }}
+        onClick={(e) => { e.stopPropagation(); if (!paused) onNext(); }}
         onMouseDown={() => setPaused(true)}
         onMouseUp={() => setPaused(false)}
         onTouchStart={() => setPaused(true)}
@@ -236,10 +261,7 @@ function ShowScreen({
         <button
           type="button"
           aria-label="Close"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
           className="pointer-events-auto flex h-8 w-8 items-center justify-center text-white"
         >
           <X size={22} />
@@ -250,10 +272,7 @@ function ShowScreen({
       {idx > 0 && (
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onPrev();
-          }}
+          onClick={(e) => { e.stopPropagation(); onPrev(); }}
           className="pointer-events-auto absolute left-2 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
         >
           <ChevronLeft size={22} />
@@ -262,19 +281,64 @@ function ShowScreen({
       {idx < total - 1 && (
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onNext();
-          }}
+          onClick={(e) => { e.stopPropagation(); onNext(); }}
           className="pointer-events-auto absolute right-2 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
         >
           <ChevronRight size={22} />
         </button>
       )}
 
-      {/* Caption */}
+      {/* ── Linked Post Embed ── */}
+      {linkedPost && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); openLinkedPost(); }}
+          className="pointer-events-auto absolute inset-x-4 z-30 flex items-center gap-3 overflow-hidden rounded-2xl bg-black/55 p-3 backdrop-blur-md ring-1 ring-white/15 transition-transform active:scale-[0.98]"
+          style={{ bottom: 96 }}
+        >
+          {/* Thumbnail */}
+          {postThumb ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={postThumb}
+              alt="Post"
+              className="h-14 w-14 shrink-0 rounded-xl object-cover"
+            />
+          ) : (
+            <div
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl"
+              style={{ background: `hsl(${postAuthorHue}deg 70% 30%)` }}
+            >
+              <span className="text-lg font-bold text-white">{postAuthorName[0]?.toUpperCase()}</span>
+            </div>
+          )}
+
+          {/* Text info */}
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <div className="flex items-center gap-1.5">
+              <Avatar name={postAuthorName} hue={postAuthorHue} size={16} src={linkedPost.profiles?.avatar_url ?? undefined} />
+              <span className="truncate text-xs font-semibold text-white/80">{postAuthorName}</span>
+            </div>
+            {linkedPost.caption ? (
+              <p className="line-clamp-2 text-left text-xs leading-snug text-white/70">
+                {linkedPost.caption}
+              </p>
+            ) : (
+              <p className="text-xs text-white/50 italic">View post</p>
+            )}
+          </div>
+
+          {/* Chevron */}
+          <ExternalLink size={16} className="shrink-0 text-white/60" />
+        </button>
+      )}
+
+      {/* Caption — sits above reply bar (or above embed if linked post) */}
       {show.caption && (
-        <div className="pointer-events-none absolute inset-x-4 bottom-24 z-20">
+        <div
+          className="pointer-events-none absolute inset-x-4 z-20"
+          style={{ bottom: linkedPost ? 180 : 96 }}
+        >
           <p className="text-sm text-white/90 drop-shadow">{show.caption}</p>
         </div>
       )}
@@ -285,10 +349,7 @@ function ShowScreen({
           <input
             value={reply}
             onChange={(e) => setReply(e.target.value)}
-            onClick={(e) => {
-              e.stopPropagation();
-              setPaused(true);
-            }}
+            onClick={(e) => { e.stopPropagation(); setPaused(true); }}
             onBlur={() => setPaused(false)}
             placeholder={`Reply to ${name}…`}
             className="h-11 flex-1 rounded-pill border border-white/30 bg-white/10 px-4 text-sm text-white outline-none backdrop-blur-sm placeholder:text-white/50"
@@ -297,10 +358,7 @@ function ShowScreen({
             type="button"
             aria-label="Hype this Show"
             disabled={hypePending}
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleShowHype();
-            }}
+            onClick={(e) => { e.stopPropagation(); toggleShowHype(); }}
             className="flex flex-col items-center gap-0.5 transition-transform active:scale-90 disabled:opacity-60"
           >
             <Star
@@ -315,10 +373,7 @@ function ShowScreen({
           <button
             type="button"
             aria-label="Send"
-            onClick={(e) => {
-              e.stopPropagation();
-              setReply("");
-            }}
+            onClick={(e) => { e.stopPropagation(); setReply(""); }}
             className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink"
           >
             <Send size={18} />

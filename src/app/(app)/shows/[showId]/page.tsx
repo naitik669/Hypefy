@@ -23,16 +23,33 @@ export default async function ShowPage({
   if (!target) notFound();
 
   // 2. Fetch all active Shows from the same user (for swipe navigation)
+  //    Join linked_post so the viewer can render the embed card without extra fetches.
   const { data: raw } = await supabase
     .from("shows")
-    .select("id, user_id, media_url, caption, created_at, hype_count, profiles(display_name, avatar_hue, username)")
+    .select(`
+      id, user_id, media_url, caption, created_at, hype_count, linked_post_id,
+      profiles(display_name, avatar_hue, username),
+      linked_post:posts(
+        id, caption, image_url, image_urls,
+        profiles(display_name, username, avatar_hue, avatar_url)
+      )
+    `)
     .eq("user_id", target.user_id)
     .gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: true });
 
-  const shows = (raw ?? []).map((s) => ({
+  const shows = (raw ?? []).map((s: any) => ({
     ...s,
     profiles: Array.isArray(s.profiles) ? s.profiles[0] ?? null : s.profiles,
+    linked_post: s.linked_post
+      ? {
+          ...(Array.isArray(s.linked_post) ? s.linked_post[0] : s.linked_post),
+          profiles: (() => {
+            const lp = Array.isArray(s.linked_post) ? s.linked_post[0] : s.linked_post;
+            return Array.isArray(lp?.profiles) ? lp.profiles[0] ?? null : lp?.profiles ?? null;
+          })(),
+        }
+      : null,
   }));
 
   if (shows.length === 0) notFound();
