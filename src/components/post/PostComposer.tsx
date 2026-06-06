@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, X, Loader2, Send, Crop, Plus } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { Image as ImageIcon, X, Send, Crop, Plus } from "lucide-react";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { ImageCropper } from "@/components/post/ImageCropper";
+import { useUpload } from "@/components/upload/UploadProvider";
 
 const MAX_SIZE_MB = 10;
 const MAX_IMAGES = 10;
@@ -16,7 +16,7 @@ type Img = { id: string; file: File; url: string; origSrc: string };
 
 export function PostComposer({ userId }: { userId: string }) {
   const router = useRouter();
-  const supabase = createClient();
+  const { uploadPost } = useUpload();
   const fileRef = useRef<HTMLInputElement>(null);
   const queueRef = useRef<{ id: string; origSrc: string }[]>([]);
 
@@ -25,8 +25,7 @@ export function PostComposer({ userId }: { userId: string }) {
   const [caption, setCaption] = useState("");
   const [body, setBody] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
-  const [postError, setPostError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [submitted, setSubmitted] = useState(false);
 
   const hashtags = extractHashtags(caption + " " + body);
   const mentions = extractMentions(caption + " " + body);
@@ -106,39 +105,19 @@ export function PostComposer({ userId }: { userId: string }) {
   }
 
   function handlePost() {
-    setPostError(null);
-    startTransition(async () => {
-      const urls: string[] = [];
-      for (let i = 0; i < imgs.length; i++) {
-        const path = `${userId}/${Date.now()}-${i}.jpg`;
-        const { error: uploadErr } = await supabase.storage
-          .from("post-images")
-          .upload(path, imgs[i].file, { contentType: "image/jpeg", upsert: false });
-        if (uploadErr) {
-          setPostError("Image upload failed: " + uploadErr.message);
-          return;
-        }
-        urls.push(supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl);
-      }
-
-      const { error: insertErr } = await supabase.from("posts").insert({
-        user_id: userId,
-        caption: caption.trim() || null,
-        body: body.trim() || null,
-        image_url: urls[0] ?? null,
-        image_urls: urls.length ? urls : null,
-        hashtags,
-        mentions,
-      });
-
-      if (insertErr) {
-        setPostError(insertErr.message);
-        return;
-      }
-
-      router.push("/home");
-      router.refresh();
+    if (submitted || !canPost) return;
+    setSubmitted(true);
+    // Hand off to the global uploader so it keeps running after we navigate —
+    // Home shows a progress bar + a "Post shared" toast when it finishes.
+    uploadPost({
+      userId,
+      files: imgs.map((i) => i.file),
+      caption: caption.trim() || null,
+      body: body.trim() || null,
+      hashtags,
+      mentions,
     });
+    router.push("/home");
   }
 
   return (
@@ -256,24 +235,14 @@ export function PostComposer({ userId }: { userId: string }) {
 
       <p className="text-xs text-faint">Use # to add hashtags · @ to mention someone</p>
 
-      {postError && <p className="rounded-xl bg-danger/10 px-3 py-2 text-xs text-danger">{postError}</p>}
-
       {/* Post button */}
       <button
         type="button"
         onClick={handlePost}
-        disabled={!canPost || pending}
+        disabled={!canPost || submitted}
         className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-accent text-base font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-50"
       >
-        {pending ? (
-          <>
-            <Loader2 size={18} className="animate-spin" /> Posting…
-          </>
-        ) : (
-          <>
-            <Send size={18} /> Post
-          </>
-        )}
+        <Send size={18} /> {submitted ? "Sharing…" : "Post"}
       </button>
     </div>
   );

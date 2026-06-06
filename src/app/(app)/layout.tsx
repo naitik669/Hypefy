@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profile";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { CallProvider } from "@/components/calls/CallProvider";
+import { UploadProvider } from "@/components/upload/UploadProvider";
 
 /**
  * Shell for the signed-in app: a mobile-first centered column with a
@@ -23,10 +24,12 @@ export default async function AppLayout({
 
   return (
     <CallProvider userId={user!.id}>
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
-        <div className="flex-1 pb-[84px]">{children}</div>
-        <BottomNav />
-      </div>
+      <UploadProvider>
+        <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
+          <div className="flex-1 pb-[84px]">{children}</div>
+          <BottomNav />
+        </div>
+      </UploadProvider>
     </CallProvider>
   );
 }

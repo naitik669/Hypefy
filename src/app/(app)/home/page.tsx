@@ -5,6 +5,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { ShowsRow } from "@/components/home/ShowsRow";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FeedCard } from "@/components/feed/FeedCard";
+import { UploadProgressBar } from "@/components/upload/UploadProvider";
 
 function normalise(raw: unknown[] | null) {
   return (raw ?? []).map((p: any) => ({
@@ -117,6 +118,7 @@ export default async function HomePage() {
     <>
       <TopBar />
       <ShowsRow shows={shows} currentUser={currentUserForRow} />
+      <UploadProgressBar />
 
       {posts.length === 0 ? (
         <EmptyState
