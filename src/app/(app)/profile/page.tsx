@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, hueFromId } from "@/lib/profile";
 import { AvatarImg } from "@/components/ui/AvatarImg";
@@ -25,10 +25,10 @@ export default async function ProfilePage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [profile, stats, showcaseRes] = await Promise.all([
+  const [profile, stats, showcaseShotsRes, showcaseShowsRes] = await Promise.all([
     getProfile(supabase),
     fetchStats(supabase, user.id),
-    // Showcase shots — no expires_at filter (they persist on profile)
+    // Showcase shots (videos) — no expires_at filter
     supabase
       .from("shots")
       .select("id, media_url, caption")
@@ -36,9 +36,19 @@ export default async function ProfilePage() {
       .eq("in_showcase", true)
       .order("created_at", { ascending: false })
       .limit(20),
+    // Showcase shows (stories) — persisted, no expiry filter
+    supabase
+      .from("shows")
+      .select("id, media_url, caption")
+      .eq("user_id", user.id)
+      .eq("is_showcase", true)
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
 
-  const showcaseShots = showcaseRes.data ?? [];
+  const showcaseShots = showcaseShotsRes.data ?? [];
+  // Graceful fallback: is_showcase column may not exist yet
+  const showcaseShows = showcaseShowsRes.error ? [] : (showcaseShowsRes.data ?? []);
 
   const name = profile?.displayName || "Hypefy User";
   const handle = profile?.username ? `@${profile.username}` : null;
@@ -85,43 +95,47 @@ export default async function ProfilePage() {
           </div>
         )}
 
-        {/* Showcase row (Instagram-style highlights) */}
-        {showcaseShots.length > 0 && (
+        {/* Showcase row — shows + shots pinned to profile */}
+        {(showcaseShows.length > 0 || showcaseShots.length > 0) && (
           <div className="mt-4">
             <p className="mb-2 text-xs font-semibold text-muted tracking-wide uppercase">Showcase</p>
             <div className="no-scrollbar flex gap-4 overflow-x-auto pb-1">
+              {/* Pinned Shows (stories) */}
+              {showcaseShows.map((show: any) => (
+                <Link
+                  key={show.id}
+                  href={`/shows/${show.id}`}
+                  className="flex w-16 shrink-0 flex-col items-center gap-1.5"
+                >
+                  <div className="h-16 w-16 overflow-hidden rounded-full ring-2 ring-accent ring-offset-2 ring-offset-background">
+                    {show.media_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={show.media_url} alt={show.caption ?? "Show"} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full bg-gradient-to-br from-accent/50 to-[hsl(280deg_70%_30%)]" />
+                    )}
+                  </div>
+                  <span className="max-w-full truncate text-center text-[10px] text-muted leading-tight">
+                    {show.caption ?? "Show"}
+                  </span>
+                </Link>
+              ))}
+
+              {/* Pinned Shots (videos) */}
               {showcaseShots.map((shot) => (
                 <Link
                   key={shot.id}
                   href="/shots"
                   className="flex w-16 shrink-0 flex-col items-center gap-1.5"
                 >
-                  {/* Circular video thumbnail with accent ring */}
-                  <div className="h-16 w-16 overflow-hidden rounded-full ring-2 ring-accent ring-offset-2 ring-offset-background">
-                    <video
-                      src={shot.media_url}
-                      className="h-full w-full object-cover"
-                      muted
-                      playsInline
-                      preload="metadata"
-                    />
+                  <div className="h-16 w-16 overflow-hidden rounded-full ring-2 ring-border ring-offset-2 ring-offset-background">
+                    <video src={shot.media_url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
                   </div>
                   <span className="max-w-full truncate text-center text-[10px] text-muted leading-tight">
                     {shot.caption ?? "Shot"}
                   </span>
                 </Link>
               ))}
-
-              {/* Add to Showcase shortcut */}
-              <Link
-                href="/shows/add"
-                className="flex w-16 shrink-0 flex-col items-center gap-1.5"
-              >
-                <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-border bg-surface">
-                  <Plus size={22} className="text-faint" />
-                </div>
-                <span className="text-[10px] text-faint">Add</span>
-              </Link>
             </div>
           </div>
         )}

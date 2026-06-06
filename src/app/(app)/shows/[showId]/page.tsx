@@ -30,7 +30,7 @@ export default async function ShowPage({
   const enhanced = await supabase
     .from("shows")
     .select(`
-      id, user_id, media_url, caption, created_at, hype_count, linked_post_id,
+      id, user_id, media_url, caption, created_at, hype_count, linked_post_id, is_showcase,
       profiles(display_name, avatar_hue, username),
       linked_post:posts(
         id, caption, image_url, image_urls,
