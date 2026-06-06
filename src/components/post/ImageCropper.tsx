@@ -4,18 +4,23 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Check, Loader2 } from "lucide-react";
 
-const OUT = 1080; // exported square size
+const OUT = 1080; // exported width
 
 /**
- * Square image cropper. Pan (drag / one finger), zoom (pinch / wheel / slider),
- * then exports a centred square crop as a JPEG blob via canvas.
+ * Image cropper. Pan (drag / one finger), zoom (pinch / wheel / slider), then
+ * exports a centred crop as a JPEG blob via canvas. `aspect` = width / height
+ * (1 = square avatar, 3 = wide banner, …).
  */
 export function ImageCropper({
   src,
+  aspect = 1,
+  label = "Crop",
   onCancel,
   onDone,
 }: {
   src: string;
+  aspect?: number;
+  label?: string;
   onCancel: () => void;
   onDone: (blob: Blob, url: string) => void;
 }) {
@@ -43,14 +48,15 @@ export function ImageCropper({
     if (frameRef.current) setD(frameRef.current.clientWidth);
   }, [nat]);
 
-  const cover = nat && D ? D / Math.min(nat.w, nat.h) : 1;
+  const Dh = D / aspect; // frame height
+  const cover = nat && D ? Math.max(D / nat.w, Dh / nat.h) : 1;
   const dispScale = cover * scale;
   const dispW = nat ? nat.w * dispScale : 0;
   const dispH = nat ? nat.h * dispScale : 0;
 
   function clamp(x: number, y: number) {
     const maxX = Math.max(0, (dispW - D) / 2);
-    const maxY = Math.max(0, (dispH - D) / 2);
+    const maxY = Math.max(0, (dispH - Dh) / 2);
     return { x: Math.max(-maxX, Math.min(maxX, x)), y: Math.max(-maxY, Math.min(maxY, y)) };
   }
 
@@ -99,20 +105,23 @@ export function ImageCropper({
     if (!img || !nat || busy) return;
     setBusy(true);
     const imgLeft = (D - dispW) / 2 + t.x;
-    const imgTop = (D - dispH) / 2 + t.y;
-    const sSize = D / dispScale;
-    const sx = Math.max(0, Math.min(nat.w - sSize, -imgLeft / dispScale));
-    const sy = Math.max(0, Math.min(nat.h - sSize, -imgTop / dispScale));
+    const imgTop = (Dh - dispH) / 2 + t.y;
+    const sW = D / dispScale;
+    const sH = Dh / dispScale;
+    const sx = Math.max(0, Math.min(nat.w - sW, -imgLeft / dispScale));
+    const sy = Math.max(0, Math.min(nat.h - sH, -imgTop / dispScale));
 
+    const outW = OUT;
+    const outH = Math.round(OUT / aspect);
     const canvas = document.createElement("canvas");
-    canvas.width = OUT;
-    canvas.height = OUT;
+    canvas.width = outW;
+    canvas.height = outH;
     const ctx = canvas.getContext("2d");
     if (!ctx) {
       setBusy(false);
       return;
     }
-    ctx.drawImage(img, sx, sy, sSize, sSize, 0, 0, OUT, OUT);
+    ctx.drawImage(img, sx, sy, sW, sH, 0, 0, outW, outH);
     canvas.toBlob(
       (blob) => {
         if (blob) onDone(blob, URL.createObjectURL(blob));
@@ -132,7 +141,7 @@ export function ImageCropper({
         <button type="button" onClick={onCancel} aria-label="Cancel" className="flex h-9 w-9 items-center justify-center text-white">
           <X size={24} />
         </button>
-        <span className="text-base font-bold text-white">Crop</span>
+        <span className="text-base font-bold text-white">{label}</span>
         <button
           type="button"
           onClick={done}
@@ -148,7 +157,8 @@ export function ImageCropper({
       <div className="flex flex-1 items-center justify-center px-5">
         <div
           ref={frameRef}
-          className="relative aspect-square w-full max-w-[min(88vw,420px)] select-none touch-none overflow-hidden rounded-2xl bg-[#0f0f0f]"
+          style={{ aspectRatio: String(aspect) }}
+          className="relative w-full max-w-[min(88vw,420px)] select-none touch-none overflow-hidden rounded-2xl bg-[#0f0f0f]"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -167,7 +177,7 @@ export function ImageCropper({
               className="pointer-events-none absolute max-w-none select-none"
               style={{
                 left: (D - dispW) / 2,
-                top: (D - dispH) / 2,
+                top: (Dh - dispH) / 2,
                 width: dispW,
                 height: dispH,
                 transform: `translate(${t.x}px, ${t.y}px)`,

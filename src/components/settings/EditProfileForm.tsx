@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { BannerPicker } from "@/components/profile/BannerPicker";
+import { ImageCropper } from "@/components/post/ImageCropper";
 import { PROFILE_TAGS, DEFAULT_BANNER_ID } from "@/lib/profile";
 import { updateProfile } from "@/app/(app)/settings/profile/actions";
 
@@ -50,6 +51,8 @@ export function EditProfileForm({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bannerRef = useRef<HTMLInputElement>(null);
+  // Crop step: holds the picked image's object URL + which target it's for.
+  const [cropper, setCropper] = useState<{ src: string; aspect: number; kind: "avatar" | "banner" } | null>(null);
 
   function onUsernameChange(raw: string) {
     const u = raw.toLowerCase().replace(/[^a-z0-9_.]/g, "");
@@ -67,7 +70,8 @@ export function EditProfileForm({
     }, 450);
   }
 
-  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+  // Pick a file → validate → open the crop step (square for avatar, wide for banner).
+  function pickImage(e: React.ChangeEvent<HTMLInputElement>, kind: "avatar" | "banner") {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
@@ -75,54 +79,35 @@ export function EditProfileForm({
       setError("Use a JPG, PNG, or WebP image.");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image must be under 5MB.");
+    const max = kind === "banner" ? 8 : 5;
+    if (file.size > max * 1024 * 1024) {
+      setError(`Image must be under ${max}MB.`);
       return;
     }
     setError(null);
-    setUploading(true);
-    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-    const path = `${userId}/avatar-${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage
-      .from("avatars")
-      .upload(path, file, { upsert: true, cacheControl: "3600" });
-    if (upErr) {
-      setError(upErr.message);
-      setUploading(false);
-      return;
-    }
-    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-    setAvatarUrl(data.publicUrl);
-    setUploading(false);
+    setCropper({ src: URL.createObjectURL(file), aspect: kind === "banner" ? 3 : 1, kind });
   }
 
-  async function onPickBanner(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setError("Use a JPG, PNG, or WebP image.");
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      setError("Banner must be under 8MB.");
-      return;
-    }
-    setError(null);
-    setBannerUploading(true);
-    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-    const path = `${userId}/banner-${Date.now()}.${ext}`;
+  // Crop done → upload the cropped square/wide JPEG to the right bucket.
+  async function onCropDone(blob: Blob) {
+    if (!cropper) return;
+    const { kind } = cropper;
+    URL.revokeObjectURL(cropper.src);
+    setCropper(null);
+    const bucket = kind === "banner" ? "banners" : "avatars";
+    const path = `${userId}/${kind}-${Date.now()}.jpg`;
+    kind === "banner" ? setBannerUploading(true) : setUploading(true);
     const { error: upErr } = await supabase.storage
-      .from("banners")
-      .upload(path, file, { upsert: true, cacheControl: "3600" });
+      .from(bucket)
+      .upload(path, blob, { upsert: true, cacheControl: "3600", contentType: "image/jpeg" });
     if (upErr) {
       setError(upErr.message);
-      setBannerUploading(false);
-      return;
+    } else {
+      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+      if (kind === "banner") setBannerUrl(data.publicUrl);
+      else setAvatarUrl(data.publicUrl);
     }
-    const { data } = supabase.storage.from("banners").getPublicUrl(path);
-    setBannerUrl(data.publicUrl);
-    setBannerUploading(false);
+    kind === "banner" ? setBannerUploading(false) : setUploading(false);
   }
 
   function toggleTag(tag: string) {
@@ -196,7 +181,7 @@ export function EditProfileForm({
           </div>
         </div>
       </div>
-      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onPickFile} />
+      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => pickImage(e, "avatar")} />
 
       {/* Avatar color (fallback when no photo) */}
       {!avatarUrl && (
@@ -238,7 +223,7 @@ export function EditProfileForm({
             </button>
           )}
         </div>
-        <input ref={bannerRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onPickBanner} />
+        <input ref={bannerRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => pickImage(e, "banner")} />
         {!bannerUrl && <BannerPicker value={bannerId} onChange={setBannerId} />}
       </Field>
 
@@ -294,6 +279,16 @@ export function EditProfileForm({
           {pending ? <><Loader2 size={18} className="animate-spin" /> Saving…</> : saved ? <><Check size={18} /> Profile updated</> : "Save changes"}
         </button>
       </div>
+
+      {cropper && (
+        <ImageCropper
+          src={cropper.src}
+          aspect={cropper.aspect}
+          label={cropper.kind === "banner" ? "Crop banner" : "Crop photo"}
+          onCancel={() => { URL.revokeObjectURL(cropper.src); setCropper(null); }}
+          onDone={(blob) => onCropDone(blob)}
+        />
+      )}
     </div>
   );
 }
