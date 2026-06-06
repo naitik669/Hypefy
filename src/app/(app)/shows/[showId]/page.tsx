@@ -22,37 +22,33 @@ export default async function ShowPage({
 
   if (!target) notFound();
 
-  // 2. Fetch all active Shows from the same user (for swipe navigation).
-  //    Try the enhanced query (with linked_post join) first; fall back to
-  //    the basic query if the linked_post_id column doesn't exist yet.
-  let raw: any[] | null = null;
+  // 2. Fetch all active Shows from the same user.
+  //    Build the select string based on which optional columns exist — we probe
+  //    them independently so a single missing column doesn't break the whole page.
+  const nowIso = new Date().toISOString();
+  const baseSelect = `id, user_id, media_url, caption, created_at, hype_count, profiles(display_name, avatar_hue, username)`;
 
-  const enhanced = await supabase
+  // Probe for linked_post_id + is_showcase in one call; degrade gracefully.
+  const [probeLinked, probeShowcase] = await Promise.all([
+    supabase.from("shows").select("linked_post_id").eq("id", target.id).maybeSingle(),
+    supabase.from("shows").select("is_showcase").eq("id", target.id).maybeSingle(),
+  ]);
+  const hasLinkedPost  = !probeLinked.error;
+  const hasIsShowcase  = !probeShowcase.error;
+
+  const extraCols = [
+    hasIsShowcase  ? "is_showcase"   : "",
+    hasLinkedPost  ? "linked_post_id, linked_post:posts(id, caption, image_url, image_urls, profiles(display_name, username, avatar_hue, avatar_url))" : "",
+  ].filter(Boolean).join(", ");
+
+  const selectStr = extraCols ? `${baseSelect}, ${extraCols}` : baseSelect;
+
+  const { data: raw } = await supabase
     .from("shows")
-    .select(`
-      id, user_id, media_url, caption, created_at, hype_count, linked_post_id, is_showcase,
-      profiles(display_name, avatar_hue, username),
-      linked_post:posts(
-        id, caption, image_url, image_urls,
-        profiles(display_name, username, avatar_hue, avatar_url)
-      )
-    `)
+    .select(selectStr)
     .eq("user_id", target.user_id)
-    .gt("expires_at", new Date().toISOString())
+    .gt("expires_at", nowIso)
     .order("created_at", { ascending: true });
-
-  if (!enhanced.error) {
-    raw = enhanced.data;
-  } else {
-    // linked_post_id column not yet migrated — fall back to basic query
-    const basic = await supabase
-      .from("shows")
-      .select("id, user_id, media_url, caption, created_at, hype_count, profiles(display_name, avatar_hue, username)")
-      .eq("user_id", target.user_id)
-      .gt("expires_at", new Date().toISOString())
-      .order("created_at", { ascending: true });
-    raw = basic.data;
-  }
 
   const shows = (raw ?? []).map((s: any) => ({
     ...s,

@@ -122,12 +122,33 @@ export default function AddShowPage() {
         mediaUrl = linkedPost.image_urls?.[0] ?? linkedPost.image_url ?? null;
       }
 
-      const { error: insertErr } = await supabase.from("shows").insert({
-        user_id: user.id,
-        media_url: mediaUrl,
-        caption: caption.trim() || null,
-        linked_post_id: linkedPost?.id ?? null,
-      });
+      // Try insert with linked_post_id (needs migration); if column missing, retry without.
+      let insertErr: any = null;
+      if (linkedPost?.id) {
+        const res = await supabase.from("shows").insert({
+          user_id: user.id,
+          media_url: mediaUrl,
+          caption: caption.trim() || null,
+          linked_post_id: linkedPost.id,
+        });
+        insertErr = res.error;
+        // Column doesn't exist yet → fall back to plain insert
+        if (insertErr) {
+          const res2 = await supabase.from("shows").insert({
+            user_id: user.id,
+            media_url: mediaUrl,
+            caption: caption.trim() || null,
+          });
+          insertErr = res2.error;
+        }
+      } else {
+        const res = await supabase.from("shows").insert({
+          user_id: user.id,
+          media_url: mediaUrl,
+          caption: caption.trim() || null,
+        });
+        insertErr = res.error;
+      }
 
       if (insertErr) { setError(insertErr.message); return; }
 
