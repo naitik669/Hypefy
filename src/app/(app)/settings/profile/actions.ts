@@ -11,6 +11,7 @@ export type UpdateProfileInput = {
   avatarHue: number;
   avatarUrl?: string | null;
   bannerId?: string | null;
+  bannerUrl?: string | null;
 };
 
 export async function updateProfile(
@@ -38,6 +39,7 @@ export async function updateProfile(
       avatar_hue: input.avatarHue,
       avatar_url: input.avatarUrl ?? null,
       banner_id: input.bannerId ?? null,
+      banner_url: input.bannerUrl ?? null,
     })
     .eq("id", user.id);
 

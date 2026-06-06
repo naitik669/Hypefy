@@ -25,6 +25,7 @@ export function EditProfileForm({
     avatarHue: number;
     avatarUrl: string | null;
     bannerId: string;
+    bannerUrl: string | null;
     profileTags: string[];
   };
 }) {
@@ -37,15 +38,18 @@ export function EditProfileForm({
   const [avatarHue, setAvatarHue] = useState(initial.avatarHue);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initial.avatarUrl);
   const [bannerId, setBannerId] = useState(initial.bannerId || DEFAULT_BANNER_ID);
+  const [bannerUrl, setBannerUrl] = useState<string | null>(initial.bannerUrl);
   const [tags, setTags] = useState<string[]>(initial.profileTags);
 
   const [uStatus, setUStatus] = useState<UsernameStatus>("idle");
   const [uploading, setUploading] = useState(false);
+  const [bannerUploading, setBannerUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const bannerRef = useRef<HTMLInputElement>(null);
 
   function onUsernameChange(raw: string) {
     const u = raw.toLowerCase().replace(/[^a-z0-9_.]/g, "");
@@ -92,6 +96,35 @@ export function EditProfileForm({
     setUploading(false);
   }
 
+  async function onPickBanner(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Use a JPG, PNG, or WebP image.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Banner must be under 8MB.");
+      return;
+    }
+    setError(null);
+    setBannerUploading(true);
+    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `${userId}/banner-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("banners")
+      .upload(path, file, { upsert: true, cacheControl: "3600" });
+    if (upErr) {
+      setError(upErr.message);
+      setBannerUploading(false);
+      return;
+    }
+    const { data } = supabase.storage.from("banners").getPublicUrl(path);
+    setBannerUrl(data.publicUrl);
+    setBannerUploading(false);
+  }
+
   function toggleTag(tag: string) {
     setTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : prev.length >= 5 ? prev : [...prev, tag],
@@ -112,7 +145,7 @@ export function EditProfileForm({
     setError(null);
     startTransition(async () => {
       const res = await updateProfile({
-        username, displayName, bio, profileTags: tags, avatarHue, avatarUrl, bannerId,
+        username, displayName, bio, profileTags: tags, avatarHue, avatarUrl, bannerId, bannerUrl,
       });
       if ("error" in res) { setError(res.error); return; }
       setSaved(true);
@@ -125,7 +158,7 @@ export function EditProfileForm({
     <div className="flex flex-col gap-6 px-5 pb-32 pt-4">
       {/* Banner + avatar preview */}
       <div className="overflow-hidden rounded-2xl border border-border">
-        <ProfileBanner bannerId={bannerId} className="h-24" />
+        <ProfileBanner bannerId={bannerId} bannerUrl={bannerUrl} className="h-24" />
         <div className="flex items-center gap-3 px-3 pb-3">
           <button
             type="button"
@@ -185,7 +218,28 @@ export function EditProfileForm({
 
       {/* Banner */}
       <Field label="Banner">
-        <BannerPicker value={bannerId} onChange={setBannerId} />
+        <div className="mb-3 flex gap-2">
+          <button
+            type="button"
+            onClick={() => bannerRef.current?.click()}
+            disabled={bannerUploading}
+            className="flex items-center gap-1.5 rounded-pill border border-border bg-surface px-3 py-1.5 text-xs font-semibold hover:bg-elevated disabled:opacity-60"
+          >
+            {bannerUploading ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
+            {bannerUrl ? "Change image" : "Upload image"}
+          </button>
+          {bannerUrl && (
+            <button
+              type="button"
+              onClick={() => setBannerUrl(null)}
+              className="flex items-center gap-1 rounded-pill border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted hover:bg-elevated"
+            >
+              <X size={12} /> Use a preset
+            </button>
+          )}
+        </div>
+        <input ref={bannerRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onPickBanner} />
+        {!bannerUrl && <BannerPicker value={bannerId} onChange={setBannerId} />}
       </Field>
 
       {/* Display name */}

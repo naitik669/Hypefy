@@ -50,7 +50,7 @@ export default async function ProfilePage() {
   return (
     <>
       {/* Banner */}
-      <ProfileBanner bannerId={bannerId} className="h-32" />
+      <ProfileBanner bannerId={bannerId} bannerUrl={profile?.bannerUrl} className="h-32" />
 
       <div className="px-4">
         {/* Avatar + stats */}

@@ -69,7 +69,7 @@ export default async function PublicProfilePage({
 
   return (
     <>
-      <ProfileBanner bannerId={bannerId} className="h-32" />
+      <ProfileBanner bannerId={bannerId} bannerUrl={profile.banner_url} className="h-32" />
 
       <div className="px-4">
         {/* Avatar + stats */}

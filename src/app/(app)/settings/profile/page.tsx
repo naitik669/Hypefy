@@ -24,6 +24,7 @@ export default async function EditProfilePage() {
           avatarHue: profile?.avatarHue ?? hueFromId(user.id),
           avatarUrl: profile?.avatarUrl ?? null,
           bannerId: profile?.bannerId ?? DEFAULT_BANNER_ID,
+          bannerUrl: profile?.bannerUrl ?? null,
           profileTags: profile?.profileTags ?? [],
         }}
       />
