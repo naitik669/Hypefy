@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Link2, PlusCircle, Repeat2, Check, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Link2, Tv, Repeat2, Check, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
@@ -37,8 +37,8 @@ export function ShareSheet({
   const [sent, setSent] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const [reposted, setReposted] = useState(false);
-  const [addingShot, setAddingShot] = useState(false);
-  const [shotAdded, setShotAdded] = useState(false);
+  const [addingShow, setAddingShow] = useState(false);
+  const [showAdded, setShowAdded] = useState(false);
   const [sendingDm, setSendingDm] = useState(false);
   const [dmDone, setDmDone] = useState(false);
 
@@ -121,24 +121,24 @@ export function ShareSheet({
   }
 
   /**
-   * Share post/shot to the user's Shot (story-style 24h content).
+   * Share post/shot to the user's Show (24-hour story).
    * Uses the currently selected image slot as the thumbnail/embed frame.
    */
-  async function shareToShot() {
-    if (addingShot || shotAdded) return;
-    setAddingShot(true);
+  async function shareToShow() {
+    if (addingShow || showAdded) return;
+    setAddingShow(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       if (targetType === "shot") {
-        // Sharing a Shot -- copy its media as a clip
+        // Sharing a Shot — copy its media into the user's Show
         const { data } = await supabase.from("shots").select("media_url").eq("id", postId).maybeSingle();
         const mediaUrl = data?.media_url ?? null;
         if (!mediaUrl) return;
         await supabase.from("shows").insert({ user_id: user.id, media_url: mediaUrl });
       } else {
-        // Sharing a Post -- use the selected image slot as media_url thumbnail
+        // Sharing a Post — use the selected image slot as media_url thumbnail
         const mediaUrl = imageUrls?.[selectedIdx] ?? imageUrls?.[0] ?? null;
 
         // If we couldn't derive from passed images, fall back to fetching from DB
@@ -165,10 +165,10 @@ export function ShareSheet({
         }
       }
 
-      setShotAdded(true);
-      setTimeout(() => { setShotAdded(false); onClose(); }, 1100);
+      setShowAdded(true);
+      setTimeout(() => { setShowAdded(false); onClose(); }, 1100);
     } finally {
-      setAddingShot(false);
+      setAddingShow(false);
     }
   }
 
@@ -285,10 +285,10 @@ export function ShareSheet({
             </div>
           )}
 
-          {/* "Choose which frame to share to Shot" hint */}
+          {/* "Choose which frame to share to Show" hint */}
           {hasMultiple && (
             <p className="mt-1.5 text-center text-[11px] text-faint">
-              Tap arrows to pick which image goes to your Shot
+              Tap arrows to pick which image goes to your Show
             </p>
           )}
         </div>
@@ -399,25 +399,25 @@ export function ShareSheet({
           </span>
         </button>
 
-        {/* Share to Shot -- available for all post types */}
+        {/* Share to Show — adds to the user's 24-hour story */}
         {targetType === "post" && (
           <button
             type="button"
-            onClick={shareToShot}
-            disabled={addingShot}
+            onClick={shareToShow}
+            disabled={addingShow}
             className="flex flex-col items-center gap-2 rounded-2xl px-2 py-3 transition-colors hover:bg-white/5 disabled:opacity-60"
           >
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface">
-              {addingShot ? (
+              {addingShow ? (
                 <Loader2 size={20} className="animate-spin text-muted" />
-              ) : shotAdded ? (
+              ) : showAdded ? (
                 <Check size={20} className="text-accent" />
               ) : (
-                <PlusCircle size={20} className="text-hype" />
+                <Tv size={20} className="text-hype" />
               )}
             </span>
-            <span className={`text-xs font-medium ${shotAdded ? "text-accent" : "text-foreground"}`}>
-              {shotAdded ? "Added to Shot!" : "Share to Shot"}
+            <span className={`text-xs font-medium ${showAdded ? "text-accent" : "text-foreground"}`}>
+              {showAdded ? "Added to Show!" : "Share to Show"}
             </span>
           </button>
         )}

@@ -14,6 +14,14 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 type Img = { id: string; file: File; url: string; origSrc: string };
 
+/** Supported aspect ratios for posts. value = width / height. */
+const RATIOS = [
+  { label: "1:1", value: 1,          cssRatio: "aspect-square" },
+  { label: "3:4", value: 3 / 4,      cssRatio: "aspect-[3/4]" },
+  { label: "4:3", value: 4 / 3,      cssRatio: "aspect-[4/3]" },
+  { label: "16:9", value: 16 / 9,    cssRatio: "aspect-video" },
+] as const;
+
 export function PostComposer({ userId }: { userId: string }) {
   const router = useRouter();
   const { uploadPost } = useUpload();
@@ -22,10 +30,13 @@ export function PostComposer({ userId }: { userId: string }) {
 
   const [imgs, setImgs] = useState<Img[]>([]);
   const [crop, setCrop] = useState<{ id: string; origSrc: string } | null>(null);
+  const [ratioIdx, setRatioIdx] = useState(0); // index into RATIOS array
   const [caption, setCaption] = useState("");
   const [body, setBody] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+
+  const currentRatio = RATIOS[ratioIdx];
 
   const hashtags = extractHashtags(caption + " " + body);
   const mentions = extractMentions(caption + " " + body);
@@ -122,10 +133,31 @@ export function PostComposer({ userId }: { userId: string }) {
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-8 pt-2">
-      {/* Image area */}
+      {/* ── Aspect-ratio picker ───────────────────────────────── */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold text-muted">Ratio</span>
+        <div className="flex gap-1.5">
+          {RATIOS.map((r, i) => (
+            <button
+              key={r.label}
+              type="button"
+              onClick={() => setRatioIdx(i)}
+              className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-colors ${
+                i === ratioIdx
+                  ? "bg-accent text-accent-ink"
+                  : "bg-surface text-muted hover:text-foreground"
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Image area ────────────────────────────────────────── */}
       {imgs.length === 0 ? (
         <div
-          className="flex min-h-[200px] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface text-center transition-colors hover:border-accent/50"
+          className={`cursor-pointer ${currentRatio.cssRatio} w-full flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface text-center transition-colors hover:border-accent/50`}
           onClick={openPicker}
         >
           <ImageIcon size={32} className="text-faint" />
@@ -135,7 +167,11 @@ export function PostComposer({ userId }: { userId: string }) {
       ) : (
         <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
           {imgs.map((img, i) => (
-            <div key={img.id} className="relative h-40 w-40 shrink-0 overflow-hidden rounded-2xl bg-surface">
+            <div
+              key={img.id}
+              className={`relative shrink-0 overflow-hidden rounded-2xl bg-surface ${currentRatio.cssRatio}`}
+              style={{ width: currentRatio.value >= 1 ? 200 : 140 }}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={img.url} alt={`Image ${i + 1}`} className="h-full w-full object-cover" />
               <button
@@ -163,7 +199,8 @@ export function PostComposer({ userId }: { userId: string }) {
             <button
               type="button"
               onClick={openPicker}
-              className="flex h-40 w-40 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-border bg-surface text-faint transition-colors hover:border-accent/50"
+              className={`flex shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-border bg-surface text-faint transition-colors hover:border-accent/50 ${currentRatio.cssRatio}`}
+              style={{ width: currentRatio.value >= 1 ? 200 : 140 }}
             >
               <Plus size={26} />
               <span className="text-xs">Add</span>
@@ -181,7 +218,15 @@ export function PostComposer({ userId }: { userId: string }) {
       />
       {fileError && <p className="text-xs text-danger">{fileError}</p>}
 
-      {crop && <ImageCropper src={crop.origSrc} onCancel={onCropCancel} onDone={onCropDone} />}
+      {crop && (
+        <ImageCropper
+          src={crop.origSrc}
+          aspect={currentRatio.value}
+          label={`Crop · ${currentRatio.label}`}
+          onCancel={onCropCancel}
+          onDone={onCropDone}
+        />
+      )}
 
       {/* Caption */}
       <div>
