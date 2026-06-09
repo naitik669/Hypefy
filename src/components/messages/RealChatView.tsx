@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban , X } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { VoiceRecorder } from "@/components/messages/VoiceRecorder";
+import { VoiceMessage } from "@/components/messages/VoiceMessage";
 
 type PostPreview = {
   id: string;
@@ -94,6 +96,7 @@ export function RealChatView({
   const [toast, setToast] = useState<string | null>(null);
   const [callChooser, setCallChooser] = useState(false);
   const [headerMenu, setHeaderMenu] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
   const { startCall } = useCallControls();
   function placeCall(type: "audio" | "video") {
     startCall({ conversationId, peerId: other.id, peerName: other.name, peerHue: other.hue, type });
@@ -256,6 +259,46 @@ export function RealChatView({
       setMessages((p) => p.map((m) => (m.id === tempId ? { ...m, ...(data as ChatMsg) } : m)));
     }
     setSending(false);
+  }
+
+  /** Upload voice blob to Supabase Storage and send as a voice message. */
+  async function sendVoice(blob: Blob, durationSecs: number) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setVoiceMode(false); return; }
+
+    const ext = blob.type.includes("ogg") ? "ogg" : "webm";
+    const path = `${user.id}/${Date.now()}.${ext}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from("voice-notes")
+      .upload(path, blob, { contentType: blob.type, upsert: false });
+
+    if (uploadErr) {
+      showToast("Couldn't upload voice note. Try again.");
+      setVoiceMode(false);
+      return;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from("voice-notes")
+      .getPublicUrl(path);
+
+    // Store as JSON so the player knows the pre-stored duration (avoids
+    // waiting for audio metadata to load before showing a duration).
+    const body = JSON.stringify({ url: publicUrl, duration: durationSecs });
+    const replyId = replyTo?.id ?? null;
+    setReplyTo(null);
+
+    const { error } = await supabase.rpc("send_message", {
+      p_conversation_id: conversationId,
+      p_body: body,
+      p_kind: "voice",
+      p_post_id: null,
+      p_reply_to_id: replyId,
+    });
+
+    if (error) showToast("Couldn't send voice note.");
+    setVoiceMode(false);
   }
 
   async function unsend(m: ChatMsg) {
@@ -481,7 +524,27 @@ export function RealChatView({
                             {m.shot.caption && <p className="line-clamp-1 text-[11px] text-white/85 drop-shadow">{m.shot.caption}</p>}
                           </div>
                         </Link>
-                      ) : (
+                      ) : m.kind === "voice" && m.body ? (() => {
+                        // Parse stored JSON: { url, duration }
+                        let voiceUrl = m.body;
+                        let voiceDuration: number | undefined;
+                        try {
+                          const p = JSON.parse(m.body);
+                          voiceUrl = p.url ?? m.body;
+                          voiceDuration = typeof p.duration === "number" ? p.duration : undefined;
+                        } catch {}
+                        return (
+                          <div
+                            onPointerDown={(e) => onPressStart(m, e)}
+                            onPointerUp={onPressEnd}
+                            onPointerMove={onPressEnd}
+                            onPointerLeave={onPressEnd}
+                            onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          >
+                            <VoiceMessage url={voiceUrl} storedDuration={voiceDuration} mine={mine} />
+                          </div>
+                        );
+                      })() : (
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
@@ -528,7 +591,8 @@ export function RealChatView({
 
       {/* Composer */}
       <div className="border-t border-border/60 bg-background px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+8px)]">
-        {replyTo && (
+        {/* Reply-to banner — shown in both text and voice modes */}
+        {replyTo && !voiceMode && (
           <div className="mb-2 flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 text-xs">
             <Reply size={13} className="text-accent" />
             <span className="min-w-0 flex-1 truncate text-muted">
@@ -541,19 +605,48 @@ export function RealChatView({
             <button onClick={() => setReplyTo(null)} className="text-faint hover:text-muted"><X size={14} /></button>
           </div>
         )}
-        <div className="flex items-center gap-2">
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-            placeholder="Message..."
-            className="h-11 flex-1 rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
+
+        {voiceMode ? (
+          /* ── Voice recorder ── replaces the text input entirely */
+          <VoiceRecorder
+            onSend={sendVoice}
+            onCancel={() => setVoiceMode(false)}
           />
-          <button type="button" onClick={send} disabled={!text.trim() || sending} aria-label="Send"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40">
-            <Send size={18} />
-          </button>
-        </div>
+        ) : (
+          /* ── Text composer ── */
+          <div className="flex items-center gap-2">
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
+              placeholder="Message..."
+              className="h-11 flex-1 rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
+            />
+            {/* Mic — visible only when input is empty */}
+            {!text.trim() && (
+              <button
+                type="button"
+                onClick={() => setVoiceMode(true)}
+                aria-label="Record voice note"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface text-muted transition hover:bg-elevated hover:text-foreground active:scale-90"
+              >
+                <Mic size={20} />
+              </button>
+            )}
+            {/* Send — visible only when there's text */}
+            {text.trim() && (
+              <button
+                type="button"
+                onClick={send}
+                disabled={sending}
+                aria-label="Send"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"
+              >
+                <Send size={18} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Long-press context menu (reactions + actions), anchored to the message */}
