@@ -117,7 +117,7 @@ export function VoiceMessage({ url, storedDuration, mine }: Props) {
         aria-label={playing ? "Pause voice note" : "Play voice note"}
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-90 ${
           mine
-            ? "bg-white/20 text-white hover:bg-white/30"
+            ? "bg-accent-ink/15 text-accent-ink hover:bg-accent-ink/25"
             : "bg-accent/15 text-accent hover:bg-accent/25"
         }`}
       >
@@ -144,10 +144,10 @@ export function VoiceMessage({ url, storedDuration, mine }: Props) {
               className={`flex-1 rounded-full transition-colors duration-75 ${
                 i < filledBars
                   ? mine
-                    ? "bg-white"
+                    ? "bg-accent-ink/80"
                     : "bg-accent"
                   : mine
-                    ? "bg-white/30"
+                    ? "bg-accent-ink/25"
                     : "bg-foreground/15"
               }`}
               style={{ height: `${h}%`, minHeight: "10%" }}
@@ -158,7 +158,7 @@ export function VoiceMessage({ url, storedDuration, mine }: Props) {
         {/* Duration / current time */}
         <span
           className={`tabular-nums text-[10px] font-semibold ${
-            mine ? "text-white/60" : "text-faint"
+            mine ? "text-accent-ink/55" : "text-faint"
           }`}
         >
           {fmt(displayTime)}
