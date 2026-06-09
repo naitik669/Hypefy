@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Check, CheckCheck, Clock, AlertCircle } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { Avatar } from "@/components/ui/Avatar";
@@ -774,17 +774,70 @@ function MenuItem({ icon, label, onClick, danger }: { icon: React.ReactNode; lab
   );
 }
 
-/** Small status tick shown only on my outgoing messages */
+/**
+ * Hypefy-branded message status indicator — shown only on outgoing (mine) messages.
+ *
+ * pending → three bouncing micro-dots (same brand loader used across Hypefy)
+ * sent    → single geometric tick, muted
+ * seen    → double geometric tick, electric lime + glow drop-shadow
+ * failed  → clean × mark, danger red
+ */
 function MsgStatusTick({ status }: { status: MsgStatus }) {
+  // ── Pending: Hypefy's brand loader — three staggered bouncing dots ──────────
   if (status === "pending") {
-    return <Clock size={10} className="text-faint" aria-label="Sending" />;
+    return (
+      <span className="flex items-end gap-[2.5px]" aria-label="Sending">
+        {[0, 0.15, 0.3].map((delay, i) => (
+          <span
+            key={i}
+            className="h-[4px] w-[4px] rounded-[1.5px] bg-faint animate-dot-bounce"
+            style={{ animationDelay: `${delay}s` }}
+          />
+        ))}
+      </span>
+    );
   }
+
+  // ── Failed: clean × mark ─────────────────────────────────────────────────────
   if (status === "failed") {
-    return <AlertCircle size={11} className="text-danger" aria-label="Failed to send" />;
+    return (
+      <svg
+        width="11" height="11" viewBox="0 0 11 11" fill="none"
+        aria-label="Failed to send" className="text-danger"
+      >
+        <path d="M1.5 1.5L9.5 9.5M9.5 1.5L1.5 9.5"
+          stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
   }
+
+  // ── Seen: double geometric tick — electric lime + brand glow ─────────────────
   if (status === "seen") {
-    return <CheckCheck size={12} className="text-accent" aria-label="Seen" />;
+    return (
+      <svg
+        width="20" height="9" viewBox="0 0 20 9" fill="none"
+        aria-label="Seen"
+        style={{ filter: "drop-shadow(0 0 4px rgb(200 255 0 / 0.7))" }}
+        className="text-accent"
+      >
+        {/* first tick */}
+        <path d="M1.5 4.5L4.5 7.5L10.5 1"
+          stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+        {/* second tick — offset right */}
+        <path d="M8 4.5L11 7.5L17 1"
+          stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
   }
-  // sent
-  return <Check size={11} className="text-muted" aria-label="Sent" />;
+
+  // ── Sent: single geometric tick, muted ───────────────────────────────────────
+  return (
+    <svg
+      width="13" height="9" viewBox="0 0 13 9" fill="none"
+      aria-label="Sent" className="text-muted/70"
+    >
+      <path d="M1.5 4.5L4.5 7.5L11 1"
+        stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
