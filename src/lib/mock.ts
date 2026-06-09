@@ -5,6 +5,7 @@ export type Show = {
   name: string;
   hue: number;
   seen: boolean;
+  avatar_url?: string | null;
 };
 
 export type Post = {

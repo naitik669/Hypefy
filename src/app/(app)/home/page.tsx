@@ -92,13 +92,14 @@ export default async function HomePage() {
     ? {
         name: myProfile.display_name ?? myProfile.username ?? "You",
         hue: myProfile.avatar_hue ?? 280,
+        avatarUrl: (myProfile as any).avatar_url ?? null,
         hasActiveShow: (myShows?.length ?? 0) > 0,
         showId: myShows?.[0]?.id as string | undefined, // entry = oldest
       }
     : undefined;
 
   // Group by user: keep most-recent-activity order, but enter at their OLDEST show.
-  const byUser = new Map<string, { id: string; name: string; hue: number }>();
+  const byUser = new Map<string, { id: string; name: string; hue: number; avatar_url: string | null }>();
   for (const s of (activeShows ?? []) as any[]) {
     const p = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
     const existing = byUser.get(s.user_id);
@@ -107,6 +108,7 @@ export default async function HomePage() {
         id: s.id,
         name: p?.display_name ?? p?.username ?? "User",
         hue: p?.avatar_hue ?? 280,
+        avatar_url: p?.avatar_url ?? null,
       });
     } else {
       existing.id = s.id; // iterating newestâ†’oldest, so this ends as the oldest

@@ -10,6 +10,7 @@ import type { Show } from "@/lib/mock";
 type CurrentUser = {
   name: string;
   hue: number;
+  avatarUrl?: string | null;
   hasActiveShow: boolean;
   showId?: string; // entry show to watch your own
 };
@@ -84,7 +85,7 @@ export function ShowsRow({
                     currentUser.hasActiveShow ? "p-[2px]" : ""
                   }`}
                 >
-                  <Avatar name={currentUser.name} hue={currentUser.hue} size={56} className="rounded-[18px]" />
+                  <Avatar name={currentUser.name} hue={currentUser.hue} size={56} src={currentUser.avatarUrl ?? undefined} className="rounded-[18px]" />
                 </div>
               </div>
             ) : (
@@ -120,14 +121,14 @@ export function ShowsRow({
               /* ── Seen: grey ring, avatar stays full opacity ── */
               <div className="rounded-[22px] p-[2.5px]" style={{ background: "#3a3a3a" }}>
                 <div className="rounded-[20px] bg-background p-[2px]">
-                  <Avatar name={s.name} hue={s.hue} size={56} className="rounded-[18px]" />
+                  <Avatar name={s.name} hue={s.hue} size={56} src={s.avatar_url ?? undefined} className="rounded-[18px]" />
                 </div>
               </div>
             ) : (
               /* ── Unseen: green ring ── */
               <div className="rounded-[22px] p-[2.5px] bg-accent">
                 <div className="rounded-[20px] bg-background p-[2px]">
-                  <Avatar name={s.name} hue={s.hue} size={56} className="rounded-[18px]" />
+                  <Avatar name={s.name} hue={s.hue} size={56} src={s.avatar_url ?? undefined} className="rounded-[18px]" />
                 </div>
               </div>
             )}
