@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Star, MessageCircle, Send, Bookmark, Volume2, VolumeX, Play } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Star, MessageCircle, Send, Bookmark, Volume2, VolumeX, Play, ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
@@ -36,6 +37,7 @@ export function ReelsFeed({
   reels: Reel[];
   currentUserId: string | null;
 }) {
+  const router = useRouter();
   const [muted, setMuted] = useState(true);
   const [activeIdx, setActiveIdx] = useState(0);
   const swipeTouchStartY = useRef(0);
@@ -46,10 +48,17 @@ export function ReelsFeed({
   function onSwipeTouchEnd(e: React.TouchEvent) {
     const dy = swipeTouchStartY.current - e.changedTouches[0].clientY;
     if (Math.abs(dy) < 40) return; // too small — treat as tap, not swipe
-    // Move exactly ONE reel regardless of velocity
-    setActiveIdx((i) =>
-      dy > 0 ? Math.min(i + 1, reels.length - 1) : Math.max(i - 1, 0),
-    );
+    if (dy > 0) {
+      // Swipe up — advance to next reel
+      setActiveIdx((i) => Math.min(i + 1, reels.length - 1));
+    } else {
+      // Swipe down — go back one reel, or exit Shots when on the first
+      if (activeIdx === 0) {
+        router.back();
+      } else {
+        setActiveIdx((i) => i - 1);
+      }
+    }
   }
 
   return (
@@ -71,6 +80,7 @@ export function ReelsFeed({
             muted={muted}
             onToggleMute={() => setMuted((m) => !m)}
             isActive={i === activeIdx}
+            onBack={() => router.back()}
           />
         </div>
       ))}
@@ -84,12 +94,14 @@ function ReelCard({
   muted,
   onToggleMute,
   isActive,
+  onBack,
 }: {
   reel: Reel;
   currentUserId: string | null;
   muted: boolean;
   onToggleMute: () => void;
   isActive: boolean;
+  onBack: () => void;
 }) {
   const supabase = createClient();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -297,7 +309,17 @@ function ReelCard({
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
 
-      {/* Mute toggle */}
+      {/* Back button — top-left */}
+      <button
+        type="button"
+        onClick={onBack}
+        aria-label="Go back"
+        className="absolute left-3 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
+      >
+        <ChevronLeft size={22} />
+      </button>
+
+      {/* Mute toggle — top-right */}
       <button
         type="button"
         onClick={onToggleMute}
