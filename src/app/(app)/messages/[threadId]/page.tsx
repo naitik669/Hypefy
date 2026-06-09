@@ -75,6 +75,18 @@ export default async function ThreadPage({
     ? await supabase.from("message_reactions").select("message_id, user_id, emoji").in("message_id", msgIds)
     : { data: [] as any[] };
 
+  // Other user's last_read_at — drives "Seen" double-tick on my messages
+  const otherUserId = op?.id ?? null;
+  const { data: otherMemberRow } = otherUserId
+    ? await supabase
+        .from("conversation_members")
+        .select("last_read_at")
+        .eq("conversation_id", threadId)
+        .eq("user_id", otherUserId)
+        .maybeSingle()
+    : { data: null };
+  const initialOtherLastReadAt: string | null = (otherMemberRow as any)?.last_read_at ?? null;
+
   return (
     <RealChatView
       conversationId={threadId}
@@ -90,6 +102,7 @@ export default async function ThreadPage({
       members={membersMap}
       initialMessages={messages}
       initialReactions={(reactRows ?? []) as any}
+      initialOtherLastReadAt={initialOtherLastReadAt}
     />
   );
 }

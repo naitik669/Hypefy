@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Check, CheckCheck, Clock, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { Avatar } from "@/components/ui/Avatar";
@@ -34,7 +34,11 @@ export type ChatMsg = {
   postProfile?: ShareProfile | null;
   shot?: ShotPreview | null;
   shotProfile?: ShareProfile | null;
+  /** Client-only: set on optimistic messages before server confirms */
+  _status?: "pending" | "failed";
 };
+
+type MsgStatus = "pending" | "sent" | "seen" | "failed";
 
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
 type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null };
@@ -73,6 +77,7 @@ export function RealChatView({
   members,
   initialMessages,
   initialReactions = [],
+  initialOtherLastReadAt = null,
 }: {
   conversationId: string;
   currentUserId: string;
@@ -81,6 +86,7 @@ export function RealChatView({
   members?: Record<string, { name: string; hue: number }>;
   initialMessages: ChatMsg[];
   initialReactions?: ReactionRow[];
+  initialOtherLastReadAt?: string | null;
 }) {
   const isGroup = !!group;
   const senderName = (id: string) => (id === currentUserId ? "You" : members?.[id]?.name ?? other.name);
@@ -88,6 +94,7 @@ export function RealChatView({
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMsg[]>(initialMessages);
   const [reactions, setReactions] = useState<ReactionRow[]>(initialReactions);
+  const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(initialOtherLastReadAt);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMsg | null>(null);
@@ -132,6 +139,15 @@ export function RealChatView({
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 1600);
+  }
+
+  /** Derives the display status for one of my outgoing messages. */
+  function getMsgStatus(m: ChatMsg): MsgStatus {
+    if (m._status === "failed") return "failed";
+    if (m._status === "pending") return "pending";
+    // In group chats we don't track individual read receipts — just show "sent"
+    if (!isGroup && otherLastReadAt && m.created_at <= otherLastReadAt) return "seen";
+    return "sent";
   }
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
@@ -223,6 +239,27 @@ export function RealChatView({
     return () => { supabase.removeChannel(ch); };
   }, [conversationId, supabase]);
 
+  // Realtime: other user's read receipt -- drives "Seen" double-tick
+  useEffect(() => {
+    if (!other.id) return;
+    const ch = supabase
+      .channel(`read:${conversationId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "conversation_members",
+          filter: `conversation_id=eq.${conversationId}` },
+        (payload) => {
+          const row = payload.new as { user_id: string; last_read_at: string | null };
+          // Only update when it's the other person who read
+          if (row.user_id !== currentUserId) {
+            setOtherLastReadAt(row.last_read_at ?? null);
+          }
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [conversationId, currentUserId, other.id, supabase]);
+
   function toggleReaction(messageId: string, emoji: string) {
     setReactions((prev) => {
       const mineRow = prev.find((r) => r.message_id === messageId && r.user_id === currentUserId);
@@ -252,11 +289,11 @@ export function RealChatView({
       p_conversation_id: conversationId, p_body: body, p_kind: "text", p_post_id: null, p_reply_to_id: replyId,
     });
     if (error || !data) {
-      setMessages((p) => p.filter((m) => m.id !== tempId));
-      setText(body);
+      // Keep message visible but mark it failed
+      setMessages((p) => p.map((m) => (m.id === tempId ? { ...m, _status: "failed" as const } : m)));
       showToast("Couldn't send. Try again.");
     } else {
-      setMessages((p) => p.map((m) => (m.id === tempId ? { ...m, ...(data as ChatMsg) } : m)));
+      setMessages((p) => p.map((m) => (m.id === tempId ? { ...m, ...(data as ChatMsg), _status: undefined } : m)));
     }
     setSending(false);
   }
@@ -578,7 +615,15 @@ export function RealChatView({
                         </div>
                       )}
 
-                      {showTime && <span className="px-1 pt-0.5 text-[10px] text-faint">{timeLabel(m.created_at)}</span>}
+                      {/* Time + status row — time always on theirs, time+tick on mine */}
+                      {(showTime || (mine && m._status === "failed")) && (
+                        <div className={`flex items-center gap-1 px-1 pt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
+                          {showTime && (
+                            <span className="text-[10px] text-faint">{timeLabel(m.created_at)}</span>
+                          )}
+                          {mine && <MsgStatusTick status={getMsgStatus(m)} />}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -727,4 +772,19 @@ function MenuItem({ icon, label, onClick, danger }: { icon: React.ReactNode; lab
       {label}
     </button>
   );
+}
+
+/** Small status tick shown only on my outgoing messages */
+function MsgStatusTick({ status }: { status: MsgStatus }) {
+  if (status === "pending") {
+    return <Clock size={10} className="text-faint" aria-label="Sending" />;
+  }
+  if (status === "failed") {
+    return <AlertCircle size={11} className="text-danger" aria-label="Failed to send" />;
+  }
+  if (status === "seen") {
+    return <CheckCheck size={12} className="text-accent" aria-label="Seen" />;
+  }
+  // sent
+  return <Check size={11} className="text-muted" aria-label="Sent" />;
 }
