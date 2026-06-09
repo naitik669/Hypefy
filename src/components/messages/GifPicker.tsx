@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Search, X, Heart } from "lucide-react";
+import { Search, X, Star } from "lucide-react";
 
 export interface GifResult {
   id: string;
@@ -17,17 +17,17 @@ interface Props {
 }
 
 // ── Categories ────────────────────────────────────────────────────────────────
-type Cat = { id: string; emoji: string; label: string; query: string | null };
+type Cat = { id: string; emoji: null; label: string; query: string | null };
 
 const CATEGORIES: Cat[] = [
-  { id: "faves",     emoji: "⭐", label: "Faves",     query: null },      // local only
-  { id: "trending",  emoji: "🔥", label: "Trending",  query: null },      // Giphy trending
-  { id: "reactions", emoji: "😂", label: "Reactions", query: "reaction" },
-  { id: "emotions",  emoji: "❤️", label: "Emotions",  query: "emotion" },
-  { id: "memes",     emoji: "😎", label: "Memes",     query: "meme" },
-  { id: "cute",      emoji: "🐱", label: "Cute",      query: "cute" },
-  { id: "sports",    emoji: "⚽", label: "Sports",    query: "sports" },
-  { id: "movies",    emoji: "🎬", label: "Movies",    query: "movie" },
+  { id: "faves",     emoji: null, label: "Faves",     query: null },
+  { id: "trending",  emoji: null, label: "Trending",  query: null },
+  { id: "reactions", emoji: null, label: "Reactions", query: "reaction" },
+  { id: "emotions",  emoji: null, label: "Emotions",  query: "emotion" },
+  { id: "memes",     emoji: null, label: "Memes",     query: "meme" },
+  { id: "cute",      emoji: null, label: "Cute",      query: "cute" },
+  { id: "sports",    emoji: null, label: "Sports",    query: "sports" },
+  { id: "movies",    emoji: null, label: "Movies",    query: "movie" },
 ];
 
 // ── In-session cache — switching tabs re-uses already fetched results ─────────
@@ -202,14 +202,13 @@ export function GifPicker({ onSelect }: Props) {
               key={cat.id}
               type="button"
               onClick={() => handleCat(cat.id)}
-              className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
                 activeCat === cat.id
                   ? "bg-accent text-accent-ink"
                   : "bg-surface text-muted hover:text-foreground"
               }`}
             >
-              <span>{cat.emoji}</span>
-              <span>{cat.label}</span>
+              {cat.label}
             </button>
           ))}
         </div>
@@ -250,7 +249,7 @@ export function GifPicker({ onSelect }: Props) {
               <>
                 <span className="text-2xl">⭐</span>
                 <p className="text-xs font-semibold text-muted">No favourites yet</p>
-                <p className="text-[10px] text-faint">Tap the ♥ on any GIF to save it here</p>
+                <p className="text-[10px] text-faint">Tap the ★ on any GIF to save it here</p>
               </>
             ) : (
               <span className="text-xs text-faint">No GIFs found</span>
@@ -277,9 +276,9 @@ export function GifPicker({ onSelect }: Props) {
                   aria-label={isFaved(gif.id) ? "Remove from favourites" : "Add to favourites"}
                   className="absolute right-1 top-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-black/55 backdrop-blur-sm transition-transform active:scale-110"
                 >
-                  <Heart
+                  <Star
                     size={9}
-                    className={isFaved(gif.id) ? "fill-red-400 text-red-400" : "fill-transparent text-white/80"}
+                    className={isFaved(gif.id) ? "fill-accent text-accent" : "fill-transparent text-white/80"}
                   />
                 </button>
               </div>
