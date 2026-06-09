@@ -517,8 +517,12 @@ export function RealChatView({
 
                       {/* Bubble */}
                       {m.is_unsent ? (
-                        <div className={`rounded-2xl border border-border px-3.5 py-2 text-sm italic text-faint ${mine ? "rounded-br-md" : "rounded-bl-md"}`}>
+                        /* Unsent — time embedded inside at bottom-right */
+                        <div className={`relative min-w-[80px] rounded-2xl border border-border px-3.5 pt-2 pb-5 text-sm italic text-faint ${mine ? "rounded-br-md" : "rounded-bl-md"}`}>
                           {mine ? "You unsent this message" : "This message was unsent"}
+                          <span className="absolute bottom-1.5 right-2.5 text-[9px] font-medium leading-none text-faint/60">
+                            {timeLabel(m.created_at)}
+                          </span>
                         </div>
                       ) : m.kind === "post" && m.post ? (
                         <Link
@@ -582,17 +586,25 @@ export function RealChatView({
                           </div>
                         );
                       })() : (
+                        /* Plain text — time + status tick live inside bubble, bottom-right */
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
                           onPointerMove={onPressEnd}
                           onPointerLeave={onPressEnd}
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
-                          className={`max-w-full cursor-default select-none rounded-2xl px-3.5 py-2 text-sm ${
+                          className={`relative min-w-[80px] max-w-full cursor-default select-none rounded-2xl px-3.5 pt-2 pb-5 text-sm ${
                             mine ? "rounded-br-md bg-accent text-accent-ink" : "rounded-bl-md bg-surface text-foreground"
                           }`}
                         >
                           {m.body}
+                          {/* Time + status always at bottom-right inside the bubble */}
+                          <span className="absolute bottom-1.5 right-2.5 flex items-center gap-[3px]">
+                            <span className={`text-[9px] font-medium leading-none ${mine ? "text-accent-ink/45" : "text-faint"}`}>
+                              {timeLabel(m.created_at)}
+                            </span>
+                            {mine && <MsgStatusTick status={getMsgStatus(m)} />}
+                          </span>
                         </div>
                       )}
 
@@ -615,8 +627,10 @@ export function RealChatView({
                         </div>
                       )}
 
-                      {/* Time + status row — time always on theirs, time+tick on mine */}
-                      {(showTime || (mine && m._status === "failed")) && (
+                      {/* External time+status — only for voice, post, and shot cards.
+                          Plain text bubbles embed the time+tick inside themselves. */}
+                      {(m.kind === "voice" || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
+                        (showTime || (mine && m._status === "failed")) && (
                         <div className={`flex items-center gap-1 px-1 pt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
                           {showTime && (
                             <span className="text-[10px] text-faint">{timeLabel(m.created_at)}</span>
