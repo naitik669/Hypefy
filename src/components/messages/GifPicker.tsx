@@ -91,13 +91,16 @@ export function GifPicker({ onSelect }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const catBarRef = useRef<HTMLDivElement>(null);
+  // Incremented on every new fetch — stale responses are discarded.
+  const reqGen = useRef(0);
 
   // ── Load initial data ─────────────────────────────────────────────────────
   useEffect(() => {
     const savedFaves = readFaves();
     setFaves(savedFaves);
-    // Fetch trending on mount
+    const gen = ++reqGen.current;
     apiFetch("").then(({ gifs: result, keyMissing: km }) => {
+      if (reqGen.current !== gen) return; // superseded by a newer request
       setKeyMissing(km);
       setGifs(result);
       setLoading(false);
@@ -115,12 +118,17 @@ export function GifPicker({ onSelect }: Props) {
       return;
     }
     const cat = CATEGORIES.find((c) => c.id === catId);
-    if (!cat) return;
+    if (!cat) { setLoading(false); return; }
+    const gen = ++reqGen.current;
     setLoading(true);
-    const { gifs: result, keyMissing: km } = await apiFetch(cat.query ?? "");
-    setKeyMissing(km);
-    setGifs(result);
-    setLoading(false);
+    try {
+      const { gifs: result, keyMissing: km } = await apiFetch(cat.query ?? "");
+      if (reqGen.current !== gen) return; // stale — a newer tab was clicked
+      setKeyMissing(km);
+      setGifs(result);
+    } finally {
+      if (reqGen.current === gen) setLoading(false);
+    }
   }, []);
 
   // ── Handle search input ───────────────────────────────────────────────────
@@ -128,16 +136,20 @@ export function GifPicker({ onSelect }: Props) {
     setSearch(q);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!q.trim()) {
-      // Clear → go back to active category
       loadCategory(activeCat);
       return;
     }
     setLoading(true);
     debounceRef.current = setTimeout(async () => {
-      const { gifs: result, keyMissing: km } = await apiFetch(q);
-      setKeyMissing(km);
-      setGifs(result);
-      setLoading(false);
+      const gen = ++reqGen.current;
+      try {
+        const { gifs: result, keyMissing: km } = await apiFetch(q);
+        if (reqGen.current !== gen) return;
+        setKeyMissing(km);
+        setGifs(result);
+      } finally {
+        if (reqGen.current === gen) setLoading(false);
+      }
     }, 380);
   }
 
