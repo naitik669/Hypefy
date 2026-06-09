@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { VoiceRecorder } from "@/components/messages/VoiceRecorder";
 import { VoiceMessage } from "@/components/messages/VoiceMessage";
+import { GifPicker } from "@/components/messages/GifPicker";
 
 type PostPreview = {
   id: string;
@@ -105,6 +106,13 @@ export function RealChatView({
   const [headerMenu, setHeaderMenu] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [starBurstId, setStarBurstId] = useState<string | null>(null);
+  const [gifPickerOpen, setGifPickerOpen] = useState(false);
+  const [attachment, setAttachment] = useState<{
+    file: File;
+    preview: string;
+    type: "image" | "video";
+  } | null>(null);
+  const [uploading, setUploading] = useState(false);
   const { startCall } = useCallControls();
   function placeCall(type: "audio" | "video") {
     startCall({ conversationId, peerId: other.id, peerName: other.name, peerHue: other.hue, type });
@@ -115,6 +123,7 @@ export function RealChatView({
   const idsRef = useRef<string[]>([]);
   /** Tracks the last tap per message to detect double-tap (star reaction) */
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   idsRef.current = messages.map((m) => m.id);
 
   const byId = useMemo(() => {
@@ -339,6 +348,96 @@ export function RealChatView({
 
     if (error) showToast("Couldn't send voice note.");
     setVoiceMode(false);
+  }
+
+  /** Send a GIF (selected from the picker) as a message. */
+  async function sendGif(gifUrl: string) {
+    setGifPickerOpen(false);
+    if (sending) return;
+    setSending(true);
+    const replyId = replyTo?.id ?? null;
+    setReplyTo(null);
+
+    const tempId = `temp-${Date.now()}`;
+    const optimistic: ChatMsg = {
+      id: tempId, body: gifUrl, sender_id: currentUserId, kind: "gif",
+      post_id: null, reply_to_id: replyId, is_unsent: false,
+      created_at: new Date().toISOString(), _status: "pending",
+    };
+    setMessages((p) => [...p, optimistic]);
+
+    const { data, error } = await supabase.rpc("send_message", {
+      p_conversation_id: conversationId, p_body: gifUrl, p_kind: "gif",
+      p_post_id: null, p_reply_to_id: replyId,
+    });
+    if (error || !data) {
+      setMessages((p) => p.map((m) => m.id === tempId ? { ...m, _status: "failed" as const } : m));
+      showToast("Couldn't send GIF.");
+    } else {
+      setMessages((p) => p.map((m) => m.id === tempId ? { ...m, ...(data as ChatMsg), _status: undefined } : m));
+    }
+    setSending(false);
+  }
+
+  /** Handle file input change — build a preview and store the attachment. */
+  function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setGifPickerOpen(false);
+    const isVideo = file.type.startsWith("video/");
+    const preview = URL.createObjectURL(file);
+    setAttachment({ file, preview, type: isVideo ? "video" : "image" });
+    e.target.value = ""; // reset so same file can be re-picked
+  }
+
+  /** Upload the staged attachment to Supabase Storage and send as a message. */
+  async function sendAttachment() {
+    if (!attachment || uploading) return;
+    setUploading(true);
+
+    const ext = attachment.file.name.split(".").pop()
+      ?? (attachment.type === "video" ? "mp4" : "jpg");
+    const path = `${currentUserId}/${Date.now()}.${ext}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from("chat-media")
+      .upload(path, attachment.file, { contentType: attachment.file.type });
+
+    if (uploadErr) {
+      showToast("Upload failed. Try again.");
+      setUploading(false);
+      return;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from("chat-media")
+      .getPublicUrl(path);
+
+    const replyId = replyTo?.id ?? null;
+    setReplyTo(null);
+    const kind = attachment.type; // "image" | "video"
+
+    const tempId = `temp-${Date.now()}`;
+    const optimistic: ChatMsg = {
+      id: tempId, body: publicUrl, sender_id: currentUserId, kind,
+      post_id: null, reply_to_id: replyId, is_unsent: false,
+      created_at: new Date().toISOString(), _status: "pending",
+    };
+    setMessages((p) => [...p, optimistic]);
+    URL.revokeObjectURL(attachment.preview);
+    setAttachment(null);
+
+    const { data, error } = await supabase.rpc("send_message", {
+      p_conversation_id: conversationId, p_body: publicUrl, p_kind: kind,
+      p_post_id: null, p_reply_to_id: replyId,
+    });
+    if (error || !data) {
+      setMessages((p) => p.map((m) => m.id === tempId ? { ...m, _status: "failed" as const } : m));
+      showToast("Couldn't send. Try again.");
+    } else {
+      setMessages((p) => p.map((m) => m.id === tempId ? { ...m, ...(data as ChatMsg), _status: undefined } : m));
+    }
+    setUploading(false);
   }
 
   async function unsend(m: ChatMsg) {
@@ -585,6 +684,58 @@ export function RealChatView({
                             {m.shot.caption && <p className="line-clamp-1 text-[11px] text-white/85 drop-shadow">{m.shot.caption}</p>}
                           </div>
                         </Link>
+                      ) : (m.kind === "gif" || m.kind === "image") && m.body ? (
+                        /* GIF / image — media bubble with time+status pill overlay */
+                        <div
+                          onPointerDown={(e) => onPressStart(m, e)}
+                          onPointerUp={onPressEnd}
+                          onPointerMove={onPressEnd}
+                          onPointerLeave={onPressEnd}
+                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          className="relative overflow-hidden rounded-2xl"
+                          style={{ maxWidth: 240 }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={m.body} alt={m.kind === "gif" ? "GIF" : ""} className="w-full rounded-2xl object-cover" />
+                          {/* GIF badge */}
+                          {m.kind === "gif" && (
+                            <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white backdrop-blur-sm">
+                              GIF
+                            </span>
+                          )}
+                          {/* Time + status pill — dark backdrop ensures readability on any image */}
+                          <span className="absolute bottom-1.5 right-2 flex items-center gap-[3px] rounded-full bg-black/50 px-1.5 py-[3px] backdrop-blur-sm">
+                            <span className="text-[9px] font-medium leading-none text-white/85">{timeLabel(m.created_at)}</span>
+                            {mine && <MsgStatusTick status={getMsgStatus(m)} />}
+                          </span>
+                          {starBurstId === m.id && (
+                            <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                              <Star size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
+                            </span>
+                          )}
+                        </div>
+                      ) : m.kind === "video" && m.body ? (
+                        /* Video bubble — player with time+status overlay */
+                        <div
+                          onPointerDown={(e) => onPressStart(m, e)}
+                          onPointerUp={onPressEnd}
+                          onPointerMove={onPressEnd}
+                          onPointerLeave={onPressEnd}
+                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          className="relative overflow-hidden rounded-2xl bg-black"
+                          style={{ maxWidth: 240 }}
+                        >
+                          <video src={m.body} className="w-full rounded-2xl" controls playsInline preload="metadata" />
+                          <span className="absolute bottom-1.5 right-2 flex items-center gap-[3px] rounded-full bg-black/60 px-1.5 py-[3px] backdrop-blur-sm">
+                            <span className="text-[9px] font-medium leading-none text-white/85">{timeLabel(m.created_at)}</span>
+                            {mine && <MsgStatusTick status={getMsgStatus(m)} />}
+                          </span>
+                          {starBurstId === m.id && (
+                            <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                              <Star size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
+                            </span>
+                          )}
+                        </div>
                       ) : m.kind === "voice" && m.body ? (() => {
                         // Parse stored JSON: { url, duration }
                         let voiceUrl = m.body;
@@ -660,7 +811,7 @@ export function RealChatView({
                       )}
 
                       {/* External time+status — only for voice, post, and shot cards.
-                          Plain text bubbles embed the time+tick inside themselves. */}
+                          Plain text, gif, image, and video bubbles embed the time+tick inside themselves. */}
                       {(m.kind === "voice" || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
                         (showTime || (mine && m._status === "failed")) && (
                         <div className={`flex items-center gap-1 px-1 pt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
@@ -682,7 +833,39 @@ export function RealChatView({
 
       {/* Composer */}
       <div className="border-t border-border/60 bg-background px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+8px)]">
-        {/* Reply-to banner — shown in both text and voice modes */}
+
+        {/* ── GIF picker panel — slides in just above the input row ── */}
+        {gifPickerOpen && !voiceMode && (
+          <div className="mb-2">
+            <GifPicker onSelect={sendGif} />
+          </div>
+        )}
+
+        {/* ── Attachment preview ── */}
+        {attachment && !voiceMode && (
+          <div className="mb-2 flex items-start gap-2 rounded-xl border border-border/60 bg-surface p-2">
+            {attachment.type === "image" ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={attachment.preview} alt="" className="h-16 w-16 rounded-lg object-cover" />
+            ) : (
+              <video src={attachment.preview} className="h-16 w-16 rounded-lg bg-black object-cover" muted playsInline preload="metadata" />
+            )}
+            <div className="min-w-0 flex-1 py-1">
+              <p className="truncate text-xs font-semibold">{attachment.file.name}</p>
+              <p className="text-[10px] text-faint capitalize">{attachment.type}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { URL.revokeObjectURL(attachment.preview); setAttachment(null); }}
+              aria-label="Remove attachment"
+              className="shrink-0 text-faint hover:text-muted"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* ── Reply-to banner ── */}
         {replyTo && !voiceMode && (
           <div className="mb-2 flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 text-xs">
             <Reply size={13} className="text-accent" />
@@ -698,46 +881,93 @@ export function RealChatView({
         )}
 
         {voiceMode ? (
-          /* ── Voice recorder ── replaces the text input entirely */
-          <VoiceRecorder
-            onSend={sendVoice}
-            onCancel={() => setVoiceMode(false)}
-          />
+          /* ── Voice recorder ── replaces the input row entirely */
+          <VoiceRecorder onSend={sendVoice} onCancel={() => setVoiceMode(false)} />
         ) : (
-          /* ── Text composer ── */
-          <div className="flex items-center gap-2">
+          /* ── Text / GIF / attachment composer ── */
+          <div className="flex items-center gap-1.5">
+
+            {/* Attachment button — always visible */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Attach photo or video"
+              className={`flex h-11 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-90 ${
+                attachment ? "text-accent" : "text-muted hover:bg-surface hover:text-foreground"
+              }`}
+            >
+              <Paperclip size={19} />
+            </button>
+
+            {/* Text input */}
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-              placeholder="Message..."
+              placeholder="Message…"
               className="h-11 flex-1 rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
             />
-            {/* Mic — visible only when input is empty */}
-            {!text.trim() && (
+
+            {/* GIF toggle — only when no text and no attachment */}
+            {!text.trim() && !attachment && (
               <button
                 type="button"
-                onClick={() => setVoiceMode(true)}
+                onClick={() => setGifPickerOpen((v) => !v)}
+                aria-label="GIF picker"
+                className={`flex h-9 shrink-0 items-center justify-center rounded-full px-2.5 text-[11px] font-black tracking-wider transition active:scale-90 ${
+                  gifPickerOpen
+                    ? "bg-accent text-accent-ink"
+                    : "bg-surface text-muted hover:text-foreground"
+                }`}
+              >
+                GIF
+              </button>
+            )}
+
+            {/* Mic — only when no text and no attachment */}
+            {!text.trim() && !attachment && (
+              <button
+                type="button"
+                onClick={() => { setGifPickerOpen(false); setVoiceMode(true); }}
                 aria-label="Record voice note"
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface text-muted transition hover:bg-elevated hover:text-foreground active:scale-90"
               >
                 <Mic size={20} />
               </button>
             )}
-            {/* Send — visible only when there's text */}
-            {text.trim() && (
+
+            {/* Send — text (takes priority) or attachment */}
+            {(text.trim() || attachment) && (
               <button
                 type="button"
-                onClick={send}
-                disabled={sending}
+                onClick={text.trim() ? send : sendAttachment}
+                disabled={sending || uploading}
                 aria-label="Send"
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"
               >
-                <Send size={18} />
+                {uploading ? (
+                  <span className="flex gap-[3px]">
+                    {[0, 0.1, 0.2].map((d, i) => (
+                      <span key={i} className="h-[5px] w-[5px] rounded-full bg-accent-ink animate-dot-bounce"
+                        style={{ animationDelay: `${d}s` }} />
+                    ))}
+                  </span>
+                ) : (
+                  <Send size={18} />
+                )}
               </button>
             )}
           </div>
         )}
+
+        {/* Hidden file input — triggered by the Paperclip button */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          className="hidden"
+          onChange={pickFile}
+        />
       </div>
 
       {/* Long-press context menu (reactions + actions), anchored to the message */}
