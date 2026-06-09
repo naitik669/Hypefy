@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { Avatar } from "@/components/ui/Avatar";
@@ -104,6 +104,7 @@ export function RealChatView({
   const [callChooser, setCallChooser] = useState(false);
   const [headerMenu, setHeaderMenu] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [starBurstId, setStarBurstId] = useState<string | null>(null);
   const { startCall } = useCallControls();
   function placeCall(type: "audio" | "video") {
     startCall({ conversationId, peerId: other.id, peerName: other.name, peerHue: other.hue, type });
@@ -112,6 +113,8 @@ export function RealChatView({
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressClick = useRef(false);
   const idsRef = useRef<string[]>([]);
+  /** Tracks the last tap per message to detect double-tap (star reaction) */
+  const lastTapRef = useRef<{ id: string; time: number } | null>(null);
   idsRef.current = messages.map((m) => m.id);
 
   const byId = useMemo(() => {
@@ -359,6 +362,23 @@ export function RealChatView({
   // Long-press Ã¢â€ â€™ context menu
   function onPressStart(m: ChatMsg, e: React.PointerEvent) {
     if (m.is_unsent) return;
+
+    // ── Double-tap → ⭐ star reaction ────────────────────────────────────────
+    // 300ms window fires before the 420ms long-press, so no conflict.
+    const now = Date.now();
+    const last = lastTapRef.current;
+    if (last && last.id === m.id && now - last.time < 300) {
+      lastTapRef.current = null;
+      if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
+      toggleReaction(m.id, "⭐");
+      setStarBurstId(m.id);
+      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(12);
+      setTimeout(() => setStarBurstId(null), 700);
+      return;
+    }
+    lastTapRef.current = { id: m.id, time: now };
+
+    // ── Long-press → context menu ────────────────────────────────────────────
     suppressClick.current = false;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     pressTimer.current = setTimeout(() => {
@@ -581,8 +601,14 @@ export function RealChatView({
                             onPointerMove={onPressEnd}
                             onPointerLeave={onPressEnd}
                             onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                            className="relative"
                           >
                             <VoiceMessage url={voiceUrl} storedDuration={voiceDuration} mine={mine} />
+                            {starBurstId === m.id && (
+                              <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                                <Star size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
+                              </span>
+                            )}
                           </div>
                         );
                       })() : (
@@ -605,6 +631,12 @@ export function RealChatView({
                             </span>
                             {mine && <MsgStatusTick status={getMsgStatus(m)} />}
                           </span>
+                          {/* Double-tap star burst — reuses Hypefy hype-pop keyframe */}
+                          {starBurstId === m.id && (
+                            <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                              <Star size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
+                            </span>
+                          )}
                         </div>
                       )}
 
