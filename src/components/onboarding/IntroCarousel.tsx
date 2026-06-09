@@ -112,8 +112,8 @@ export function IntroCarousel() {
             const active = i === index;
             return (
               <section key={s} className="flex h-full w-full shrink-0 flex-col px-7">
-                {/* Visual — animates in/out, floats while idle */}
-                <div className="flex flex-[1.15] items-center justify-center">
+                {/* Visual — fills all remaining space above the copy block */}
+                <div className="min-h-0 flex-1 flex items-center justify-center overflow-hidden">
                   {/* Shots handles its own per-reel reveal (see MockReel). */}
                   <div style={s === "shots" ? undefined : slideAnim(active, 0)}>
                     {/* Posts, shots + discover slides float each element individually;
@@ -129,8 +129,9 @@ export function IntroCarousel() {
                     </div>
                   </div>
                 </div>
-                {/* Copy — header then body lead the reveal sequence */}
-                <div className="flex flex-1 flex-col justify-start pt-1">
+                {/* Copy — natural height, anchored just above the footer.
+                    flex-none prevents it from growing and creating a blank zone. */}
+                <div className="flex-none pb-5 pt-4">
                   <Copy slide={s} active={active} />
                 </div>
               </section>
