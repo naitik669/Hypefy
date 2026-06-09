@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Search, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Search, X, Heart } from "lucide-react";
 
-interface GifResult {
+export interface GifResult {
   id: string;
-  /** downsized_medium — reasonable size for sending */
+  /** downsized_medium URL — sent as the message body */
   gifUrl: string;
-  /** fixed_height_small — fast thumbnail for the picker grid */
+  /** fixed_height_small URL — fast-loading grid thumbnail */
   previewUrl: string;
   title: string;
 }
@@ -16,100 +16,221 @@ interface Props {
   onSelect: (gifUrl: string) => void;
 }
 
-/**
- * Fetches from our own /api/gifs proxy — keeps the Giphy key server-side,
- * avoids CORS, and works regardless of NEXT_PUBLIC_ build-time baking.
- */
-async function fetchGifs(query: string): Promise<GifResult[]> {
-  const url = query.trim()
-    ? `/api/gifs?q=${encodeURIComponent(query)}`
-    : `/api/gifs`;
+// ── Categories ────────────────────────────────────────────────────────────────
+type Cat = { id: string; emoji: string; label: string; query: string | null };
+
+const CATEGORIES: Cat[] = [
+  { id: "faves",     emoji: "⭐", label: "Faves",     query: null },      // local only
+  { id: "trending",  emoji: "🔥", label: "Trending",  query: null },      // Giphy trending
+  { id: "reactions", emoji: "😂", label: "Reactions", query: "reaction" },
+  { id: "emotions",  emoji: "❤️", label: "Emotions",  query: "emotion" },
+  { id: "memes",     emoji: "😎", label: "Memes",     query: "meme" },
+  { id: "cute",      emoji: "🐱", label: "Cute",      query: "cute" },
+  { id: "sports",    emoji: "⚽", label: "Sports",    query: "sports" },
+  { id: "movies",    emoji: "🎬", label: "Movies",    query: "movie" },
+];
+
+// ── In-session cache — switching tabs re-uses already fetched results ─────────
+const gifCache = new Map<string, GifResult[]>();
+
+// ── Favourites — persisted in localStorage ────────────────────────────────────
+const FAVES_KEY = "hypefy_gif_faves";
+const MAX_FAVES = 50;
+
+function readFaves(): GifResult[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(FAVES_KEY) ?? "[]") as GifResult[];
+  } catch { return []; }
+}
+function writeFaves(next: GifResult[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(FAVES_KEY, JSON.stringify(next.slice(0, MAX_FAVES)));
+}
+
+// ── API helper ────────────────────────────────────────────────────────────────
+async function apiFetch(query: string): Promise<{ gifs: GifResult[]; keyMissing: boolean }> {
+  const key = query.trim() || "__trending__";
+  if (gifCache.has(key)) return { gifs: gifCache.get(key)!, keyMissing: false };
+  const url = query.trim() ? `/api/gifs?q=${encodeURIComponent(query.trim())}` : `/api/gifs`;
   try {
     const res = await fetch(url);
-    if (!res.ok) return [];
+    if (res.status === 503) return { gifs: [], keyMissing: true };
+    if (!res.ok) return { gifs: [], keyMissing: false };
     const json = await res.json();
-    return (json.gifs ?? []) as GifResult[];
+    const gifs = (json.gifs ?? []) as GifResult[];
+    gifCache.set(key, gifs);
+    return { gifs, keyMissing: false };
   } catch {
-    return [];
+    return { gifs: [], keyMissing: false };
   }
 }
 
 /**
- * Discord-style GIF picker.
- * — Search bar (debounced 380 ms)
- * — CSS columns masonry grid (3 cols)
- * — Trending on open, search results while typing
- * — Requires GIPHY_API_KEY in Vercel / .env.local (no NEXT_PUBLIC_ prefix)
+ * Discord-style GIF picker — categories, search, favourites.
+ *
+ * ⭐ Faves      → GIFs the user has hearted (localStorage, persists across sessions)
+ * 🔥 Trending   → Giphy trending
+ * 😂 Reactions  → search "reaction"
+ * ❤️ Emotions   → search "emotion"
+ * 😎 Memes      → search "meme"
+ * 🐱 Cute       → search "cute"
+ * ⚽ Sports     → search "sports"
+ * 🎬 Movies     → search "movie"
+ *
+ * Search bar overrides the active category while typing.
+ * Requires GIPHY_API_KEY (server-only) — fetches via /api/gifs proxy.
  */
 export function GifPicker({ onSelect }: Props) {
-  const [query, setQuery] = useState("");
+  const [activeCat, setActiveCat] = useState("trending");
+  const [search, setSearch] = useState("");
   const [gifs, setGifs] = useState<GifResult[]>([]);
+  const [faves, setFaves] = useState<GifResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [noKey, setNoKey] = useState(false);
+  const [keyMissing, setKeyMissing] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const catBarRef = useRef<HTMLDivElement>(null);
 
+  // ── Load initial data ─────────────────────────────────────────────────────
   useEffect(() => {
-    fetchGifs("").then((results) => {
-      if (results.length === 0) {
-        // Could be key missing or empty — show no-key state to surface the issue
-        setNoKey(true);
-      }
-      setGifs(results);
+    const savedFaves = readFaves();
+    setFaves(savedFaves);
+    // Fetch trending on mount
+    apiFetch("").then(({ gifs: result, keyMissing: km }) => {
+      setKeyMissing(km);
+      setGifs(result);
       setLoading(false);
     });
     inputRef.current?.focus();
   }, []);
 
-  function handleQuery(q: string) {
-    setQuery(q);
-    setNoKey(false);
+  // ── Fetch for a category (no search) ─────────────────────────────────────
+  const loadCategory = useCallback(async (catId: string) => {
+    if (catId === "faves") {
+      const saved = readFaves();
+      setFaves(saved);
+      setGifs(saved);
+      setLoading(false);
+      return;
+    }
+    const cat = CATEGORIES.find((c) => c.id === catId);
+    if (!cat) return;
+    setLoading(true);
+    const { gifs: result, keyMissing: km } = await apiFetch(cat.query ?? "");
+    setKeyMissing(km);
+    setGifs(result);
+    setLoading(false);
+  }, []);
+
+  // ── Handle search input ───────────────────────────────────────────────────
+  function handleSearch(q: string) {
+    setSearch(q);
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!q.trim()) {
+      // Clear → go back to active category
+      loadCategory(activeCat);
+      return;
+    }
     setLoading(true);
     debounceRef.current = setTimeout(async () => {
-      const results = await fetchGifs(q);
-      setGifs(results);
+      const { gifs: result, keyMissing: km } = await apiFetch(q);
+      setKeyMissing(km);
+      setGifs(result);
       setLoading(false);
     }, 380);
   }
 
+  // ── Handle category tab click ─────────────────────────────────────────────
+  function handleCat(catId: string) {
+    if (catId === activeCat && !search) return;
+    setActiveCat(catId);
+    setSearch("");
+    setLoading(true);
+    loadCategory(catId);
+  }
+
+  // ── Favourite toggle ──────────────────────────────────────────────────────
+  function toggleFave(e: React.MouseEvent, gif: GifResult) {
+    e.stopPropagation();
+    const current = readFaves();
+    const idx = current.findIndex((f) => f.id === gif.id);
+    const next = idx >= 0
+      ? current.filter((_, i) => i !== idx)
+      : [gif, ...current];
+    writeFaves(next);
+    setFaves(next);
+    // If we're on the faves tab, keep the grid in sync
+    if (activeCat === "faves" && !search) setGifs(next);
+  }
+
+  function isFaved(id: string) {
+    return faves.some((f) => f.id === id);
+  }
+
+  const isSearching = search.trim().length > 0;
+  const sectionLabel = isSearching ? "Results" : CATEGORIES.find((c) => c.id === activeCat)?.label ?? "Trending";
+
   return (
-    <div className="flex h-72 flex-col overflow-hidden rounded-2xl border border-border bg-elevated shadow-2xl">
+    <div className="flex h-[340px] flex-col overflow-hidden rounded-2xl border border-border bg-elevated shadow-2xl">
 
       {/* ── Search bar ── */}
-      <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-3 py-2">
         <Search size={14} className="shrink-0 text-faint" />
         <input
           ref={inputRef}
-          value={query}
-          onChange={(e) => handleQuery(e.target.value)}
+          value={search}
+          onChange={(e) => handleSearch(e.target.value)}
           placeholder="Search GIFs…"
           className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
         />
-        {query && (
-          <button
-            type="button"
-            onClick={() => handleQuery("")}
-            className="shrink-0 text-faint hover:text-muted"
-          >
+        {search && (
+          <button type="button" onClick={() => handleSearch("")} className="shrink-0 text-faint hover:text-muted">
             <X size={14} />
           </button>
         )}
       </div>
 
+      {/* ── Category tabs ── */}
+      {!isSearching && (
+        <div
+          ref={catBarRef}
+          className="no-scrollbar flex shrink-0 gap-1.5 overflow-x-auto border-b border-border/40 px-2 py-1.5"
+        >
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => handleCat(cat.id)}
+              className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                activeCat === cat.id
+                  ? "bg-accent text-accent-ink"
+                  : "bg-surface text-muted hover:text-foreground"
+              }`}
+            >
+              <span>{cat.emoji}</span>
+              <span>{cat.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── Section label ── */}
-      <div className="px-3 py-1.5">
+      <div className="shrink-0 px-3 py-1">
         <span className="text-[10px] font-bold uppercase tracking-widest text-faint">
-          {query.trim() ? "Results" : "Trending"}
+          {sectionLabel}
+          {activeCat === "faves" && !isSearching && faves.length > 0 && (
+            <span className="ml-1.5 text-faint/60">· {faves.length}</span>
+          )}
         </span>
       </div>
 
       {/* ── GIF grid ── */}
       <div className="flex-1 overflow-y-auto px-2 pb-2">
-        {noKey ? (
-          <div className="flex h-full flex-col items-center justify-center gap-1.5 text-center px-4">
+        {keyMissing ? (
+          <div className="flex h-full flex-col items-center justify-center gap-1.5 px-4 text-center">
             <p className="text-xs font-semibold text-muted">GIFs not configured</p>
-            <p className="text-[10px] text-faint leading-relaxed">
+            <p className="text-[10px] leading-relaxed text-faint">
               Add <code className="rounded bg-surface px-1 text-[9px]">GIPHY_API_KEY</code> to
               Vercel Environment Variables, then redeploy.
             </p>
@@ -118,43 +239,58 @@ export function GifPicker({ onSelect }: Props) {
           <div className="flex h-full items-center justify-center">
             <span className="flex gap-1.5">
               {[0, 0.12, 0.24].map((delay, i) => (
-                <span
-                  key={i}
-                  className="h-1.5 w-1.5 rounded-full bg-faint animate-dot-bounce"
-                  style={{ animationDelay: `${delay}s` }}
-                />
+                <span key={i} className="h-1.5 w-1.5 animate-dot-bounce rounded-full bg-faint"
+                  style={{ animationDelay: `${delay}s` }} />
               ))}
             </span>
           </div>
         ) : gifs.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <span className="text-xs text-faint">No GIFs found</span>
+          <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
+            {activeCat === "faves" && !isSearching ? (
+              <>
+                <span className="text-2xl">⭐</span>
+                <p className="text-xs font-semibold text-muted">No favourites yet</p>
+                <p className="text-[10px] text-faint">Tap the ♥ on any GIF to save it here</p>
+              </>
+            ) : (
+              <span className="text-xs text-faint">No GIFs found</span>
+            )}
           </div>
         ) : (
+          /* CSS columns = natural masonry, no JS needed */
           <div className="columns-3 gap-1 space-y-1">
             {gifs.map((gif) => (
-              <button
-                key={gif.id}
-                type="button"
-                onClick={() => onSelect(gif.gifUrl)}
-                className="block w-full overflow-hidden rounded-lg transition-opacity active:opacity-60"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={gif.previewUrl}
-                  alt={gif.title}
-                  className="w-full rounded-lg"
-                  loading="lazy"
-                />
-              </button>
+              <div key={gif.id} className="relative break-inside-avoid">
+                <button
+                  type="button"
+                  onClick={() => onSelect(gif.gifUrl)}
+                  className="block w-full overflow-hidden rounded-lg transition-opacity active:opacity-60"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={gif.previewUrl} alt={gif.title} className="w-full rounded-lg" loading="lazy" />
+                </button>
+
+                {/* Heart / fave button — always visible, top-right of each GIF */}
+                <button
+                  type="button"
+                  onClick={(e) => toggleFave(e, gif)}
+                  aria-label={isFaved(gif.id) ? "Remove from favourites" : "Add to favourites"}
+                  className="absolute right-1 top-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-black/55 backdrop-blur-sm transition-transform active:scale-110"
+                >
+                  <Heart
+                    size={9}
+                    className={isFaved(gif.id) ? "fill-red-400 text-red-400" : "fill-transparent text-white/80"}
+                  />
+                </button>
+              </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* ── GIPHY attribution (required by Giphy ToS) ── */}
-      {!noKey && !loading && (
-        <div className="border-t border-border/40 px-3 py-1 text-right">
+      {/* ── GIPHY attribution (required by ToS) ── */}
+      {!keyMissing && (
+        <div className="shrink-0 border-t border-border/40 px-3 py-1 text-right">
           <span className="text-[9px] font-bold uppercase tracking-widest text-faint/50">
             Powered by GIPHY
           </span>

@@ -579,8 +579,11 @@ export function RealChatView({
         </div>
       </header>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      {/* Messages — clicking here closes the GIF picker */}
+      <div
+        className="flex-1 overflow-y-auto px-4 py-4"
+        onClick={() => { if (gifPickerOpen) setGifPickerOpen(false); }}
+      >
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
             {isGroup ? (
