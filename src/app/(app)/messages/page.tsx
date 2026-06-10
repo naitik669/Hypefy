@@ -66,6 +66,16 @@ export default async function MessagesPage() {
       if (m.blocked_at) blockedByConv.add(m.conversation_id);
     });
 
+    // Count unread messages per conversation (messages after my last_read_at, not sent by me)
+    const unreadCountByConv = new Map<string, number>();
+    (msgsRes.data ?? []).forEach((m: any) => {
+      if (m.sender_id === user.id) return;
+      const lastRead = readByConv.get(m.conversation_id) ?? null;
+      if (!lastRead || new Date(m.created_at) > new Date(lastRead)) {
+        unreadCountByConv.set(m.conversation_id, (unreadCountByConv.get(m.conversation_id) ?? 0) + 1);
+      }
+    });
+
     rows = (convs ?? [])
       .filter((c: any) => !blockedByConv.has(c.id)) // hide conversations I've blocked
       .map((c: any) => {
@@ -102,6 +112,7 @@ export default async function MessagesPage() {
           lastMine: last?.sender_id === user.id,
           lastSenderName,
           unread,
+          unreadCount: unreadCountByConv.get(c.id) ?? 0,
           isRequest: !isGroup && requestByConv.get(c.id) === false,
         } as InboxRow;
       })
