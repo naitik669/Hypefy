@@ -247,13 +247,15 @@ export function GifPicker({ onSelect }: Props) {
             </p>
           </div>
         ) : loading ? (
-          <div className="flex h-full items-center justify-center">
-            <span className="flex gap-1.5">
-              {[0, 0.12, 0.24].map((delay, i) => (
-                <span key={i} className="h-1.5 w-1.5 animate-dot-bounce rounded-full bg-faint"
-                  style={{ animationDelay: `${delay}s` }} />
-              ))}
-            </span>
+          /* Skeleton grid — 3 columns, varying heights to mimic real masonry */
+          <div className="columns-3 gap-1 space-y-1">
+            {[72, 52, 88, 60, 96, 52, 80, 64, 72, 88, 56, 68].map((h, i) => (
+              <div
+                key={i}
+                className="skeleton break-inside-avoid rounded-lg"
+                style={{ height: h }}
+              />
+            ))}
           </div>
         ) : gifs.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
