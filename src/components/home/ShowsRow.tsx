@@ -5,7 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
-import type { Show } from "@/lib/mock";
+export type Show = {
+  id: string;
+  name: string;
+  hue: number;
+  seen: boolean;
+  avatar_url?: string | null;
+};
 
 type CurrentUser = {
   name: string;

@@ -333,8 +333,10 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
             {formatCount(commentCount)}
           </button>
 
-          <button type="button" onClick={() => setShareOpen(true)} aria-label="Share" className="text-foreground">
+          <button type="button" onClick={() => setShareOpen(true)} aria-label="Share"
+            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground">
             <Send size={21} strokeWidth={2.2} />
+            {((post as any).share_count ?? 0) > 0 && formatCount((post as any).share_count)}
           </button>
         </div>
 

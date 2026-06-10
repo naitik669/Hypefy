@@ -327,8 +327,17 @@ export function ShareSheet({
       {/* Friends list */}
       <div className="flex flex-col overflow-y-auto" style={{ maxHeight: "36dvh" }}>
         {loading ? (
-          <div className="flex items-center justify-center py-6">
-            <Loader2 size={20} className="animate-spin text-muted" />
+          /* Shimmer skeleton rows shaped like friend rows */
+          <div className="flex flex-col">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-1 py-2.5">
+                <div className="skeleton h-[46px] w-[46px] shrink-0 rounded-[30%]" />
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <div className="skeleton h-3 rounded" style={{ width: `${45 + (i % 3) * 14}%` }} />
+                  <div className="skeleton h-2.5 w-16 rounded" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <p className="py-6 text-center text-sm text-faint">

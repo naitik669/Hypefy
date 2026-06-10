@@ -139,11 +139,21 @@ export default function NotificationsPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 size={24} className="animate-spin text-muted" />
+        /* Shimmer skeleton rows shaped like real notifications */
+        <div className="flex flex-col gap-1 px-4 pt-1">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 py-2.5">
+              <div className="skeleton h-11 w-11 shrink-0 rounded-[30%]" />
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <div className="skeleton h-3 rounded" style={{ width: `${55 + (i % 3) * 12}%` }} />
+                <div className="skeleton h-2.5 w-16 rounded" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : visible.length === 0 ? (
         <EmptyState
+          mascot
           icon={Bell}
           title="Quiet for now"
           text="Hypes, replies, follows, and mentions will show up here."
