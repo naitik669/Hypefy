@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Star, MessageCircle, Send, Bookmark, Volume2, VolumeX, Play, ChevronLeft } from "lucide-react";
+import { Star, MessageCircle, Send, Bookmark, Volume2, VolumeX, Play, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
@@ -122,6 +122,13 @@ function ReelCard({
   const [saved, setSaved] = useState(false);
   const [savePending, setSavePending] = useState(false);
 
+  // Owner controls
+  const isOwner = !!currentUserId && currentUserId === reel.user_id;
+  const [ownerMenuOpen, setOwnerMenuOpen] = useState(false);
+  const [inShowcase, setInShowcase] = useState(false);
+  const [ownerAction, setOwnerAction] = useState<"delete" | "showcase" | null>(null);
+  const [deleted, setDeleted] = useState(false);
+
   // Double-tap-to-Hype (animations mirror the feed: 380ms burst + 640ms particles)
   const [hypeBurst, setHypeBurst] = useState(false);
   const [showParticles, setShowParticles] = useState(false);
@@ -154,7 +161,7 @@ function ReelCard({
           .eq("target_type", "shot")
           .eq("target_id", reel.id)
           .maybeSingle(),
-        supabase.from("shots").select("hype_count, comment_count").eq("id", reel.id).maybeSingle(),
+        supabase.from("shots").select("hype_count, comment_count, in_showcase").eq("id", reel.id).maybeSingle(),
         supabase
           .from("saved_shots")
           .select("id")
@@ -167,6 +174,7 @@ function ReelCard({
       if (total.data) {
         setHypeCount(total.data.hype_count ?? 0);
         setCommentCount(total.data.comment_count ?? 0);
+        setInShowcase(!!(total.data as any).in_showcase);
       }
       setSaved(!!savedRow.data);
     }
@@ -225,6 +233,25 @@ function ReelCard({
     } finally {
       setSavePending(false);
     }
+  }
+
+  async function deleteShot() {
+    setOwnerAction("delete");
+    const { error } = await supabase.from("shots").delete().eq("id", reel.id);
+    setOwnerAction(null);
+    if (error) return;
+    setOwnerMenuOpen(false);
+    setDeleted(true);
+    setTimeout(onBack, 700);
+  }
+
+  async function toggleShotShowcase() {
+    setOwnerAction("showcase");
+    const next = !inShowcase;
+    const { error } = await supabase.from("shots").update({ in_showcase: next }).eq("id", reel.id);
+    setOwnerAction(null);
+    if (!error) setInShowcase(next);
+    setOwnerMenuOpen(false);
   }
 
   function togglePlay() {
@@ -360,6 +387,12 @@ function ReelCard({
         <RailButton label="Save" onClick={toggleSave} disabled={savePending}>
           <Bookmark size={30} className={saved ? "text-accent" : "text-white"} fill={saved ? "currentColor" : "none"} />
         </RailButton>
+
+        {isOwner && (
+          <RailButton label="More" onClick={() => setOwnerMenuOpen(true)}>
+            <MoreHorizontal size={30} className="text-white" />
+          </RailButton>
+        )}
       </div>
 
       {/* Author + caption */}
@@ -376,6 +409,65 @@ function ReelCard({
           </ExpandableText>
         )}
       </div>
+
+      {/* Deleted confirmation */}
+      {deleted && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/80">
+          <p className="text-sm font-semibold text-white/80">Shot deleted</p>
+        </div>
+      )}
+
+      {/* Owner actions menu — same pattern as ShowViewer */}
+      {ownerMenuOpen && (
+        <>
+          <div className="absolute inset-0 z-30" onClick={() => setOwnerMenuOpen(false)} />
+          <div className="absolute inset-x-4 bottom-8 z-40 overflow-hidden rounded-2xl bg-elevated/95 ring-1 ring-border backdrop-blur-xl">
+            <button
+              type="button"
+              disabled={ownerAction !== null}
+              onClick={toggleShotShowcase}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5 disabled:opacity-50"
+            >
+              {ownerAction === "showcase"
+                ? <Loader2 size={20} className="animate-spin text-accent" />
+                : inShowcase
+                  ? <BookmarkCheck size={20} className="text-accent" />
+                  : <Bookmark size={20} className="text-foreground" />}
+              <div>
+                <p className="text-sm font-semibold">{inShowcase ? "Remove from Showcase" : "Add to Showcase"}</p>
+                <p className="text-xs text-muted">
+                  {inShowcase ? "Remove from your profile highlights" : "Pin to your profile highlights"}
+                </p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
+            <button
+              type="button"
+              disabled={ownerAction !== null}
+              onClick={deleteShot}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left text-danger transition-colors hover:bg-danger/10 disabled:opacity-50"
+            >
+              {ownerAction === "delete" ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
+              <div>
+                <p className="text-sm font-semibold">Delete Shot</p>
+                <p className="text-xs opacity-70">Removes this Shot permanently</p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
+            <button
+              type="button"
+              onClick={() => setOwnerMenuOpen(false)}
+              className="flex w-full items-center justify-center px-5 py-4 text-sm font-semibold text-muted transition-colors hover:bg-white/5"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Sheets */}
       {currentUserId && (

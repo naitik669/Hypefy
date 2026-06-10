@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { Avatar } from "@/components/ui/Avatar";
@@ -30,6 +30,7 @@ export type ChatMsg = {
   shot_id?: string | null;
   reply_to_id: string | null;
   is_unsent: boolean;
+  edited_at?: string | null;
   created_at: string;
   post?: PostPreview | null;
   postProfile?: ShareProfile | null;
@@ -99,6 +100,7 @@ export function RealChatView({
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMsg | null>(null);
+  const [editing, setEditing] = useState<ChatMsg | null>(null);
   const [menu, setMenu] = useState<{ msg: ChatMsg; rect: DOMRect } | null>(null);
   const [reportMsg, setReportMsg] = useState<ChatMsg | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -154,6 +156,19 @@ export function RealChatView({
     }
     showToast("Blocked & reported");
     setTimeout(() => router.push("/messages"), 600);
+  }
+
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
+  async function leaveConversation() {
+    const { error } = await supabase.rpc("leave_conversation", { p_conversation_id: conversationId });
+    setConfirmLeave(false);
+    if (error) {
+      showToast(isGroup ? "Couldn't leave group" : "Couldn't delete chat");
+      return;
+    }
+    showToast(isGroup ? "Left group" : "Chat deleted");
+    setTimeout(() => router.push("/messages"), 500);
   }
   function placeCall(type: "audio" | "video") {
     startCall({ conversationId, peerId: other.id, peerName: other.name, peerHue: other.hue, type });
@@ -324,6 +339,7 @@ export function RealChatView({
   }
 
   async function send() {
+    if (editing) { await saveEdit(); return; }
     const body = text.trim();
     if (!body || sending) return;
     setSending(true);
@@ -487,6 +503,23 @@ export function RealChatView({
     if (error) showToast("Couldn't unsend");
   }
 
+  function startEdit(m: ChatMsg) {
+    setEditing(m);
+    setReplyTo(null);
+    setText(m.body ?? "");
+  }
+
+  async function saveEdit() {
+    if (!editing || !text.trim()) return;
+    const id = editing.id;
+    const newBody = text.trim();
+    setMessages((p) => p.map((x) => (x.id === id ? { ...x, body: newBody, edited_at: new Date().toISOString() } : x)));
+    setEditing(null);
+    setText("");
+    const { error } = await supabase.rpc("edit_message", { p_message_id: id, p_body: newBody });
+    if (error) showToast("Couldn't edit message");
+  }
+
   async function submitReport(reason: string) {
     if (!reportMsg) return;
     const m = reportMsg;
@@ -608,6 +641,11 @@ export function RealChatView({
                   className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/5">
                   <BellOff size={17} className={muted ? "text-accent" : "text-muted"} />
                   {muted ? "Unmute notifications" : "Mute notifications"}
+                </button>
+                <button type="button"
+                  onClick={() => { setHeaderMenu(false); setConfirmLeave(true); }}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/5">
+                  <LogOut size={17} className="text-muted" /> {isGroup ? "Leave group" : "Delete chat"}
                 </button>
                 <div className="my-1 h-px bg-border" />
                 {isGroup ? (
@@ -830,6 +868,11 @@ export function RealChatView({
                           {m.body}
                           {/* Time + status always at bottom-right inside the bubble */}
                           <span className="absolute bottom-1.5 right-2.5 flex items-center gap-[3px]">
+                            {m.edited_at && (
+                              <span className={`text-[9px] font-medium italic leading-none ${mine ? "text-accent-ink/45" : "text-faint"}`}>
+                                edited ·
+                              </span>
+                            )}
                             <span className={`text-[9px] font-medium leading-none ${mine ? "text-accent-ink/45" : "text-faint"}`}>
                               {timeLabel(m.created_at)}
                             </span>
@@ -930,6 +973,17 @@ export function RealChatView({
               : {replyTo.is_unsent ? "Unsent" : replyTo.body ?? (replyTo.kind === "shot" ? "Shot" : "Post")}
             </span>
             <button onClick={() => setReplyTo(null)} className="text-faint hover:text-muted"><X size={14} /></button>
+          </div>
+        )}
+
+        {/* Editing banner */}
+        {editing && (
+          <div className="mb-2 flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-xs">
+            <Pencil size={13} className="shrink-0 text-accent" />
+            <span className="min-w-0 flex-1 truncate text-muted">
+              Editing: <span className="text-foreground">{editing.body}</span>
+            </span>
+            <button onClick={() => { setEditing(null); setText(""); }} className="text-faint hover:text-muted"><X size={14} /></button>
           </div>
         )}
 
@@ -1055,6 +1109,9 @@ export function RealChatView({
                 <div className={`w-44 overflow-hidden rounded-2xl bg-elevated p-1 shadow-xl ring-1 ring-border ${mine ? "ml-auto" : ""}`}>
                   <MenuItem icon={<Reply size={17} />} label="Reply" onClick={() => { setReplyTo(menu.msg); setMenu(null); }} />
                   {menu.msg.body && <MenuItem icon={<Copy size={17} />} label="Copy" onClick={() => { copy(menu.msg); setMenu(null); }} />}
+                  {menu.msg.sender_id === currentUserId && menu.msg.kind === "text" && !menu.msg.is_unsent && (
+                    <MenuItem icon={<Pencil size={17} />} label="Edit" onClick={() => { startEdit(menu.msg); setMenu(null); }} />
+                  )}
                   {mine ? (
                     <MenuItem danger icon={<Trash2 size={17} />} label="Unsend" onClick={() => { unsend(menu.msg); setMenu(null); }} />
                   ) : (
@@ -1080,6 +1137,31 @@ export function RealChatView({
             ))}
           </div>
         </BottomSheet>
+      )}
+
+      {/* Confirm leave / delete chat */}
+      {confirmLeave && (
+        <>
+          <div className="fixed inset-0 z-[200] bg-black/60" onClick={() => setConfirmLeave(false)} />
+          <div className="fixed inset-x-6 top-1/2 z-[210] -translate-y-1/2 rounded-2xl bg-elevated p-5 ring-1 ring-border">
+            <p className="text-base font-bold">{isGroup ? "Leave this group?" : "Delete this chat?"}</p>
+            <p className="mt-1 text-sm text-muted">
+              {isGroup
+                ? "You'll stop receiving messages and the chat disappears from your inbox."
+                : "The conversation disappears from your inbox. The other person keeps their copy."}
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button type="button" onClick={() => setConfirmLeave(false)}
+                className="flex-1 rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-white/5">
+                Cancel
+              </button>
+              <button type="button" onClick={leaveConversation}
+                className="flex-1 rounded-xl bg-danger py-2.5 text-sm font-bold text-white">
+                {isGroup ? "Leave" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Toast */}
