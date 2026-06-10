@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Star, Send, Loader2, Flag, Check, ChevronDown, Trash2, X, CornerUpLeft } from "lucide-react";
+import { Star, Send, Loader2, Flag, Check, ChevronDown, Trash2, CornerUpLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { Avatar } from "@/components/ui/Avatar";
+import { GifPicker } from "@/components/messages/GifPicker";
 import { formatCount } from "@/lib/format";
+
+const isGifBody = (body: string) => body.startsWith("https://");
 
 /* --- Types ---------------------------------------------------------------- */
 type RawComment = {
@@ -77,6 +80,7 @@ export function CommentsSheet({
   const [posting, setPosting] = useState(false);
   const [replyTo, setReplyTo] = useState<{ id: string; username: string } | null>(null);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
+  const [gifPickerOpen, setGifPickerOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -97,7 +101,7 @@ export function CommentsSheet({
       });
   }, [open, postId, targetType, supabase]);
 
-  useEffect(() => { if (!open) { setReplyTo(null); setText(""); } }, [open]);
+  useEffect(() => { if (!open) { setReplyTo(null); setText(""); setGifPickerOpen(false); } }, [open]);
 
   // Keep the parent's comment badge in sync -- counts replies too.
   const totalCount = countAll(tree);
@@ -205,6 +209,52 @@ export function CommentsSheet({
     setReplyTo(null);
   }
 
+  async function submitGif(gifUrl: string) {
+    if (posting) return;
+    setGifPickerOpen(false);
+    setPosting(true);
+    const { data, error } =
+      targetType === "shot"
+        ? await supabase.rpc("create_shot_comment", {
+            p_shot_id: postId,
+            p_body: gifUrl,
+            p_owner_id: postOwnerId,
+            p_parent_id: replyTo?.id ?? null,
+          })
+        : await supabase.rpc("create_comment", {
+            p_post_id: postId,
+            p_body: gifUrl,
+            p_owner_id: postOwnerId,
+            p_parent_id: replyTo?.id ?? null,
+          });
+    setPosting(false);
+    if (error || !data) return;
+
+    const { data: row } = await supabase
+      .from("comments")
+      .select("id, user_id, body, hype_count, created_at, parent_id, profiles(display_name, username, avatar_hue, avatar_url)")
+      .eq("id", data)
+      .single();
+
+    if (row) {
+      const newComment: Comment = {
+        ...(row as any),
+        profiles: Array.isArray((row as any).profiles) ? (row as any).profiles[0] ?? null : (row as any).profiles,
+        hyped: false,
+        localHypeCount: 0,
+        reported: false,
+        replies: [],
+        showReplies: false,
+      };
+      if (replyTo?.id) {
+        mutateFn(replyTo.id, (parent) => ({ ...parent, replies: [...parent.replies, newComment], showReplies: true }));
+      } else {
+        setTree((prev) => [...prev, newComment]);
+      }
+    }
+    setReplyTo(null);
+  }
+
   return (
     <>
     <BottomSheet open={open} onClose={onClose} title={`Comments · ${totalCount}`}>
@@ -232,7 +282,14 @@ export function CommentsSheet({
       )}
 
       {/* Input */}
-      <div className="sticky bottom-0 -mx-5 border-t border-border bg-elevated px-5 py-3">
+      <div className="sticky bottom-0 -mx-5 border-t border-border bg-elevated px-5 pb-3 pt-2">
+        {/* GIF picker panel */}
+        {gifPickerOpen && (
+          <div className="mb-2">
+            <GifPicker onSelect={submitGif} />
+          </div>
+        )}
+
         {replyTo && (
           <div className="mb-2 flex items-center gap-2 text-xs text-muted">
             <CornerUpLeft size={13} className="text-faint" />
@@ -242,6 +299,17 @@ export function CommentsSheet({
           </div>
         )}
         <div className="flex items-center gap-2">
+          {/* GIF toggle button */}
+          <button
+            type="button"
+            onClick={() => setGifPickerOpen((v) => !v)}
+            className={`flex h-9 items-center justify-center rounded-lg px-2 text-[11px] font-black tracking-wide transition-colors ${
+              gifPickerOpen ? "bg-accent text-accent-ink" : "bg-surface text-muted hover:text-foreground"
+            }`}
+          >
+            GIF
+          </button>
+
           <input
             ref={inputRef}
             value={text}
@@ -311,7 +379,12 @@ function CommentItem({
             <span className="text-sm font-semibold">{n}</span>
             <span className="text-xs text-faint">· {timeAgo(comment.created_at)}</span>
           </div>
-          <p className="mt-0.5 text-sm text-foreground/90">{comment.body}</p>
+          {isGifBody(comment.body) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={comment.body} alt="GIF" className="mt-1 max-w-[200px] rounded-xl" />
+          ) : (
+            <p className="mt-0.5 text-sm text-foreground/90">{comment.body}</p>
+          )}
 
           {/* Actions */}
           <div className="mt-1.5 flex items-center gap-4">
@@ -376,7 +449,12 @@ function CommentItem({
                       <span className="text-sm font-semibold">{rn}</span>
                       <span className="text-xs text-faint">· {timeAgo(reply.created_at)}</span>
                     </div>
-                    <p className="mt-0.5 text-sm text-foreground/90">{reply.body}</p>
+                    {isGifBody(reply.body) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={reply.body} alt="GIF" className="mt-1 max-w-[180px] rounded-xl" />
+                    ) : (
+                      <p className="mt-0.5 text-sm text-foreground/90">{reply.body}</p>
+                    )}
                     <div className="mt-1.5 flex items-center gap-4">
                       <button type="button" onClick={() => onHype(reply)}
                         className={`flex items-center gap-1 text-xs font-medium ${reply.hyped ? "text-hype" : "text-faint hover:text-muted"}`}>
