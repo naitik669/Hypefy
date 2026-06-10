@@ -52,6 +52,13 @@ export default function SettingsPage() {
 
         {/* Sign out */}
         <SignOutButton />
+
+        {/* Legal footer */}
+        <p className="text-center text-[11px] text-faint">
+          <Link href="/terms" className="underline hover:text-muted">Terms of Service</Link>
+          <span className="mx-2">·</span>
+          <Link href="/privacy" className="underline hover:text-muted">Privacy Policy</Link>
+        </p>
       </div>
     </>
   );

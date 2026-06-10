@@ -237,6 +237,14 @@ export function AuthCard({ mode }: { mode: Mode }) {
             {t.footerLink}
           </Link>
         </p>
+
+        {mode === "signup" && (
+          <p className="mt-3 text-center text-[11px] leading-relaxed text-faint">
+            By signing up you agree to our{" "}
+            <Link href="/terms" className="underline hover:text-muted">Terms of Service</Link> and{" "}
+            <Link href="/privacy" className="underline hover:text-muted">Privacy Policy</Link>.
+          </p>
+        )}
       </div>
     </div>
   );
