@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { NotificationPrefs, type NotifPrefs } from "@/components/settings/NotificationPrefs";
+import { PushToggle } from "@/components/pwa/PushToggle";
 
 export default async function NotificationSettingsPage() {
   const supabase = await createClient();
@@ -17,11 +18,23 @@ export default async function NotificationSettingsPage() {
   return (
     <>
       <PageHeader title="Notifications" showBack />
-      <div className="px-4 pb-10 pt-3">
-        <NotificationPrefs
-          userId={user.id}
-          initialPrefs={((profile as any)?.notif_prefs ?? {}) as NotifPrefs}
-        />
+      <div className="flex flex-col gap-6 px-4 pb-10 pt-3">
+        <section>
+          <p className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">
+            This device
+          </p>
+          <PushToggle userId={user.id} />
+        </section>
+
+        <section>
+          <p className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">
+            What pings you
+          </p>
+          <NotificationPrefs
+            userId={user.id}
+            initialPrefs={((profile as any)?.notif_prefs ?? {}) as NotifPrefs}
+          />
+        </section>
       </div>
     </>
   );
