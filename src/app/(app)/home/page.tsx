@@ -99,6 +99,17 @@ export default async function HomePage() {
       : Promise.resolve({ data: [] as any[] }),
   ]);
 
+  // Which active shows I've already viewed (server-side truth for the seen ring)
+  const activeShowIds = (activeShows ?? []).map((s: any) => s.id);
+  const { data: myViews } = activeShowIds.length > 0
+    ? await supabase
+        .from("show_views")
+        .select("show_id")
+        .eq("viewer_id", user.id)
+        .in("show_id", activeShowIds)
+    : { data: [] as any[] };
+  const viewedShowIds = new Set((myViews ?? []).map((v: any) => v.show_id as string));
+
   // Merge followed + global, dedupe (followed posts can appear in both slices)
   const byId = new Map<string, any>();
   for (const p of [...normalise(followedPosts), ...normalise(rawPosts)]) {
@@ -170,7 +181,7 @@ export default async function HomePage() {
     : undefined;
 
   // Group by user: keep most-recent-activity order, but enter at their OLDEST show.
-  const byUser = new Map<string, { id: string; name: string; hue: number; avatar_url: string | null }>();
+  const byUser = new Map<string, { id: string; name: string; hue: number; avatar_url: string | null; allIds: string[] }>();
   for (const s of (activeShows ?? []) as any[]) {
     const p = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
     const existing = byUser.get(s.user_id);
@@ -180,12 +191,18 @@ export default async function HomePage() {
         name: p?.display_name ?? p?.username ?? "User",
         hue: p?.avatar_hue ?? 280,
         avatar_url: p?.avatar_url ?? null,
+        allIds: [s.id],
       });
     } else {
-      existing.id = s.id; // iterating newestâ†’oldest, so this ends as the oldest
+      existing.id = s.id; // iterating newest->oldest, so this ends as the oldest
+      existing.allIds.push(s.id);
     }
   }
-  const shows = [...byUser.values()].map((v) => ({ ...v, seen: false }));
+  // Seen only when EVERY active show from that user has a server-side view
+  const shows = [...byUser.values()].map(({ allIds, ...v }) => ({
+    ...v,
+    seen: allIds.every((id) => viewedShowIds.has(id)),
+  }));
 
   return (
     <>

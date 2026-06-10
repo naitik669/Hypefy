@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   X, Send, Star, ChevronLeft, ChevronRight, ExternalLink,
-  MoreHorizontal, Trash2, Bookmark, BookmarkCheck, Loader2, FileText,
+  MoreHorizontal, Trash2, Bookmark, BookmarkCheck, Loader2, FileText, Eye,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
@@ -137,6 +137,28 @@ function ShowScreen({
   const [hyped, setHyped] = useState(false);
   const [hypeCount, setHypeCount] = useState(show.hype_count ?? 0);
   const [hypePending, setHypePending] = useState(false);
+  const [viewCount, setViewCount] = useState<number | null>(null);
+
+  // Server-side view tracking: viewers register a view, owners see the count
+  useEffect(() => {
+    if (!currentUserId) return;
+    if (isOwner) {
+      supabase
+        .from("show_views")
+        .select("viewer_id", { count: "exact", head: true })
+        .eq("show_id", show.id)
+        .then(({ count }) => setViewCount(count ?? 0));
+    } else {
+      supabase
+        .from("show_views")
+        .upsert(
+          { show_id: show.id, viewer_id: currentUserId },
+          { onConflict: "show_id,viewer_id", ignoreDuplicates: true },
+        )
+        .then(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show.id, currentUserId, isOwner]);
 
   const linkedPost = show.linked_post ?? null;
   const postAuthorName = linkedPost?.profiles?.display_name ?? linkedPost?.profiles?.username ?? "User";
@@ -405,6 +427,18 @@ function ShowScreen({
       {show.caption && !menuOpen && (
         <div className="pointer-events-none absolute inset-x-4 z-20" style={{ bottom: 96 }}>
           <p className="text-sm text-white/90 drop-shadow">{show.caption}</p>
+        </div>
+      )}
+
+      {/* ── Owner view count ── */}
+      {isOwner && viewCount !== null && !menuOpen && (
+        <div className="pointer-events-none absolute left-4 z-20 flex items-center gap-1.5" style={{ bottom: show.caption ? 128 : 96 }}>
+          <span className="flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 backdrop-blur-sm">
+            <Eye size={13} className="text-white/80" />
+            <span className="text-xs font-semibold text-white/90">
+              {viewCount} {viewCount === 1 ? "view" : "views"}
+            </span>
+          </span>
         </div>
       )}
 
