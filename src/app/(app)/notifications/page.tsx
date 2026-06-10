@@ -30,7 +30,7 @@ const FILTERS: Filter[] = ["All", "Hypes", "Comments", "Follows", "Mentions"];
 
 const TYPE_MAP: Record<Filter, string[]> = {
   All: [],
-  Hypes: ["hype_post", "hype_shot"],
+  Hypes: ["hype_post", "hype_shot", "hype_comment", "repost"],
   Comments: ["comment_post", "comment_shot"],
   Follows: ["follow"],
   Mentions: ["mention_post", "mention_shot"],
@@ -83,6 +83,37 @@ export default function NotificationsPage() {
     }
     load();
   }, [supabase]);
+
+  // Realtime: new notifications appear at the top without a refresh
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      channel = supabase
+        .channel(`notifs-page-${user.id}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+          async (payload) => {
+            const n = payload.new as any;
+            // Fetch actor profile for the new row
+            let actor = null;
+            if (n.actor_id) {
+              const { data } = await supabase
+                .from("profiles")
+                .select("display_name, username, avatar_hue, avatar_url")
+                .eq("id", n.actor_id)
+                .maybeSingle();
+              actor = data ?? null;
+            }
+            setNotifs((prev) => [{ ...n, actor } as Notif, ...prev]);
+          },
+        )
+        .subscribe();
+    });
+    return () => { if (channel) supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const allowed = TYPE_MAP[filter];
   const visible = allowed.length === 0 ? notifs : notifs.filter((n) => allowed.includes(n.type));

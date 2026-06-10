@@ -49,7 +49,17 @@ export function FollowButton({
         .delete()
         .eq("follower_id", currentUserId)
         .eq("following_id", targetUserId);
-      if (error) setFollowing(prev);
+      if (error) {
+        setFollowing(prev);
+      } else {
+        // Clean up the "started following you" notification
+        await supabase
+          .from("notifications")
+          .delete()
+          .eq("user_id", targetUserId)
+          .eq("actor_id", currentUserId)
+          .eq("type", "follow");
+      }
     }
     setPending(false);
   }
