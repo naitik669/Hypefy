@@ -14,6 +14,28 @@ function normalise(raw: unknown[] | null) {
   }));
 }
 
+/**
+ * Blended feed score. Followed content gets a strong boost but does NOT
+ * hard-eclipse fresh content; engagement is capped so a viral old post
+ * can't permanently camp at the top.
+ *
+ *  - recency:    up to ~96 pts, decays linearly over 48h
+ *  - social:     +44 followed / +28 own / 0 stranger
+ *  - engagement: hype*3 + comments*2 + saves*2, capped at 60
+ */
+function feedScore(p: any, isOwn: boolean, isFollowed: boolean, now: number) {
+  const hours = (now - new Date(p.created_at).getTime()) / 3_600_000;
+  const recency = Math.max(0, 48 - hours) * 2;
+  const social = isFollowed ? 44 : isOwn ? 28 : 0;
+  const engagement = Math.min(
+    (p.hype_count ?? 0) * 3 + (p.comment_count ?? 0) * 2 + (p.save_count ?? 0) * 2,
+    60,
+  );
+  return recency + social + engagement;
+}
+
+const POST_COLS = "*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags)";
+
 export default async function HomePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -21,16 +43,32 @@ export default async function HomePage() {
 
   const nowIso = new Date().toISOString();
 
-  // Fire all independent queries concurrently (was 5 sequential round-trips).
+  // Follow graph first: the followed-posts query depends on it.
+  const { data: followRows } = await supabase
+    .from("follows")
+    .select("following_id")
+    .eq("follower_id", user.id);
+  const followingIds = new Set(
+    (followRows ?? []).map((r: any) => r.following_id as string),
+  );
+  const feedUserIds = [...followingIds, user.id];
+
+  // Fire all remaining queries concurrently.
   const [
-    { data: followRows },
+    { data: followedPosts },
     { data: rawPosts },
     { data: myProfile },
     { data: myShows },
     { data: activeShows },
   ] = await Promise.all([
-    // Who the user follows (for ranking boost)
-    supabase.from("follows").select("following_id").eq("follower_id", user.id),
+    // Posts from people I follow (+ my own): guaranteed present even when
+    // the global firehose has scrolled past them.
+    supabase
+      .from("posts")
+      .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags)")
+      .in("user_id", feedUserIds)
+      .order("created_at", { ascending: false })
+      .limit(40),
     // Global feed â€” show ALL posts so early users always see content.
     supabase
       .from("posts")
@@ -51,19 +89,25 @@ export default async function HomePage() {
       .limit(50),
   ]);
 
-  const followingIds = new Set(
-    (followRows ?? []).map((r: any) => r.following_id as string),
-  );
+  // Merge followed + global, dedupe (followed posts can appear in both slices)
+  const byId = new Map<string, any>();
+  for (const p of [...normalise(followedPosts), ...normalise(rawPosts)]) {
+    if (!byId.has(p.id)) byId.set(p.id, p);
+  }
 
-  // Soft-boost: own posts + followed user posts float to the top
-  const all = normalise(rawPosts);
-  const boosted = all.filter(
-    (p: any) => p.user_id === user.id || followingIds.has(p.user_id),
-  );
-  const rest = all.filter(
-    (p: any) => p.user_id !== user.id && !followingIds.has(p.user_id),
-  );
-  const posts = [...boosted, ...rest].slice(0, 30);
+  // Rank by blended score; recency breaks ties
+  const now = Date.now();
+  const posts = [...byId.values()]
+    .map((p: any) => ({
+      ...p,
+      _score: feedScore(p, p.user_id === user.id, followingIds.has(p.user_id), now),
+    }))
+    .sort((a: any, b: any) =>
+      b._score !== a._score
+        ? b._score - a._score
+        : new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )
+    .slice(0, 30);
 
   // Fetch which posts current user has hyped/saved â€” for initial state
   const postIds = posts.map((p: any) => p.id);
