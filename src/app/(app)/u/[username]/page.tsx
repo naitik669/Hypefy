@@ -9,6 +9,7 @@ import { MessageButton } from "@/components/profile/MessageButton";
 import { FollowStats } from "@/components/profile/FollowStats";
 import { SignOutButton } from "@/components/SignOutButton";
 import { hueFromId } from "@/lib/profile";
+import { Lock } from "lucide-react";
 
 async function fetchStats(supabase: any, userId: string) {
   const [postsRes, followersRes, followingRes] = await Promise.all([
@@ -50,6 +51,9 @@ export default async function PublicProfilePage({
       .maybeSingle();
     isFollowing = !!followRow;
   }
+
+  // Private account: only the owner and followers see content
+  const isLocked = !!profile.is_private && !isOwn && !isFollowing;
 
   const name = profile.display_name ?? profile.username ?? "User";
   const hue = profile.avatar_hue ?? hueFromId(profile.id);
@@ -103,7 +107,7 @@ export default async function PublicProfilePage({
         )}
 
         {/* ── Showcase — only shown when visitor has items ── */}
-        {hasShowcase && (
+        {hasShowcase && !isLocked && (
           <div className="mt-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Showcase</p>
             <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
@@ -172,12 +176,22 @@ export default async function PublicProfilePage({
         </div>
       </div>
 
-      {/* Tabs: Posts | Shots (no Saved for others) */}
-      <PublicProfileTabs
-        userId={profile.id}
-        isOwn={isOwn}
-        currentUserId={currentUser?.id ?? null}
-      />
+      {/* Tabs: Posts | Shots (no Saved for others) — locked for private accounts */}
+      {isLocked ? (
+        <div className="flex flex-col items-center gap-2 px-6 py-16 text-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface">
+            <Lock size={24} className="text-muted" />
+          </span>
+          <p className="text-sm font-bold">This account is private</p>
+          <p className="text-xs text-muted">Follow {name} to see their posts and Shots.</p>
+        </div>
+      ) : (
+        <PublicProfileTabs
+          userId={profile.id}
+          isOwn={isOwn}
+          currentUserId={currentUser?.id ?? null}
+        />
+      )}
     </>
   );
 }

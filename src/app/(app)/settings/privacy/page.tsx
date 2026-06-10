@@ -1,16 +1,29 @@
-import { Lock } from "lucide-react";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { PrivacySettings } from "@/components/settings/PrivacySettings";
 
-export default function PrivacySettingsPage() {
+export default async function PrivacySettingsPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/signin");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_private, dm_privacy")
+    .eq("id", user.id)
+    .maybeSingle();
+
   return (
     <>
       <PageHeader title="Privacy" showBack />
-      <EmptyState
-        icon={Lock}
-        title="Privacy controls coming soon"
-        text="Account visibility, who can message you, and blocking will live here."
-      />
+      <div className="px-4 pb-10 pt-4">
+        <PrivacySettings
+          userId={user.id}
+          initialIsPrivate={!!(profile as any)?.is_private}
+          initialDmPrivacy={((profile as any)?.dm_privacy ?? "everyone") as "everyone" | "following"}
+        />
+      </div>
     </>
   );
 }

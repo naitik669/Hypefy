@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SignOutButton } from "@/components/SignOutButton";
+import { AccountForms } from "@/components/settings/AccountForms";
 
 export default async function AccountSettingsPage() {
   const supabase = await createClient();
@@ -11,14 +12,8 @@ export default async function AccountSettingsPage() {
   return (
     <>
       <PageHeader title="Account" showBack />
-      <div className="flex flex-col gap-4 px-5 pt-4">
-        <div className="rounded-2xl border border-border bg-surface p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Email</p>
-          <p className="mt-1 text-sm">{user.email ?? "—"}</p>
-        </div>
-        <p className="px-1 text-xs text-muted">
-          Email and password changes are coming soon. For now you can sign out below.
-        </p>
+      <div className="flex flex-col gap-6 px-5 pb-10 pt-4">
+        <AccountForms currentEmail={user.email ?? ""} />
         <SignOutButton />
       </div>
     </>

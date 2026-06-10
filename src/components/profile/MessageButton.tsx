@@ -15,7 +15,7 @@ export function MessageButton({
   const supabase = createClient();
   const router = useRouter();
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function startChat() {
     if (pending) return;
@@ -23,12 +23,18 @@ export function MessageButton({
     if (currentUserId === targetUserId) return;
 
     setPending(true);
-    setError(false);
+    setError(null);
     const { data: convId, error: err } = await supabase.rpc("get_or_create_dm", { p_other: targetUserId });
     if (err || !convId) {
-      setError(true);
+      setError(
+        err?.message?.includes("dm_restricted")
+          ? "DMs limited to people they follow"
+          : err?.message?.includes("blocked")
+            ? "Can't message this account"
+            : "Couldn't start chat",
+      );
       setPending(false);
-      setTimeout(() => setError(false), 1800);
+      setTimeout(() => setError(null), 2200);
       return;
     }
     router.push(`/messages/${convId}`);
@@ -41,7 +47,7 @@ export function MessageButton({
       disabled={pending}
       className="flex h-10 flex-1 items-center justify-center rounded-xl border border-border bg-surface text-sm font-semibold text-foreground transition-colors hover:bg-elevated disabled:opacity-60"
     >
-      {pending ? <Loader2 size={16} className="animate-spin" /> : error ? "Couldn't start chat" : "Message"}
+      {pending ? <Loader2 size={16} className="animate-spin" /> : error ?? "Message"}
     </button>
   );
 }
