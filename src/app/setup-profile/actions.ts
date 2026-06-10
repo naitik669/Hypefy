@@ -50,7 +50,8 @@ export async function saveProfile(
     return { error: error.message };
   }
 
-  redirect("/home");
+  // New users pick people to follow before landing on the feed
+  redirect("/onboarding/follow");
 }
 
 export async function checkUsername(
