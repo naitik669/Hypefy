@@ -60,6 +60,7 @@ export default async function HomePage() {
     { data: myProfile },
     { data: myShows },
     { data: activeShows },
+    { data: followedReposts },
   ] = await Promise.all([
     // Posts from people I follow (+ my own): guaranteed present even when
     // the global firehose has scrolled past them.
@@ -87,12 +88,38 @@ export default async function HomePage() {
       .neq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(50),
+    // Recent reposts by people I follow: their reposted posts join the feed
+    followingIds.size > 0
+      ? supabase
+          .from("reposts")
+          .select("post_id, created_at, user_id, profiles:user_id(display_name, username), posts(*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags))")
+          .in("user_id", [...followingIds])
+          .order("created_at", { ascending: false })
+          .limit(20)
+      : Promise.resolve({ data: [] as any[] }),
   ]);
 
   // Merge followed + global, dedupe (followed posts can appear in both slices)
   const byId = new Map<string, any>();
   for (const p of [...normalise(followedPosts), ...normalise(rawPosts)]) {
     if (!byId.has(p.id)) byId.set(p.id, p);
+  }
+
+  // Blend in reposted posts: use the REPOST time for recency so they resurface,
+  // and tag with who reposted for the FeedCard header.
+  for (const r of (followedReposts ?? []) as any[]) {
+    const post = Array.isArray(r.posts) ? r.posts[0] : r.posts;
+    if (!post) continue;
+    const reposterProfile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+    const reposter = reposterProfile?.display_name ?? reposterProfile?.username ?? null;
+    const normalised = {
+      ...post,
+      profiles: Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles,
+      created_at: r.created_at, // rank by repost time
+      _repostedBy: reposter,
+    };
+    // Repost wins over the plain copy so the header shows
+    byId.set(post.id, byId.has(post.id) ? { ...byId.get(post.id), created_at: r.created_at, _repostedBy: reposter } : normalised);
   }
 
   // Rank by blended score; recency breaks ties

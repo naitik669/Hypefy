@@ -37,7 +37,7 @@ export default async function MessagesPage() {
       // My membership state per conversation (read + request + block)
       supabase
         .from("conversation_members")
-        .select("conversation_id, last_read_at, request_accepted, blocked_at")
+        .select("conversation_id, last_read_at, request_accepted, blocked_at, muted_at")
         .in("conversation_id", convIds)
         .eq("user_id", user.id),
     ]);
@@ -60,10 +60,12 @@ export default async function MessagesPage() {
     const readByConv = new Map<string, string | null>();
     const requestByConv = new Map<string, boolean>();
     const blockedByConv = new Set<string>();
+    const mutedByConv = new Set<string>();
     (myMemberRes.data ?? []).forEach((m: any) => {
       readByConv.set(m.conversation_id, m.last_read_at);
       requestByConv.set(m.conversation_id, m.request_accepted !== false);
       if (m.blocked_at) blockedByConv.add(m.conversation_id);
+      if (m.muted_at) mutedByConv.add(m.conversation_id);
     });
 
     // Count unread messages per conversation (messages after my last_read_at, not sent by me)
@@ -113,6 +115,7 @@ export default async function MessagesPage() {
           lastSenderName,
           unread,
           unreadCount: unreadCountByConv.get(c.id) ?? 0,
+          muted: mutedByConv.has(c.id),
           isRequest: !isGroup && requestByConv.get(c.id) === false,
         } as InboxRow;
       })

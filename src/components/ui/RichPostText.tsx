@@ -26,7 +26,7 @@ export function RichPostText({
           return (
             <Link
               key={i}
-              href={`/search?tag=${encodeURIComponent(tag)}`}
+              href={`/search?q=${encodeURIComponent(`#${tag}`)}`}
               className="font-semibold text-accent hover:underline"
             >
               {part}

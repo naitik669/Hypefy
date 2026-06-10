@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Star, MessageCircle, Send, Bookmark, MoreHorizontal, Maximize2 } from "lucide-react";
+import { Star, MessageCircle, Send, Bookmark, MoreHorizontal, Maximize2, Repeat2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ZoomViewer } from "@/components/ui/ZoomViewer";
@@ -37,6 +37,8 @@ export type FeedPost = {
   } | null;
   initialHyped?: boolean;
   initialSaved?: boolean;
+  /** Display name of the followed user whose repost surfaced this post. */
+  _repostedBy?: string | null;
 };
 
 function timeAgo(iso: string) {
@@ -225,6 +227,13 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
 
   return (
     <article className="relative border-b border-border/50 pb-3">
+      {/* Repost attribution */}
+      {post._repostedBy && (
+        <div className="flex items-center gap-1.5 px-4 pt-2.5 text-xs text-muted">
+          <Repeat2 size={14} className="text-accent" />
+          <span className="font-semibold">{post._repostedBy}</span> reposted
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3">
         <Link href={profileHref}><Avatar name={name} hue={hue} size={40} src={profile?.avatar_url ?? undefined} /></Link>

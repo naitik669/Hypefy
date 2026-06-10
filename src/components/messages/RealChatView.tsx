@@ -113,7 +113,48 @@ export function RealChatView({
     type: "image" | "video";
   } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [muted, setMuted] = useState(false);
   const { startCall } = useCallControls();
+
+  // Load my mute state for this conversation
+  useEffect(() => {
+    supabase
+      .from("conversation_members")
+      .select("muted_at")
+      .eq("conversation_id", conversationId)
+      .eq("user_id", currentUserId)
+      .maybeSingle()
+      .then(({ data }) => setMuted(!!data?.muted_at));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, currentUserId]);
+
+  async function toggleMute() {
+    setHeaderMenu(false);
+    const next = !muted;
+    setMuted(next);
+    const { error } = await supabase
+      .from("conversation_members")
+      .update({ muted_at: next ? new Date().toISOString() : null })
+      .eq("conversation_id", conversationId)
+      .eq("user_id", currentUserId);
+    if (error) {
+      setMuted(!next);
+      showToast("Couldn't update mute");
+      return;
+    }
+    showToast(next ? "Notifications muted" : "Notifications unmuted");
+  }
+
+  async function blockUser() {
+    setHeaderMenu(false);
+    const { error } = await supabase.rpc("block_message_request", { p_conversation_id: conversationId });
+    if (error) {
+      showToast("Couldn't block user");
+      return;
+    }
+    showToast("Blocked & reported");
+    setTimeout(() => router.push("/messages"), 600);
+  }
   function placeCall(type: "audio" | "video") {
     startCall({ conversationId, peerId: other.id, peerName: other.name, peerHue: other.hue, type });
   }
@@ -563,16 +604,25 @@ export function RealChatView({
                   </Link>
                 )}
                 <button type="button"
-                  onClick={() => { setHeaderMenu(false); showToast("Notifications muted"); }}
+                  onClick={toggleMute}
                   className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/5">
-                  <BellOff size={17} className="text-muted" /> Mute notifications
+                  <BellOff size={17} className={muted ? "text-accent" : "text-muted"} />
+                  {muted ? "Unmute notifications" : "Mute notifications"}
                 </button>
                 <div className="my-1 h-px bg-border" />
-                <button type="button"
-                  onClick={() => { setHeaderMenu(false); showToast(isGroup ? "Reported group" : "Blocked & reported"); }}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-400 hover:bg-white/5">
-                  <Ban size={17} /> {isGroup ? "Report group" : "Block user"}
-                </button>
+                {isGroup ? (
+                  <button type="button"
+                    onClick={() => { setHeaderMenu(false); showToast("Reported group"); }}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-400 hover:bg-white/5">
+                    <Ban size={17} /> Report group
+                  </button>
+                ) : (
+                  <button type="button"
+                    onClick={blockUser}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-400 hover:bg-white/5">
+                    <Ban size={17} /> Block user
+                  </button>
+                )}
               </div>
             </>
           )}

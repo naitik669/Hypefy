@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, MessageCircle, Users, Check, Ban, Loader2 } from "lucide-react";
+import { Search, MessageCircle, Users, Check, Ban, Loader2, BellOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -22,6 +22,7 @@ export type InboxRow = {
   lastSenderName: string | null;
   unread: boolean;
   unreadCount: number;
+  muted: boolean;
   isRequest: boolean;
 };
 
@@ -79,7 +80,8 @@ export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const isUnread = (r: InboxRow) => r.unread && !readIds.has(r.id);
+  // Muted conversations never surface as unread (no badge, no Unread section)
+  const isUnread = (r: InboxRow) => r.unread && !r.muted && !readIds.has(r.id);
   const isPendingRequest = (r: InboxRow) => r.isRequest && !approvedIds.has(r.id) && !removedIds.has(r.id);
 
   async function approveRequest(id: string) {
@@ -160,7 +162,10 @@ export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
-            {r.lastAt && <span className="text-xs text-faint">{timeAgo(r.lastAt)}</span>}
+            <span className="flex items-center gap-1.5">
+              {r.muted && <BellOff size={12} className="text-faint" />}
+              {r.lastAt && <span className="text-xs text-faint">{timeAgo(r.lastAt)}</span>}
+            </span>
             {effectiveCount > 0 && !pending && <UnreadBadge count={effectiveCount} />}
           </div>
         </Link>

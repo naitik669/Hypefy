@@ -172,9 +172,28 @@ export function ShareSheet({
     }
   }
 
-  function repost() {
-    setReposted(true);
-    setTimeout(() => { setReposted(false); onClose(); }, 900);
+  const [reposting, setReposting] = useState(false);
+
+  /** Real repost — inserts into reposts (trigger bumps count + notifies owner). */
+  async function repost() {
+    if (reposting || targetType !== "post") return;
+    setReposting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { error } = await supabase.from("reposts").insert({ user_id: user.id, post_id: postId });
+      if (error?.code === "23505") {
+        // Already reposted — toggle off
+        await supabase.from("reposts").delete().eq("user_id", user.id).eq("post_id", postId);
+        setReposted(false);
+        return;
+      }
+      if (error) return;
+      setReposted(true);
+      setTimeout(() => { setReposted(false); onClose(); }, 900);
+    } finally {
+      setReposting(false);
+    }
   }
 
   async function sendToSelected() {
