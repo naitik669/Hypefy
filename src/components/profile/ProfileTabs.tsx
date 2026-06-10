@@ -104,8 +104,8 @@ export function ProfileTabs({ userId }: { userId: string }) {
         ) : posts.length === 0 ? (
           <EmptyState
             icon={PlusCircle}
-            title="No posts yet"
-            text="Your posts will show up here."
+            title="Nothing posted yet"
+            text="Your posts live here. Make some noise."
             ctaLabel="Create Post"
             ctaHref="/create/post"
           />
@@ -125,8 +125,8 @@ export function ProfileTabs({ userId }: { userId: string }) {
         ) : shots.length === 0 ? (
           <EmptyState
             icon={Video}
-            title="No Shots yet"
-            text="Shots are short video reels."
+            title="No Shots fired"
+            text="Short videos, big energy. Post your first."
             ctaLabel="Add Shot"
             ctaHref="/create/shot"
           />
@@ -158,7 +158,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
           <EmptyState
             icon={Bookmark}
             title="Nothing saved yet"
-            text="Save posts and Shots you want to revisit."
+            text="Stash the posts and Shots you'll want back."
           />
         ) : (
           <div className="grid grid-cols-3 gap-1.5 px-1.5">

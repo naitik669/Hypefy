@@ -169,8 +169,8 @@ export default async function HomePage() {
       {posts.length === 0 ? (
         <EmptyState
           icon={PlusCircle}
-          title="No posts yet"
-          text="Follow people or create the first post."
+          title="Your feed is warming up"
+          text="Follow people or drop the first post — someone has to start the hype."
           ctaLabel="Create Post"
           ctaHref="/create/post"
         />

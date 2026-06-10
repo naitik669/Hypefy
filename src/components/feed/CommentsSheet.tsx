@@ -263,7 +263,7 @@ export function CommentsSheet({
           <Loader2 size={22} className="animate-spin text-muted" />
         </div>
       ) : tree.length === 0 ? (
-        <p className="py-8 text-center text-sm text-faint">No comments yet. Be the first.</p>
+        <p className="py-8 text-center text-sm text-faint">Quiet so far. Drop the first take.</p>
       ) : (
         <div className="flex flex-col gap-5 pb-3 pt-1">
           {tree.map((c) => (

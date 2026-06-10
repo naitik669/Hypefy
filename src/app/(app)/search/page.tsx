@@ -150,7 +150,7 @@ export default function SearchPage() {
       )}
 
       {!isPending && searched && !hasResults && (
-        <EmptyState icon={SearchX} title="No results found" text="Try searching a name or post." />
+        <EmptyState icon={SearchX} title="Nothing turned up" text="Try a different name, post, or #tag." />
       )}
 
       {!isPending && !searched && (

@@ -314,8 +314,8 @@ export function ShareSheet({
         ) : filtered.length === 0 ? (
           <p className="py-6 text-center text-sm text-faint">
             {friends.length === 0
-              ? "Follow people or interact with posts to see connections here."
-              : "No results"}
+              ? "Follow people or interact with posts to build your circle."
+              : "Nobody by that name."}
           </p>
         ) : (
           filtered.map((f) => {

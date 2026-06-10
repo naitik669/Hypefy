@@ -99,8 +99,8 @@ export function PublicProfileTabs({
         activePosts.length === 0 ? (
           <EmptyState
             icon={PlusCircle}
-            title={tab === "Saved" ? "No saved posts yet" : "No posts yet"}
-            text={tab === "Saved" ? "Save posts you want to revisit." : "Posts will show up here."}
+            title={tab === "Saved" ? "Nothing saved yet" : "Nothing posted yet"}
+            text={tab === "Saved" ? "Stash the posts you'll want back." : "When they post, it lands here."}
             ctaLabel={isOwn && tab === "Posts" ? "Create Post" : undefined}
             ctaHref={isOwn && tab === "Posts" ? "/create/post" : undefined}
           />
@@ -150,8 +150,8 @@ export function PublicProfileTabs({
         shots.length === 0 ? (
           <EmptyState
             icon={Zap}
-            title="No Shots yet"
-            text="Short video reels will show here."
+            title="No Shots fired"
+            text="Short videos, big energy — none yet."
             ctaLabel={isOwn ? "Add Shot" : undefined}
             ctaHref={isOwn ? "/create/shot" : undefined}
           />

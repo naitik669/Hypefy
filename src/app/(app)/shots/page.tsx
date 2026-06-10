@@ -25,8 +25,8 @@ export default async function ShotsPage() {
     return (
       <EmptyState
         icon={Video}
-        title="No Shots yet"
-        text="Shots are short video reels. Post the first one."
+        title="The reel is empty"
+        text="Short videos, big energy. Fire the first Shot."
         ctaLabel="Add Shot"
         ctaHref="/create/shot"
       />

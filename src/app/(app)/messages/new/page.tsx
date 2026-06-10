@@ -134,7 +134,7 @@ export default function NewChatPage() {
             <div className="flex justify-center py-10"><Loader2 size={22} className="animate-spin text-muted" /></div>
           ) : filtered.length === 0 ? (
             <p className="py-10 text-center text-sm text-faint">
-              {people.length === 0 ? "Follow people to start a chat." : "No results"}
+              {people.length === 0 ? "Follow people to unlock the chat." : "Nobody by that name."}
             </p>
           ) : (
             filtered.map((p) => {

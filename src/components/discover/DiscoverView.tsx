@@ -46,7 +46,7 @@ export function DiscoverView({
 
   if (everythingEmpty) {
     return (
-      <EmptyState icon={Compass} title="Nothing here yet" text="Hypefy gets better as more people join. Check back soon." />
+      <EmptyState icon={Compass} title="The stage is empty" text="Hypefy gets louder as more people join. Check back soon." />
     );
   }
 
@@ -120,7 +120,7 @@ export function DiscoverView({
                 {trendingShots.map((s) => <ShotTile key={s.id} shot={s} />)}
               </div>
             </Section>
-          ) : <EmptyState icon={Play} title="No Shots yet" text="Post a Shot to start the feed." />
+          ) : <EmptyState icon={Play} title="No Shots fired yet" text="Be the first one on the reel." />
         )}
 
         {cat === "Creators" && (
@@ -128,7 +128,7 @@ export function DiscoverView({
             <div className="flex flex-col pt-2">
               {people.map((person) => <CreatorRow key={person.id} person={person} />)}
             </div>
-          ) : <EmptyState icon={Compass} title="No creators yet" text="Check back as more people join." />
+          ) : <EmptyState icon={Compass} title="Creators incoming" text="The lineup fills up as more people join." />
         )}
 
         {cat === "Tags" && (
@@ -147,7 +147,7 @@ export function DiscoverView({
                 </Link>
               ))}
             </div>
-          ) : <EmptyState icon={Hash} title="No tags yet" text="Add #tags to your posts to see them here." />
+          ) : <EmptyState icon={Hash} title="No tags trending" text="Throw #tags on your posts and start a wave." />
         )}
       </div>
     </>

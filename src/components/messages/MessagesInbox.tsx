@@ -123,8 +123,8 @@ export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
     return (
       <EmptyState
         icon={MessageCircle}
-        title="No messages yet"
-        text="Start a DM or create a group chat."
+        title="It's quiet in here"
+        text="Slide into a DM or rally a group chat."
         ctaLabel="New message"
         ctaHref="/messages/new"
       />
@@ -234,10 +234,10 @@ export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
       {filtered.length === 0 ? (
         <p className="px-4 py-12 text-center text-sm text-faint">
           {tab === "requests"
-            ? "No message requests."
+            ? "No requests — your door is clear."
             : tab === "unread"
-              ? "You're all caught up."
-              : "No matches."}
+              ? "All caught up. Zero noise. 🎉"
+              : "Nobody by that name."}
         </p>
       ) : (
         <div className="flex flex-col pt-1">
