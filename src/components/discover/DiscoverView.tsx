@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Zap, MessageCircle, Play, Compass, Hash } from "lucide-react";
+import { Zap, MessageCircle, Play, Compass, Hash, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { UserSuggestionCard } from "@/components/discover/UserSuggestionCard";
 import { formatCount } from "@/lib/format";
@@ -38,8 +39,32 @@ export function DiscoverView({
   people: Person[];
   tags: Tag[];
 }) {
+  const supabase = createClient();
   const [cat, setCat] = useState<Cat>("For You");
-  const allPosts = [...trendingPosts, ...freshPosts];
+  const [extraFresh, setExtraFresh] = useState<Post[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [noMore, setNoMore] = useState(false);
+  const fresh = [...freshPosts, ...extraFresh];
+  const allPosts = [...trendingPosts, ...fresh];
+
+  async function loadMoreFresh() {
+    if (loadingMore || noMore) return;
+    setLoadingMore(true);
+    const last = fresh[fresh.length - 1] as any;
+    const cursor = last?.created_at ?? new Date().toISOString();
+    const { data } = await supabase
+      .from("posts")
+      .select("id, caption, body, image_url, image_urls, hype_count, comment_count, created_at, profiles(display_name, username, avatar_hue)")
+      .lt("created_at", cursor)
+      .order("created_at", { ascending: false })
+      .limit(12);
+    const mapped = (data ?? [])
+      .map((p: any) => ({ ...p, profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles }))
+      .filter((p: any) => !allPosts.some((x) => x.id === p.id));
+    if ((data?.length ?? 0) < 12) setNoMore(true);
+    setExtraFresh((prev) => [...prev, ...mapped]);
+    setLoadingMore(false);
+  }
 
   const everythingEmpty =
     trendingPosts.length === 0 && freshPosts.length === 0 && trendingShots.length === 0 && people.length === 0;
@@ -93,9 +118,21 @@ export function DiscoverView({
                 </div>
               </Section>
             )}
-            {freshPosts.length > 0 && (
+            {fresh.length > 0 && (
               <Section title="Fresh">
-                <Grid>{freshPosts.map((p) => <PostTile key={p.id} post={p} />)}</Grid>
+                <Grid>{fresh.map((p) => <PostTile key={p.id} post={p} />)}</Grid>
+                {!noMore && (
+                  <div className="px-4 pt-3">
+                    <button
+                      type="button"
+                      onClick={loadMoreFresh}
+                      disabled={loadingMore}
+                      className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface text-sm font-semibold text-muted transition-colors hover:text-foreground disabled:opacity-60"
+                    >
+                      {loadingMore ? <Loader2 size={15} className="animate-spin" /> : "Show more"}
+                    </button>
+                  </div>
+                )}
               </Section>
             )}
           </>

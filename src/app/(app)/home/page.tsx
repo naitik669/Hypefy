@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/TopBar";
 import { ShowsRow } from "@/components/home/ShowsRow";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { FeedCard } from "@/components/feed/FeedCard";
+import { FeedList } from "@/components/feed/FeedList";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { UploadProgressBar } from "@/components/upload/UploadProvider";
 
 function normalise(raw: unknown[] | null) {
@@ -207,29 +208,30 @@ export default async function HomePage() {
   return (
     <>
       <TopBar />
-      <ShowsRow shows={shows} currentUser={currentUserForRow} />
-      <UploadProgressBar />
+      <PullToRefresh>
+        <ShowsRow shows={shows} currentUser={currentUserForRow} />
+        <UploadProgressBar />
 
-      {posts.length === 0 ? (
-        <EmptyState
-          mascot
-          icon={PlusCircle}
-          title="Your feed is warming up"
-          text="Follow people or drop the first post — someone has to start the hype."
-          ctaLabel="Create Post"
-          ctaHref="/create/post"
-        />
-      ) : (
-        <div className="flex flex-col">
-          {posts.map((post: any) => (
-            <FeedCard
-              key={post.id}
-              post={{ ...post, initialHyped: hypedIds.has(post.id), initialSaved: savedIds.has(post.id) }}
-              currentUserId={user.id}
-            />
-          ))}
-        </div>
-      )}
+        {posts.length === 0 ? (
+          <EmptyState
+            mascot
+            icon={PlusCircle}
+            title="Your feed is warming up"
+            text="Follow people or drop the first post — someone has to start the hype."
+            ctaLabel="Create Post"
+            ctaHref="/create/post"
+          />
+        ) : (
+          <FeedList
+            initialPosts={posts.map((post: any) => ({
+              ...post,
+              initialHyped: hypedIds.has(post.id),
+              initialSaved: savedIds.has(post.id),
+            }))}
+            currentUserId={user.id}
+          />
+        )}
+      </PullToRefresh>
     </>
   );
 }

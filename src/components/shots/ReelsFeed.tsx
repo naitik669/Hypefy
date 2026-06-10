@@ -31,16 +31,47 @@ export type Reel = {
  * native scroll momentum cannot skip multiple shots.
  */
 export function ReelsFeed({
-  reels,
+  reels: initialReels,
   currentUserId,
 }: {
   reels: Reel[];
   currentUserId: string | null;
 }) {
   const router = useRouter();
+  const supabase = createClient();
+  const [reels, setReels] = useState<Reel[]>(initialReels);
   const [muted, setMuted] = useState(true);
   const [activeIdx, setActiveIdx] = useState(0);
   const swipeTouchStartY = useRef(0);
+  const fetchingMore = useRef(false);
+  const [noMore, setNoMore] = useState(initialReels.length < 5);
+
+  // Fetch the next batch when the viewer nears the end of the loaded reels
+  useEffect(() => {
+    if (noMore || fetchingMore.current) return;
+    if (activeIdx < reels.length - 2) return;
+    fetchingMore.current = true;
+    const oldest = reels[reels.length - 1]?.created_at;
+    if (!oldest) { fetchingMore.current = false; return; }
+    supabase
+      .from("shots")
+      .select("id, user_id, media_url, caption, created_at, hype_count, comment_count, profiles(display_name, avatar_hue, username)")
+      .lt("created_at", oldest)
+      .order("created_at", { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        const fresh = (data ?? []).map((s: any) => ({
+          ...s,
+          profiles: Array.isArray(s.profiles) ? s.profiles[0] ?? null : s.profiles,
+        })) as Reel[];
+        if (fresh.length < 10) setNoMore(true);
+        if (fresh.length > 0) {
+          setReels((prev) => [...prev, ...fresh.filter((f) => !prev.some((p) => p.id === f.id))]);
+        }
+        fetchingMore.current = false;
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIdx, reels.length, noMore]);
 
   function onSwipeTouchStart(e: React.TouchEvent) {
     swipeTouchStartY.current = e.touches[0].clientY;
