@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Settings, Layers } from "lucide-react";
+import { Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, hueFromId } from "@/lib/profile";
 import { AvatarImg } from "@/components/ui/AvatarImg";
@@ -94,69 +94,6 @@ export default async function ProfilePage() {
           </div>
         )}
 
-        {/* ── Showcase row ── */}
-        <div className="mt-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Showcase</p>
-
-          {hasShowcase ? (
-            <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
-              {/* Pinned story-shots */}
-              {showcaseShows.map((show: any) => (
-                <Link
-                  key={show.id}
-                  href={`/shows/${show.id}`}
-                  className="flex w-[72px] shrink-0 flex-col items-center gap-1.5"
-                >
-                  <div className="relative h-[72px] w-[72px] overflow-hidden rounded-2xl ring-2 ring-accent ring-offset-2 ring-offset-background">
-                    {show.media_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={show.media_url} alt={show.caption ?? "Shot"} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="h-full w-full bg-gradient-to-br from-accent/50 to-[hsl(280deg_70%_30%)]" />
-                    )}
-                    {/* Shot label */}
-                    <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">
-                      Shot
-                    </span>
-                  </div>
-                  <span className="max-w-full truncate text-center text-[10px] leading-tight text-muted">
-                    {show.caption ?? "Shot"}
-                  </span>
-                </Link>
-              ))}
-
-              {/* Pinned video shots */}
-              {showcaseShots.map((shot: any) => (
-                <Link
-                  key={shot.id}
-                  href={`/shots/${shot.id}`}
-                  className="flex w-[72px] shrink-0 flex-col items-center gap-1.5"
-                >
-                  <div className="relative h-[72px] w-[72px] overflow-hidden rounded-2xl ring-2 ring-border ring-offset-2 ring-offset-background">
-                    <video src={shot.media_url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
-                    {/* Video label */}
-                    <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">
-                      Reel
-                    </span>
-                  </div>
-                  <span className="max-w-full truncate text-center text-[10px] leading-tight text-muted">
-                    {shot.caption ?? "Shot"}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            /* Empty showcase — own profile only */
-            <div className="flex items-center gap-3 rounded-2xl border border-dashed border-border bg-surface/50 px-4 py-3.5">
-              <Layers size={18} className="shrink-0 text-muted" />
-              <div>
-                <p className="text-xs font-semibold text-foreground">No Showcase yet</p>
-                <p className="text-[11px] text-muted">Add your best Shots to pin them here.</p>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Action buttons */}
         <div className="mt-3 flex gap-2">
           <Link
@@ -174,6 +111,54 @@ export default async function ProfilePage() {
           </Link>
         </div>
       </div>
+
+      {/* ── Showcase — between Edit profile and tabs ── */}
+      {hasShowcase && (
+        <div className="mt-3 px-4">
+          <div className="no-scrollbar flex gap-2.5 overflow-x-auto pb-1">
+            {showcaseShows.map((show: any) => (
+              <Link
+                key={show.id}
+                href={`/shows/${show.id}`}
+                className="flex w-[56px] shrink-0 flex-col items-center gap-1"
+              >
+                <div className="relative h-[56px] w-[56px] overflow-hidden rounded-xl border border-border/50">
+                  {show.media_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={show.media_url} alt={show.caption ?? "Show"} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full bg-gradient-to-br from-accent/50 to-[hsl(280deg_70%_30%)]" />
+                  )}
+                  <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 py-px text-[7px] font-bold uppercase tracking-wide text-white">
+                    Show
+                  </span>
+                </div>
+                <span className="max-w-full truncate text-center text-[9px] leading-tight text-muted">
+                  {show.caption ?? "Show"}
+                </span>
+              </Link>
+            ))}
+
+            {showcaseShots.map((shot: any) => (
+              <Link
+                key={shot.id}
+                href={`/shots/${shot.id}`}
+                className="flex w-[56px] shrink-0 flex-col items-center gap-1"
+              >
+                <div className="relative h-[56px] w-[56px] overflow-hidden rounded-xl border border-border/50">
+                  <video src={shot.media_url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+                  <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 py-px text-[7px] font-bold uppercase tracking-wide text-white">
+                    Reel
+                  </span>
+                </div>
+                <span className="max-w-full truncate text-center text-[9px] leading-tight text-muted">
+                  {shot.caption ?? "Reel"}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Tabs: Posts | Shots | Saved */}
       <ProfileTabs userId={user.id} />

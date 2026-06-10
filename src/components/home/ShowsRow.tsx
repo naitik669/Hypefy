@@ -58,6 +58,9 @@ export function ShowsRow({
   const seen   = shows.filter((s) =>  seenIds.has(s.id) ||  s.seen);
   const sorted = [...unseen, ...seen];
 
+  // Whether the current user has already watched their own active show
+  const ownShowSeen = !!(currentUser?.showId && seenIds.has(currentUser.showId));
+
   return (
     <div className="no-scrollbar flex gap-4 overflow-x-auto px-4 py-4">
 
@@ -66,23 +69,26 @@ export function ShowsRow({
         <div className="relative">
           <button
             type="button"
-            onClick={() =>
-              currentUser?.hasActiveShow && currentUser.showId
-                ? router.push(`/shows/${currentUser.showId}`)
-                : router.push("/shows/add")
-            }
-            aria-label={currentUser?.hasActiveShow ? "Watch your Shot" : "Add a Shot"}
+            onClick={() => {
+              if (currentUser?.hasActiveShow && currentUser.showId) {
+                // Use handleShowTap so the seenId is recorded → ring disappears
+                handleShowTap(currentUser.showId);
+              } else {
+                router.push("/shows/add");
+              }
+            }}
+            aria-label={currentUser?.hasActiveShow ? "Watch your Show" : "Add a Show"}
             className="block active:opacity-70"
           >
             {currentUser ? (
               <div
                 className={`rounded-[22px] p-[2.5px] ${
-                  currentUser.hasActiveShow ? "bg-accent" : "bg-transparent"
+                  currentUser.hasActiveShow && !ownShowSeen ? "bg-accent" : "bg-transparent"
                 }`}
               >
                 <div
                   className={`rounded-[20px] bg-background ${
-                    currentUser.hasActiveShow ? "p-[2px]" : ""
+                    currentUser.hasActiveShow && !ownShowSeen ? "p-[2px]" : ""
                   }`}
                 >
                   <Avatar name={currentUser.name} hue={currentUser.hue} size={56} src={currentUser.avatarUrl ?? undefined} className="rounded-[18px]" />
