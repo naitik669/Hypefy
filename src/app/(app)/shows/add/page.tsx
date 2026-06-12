@@ -229,7 +229,7 @@ export default function AddShowPage() {
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
             <LayoutGrid size={40} className="text-white/25" />
             <p className="text-sm text-white/50">No posts yet</p>
-            <p className="text-xs text-white/35">Create a post first, then share it to your Shot.</p>
+            <p className="text-xs text-white/35">Create a post first, then share it to your Show.</p>
           </div>
         ) : (
           <div className="no-scrollbar grid flex-1 grid-cols-3 gap-0.5 overflow-y-auto">
@@ -325,7 +325,7 @@ export default function AddShowPage() {
               className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm">
               <X size={20} />
             </button>
-            <span className="text-base font-extrabold tracking-tight text-white">Your Shot</span>
+            <span className="text-base font-extrabold tracking-tight text-white">Your Show</span>
             <span className="rounded-pill border border-white/30 px-2.5 py-0.5 text-xs text-white/60">24h</span>
           </div>
 
@@ -369,7 +369,7 @@ export default function AddShowPage() {
               )
             ) : previewUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={previewUrl} alt="Shot preview" className="h-full w-full object-cover" />
+              <img src={previewUrl} alt="Show preview" className="h-full w-full object-cover" />
             ) : (
               <div className="h-full w-full bg-gradient-to-br from-accent/30 to-[hsl(280deg_80%_20%)]" />
             )}
@@ -471,11 +471,11 @@ export default function AddShowPage() {
           <div className="absolute inset-x-0 bottom-0 z-20 flex items-center gap-2.5 px-4 pb-9 pt-4">
             <span className="flex items-center gap-2 rounded-pill bg-white/15 py-1.5 pl-1.5 pr-3.5 backdrop-blur-sm">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/25 text-white"><User size={15} /></span>
-              <span className="text-sm font-semibold text-white">Your Shot</span>
+              <span className="text-sm font-semibold text-white">Your Show</span>
             </span>
             <span className="rounded-pill bg-white/15 px-3.5 py-2 text-sm font-semibold text-white/75 backdrop-blur-sm">24h</span>
             <div className="flex-1" />
-            <button type="button" onClick={share} disabled={pending} aria-label="Share to your Shot"
+            <button type="button" onClick={share} disabled={pending} aria-label="Share to your Show"
               className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-ink shadow-lg transition-transform active:scale-95 disabled:opacity-60">
               {pending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
             </button>

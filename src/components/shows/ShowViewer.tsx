@@ -262,7 +262,7 @@ function ShowScreen({
       ) : show.media_url ? (
         // Normal shot: full-bleed image
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={show.media_url} alt={show.caption ?? "Shot"} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={show.media_url} alt={show.caption ?? "Show"} className="absolute inset-0 h-full w-full object-cover" />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-accent/40 to-[hsl(280deg_80%_20%)]" />
       )}
@@ -311,7 +311,7 @@ function ShowScreen({
         {isOwner && (
           <button
             type="button"
-            aria-label="Shot options"
+            aria-label="Show options"
             onClick={(e) => { e.stopPropagation(); setMenuOpen(true); setPaused(true); }}
             className="pointer-events-auto flex h-8 w-8 items-center justify-center text-white"
           >
@@ -456,7 +456,7 @@ function ShowScreen({
             />
             <button
               type="button"
-              aria-label="Hype this Shot"
+              aria-label="Hype this Show"
               disabled={hypePending}
               onClick={(e) => { e.stopPropagation(); toggleShowHype(); }}
               className="flex flex-col items-center gap-0.5 transition-transform active:scale-90 disabled:opacity-60"
@@ -517,8 +517,8 @@ function ShowScreen({
                 ? <Loader2 size={20} className="animate-spin" />
                 : <Trash2 size={20} />}
               <div>
-                <p className="text-sm font-semibold">Delete Shot</p>
-                <p className="text-xs opacity-70">Removes this Shot permanently</p>
+                <p className="text-sm font-semibold">Delete Show</p>
+                <p className="text-xs opacity-70">Removes this Show permanently</p>
               </div>
             </button>
 

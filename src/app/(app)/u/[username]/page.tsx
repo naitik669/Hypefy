@@ -117,16 +117,16 @@ export default async function PublicProfilePage({
                   <div className="relative h-[72px] w-[72px] overflow-hidden rounded-2xl ring-2 ring-accent ring-offset-2 ring-offset-background">
                     {show.media_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={show.media_url} alt={show.caption ?? "Shot"} className="h-full w-full object-cover" />
+                      <img src={show.media_url} alt={show.caption ?? "Show"} className="h-full w-full object-cover" />
                     ) : (
                       <div className="h-full w-full bg-gradient-to-br from-accent/50 to-[hsl(280deg_70%_30%)]" />
                     )}
                     <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">
-                      Shot
+                      Show
                     </span>
                   </div>
                   <span className="max-w-full truncate text-center text-[10px] leading-tight text-muted">
-                    {show.caption ?? "Shot"}
+                    {show.caption ?? "Show"}
                   </span>
                 </Link>
               ))}
