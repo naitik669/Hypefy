@@ -84,7 +84,7 @@ export default async function HomePage() {
     // Active Shows from OTHERS â€” newest first
     supabase
       .from("shows")
-      .select("id, user_id, profiles(display_name, avatar_hue, avatar_url, username)")
+      .select("id, user_id, profiles!shows_user_id_fkey(display_name, avatar_hue, avatar_url, username)")
       .gt("expires_at", nowIso)
       .neq("user_id", user.id)
       .order("created_at", { ascending: false })

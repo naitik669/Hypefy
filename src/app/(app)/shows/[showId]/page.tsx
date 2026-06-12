@@ -26,7 +26,9 @@ export default async function ShowPage({
   //    Build the select string based on which optional columns exist — we probe
   //    them independently so a single missing column doesn't break the whole page.
   const nowIso = new Date().toISOString();
-  const baseSelect = `id, user_id, media_url, caption, created_at, hype_count, profiles(display_name, avatar_hue, username)`;
+  // profiles must be disambiguated: show_views adds a second shows<->profiles
+  // relationship path, which makes a bare profiles(...) embed error (PGRST201).
+  const baseSelect = `id, user_id, media_url, caption, created_at, hype_count, profiles!shows_user_id_fkey(display_name, avatar_hue, username)`;
 
   // Probe for linked_post_id + is_showcase in one call; degrade gracefully.
   const [probeLinked, probeShowcase] = await Promise.all([
