@@ -21,7 +21,7 @@ export default async function MessagesPage() {
 
   let rows: InboxRow[] = [];
   if (convIds.length > 0) {
-    const [membersRes, msgsRes, myMemberRes] = await Promise.all([
+    const [membersRes, msgsRes, myMemberRes, reactionsRes] = await Promise.all([
       // The other participant in each conversation
       supabase
         .from("conversation_members")
@@ -40,7 +40,27 @@ export default async function MessagesPage() {
         .select("conversation_id, last_read_at, request_accepted, blocked_at, muted_at")
         .in("conversation_id", convIds)
         .eq("user_id", user.id),
+      // Recent reactions — when newer than the last message, they become the preview
+      supabase
+        .from("message_reactions")
+        .select("emoji, user_id, created_at, messages!inner(conversation_id, sender_id)")
+        .in("messages.conversation_id", convIds)
+        .order("created_at", { ascending: false })
+        .limit(80),
     ]);
+
+    // Latest reaction per conversation
+    const reactionByConv = new Map<string, { emoji: string; created_at: string; mine: boolean; onMine: boolean }>();
+    (reactionsRes.data ?? []).forEach((r: any) => {
+      const msg = Array.isArray(r.messages) ? r.messages[0] : r.messages;
+      if (!msg || reactionByConv.has(msg.conversation_id)) return;
+      reactionByConv.set(msg.conversation_id, {
+        emoji: r.emoji,
+        created_at: r.created_at,
+        mine: r.user_id === user.id,
+        onMine: msg.sender_id === user.id,
+      });
+    });
 
     // All other members per conversation (for groups we need everyone)
     const membersByConv = new Map<string, { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null }[]>();
@@ -117,6 +137,13 @@ export default async function MessagesPage() {
           unreadCount: unreadCountByConv.get(c.id) ?? 0,
           muted: mutedByConv.has(c.id),
           isRequest: !isGroup && requestByConv.get(c.id) === false,
+          // A reaction newer than the last message becomes the preview line
+          lastReaction: (() => {
+            const rx = reactionByConv.get(c.id);
+            if (!rx) return null;
+            if (last && new Date(rx.created_at) <= new Date(last.created_at)) return null;
+            return { emoji: rx.emoji, mine: rx.mine, onMine: rx.onMine };
+          })(),
         } as InboxRow;
       })
       .filter(Boolean) as InboxRow[];

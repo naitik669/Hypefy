@@ -42,6 +42,20 @@ export type ChatMsg = {
 
 type MsgStatus = "pending" | "sent" | "seen" | "failed";
 
+/** Short human snippet for quoting a message — never a raw URL. */
+function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null }): string {
+  if (m.is_unsent) return "Unsent message";
+  switch (m.kind) {
+    case "gif": return "GIF";
+    case "image": return "Photo";
+    case "video": return "Video";
+    case "voice": return "Voice note";
+    case "shot": return "Shot";
+    case "post": return "Post";
+    default: return m.body ?? "Message";
+  }
+}
+
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
 type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null };
 
@@ -721,7 +735,7 @@ export function RealChatView({
                         <div className="mb-0.5 max-w-full truncate rounded-lg border-l-2 border-accent/60 bg-surface px-2 py-1 text-[11px] text-muted">
                           <span className="font-semibold">{senderName(replied.sender_id)}</span>
                           {": "}
-                          {replied.is_unsent ? "Unsent message" : replied.body ?? (replied.kind === "shot" ? "Shot" : "Post")}
+                          {msgSnippet(replied)}
                         </div>
                       )}
 
@@ -970,7 +984,7 @@ export function RealChatView({
               <span className="font-semibold text-foreground">
                 {replyTo.sender_id === currentUserId ? "yourself" : senderName(replyTo.sender_id)}
               </span>
-              : {replyTo.is_unsent ? "Unsent" : replyTo.body ?? (replyTo.kind === "shot" ? "Shot" : "Post")}
+              : {msgSnippet(replyTo)}
             </span>
             <button onClick={() => setReplyTo(null)} className="text-faint hover:text-muted"><X size={14} /></button>
           </div>

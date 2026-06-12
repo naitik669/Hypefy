@@ -24,6 +24,8 @@ export type InboxRow = {
   unreadCount: number;
   muted: boolean;
   isRequest: boolean;
+  /** Set when a reaction is newer than the last message — becomes the preview */
+  lastReaction?: { emoji: string; mine: boolean; onMine: boolean } | null;
 };
 
 function GroupAvatar() {
@@ -57,12 +59,41 @@ function timeAgo(iso: string) {
   return `${Math.floor(s / 86400)}d`;
 }
 
+/** Human verbs for non-text message kinds — never show raw URLs. */
+const KIND_VERB: Record<string, string> = {
+  post: "shared a post",
+  shot: "shared a Shot",
+  gif: "sent a GIF",
+  image: "sent a photo",
+  video: "sent a video",
+  voice: "sent a voice note",
+};
+
+function cap(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 function preview(r: InboxRow) {
+  // 1. Fresh reaction beats the last message
+  if (r.lastReaction) {
+    const { emoji, mine, onMine } = r.lastReaction;
+    const target = onMine ? (mine ? "their message" : "your message") : "a message";
+    const verb = emoji === "⭐" ? `hyped ${target}` : `reacted ${emoji} to ${target}`;
+    return mine ? `You ${emoji === "⭐" ? "hyped a message" : `reacted ${emoji} to a message`}` : cap(verb);
+  }
+
   if (!r.lastAt) return r.isGroup ? "New group" : "Say hi 👋";
-  const body =
-    r.lastKind === "post" ? "Shared a post"
-    : r.lastKind === "shot" ? "Shared a Shot"
-    : r.lastBody ?? "Sent a message";
+
+  const verb = r.lastKind ? KIND_VERB[r.lastKind] : undefined;
+
+  if (verb) {
+    // Media/share kinds read as a sentence: "You sent a photo" / "Aman sent a GIF"
+    if (r.lastMine) return `You ${verb}`;
+    if (r.isGroup && r.lastSenderName) return `${r.lastSenderName} ${verb}`;
+    return cap(verb);
+  }
+
+  const body = r.lastBody ?? "Sent a message";
   if (r.isGroup) {
     const who = r.lastMine ? "You" : r.lastSenderName;
     return who ? `${who}: ${body}` : body;
