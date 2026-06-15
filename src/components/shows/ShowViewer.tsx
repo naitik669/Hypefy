@@ -138,6 +138,9 @@ function ShowScreen({
   const [hypeCount, setHypeCount] = useState(show.hype_count ?? 0);
   const [hypePending, setHypePending] = useState(false);
   const [viewCount, setViewCount] = useState<number | null>(null);
+  const [sendingReply, setSendingReply] = useState(false);
+  const [replyStatus, setReplyStatus] = useState<"idle" | "sent" | "error">("idle");
+  const [replyError, setReplyError] = useState<string | null>(null);
 
   // Server-side view tracking: viewers register a view, owners see the count
   useEffect(() => {
@@ -195,6 +198,53 @@ function ShowScreen({
       if (data && typeof data === "object") { setHyped(Boolean(data.hyped)); setHypeCount(Number(data.hype_count)); }
     } catch { setHyped(prev); setHypeCount(prevCount); }
     finally { setHypePending(false); }
+  }
+
+  /**
+   * Send a Show reply as a DM to the owner. Without a show_id column on
+   * messages, we prefix a context line so the chat reads like a story reply.
+   */
+  async function sendReply() {
+    const text = reply.trim();
+    if (!text || sendingReply || !currentUserId || isOwner) return;
+    setSendingReply(true);
+    setReplyError(null);
+
+    const { data: convId, error: convErr } = await supabase.rpc("get_or_create_dm", { p_other: show.user_id });
+    if (convErr || !convId) {
+      setSendingReply(false);
+      setReplyStatus("error");
+      setReplyError(
+        convErr?.message?.includes("dm_restricted")
+          ? "They only accept DMs from people they follow"
+          : convErr?.message?.includes("blocked")
+            ? "Can't reply to this account"
+            : "Couldn't send reply",
+      );
+      setTimeout(() => { setReplyStatus("idle"); setReplyError(null); }, 2600);
+      return;
+    }
+
+    const body = `↩️ Replied to your Show: ${text}`;
+    const { error: sendErr } = await supabase.rpc("send_message", {
+      p_conversation_id: convId,
+      p_body: body,
+      p_kind: "text",
+      p_post_id: null,
+      p_reply_to_id: null,
+      p_shot_id: null,
+    });
+
+    setSendingReply(false);
+    if (sendErr) {
+      setReplyStatus("error");
+      setReplyError("Couldn't send reply");
+      setTimeout(() => { setReplyStatus("idle"); setReplyError(null); }, 2600);
+      return;
+    }
+    setReply("");
+    setReplyStatus("sent");
+    setTimeout(() => setReplyStatus("idle"), 2200);
   }
 
   async function deleteShow() {
@@ -442,17 +492,29 @@ function ShowScreen({
         </div>
       )}
 
-      {/* ── Reply + Hype bar ── */}
-      {!menuOpen && (
+      {/* ── Reply + Hype bar (viewers only) ── */}
+      {!menuOpen && !isOwner && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/70 to-transparent px-3 pb-6 pt-12">
+          {/* Sent / error feedback */}
+          {replyStatus !== "idle" && (
+            <div className="pointer-events-none mb-2 flex justify-center">
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-sm ${
+                replyStatus === "sent" ? "bg-accent/90 text-accent-ink" : "bg-black/60 text-white"
+              }`}>
+                {replyStatus === "sent" ? "Reply sent ⚡" : replyError ?? "Couldn't send reply"}
+              </span>
+            </div>
+          )}
           <div className="pointer-events-auto flex items-center gap-3">
             <input
               value={reply}
               onChange={(e) => setReply(e.target.value)}
               onClick={(e) => { e.stopPropagation(); setPaused(true); }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); sendReply(); } }}
               onBlur={() => setPaused(false)}
               placeholder={`Reply to ${name}…`}
-              className="h-11 flex-1 rounded-pill border border-white/25 bg-white/10 px-4 text-sm text-white outline-none backdrop-blur-sm placeholder:text-white/45"
+              disabled={sendingReply}
+              className="h-11 flex-1 rounded-pill border border-white/25 bg-white/10 px-4 text-sm text-white outline-none backdrop-blur-sm placeholder:text-white/45 disabled:opacity-60"
             />
             <button
               type="button"
@@ -467,10 +529,11 @@ function ShowScreen({
             <button
               type="button"
               aria-label="Send reply"
-              onClick={(e) => { e.stopPropagation(); setReply(""); }}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink"
+              disabled={!reply.trim() || sendingReply}
+              onClick={(e) => { e.stopPropagation(); sendReply(); }}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink transition-transform active:scale-90 disabled:opacity-40"
             >
-              <Send size={18} />
+              {sendingReply ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
             </button>
           </div>
         </div>
