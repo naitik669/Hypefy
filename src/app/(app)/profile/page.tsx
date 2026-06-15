@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, hueFromId } from "@/lib/profile";
-import { AvatarImg } from "@/components/ui/AvatarImg";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
 import { FollowStats } from "@/components/profile/FollowStats";
@@ -25,7 +25,8 @@ export default async function ProfilePage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [profile, stats, showcaseShotsRes, showcaseShowsRes] = await Promise.all([
+  const nowIso = new Date().toISOString();
+  const [profile, stats, showcaseShotsRes, showcaseShowsRes, activeShowsRes] = await Promise.all([
     getProfile(supabase),
     fetchStats(supabase, user.id),
     // Pinned shots (video reels marked in_showcase)
@@ -44,11 +45,20 @@ export default async function ProfilePage() {
       .eq("is_showcase", true)
       .order("created_at", { ascending: false })
       .limit(20),
+    // Active Shows for the avatar ring (oldest = entry)
+    supabase
+      .from("shows")
+      .select("id")
+      .eq("user_id", user.id)
+      .gt("expires_at", nowIso)
+      .order("created_at", { ascending: true })
+      .limit(1),
   ]);
 
   const showcaseShots = showcaseShotsRes.data ?? [];
   const showcaseShows = showcaseShowsRes.error ? [] : (showcaseShowsRes.data ?? []);
   const hasShowcase = showcaseShows.length > 0 || showcaseShots.length > 0;
+  const entryShowId = activeShowsRes.data?.[0]?.id ?? null;
 
   const name = profile?.displayName || "Hypefy User";
   const handle = profile?.username ? `@${profile.username}` : null;
@@ -65,7 +75,13 @@ export default async function ProfilePage() {
         {/* Avatar + stats */}
         <div className="flex items-end gap-4">
           <div className="-mt-11">
-            <AvatarImg url={profile?.avatarUrl} name={name} hue={hue} size={84} className="rounded-[26px] ring-4 ring-background" />
+            <ProfileAvatar
+              name={name}
+              hue={hue}
+              avatarUrl={profile?.avatarUrl}
+              hasActiveShow={!!entryShowId}
+              showId={entryShowId}
+            />
           </div>
           <FollowStats
             userId={user.id}

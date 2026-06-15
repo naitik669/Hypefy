@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Avatar } from "@/components/ui/Avatar";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { PublicProfileTabs } from "@/components/profile/PublicProfileTabs";
 import { FollowButton } from "@/components/profile/FollowButton";
@@ -60,14 +60,18 @@ export default async function PublicProfilePage({
   const bannerId = profile.banner_id ?? "lime-pulse";
   const tags: string[] = profile.profile_tags ?? [];
 
-  // Showcase: pinned video shots + story-shots
-  const [showcaseShotsRes, showcaseShowsRes] = await Promise.all([
+  // Showcase: pinned video shots + story-shots; + active Shows for the avatar ring
+  const nowIso = new Date().toISOString();
+  const [showcaseShotsRes, showcaseShowsRes, activeShowsRes] = await Promise.all([
     supabase.from("shots").select("id, media_url, caption").eq("user_id", profile.id).eq("in_showcase", true).order("created_at", { ascending: false }).limit(20),
     supabase.from("shows").select("id, media_url, caption").eq("user_id", profile.id).eq("is_showcase", true).order("created_at", { ascending: false }).limit(20),
+    supabase.from("shows").select("id").eq("user_id", profile.id).gt("expires_at", nowIso).order("created_at", { ascending: true }).limit(1),
   ]);
   const showcaseShots = showcaseShotsRes.data ?? [];
   const showcaseShows = showcaseShowsRes.error ? [] : (showcaseShowsRes.data ?? []);
   const hasShowcase = showcaseShows.length > 0 || showcaseShots.length > 0;
+  // Entry Show (oldest) for the avatar ring — never expose to non-followers of private accounts
+  const entryShowId = (!isLocked && activeShowsRes.data?.[0]?.id) || null;
 
   return (
     <>
@@ -77,7 +81,13 @@ export default async function PublicProfilePage({
         {/* Avatar + stats */}
         <div className="flex items-end gap-4">
           <div className="-mt-11">
-            <Avatar name={name} hue={hue} size={84} src={profile.avatar_url ?? undefined} className="rounded-[26px] ring-4 ring-background" />
+            <ProfileAvatar
+              name={name}
+              hue={hue}
+              avatarUrl={profile.avatar_url}
+              hasActiveShow={!!entryShowId}
+              showId={entryShowId}
+            />
           </div>
           <FollowStats
             userId={profile.id}
