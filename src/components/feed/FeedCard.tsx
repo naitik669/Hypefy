@@ -105,6 +105,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const [editOpen, setEditOpen] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [avatarZoomOpen, setAvatarZoomOpen] = useState(false);
   const [liveCaption, setLiveCaption] = useState(post.caption);
   const [liveBody, setLiveBody] = useState(post.body);
 
@@ -236,7 +237,14 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
       )}
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <Link href={profileHref}><Avatar name={name} hue={hue} size={40} src={profile?.avatar_url ?? undefined} /></Link>
+        <button
+          type="button"
+          aria-label={`View ${name}'s photo`}
+          onClick={() => { if (profile?.avatar_url) setAvatarZoomOpen(true); else window.location.href = profileHref; }}
+          className="shrink-0 active:scale-95 transition-transform"
+        >
+          <Avatar name={name} hue={hue} size={40} src={profile?.avatar_url ?? undefined} />
+        </button>
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <Link href={profileHref} className="truncate text-sm font-semibold hover:underline">{name}</Link>
           <span className="ml-1 text-xs text-faint">· {timeAgo(post.created_at)}</span>
@@ -376,6 +384,10 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
 
       {zoomOpen && images[imgIdx] && (
         <ZoomViewer src={images[imgIdx]} onClose={() => setZoomOpen(false)} />
+      )}
+
+      {avatarZoomOpen && profile?.avatar_url && (
+        <ZoomViewer src={profile.avatar_url} onClose={() => setAvatarZoomOpen(false)} />
       )}
 
       <PostActionsSheet open={actionsOpen} onClose={() => setActionsOpen(false)}

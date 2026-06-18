@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { Avatar } from "@/components/ui/Avatar";
+import { ZoomViewer } from "@/components/ui/ZoomViewer";
 import { GifPicker } from "@/components/messages/GifPicker";
 import { formatCount } from "@/lib/format";
 
@@ -361,14 +362,23 @@ function CommentItem({
   const hue = comment.profiles?.avatar_hue ?? 280;
   const hasReplies = comment.replies.length > 0;
   const isOwnComment = comment.user_id === currentUserId;
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
 
   return (
+    <>
     <div>
       {/* Parent comment */}
       <div className="flex gap-3">
         {/* Avatar column -- shows the vertical thread line below if replies are open */}
         <div className="flex flex-col items-center">
-          <Avatar name={n} hue={hue} size={34} src={comment.profiles?.avatar_url ?? undefined} />
+          <button
+            type="button"
+            aria-label={`View ${n}'s photo`}
+            onClick={() => { const src = comment.profiles?.avatar_url; if (src) setZoomSrc(src); }}
+            className="shrink-0 active:scale-95 transition-transform"
+          >
+            <Avatar name={n} hue={hue} size={34} src={comment.profiles?.avatar_url ?? undefined} />
+          </button>
           {hasReplies && comment.showReplies && (
             <div className="mt-1.5 flex-1 w-px bg-border/70" />
           )}
@@ -443,7 +453,14 @@ function CommentItem({
               const rhue = reply.profiles?.avatar_hue ?? 280;
               return (
                 <div key={reply.id} className="flex gap-2.5">
-                  <Avatar name={rn} hue={rhue} size={28} src={reply.profiles?.avatar_url ?? undefined} />
+                  <button
+                    type="button"
+                    aria-label={`View ${rn}'s photo`}
+                    onClick={() => { const src = reply.profiles?.avatar_url; if (src) setZoomSrc(src); }}
+                    className="shrink-0 active:scale-95 transition-transform"
+                  >
+                    <Avatar name={rn} hue={rhue} size={28} src={reply.profiles?.avatar_url ?? undefined} />
+                  </button>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-semibold">{rn}</span>
@@ -481,5 +498,7 @@ function CommentItem({
         </div>
       )}
     </div>
+    {zoomSrc && <ZoomViewer src={zoomSrc} onClose={() => setZoomSrc(null)} />}
+    </>
   );
 }
