@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { HypefyMark } from "@/components/HypefyMark";
+import { upsertSavedAccount } from "@/lib/saved-accounts";
 
 type Mode = "signin" | "signup";
 
@@ -42,6 +43,9 @@ export function AuthCard({ mode }: { mode: Mode }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  // ?add=1 — reached via Settings → "Add account". Keeps the existing
+  // session saved in the switcher instead of just discarding it.
+  const [addMode, setAddMode] = useState(false);
 
   // Prefill email + show a notice when redirected here (e.g. from signup
   // because the email is already registered). Read from the URL directly
@@ -53,20 +57,47 @@ export function AuthCard({ mode }: { mode: Mode }) {
     if (mode === "signin" && params.get("exists") === "1") {
       setNotice("That email is already registered. Sign in to continue.");
     }
+    if (params.get("add") === "1") setAddMode(true);
   }, [mode]);
+
+  async function saveSessionAsAccount(session: { user: { id: string; email?: string | null }; access_token: string; refresh_token: string }) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id, display_name, username, avatar_hue, avatar_url")
+      .eq("id", session.user.id)
+      .maybeSingle();
+    upsertSavedAccount({
+      userId: session.user.id,
+      email: session.user.email ?? "",
+      displayName: (profile as any)?.display_name ?? null,
+      username: (profile as any)?.username ?? null,
+      avatarHue: (profile as any)?.avatar_hue ?? null,
+      avatarUrl: (profile as any)?.avatar_url ?? null,
+      accessToken: session.access_token,
+      refreshToken: session.refresh_token,
+    });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
+    // Adding another account: snapshot whoever's currently signed in
+    // before we overwrite the client's active session below.
+    const prevSession = addMode ? (await supabase.auth.getSession()).data.session : null;
+
     try {
       if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
+        if (addMode) {
+          if (prevSession) await saveSessionAsAccount(prevSession);
+          if (data.session) await saveSessionAsAccount(data.session);
+        }
         router.push("/home");
         router.refresh();
       } else {
@@ -80,7 +111,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
         if (error) {
           // Confirmations off: Supabase returns an explicit error.
           if (/already registered|already exists|already in use/i.test(error.message)) {
-            router.push(`/signin?exists=1&email=${encodeURIComponent(email)}`);
+            router.push(`/signin?exists=1&email=${encodeURIComponent(email)}${addMode ? "&add=1" : ""}`);
             return;
           }
           throw error;
@@ -88,15 +119,27 @@ export function AuthCard({ mode }: { mode: Mode }) {
         // Confirmations on: Supabase hides existing emails (enumeration
         // protection) by returning a user with an empty identities array.
         if (data.user && (data.user.identities?.length ?? 0) === 0) {
-          router.push(`/signin?exists=1&email=${encodeURIComponent(email)}`);
+          router.push(`/signin?exists=1&email=${encodeURIComponent(email)}${addMode ? "&add=1" : ""}`);
           return;
         }
         // New account. If a session exists, go straight to setup; otherwise
         // confirmation is required — show the branded "check your inbox" screen.
         if (data.session) {
+          if (addMode) {
+            if (prevSession) await saveSessionAsAccount(prevSession);
+            await saveSessionAsAccount(data.session);
+          }
           router.push("/setup-profile");
           router.refresh();
         } else {
+          // No session yet (email confirmation pending) — restore whoever
+          // was signed in so they aren't logged out while waiting.
+          if (addMode && prevSession) {
+            await supabase.auth.setSession({
+              access_token: prevSession.access_token,
+              refresh_token: prevSession.refresh_token,
+            });
+          }
           router.push(`/check-email?email=${encodeURIComponent(email)}`);
         }
       }
@@ -139,7 +182,13 @@ export function AuthCard({ mode }: { mode: Mode }) {
           <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground">
             {t.title}
           </h1>
-          <p className="mt-1 text-[13px] text-muted">{t.subtitle}</p>
+          <p className="mt-1 text-[13px] text-muted">
+            {addMode
+              ? mode === "signin"
+                ? "Log in to an existing account to switch between profiles."
+                : "Set up a new account to add to your switcher."
+              : t.subtitle}
+          </p>
         </div>
 
         {/* Notice (e.g. redirected from signup — email already registered) */}
@@ -207,36 +256,46 @@ export function AuthCard({ mode }: { mode: Mode }) {
           </button>
         </form>
 
-        {/* Divider */}
-        <div className="my-5 flex items-center gap-3">
-          <span className="h-px flex-1 bg-white/10" />
-          <span className="text-[11px] font-medium tracking-widest text-faint">
-            OR
-          </span>
-          <span className="h-px flex-1 bg-white/10" />
-        </div>
-
-        {/* Google */}
-        <button
-          type="button"
-          onClick={handleGoogle}
-          disabled={googleLoading}
-          className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/5 bg-white/[0.06] text-sm font-medium text-foreground/90 transition hover:bg-white/[0.1] active:scale-[0.99] disabled:opacity-60"
-        >
-          <GoogleGlyph className="h-[18px] w-[18px]" />
-          {googleLoading ? "Redirecting…" : t.googleLabel}
-        </button>
+        {/* Google — skipped when adding an account: its full-page OAuth
+            redirect can't safely snapshot the session being switched from */}
+        {!addMode && (
+          <>
+            <div className="my-5 flex items-center gap-3">
+              <span className="h-px flex-1 bg-white/10" />
+              <span className="text-[11px] font-medium tracking-widest text-faint">
+                OR
+              </span>
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
+            <button
+              type="button"
+              onClick={handleGoogle}
+              disabled={googleLoading}
+              className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/5 bg-white/[0.06] text-sm font-medium text-foreground/90 transition hover:bg-white/[0.1] active:scale-[0.99] disabled:opacity-60"
+            >
+              <GoogleGlyph className="h-[18px] w-[18px]" />
+              {googleLoading ? "Redirecting…" : t.googleLabel}
+            </button>
+          </>
+        )}
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-muted">
           {t.footerText}{" "}
           <Link
-            href={t.footerHref}
+            href={`${t.footerHref}${addMode ? "?add=1" : ""}`}
             className="font-semibold text-foreground transition-colors hover:text-accent"
           >
             {t.footerLink}
           </Link>
         </p>
+        {addMode && (
+          <p className="mt-3 text-center text-xs text-muted">
+            <Link href="/settings" className="hover:text-foreground">
+              Cancel
+            </Link>
+          </p>
+        )}
 
         {mode === "signup" && (
           <p className="mt-3 text-center text-[11px] leading-relaxed text-faint">

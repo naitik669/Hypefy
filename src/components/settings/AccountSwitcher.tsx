@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Plus, X, Loader2, Eye, EyeOff } from "lucide-react";
+import Link from "next/link";
+import { Check, Plus, X, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import {
@@ -15,12 +16,6 @@ export function AccountSwitcher() {
   const supabase = createClient();
   const [accounts, setAccounts] = useState<SavedAccount[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [addOpen, setAddOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [loggingIn, setLoggingIn] = useState(false);
   const [switching, setSwitching] = useState<string | null>(null);
 
   // On mount: save current session into localStorage so it shows in the list
@@ -67,51 +62,6 @@ export function AccountSwitcher() {
       setSwitching(null);
       return;
     }
-    window.location.href = "/home";
-  }
-
-  async function addAccount() {
-    if (loggingIn || !email.trim() || !password) return;
-    setLoginError(null);
-    setLoggingIn(true);
-
-    // Snapshot the current session so we can restore it if login fails
-    const { data: { session: prev } } = await supabase.auth.getSession();
-
-    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-
-    if (error || !data.session) {
-      setLoginError(error?.message ?? "Login failed");
-      setLoggingIn(false);
-      // Restore current session
-      if (prev) {
-        await supabase.auth.setSession({
-          access_token: prev.access_token,
-          refresh_token: prev.refresh_token,
-        });
-      }
-      return;
-    }
-
-    // Fetch new account's profile
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id, display_name, username, avatar_hue, avatar_url")
-      .eq("id", data.session.user.id)
-      .maybeSingle();
-
-    upsertSavedAccount({
-      userId: data.session.user.id,
-      email: data.session.user.email ?? "",
-      displayName: (profile as any)?.display_name ?? null,
-      username: (profile as any)?.username ?? null,
-      avatarHue: (profile as any)?.avatar_hue ?? null,
-      avatarUrl: (profile as any)?.avatar_url ?? null,
-      accessToken: data.session.access_token,
-      refreshToken: data.session.refresh_token,
-    });
-
-    // Switch to the new account
     window.location.href = "/home";
   }
 
@@ -184,80 +134,15 @@ export function AccountSwitcher() {
         );
       })}
 
-      {/* Add account */}
-      {!addOpen ? (
-        <button
-          type="button"
-          onClick={() => setAddOpen(true)}
-          className="flex items-center gap-2 rounded-2xl border border-dashed border-border px-3 py-3 text-sm text-muted transition-colors hover:border-accent/40 hover:text-foreground"
-        >
-          <Plus size={18} />
-          Add account
-        </button>
-      ) : (
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface px-4 py-4">
-          <p className="text-sm font-semibold">Sign in to another account</p>
-
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            className="input"
-            autoComplete="off"
-          />
-
-          <div className="relative">
-            <input
-              type={showPw ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              className="input pr-10"
-              onKeyDown={(e) => { if (e.key === "Enter") addAccount(); }}
-            />
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={() => setShowPw((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-faint"
-            >
-              {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-
-          {loginError && (
-            <p className="text-xs text-danger">{loginError}</p>
-          )}
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setAddOpen(false);
-                setEmail("");
-                setPassword("");
-                setLoginError(null);
-              }}
-              className="flex-1 rounded-xl border border-border py-2.5 text-sm font-semibold transition-colors hover:bg-white/[0.04]"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={addAccount}
-              disabled={loggingIn || !email.trim() || !password}
-              className="flex flex-1 items-center justify-center rounded-xl bg-accent py-2.5 text-sm font-bold text-accent-ink disabled:opacity-50"
-            >
-              {loggingIn ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                "Sign in"
-              )}
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Add account — routes through the real sign-in/sign-up flow, same
+          as other apps, instead of a cramped inline form */}
+      <Link
+        href="/signin?add=1"
+        className="flex items-center gap-2 rounded-2xl border border-dashed border-border px-3 py-3 text-sm text-muted transition-colors hover:border-accent/40 hover:text-foreground"
+      >
+        <Plus size={18} />
+        Add account
+      </Link>
     </div>
   );
 }
