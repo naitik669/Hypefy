@@ -111,7 +111,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
         if (error) {
           // Confirmations off: Supabase returns an explicit error.
           if (/already registered|already exists|already in use/i.test(error.message)) {
-            router.push(`/signin?exists=1&email=${encodeURIComponent(email)}${addMode ? "&add=1" : ""}`);
+            router.push(`/signin?exists=1&email=${encodeURIComponent(email)}${addMode ? "&add=1&view=form" : ""}`);
             return;
           }
           throw error;
@@ -119,7 +119,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
         // Confirmations on: Supabase hides existing emails (enumeration
         // protection) by returning a user with an empty identities array.
         if (data.user && (data.user.identities?.length ?? 0) === 0) {
-          router.push(`/signin?exists=1&email=${encodeURIComponent(email)}${addMode ? "&add=1" : ""}`);
+          router.push(`/signin?exists=1&email=${encodeURIComponent(email)}${addMode ? "&add=1&view=form" : ""}`);
           return;
         }
         // New account. If a session exists, go straight to setup; otherwise
@@ -283,7 +283,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
         <p className="mt-6 text-center text-xs text-muted">
           {t.footerText}{" "}
           <Link
-            href={`${t.footerHref}${addMode ? "?add=1" : ""}`}
+            href={`${t.footerHref}${addMode ? "?add=1&view=form" : ""}`}
             className="font-semibold text-foreground transition-colors hover:text-accent"
           >
             {t.footerLink}

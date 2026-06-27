@@ -1,5 +1,5 @@
-import { AuthCard } from "@/components/auth/AuthCard";
+import { AccountGate } from "@/components/auth/AccountGate";
 
 export default function SignInPage() {
-  return <AuthCard mode="signin" />;
+  return <AccountGate mode="signin" />;
 }
