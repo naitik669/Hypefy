@@ -188,6 +188,7 @@ export function RealChatView({
     startCall({ conversationId, peerId: other.id, peerName: other.name, peerHue: other.hue, type });
   }
   const endRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const unreadDividerRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
   // null = not resolved yet. Resolved with a fresh client-side read of
@@ -240,16 +241,43 @@ export function RealChatView({
 
   useEffect(() => {
     if (firstUnreadIndex === null) return; // not resolved yet — see mark-as-read effect below
-    if (!initialScrollDone.current) {
-      initialScrollDone.current = true;
-      if (unreadDividerRef.current) {
-        unreadDividerRef.current.scrollIntoView({ behavior: "auto", block: "center" });
-      } else {
-        endRef.current?.scrollIntoView({ behavior: "auto" });
-      }
+
+    // Subsequent message changes (after the first landing): smooth-scroll
+    // to the newest message.
+    if (initialScrollDone.current) {
+      endRef.current?.scrollIntoView({ behavior: "smooth" });
       return;
     }
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+
+    // Initial landing. Pin to the unread divider (if any) or the bottom.
+    // Media (images, GIFs, videos, shared post/shot cards) loads async and
+    // grows the layout downward — a single pin lands on a not-yet-grown
+    // layout (i.e. near the top), so we re-pin across a few frames and on
+    // every media load until things settle.
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const pin = () => {
+      const divider = unreadDividerRef.current;
+      if (divider) divider.scrollIntoView({ behavior: "auto", block: "center" });
+      else container.scrollTop = container.scrollHeight;
+    };
+
+    pin();
+    const raf = requestAnimationFrame(pin);
+    const media = Array.from(container.querySelectorAll("img, video"));
+    media.forEach((m) => { m.addEventListener("load", pin); m.addEventListener("loadeddata", pin); });
+    const settle = setTimeout(() => {
+      pin();
+      initialScrollDone.current = true;
+      media.forEach((m) => { m.removeEventListener("load", pin); m.removeEventListener("loadeddata", pin); });
+    }, 600);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(settle);
+      media.forEach((m) => { m.removeEventListener("load", pin); m.removeEventListener("loadeddata", pin); });
+    };
   }, [messages, firstUnreadIndex]);
 
   // Close the long-press menu on Escape.
@@ -720,6 +748,7 @@ export function RealChatView({
 
       {/* Messages — clicking here closes the GIF picker */}
       <div
+        ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-4 py-4"
         onClick={() => { if (gifPickerOpen) setGifPickerOpen(false); }}
       >
