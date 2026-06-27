@@ -117,6 +117,8 @@ export function RealChatView({
   const [editing, setEditing] = useState<ChatMsg | null>(null);
   const [menu, setMenu] = useState<{ msg: ChatMsg; rect: DOMRect } | null>(null);
   const [reportMsg, setReportMsg] = useState<ChatMsg | null>(null);
+  // Message id whose reaction list ("who reacted with what") is open
+  const [reactionSheet, setReactionSheet] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [callChooser, setCallChooser] = useState(false);
   const [headerMenu, setHeaderMenu] = useState(false);
@@ -983,7 +985,7 @@ export function RealChatView({
                             <button
                               key={r.emoji}
                               type="button"
-                              onClick={() => toggleReaction(m.id, r.emoji)}
+                              onClick={() => setReactionSheet(m.id)}
                               className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[12px] leading-none ${
                                 r.mine ? "bg-accent/20 ring-1 ring-accent/40" : "bg-surface ring-1 ring-border"
                               }`}
@@ -1210,6 +1212,43 @@ export function RealChatView({
               </div>
             </div>
           </>
+        );
+      })()}
+
+      {/* Reaction details — who reacted with what */}
+      {reactionSheet && (() => {
+        const rows = reactions.filter((r) => r.message_id === reactionSheet);
+        return (
+          <BottomSheet open onClose={() => setReactionSheet(null)} title="Reactions">
+            <div className="flex flex-col pb-3">
+              {rows.length === 0 ? (
+                <p className="px-1 py-6 text-center text-sm text-muted">No reactions yet.</p>
+              ) : (
+                rows.map((r) => {
+                  const isMine = r.user_id === currentUserId;
+                  const name = senderName(r.user_id);
+                  const hue = isMine ? 280 : members?.[r.user_id]?.hue ?? other.hue;
+                  return (
+                    <button
+                      key={`${r.user_id}-${r.emoji}`}
+                      type="button"
+                      onClick={() => {
+                        if (isMine) { toggleReaction(reactionSheet, r.emoji); setReactionSheet(null); }
+                      }}
+                      className={`flex items-center gap-3 rounded-xl px-2 py-2.5 text-left ${isMine ? "hover:bg-white/5" : "cursor-default"}`}
+                    >
+                      <Avatar name={name} hue={hue} size={40} src={isMine ? undefined : members?.[r.user_id] ? undefined : other.avatarUrl ?? undefined} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{name}</p>
+                        {isMine && <p className="text-xs text-muted">Tap to remove</p>}
+                      </div>
+                      <span className="text-xl leading-none">{r.emoji}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </BottomSheet>
         );
       })()}
 

@@ -163,7 +163,7 @@ export default async function MessagesPage() {
           </Link>
         }
       />
-      <MessagesInbox rows={rows} />
+      <MessagesInbox rows={rows} currentUserId={user.id} />
     </>
   );
 }

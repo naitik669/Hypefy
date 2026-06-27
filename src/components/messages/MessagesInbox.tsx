@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Search, MessageCircle, Users, Check, Ban, Loader2, BellOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
@@ -101,8 +102,9 @@ function preview(r: InboxRow) {
   return (r.lastMine ? "You: " : "") + body;
 }
 
-export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
+export function MessagesInbox({ rows, currentUserId }: { rows: InboxRow[]; currentUserId: string }) {
   const supabase = createClient();
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
   // Conversations the user has opened — optimistically clear their unread state.
@@ -110,6 +112,41 @@ export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
   const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Realtime: keep the inbox live without a manual refresh. A new message,
+  // reaction, or conversation change re-runs the server fetch (debounced),
+  // so previews, ordering, and unread badges update on their own.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const refresh = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => router.refresh(), 350);
+    };
+    const channel = supabase
+      .channel("inbox-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+        const m = payload.new as { sender_id?: string; conversation_id?: string };
+        if (m.sender_id === currentUserId) return; // my own sends are handled on open
+        // A fresh message means this conversation is unread again, even if I
+        // opened it earlier this session.
+        if (m.conversation_id) {
+          setReadIds((prev) => {
+            if (!prev.has(m.conversation_id!)) return prev;
+            const next = new Set(prev);
+            next.delete(m.conversation_id!);
+            return next;
+          });
+        }
+        refresh();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, () => refresh())
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations" }, () => refresh())
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, currentUserId, router]);
 
   // Muted conversations never surface as unread (no badge, no Unread section)
   const isUnread = (r: InboxRow) => r.unread && !r.muted && !readIds.has(r.id);
