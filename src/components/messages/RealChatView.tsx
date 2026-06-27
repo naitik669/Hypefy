@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil } from "lucide-react";
@@ -61,6 +61,25 @@ type Other = { id: string; name: string; username: string | null; hue: number; a
 
 const REPORT_REASONS = ["Spam", "Harassment", "Hate or abuse", "Scam", "Inappropriate content", "Other"];
 const QUICK = ["❤️", "🥰", "😂", "👍", "😮", "😢"];
+
+/** How many messages per page (initial load + each scroll-up chunk). */
+const MSG_PAGE = 30;
+/** Select used for both the initial server load and client pagination. */
+const MSG_SELECT =
+  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, created_at, post:posts(id, caption, image_url, image_urls, profiles(username, display_name, avatar_hue)), shot:shots(id, media_url, caption, profiles(username, display_name, avatar_hue))";
+
+/** Flatten Supabase's nested post/shot+profile joins into ChatMsg shape. */
+function mapMessageRow(m: any): ChatMsg {
+  const one = (x: any) => (Array.isArray(x) ? x[0] : x);
+  const profOf = (x: any) => { const p = one(x); return p ? one(p.profiles) : null; };
+  return {
+    ...m,
+    post: m.post ? { ...one(m.post), profiles: undefined } : null,
+    postProfile: m.post ? profOf(m.post) : null,
+    shot: m.shot ? { ...one(m.shot), profiles: undefined } : null,
+    shotProfile: m.shot ? profOf(m.shot) : null,
+  };
+}
 
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -197,6 +216,22 @@ export function RealChatView({
   // last_read_at right before marking the thread read (see effect below),
   // so the unread boundary always reflects the true pre-visit state.
   const [firstUnreadIndex, setFirstUnreadIndex] = useState<number | null>(null);
+  // Reverse pagination: load older messages in chunks as the user scrolls up.
+  const [hasMore, setHasMore] = useState(initialMessages.length >= MSG_PAGE);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const loadingOlderRef = useRef(false);
+  // scrollHeight captured right before a prepend, so the layout effect can
+  // restore the viewport to the same message (no jump).
+  const prependRestore = useRef<number | null>(null);
+  // Set while a prepend is in flight so the auto-scroll effect knows this
+  // messages change is older history, not a new message at the end.
+  const justPrepended = useRef(false);
+  // Last message id we've already auto-scrolled to — lets us tell a genuine
+  // new message at the end from a prepend or an in-place hydration.
+  const prevLastIdRef = useRef<string | null>(null);
+  // Whether the user is near the bottom (updated on scroll) — gates whether
+  // an incoming message yanks the view down.
+  const nearBottomRef = useRef(true);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressClick = useRef(false);
   const idsRef = useRef<string[]>([]);
@@ -241,13 +276,39 @@ export function RealChatView({
     return "sent";
   }
 
+  // Restore the viewport after older messages are prepended, before paint,
+  // so the message the user was reading stays put instead of jumping.
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (prependRestore.current != null && container) {
+      container.scrollTop = container.scrollHeight - prependRestore.current;
+      prependRestore.current = null;
+    }
+  }, [messages]);
+
   useEffect(() => {
     if (firstUnreadIndex === null) return; // not resolved yet — see mark-as-read effect below
 
-    // Subsequent message changes (after the first landing): smooth-scroll
-    // to the newest message.
+    // After the first landing, only auto-scroll for a genuinely new message
+    // at the end — never for a prepend (older history) or an in-place
+    // hydration (post/shot preview filling in).
     if (initialScrollDone.current) {
-      endRef.current?.scrollIntoView({ behavior: "smooth" });
+      // A prepend (older history) changed `messages` but added nothing at the
+      // end — never auto-scroll; the layout effect restores the position.
+      if (justPrepended.current) {
+        justPrepended.current = false;
+        prevLastIdRef.current = messages[messages.length - 1]?.id ?? null;
+        return;
+      }
+      const lastId = messages[messages.length - 1]?.id ?? null;
+      if (lastId !== prevLastIdRef.current) {
+        const last = messages[messages.length - 1];
+        prevLastIdRef.current = lastId;
+        // Mine, or I'm already near the bottom → follow the conversation down.
+        if (last && (last.sender_id === currentUserId || nearBottomRef.current)) {
+          endRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
+      }
       return;
     }
 
@@ -272,6 +333,7 @@ export function RealChatView({
     const settle = setTimeout(() => {
       pin();
       initialScrollDone.current = true;
+      prevLastIdRef.current = messages[messages.length - 1]?.id ?? null;
       media.forEach((m) => { m.removeEventListener("load", pin); m.removeEventListener("loadeddata", pin); });
     }, 600);
 
@@ -346,6 +408,70 @@ export function RealChatView({
         x.id === msgId ? { ...x, shot: { id: d.id, media_url: d.media_url, caption: d.caption }, shotProfile: pr } : x,
       ),
     );
+  }
+
+  /** Fetch the next older page and prepend it, preserving scroll position. */
+  async function loadOlder() {
+    if (loadingOlderRef.current || !hasMore) return;
+    const oldest = messages[0];
+    if (!oldest) return;
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
+
+    const container = scrollContainerRef.current;
+    const prevHeight = container ? container.scrollHeight : 0;
+
+    const { data, error } = await supabase
+      .from("messages")
+      .select(MSG_SELECT)
+      .eq("conversation_id", conversationId)
+      .lt("created_at", oldest.created_at)
+      .order("created_at", { ascending: false })
+      .limit(MSG_PAGE);
+
+    if (error) {
+      loadingOlderRef.current = false;
+      setLoadingOlder(false);
+      return;
+    }
+
+    const older = (data ?? []).slice().reverse().map(mapMessageRow);
+    if (older.length < MSG_PAGE) setHasMore(false);
+
+    if (older.length > 0) {
+      prependRestore.current = prevHeight; // layout effect restores position
+      justPrepended.current = true; // auto-scroll effect skips this change
+      setMessages((prev) => {
+        const existing = new Set(prev.map((p) => p.id));
+        const fresh = older.filter((o) => !existing.has(o.id));
+        return [...fresh, ...prev];
+      });
+
+      const ids = older.map((o) => o.id);
+      const { data: rx } = await supabase
+        .from("message_reactions")
+        .select("message_id, user_id, emoji")
+        .in("message_id", ids);
+      if (rx && rx.length) {
+        setReactions((prev) => {
+          const have = new Set(prev.map((p) => `${p.message_id}|${p.user_id}|${p.emoji}`));
+          const add = (rx as ReactionRow[]).filter((r) => !have.has(`${r.message_id}|${r.user_id}|${r.emoji}`));
+          return add.length ? [...prev, ...add] : prev;
+        });
+      }
+    }
+
+    loadingOlderRef.current = false;
+    setLoadingOlder(false);
+  }
+
+  // Track scroll position: load older near the top, remember near-bottom.
+  function onMessagesScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    if (initialScrollDone.current && el.scrollTop < 200 && hasMore && !loadingOlderRef.current) {
+      loadOlder();
+    }
   }
 
   // Realtime: messages
@@ -751,9 +877,16 @@ export function RealChatView({
       {/* Messages — clicking here closes the GIF picker */}
       <div
         ref={scrollContainerRef}
+        onScroll={onMessagesScroll}
         className="flex-1 overflow-y-auto px-4 py-4"
         onClick={() => { if (gifPickerOpen) setGifPickerOpen(false); }}
       >
+        {/* Older-history loader — appears at the top while a chunk loads in */}
+        {loadingOlder && (
+          <div className="flex justify-center py-2">
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-accent" />
+          </div>
+        )}
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
             {isGroup ? (
