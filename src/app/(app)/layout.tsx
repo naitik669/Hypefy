@@ -27,7 +27,11 @@ export default async function AppLayout({
       <UploadProvider>
         <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
           <div className="flex-1 pb-[84px]">{children}</div>
-          <BottomNav />
+          <BottomNav
+            avatarUrl={profile.avatarUrl}
+            avatarHue={profile.avatarHue ?? 200}
+            displayName={profile.displayName ?? "U"}
+          />
         </div>
       </UploadProvider>
     </CallProvider>

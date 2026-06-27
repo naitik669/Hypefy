@@ -60,6 +60,14 @@ export const BANNERS: Banner[] = [
     gradient:
       "linear-gradient(120deg, #3a1a5a 0%, #1a2a6a 45%, #0a4a4a 100%)",
   },
+  {
+    id: "rainbow-glow",
+    label: "Rainbow Glow",
+    gradient:
+      "radial-gradient(90% 140% at 15% -20%, rgba(255,255,255,0.18), transparent 55%), " +
+      "linear-gradient(100deg, #ff2e63 0%, #ff9a3c 16%, #ffe45e 32%, #4ade80 48%, #38bdf8 64%, #a855f7 80%, #ff2e63 100%), " +
+      "#0a0a0a",
+  },
 ];
 
 export const DEFAULT_BANNER_ID = "lime-pulse";

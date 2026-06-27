@@ -1,12 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
-import { ProfileBanner } from "@/components/profile/ProfileBanner";
+import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { PublicProfileTabs } from "@/components/profile/PublicProfileTabs";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { MessageButton } from "@/components/profile/MessageButton";
-import { FollowStats } from "@/components/profile/FollowStats";
 import { SignOutButton } from "@/components/SignOutButton";
 import { hueFromId } from "@/lib/profile";
 import { Lock } from "lucide-react";
@@ -60,110 +58,38 @@ export default async function PublicProfilePage({
   const bannerId = profile.banner_id ?? "lime-pulse";
   const tags: string[] = profile.profile_tags ?? [];
 
-  // Showcase: pinned video shots + story-shots; + active Shows for the avatar ring
+  // Active Shows for the avatar ring
   const nowIso = new Date().toISOString();
-  const [showcaseShotsRes, showcaseShowsRes, activeShowsRes] = await Promise.all([
-    supabase.from("shots").select("id, media_url, caption").eq("user_id", profile.id).eq("in_showcase", true).order("created_at", { ascending: false }).limit(20),
-    supabase.from("shows").select("id, media_url, caption").eq("user_id", profile.id).eq("is_showcase", true).order("created_at", { ascending: false }).limit(20),
-    supabase.from("shows").select("id").eq("user_id", profile.id).gt("expires_at", nowIso).order("created_at", { ascending: true }).limit(1),
-  ]);
-  const showcaseShots = showcaseShotsRes.data ?? [];
-  const showcaseShows = showcaseShowsRes.error ? [] : (showcaseShowsRes.data ?? []);
-  const hasShowcase = showcaseShows.length > 0 || showcaseShots.length > 0;
+  const { data: activeShows } = await supabase
+    .from("shows")
+    .select("id")
+    .eq("user_id", profile.id)
+    .gt("expires_at", nowIso)
+    .order("created_at", { ascending: true })
+    .limit(1);
   // Entry Show (oldest) for the avatar ring — never expose to non-followers of private accounts
-  const entryShowId = (!isLocked && activeShowsRes.data?.[0]?.id) || null;
+  const entryShowId = (!isLocked && activeShows?.[0]?.id) || null;
 
   return (
     <>
-      <ProfileBanner bannerId={bannerId} bannerUrl={profile.banner_url} className="h-32" />
-
-      <div className="px-4">
-        {/* Avatar + stats */}
-        <div className="flex items-end gap-4">
-          <div className="-mt-11">
-            <ProfileAvatar
-              name={name}
-              hue={hue}
-              avatarUrl={profile.avatar_url}
-              hasActiveShow={!!entryShowId}
-              showId={entryShowId}
-            />
-          </div>
-          <FollowStats
-            userId={profile.id}
-            currentUserId={currentUser?.id ?? null}
-            posts={stats.posts}
-            followers={stats.followers}
-            following={stats.following}
-          />
-        </div>
-
-        {/* Identity */}
-        <div className="mt-3">
-          <span className="text-base font-bold">{name}</span>
-          <p className="mt-0.5 text-sm text-muted">@{profile.username}</p>
-          {profile.bio && <p className="mt-1.5 text-sm leading-snug">{profile.bio}</p>}
-        </div>
-
-        {/* Profile tags */}
-        {tags.length > 0 && (
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {tags.map((tag: string) => (
-              <span key={tag} className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-medium">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* ── Showcase — only shown when visitor has items ── */}
-        {hasShowcase && !isLocked && (
-          <div className="mt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Showcase</p>
-            <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
-              {/* Pinned story-shots */}
-              {showcaseShows.map((show: any) => (
-                <Link key={show.id} href={`/shows/${show.id}`} className="flex w-[72px] shrink-0 flex-col items-center gap-1.5">
-                  <div className="relative h-[72px] w-[72px] overflow-hidden rounded-2xl ring-2 ring-accent ring-offset-2 ring-offset-background">
-                    {show.media_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={show.media_url} alt={show.caption ?? "Show"} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="h-full w-full bg-gradient-to-br from-accent/50 to-[hsl(280deg_70%_30%)]" />
-                    )}
-                    <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">
-                      Show
-                    </span>
-                  </div>
-                  <span className="max-w-full truncate text-center text-[10px] leading-tight text-muted">
-                    {show.caption ?? "Show"}
-                  </span>
-                </Link>
-              ))}
-
-              {/* Pinned video shots */}
-              {showcaseShots.map((shot: any) => (
-                <Link key={shot.id} href={`/shots/${shot.id}`} className="flex w-[72px] shrink-0 flex-col items-center gap-1.5">
-                  <div className="relative h-[72px] w-[72px] overflow-hidden rounded-2xl ring-2 ring-border ring-offset-2 ring-offset-background">
-                    <video src={shot.media_url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
-                    <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">
-                      Reel
-                    </span>
-                  </div>
-                  <span className="max-w-full truncate text-center text-[10px] leading-tight text-muted">
-                    {shot.caption ?? "Shot"}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Action buttons */}
-        <div className="mt-3 flex gap-2">
-          {isOwn ? (
+      <ProfileHeader
+        name={name}
+        username={profile.username}
+        bio={profile.bio}
+        tags={tags}
+        hue={hue}
+        avatarUrl={profile.avatar_url}
+        bannerId={bannerId}
+        bannerUrl={profile.banner_url}
+        hasActiveShow={!!entryShowId}
+        entryShowId={entryShowId}
+        userId={profile.id}
+        currentUserId={currentUser?.id ?? null}
+        stats={stats}
+        actions={
+          isOwn ? (
             <>
-              <Link href="/setup-profile" className="flex h-10 flex-1 items-center justify-center rounded-xl border border-border bg-surface text-sm font-semibold transition-colors hover:bg-elevated">
+              <Link href="/setup-profile" className="flex h-10 flex-1 items-center justify-center rounded-xl border border-border bg-elevated text-sm font-semibold transition-colors hover:bg-elevated/70">
                 Edit profile
               </Link>
               <SignOutButton />
@@ -182,9 +108,9 @@ export default async function PublicProfilePage({
             <Link href="/signin" className="flex h-10 flex-1 items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-ink">
               Sign in to follow
             </Link>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
 
       {/* Tabs: Posts | Shots (no Saved for others) — locked for private accounts */}
       {isLocked ? (

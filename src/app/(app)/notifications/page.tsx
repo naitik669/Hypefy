@@ -22,6 +22,7 @@ type Notif = {
     avatar_hue: number | null;
     avatar_url: string | null;
   } | null;
+  thumb?: { url: string; isVideo: boolean } | null;
 };
 
 type Filter = "All" | "Hypes" | "Comments" | "Follows" | "Mentions";
@@ -58,6 +59,37 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("All");
 
+  // Look up the post/shot/show a notification points at, so we can show a
+  // small preview thumbnail next to it (and not just the actor's avatar).
+  async function withThumbs(list: Notif[]): Promise<Notif[]> {
+    const postIds = list.filter((n) => n.target_type === "post" && n.target_id).map((n) => n.target_id!);
+    const shotIds = list.filter((n) => n.target_type === "shot" && n.target_id).map((n) => n.target_id!);
+    const showIds = list.filter((n) => n.target_type === "show" && n.target_id).map((n) => n.target_id!);
+
+    const [postsRes, shotsRes, showsRes] = await Promise.all([
+      postIds.length ? supabase.from("posts").select("id, image_url, image_urls").in("id", postIds) : Promise.resolve({ data: [] as any[] }),
+      shotIds.length ? supabase.from("shots").select("id, media_url").in("id", shotIds) : Promise.resolve({ data: [] as any[] }),
+      showIds.length ? supabase.from("shows").select("id, media_url").in("id", showIds) : Promise.resolve({ data: [] as any[] }),
+    ]);
+
+    const postMap = new Map((postsRes.data ?? []).map((p: any) => [p.id, p.image_urls?.[0] ?? p.image_url ?? null]));
+    const shotMap = new Map((shotsRes.data ?? []).map((s: any) => [s.id, s.media_url ?? null]));
+    const showMap = new Map((showsRes.data ?? []).map((s: any) => [s.id, s.media_url ?? null]));
+
+    return list.map((n) => {
+      if (n.target_type === "post" && n.target_id && postMap.get(n.target_id)) {
+        return { ...n, thumb: { url: postMap.get(n.target_id)!, isVideo: false } };
+      }
+      if (n.target_type === "shot" && n.target_id && shotMap.get(n.target_id)) {
+        return { ...n, thumb: { url: shotMap.get(n.target_id)!, isVideo: true } };
+      }
+      if (n.target_type === "show" && n.target_id && showMap.get(n.target_id)) {
+        return { ...n, thumb: { url: showMap.get(n.target_id)!, isVideo: false } };
+      }
+      return n;
+    });
+  }
+
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -75,13 +107,14 @@ export default function NotificationsPage() {
         ...n,
         actor: Array.isArray(n.actor) ? n.actor[0] ?? null : n.actor,
       }));
-      setNotifs(mapped);
+      setNotifs(await withThumbs(mapped));
       setLoading(false);
 
       // Mark all as read (RPC fires the UPDATE that clears the TopBar badge)
       await supabase.rpc("mark_notifications_read");
     }
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
   // Realtime: new notifications appear at the top without a refresh
@@ -106,7 +139,8 @@ export default function NotificationsPage() {
                 .maybeSingle();
               actor = data ?? null;
             }
-            setNotifs((prev) => [{ ...n, actor } as Notif, ...prev]);
+            const [withThumb] = await withThumbs([{ ...n, actor } as Notif]);
+            setNotifs((prev) => [withThumb, ...prev]);
           },
         )
         .subscribe();
@@ -179,9 +213,19 @@ export default function NotificationsPage() {
                 </div>
                 <p className="min-w-0 flex-1 text-sm leading-snug">
                   <span className="font-semibold">{actorName}</span>{" "}
-                  <span className="text-muted">{n.body ?? "interacted with your content"}</span>
+                  <span className="text-muted">{n.body ?? "interacted with your content"}</span>{" "}
+                  <span className="text-xs text-faint">{timeAgo(n.created_at)}</span>
                 </p>
-                <span className="shrink-0 text-xs text-faint">{timeAgo(n.created_at)}</span>
+                {n.thumb && (
+                  <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface">
+                    {n.thumb.isVideo ? (
+                      <video src={n.thumb.url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={n.thumb.url} alt="" className="h-full w-full object-cover" />
+                    )}
+                  </div>
+                )}
               </Link>
             );
           })}

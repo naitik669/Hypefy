@@ -423,6 +423,28 @@ body {
   animation: dot-bounce 1.2s infinite ease-in-out;
 }
 
+/* New-notification bell/star bulge: scales up, settles down, eases up again */
+@keyframes notif-bulge {
+  0% {
+    transform: scale(1);
+  }
+  28% {
+    transform: scale(1.32);
+  }
+  52% {
+    transform: scale(0.94);
+  }
+  76% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-notif-bulge {
+  animation: notif-bulge 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-hype-burst,
   .animate-drift,
@@ -445,7 +467,8 @@ body {
   .animate-dot-pop,
   .animate-dot-bounce,
   .animate-orbit,
-  .animate-orbit-reverse {
+  .animate-orbit-reverse,
+  .animate-notif-bulge {
     animation: none;
   }
   .animate-rise {

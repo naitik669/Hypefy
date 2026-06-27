@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Grid3x3, Zap, Bookmark, PlusCircle } from "lucide-react";
+import { Grid3x3, Zap, Bookmark, PlusCircle, Copy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
@@ -78,7 +78,7 @@ export function PublicProfileTabs({
 
   return (
     <div className="mt-2">
-      {/* Tab bar */}
+      {/* Tab bar — thin hairline dividers, blends with the page background */}
       <div className="sticky top-14 z-10 flex border-y border-border bg-background/90 backdrop-blur-xl">
         {tabs.map((t) => {
           const Icon = t === "Posts" ? Grid3x3 : t === "Shots" ? Zap : Bookmark;
@@ -93,6 +93,7 @@ export function PublicProfileTabs({
         })}
       </div>
 
+      <div className="mt-3">
       {loading ? (
         <div className="py-12 text-center text-sm text-faint">Loading...</div>
       ) : tab === "Posts" || (tab === "Saved" && isOwn) ? (
@@ -124,10 +125,10 @@ export function PublicProfileTabs({
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-xs text-faint">No image</div>
                     )}
-                    {/* Multi-image badge */}
+                    {/* Multi-image badge — signals a swipeable gallery post */}
                     {multi && (
-                      <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-[10px] font-bold text-white">
-                        +
+                      <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-white drop-shadow">
+                        <Copy size={11} strokeWidth={2.5} />
                       </span>
                     )}
                   </button>
@@ -165,6 +166,7 @@ export function PublicProfileTabs({
           </div>
         )
       ) : null}
+      </div>
     </div>
   );
 }

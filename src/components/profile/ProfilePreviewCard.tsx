@@ -39,7 +39,7 @@ export function ProfilePreviewCard({
       <div className="overflow-hidden rounded-card border border-border bg-surface">
         <ProfileBanner bannerId={bannerId} className="h-20" />
         <div className="px-4 pb-4">
-          <div className="-mt-7 mb-2">
+          <div className="-mt-7 mb-2 inline-block rounded-[18px] shadow-[0_8px_20px_rgba(0,0,0,0.45)]">
             <Avatar
               name={name}
               hue={avatarHue}

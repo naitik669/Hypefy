@@ -1,0 +1,1245 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
+  public: {
+    Tables: {
+      blocked_users: {
+        Row: {
+          blocked_id: string | null
+          blocker_id: string | null
+          created_at: string | null
+          id: string
+        }
+        Insert: {
+          blocked_id?: string | null
+          blocker_id?: string | null
+          created_at?: string | null
+          id?: string
+        }
+        Update: {
+          blocked_id?: string | null
+          blocker_id?: string | null
+          created_at?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blocked_users_blocked_id_fkey"
+            columns: ["blocked_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blocked_users_blocker_id_fkey"
+            columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      call_sessions: {
+        Row: {
+          answered_at: string | null
+          caller_id: string | null
+          conversation_id: string | null
+          created_at: string | null
+          ended_at: string | null
+          id: string
+          quick_reply: string | null
+          receiver_id: string | null
+          started_at: string | null
+          status: string
+          type: string
+        }
+        Insert: {
+          answered_at?: string | null
+          caller_id?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          ended_at?: string | null
+          id?: string
+          quick_reply?: string | null
+          receiver_id?: string | null
+          started_at?: string | null
+          status?: string
+          type: string
+        }
+        Update: {
+          answered_at?: string | null
+          caller_id?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          ended_at?: string | null
+          id?: string
+          quick_reply?: string | null
+          receiver_id?: string | null
+          started_at?: string | null
+          status?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_sessions_caller_id_fkey"
+            columns: ["caller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_sessions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_sessions_receiver_id_fkey"
+            columns: ["receiver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comments: {
+        Row: {
+          body: string
+          created_at: string
+          deleted_at: string | null
+          hype_count: number
+          id: string
+          parent_id: string | null
+          post_id: string | null
+          shot_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          deleted_at?: string | null
+          hype_count?: number
+          id?: string
+          parent_id?: string | null
+          post_id?: string | null
+          shot_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          hype_count?: number
+          id?: string
+          parent_id?: string | null
+          post_id?: string | null
+          shot_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_shot_id_fkey"
+            columns: ["shot_id"]
+            isOneToOne: false
+            referencedRelation: "shots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_members: {
+        Row: {
+          archived_at: string | null
+          blocked_at: string | null
+          conversation_id: string
+          created_at: string
+          last_read_at: string | null
+          muted_at: string | null
+          muted_until: string | null
+          request_accepted: boolean | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          blocked_at?: string | null
+          conversation_id: string
+          created_at?: string
+          last_read_at?: string | null
+          muted_at?: string | null
+          muted_until?: string | null
+          request_accepted?: boolean | null
+          role?: string
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          blocked_at?: string | null
+          conversation_id?: string
+          created_at?: string
+          last_read_at?: string | null
+          muted_at?: string | null
+          muted_until?: string | null
+          request_accepted?: boolean | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_members_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          last_message_at: string
+          last_message_id: string | null
+          title: string | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_message_at?: string
+          last_message_id?: string | null
+          title?: string | null
+          type?: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_message_at?: string
+          last_message_id?: string | null
+          title?: string | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      follows: {
+        Row: {
+          created_at: string
+          follower_id: string
+          following_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          follower_id: string
+          following_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          follower_id?: string
+          following_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follows_follower_id_fkey"
+            columns: ["follower_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follows_following_id_fkey"
+            columns: ["following_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hypes: {
+        Row: {
+          created_at: string
+          id: string
+          target_id: string
+          target_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          target_id: string
+          target_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          target_id?: string
+          target_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hypes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_reports: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          details: string | null
+          id: string
+          message_id: string
+          reason: string | null
+          reporter_id: string
+          status: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          details?: string | null
+          id?: string
+          message_id: string
+          reason?: string | null
+          reporter_id: string
+          status?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          details?: string | null
+          id?: string
+          message_id?: string
+          reason?: string | null
+          reporter_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_reports_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reports_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          body: string | null
+          conversation_id: string
+          created_at: string
+          edited_at: string | null
+          id: string
+          is_unsent: boolean
+          kind: string
+          metadata: Json
+          post_id: string | null
+          reply_to_id: string | null
+          sender_id: string
+          shot_id: string | null
+          unsent_at: string | null
+        }
+        Insert: {
+          body?: string | null
+          conversation_id: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+          is_unsent?: boolean
+          kind?: string
+          metadata?: Json
+          post_id?: string | null
+          reply_to_id?: string | null
+          sender_id: string
+          shot_id?: string | null
+          unsent_at?: string | null
+        }
+        Update: {
+          body?: string | null
+          conversation_id?: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+          is_unsent?: boolean
+          kind?: string
+          metadata?: Json
+          post_id?: string | null
+          reply_to_id?: string | null
+          sender_id?: string
+          shot_id?: string | null
+          unsent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_shot_id_fkey"
+            columns: ["shot_id"]
+            isOneToOne: false
+            referencedRelation: "shots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          actor_id: string | null
+          body: string | null
+          created_at: string
+          id: string
+          is_read: boolean
+          target_id: string | null
+          target_type: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          body?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          target_id?: string | null
+          target_type?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          body?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          target_id?: string | null
+          target_type?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          body: string | null
+          caption: string | null
+          comment_count: number
+          created_at: string
+          hashtags: string[]
+          hype_count: number
+          id: string
+          image_url: string | null
+          image_urls: string[]
+          mentions: string[]
+          repost_count: number
+          save_count: number
+          share_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          caption?: string | null
+          comment_count?: number
+          created_at?: string
+          hashtags?: string[]
+          hype_count?: number
+          id?: string
+          image_url?: string | null
+          image_urls?: string[]
+          mentions?: string[]
+          repost_count?: number
+          save_count?: number
+          share_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          caption?: string | null
+          comment_count?: number
+          created_at?: string
+          hashtags?: string[]
+          hype_count?: number
+          id?: string
+          image_url?: string | null
+          image_urls?: string[]
+          mentions?: string[]
+          repost_count?: number
+          save_count?: number
+          share_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_hue: number | null
+          avatar_url: string | null
+          banner_id: string | null
+          banner_url: string | null
+          bio: string | null
+          created_at: string
+          current_vibe: string | null
+          display_name: string | null
+          dm_privacy: string
+          id: string
+          interests: string[]
+          is_private: boolean
+          notif_prefs: Json
+          profile_completed: boolean
+          profile_tags: string[]
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          avatar_hue?: number | null
+          avatar_url?: string | null
+          banner_id?: string | null
+          banner_url?: string | null
+          bio?: string | null
+          created_at?: string
+          current_vibe?: string | null
+          display_name?: string | null
+          dm_privacy?: string
+          id: string
+          interests?: string[]
+          is_private?: boolean
+          notif_prefs?: Json
+          profile_completed?: boolean
+          profile_tags?: string[]
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          avatar_hue?: number | null
+          avatar_url?: string | null
+          banner_id?: string | null
+          banner_url?: string | null
+          bio?: string | null
+          created_at?: string
+          current_vibe?: string | null
+          display_name?: string | null
+          dm_privacy?: string
+          id?: string
+          interests?: string[]
+          is_private?: boolean
+          notif_prefs?: Json
+          profile_completed?: boolean
+          profile_tags?: string[]
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          p256dh: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          p256dh: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          p256dh?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reports: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          reason: string | null
+          reporter_id: string
+          status: string
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason?: string | null
+          reporter_id: string
+          status?: string
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason?: string | null
+          reporter_id?: string
+          status?: string
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reposts: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reposts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reposts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_posts: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_posts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_shots: {
+        Row: {
+          created_at: string
+          id: string
+          shot_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          shot_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          shot_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_shots_shot_id_fkey"
+            columns: ["shot_id"]
+            isOneToOne: false
+            referencedRelation: "shots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_shots_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shots: {
+        Row: {
+          caption: string | null
+          comment_count: number
+          created_at: string
+          hype_count: number
+          id: string
+          in_showcase: boolean
+          media_url: string
+          poster_url: string | null
+          save_count: number
+          share_count: number
+          user_id: string
+        }
+        Insert: {
+          caption?: string | null
+          comment_count?: number
+          created_at?: string
+          hype_count?: number
+          id?: string
+          in_showcase?: boolean
+          media_url: string
+          poster_url?: string | null
+          save_count?: number
+          share_count?: number
+          user_id: string
+        }
+        Update: {
+          caption?: string | null
+          comment_count?: number
+          created_at?: string
+          hype_count?: number
+          id?: string
+          in_showcase?: boolean
+          media_url?: string
+          poster_url?: string | null
+          save_count?: number
+          share_count?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shots_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      show_views: {
+        Row: {
+          created_at: string
+          show_id: string
+          viewer_id: string
+        }
+        Insert: {
+          created_at?: string
+          show_id: string
+          viewer_id: string
+        }
+        Update: {
+          created_at?: string
+          show_id?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_views_show_id_fkey"
+            columns: ["show_id"]
+            isOneToOne: false
+            referencedRelation: "shows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "show_views_viewer_id_fkey"
+            columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shows: {
+        Row: {
+          caption: string | null
+          created_at: string
+          expires_at: string
+          hype_count: number
+          id: string
+          is_showcase: boolean | null
+          linked_post_id: string | null
+          media_url: string
+          user_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          expires_at?: string
+          hype_count?: number
+          id?: string
+          is_showcase?: boolean | null
+          linked_post_id?: string | null
+          media_url: string
+          user_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          expires_at?: string
+          hype_count?: number
+          id?: string
+          is_showcase?: boolean | null
+          linked_post_id?: string | null
+          media_url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shows_linked_post_id_fkey"
+            columns: ["linked_post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shows_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      accept_call: { Args: { p_call_id: string }; Returns: undefined }
+      approve_message_request: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
+      block_message_request: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
+      block_user: { Args: { p_blocked: string }; Returns: undefined }
+      create_comment:
+        | {
+            Args: { p_body: string; p_owner_id?: string; p_post_id: string }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_body: string
+              p_owner_id?: string
+              p_parent_id?: string
+              p_post_id: string
+            }
+            Returns: string
+          }
+      create_group: {
+        Args: { p_member_ids: string[]; p_title: string }
+        Returns: string
+      }
+      create_shot_comment: {
+        Args: {
+          p_body: string
+          p_owner_id?: string
+          p_parent_id?: string
+          p_shot_id: string
+        }
+        Returns: string
+      }
+      decline_call: { Args: { p_call_id: string }; Returns: undefined }
+      edit_message: {
+        Args: { p_body: string; p_message_id: string }
+        Returns: undefined
+      }
+      end_call: { Args: { p_call_id: string }; Returns: undefined }
+      get_or_create_dm: { Args: { p_other: string }; Returns: string }
+      is_conv_member: { Args: { conv: string }; Returns: boolean }
+      leave_conversation: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
+      mark_call_missed: { Args: { p_call_id: string }; Returns: undefined }
+      mark_conversation_read: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
+      mark_notifications_read: { Args: never; Returns: undefined }
+      quick_reply_call: {
+        Args: { p_call_id: string; p_reply: string }
+        Returns: undefined
+      }
+      report_message: {
+        Args: { p_details?: string; p_message_id: string; p_reason: string }
+        Returns: undefined
+      }
+      send_message: {
+        Args: {
+          p_body?: string
+          p_conversation_id: string
+          p_kind?: string
+          p_post_id?: string
+          p_reply_to_id?: string
+          p_shot_id?: string
+        }
+        Returns: Json
+      }
+      start_call: {
+        Args: {
+          p_conversation_id: string
+          p_receiver_id: string
+          p_type: string
+        }
+        Returns: string
+      }
+      toggle_hype: {
+        Args: {
+          p_owner_id?: string
+          p_target_id: string
+          p_target_type: string
+        }
+        Returns: Json
+      }
+      toggle_reaction: {
+        Args: { p_emoji: string; p_message_id: string }
+        Returns: undefined
+      }
+      unsend_message: { Args: { p_message_id: string }; Returns: undefined }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const

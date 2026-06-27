@@ -50,7 +50,12 @@ export async function POST(req: NextRequest) {
   if (!publicKey || !privateKey || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json({ error: "push not configured" }, { status: 503 });
   }
-  webpush.setVapidDetails("mailto:craziematez@gmail.com", publicKey, privateKey);
+  const contactEmail = process.env.PUSH_CONTACT_EMAIL || "mailto:support@hypefy.chat";
+  webpush.setVapidDetails(
+    contactEmail.startsWith("mailto:") ? contactEmail : `mailto:${contactEmail}`,
+    publicKey,
+    privateKey,
+  );
 
   const n = await req.json();
   if (!n?.user_id) return NextResponse.json({ error: "bad payload" }, { status: 400 });

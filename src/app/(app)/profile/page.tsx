@@ -2,10 +2,8 @@ import Link from "next/link";
 import { Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, hueFromId } from "@/lib/profile";
-import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
-import { ProfileBanner } from "@/components/profile/ProfileBanner";
+import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
-import { FollowStats } from "@/components/profile/FollowStats";
 
 async function fetchStats(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const [postsRes, followersRes, followingRes] = await Promise.all([
@@ -26,25 +24,9 @@ export default async function ProfilePage() {
   if (!user) return null;
 
   const nowIso = new Date().toISOString();
-  const [profile, stats, showcaseShotsRes, showcaseShowsRes, activeShowsRes] = await Promise.all([
+  const [profile, stats, activeShowsRes] = await Promise.all([
     getProfile(supabase),
     fetchStats(supabase, user.id),
-    // Pinned shots (video reels marked in_showcase)
-    supabase
-      .from("shots")
-      .select("id, media_url, caption")
-      .eq("user_id", user.id)
-      .eq("in_showcase", true)
-      .order("created_at", { ascending: false })
-      .limit(20),
-    // Pinned shows/story-shots (is_showcase — column may not exist yet, handled gracefully)
-    supabase
-      .from("shows")
-      .select("id, media_url, caption")
-      .eq("user_id", user.id)
-      .eq("is_showcase", true)
-      .order("created_at", { ascending: false })
-      .limit(20),
     // Active Shows for the avatar ring (oldest = entry)
     supabase
       .from("shows")
@@ -55,13 +37,9 @@ export default async function ProfilePage() {
       .limit(1),
   ]);
 
-  const showcaseShots = showcaseShotsRes.data ?? [];
-  const showcaseShows = showcaseShowsRes.error ? [] : (showcaseShowsRes.data ?? []);
-  const hasShowcase = showcaseShows.length > 0 || showcaseShots.length > 0;
   const entryShowId = activeShowsRes.data?.[0]?.id ?? null;
 
   const name = profile?.displayName || "Hypefy User";
-  const handle = profile?.username ? `@${profile.username}` : null;
   const bio = profile?.bio ?? null;
   const profileTags = profile?.profileTags ?? [];
   const hue = profile?.avatarHue ?? hueFromId(user.id);
@@ -69,112 +47,38 @@ export default async function ProfilePage() {
 
   return (
     <>
-      <ProfileBanner bannerId={bannerId} bannerUrl={profile?.bannerUrl} className="h-32" />
-
-      <div className="px-4">
-        {/* Avatar + stats */}
-        <div className="flex items-end gap-4">
-          <div className="-mt-11">
-            <ProfileAvatar
-              name={name}
-              hue={hue}
-              avatarUrl={profile?.avatarUrl}
-              hasActiveShow={!!entryShowId}
-              showId={entryShowId}
-            />
-          </div>
-          <FollowStats
-            userId={user.id}
-            currentUserId={user.id}
-            posts={stats.posts}
-            followers={stats.followers}
-            following={stats.following}
-          />
-        </div>
-
-        {/* Identity */}
-        <div className="mt-3">
-          <span className="text-base font-bold leading-tight">{name}</span>
-          {handle && <p className="mt-0.5 text-sm text-muted">{handle}</p>}
-          {bio && <p className="mt-1.5 text-sm leading-snug">{bio}</p>}
-        </div>
-
-        {/* Profile tags */}
-        {profileTags.length > 0 && (
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {profileTags.map((tag) => (
-              <span key={tag} className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-medium text-foreground">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Action buttons */}
-        <div className="mt-3 flex gap-2">
-          <Link
-            href="/settings/profile"
-            className="flex h-10 flex-1 items-center justify-center rounded-xl border border-border bg-surface text-sm font-semibold text-foreground transition-colors hover:bg-elevated active:scale-[0.99]"
-          >
-            Edit profile
-          </Link>
-          <Link
-            href="/settings"
-            aria-label="Settings"
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface text-foreground transition-colors hover:bg-elevated active:scale-[0.99]"
-          >
-            <Settings size={18} />
-          </Link>
-        </div>
-      </div>
-
-      {/* ── Showcase — between Edit profile and tabs ── */}
-      {hasShowcase && (
-        <div className="mt-3 px-4">
-          <div className="no-scrollbar flex gap-2.5 overflow-x-auto pb-1">
-            {showcaseShows.map((show: any) => (
-              <Link
-                key={show.id}
-                href={`/shows/${show.id}`}
-                className="flex w-[56px] shrink-0 flex-col items-center gap-1"
-              >
-                <div className="relative h-[56px] w-[56px] overflow-hidden rounded-xl border border-border/50">
-                  {show.media_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={show.media_url} alt={show.caption ?? "Show"} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="h-full w-full bg-gradient-to-br from-accent/50 to-[hsl(280deg_70%_30%)]" />
-                  )}
-                  <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 py-px text-[7px] font-bold uppercase tracking-wide text-white">
-                    Show
-                  </span>
-                </div>
-                <span className="max-w-full truncate text-center text-[9px] leading-tight text-muted">
-                  {show.caption ?? "Show"}
-                </span>
-              </Link>
-            ))}
-
-            {showcaseShots.map((shot: any) => (
-              <Link
-                key={shot.id}
-                href={`/shots/${shot.id}`}
-                className="flex w-[56px] shrink-0 flex-col items-center gap-1"
-              >
-                <div className="relative h-[56px] w-[56px] overflow-hidden rounded-xl border border-border/50">
-                  <video src={shot.media_url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
-                  <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 py-px text-[7px] font-bold uppercase tracking-wide text-white">
-                    Reel
-                  </span>
-                </div>
-                <span className="max-w-full truncate text-center text-[9px] leading-tight text-muted">
-                  {shot.caption ?? "Reel"}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
+      <ProfileHeader
+        name={name}
+        username={profile?.username ?? null}
+        bio={bio}
+        tags={profileTags}
+        hue={hue}
+        avatarUrl={profile?.avatarUrl}
+        bannerId={bannerId}
+        bannerUrl={profile?.bannerUrl}
+        hasActiveShow={!!entryShowId}
+        entryShowId={entryShowId}
+        userId={user.id}
+        currentUserId={user.id}
+        stats={stats}
+        actions={
+          <>
+            <Link
+              href="/settings/profile"
+              className="flex h-10 flex-1 items-center justify-center rounded-xl border border-border bg-elevated text-sm font-semibold text-foreground transition-colors hover:bg-elevated/70 active:scale-[0.99]"
+            >
+              Edit profile
+            </Link>
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-elevated text-foreground transition-colors hover:bg-elevated/70 active:scale-[0.99]"
+            >
+              <Settings size={18} />
+            </Link>
+          </>
+        }
+      />
 
       {/* Tabs: Posts | Shots | Saved */}
       <ProfileTabs userId={user.id} />

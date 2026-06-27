@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Star, MessageCircle, Send, Bookmark, MoreHorizontal, Maximize2, Repeat2 } from "lucide-react";
+import { Star, MessageCircle, Send, Bookmark, MoreHorizontal, Maximize2, Repeat2, ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ZoomViewer } from "@/components/ui/ZoomViewer";
@@ -287,6 +287,32 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <HypeParticles size={16} />
             </div>
+          )}
+
+          {/* Left/right arrows -- desktop-friendly nav, mirrors the swipe gesture */}
+          {images.length > 1 && (
+            <>
+              {imgIdx > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setImgIdx((i) => Math.max(i - 1, 0)); }}
+                  aria-label="Previous image"
+                  className="absolute left-2.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+              )}
+              {imgIdx < images.length - 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setImgIdx((i) => Math.min(i + 1, images.length - 1)); }}
+                  aria-label="Next image"
+                  className="absolute right-2.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              )}
+            </>
           )}
 
           {/* Expand â†’ full-screen pinch-to-zoom viewer */}

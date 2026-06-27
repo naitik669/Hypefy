@@ -80,7 +80,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
 
   return (
     <div className="mt-2">
-      {/* Tab bar */}
+      {/* Tab bar — thin hairline dividers, blends with the page background */}
       <div className="sticky top-14 z-10 flex border-y border-border bg-background/90 backdrop-blur-xl">
         {tabs.map(({ key, Icon }) => (
           <button
@@ -98,6 +98,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
       </div>
 
       {/* Posts grid */}
+      <div className="mt-3">
       {tab === "Posts" && (
         posts === null ? (
           <GridSkeleton />
@@ -186,6 +187,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
           </div>
         )
       )}
+      </div>
     </div>
   );
 }

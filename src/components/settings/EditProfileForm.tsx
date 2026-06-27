@@ -148,7 +148,7 @@ export function EditProfileForm({
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="relative -mt-7 h-20 w-20 shrink-0 overflow-hidden rounded-[24px] ring-4 ring-background"
+            className="relative -mt-7 h-20 w-20 shrink-0 overflow-hidden rounded-[24px] ring-4 ring-background shadow-[0_8px_20px_rgba(0,0,0,0.45)]"
             aria-label="Change profile picture"
           >
             {avatarUrl ? (

@@ -3,19 +3,27 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, PaperPlaneTilt, Lightning, User, Plus, X } from "@phosphor-icons/react";
+import { House, PaperPlaneTilt, Lightning, Plus, X } from "@phosphor-icons/react";
 import { CreateSheet } from "@/components/create/CreateSheet";
+import { Avatar } from "@/components/ui/Avatar";
 
 const items = [
   { href: "/home",     label: "Home",     Icon: House },
   { href: "/messages", label: "Messages", Icon: PaperPlaneTilt },
-  { href: "/shots",    label: "Shots",    Icon: Lightning },
-  { href: "/profile",  label: "Profile",  Icon: User },
 ] as const;
 
-export function BottomNav() {
+export function BottomNav({
+  avatarUrl,
+  avatarHue,
+  displayName,
+}: {
+  avatarUrl: string | null | undefined;
+  avatarHue: number;
+  displayName: string;
+}) {
   const pathname = usePathname();
   const [createOpen, setCreateOpen] = useState(false);
+  const profileActive = pathname.startsWith("/profile");
 
   return (
     <>
@@ -39,10 +47,30 @@ export function BottomNav() {
           )}
         </button>
 
-        {/* right two */}
-        {items.slice(2).map(({ href, label, Icon }) => (
-          <NavItem key={href} href={href} label={label} Icon={Icon} active={pathname.startsWith(href)} />
-        ))}
+        {/* Shots */}
+        <NavItem href="/shots" label="Shots" Icon={Lightning} active={pathname.startsWith("/shots")} />
+
+        {/* Profile — own avatar instead of a generic icon */}
+        <Link
+          href="/profile"
+          aria-label="Profile"
+          className="flex h-12 w-12 flex-col items-center justify-center gap-1"
+        >
+          <Avatar
+            name={displayName}
+            hue={avatarHue}
+            src={avatarUrl ?? undefined}
+            size={28}
+            className={`rounded-[9px] transition-all ${
+              profileActive ? "opacity-100 brightness-100" : "opacity-80 brightness-90"
+            }`}
+          />
+          <span
+            className={`h-1 w-1 rounded-full transition-colors ${
+              profileActive ? "bg-accent" : "bg-transparent"
+            }`}
+          />
+        </Link>
       </nav>
 
       <CreateSheet open={createOpen} onClose={() => setCreateOpen(false)} />

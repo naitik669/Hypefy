@@ -36,7 +36,7 @@ export function ProfilePreviewCard({
       />
 
       <div className="px-4 pb-4">
-        <div className={compact ? "-mt-7" : "-mt-9"}>
+        <div className={`inline-block rounded-[22px] shadow-[0_8px_20px_rgba(0,0,0,0.45)] ${compact ? "-mt-7" : "-mt-9"}`}>
           <Avatar
             name={name}
             hue={avatarHue}
