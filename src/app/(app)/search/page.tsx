@@ -185,7 +185,7 @@ export default function SearchPage() {
                     className="flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/[0.03]"
                   >
                     <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface">
-                      <Hash size={18} className="text-accent" />
+                      <Hash size={18} className="text-hashtag" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">#{t.tag}</p>

@@ -175,7 +175,7 @@ export function DiscoverView({
                 <Link key={t.tag} href={`/search?q=%23${encodeURIComponent(t.tag)}`}
                   className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03]">
                   <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface">
-                    <Hash size={18} className="text-accent" />
+                    <Hash size={18} className="text-hashtag" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">#{t.tag}</p>
@@ -211,7 +211,7 @@ function TagRail({ tags }: { tags: Tag[] }) {
         {tags.map(({ tag, count }) => (
           <Link key={tag} href={`/search?q=%23${encodeURIComponent(tag)}`}
             className="flex shrink-0 flex-col rounded-2xl border border-border bg-surface px-4 py-2.5">
-            <span className="text-sm font-bold text-accent">#{tag}</span>
+            <span className="text-sm font-bold text-hashtag">#{tag}</span>
             <span className="text-xs text-muted">{count} {count === 1 ? "post" : "posts"}</span>
           </Link>
         ))}

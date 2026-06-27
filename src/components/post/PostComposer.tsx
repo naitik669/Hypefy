@@ -266,7 +266,7 @@ export function PostComposer({ userId }: { userId: string }) {
       {(hashtags.length > 0 || mentions.length > 0) && (
         <div className="flex flex-wrap gap-1.5 rounded-xl bg-surface px-3 py-2">
           {hashtags.map((t) => (
-            <span key={t} className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold text-accent">
+            <span key={t} className="rounded-full bg-hashtag/15 px-2 py-0.5 text-xs font-semibold text-hashtag">
               #{t}
             </span>
           ))}

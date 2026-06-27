@@ -20,6 +20,7 @@
   --color-accent-ink: #0a0a0a; /* text on accent fills */
   --color-hype: #ffd000; /* active Hype star */
   --color-verified: #3897f0; /* Verified Star (blue) */
+  --color-hashtag: #4ea1ff; /* clickable #hashtags (blue) */
   --color-danger: #ff4545;
 
   --font-sans: var(--font-jakarta), system-ui, sans-serif;
