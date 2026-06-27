@@ -105,7 +105,7 @@ export function DiscoverView({
               </Section>
             )}
             {trendingPosts.length > 0 && (
-              <Section title="Blowing up ðŸ”¥">
+              <Section title="Blowing up 🔥">
                 <div className="no-scrollbar flex gap-2.5 overflow-x-auto px-4">
                   {trendingPosts.map((p) => <div key={p.id} className="w-40 shrink-0"><PostTile post={p} /></div>)}
                 </div>
@@ -139,7 +139,7 @@ export function DiscoverView({
         )}
 
         {cat === "Blowing Up" && (
-          <Section title="Blowing up ðŸ”¥">
+          <Section title="Blowing up 🔥">
             <Grid>{trendingPosts.map((p) => <PostTile key={p.id} post={p} />)}</Grid>
           </Section>
         )}
