@@ -187,7 +187,6 @@ export default function NotificationsPage() {
         </div>
       ) : visible.length === 0 ? (
         <EmptyState
-          mascot
           icon={Bell}
           title="Quiet for now"
           text="Hypes, replies, follows, and mentions will show up here."

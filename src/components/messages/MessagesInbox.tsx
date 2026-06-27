@@ -155,7 +155,6 @@ export function MessagesInbox({ rows }: { rows: InboxRow[] }) {
   if (rows.length === 0) {
     return (
       <EmptyState
-        mascot
         icon={MessageCircle}
         title="It's quiet in here"
         text="Slide into a DM or rally a group chat."
