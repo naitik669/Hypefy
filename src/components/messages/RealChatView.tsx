@@ -94,6 +94,7 @@ export function RealChatView({
   initialMessages,
   initialReactions = [],
   initialOtherLastReadAt = null,
+  initialOwnLastReadAt = null,
 }: {
   conversationId: string;
   currentUserId: string;
@@ -103,6 +104,8 @@ export function RealChatView({
   initialMessages: ChatMsg[];
   initialReactions?: ReactionRow[];
   initialOtherLastReadAt?: string | null;
+  /** My own last_read_at as of page load, before the client marks this thread read. */
+  initialOwnLastReadAt?: string | null;
 }) {
   const isGroup = !!group;
   const senderName = (id: string) => (id === currentUserId ? "You" : members?.[id]?.name ?? other.name);
@@ -188,6 +191,17 @@ export function RealChatView({
     startCall({ conversationId, peerId: other.id, peerName: other.name, peerHue: other.hue, type });
   }
   const endRef = useRef<HTMLDivElement>(null);
+  const unreadDividerRef = useRef<HTMLDivElement>(null);
+  const initialScrollDone = useRef(false);
+  // Locked in once on mount, from the snapshot taken before this thread was
+  // marked read — first message from the other person sent after I last
+  // read this conversation. New messages that arrive while the chat is
+  // open are marked read immediately, so this never recomputes.
+  const [firstUnreadIndex] = useState(() =>
+    initialMessages.findIndex(
+      (m) => m.sender_id !== currentUserId && (!initialOwnLastReadAt || m.created_at > initialOwnLastReadAt),
+    ),
+  );
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressClick = useRef(false);
   const idsRef = useRef<string[]>([]);
@@ -232,7 +246,18 @@ export function RealChatView({
     return "sent";
   }
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => {
+    if (!initialScrollDone.current) {
+      initialScrollDone.current = true;
+      if (unreadDividerRef.current) {
+        unreadDividerRef.current.scrollIntoView({ behavior: "auto", block: "center" });
+      } else {
+        endRef.current?.scrollIntoView({ behavior: "auto" });
+      }
+      return;
+    }
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   // Close the long-press menu on Escape.
   useEffect(() => {
@@ -719,6 +744,15 @@ export function RealChatView({
 
               return (
                 <div key={m.id}>
+                  {i === firstUnreadIndex && (
+                    <div ref={unreadDividerRef} className="flex items-center gap-2 py-2">
+                      <span className="h-px flex-1 bg-accent/30" />
+                      <span className="rounded-full bg-accent/15 px-3 py-1 text-[11px] font-bold text-accent">
+                        Unread messages
+                      </span>
+                      <span className="h-px flex-1 bg-accent/30" />
+                    </div>
+                  )}
                   {newDay && (
                     <div className="flex justify-center py-2">
                       <span className="rounded-full bg-surface px-3 py-1 text-[11px] font-semibold text-muted">
