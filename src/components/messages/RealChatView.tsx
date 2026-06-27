@@ -94,7 +94,6 @@ export function RealChatView({
   initialMessages,
   initialReactions = [],
   initialOtherLastReadAt = null,
-  initialOwnLastReadAt = null,
 }: {
   conversationId: string;
   currentUserId: string;
@@ -104,8 +103,6 @@ export function RealChatView({
   initialMessages: ChatMsg[];
   initialReactions?: ReactionRow[];
   initialOtherLastReadAt?: string | null;
-  /** My own last_read_at as of page load, before the client marks this thread read. */
-  initialOwnLastReadAt?: string | null;
 }) {
   const isGroup = !!group;
   const senderName = (id: string) => (id === currentUserId ? "You" : members?.[id]?.name ?? other.name);
@@ -193,15 +190,10 @@ export function RealChatView({
   const endRef = useRef<HTMLDivElement>(null);
   const unreadDividerRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
-  // Locked in once on mount, from the snapshot taken before this thread was
-  // marked read — first message from the other person sent after I last
-  // read this conversation. New messages that arrive while the chat is
-  // open are marked read immediately, so this never recomputes.
-  const [firstUnreadIndex] = useState(() =>
-    initialMessages.findIndex(
-      (m) => m.sender_id !== currentUserId && (!initialOwnLastReadAt || m.created_at > initialOwnLastReadAt),
-    ),
-  );
+  // null = not resolved yet. Resolved with a fresh client-side read of
+  // last_read_at right before marking the thread read (see effect below),
+  // so the unread boundary always reflects the true pre-visit state.
+  const [firstUnreadIndex, setFirstUnreadIndex] = useState<number | null>(null);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressClick = useRef(false);
   const idsRef = useRef<string[]>([]);
@@ -247,6 +239,7 @@ export function RealChatView({
   }
 
   useEffect(() => {
+    if (firstUnreadIndex === null) return; // not resolved yet — see mark-as-read effect below
     if (!initialScrollDone.current) {
       initialScrollDone.current = true;
       if (unreadDividerRef.current) {
@@ -257,7 +250,7 @@ export function RealChatView({
       return;
     }
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, firstUnreadIndex]);
 
   // Close the long-press menu on Escape.
   useEffect(() => {
@@ -268,9 +261,28 @@ export function RealChatView({
   }, [menu]);
 
   useEffect(() => {
-    // NOTE: supabase.rpc() is lazy â€” it only fires when awaited/then'd.
-    supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId }).then(() => {});
-  }, [conversationId, supabase]);
+    let active = true;
+    async function resolveUnreadThenMarkRead() {
+      // Re-fetch my own read position fresh — don't trust the server-rendered
+      // prop alone, since Next's client router cache can serve a stale RSC
+      // snapshot from before a previous visit already marked this read.
+      const { data } = await supabase
+        .from("conversation_members")
+        .select("last_read_at")
+        .eq("conversation_id", conversationId)
+        .eq("user_id", currentUserId)
+        .maybeSingle();
+      const lastReadAt = (data as any)?.last_read_at ?? null;
+      const idx = initialMessages.findIndex(
+        (m) => m.sender_id !== currentUserId && (!lastReadAt || m.created_at > lastReadAt),
+      );
+      if (active) setFirstUnreadIndex(idx);
+      await supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
+    }
+    resolveUnreadThenMarkRead();
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
 
   async function hydratePost(msgId: string, postId: string) {
     const { data } = await supabase

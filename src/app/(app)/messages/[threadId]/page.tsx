@@ -87,17 +87,6 @@ export default async function ThreadPage({
     : { data: null };
   const initialOtherLastReadAt: string | null = (otherMemberRow as any)?.last_read_at ?? null;
 
-  // My own last_read_at, captured BEFORE the client marks this thread read
-  // on mount — this is what lets us land on an "Unread messages" divider
-  // instead of always jumping straight to the bottom.
-  const { data: myMemberRow } = await supabase
-    .from("conversation_members")
-    .select("last_read_at")
-    .eq("conversation_id", threadId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  const initialOwnLastReadAt: string | null = (myMemberRow as any)?.last_read_at ?? null;
-
   return (
     <RealChatView
       conversationId={threadId}
@@ -114,7 +103,6 @@ export default async function ThreadPage({
       initialMessages={messages}
       initialReactions={(reactRows ?? []) as any}
       initialOtherLastReadAt={initialOtherLastReadAt}
-      initialOwnLastReadAt={initialOwnLastReadAt}
     />
   );
 }
