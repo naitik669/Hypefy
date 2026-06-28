@@ -1,7 +1,8 @@
--- Hypefy — current schema snapshot.
--- Source of truth: supabase/migrations/ (this mirrors 0001_baseline.sql,
--- the consolidated live migration history). Regenerate TS types with the
--- Supabase CLI / MCP after schema changes.
+-- Hypefy schema baseline — consolidated migration history.
+-- Generated from the live Supabase migration history
+-- (supabase_migrations.schema_migrations). Applying these statements in
+-- order reproduces the live public schema. Keep new changes as separate
+-- numbered migrations going forward.
 
 -- ───────────────────────────────────────────────────────────────────
 -- migration: 20260602050451_create_profiles

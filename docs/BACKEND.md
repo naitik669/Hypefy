@@ -2,7 +2,9 @@
 
 Supabase project: `fyaioseridqabockidyp`. **All migrations are applied to the
 live project and tracked in Supabase's `supabase_migrations.schema_migrations`
-table** (49 migrations as of this writing — see "Migrations" below). This
+table** (61 migrations as of this writing) and are now also mirrored into the
+repo at `supabase/migrations/0001_baseline.sql` (consolidated history) with a
+current snapshot in `supabase/schema.sql` — see "Migrations" below. This
 document is the source-of-truth inventory so the schema is not a hidden
 dependency. **No service-role key is used on the client** — every write goes
 through RLS-protected tables or `SECURITY DEFINER` RPCs. The service role is
@@ -12,12 +14,14 @@ Generated TypeScript types for the whole schema live in
 `src/lib/supabase/database.types.ts` (regenerate via Supabase
 `generate_typescript_types`).
 
-## Tables (public schema — 22)
+## Tables (public schema — 24)
 
 | Table | Purpose | Key columns |
 |---|---|---|
-| `profiles` | User identity | id, username, display_name, bio, avatar_url, avatar_hue, banner_id, banner_url, current_vibe, interests[], profile_tags[], profile_completed, **is_private**, **dm_privacy**, **notif_prefs** (jsonb) |
-| `posts` | Image/text posts | id, user_id, caption, body, image_url, image_urls[], hashtags[], mentions[], hype_count, comment_count, save_count, share_count, **repost_count** |
+| `profiles` | User identity | id, username, display_name, bio, avatar_url, avatar_hue, banner_id, banner_url, current_vibe, interests[], profile_tags[], profile_completed, is_private, dm_privacy, notif_prefs (jsonb), **is_verified**, **last_seen_at**, **show_activity** |
+| `posts` | Image/text posts | id, user_id, caption, body, image_url, image_urls[], hashtags[], mentions[], hype_count, comment_count, save_count, share_count, repost_count, **view_count** |
+| `collections` | Saved-post folders | id, user_id, name, cover_url, created_at (owner-only RLS) |
+| `collection_items` | Posts inside a collection | collection_id, post_id (unique together) |
 | `shots` | Short video reels | id, user_id, media_url, poster_url, caption, hype_count, comment_count, save_count, share_count, in_showcase |
 | `shows` | 24h stories (distinct from Shots) | id, user_id, media_url, caption, expires_at, hype_count, **linked_post_id**, **is_showcase** |
 | `show_views` | Per-viewer Show view tracking | show_id, viewer_id (pk pair), created_at |
@@ -33,7 +37,7 @@ Generated TypeScript types for the whole schema live in
 | `message_reactions` | Emoji reactions | message_id, user_id, emoji (unique) |
 | `notifications` | Activity feed | user_id, actor_id, type, target_type, target_id, body, is_read |
 | `call_sessions` | 1:1 audio/video calls | conversation_id, caller_id, receiver_id, type, status, quick_reply, started_at, answered_at, ended_at |
-| `reports` / `message_reports` | Moderation | reporter_id, target_type, target_id, reason, details, status |
+| `reports` / `message_reports` | Moderation | reporter_id, target_type (post/comment/message/profile/shot/user/show/conversation), target_id, reason, details, status |
 | `push_subscriptions` | Web push devices | user_id, endpoint (unique), p256dh, auth |
 
 ## RPCs (SECURITY DEFINER)
@@ -60,6 +64,13 @@ Generated TypeScript types for the whole schema live in
 | `accept_call` / `decline_call` / `end_call` | p_call_id | State transitions |
 | `quick_reply_call` | p_call_id, p_reply | Sends canned message + declines |
 | `mark_call_missed` | p_call_id | Ringing → missed + missed_call notification |
+| `touch_last_seen` | — | Presence heartbeat; sets caller's `profiles.last_seen_at` |
+| `update_conversation` | p_conversation_id, p_title, p_avatar_url | Group rename/avatar; admin-only |
+| `add_conversation_member` | p_conversation_id, p_user_id | Add to group; admin-only |
+| `remove_conversation_member` | p_conversation_id, p_user_id | Remove from group; admin-only |
+| `set_member_role` | p_conversation_id, p_user_id, p_role | Promote/demote admin; admin-only |
+| `set_verified` | p_user_id, p_value | Grant/revoke verified badge; **service-role only** (anon+authenticated revoked) |
+| `increment_post_view` | p_post_id | Counts a post view, excluding the author's own |
 
 Internal trigger/helper functions: `handle_new_user`, `handle_post_mentions`,
 `handle_repost_insert` / `handle_repost_delete`, `bump_post_save_count`,
@@ -102,17 +113,16 @@ evaluate RLS on UPDATE/DELETE (their policies reference non-PK columns).
 ## Migrations
 
 Migration history is tracked in `supabase_migrations.schema_migrations` on the
-live project (49 migrations, `20260602050451_create_profiles` →
-`20260612135050_add_missing_fk_indexes`). To mirror them into this repo as
-files, link the project and pull with the Supabase CLI:
+live project (61 migrations, `20260602050451_create_profiles` →
+`20260628052448_reports_target_type_align`) and is **mirrored into the repo**:
 
-```bash
-supabase link --project-ref fyaioseridqabockidyp   # needs DB password
-supabase db pull                                    # writes supabase/migrations/*
-```
+- `supabase/migrations/0001_baseline.sql` — the consolidated history extracted
+  from the live project; applying it reproduces the live `public` schema.
+- `supabase/schema.sql` — a current full snapshot (mirrors the baseline).
 
-New schema changes should be authored as new migration files and applied via
-the Supabase CLI or `apply_migration`, then `database.types.ts` regenerated.
+New schema changes should be authored as new numbered migration files and
+applied via the Supabase CLI or `apply_migration`, then `database.types.ts`
+regenerated and this doc updated.
 
 ## Indexes
 
