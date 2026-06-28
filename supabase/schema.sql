@@ -2502,3 +2502,16 @@ create index if not exists collection_items_post_idx on public.collection_items 
 alter table public.reports drop constraint if exists reports_target_type_check;
 alter table public.reports add constraint reports_target_type_check
   check (target_type = any (array['post','comment','message','profile','shot','user','show','conversation']));;
+
+-- ───────────────────────────────────────────────────────────────────
+-- migration: 0002_set_verified_revoke_public (security fix)
+-- ───────────────────────────────────────────────────────────────────
+-- Security fix (found in two-account QA): set_verified must be service-role
+-- only. Postgres grants EXECUTE to PUBLIC by default, so revoking from
+-- anon/authenticated alone left a privilege-escalation hole — any logged-in
+-- user could verify (or un-verify) anyone. Revoke from PUBLIC and grant
+-- explicitly to service_role.
+revoke execute on function public.set_verified(uuid, boolean) from public;
+revoke execute on function public.set_verified(uuid, boolean) from anon;
+revoke execute on function public.set_verified(uuid, boolean) from authenticated;
+grant execute on function public.set_verified(uuid, boolean) to service_role;

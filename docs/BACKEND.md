@@ -69,7 +69,7 @@ Generated TypeScript types for the whole schema live in
 | `add_conversation_member` | p_conversation_id, p_user_id | Add to group; admin-only |
 | `remove_conversation_member` | p_conversation_id, p_user_id | Remove from group; admin-only |
 | `set_member_role` | p_conversation_id, p_user_id, p_role | Promote/demote admin; admin-only |
-| `set_verified` | p_user_id, p_value | Grant/revoke verified badge; **service-role only** (anon+authenticated revoked) |
+| `set_verified` | p_user_id, p_value | Grant/revoke verified badge; **service-role only** (EXECUTE revoked from PUBLIC, granted to service_role) |
 | `increment_post_view` | p_post_id | Counts a post view, excluding the author's own |
 
 Internal trigger/helper functions: `handle_new_user`, `handle_post_mentions`,
