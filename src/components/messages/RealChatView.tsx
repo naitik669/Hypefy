@@ -57,7 +57,17 @@ function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null 
 }
 
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
-type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null };
+type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null; lastSeenAt?: string | null; showActivity?: boolean };
+
+/** "online" when seen within 90s; otherwise a short "Active Nm ago". */
+function presenceLabel(lastSeenAt: string | null | undefined): { online: boolean; text: string } | null {
+  if (!lastSeenAt) return null;
+  const secs = Math.floor((Date.now() - new Date(lastSeenAt).getTime()) / 1000);
+  if (secs < 90) return { online: true, text: "Active now" };
+  if (secs < 3600) return { online: false, text: `Active ${Math.floor(secs / 60)}m ago` };
+  if (secs < 86400) return { online: false, text: `Active ${Math.floor(secs / 3600)}h ago` };
+  return { online: false, text: `Active ${Math.floor(secs / 86400)}d ago` };
+}
 
 const REPORT_REASONS = ["Spam", "Harassment", "Hate or abuse", "Scam", "Inappropriate content", "Other"];
 const QUICK = ["❤️", "🥰", "😂", "👍", "😮", "😢"];
@@ -138,6 +148,9 @@ export function RealChatView({
   const [reportMsg, setReportMsg] = useState<ChatMsg | null>(null);
   // Message id whose reaction list ("who reacted with what") is open
   const [reactionSheet, setReactionSheet] = useState<string | null>(null);
+  // Other DM party's presence (last_seen_at), kept live via realtime + a ticker.
+  const [otherLastSeen, setOtherLastSeen] = useState<string | null>(other.lastSeenAt ?? null);
+  const [, forcePresenceTick] = useState(0);
   // User ids currently typing (others only) — driven by realtime broadcast.
   const [typingIds, setTypingIds] = useState<string[]>([]);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -570,6 +583,24 @@ export function RealChatView({
     };
   }, [conversationId, currentUserId, supabase]);
 
+  // Realtime: the other DM party's last_seen_at (presence). Plus a 30s ticker
+  // so "Active 4m ago" stays current without new events.
+  useEffect(() => {
+    if (isGroup || !other.id || other.showActivity === false) return;
+    const ch = supabase
+      .channel(`presence:${other.id}`)
+      .on("postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${other.id}` },
+        (payload) => {
+          const row = payload.new as { last_seen_at?: string | null; show_activity?: boolean };
+          if (row.show_activity === false) { setOtherLastSeen(null); return; }
+          if (row.last_seen_at) setOtherLastSeen(row.last_seen_at);
+        })
+      .subscribe();
+    const ticker = setInterval(() => forcePresenceTick((n) => n + 1), 30_000);
+    return () => { supabase.removeChannel(ch); clearInterval(ticker); };
+  }, [isGroup, other.id, other.showActivity, supabase]);
+
   function emitTyping() {
     const now = Date.now();
     if (now - lastTypingSent.current < 1500) return; // throttle
@@ -848,10 +879,19 @@ export function RealChatView({
           </div>
         ) : (
           <Link href={other.username ? `/u/${other.username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
-            <Avatar name={other.name} hue={other.hue} size={36} src={other.avatarUrl ?? undefined} />
+            <div className="relative shrink-0">
+              <Avatar name={other.name} hue={other.hue} size={36} src={other.avatarUrl ?? undefined} />
+              {presenceLabel(otherLastSeen)?.online && (
+                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background bg-green-500" />
+              )}
+            </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{other.name}</p>
-              {other.username && <p className="truncate text-xs text-muted">@{other.username}</p>}
+              {(() => {
+                const pres = presenceLabel(otherLastSeen);
+                if (pres) return <p className={`truncate text-xs ${pres.online ? "text-green-500" : "text-muted"}`}>{pres.text}</p>;
+                return other.username ? <p className="truncate text-xs text-muted">@{other.username}</p> : null;
+              })()}
             </div>
           </Link>
         )}

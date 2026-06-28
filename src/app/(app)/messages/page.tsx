@@ -25,7 +25,7 @@ export default async function MessagesPage() {
       // The other participant in each conversation
       supabase
         .from("conversation_members")
-        .select("conversation_id, user_id, profiles(id, display_name, username, avatar_hue, avatar_url)")
+        .select("conversation_id, user_id, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity)")
         .in("conversation_id", convIds)
         .neq("user_id", user.id),
       // Latest messages across these conversations
@@ -63,12 +63,16 @@ export default async function MessagesPage() {
     });
 
     // All other members per conversation (for groups we need everyone)
-    const membersByConv = new Map<string, { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null }[]>();
+    const membersByConv = new Map<string, { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null; online: boolean }[]>();
     (membersRes.data ?? []).forEach((m: any) => {
       const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
       if (!p) return;
       const arr = membersByConv.get(m.conversation_id) ?? [];
-      arr.push({ id: p.id, name: p.display_name ?? p.username ?? "User", username: p.username ?? null, hue: p.avatar_hue ?? 280, avatarUrl: p.avatar_url ?? null });
+      const online =
+        p.show_activity !== false &&
+        !!p.last_seen_at &&
+        Date.now() - new Date(p.last_seen_at).getTime() < 90_000;
+      arr.push({ id: p.id, name: p.display_name ?? p.username ?? "User", username: p.username ?? null, hue: p.avatar_hue ?? 280, avatarUrl: p.avatar_url ?? null, online });
       membersByConv.set(m.conversation_id, arr);
     });
 
@@ -135,6 +139,7 @@ export default async function MessagesPage() {
           lastSenderName,
           unread,
           unreadCount: unreadCountByConv.get(c.id) ?? 0,
+          online: !isGroup && (members[0]?.online ?? false),
           muted: mutedByConv.has(c.id),
           isRequest: !isGroup && requestByConv.get(c.id) === false,
           // A reaction newer than the last message becomes the preview line

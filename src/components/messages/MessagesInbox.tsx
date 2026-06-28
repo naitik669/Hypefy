@@ -23,6 +23,7 @@ export type InboxRow = {
   lastSenderName: string | null;
   unread: boolean;
   unreadCount: number;
+  online: boolean;
   muted: boolean;
   isRequest: boolean;
   /** Set when a reaction is newer than the last message — becomes the preview */
@@ -219,7 +220,12 @@ export function MessagesInbox({ rows, currentUserId }: { rows: InboxRow[]; curre
           onClick={() => setReadIds((prev) => new Set(prev).add(r.id))}
           className={`flex items-center gap-3 transition-colors hover:bg-white/[0.03] ${pending ? "" : "px-4 py-3"}`}
         >
-          {r.isGroup ? <GroupAvatar /> : <Avatar name={r.name} hue={r.hue} size={52} src={r.avatarUrl ?? undefined} />}
+          <div className="relative shrink-0">
+            {r.isGroup ? <GroupAvatar /> : <Avatar name={r.name} hue={r.hue} size={52} src={r.avatarUrl ?? undefined} />}
+            {r.online && !r.isGroup && (
+              <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-green-500" />
+            )}
+          </div>
           <div className="min-w-0 flex-1">
             <p className={`truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
               {r.name}
