@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { createClient as createSupabase } from "@supabase/supabase-js";
 import webpush from "web-push";
 
@@ -90,9 +91,11 @@ export async function POST(req: NextRequest) {
         );
         sent++;
       } catch (err: any) {
-        // Subscription expired or revoked — remove it
+        // Subscription expired or revoked — remove it (expected, not an error)
         if (err?.statusCode === 404 || err?.statusCode === 410) {
           await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+        } else {
+          Sentry.captureException(err, { tags: { route: "push" } });
         }
       }
     }),

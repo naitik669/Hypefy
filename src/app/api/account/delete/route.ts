@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,6 +28,7 @@ export async function POST() {
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) {
     console.error("[account/delete]", error.message);
+    Sentry.captureException(error, { tags: { route: "account/delete" } });
     return NextResponse.json({ error: "Deletion failed" }, { status: 500 });
   }
 

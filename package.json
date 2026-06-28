@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
+    "@sentry/nextjs": "^10.62.0",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
     "lucide-react": "^1.17.0",

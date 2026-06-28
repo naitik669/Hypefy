@@ -1,0 +1,10 @@
+import * as Sentry from "@sentry/nextjs";
+
+const dsn = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN;
+
+// No-ops when no DSN is configured, so this is safe to ship before Sentry is set up.
+Sentry.init({
+  dsn,
+  enabled: !!dsn,
+  tracesSampleRate: 0.1,
+});

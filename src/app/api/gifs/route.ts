@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * GET /api/gifs?q=query
@@ -48,6 +49,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ gifs });
   } catch (err) {
     console.error("[/api/gifs]", err);
+    Sentry.captureException(err, { tags: { route: "gifs" } });
     return NextResponse.json({ error: "Fetch failed" }, { status: 500 });
   }
 }
