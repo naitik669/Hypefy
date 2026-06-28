@@ -9,6 +9,11 @@
  *  - social:     +44 followed / +28 own / 0 stranger
  *  - engagement: hype*3 + comments*2 + saves*2, capped at 60
  *  - interest:   +18 when the post's hashtags overlap my interests/tags
+ *  - author affinity: up to +30 for authors I actually interact with
+ *  - tag affinity:    up to +15 for tags I engage with / follow
+ *
+ * `authorAffinity` and `tagAffinity` are the raw weights from get_affinity
+ * (0 when none); both are capped so they enrich rather than dominate.
  */
 export function feedScore(
   p: { created_at: string; hype_count?: number; comment_count?: number; save_count?: number },
@@ -16,6 +21,8 @@ export function feedScore(
   isFollowed: boolean,
   interestMatch: boolean,
   now: number,
+  authorAffinity = 0,
+  tagAffinity = 0,
 ): number {
   const hours = (now - new Date(p.created_at).getTime()) / 3_600_000;
   const recency = Math.max(0, 48 - hours) * 2;
@@ -25,7 +32,27 @@ export function feedScore(
     60,
   );
   const interest = interestMatch ? 18 : 0;
-  return recency + social + engagement + interest;
+  const authorBoost = Math.min(Math.max(authorAffinity, 0) * 1.5, 30);
+  const tagBoost = Math.min(Math.max(tagAffinity, 0) * 1.5, 15);
+  return recency + social + engagement + interest + authorBoost + tagBoost;
+}
+
+/**
+ * Sum of affinity weights for a post's tags, given the caller's tag-affinity
+ * map (lowercased tag → weight) and the set of tags they follow (each
+ * followed tag contributes a flat bonus). Use as the `tagAffinity` arg above.
+ */
+export function tagAffinityFor(
+  p: { hashtags?: string[] | null },
+  tagWeights: Record<string, number>,
+  followedTags: Set<string> = new Set(),
+): number {
+  let sum = 0;
+  for (const t of postTags(p)) {
+    sum += tagWeights[t] ?? 0;
+    if (followedTags.has(t)) sum += 2;
+  }
+  return sum;
 }
 
 /**

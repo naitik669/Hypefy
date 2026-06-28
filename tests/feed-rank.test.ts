@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { feedScore, diversify, postTags } from "@/lib/feed-rank";
+import { feedScore, diversify, postTags, tagAffinityFor } from "@/lib/feed-rank";
 
 const now = Date.UTC(2026, 5, 28, 12, 0, 0);
 const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
@@ -31,6 +31,34 @@ describe("feedScore", () => {
   it("adds +18 for an interest match", () => {
     const p = { created_at: iso(0) };
     expect(feedScore(p, false, false, true, now) - feedScore(p, false, false, false, now)).toBe(18);
+  });
+
+  it("boosts by author affinity, capped at +30", () => {
+    const p = { created_at: iso(0) };
+    const base = feedScore(p, false, false, false, now);
+    expect(feedScore(p, false, false, false, now, 10) - base).toBeCloseTo(15, 5); // 10*1.5
+    expect(feedScore(p, false, false, false, now, 9999) - base).toBe(30); // capped
+  });
+
+  it("boosts by tag affinity, capped at +15", () => {
+    const p = { created_at: iso(0) };
+    const base = feedScore(p, false, false, false, now);
+    expect(feedScore(p, false, false, false, now, 0, 4) - base).toBeCloseTo(6, 5); // 4*1.5
+    expect(feedScore(p, false, false, false, now, 0, 9999) - base).toBe(15); // capped
+  });
+});
+
+describe("tagAffinityFor", () => {
+  it("sums tag weights and adds a bonus for followed tags", () => {
+    const post = { hashtags: ["#FYP", "art", "misc"] };
+    const weights = { fyp: 3, art: 1 };
+    const followed = new Set(["art"]);
+    // fyp 3 + art (1 + 2 followed bonus) + misc 0 = 6
+    expect(tagAffinityFor(post, weights, followed)).toBe(6);
+  });
+  it("is 0 with no overlap and tolerates null hashtags", () => {
+    expect(tagAffinityFor({ hashtags: null }, { x: 5 })).toBe(0);
+    expect(tagAffinityFor({ hashtags: ["nope"] }, { x: 5 })).toBe(0);
   });
 });
 
