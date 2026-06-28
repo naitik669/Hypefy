@@ -94,6 +94,24 @@ export function AuthCard({ mode }: { mode: Mode }) {
           password,
         });
         if (error) throw error;
+
+        // Opt-in 2-step verification: if this account requires an email code,
+        // drop the password session and gate behind a one-time code. (Skipped
+        // when adding a second account to the switcher.)
+        if (!addMode && data.user) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("two_step_enabled")
+            .eq("id", data.user.id)
+            .maybeSingle();
+          if ((prof as any)?.two_step_enabled) {
+            await supabase.auth.signOut();
+            await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+            router.push(`/verify-2step?email=${encodeURIComponent(email)}`);
+            return;
+          }
+        }
+
         if (addMode) {
           if (prevSession) await saveSessionAsAccount(prevSession);
           if (data.session) await saveSessionAsAccount(data.session);

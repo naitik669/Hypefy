@@ -727,6 +727,7 @@ export type Database = {
           profile_completed: boolean
           profile_tags: string[]
           show_activity: boolean
+          two_step_enabled: boolean
           updated_at: string
           username: string | null
         }
@@ -749,6 +750,7 @@ export type Database = {
           profile_completed?: boolean
           profile_tags?: string[]
           show_activity?: boolean
+          two_step_enabled?: boolean
           updated_at?: string
           username?: string | null
         }
@@ -771,6 +773,7 @@ export type Database = {
           profile_completed?: boolean
           profile_tags?: string[]
           show_activity?: boolean
+          two_step_enabled?: boolean
           updated_at?: string
           username?: string | null
         }

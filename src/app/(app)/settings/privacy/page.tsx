@@ -10,7 +10,7 @@ export default async function PrivacySettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_private, dm_privacy, show_activity")
+    .select("is_private, dm_privacy, show_activity, two_step_enabled")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -23,6 +23,7 @@ export default async function PrivacySettingsPage() {
           initialIsPrivate={!!(profile as any)?.is_private}
           initialDmPrivacy={((profile as any)?.dm_privacy ?? "everyone") as "everyone" | "following"}
           initialShowActivity={(profile as any)?.show_activity ?? true}
+          initialTwoStep={!!(profile as any)?.two_step_enabled}
         />
       </div>
     </>

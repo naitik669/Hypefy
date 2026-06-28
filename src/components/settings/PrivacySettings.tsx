@@ -9,19 +9,22 @@ export function PrivacySettings({
   initialIsPrivate,
   initialDmPrivacy,
   initialShowActivity,
+  initialTwoStep,
 }: {
   userId: string;
   initialIsPrivate: boolean;
   initialDmPrivacy: "everyone" | "following";
   initialShowActivity: boolean;
+  initialTwoStep: boolean;
 }) {
   const supabase = createClient();
   const [isPrivate, setIsPrivate] = useState(initialIsPrivate);
   const [dmPrivacy, setDmPrivacy] = useState(initialDmPrivacy);
   const [showActivity, setShowActivity] = useState(initialShowActivity);
+  const [twoStep, setTwoStep] = useState(initialTwoStep);
   const [saving, setSaving] = useState(false);
 
-  async function save(patch: { is_private?: boolean; dm_privacy?: string; show_activity?: boolean }) {
+  async function save(patch: { is_private?: boolean; dm_privacy?: string; show_activity?: boolean; two_step_enabled?: boolean }) {
     setSaving(true);
     const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
     setSaving(false);
@@ -36,6 +39,11 @@ export function PrivacySettings({
   async function toggleActivity(next: boolean) {
     setShowActivity(next);
     if (!(await save({ show_activity: next }))) setShowActivity(!next);
+  }
+
+  async function toggleTwoStep(next: boolean) {
+    setTwoStep(next);
+    if (!(await save({ two_step_enabled: next }))) setTwoStep(!next);
   }
 
   async function setDm(next: "everyone" | "following") {
@@ -64,6 +72,17 @@ export function PrivacySettings({
             disabled={saving}
           />
         </div>
+      </section>
+
+      <section>
+        <p className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">Security</p>
+        <SettingToggle
+          label="Two-step verification"
+          sub="Require an emailed 6-digit code at sign-in, on top of your password"
+          checked={twoStep}
+          onChange={toggleTwoStep}
+          disabled={saving}
+        />
       </section>
 
       <section>
