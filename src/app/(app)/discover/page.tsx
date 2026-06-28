@@ -80,7 +80,7 @@ export default async function DiscoverPage() {
   // Creators to follow
   let peopleQuery = supabase
     .from("profiles")
-    .select("id, display_name, username, avatar_hue, avatar_url, bio, profile_tags")
+    .select("id, display_name, username, avatar_hue, avatar_url, bio, profile_tags, is_verified")
     .eq("profile_completed", true)
     .neq("id", user.id)
     .limit(12);

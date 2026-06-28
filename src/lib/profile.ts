@@ -26,6 +26,7 @@ export type Profile = {
   interests: string[];
   profileTags: string[];
   profileCompleted: boolean;
+  isVerified: boolean;
 };
 
 export type Banner = { id: string; label: string; gradient: string };
@@ -135,6 +136,7 @@ function mapProfile(row: any): Profile {
     interests: row.interests ?? [],
     profileTags: row.profile_tags ?? [],
     profileCompleted: row.profile_completed ?? false,
+    isVerified: row.is_verified ?? false,
   };
 }
 

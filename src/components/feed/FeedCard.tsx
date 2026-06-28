@@ -13,6 +13,7 @@ import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
 import { EditPostSheet } from "@/components/feed/EditPostSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
+import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { formatCount } from "@/lib/format";
 
 export type FeedPost = {
@@ -34,6 +35,7 @@ export type FeedPost = {
     avatar_hue: number | null;
     avatar_url?: string | null;
     profile_tags: string[] | null;
+    is_verified?: boolean | null;
   } | null;
   initialHyped?: boolean;
   initialSaved?: boolean;
@@ -247,6 +249,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <Link href={profileHref} className="truncate text-sm font-semibold hover:underline">{name}</Link>
+          {profile?.is_verified && <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />}
           <span className="ml-1 text-xs text-faint">· {timeAgo(post.created_at)}</span>
         </div>
         {/* THREE DOTS -- fully functional */}

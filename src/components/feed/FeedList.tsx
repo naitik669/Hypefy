@@ -67,7 +67,7 @@ export function FeedList({
 
     const { data } = await supabase
       .from("posts")
-      .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags)")
+      .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)")
       .lt("created_at", oldest)
       .order("created_at", { ascending: false })
       .limit(PAGE_SIZE);

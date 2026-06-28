@@ -61,6 +61,7 @@ export default async function ProfilePage() {
         userId={user.id}
         currentUserId={user.id}
         stats={stats}
+        verified={profile?.isVerified ?? false}
         actions={
           <>
             <Link

@@ -47,7 +47,7 @@ export default async function PostDetailPage({
   // just this single post (private account, not a follower).
   const postsQuery = supabase
     .from("posts")
-    .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags)")
+    .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)")
     .order("created_at", { ascending: false });
   const { data: rows } = canSeeAll
     ? await postsQuery.eq("user_id", target.user_id)

@@ -58,7 +58,7 @@ function postTags(p: any): string[] {
   return ((p.hashtags ?? []) as string[]).map((t) => t.replace(/^#/, "").toLowerCase());
 }
 
-const POST_COLS = "*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags)";
+const POST_COLS = "*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -90,7 +90,7 @@ export default async function HomePage() {
     // the global firehose has scrolled past them.
     supabase
       .from("posts")
-      .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags)")
+      .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)")
       .in("user_id", feedUserIds)
       .order("created_at", { ascending: false })
       .limit(40),
@@ -98,7 +98,7 @@ export default async function HomePage() {
     // the post volume grows (was 50).
     supabase
       .from("posts")
-      .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags)")
+      .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)")
       .order("created_at", { ascending: false })
       .limit(150),
     // Current user profile for "Your Show" bubble + interest signals
@@ -117,7 +117,7 @@ export default async function HomePage() {
     followingIds.size > 0
       ? supabase
           .from("reposts")
-          .select("post_id, created_at, user_id, profiles:user_id(display_name, username), posts(*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags))")
+          .select("post_id, created_at, user_id, profiles:user_id(display_name, username), posts(*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified))")
           .in("user_id", [...followingIds])
           .order("created_at", { ascending: false })
           .limit(20)

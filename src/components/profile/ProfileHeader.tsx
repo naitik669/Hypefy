@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { FollowStats } from "@/components/profile/FollowStats";
+import { VerifiedStar } from "@/components/ui/VerifiedStar";
 
 /**
  * Profile hero — banner, the squircle avatar overlapping its bottom-left
@@ -23,6 +24,7 @@ export function ProfileHeader({
   currentUserId,
   stats,
   actions,
+  verified = false,
 }: {
   name: string;
   username: string | null;
@@ -38,6 +40,7 @@ export function ProfileHeader({
   currentUserId: string | null;
   stats: { posts: number; followers: number; following: number };
   actions?: ReactNode;
+  verified?: boolean;
 }) {
   return (
     <>
@@ -66,7 +69,10 @@ export function ProfileHeader({
 
         {/* Identity */}
         <div className="mt-3">
-          <span className="text-base font-bold leading-tight">{name}</span>
+          <span className="flex items-center gap-1 text-base font-bold leading-tight">
+            {name}
+            {verified && <VerifiedStar className="h-4 w-4 shrink-0 text-verified" />}
+          </span>
           {username && <p className="mt-0.5 text-sm text-muted">@{username}</p>}
           {bio && <p className="mt-1.5 text-sm leading-snug">{bio}</p>}
         </div>

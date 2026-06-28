@@ -86,6 +86,7 @@ export default async function PublicProfilePage({
         userId={profile.id}
         currentUserId={currentUser?.id ?? null}
         stats={stats}
+        verified={!!(profile as any).is_verified}
         actions={
           isOwn ? (
             <>

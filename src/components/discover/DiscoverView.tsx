@@ -19,7 +19,7 @@ type Shot = {
   hype_count: number; comment_count: number;
   profiles: { display_name: string | null; username: string | null; avatar_hue: number | null } | null;
 };
-type Person = { id: string; display_name: string | null; username: string | null; avatar_hue: number | null; avatar_url?: string | null };
+type Person = { id: string; display_name: string | null; username: string | null; avatar_hue: number | null; avatar_url?: string | null; is_verified?: boolean | null };
 type Tag = { tag: string; count: number };
 
 const CATEGORIES = ["For You", "Blowing Up", "Posts", "Shots", "Creators", "Tags"] as const;
@@ -276,7 +276,7 @@ function CreatorRow({ person }: { person: Person }) {
         handle: person.username ? `@${person.username}` : "",
         hue: person.avatar_hue ?? 280,
         avatarUrl: person.avatar_url ?? null,
-        verified: false,
+        verified: !!person.is_verified,
       }}
     />
   );
