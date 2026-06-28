@@ -16,13 +16,16 @@ function recencyBoost(createdAt: string, now: number) {
   if (h < 72) return 5;
   return 0;
 }
-function score(x: any, now: number) {
+function score(x: any, now: number, interests: Set<string>) {
+  const tags = ((x.hashtags ?? []) as string[]).map((t) => t.replace(/^#/, "").toLowerCase());
+  const interestBoost = interests.size > 0 && tags.some((t) => interests.has(t)) ? 12 : 0;
   return (
     (x.hype_count ?? 0) * 3 +
     (x.comment_count ?? 0) * 2 +
     (x.save_count ?? 0) * 2 +
     (x.share_count ?? 0) * 2 +
-    recencyBoost(x.created_at, now)
+    recencyBoost(x.created_at, now) +
+    interestBoost
   );
 }
 
@@ -33,26 +36,31 @@ export default async function DiscoverPage() {
 
   const now = Date.now();
 
-  const [postsRes, shotsRes, followRes] = await Promise.all([
+  const [postsRes, shotsRes, followRes, meRes] = await Promise.all([
     supabase
       .from("posts")
       .select("id, caption, body, image_url, image_urls, hashtags, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles(id, display_name, username, avatar_hue, avatar_url)")
       .neq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(60),
+      .limit(150),
     supabase
       .from("shots")
       .select("id, media_url, poster_url, caption, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles(id, display_name, username, avatar_hue, avatar_url)")
       .neq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(40),
+      .limit(80),
     supabase.from("follows").select("following_id").eq("follower_id", user.id),
+    supabase.from("profiles").select("interests, profile_tags").eq("id", user.id).maybeSingle(),
   ]);
 
   const followingIds = (followRes.data ?? []).map((r: any) => r.following_id as string);
+  const interests = new Set<string>([
+    ...(((meRes.data as any)?.interests ?? []) as string[]),
+    ...(((meRes.data as any)?.profile_tags ?? []) as string[]),
+  ].map((t) => t.replace(/^#/, "").toLowerCase()));
 
-  const posts = (postsRes.data ?? []).map(one).map((p: any) => ({ ...p, _score: score(p, now) }));
-  const shots = (shotsRes.data ?? []).map(one).map((s: any) => ({ ...s, _score: score(s, now) }));
+  const posts = (postsRes.data ?? []).map(one).map((p: any) => ({ ...p, _score: score(p, now, interests) }));
+  const shots = (shotsRes.data ?? []).map(one).map((s: any) => ({ ...s, _score: score(s, now, interests) }));
 
   const trendingPosts = [...posts].sort((a, b) => b._score - a._score).slice(0, 12);
   const trendingIds = new Set(trendingPosts.map((p) => p.id));

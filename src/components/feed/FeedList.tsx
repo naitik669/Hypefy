@@ -5,6 +5,25 @@ import { createClient } from "@/lib/supabase/client";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
 
 const PAGE_SIZE = 20;
+const SEEN_KEY = "hypefy_feed_seen";
+const SEEN_CAP = 500;
+
+/** Recently-seen post ids (capped ring in localStorage) — lets the
+ *  chronological tail skip posts already shown in recent sessions. */
+function loadSeen(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]") as string[]);
+  } catch {
+    return new Set();
+  }
+}
+function saveSeen(seen: Set<string>) {
+  try {
+    const arr = [...seen].slice(-SEEN_CAP);
+    localStorage.setItem(SEEN_KEY, JSON.stringify(arr));
+  } catch { /* quota / private mode — non-fatal */ }
+}
 
 /**
  * Client feed with infinite scroll. The server renders the first scored page;
@@ -24,6 +43,16 @@ export function FeedList({
   const [done, setDone] = useState(initialPosts.length < 10);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
+  const seenRef = useRef<Set<string>>(new Set());
+
+  // Mark the initial (ranked) page as seen so the chronological tail won't
+  // resurface them later.
+  useEffect(() => {
+    seenRef.current = loadSeen();
+    initialPosts.forEach((p) => seenRef.current.add(p.id));
+    saveSeen(seenRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function loadMore() {
     if (loadingRef.current || done) return;
@@ -48,9 +77,14 @@ export function FeedList({
         ...p,
         profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles,
       }))
-      .filter((p: any) => !current.some((x) => x.id === p.id));
+      // Drop posts already on screen or seen in a recent session.
+      .filter((p: any) => !current.some((x) => x.id === p.id) && !seenRef.current.has(p.id));
 
     if ((data?.length ?? 0) < PAGE_SIZE) setDone(true);
+
+    // Remember what we're about to show so it won't resurface.
+    fresh.forEach((p: any) => seenRef.current.add(p.id));
+    saveSeen(seenRef.current);
 
     if (fresh.length > 0) {
       // Initial hype/save state for the new batch

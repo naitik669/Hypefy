@@ -23,8 +23,9 @@ function normalise(raw: unknown[] | null) {
  *  - recency:    up to ~96 pts, decays linearly over 48h
  *  - social:     +44 followed / +28 own / 0 stranger
  *  - engagement: hype*3 + comments*2 + saves*2, capped at 60
+ *  - interest:   +18 when the post's hashtags overlap my interests/tags
  */
-function feedScore(p: any, isOwn: boolean, isFollowed: boolean, now: number) {
+function feedScore(p: any, isOwn: boolean, isFollowed: boolean, interestMatch: boolean, now: number) {
   const hours = (now - new Date(p.created_at).getTime()) / 3_600_000;
   const recency = Math.max(0, 48 - hours) * 2;
   const social = isFollowed ? 44 : isOwn ? 28 : 0;
@@ -32,7 +33,29 @@ function feedScore(p: any, isOwn: boolean, isFollowed: boolean, now: number) {
     (p.hype_count ?? 0) * 3 + (p.comment_count ?? 0) * 2 + (p.save_count ?? 0) * 2,
     60,
   );
-  return recency + social + engagement;
+  const interest = interestMatch ? 18 : 0;
+  return recency + social + engagement + interest;
+}
+
+/**
+ * Reorder a ranked list so the same author never appears in two consecutive
+ * slots when avoidable — keeps one prolific poster from dominating the top.
+ */
+function diversify<T extends { user_id: string }>(ranked: T[]): T[] {
+  const out: T[] = [];
+  const pending = [...ranked];
+  while (pending.length) {
+    const lastAuthor = out.length ? out[out.length - 1].user_id : null;
+    const idx = pending.findIndex((p) => p.user_id !== lastAuthor);
+    const pick = idx === -1 ? 0 : idx;
+    out.push(pending.splice(pick, 1)[0]);
+  }
+  return out;
+}
+
+/** Lowercased hashtag set from a post, for interest matching. */
+function postTags(p: any): string[] {
+  return ((p.hashtags ?? []) as string[]).map((t) => t.replace(/^#/, "").toLowerCase());
 }
 
 const POST_COLS = "*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags)";
@@ -71,14 +94,15 @@ export default async function HomePage() {
       .in("user_id", feedUserIds)
       .order("created_at", { ascending: false })
       .limit(40),
-    // Global feed â€” show ALL posts so early users always see content.
+    // Global feed â€” wider candidate window so ranking has room to work as
+    // the post volume grows (was 50).
     supabase
       .from("posts")
       .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags)")
       .order("created_at", { ascending: false })
-      .limit(50),
-    // Current user profile for "Your Show" bubble
-    supabase.from("profiles").select("display_name, username, avatar_hue, avatar_url").eq("id", user.id).maybeSingle(),
+      .limit(150),
+    // Current user profile for "Your Show" bubble + interest signals
+    supabase.from("profiles").select("display_name, username, avatar_hue, avatar_url, interests, profile_tags").eq("id", user.id).maybeSingle(),
     // Current user's own active Shows â€” oldest first
     supabase.from("shows").select("id").eq("user_id", user.id).gt("expires_at", nowIso).order("created_at", { ascending: true }),
     // Active Shows from OTHERS â€” newest first
@@ -134,12 +158,24 @@ export default async function HomePage() {
     byId.set(post.id, byId.has(post.id) ? { ...byId.get(post.id), created_at: r.created_at, _repostedBy: reposter } : normalised);
   }
 
-  // Rank by blended score; recency breaks ties
+  // My interest signals (hashtags I care about) for personalized ranking.
+  const myInterests = new Set<string>([
+    ...(((myProfile as any)?.interests ?? []) as string[]),
+    ...(((myProfile as any)?.profile_tags ?? []) as string[]),
+  ].map((t) => t.replace(/^#/, "").toLowerCase()));
+
+  // Rank by blended score; recency breaks ties. Then diversify authors.
   const now = Date.now();
-  const posts = [...byId.values()]
+  const ranked = [...byId.values()]
     .map((p: any) => ({
       ...p,
-      _score: feedScore(p, p.user_id === user.id, followingIds.has(p.user_id), now),
+      _score: feedScore(
+        p,
+        p.user_id === user.id,
+        followingIds.has(p.user_id),
+        myInterests.size > 0 && postTags(p).some((t) => myInterests.has(t)),
+        now,
+      ),
     }))
     .sort((a: any, b: any) =>
       b._score !== a._score
@@ -147,6 +183,7 @@ export default async function HomePage() {
         : new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     )
     .slice(0, 30);
+  const posts = diversify(ranked);
 
   // Fetch which posts current user has hyped/saved â€” for initial state
   const postIds = posts.map((p: any) => p.id);
