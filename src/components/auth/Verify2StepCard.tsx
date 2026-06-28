@@ -67,7 +67,7 @@ export function Verify2StepCard({ email }: { email: string }) {
           </span>
           <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground">Two-step verification</h1>
           <p className="mt-1 text-[13px] text-muted">
-            Enter the 6-digit code we sent to{" "}
+            Enter the code we sent to{" "}
             <span className="font-semibold text-foreground">{email}</span>.
           </p>
         </div>
@@ -81,9 +81,9 @@ export function Verify2StepCard({ email }: { email: string }) {
             inputMode="numeric"
             autoComplete="one-time-code"
             autoFocus
-            maxLength={6}
+            maxLength={10}
             required
-            placeholder="123456"
+            placeholder="Enter code"
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             className="h-12 w-full rounded-xl border border-white/5 bg-white/[0.06] px-4 text-center text-lg font-bold tracking-[0.4em] text-foreground placeholder:tracking-normal placeholder:text-faint outline-none transition focus:border-accent/40 focus:ring-2 focus:ring-accent/30"
