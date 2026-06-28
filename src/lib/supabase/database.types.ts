@@ -384,6 +384,32 @@ export type Database = {
           },
         ]
       }
+      hashtag_follows: {
+        Row: {
+          created_at: string
+          tag: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          tag: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          tag?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hashtag_follows_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hypes: {
         Row: {
           created_at: string
@@ -1146,7 +1172,26 @@ export type Database = {
         Returns: undefined
       }
       end_call: { Args: { p_call_id: string }; Returns: undefined }
+      get_affinity: { Args: { p_lookback_days?: number }; Returns: Json }
       get_or_create_dm: { Args: { p_other: string }; Returns: string }
+      get_suggested_people: {
+        Args: { p_limit?: number }
+        Returns: {
+          avatar_hue: number
+          avatar_url: string
+          bio: string
+          display_name: string
+          id: string
+          is_verified: boolean
+          profile_tags: string[]
+          score: number
+          username: string
+        }[]
+      }
+      get_trending_tags: {
+        Args: { p_limit?: number }
+        Returns: { recent: number; score: number; tag: string }[]
+      }
       increment_post_view: { Args: { p_post_id: string }; Returns: undefined }
       is_conv_member: { Args: { conv: string }; Returns: boolean }
       leave_conversation: {
@@ -1198,6 +1243,7 @@ export type Database = {
         }
         Returns: string
       }
+      toggle_hashtag_follow: { Args: { p_tag: string }; Returns: boolean }
       toggle_hype: {
         Args: {
           p_owner_id?: string

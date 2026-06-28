@@ -14,7 +14,7 @@ Generated TypeScript types for the whole schema live in
 `src/lib/supabase/database.types.ts` (regenerate via Supabase
 `generate_typescript_types`).
 
-## Tables (public schema — 24)
+## Tables (public schema — 25)
 
 | Table | Purpose | Key columns |
 |---|---|---|
@@ -22,6 +22,7 @@ Generated TypeScript types for the whole schema live in
 | `posts` | Image/text posts | id, user_id, caption, body, image_url, image_urls[], hashtags[], mentions[], hype_count, comment_count, save_count, share_count, repost_count, **view_count** |
 | `collections` | Saved-post folders | id, user_id, name, cover_url, created_at (owner-only RLS) |
 | `collection_items` | Posts inside a collection | collection_id, post_id (unique together) |
+| `hashtag_follows` | Tags a user follows (weights the feed) | user_id, tag (pk pair) — owner-only RLS |
 | `shots` | Short video reels | id, user_id, media_url, poster_url, caption, hype_count, comment_count, save_count, share_count, in_showcase |
 | `shows` | 24h stories (distinct from Shots) | id, user_id, media_url, caption, expires_at, hype_count, **linked_post_id**, **is_showcase** |
 | `show_views` | Per-viewer Show view tracking | show_id, viewer_id (pk pair), created_at |
@@ -71,6 +72,10 @@ Generated TypeScript types for the whole schema live in
 | `set_member_role` | p_conversation_id, p_user_id, p_role | Promote/demote admin; admin-only |
 | `set_verified` | p_user_id, p_value | Grant/revoke verified badge; **service-role only** (EXECUTE revoked from PUBLIC, granted to service_role) |
 | `increment_post_view` | p_post_id | Counts a post view, excluding the author's own |
+| `get_affinity` | p_lookback_days | Per-user author+tag affinity (hype/comment/save/repost/DM, recency-decayed) → `{authors,tags}` json; powers personalized ranking |
+| `get_trending_tags` | p_limit | Velocity trending: last-24h rate vs prior-72h baseline |
+| `get_suggested_people` | p_limit | Friendly-circle suggestions: friends-of-friends + shared interests + reciprocity, soft down-rank of large accounts; excludes self/followed/blocked |
+| `toggle_hashtag_follow` | p_tag | Follow/unfollow a hashtag; returns new state |
 
 Internal trigger/helper functions: `handle_new_user`, `handle_post_mentions`,
 `handle_repost_insert` / `handle_repost_delete`, `bump_post_save_count`,
