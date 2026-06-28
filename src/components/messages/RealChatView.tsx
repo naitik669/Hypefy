@@ -647,6 +647,14 @@ export function RealChatView({
     return () => { supabase.removeChannel(ch); clearInterval(ticker); };
   }, [isGroup, other.id, other.showActivity, supabase]);
 
+  // When someone starts typing and you're already near the bottom, nudge the
+  // view down so the typing bubble is visible.
+  useEffect(() => {
+    if (typingIds.length > 0 && nearBottomRef.current) {
+      endRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [typingIds.length]);
+
   function emitTyping() {
     const now = Date.now();
     if (now - lastTypingSent.current < 1500) return; // throttle
