@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Settings } from "lucide-react";
+import { Settings, BarChart3 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, hueFromId } from "@/lib/profile";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
@@ -69,6 +69,13 @@ export default async function ProfilePage() {
               className="flex h-10 flex-1 items-center justify-center rounded-xl border border-border bg-elevated text-sm font-semibold text-foreground transition-colors hover:bg-elevated/70 active:scale-[0.99]"
             >
               Edit profile
+            </Link>
+            <Link
+              href="/profile/insights"
+              aria-label="Insights"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-elevated text-foreground transition-colors hover:bg-elevated/70 active:scale-[0.99]"
+            >
+              <BarChart3 size={18} />
             </Link>
             <Link
               href="/settings"
