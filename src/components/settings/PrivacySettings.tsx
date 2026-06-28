@@ -8,17 +8,20 @@ export function PrivacySettings({
   userId,
   initialIsPrivate,
   initialDmPrivacy,
+  initialShowActivity,
 }: {
   userId: string;
   initialIsPrivate: boolean;
   initialDmPrivacy: "everyone" | "following";
+  initialShowActivity: boolean;
 }) {
   const supabase = createClient();
   const [isPrivate, setIsPrivate] = useState(initialIsPrivate);
   const [dmPrivacy, setDmPrivacy] = useState(initialDmPrivacy);
+  const [showActivity, setShowActivity] = useState(initialShowActivity);
   const [saving, setSaving] = useState(false);
 
-  async function save(patch: { is_private?: boolean; dm_privacy?: string }) {
+  async function save(patch: { is_private?: boolean; dm_privacy?: string; show_activity?: boolean }) {
     setSaving(true);
     const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
     setSaving(false);
@@ -28,6 +31,11 @@ export function PrivacySettings({
   async function togglePrivate(next: boolean) {
     setIsPrivate(next);
     if (!(await save({ is_private: next }))) setIsPrivate(!next);
+  }
+
+  async function toggleActivity(next: boolean) {
+    setShowActivity(next);
+    if (!(await save({ show_activity: next }))) setShowActivity(!next);
   }
 
   async function setDm(next: "everyone" | "following") {
@@ -47,6 +55,15 @@ export function PrivacySettings({
           onChange={togglePrivate}
           disabled={saving}
         />
+        <div className="mt-2">
+          <SettingToggle
+            label="Show activity status"
+            sub="Let others see when you're online and your last active time"
+            checked={showActivity}
+            onChange={toggleActivity}
+            disabled={saving}
+          />
+        </div>
       </section>
 
       <section>
