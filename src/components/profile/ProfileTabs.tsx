@@ -15,7 +15,7 @@ const tabs: { key: Tab; Icon: typeof Grid3x3 }[] = [
   { key: "Saved", Icon: Bookmark },
 ];
 
-type PostRow = { id: string; image_url: string | null; caption: string | null; created_at: string };
+type PostRow = { id: string; image_url: string | null; image_urls?: string[] | null; caption: string | null; created_at: string };
 type ShotRow = { id: string; media_url: string; caption: string | null; created_at: string };
 
 export function ProfileTabs({ userId }: { userId: string }) {
@@ -36,7 +36,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
   async function loadPosts() {
     const { data } = await supabase
       .from("posts")
-      .select("id, image_url, caption, created_at")
+      .select("id, image_url, image_urls, caption, created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
     setPosts(data ?? []);
@@ -55,7 +55,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
     const [postsRes, shotsRes] = await Promise.all([
       supabase
         .from("saved_posts")
-        .select("post_id, created_at, posts(id, image_url, caption, created_at)")
+        .select("post_id, created_at, posts(id, image_url, image_urls, caption, created_at)")
         .eq("user_id", userId)
         .order("created_at", { ascending: false }),
       supabase
@@ -193,11 +193,19 @@ export function ProfileTabs({ userId }: { userId: string }) {
 }
 
 function PostThumb({ post }: { post: PostRow }) {
+  const cover = post.image_url ?? post.image_urls?.[0] ?? null;
   return (
-    <Link href={`/p/${post.id}`} className="block aspect-square overflow-hidden rounded-xl bg-surface">
-      {post.image_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={post.image_url} alt={post.caption ?? "Post"} className="h-full w-full object-cover" />
+    <Link href={`/p/${post.id}`} className="relative block aspect-square overflow-hidden rounded-xl bg-surface">
+      {cover ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={cover} alt={post.caption ?? "Post"} className="h-full w-full object-cover" />
+          {(post.image_urls?.length ?? 0) > 1 && (
+            <span className="absolute right-1.5 top-1.5 rounded-md bg-black/55 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+              {post.image_urls!.length}
+            </span>
+          )}
+        </>
       ) : (
         <div className="flex h-full items-start bg-elevated p-2">
           <p className="line-clamp-4 text-[10px] leading-snug text-muted">
