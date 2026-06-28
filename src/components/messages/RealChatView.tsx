@@ -799,12 +799,19 @@ export function RealChatView({
   /** Handle file input change — build a preview and store the attachment. */
   function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = ""; // reset so the same file can be re-picked
     if (!file) return;
     setGifPickerOpen(false);
     const isVideo = file.type.startsWith("video/");
+    const isImage = file.type.startsWith("image/");
+    if (!isVideo && !isImage) { showToast("Only photos and videos can be sent."); return; }
+    const maxMb = isVideo ? 50 : 10;
+    if (file.size > maxMb * 1024 * 1024) {
+      showToast(`${isVideo ? "Video" : "Photo"} is too large (max ${maxMb}MB).`);
+      return;
+    }
     const preview = URL.createObjectURL(file);
     setAttachment({ file, preview, type: isVideo ? "video" : "image" });
-    e.target.value = ""; // reset so same file can be re-picked
   }
 
   /** Upload the staged attachment to Supabase Storage and send as a message. */
