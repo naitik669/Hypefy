@@ -100,7 +100,7 @@ export function DiscoverView({
             {trendingShots.length > 0 && (
               <Section title="Shots">
                 <div className="no-scrollbar flex gap-2.5 overflow-x-auto px-4">
-                  {trendingShots.map((s) => <div key={s.id} className="w-32 shrink-0"><ShotTile shot={s} /></div>)}
+                  {trendingShots.map((s) => <div key={s.id} className="w-36 shrink-0"><ShotTile shot={s} /></div>)}
                 </div>
               </Section>
             )}
@@ -199,7 +199,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function Grid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-2 gap-2.5 px-4">{children}</div>;
+  return <div className="grid grid-cols-3 gap-1.5 px-3">{children}</div>;
 }
 
 function TagRail({ tags }: { tags: Tag[] }) {
@@ -249,7 +249,7 @@ function PostTile({ post }: { post: Post }) {
 
 function ShotTile({ shot }: { shot: Shot }) {
   return (
-    <Link href={`/shots/${shot.id}`} className="relative block aspect-[3/4] overflow-hidden rounded-2xl bg-black">
+    <Link href={`/shots/${shot.id}`} className="relative block aspect-[9/16] overflow-hidden rounded-2xl bg-black">
       {shot.poster_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={shot.poster_url} alt={shot.caption ?? "Shot"} loading="lazy" decoding="async" className="h-full w-full object-cover" />

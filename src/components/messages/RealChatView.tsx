@@ -12,6 +12,7 @@ import { VoiceRecorder } from "@/components/messages/VoiceRecorder";
 import { VoiceMessage } from "@/components/messages/VoiceMessage";
 import { GifPicker } from "@/components/messages/GifPicker";
 import { GroupInfoSheet } from "@/components/messages/GroupInfoSheet";
+import { ReportSheet } from "@/components/ui/ReportSheet";
 
 type PostPreview = {
   id: string;
@@ -152,6 +153,7 @@ export function RealChatView({
   // Message id whose reaction list ("who reacted with what") is open
   const [reactionSheet, setReactionSheet] = useState<string | null>(null);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
+  const [reportGroupOpen, setReportGroupOpen] = useState(false);
   // Other DM party's presence (last_seen_at), kept live via realtime + a ticker.
   const [otherLastSeen, setOtherLastSeen] = useState<string | null>(other.lastSeenAt ?? null);
   const [, forcePresenceTick] = useState(0);
@@ -1038,7 +1040,7 @@ export function RealChatView({
                 <div className="my-1 h-px bg-border" />
                 {isGroup ? (
                   <button type="button"
-                    onClick={() => { setHeaderMenu(false); showToast("Reported group"); }}
+                    onClick={() => { setHeaderMenu(false); setReportGroupOpen(true); }}
                     className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-400 hover:bg-white/5">
                     <Ban size={17} /> Report group
                   </button>
@@ -1338,6 +1340,21 @@ export function RealChatView({
                 </div>
               );
             })}
+
+            {/* Typing indicator — a real incoming chat bubble with bouncing dots */}
+            {typingIds.length > 0 && (
+              <div className="flex flex-col items-start gap-0.5">
+                {isGroup && (
+                  <span className="px-1 text-[11px] font-semibold text-muted">{typingLabel(typingIds)}</span>
+                )}
+                <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-surface px-3.5 py-3">
+                  {[0, 0.15, 0.3].map((d, i) => (
+                    <span key={i} className="h-2 w-2 animate-dot-bounce rounded-full bg-muted" style={{ animationDelay: `${d}s` }} />
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div ref={endRef} />
           </div>
         )}
@@ -1345,18 +1362,6 @@ export function RealChatView({
 
       {/* Composer */}
       <div className="border-t border-border/60 bg-background px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+8px)]">
-
-        {/* ── Typing indicator ── */}
-        {typingIds.length > 0 && (
-          <div className="flex items-center gap-1.5 px-2 pb-1.5 text-xs text-muted">
-            <span className="flex gap-0.5">
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.3s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.15s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted" />
-            </span>
-            {typingLabel(typingIds)}
-          </div>
-        )}
 
         {/* ── GIF picker panel — slides in just above the input row ── */}
         {gifPickerOpen && !voiceMode && (
@@ -1613,6 +1618,18 @@ export function RealChatView({
             ))}
           </div>
         </BottomSheet>
+      )}
+
+      {/* Report group → writes a real row to public.reports */}
+      {reportGroupOpen && (
+        <ReportSheet
+          open
+          onClose={() => setReportGroupOpen(false)}
+          targetType="conversation"
+          targetId={conversationId}
+          currentUserId={currentUserId}
+          onReported={() => showToast("Group reported")}
+        />
       )}
 
       {/* Confirm leave / delete chat */}

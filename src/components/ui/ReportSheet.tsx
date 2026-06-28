@@ -16,7 +16,7 @@ export const REPORT_REASONS = [
   "Other",
 ];
 
-export type ReportTarget = "post" | "shot" | "comment" | "user" | "show";
+export type ReportTarget = "post" | "shot" | "comment" | "user" | "show" | "conversation";
 
 const LABELS: Record<ReportTarget, string> = {
   post: "post",
@@ -24,6 +24,7 @@ const LABELS: Record<ReportTarget, string> = {
   comment: "comment",
   user: "account",
   show: "Show",
+  conversation: "group",
 };
 
 /**
