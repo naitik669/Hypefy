@@ -22,7 +22,7 @@ type Shot = {
 type Person = { id: string; display_name: string | null; username: string | null; avatar_hue: number | null; avatar_url?: string | null; is_verified?: boolean | null };
 type Tag = { tag: string; count: number };
 
-const CATEGORIES = ["For You", "Blowing Up", "Posts", "Shots", "Creators", "Tags"] as const;
+const CATEGORIES = ["For You", "Blowing Up", "Posts", "Shots", "People", "Tags"] as const;
 type Cat = (typeof CATEGORIES)[number];
 
 function postImage(p: Post): string | null {
@@ -110,7 +110,7 @@ export function DiscoverView({
               </Section>
             )}
             {people.length > 0 && (
-              <Section title="Creators to Hype">
+              <Section title="Suggested people">
                 <div className="flex flex-col">
                   {people.slice(0, 5).map((person) => <CreatorRow key={person.id} person={person} />)}
                 </div>
@@ -158,12 +158,12 @@ export function DiscoverView({
           ) : <EmptyState icon={Play} title="No Shots fired yet" text="Be the first one on the reel." />
         )}
 
-        {cat === "Creators" && (
+        {cat === "People" && (
           people.length > 0 ? (
             <div className="flex flex-col pt-2">
               {people.map((person) => <CreatorRow key={person.id} person={person} />)}
             </div>
-          ) : <EmptyState icon={Compass} title="Creators incoming" text="The lineup fills up as more people join." />
+          ) : <EmptyState icon={Compass} title="No suggestions yet" text="As you follow people and post, your circle fills up here." />
         )}
 
         {cat === "Tags" && (

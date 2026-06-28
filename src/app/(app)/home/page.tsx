@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { FeedList } from "@/components/feed/FeedList";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { UploadProgressBar } from "@/components/upload/UploadProvider";
-import { feedScore, diversify, postTags } from "@/lib/feed-rank";
+import { feedScore, diversify, postTags, tagAffinityFor } from "@/lib/feed-rank";
 
 function normalise(raw: unknown[] | null) {
   return (raw ?? []).map((p: any) => ({
@@ -43,6 +43,8 @@ export default async function HomePage() {
     { data: myShows },
     { data: activeShows },
     { data: followedReposts },
+    { data: affinityData },
+    { data: followedTagRows },
   ] = await Promise.all([
     // Posts from people I follow (+ my own): guaranteed present even when
     // the global firehose has scrolled past them.
@@ -80,6 +82,10 @@ export default async function HomePage() {
           .order("created_at", { ascending: false })
           .limit(20)
       : Promise.resolve({ data: [] as any[] }),
+    // Interaction affinity (authors + tags I engage with) for personalization
+    supabase.rpc("get_affinity", { p_lookback_days: 60 }),
+    // Hashtags I follow
+    supabase.from("hashtag_follows").select("tag").eq("user_id", user.id),
   ]);
 
   // Which active shows I've already viewed (server-side truth for the seen ring)
@@ -122,6 +128,11 @@ export default async function HomePage() {
     ...(((myProfile as any)?.profile_tags ?? []) as string[]),
   ].map((t) => t.replace(/^#/, "").toLowerCase()));
 
+  // Interaction affinity: authors + tags I actually engage with, plus tags I follow.
+  const authorAff = ((affinityData as any)?.authors ?? {}) as Record<string, number>;
+  const tagAff = ((affinityData as any)?.tags ?? {}) as Record<string, number>;
+  const followedTags = new Set<string>((followedTagRows ?? []).map((r: any) => r.tag));
+
   // Rank by blended score; recency breaks ties. Then diversify authors.
   const now = Date.now();
   const ranked = [...byId.values()]
@@ -133,6 +144,8 @@ export default async function HomePage() {
         followingIds.has(p.user_id),
         myInterests.size > 0 && postTags(p).some((t) => myInterests.has(t)),
         now,
+        authorAff[p.user_id] ?? 0,
+        tagAffinityFor(p, tagAff, followedTags),
       ),
     }))
     .sort((a: any, b: any) =>

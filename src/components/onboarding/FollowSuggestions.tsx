@@ -87,7 +87,7 @@ export function FollowSuggestions({
           Fuel your feed <span className="text-accent">⚡</span>
         </h1>
         <p className="mt-1.5 text-sm text-muted">
-          Follow a few creators so your home feed starts loud, not empty.
+          Follow a few people so your home feed starts loud, not empty.
         </p>
 
         {/* Progress */}
