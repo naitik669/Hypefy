@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      # Lint is non-blocking for now (pre-existing debt) — surfaced, not gated.
+      - name: Lint (non-blocking)
+        run: npm run lint || true
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          # Placeholders so the build never needs real secrets. App pages are
+          # dynamic; the Supabase client is constructed at request time, not at
+          # build time, so no network calls happen during the build.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+
+# NOTE: Playwright e2e is intentionally deferred — the critical flows need a
+# seeded Supabase test project + a confirmed test user (email confirmation is
+# on), which CI doesn't have yet. Add an e2e job once that test env exists.

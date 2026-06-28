@@ -13,6 +13,7 @@ import { VoiceMessage } from "@/components/messages/VoiceMessage";
 import { GifPicker } from "@/components/messages/GifPicker";
 import { GroupInfoSheet } from "@/components/messages/GroupInfoSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
+import { presenceLabel } from "@/lib/presence";
 
 type PostPreview = {
   id: string;
@@ -62,16 +63,6 @@ type ReactionRow = { message_id: string; user_id: string; emoji: string };
 type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null; lastSeenAt?: string | null; showActivity?: boolean };
 type GroupMember = { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null; role: string };
 type GroupMeta = { title: string; memberCount: number; avatarUrl?: string | null; members?: GroupMember[]; myRole?: string };
-
-/** "online" when seen within 90s; otherwise a short "Active Nm ago". */
-function presenceLabel(lastSeenAt: string | null | undefined): { online: boolean; text: string } | null {
-  if (!lastSeenAt) return null;
-  const secs = Math.floor((Date.now() - new Date(lastSeenAt).getTime()) / 1000);
-  if (secs < 90) return { online: true, text: "Active now" };
-  if (secs < 3600) return { online: false, text: `Active ${Math.floor(secs / 60)}m ago` };
-  if (secs < 86400) return { online: false, text: `Active ${Math.floor(secs / 3600)}h ago` };
-  return { online: false, text: `Active ${Math.floor(secs / 86400)}d ago` };
-}
 
 const REPORT_REASONS = ["Spam", "Harassment", "Hate or abuse", "Scam", "Inappropriate content", "Other"];
 const QUICK = ["❤️", "🥰", "😂", "👍", "😮", "😢"];
