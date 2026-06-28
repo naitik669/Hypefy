@@ -138,6 +138,11 @@ export function RealChatView({
   const [reportMsg, setReportMsg] = useState<ChatMsg | null>(null);
   // Message id whose reaction list ("who reacted with what") is open
   const [reactionSheet, setReactionSheet] = useState<string | null>(null);
+  // User ids currently typing (others only) — driven by realtime broadcast.
+  const [typingIds, setTypingIds] = useState<string[]>([]);
+  const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const lastTypingSent = useRef(0);
   const [toast, setToast] = useState<string | null>(null);
   const [callChooser, setCallChooser] = useState(false);
   const [headerMenu, setHeaderMenu] = useState(false);
@@ -535,6 +540,55 @@ export function RealChatView({
     return () => { supabase.removeChannel(ch); };
   }, [conversationId, currentUserId, other.id, supabase]);
 
+  // Realtime: typing indicators (ephemeral broadcast, no DB writes)
+  useEffect(() => {
+    const ch = supabase.channel(`typing:${conversationId}`, { config: { broadcast: { self: false } } });
+    const forget = (uid: string) => {
+      setTypingIds((prev) => prev.filter((x) => x !== uid));
+      const t = typingTimers.current.get(uid);
+      if (t) { clearTimeout(t); typingTimers.current.delete(uid); }
+    };
+    ch.on("broadcast", { event: "typing" }, ({ payload }) => {
+      const uid = (payload as { userId?: string })?.userId;
+      if (!uid || uid === currentUserId) return;
+      setTypingIds((prev) => (prev.includes(uid) ? prev : [...prev, uid]));
+      const existing = typingTimers.current.get(uid);
+      if (existing) clearTimeout(existing);
+      typingTimers.current.set(uid, setTimeout(() => forget(uid), 4000));
+    });
+    ch.on("broadcast", { event: "stop" }, ({ payload }) => {
+      const uid = (payload as { userId?: string })?.userId;
+      if (uid) forget(uid);
+    });
+    ch.subscribe();
+    typingChannelRef.current = ch;
+    return () => {
+      typingTimers.current.forEach((t) => clearTimeout(t));
+      typingTimers.current.clear();
+      supabase.removeChannel(ch);
+      typingChannelRef.current = null;
+    };
+  }, [conversationId, currentUserId, supabase]);
+
+  function emitTyping() {
+    const now = Date.now();
+    if (now - lastTypingSent.current < 1500) return; // throttle
+    lastTypingSent.current = now;
+    typingChannelRef.current?.send({ type: "broadcast", event: "typing", payload: { userId: currentUserId } });
+  }
+  function emitStopTyping() {
+    lastTypingSent.current = 0;
+    typingChannelRef.current?.send({ type: "broadcast", event: "stop", payload: { userId: currentUserId } });
+  }
+
+  /** Resolve a typing user's display name (group member, the other DM party). */
+  function typingLabel(ids: string[]) {
+    const names = ids.map((id) => members?.[id]?.name ?? (id === other.id ? other.name : "Someone"));
+    if (names.length === 1) return `${names[0]} is typing…`;
+    if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
+    return `${names[0]} and ${names.length - 1} others are typing…`;
+  }
+
   function toggleReaction(messageId: string, emoji: string) {
     setReactions((prev) => {
       const mineRow = prev.find((r) => r.message_id === messageId && r.user_id === currentUserId);
@@ -551,6 +605,7 @@ export function RealChatView({
     if (!body || sending) return;
     setSending(true);
     setText("");
+    emitStopTyping();
     const replyId = replyTo?.id ?? null;
     setReplyTo(null);
 
@@ -1154,6 +1209,18 @@ export function RealChatView({
       {/* Composer */}
       <div className="border-t border-border/60 bg-background px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+8px)]">
 
+        {/* ── Typing indicator ── */}
+        {typingIds.length > 0 && (
+          <div className="flex items-center gap-1.5 px-2 pb-1.5 text-xs text-muted">
+            <span className="flex gap-0.5">
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.3s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.15s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted" />
+            </span>
+            {typingLabel(typingIds)}
+          </div>
+        )}
+
         {/* ── GIF picker panel — slides in just above the input row ── */}
         {gifPickerOpen && !voiceMode && (
           <div className="mb-2">
@@ -1233,7 +1300,7 @@ export function RealChatView({
             {/* Text input */}
             <input
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => { setText(e.target.value); if (e.target.value) emitTyping(); }}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
               placeholder="Message…"
               className="h-11 flex-1 rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
