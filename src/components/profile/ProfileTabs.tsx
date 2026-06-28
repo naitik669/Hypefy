@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RichPostText } from "@/components/ui/RichPostText";
+import { CollectionsStrip } from "@/components/profile/CollectionsStrip";
 
 type Tab = "Posts" | "Shots" | "Saved";
 
@@ -162,6 +163,8 @@ export function ProfileTabs({ userId }: { userId: string }) {
             text="Stash the posts and Shots you'll want back."
           />
         ) : (
+          <>
+          <CollectionsStrip userId={userId} savedPosts={saved} />
           <div className="grid grid-cols-3 gap-1.5 px-1.5">
             {saved.map((p) => (
               <PostThumb key={`p-${p.id}`} post={p} />
@@ -185,6 +188,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
               </Link>
             ))}
           </div>
+          </>
         )
       )}
       </div>
