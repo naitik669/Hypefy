@@ -11,6 +11,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { VoiceRecorder } from "@/components/messages/VoiceRecorder";
 import { VoiceMessage } from "@/components/messages/VoiceMessage";
 import { GifPicker } from "@/components/messages/GifPicker";
+import { GroupInfoSheet } from "@/components/messages/GroupInfoSheet";
 
 type PostPreview = {
   id: string;
@@ -58,6 +59,8 @@ function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null 
 
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
 type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null; lastSeenAt?: string | null; showActivity?: boolean };
+type GroupMember = { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null; role: string };
+type GroupMeta = { title: string; memberCount: number; avatarUrl?: string | null; members?: GroupMember[]; myRole?: string };
 
 /** "online" when seen within 90s; otherwise a short "Active Nm ago". */
 function presenceLabel(lastSeenAt: string | null | undefined): { online: boolean; text: string } | null {
@@ -127,7 +130,7 @@ export function RealChatView({
   conversationId: string;
   currentUserId: string;
   other: Other;
-  group?: { title: string; memberCount: number } | null;
+  group?: GroupMeta | null;
   members?: Record<string, { name: string; hue: number }>;
   initialMessages: ChatMsg[];
   initialReactions?: ReactionRow[];
@@ -148,6 +151,7 @@ export function RealChatView({
   const [reportMsg, setReportMsg] = useState<ChatMsg | null>(null);
   // Message id whose reaction list ("who reacted with what") is open
   const [reactionSheet, setReactionSheet] = useState<string | null>(null);
+  const [groupInfoOpen, setGroupInfoOpen] = useState(false);
   // Other DM party's presence (last_seen_at), kept live via realtime + a ticker.
   const [otherLastSeen, setOtherLastSeen] = useState<string | null>(other.lastSeenAt ?? null);
   const [, forcePresenceTick] = useState(0);
@@ -942,7 +946,7 @@ export function RealChatView({
           <ChevronLeft size={24} />
         </button>
         {isGroup ? (
-          <div className="flex min-w-0 flex-1 items-center gap-3">
+          <button type="button" onClick={() => setGroupInfoOpen(true)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[30%]"
               style={{ background: "linear-gradient(140deg, hsl(210 70% 52%), hsl(260 65% 42%))" }}>
               <Users size={18} className="text-white/95" />
@@ -951,7 +955,7 @@ export function RealChatView({
               <p className="truncate text-sm font-semibold">{group!.title}</p>
               <p className="truncate text-xs text-muted">{group!.memberCount} members</p>
             </div>
-          </div>
+          </button>
         ) : (
           <Link href={other.username ? `/u/${other.username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
             <div className="relative shrink-0">
@@ -1012,6 +1016,13 @@ export function RealChatView({
                     className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-white/5">
                     <UserCircle size={17} className="text-muted" /> View profile
                   </Link>
+                )}
+                {isGroup && (
+                  <button type="button"
+                    onClick={() => { setHeaderMenu(false); setGroupInfoOpen(true); }}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/5">
+                    <Users size={17} className="text-muted" /> Group info
+                  </button>
                 )}
                 <button type="button"
                   onClick={toggleMute}
@@ -1540,6 +1551,17 @@ export function RealChatView({
           </>
         );
       })()}
+
+      {/* Group info / management */}
+      {groupInfoOpen && isGroup && group?.members && (
+        <GroupInfoSheet
+          conversationId={conversationId}
+          title={group.title}
+          members={group.members}
+          myRole={group.myRole ?? "member"}
+          onClose={() => setGroupInfoOpen(false)}
+        />
+      )}
 
       {/* Reaction details — who reacted with what */}
       {reactionSheet && (() => {

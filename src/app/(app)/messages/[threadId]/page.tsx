@@ -16,9 +16,9 @@ export default async function ThreadPage({
   const [{ data: members }, { data: conv }] = await Promise.all([
     supabase
       .from("conversation_members")
-      .select("user_id, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity)")
+      .select("user_id, role, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity)")
       .eq("conversation_id", threadId),
-    supabase.from("conversations").select("type, title").eq("id", threadId).maybeSingle(),
+    supabase.from("conversations").select("type, title, avatar_url").eq("id", threadId).maybeSingle(),
   ]);
 
   if (!members || members.length === 0) notFound();
@@ -38,6 +38,21 @@ export default async function ThreadPage({
   others.forEach((p: any) => {
     membersMap[p.id] = { name: p.display_name ?? p.username ?? "User", hue: p.avatar_hue ?? 280 };
   });
+  const groupMembers = members
+    .map((m: any) => {
+      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+      if (!p) return null;
+      return {
+        id: p.id,
+        name: p.display_name ?? p.username ?? "User",
+        username: p.username ?? null,
+        hue: p.avatar_hue ?? 280,
+        avatarUrl: p.avatar_url ?? null,
+        role: (m.role ?? "member") as string,
+      };
+    })
+    .filter(Boolean) as { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null; role: string }[];
+
   const group = isGroup
     ? {
         title:
@@ -45,6 +60,9 @@ export default async function ThreadPage({
           others.slice(0, 3).map((p: any) => p.display_name ?? p.username ?? "User").join(", ") +
             (others.length > 3 ? ` +${others.length - 3}` : ""),
         memberCount: members.length,
+        avatarUrl: (conv as any)?.avatar_url ?? null,
+        members: groupMembers,
+        myRole: ((me as any).role ?? "member") as string,
       }
     : null;
 
