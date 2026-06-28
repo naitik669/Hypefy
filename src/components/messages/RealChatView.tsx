@@ -253,10 +253,12 @@ export function RealChatView({
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressClick = useRef(false);
   const idsRef = useRef<string[]>([]);
+  const messagesRef = useRef<ChatMsg[]>(initialMessages);
   /** Tracks the last tap per message to detect double-tap (star reaction) */
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   idsRef.current = messages.map((m) => m.id);
+  messagesRef.current = messages;
 
   const byId = useMemo(() => {
     const m = new Map<string, ChatMsg>();
@@ -500,7 +502,21 @@ export function RealChatView({
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
           const m = payload.new as ChatMsg;
-          setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, { ...m, post: null }]));
+          setMessages((prev) => {
+            if (prev.some((x) => x.id === m.id)) return prev; // already have the real row
+            // Reconcile my own optimistic temp if the realtime echo wins the
+            // race against the send RPC's return — replace it instead of
+            // appending a duplicate.
+            if (m.sender_id === currentUserId) {
+              const tempIdx = prev.findIndex((x) => x.id.startsWith("temp-") && x.kind === m.kind && x.body === m.body);
+              if (tempIdx !== -1) {
+                const copy = [...prev];
+                copy[tempIdx] = { ...m, post: null };
+                return copy;
+              }
+            }
+            return [...prev, { ...m, post: null }];
+          });
           if (m.kind === "post" && m.post_id) hydratePost(m.id, m.post_id);
           if (m.kind === "shot" && m.shot_id) hydrateShot(m.id, m.shot_id);
           if (m.sender_id !== currentUserId) supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId }).then(() => {});
@@ -511,7 +527,31 @@ export function RealChatView({
           const m = payload.new as ChatMsg;
           setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, ...m } : x)));
         })
-      .subscribe();
+      .subscribe((status) => {
+        // On (re)subscribe — including after a dropped connection — pull any
+        // messages that arrived while we were offline so nothing is missed.
+        if (status === "SUBSCRIBED") {
+          const latest = messagesRef.current.reduce(
+            (max, m) => (m.created_at > max ? m.created_at : max),
+            "1970-01-01T00:00:00Z",
+          );
+          supabase
+            .from("messages")
+            .select(MSG_SELECT)
+            .eq("conversation_id", conversationId)
+            .gt("created_at", latest)
+            .order("created_at", { ascending: true })
+            .then(({ data }) => {
+              const rows = (data ?? []).map(mapMessageRow);
+              if (!rows.length) return;
+              setMessages((prev) => {
+                const have = new Set(prev.map((p) => p.id));
+                const add = rows.filter((r) => !have.has(r.id));
+                return add.length ? [...prev, ...add] : prev;
+              });
+            });
+        }
+      });
     return () => { supabase.removeChannel(channel); };
   }, [conversationId, currentUserId, supabase]);
 
@@ -655,9 +695,35 @@ export function RealChatView({
       setMessages((p) => p.map((m) => (m.id === tempId ? { ...m, _status: "failed" as const } : m)));
       showToast("Couldn't send. Try again.");
     } else {
-      setMessages((p) => p.map((m) => (m.id === tempId ? { ...m, ...(data as ChatMsg), _status: undefined } : m)));
+      const real = data as ChatMsg;
+      // If the realtime echo already added the real row, just drop the temp.
+      setMessages((p) =>
+        p.some((m) => m.id === real.id)
+          ? p.filter((m) => m.id !== tempId)
+          : p.map((m) => (m.id === tempId ? { ...m, ...real, _status: undefined } : m)),
+      );
     }
     setSending(false);
+  }
+
+  /** Re-send a message that previously failed (tap the failed bubble). */
+  async function retrySend(failed: ChatMsg) {
+    if (failed.kind !== "text" || !failed.body) return;
+    setMessages((p) => p.map((m) => (m.id === failed.id ? { ...m, _status: "pending" as const } : m)));
+    const { data, error } = await supabase.rpc("send_message", {
+      p_conversation_id: conversationId, p_body: failed.body, p_kind: "text", p_post_id: null, p_reply_to_id: failed.reply_to_id,
+    });
+    if (error || !data) {
+      setMessages((p) => p.map((m) => (m.id === failed.id ? { ...m, _status: "failed" as const } : m)));
+      showToast("Still couldn't send. Check your connection.");
+    } else {
+      const real = data as ChatMsg;
+      setMessages((p) =>
+        p.some((m) => m.id === real.id)
+          ? p.filter((m) => m.id !== failed.id)
+          : p.map((m) => (m.id === failed.id ? { ...m, ...real, _status: undefined } : m)),
+      );
+    }
   }
 
   /** Upload voice blob to Supabase Storage and send as a voice message. */
@@ -724,7 +790,8 @@ export function RealChatView({
       setMessages((p) => p.map((m) => m.id === tempId ? { ...m, _status: "failed" as const } : m));
       showToast("Couldn't send GIF.");
     } else {
-      setMessages((p) => p.map((m) => m.id === tempId ? { ...m, ...(data as ChatMsg), _status: undefined } : m));
+      const real = data as ChatMsg;
+      setMessages((p) => p.some((m) => m.id === real.id) ? p.filter((m) => m.id !== tempId) : p.map((m) => m.id === tempId ? { ...m, ...real, _status: undefined } : m));
     }
     setSending(false);
   }
@@ -785,7 +852,8 @@ export function RealChatView({
       setMessages((p) => p.map((m) => m.id === tempId ? { ...m, _status: "failed" as const } : m));
       showToast("Couldn't send. Try again.");
     } else {
-      setMessages((p) => p.map((m) => m.id === tempId ? { ...m, ...(data as ChatMsg), _status: undefined } : m));
+      const real = data as ChatMsg;
+      setMessages((p) => p.some((m) => m.id === real.id) ? p.filter((m) => m.id !== tempId) : p.map((m) => m.id === tempId ? { ...m, ...real, _status: undefined } : m));
     }
     setUploading(false);
   }
@@ -1235,6 +1303,17 @@ export function RealChatView({
                           )}
                           {mine && <MsgStatusTick status={getMsgStatus(m)} />}
                         </div>
+                      )}
+
+                      {/* Tap-to-retry for failed text sends */}
+                      {mine && m._status === "failed" && m.kind === "text" && (
+                        <button
+                          type="button"
+                          onClick={() => retrySend(m)}
+                          className="px-1 pt-0.5 text-right text-[10px] font-semibold text-danger hover:underline"
+                        >
+                          Failed · Tap to retry
+                        </button>
                       )}
                     </div>
                   </div>
