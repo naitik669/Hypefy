@@ -48,19 +48,19 @@ export function CheckEmailCard({ email }: { email: string }) {
         <MailAnimation />
 
         <h1 className="mt-6 text-2xl font-bold tracking-tight text-foreground">
-          Check your inbox
+          Confirm your email
         </h1>
         <p className="mt-2 text-[13px] leading-relaxed text-muted">
-          We just dropped a confirmation link to
+          Tap the link we just sent to
           {email ? (
             <>
               {" "}
-              <span className="font-semibold text-foreground">{email}</span>.
+              <span className="font-semibold text-foreground">{email}</span>
             </>
           ) : (
-            " your email."
+            " your email"
           )}{" "}
-          Tap it and your hype begins. ⚡
+          to activate your account — then you&apos;re in. ⚡
         </p>
 
         {/* Status line */}
