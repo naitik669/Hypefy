@@ -33,17 +33,42 @@ export default function SearchPage() {
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
   const [searched, setSearched] = useState(false);
   const [userId, setUserId] = useState("");
+  const [followedTags, setFollowedTags] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
 
   // Resolve current user (for FeedCard hype/save attribution) + seed from ?q=
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? ""));
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data.user?.id ?? "";
+      setUserId(uid);
+      if (uid) {
+        supabase.from("hashtag_follows").select("tag").eq("user_id", uid)
+          .then(({ data: rows }) => setFollowedTags(new Set((rows ?? []).map((r: any) => r.tag))));
+      }
+    });
     if (query) {
       if (query.startsWith("#")) setTab("Tags");
       runSearch(query);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function toggleTagFollow(tag: string) {
+    const t = tag.replace(/^#/, "").toLowerCase();
+    const was = followedTags.has(t);
+    // optimistic
+    setFollowedTags((prev) => {
+      const next = new Set(prev);
+      was ? next.delete(t) : next.add(t);
+      return next;
+    });
+    const { error } = await supabase.rpc("toggle_hashtag_follow", { p_tag: t });
+    if (error) setFollowedTags((prev) => {
+      const next = new Set(prev);
+      was ? next.add(t) : next.delete(t);
+      return next;
+    });
+  }
 
   function normPosts(rows: any[]): FeedPost[] {
     return (rows ?? []).map((p: any) => ({
@@ -177,22 +202,37 @@ export default function SearchPage() {
             <>
               <h2 className="px-4 pb-1 pt-3 text-sm font-bold text-muted">Tags</h2>
               <div className="flex flex-col">
-                {tags.map((t) => (
-                  <button
-                    key={t.tag}
-                    type="button"
-                    onClick={() => { setQuery(`#${t.tag}`); setTab("Posts"); runSearch(`#${t.tag}`); }}
-                    className="flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/[0.03]"
-                  >
-                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface">
-                      <Hash size={18} className="text-hashtag" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">#{t.tag}</p>
-                      <p className="truncate text-xs text-muted">{t.count} {t.count === 1 ? "post" : "posts"}</p>
+                {tags.map((t) => {
+                  const isFollowed = followedTags.has(t.tag.replace(/^#/, "").toLowerCase());
+                  return (
+                    <div key={t.tag} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03]">
+                      <button
+                        type="button"
+                        onClick={() => { setQuery(`#${t.tag}`); setTab("Posts"); runSearch(`#${t.tag}`); }}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      >
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface">
+                          <Hash size={18} className="text-hashtag" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">#{t.tag}</p>
+                          <p className="truncate text-xs text-muted">{t.count} {t.count === 1 ? "post" : "posts"}</p>
+                        </div>
+                      </button>
+                      {userId && (
+                        <button
+                          type="button"
+                          onClick={() => toggleTagFollow(t.tag)}
+                          className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-colors ${
+                            isFollowed ? "border border-border text-foreground" : "bg-accent text-accent-ink"
+                          }`}
+                        >
+                          {isFollowed ? "Following" : "Follow"}
+                        </button>
+                      )}
                     </div>
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
