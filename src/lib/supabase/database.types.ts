@@ -114,6 +114,74 @@ export type Database = {
           },
         ]
       }
+      collection_items: {
+        Row: {
+          collection_id: string
+          created_at: string
+          id: string
+          post_id: string
+        }
+        Insert: {
+          collection_id: string
+          created_at?: string
+          id?: string
+          post_id: string
+        }
+        Update: {
+          collection_id?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_items_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_items_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collections: {
+        Row: {
+          cover_url: string | null
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collections_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comments: {
         Row: {
           body: string
@@ -591,6 +659,7 @@ export type Database = {
           share_count: number
           updated_at: string
           user_id: string
+          view_count: number
         }
         Insert: {
           body?: string | null
@@ -608,6 +677,7 @@ export type Database = {
           share_count?: number
           updated_at?: string
           user_id: string
+          view_count?: number
         }
         Update: {
           body?: string | null
@@ -625,6 +695,7 @@ export type Database = {
           share_count?: number
           updated_at?: string
           user_id?: string
+          view_count?: number
         }
         Relationships: [
           {
@@ -650,9 +721,12 @@ export type Database = {
           id: string
           interests: string[]
           is_private: boolean
+          is_verified: boolean
+          last_seen_at: string | null
           notif_prefs: Json
           profile_completed: boolean
           profile_tags: string[]
+          show_activity: boolean
           updated_at: string
           username: string | null
         }
@@ -669,9 +743,12 @@ export type Database = {
           id: string
           interests?: string[]
           is_private?: boolean
+          is_verified?: boolean
+          last_seen_at?: string | null
           notif_prefs?: Json
           profile_completed?: boolean
           profile_tags?: string[]
+          show_activity?: boolean
           updated_at?: string
           username?: string | null
         }
@@ -688,9 +765,12 @@ export type Database = {
           id?: string
           interests?: string[]
           is_private?: boolean
+          is_verified?: boolean
+          last_seen_at?: string | null
           notif_prefs?: Json
           profile_completed?: boolean
           profile_tags?: string[]
+          show_activity?: boolean
           updated_at?: string
           username?: string | null
         }
@@ -1017,6 +1097,10 @@ export type Database = {
     }
     Functions: {
       accept_call: { Args: { p_call_id: string }; Returns: undefined }
+      add_conversation_member: {
+        Args: { p_conversation_id: string; p_user_id: string }
+        Returns: undefined
+      }
       approve_message_request: {
         Args: { p_conversation_id: string }
         Returns: undefined
@@ -1060,6 +1144,7 @@ export type Database = {
       }
       end_call: { Args: { p_call_id: string }; Returns: undefined }
       get_or_create_dm: { Args: { p_other: string }; Returns: string }
+      increment_post_view: { Args: { p_post_id: string }; Returns: undefined }
       is_conv_member: { Args: { conv: string }; Returns: boolean }
       leave_conversation: {
         Args: { p_conversation_id: string }
@@ -1073,6 +1158,10 @@ export type Database = {
       mark_notifications_read: { Args: never; Returns: undefined }
       quick_reply_call: {
         Args: { p_call_id: string; p_reply: string }
+        Returns: undefined
+      }
+      remove_conversation_member: {
+        Args: { p_conversation_id: string; p_user_id: string }
         Returns: undefined
       }
       report_message: {
@@ -1089,6 +1178,14 @@ export type Database = {
           p_shot_id?: string
         }
         Returns: Json
+      }
+      set_member_role: {
+        Args: { p_conversation_id: string; p_role: string; p_user_id: string }
+        Returns: undefined
+      }
+      set_verified: {
+        Args: { p_user_id: string; p_value: boolean }
+        Returns: undefined
       }
       start_call: {
         Args: {
@@ -1110,7 +1207,16 @@ export type Database = {
         Args: { p_emoji: string; p_message_id: string }
         Returns: undefined
       }
+      touch_last_seen: { Args: never; Returns: undefined }
       unsend_message: { Args: { p_message_id: string }; Returns: undefined }
+      update_conversation: {
+        Args: {
+          p_avatar_url?: string
+          p_conversation_id: string
+          p_title?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
