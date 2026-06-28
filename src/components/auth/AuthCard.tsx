@@ -150,6 +150,20 @@ export function AuthCard({ mode }: { mode: Mode }) {
     }
   }
 
+  async function handleForgotPassword() {
+    setError(null);
+    setNotice(null);
+    if (!email.trim()) {
+      setError("Enter your email above, then tap Forgot Password.");
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    });
+    if (error) setError(error.message);
+    else setNotice("Password reset link sent — check your inbox.");
+  }
+
   async function handleGoogle() {
     setError(null);
     setGoogleLoading(true);
@@ -233,12 +247,13 @@ export function AuthCard({ mode }: { mode: Mode }) {
           </div>
 
           {mode === "signin" && (
-            <Link
-              href="/signin"
+            <button
+              type="button"
+              onClick={handleForgotPassword}
               className="-mt-1 self-end text-xs text-muted transition-colors hover:text-foreground"
             >
               Forgot Password?
-            </Link>
+            </button>
           )}
 
           {error && (
