@@ -41,7 +41,7 @@ export default async function MessagesPage() {
       // My membership state per conversation (read + request + block)
       supabase
         .from("conversation_members")
-        .select("conversation_id, last_read_at, request_accepted, blocked_at, muted_at")
+        .select("conversation_id, last_read_at, request_accepted, blocked_at, muted_at, pinned_at")
         .in("conversation_id", convIds)
         .eq("user_id", user.id),
       // Recent reactions — when newer than the last message, they become the preview
@@ -89,11 +89,13 @@ export default async function MessagesPage() {
     const requestByConv = new Map<string, boolean>();
     const blockedByConv = new Set<string>();
     const mutedByConv = new Set<string>();
+    const pinnedByConv = new Set<string>();
     (myMemberRes.data ?? []).forEach((m: any) => {
       readByConv.set(m.conversation_id, m.last_read_at);
       requestByConv.set(m.conversation_id, m.request_accepted !== false);
       if (m.blocked_at) blockedByConv.add(m.conversation_id);
       if (m.muted_at) mutedByConv.add(m.conversation_id);
+      if (m.pinned_at) pinnedByConv.add(m.conversation_id);
     });
 
     // Count unread messages per conversation (messages after my last_read_at, not sent by me)
@@ -145,6 +147,7 @@ export default async function MessagesPage() {
           unreadCount: unreadCountByConv.get(c.id) ?? 0,
           online: !isGroup && (members[0]?.online ?? false),
           muted: mutedByConv.has(c.id),
+          pinned: pinnedByConv.has(c.id),
           isRequest: !isGroup && requestByConv.get(c.id) === false,
           // A reaction newer than the last message becomes the preview line
           lastReaction: (() => {

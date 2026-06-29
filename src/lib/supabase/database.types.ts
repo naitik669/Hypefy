@@ -259,6 +259,7 @@ export type Database = {
           last_read_at: string | null
           muted_at: string | null
           muted_until: string | null
+          pinned_at: string | null
           request_accepted: boolean | null
           role: string
           user_id: string
@@ -271,6 +272,7 @@ export type Database = {
           last_read_at?: string | null
           muted_at?: string | null
           muted_until?: string | null
+          pinned_at?: string | null
           request_accepted?: boolean | null
           role?: string
           user_id: string
@@ -283,6 +285,7 @@ export type Database = {
           last_read_at?: string | null
           muted_at?: string | null
           muted_until?: string | null
+          pinned_at?: string | null
           request_accepted?: boolean | null
           role?: string
           user_id?: string

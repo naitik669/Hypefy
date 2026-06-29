@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, MessageCircle, Users, Check, Ban, Loader2, BellOff } from "lucide-react";
+import { Search, MessageCircle, Users, Check, Ban, Loader2, BellOff, Bell, Pin, PinOff, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 export type InboxRow = {
@@ -25,6 +26,7 @@ export type InboxRow = {
   unreadCount: number;
   online: boolean;
   muted: boolean;
+  pinned: boolean;
   isRequest: boolean;
   /** Set when a reaction is newer than the last message — becomes the preview */
   lastReaction?: { emoji: string; mine: boolean; onMine: boolean } | null;
@@ -113,6 +115,50 @@ export function MessagesInbox({ rows, currentUserId }: { rows: InboxRow[]; curre
   const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Long-press action menu (pin / mute / delete) for a conversation row.
+  const [menuRow, setMenuRow] = useState<InboxRow | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressClick = useRef(false);
+
+  function openMenu(r: InboxRow) {
+    if (r.isRequest) return; // requests have their own actions
+    suppressClick.current = true;
+    setMenuRow(r);
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
+  }
+  function onPressStart(r: InboxRow) {
+    pressTimer.current = setTimeout(() => { pressTimer.current = null; openMenu(r); }, 420);
+  }
+  function onPressEnd() {
+    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
+  }
+
+  async function togglePin(r: InboxRow) {
+    setActionBusy(true);
+    await supabase.from("conversation_members")
+      .update({ pinned_at: r.pinned ? null : new Date().toISOString() })
+      .eq("conversation_id", r.id).eq("user_id", currentUserId);
+    setActionBusy(false);
+    setMenuRow(null);
+    router.refresh();
+  }
+  async function toggleMute(r: InboxRow) {
+    setActionBusy(true);
+    await supabase.from("conversation_members")
+      .update({ muted_at: r.muted ? null : new Date().toISOString() })
+      .eq("conversation_id", r.id).eq("user_id", currentUserId);
+    setActionBusy(false);
+    setMenuRow(null);
+    router.refresh();
+  }
+  async function deleteChat(r: InboxRow) {
+    setActionBusy(true);
+    const { error } = await supabase.rpc("leave_conversation", { p_conversation_id: r.id });
+    setActionBusy(false);
+    setMenuRow(null);
+    if (!error) { setRemovedIds((p) => new Set(p).add(r.id)); router.refresh(); }
+  }
 
   // Realtime: keep the inbox live without a manual refresh. A new message,
   // reaction, or conversation change re-runs the server fetch (debounced),
@@ -186,9 +232,10 @@ export function MessagesInbox({ rows, currentUserId }: { rows: InboxRow[]; curre
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, tab, q, readIds, approvedIds, removedIds]);
 
-  // Split "All" tab into Unread section + rest
-  const unreadRows = tab === "all" ? filtered.filter((r) => isUnread(r)) : [];
-  const otherRows  = tab === "all" ? filtered.filter((r) => !isUnread(r)) : filtered;
+  // Split "All" tab into Pinned + Unread + rest
+  const pinnedRows = tab === "all" ? filtered.filter((r) => r.pinned) : [];
+  const unreadRows = tab === "all" ? filtered.filter((r) => isUnread(r) && !r.pinned) : [];
+  const otherRows  = tab === "all" ? filtered.filter((r) => !isUnread(r) && !r.pinned) : filtered;
 
   if (rows.length === 0) {
     return (
@@ -217,7 +264,15 @@ export function MessagesInbox({ rows, currentUserId }: { rows: InboxRow[]; curre
       <div key={r.id} className={pending ? "px-4 py-3" : ""}>
         <Link
           href={`/messages/${r.id}`}
-          onClick={() => setReadIds((prev) => new Set(prev).add(r.id))}
+          onClick={(e) => {
+            if (suppressClick.current) { e.preventDefault(); suppressClick.current = false; return; }
+            setReadIds((prev) => new Set(prev).add(r.id));
+          }}
+          onPointerDown={() => onPressStart(r)}
+          onPointerUp={onPressEnd}
+          onPointerLeave={onPressEnd}
+          onPointerMove={onPressEnd}
+          onContextMenu={(e) => { e.preventDefault(); openMenu(r); }}
           className={`flex items-center gap-3 transition-colors hover:bg-white/[0.03] ${pending ? "" : "px-4 py-3"}`}
         >
           <div className="relative shrink-0">
@@ -237,6 +292,7 @@ export function MessagesInbox({ rows, currentUserId }: { rows: InboxRow[]; curre
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             <span className="flex items-center gap-1.5">
+              {r.pinned && <Pin size={12} className="rotate-45 fill-faint text-faint" />}
               {r.muted && <BellOff size={12} className="text-faint" />}
               {r.lastAt && <span className="text-xs text-faint">{timeAgo(r.lastAt)}</span>}
             </span>
@@ -320,6 +376,17 @@ export function MessagesInbox({ rows, currentUserId }: { rows: InboxRow[]; curre
         </p>
       ) : (
         <div className="flex flex-col pt-1">
+          {/* Pinned section — top of the "All" tab */}
+          {pinnedRows.length > 0 && (
+            <>
+              <p className="flex items-center gap-1 px-4 pb-1 pt-2 text-[11px] font-bold uppercase tracking-widest text-faint">
+                <Pin size={11} className="rotate-45 fill-faint" /> Pinned
+              </p>
+              {pinnedRows.map((r) => <RowItem key={r.id} r={r} />)}
+              <div className="mx-4 my-1 h-px bg-border/50" />
+            </>
+          )}
+
           {/* Unread section — only shown in "All" tab when there are unread rows */}
           {unreadRows.length > 0 && (
             <>
@@ -343,6 +410,29 @@ export function MessagesInbox({ rows, currentUserId }: { rows: InboxRow[]; curre
             </>
           )}
         </div>
+      )}
+
+      {/* Long-press action menu */}
+      {menuRow && (
+        <BottomSheet open onClose={() => setMenuRow(null)} title={menuRow.name}>
+          <div className="flex flex-col pb-3">
+            <button type="button" disabled={actionBusy} onClick={() => togglePin(menuRow)}
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/5 disabled:opacity-60">
+              {menuRow.pinned ? <PinOff size={18} className="text-muted" /> : <Pin size={18} className="text-muted" />}
+              {menuRow.pinned ? "Unpin" : "Pin to top"}
+            </button>
+            <button type="button" disabled={actionBusy} onClick={() => toggleMute(menuRow)}
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/5 disabled:opacity-60">
+              {menuRow.muted ? <Bell size={18} className="text-muted" /> : <BellOff size={18} className="text-muted" />}
+              {menuRow.muted ? "Unmute" : "Mute"}
+            </button>
+            <button type="button" disabled={actionBusy} onClick={() => deleteChat(menuRow)}
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-red-400 hover:bg-white/5 disabled:opacity-60">
+              {actionBusy ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+              {menuRow.isGroup ? "Leave group" : "Delete chat"}
+            </button>
+          </div>
+        </BottomSheet>
       )}
     </>
   );
