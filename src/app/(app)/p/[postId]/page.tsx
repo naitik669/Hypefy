@@ -1,7 +1,16 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import type { FeedPost } from "@/components/feed/FeedCard";
-import { PostDetailViewer } from "@/components/profile/PostDetailViewer";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
+
+type Thumb = { id: string; image_url: string | null; image_urls: string[] | null; caption: string | null };
+
+const POST_COLS = "*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)";
+
+function cover(p: Thumb): string | null {
+  return p.image_url ?? p.image_urls?.[0] ?? null;
+}
 
 export default async function PostDetailPage({
   params,
@@ -13,65 +22,108 @@ export default async function PostDetailPage({
   const { data: { user } } = await supabase.auth.getUser();
   const uid = user?.id ?? "";
 
-  const { data: target } = await supabase
-    .from("posts")
-    .select("id, user_id")
-    .eq("id", postId)
-    .maybeSingle();
+  // The single target post (this is what an embed/chat link should open).
+  const { data: raw } = await supabase.from("posts").select(POST_COLS).eq("id", postId).maybeSingle();
+  if (!raw) notFound();
+  const ownerId = (raw as any).user_id as string;
+  const isOwn = uid === ownerId;
 
-  if (!target) notFound();
-
-  const isOwn = uid === target.user_id;
-  let canSeeAll = isOwn;
-  if (!canSeeAll) {
-    const { data: ownerProfile } = await supabase
-      .from("profiles")
-      .select("is_private")
-      .eq("id", target.user_id)
-      .maybeSingle();
-    if (!ownerProfile?.is_private) {
-      canSeeAll = true;
-    } else if (uid) {
+  // Can the viewer see the owner's other posts? (private + non-follower → no)
+  let canSeeMore = isOwn;
+  if (!canSeeMore) {
+    const { data: ownerProfile } = await supabase.from("profiles").select("is_private").eq("id", ownerId).maybeSingle();
+    if (!ownerProfile?.is_private) canSeeMore = true;
+    else if (uid) {
       const { data: followRow } = await supabase
-        .from("follows")
-        .select("id")
-        .eq("follower_id", uid)
-        .eq("following_id", target.user_id)
-        .maybeSingle();
-      canSeeAll = !!followRow;
+        .from("follows").select("id").eq("follower_id", uid).eq("following_id", ownerId).maybeSingle();
+      canSeeMore = !!followRow;
     }
   }
 
-  // Scrollable in the same chronological order as the profile grid when the
-  // viewer is allowed to see the rest of that profile's posts; otherwise
-  // just this single post (private account, not a follower).
-  const postsQuery = supabase
-    .from("posts")
-    .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)")
-    .order("created_at", { ascending: false });
-  const { data: rows } = canSeeAll
-    ? await postsQuery.eq("user_id", target.user_id)
-    : await postsQuery.eq("id", postId);
-
-  const postIds = (rows ?? []).map((r) => r.id);
-  const [hypesRes, savedRes] = uid && postIds.length
+  // Hype/save state for the target post
+  const [hypeRes, saveRes] = uid
     ? await Promise.all([
-        supabase.from("hypes").select("target_id").eq("user_id", uid).eq("target_type", "post").in("target_id", postIds),
-        supabase.from("saved_posts").select("post_id").eq("user_id", uid).in("post_id", postIds),
+        supabase.from("hypes").select("target_id").eq("user_id", uid).eq("target_type", "post").eq("target_id", postId).maybeSingle(),
+        supabase.from("saved_posts").select("post_id").eq("user_id", uid).eq("post_id", postId).maybeSingle(),
       ])
-    : [{ data: [] }, { data: [] }];
-  const hypedSet = new Set((hypesRes.data ?? []).map((h: any) => h.target_id));
-  const savedSet = new Set((savedRes.data ?? []).map((s: any) => s.post_id));
+    : [{ data: null }, { data: null }];
 
-  const posts: FeedPost[] = (rows ?? []).map((raw: any) => ({
-    ...raw,
-    profiles: Array.isArray(raw.profiles) ? raw.profiles[0] ?? null : raw.profiles,
-    initialHyped: hypedSet.has(raw.id),
-    initialSaved: savedSet.has(raw.id),
-  }));
+  const post: FeedPost = {
+    ...(raw as any),
+    profiles: Array.isArray((raw as any).profiles) ? (raw as any).profiles[0] ?? null : (raw as any).profiles,
+    initialHyped: !!hypeRes.data,
+    initialSaved: !!saveRes.data,
+  };
+  const username = post.profiles?.username ?? null;
+  const hashtags = ((raw as any).hashtags ?? []) as string[];
 
-  const startIdx = posts.findIndex((p) => p.id === postId);
-  if (startIdx === -1) notFound();
+  // "More from @username" + "More like this" — only when the viewer may see more.
+  let moreFrom: Thumb[] = [];
+  let moreLike: Thumb[] = [];
+  if (canSeeMore) {
+    const [fromRes, likeRes] = await Promise.all([
+      supabase
+        .from("posts")
+        .select("id, image_url, image_urls, caption")
+        .eq("user_id", ownerId)
+        .neq("id", postId)
+        .order("created_at", { ascending: false })
+        .limit(12),
+      hashtags.length > 0
+        ? supabase
+            .from("posts")
+            .select("id, image_url, image_urls, caption")
+            .overlaps("hashtags", hashtags)
+            .neq("user_id", ownerId)
+            .neq("id", postId)
+            .order("hype_count", { ascending: false })
+            .limit(12)
+        : supabase
+            .from("posts")
+            .select("id, image_url, image_urls, caption")
+            .neq("user_id", ownerId)
+            .neq("id", postId)
+            .order("hype_count", { ascending: false })
+            .limit(12),
+    ]);
+    moreFrom = (fromRes.data ?? []) as Thumb[];
+    moreLike = (likeRes.data ?? []) as Thumb[];
+  }
 
-  return <PostDetailViewer posts={posts} startIdx={startIdx} currentUserId={uid} />;
+  return (
+    <>
+      <PageHeader title="Post" showBack />
+      <FeedCard post={post} currentUserId={uid} />
+
+      {moreFrom.length > 0 && (
+        <ThumbSection title={username ? `More from @${username}` : "More from this person"} items={moreFrom} />
+      )}
+      {moreLike.length > 0 && <ThumbSection title="More like this" items={moreLike} />}
+    </>
+  );
+}
+
+function ThumbSection({ title, items }: { title: string; items: Thumb[] }) {
+  return (
+    <section className="mt-2 border-t border-border/60 pt-3">
+      <h2 className="px-4 pb-2 text-sm font-bold tracking-tight">{title}</h2>
+      <div className="grid grid-cols-3 gap-1.5 px-1.5 pb-2">
+        {items.map((p) => {
+          const c = cover(p);
+          return (
+            <Link key={p.id} href={`/p/${p.id}`} className="relative block aspect-square overflow-hidden rounded-xl bg-surface">
+              {c ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={c} alt={p.caption ?? "Post"} loading="lazy" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-end p-2">
+                  <p className="line-clamp-3 text-[10px] text-muted">{p.caption ?? ""}</p>
+                </div>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
 }

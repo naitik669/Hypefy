@@ -4,15 +4,18 @@ import { createClient } from "@/lib/supabase/server";
 import { getProfile, hueFromId } from "@/lib/profile";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
+import { ProfileShowcase } from "@/components/profile/ProfileShowcase";
 
 async function fetchStats(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const [postsRes, followersRes, followingRes] = await Promise.all([
+  const [postsRes, shotsRes, followersRes, followingRes] = await Promise.all([
     supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    supabase.from("shots").select("id", { count: "exact", head: true }).eq("user_id", userId),
     supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", userId),
     supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", userId),
   ]);
   return {
-    posts: postsRes.count ?? 0,
+    // "Posts" count includes Shots (both are content the user posted).
+    posts: (postsRes.count ?? 0) + (shotsRes.count ?? 0),
     followers: followersRes.count ?? 0,
     following: followingRes.count ?? 0,
   };
@@ -87,6 +90,9 @@ export default async function ProfilePage() {
           </>
         }
       />
+
+      {/* Pinned Shots/Shows highlights */}
+      <ProfileShowcase userId={user.id} />
 
       {/* Tabs: Posts | Shots | Saved */}
       <ProfileTabs userId={user.id} />

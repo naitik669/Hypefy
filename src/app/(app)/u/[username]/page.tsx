@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { PublicProfileTabs } from "@/components/profile/PublicProfileTabs";
+import { ProfileShowcase } from "@/components/profile/ProfileShowcase";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { MessageButton } from "@/components/profile/MessageButton";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -10,12 +11,14 @@ import { hueFromId } from "@/lib/profile";
 import { Lock } from "lucide-react";
 
 async function fetchStats(supabase: any, userId: string) {
-  const [postsRes, followersRes, followingRes] = await Promise.all([
+  const [postsRes, shotsRes, followersRes, followingRes] = await Promise.all([
     supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    supabase.from("shots").select("id", { count: "exact", head: true }).eq("user_id", userId),
     supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", userId),
     supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", userId),
   ]);
-  return { posts: postsRes.count ?? 0, followers: followersRes.count ?? 0, following: followingRes.count ?? 0 };
+  // "Posts" includes Shots.
+  return { posts: (postsRes.count ?? 0) + (shotsRes.count ?? 0), followers: followersRes.count ?? 0, following: followingRes.count ?? 0 };
 }
 
 export default async function PublicProfilePage({
@@ -112,6 +115,9 @@ export default async function PublicProfilePage({
           )
         }
       />
+
+      {/* Pinned highlights (hidden for locked private accounts) */}
+      {!isLocked && <ProfileShowcase userId={profile.id} />}
 
       {/* Tabs: Posts | Shots (no Saved for others) — locked for private accounts */}
       {isLocked ? (
