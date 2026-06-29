@@ -6,8 +6,6 @@ import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
 
 type Thumb = { id: string; image_url: string | null; image_urls: string[] | null; caption: string | null };
 
-const POST_COLS = "*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)";
-
 function cover(p: Thumb): string | null {
   return p.image_url ?? p.image_urls?.[0] ?? null;
 }
@@ -23,10 +21,18 @@ export default async function PostDetailPage({
   const uid = user?.id ?? "";
 
   // The single target post (this is what an embed/chat link should open).
-  const { data: raw } = await supabase.from("posts").select(POST_COLS).eq("id", postId).maybeSingle();
+  const { data: raw } = await supabase.from("posts").select("*").eq("id", postId).maybeSingle();
   if (!raw) notFound();
   const ownerId = (raw as any).user_id as string;
   const isOwn = uid === ownerId;
+
+  // Author profile (fetched separately — embedding it in the single-row query
+  // above intermittently returned null).
+  const { data: ownerProf } = await supabase
+    .from("profiles")
+    .select("id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified")
+    .eq("id", ownerId)
+    .maybeSingle();
 
   // Can the viewer see the owner's other posts? (private + non-follower → no)
   let canSeeMore = isOwn;
@@ -50,7 +56,7 @@ export default async function PostDetailPage({
 
   const post: FeedPost = {
     ...(raw as any),
-    profiles: Array.isArray((raw as any).profiles) ? (raw as any).profiles[0] ?? null : (raw as any).profiles,
+    profiles: (ownerProf as any) ?? null,
     initialHyped: !!hypeRes.data,
     initialSaved: !!saveRes.data,
   };
