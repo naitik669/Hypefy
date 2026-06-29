@@ -1,14 +1,18 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { PenSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { MessagesHeader } from "@/components/messages/MessagesHeader";
 import { MessagesInbox, type InboxRow } from "@/components/messages/MessagesInbox";
 
 export default async function MessagesPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
+
+  const { data: me } = await supabase
+    .from("profiles")
+    .select("display_name, username, avatar_hue, avatar_url")
+    .eq("id", user.id)
+    .maybeSingle();
 
   // Conversations I'm a member of (RLS filters to mine), newest first
   const { data: convs } = await supabase
@@ -156,17 +160,12 @@ export default async function MessagesPage() {
 
   return (
     <>
-      <PageHeader
-        title="Messages"
-        right={
-          <Link
-            href="/messages/new"
-            aria-label="New message"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5"
-          >
-            <PenSquare size={22} />
-          </Link>
-        }
+      <MessagesHeader
+        currentUserId={user.id}
+        name={(me as any)?.display_name ?? (me as any)?.username ?? "You"}
+        username={(me as any)?.username ?? null}
+        avatarUrl={(me as any)?.avatar_url ?? null}
+        hue={(me as any)?.avatar_hue ?? 280}
       />
       <MessagesInbox rows={rows} currentUserId={user.id} />
     </>
