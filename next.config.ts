@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   async headers() {
@@ -30,4 +31,18 @@ const nextConfig: NextConfig = {
   // Adding them here too causes ERR_TOO_MANY_REDIRECTS.
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  // Suppress the Sentry CLI upload logs during build
+  silent: !process.env.CI,
+  // Don't upload source maps unless SENTRY_AUTH_TOKEN is set
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  // Disable source map upload if no auth token (safe default)
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
+  // Turbopack-safe: don't inject auto-instrumentation wrappers
+  autoInstrumentServerFunctions: false,
+  autoInstrumentMiddleware: false,
+});
