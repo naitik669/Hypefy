@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Grid3x3, Zap, Bookmark, PlusCircle, Video, Play } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -19,12 +19,19 @@ const tabs: { key: Tab; Icon: typeof Grid3x3 }[] = [
 type PostRow = { id: string; image_url: string | null; image_urls?: string[] | null; caption: string | null; created_at: string };
 type ShotRow = { id: string; media_url: string; caption: string | null; created_at: string };
 
+const PAGE = 30; // items per page
+
 export function ProfileTabs({ userId }: { userId: string }) {
   const [tab, setTab] = useState<Tab>("Posts");
   const [posts, setPosts] = useState<PostRow[] | null>(null);
+  const [postsHasMore, setPostsHasMore] = useState(true);
   const [shots, setShots] = useState<ShotRow[] | null>(null);
+  const [shotsHasMore, setShotsHasMore] = useState(true);
   const [saved, setSaved] = useState<PostRow[] | null>(null);
   const [savedShots, setSavedShots] = useState<ShotRow[] | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const postsSentinel = useRef<HTMLDivElement>(null);
+  const shotsSentinel = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -34,13 +41,54 @@ export function ProfileTabs({ userId }: { userId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
+  // IntersectionObserver for Posts
+  useEffect(() => {
+    if (tab !== "Posts" || !postsHasMore || posts === null) return;
+    const el = postsSentinel.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) loadMorePosts(); }, { threshold: 0.1 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, postsHasMore, posts]);
+
+  // IntersectionObserver for Shots
+  useEffect(() => {
+    if (tab !== "Shots" || !shotsHasMore || shots === null) return;
+    const el = shotsSentinel.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) loadMoreShots(); }, { threshold: 0.1 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, shotsHasMore, shots]);
+
   async function loadPosts() {
     const { data } = await supabase
       .from("posts")
       .select("id, image_url, image_urls, caption, created_at")
       .eq("user_id", userId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(PAGE);
     setPosts(data ?? []);
+    setPostsHasMore((data ?? []).length === PAGE);
+  }
+
+  async function loadMorePosts() {
+    if (loadingMore || !posts) return;
+    setLoadingMore(true);
+    const oldest = posts[posts.length - 1]?.created_at;
+    if (!oldest) { setLoadingMore(false); return; }
+    const { data } = await supabase
+      .from("posts")
+      .select("id, image_url, image_urls, caption, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .lt("created_at", oldest)
+      .limit(PAGE);
+    setPosts((prev) => [...(prev ?? []), ...(data ?? [])]);
+    setPostsHasMore((data ?? []).length === PAGE);
+    setLoadingMore(false);
   }
 
   async function loadShots() {
@@ -48,8 +96,27 @@ export function ProfileTabs({ userId }: { userId: string }) {
       .from("shots")
       .select("id, media_url, caption, created_at")
       .eq("user_id", userId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(PAGE);
     setShots(data ?? []);
+    setShotsHasMore((data ?? []).length === PAGE);
+  }
+
+  async function loadMoreShots() {
+    if (loadingMore || !shots) return;
+    setLoadingMore(true);
+    const oldest = shots[shots.length - 1]?.created_at;
+    if (!oldest) { setLoadingMore(false); return; }
+    const { data } = await supabase
+      .from("shots")
+      .select("id, media_url, caption, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .lt("created_at", oldest)
+      .limit(PAGE);
+    setShots((prev) => [...(prev ?? []), ...(data ?? [])]);
+    setShotsHasMore((data ?? []).length === PAGE);
+    setLoadingMore(false);
   }
 
   async function loadSaved() {
@@ -58,12 +125,14 @@ export function ProfileTabs({ userId }: { userId: string }) {
         .from("saved_posts")
         .select("post_id, created_at, posts(id, image_url, image_urls, caption, created_at)")
         .eq("user_id", userId)
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(PAGE),
       supabase
         .from("saved_shots")
         .select("shot_id, created_at, shots(id, media_url, caption, created_at)")
         .eq("user_id", userId)
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(PAGE),
     ]);
     const postRows = (postsRes.data ?? []).flatMap((row: { posts: PostRow | PostRow[] | null }) => {
       const p = row.posts;
@@ -112,10 +181,13 @@ export function ProfileTabs({ userId }: { userId: string }) {
             ctaHref="/create/post"
           />
         ) : (
-          <div className="grid grid-cols-3 gap-1.5 px-1.5">
-            {posts.map((p) => (
-              <PostThumb key={p.id} post={p} />
-            ))}
+          <div>
+            <div className="grid grid-cols-3 gap-1.5 px-1.5">
+              {posts.map((p) => (
+                <PostThumb key={p.id} post={p} />
+              ))}
+            </div>
+            {postsHasMore && <div ref={postsSentinel} className="h-8" />}
           </div>
         )
       )}
@@ -133,6 +205,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
             ctaHref="/create/shot"
           />
         ) : (
+          <div>
           <div className="grid grid-cols-3 gap-1.5 px-1.5">
             {shots.map((s) => (
               <Link key={s.id} href={`/shots/${s.id}`} className="relative block aspect-[3/4] overflow-hidden rounded-xl bg-surface">
@@ -148,6 +221,8 @@ export function ProfileTabs({ userId }: { userId: string }) {
                 </span>
               </Link>
             ))}
+          </div>
+          {shotsHasMore && <div ref={shotsSentinel} className="h-8" />}
           </div>
         )
       )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -57,7 +57,11 @@ export default function NotificationsPage() {
   const supabase = createClient();
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [filter, setFilter] = useState<Filter>("All");
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const PAGE = 50;
 
   // Look up the post/shot/show a notification points at, so we can show a
   // small preview thumbnail next to it (and not just the actor's avatar).
@@ -101,13 +105,15 @@ export default function NotificationsPage() {
         .select("id, type, target_type, target_id, body, is_read, created_at, actor:actor_id(display_name, username, avatar_hue, avatar_url)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(PAGE);
 
       const mapped: Notif[] = (data ?? []).map((n: any) => ({
         ...n,
         actor: Array.isArray(n.actor) ? n.actor[0] ?? null : n.actor,
       }));
-      setNotifs(await withThumbs(mapped));
+      const withT = await withThumbs(mapped);
+      setNotifs(withT);
+      setHasMore(mapped.length === PAGE);
       setLoading(false);
 
       // Mark all as read (RPC fires the UPDATE that clears the TopBar badge)
@@ -148,6 +154,36 @@ export default function NotificationsPage() {
     return () => { if (channel) supabase.removeChannel(channel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Infinite scroll: load older notifications when sentinel enters view
+  useEffect(() => {
+    if (!hasMore || loading) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(async ([entry]) => {
+      if (!entry.isIntersecting || loadingMore) return;
+      setLoadingMore(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoadingMore(false); return; }
+      const oldest = notifs[notifs.length - 1]?.created_at;
+      if (!oldest) { setLoadingMore(false); return; }
+      const { data } = await supabase
+        .from("notifications")
+        .select("id, type, target_type, target_id, body, is_read, created_at, actor:actor_id(display_name, username, avatar_hue, avatar_url)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .lt("created_at", oldest)
+        .limit(PAGE);
+      const mapped: Notif[] = (data ?? []).map((n: any) => ({ ...n, actor: Array.isArray(n.actor) ? n.actor[0] ?? null : n.actor }));
+      const withT = await withThumbs(mapped);
+      setNotifs((prev) => [...prev, ...withT]);
+      setHasMore(mapped.length === PAGE);
+      setLoadingMore(false);
+    }, { threshold: 0.1 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, loading, loadingMore, notifs]);
 
   const allowed = TYPE_MAP[filter];
   const visible = allowed.length === 0 ? notifs : notifs.filter((n) => allowed.includes(n.type));
@@ -192,7 +228,7 @@ export default function NotificationsPage() {
           text="Hypes, replies, follows, and mentions will show up here."
         />
       ) : (
-        <div className="flex flex-col">
+        <div className="flex flex-col pb-4">
           {visible.map((n) => {
             const actorName = n.actor?.display_name ?? n.actor?.username ?? "Someone";
             const hue = n.actor?.avatar_hue ?? 280;
@@ -228,6 +264,10 @@ export default function NotificationsPage() {
               </Link>
             );
           })}
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} className="py-2 flex justify-center">
+            {loadingMore && <Loader2 size={18} className="animate-spin text-faint" />}
+          </div>
         </div>
       )}
     </>

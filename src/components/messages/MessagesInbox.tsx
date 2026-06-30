@@ -162,34 +162,58 @@ export function MessagesInbox({ rows, currentUserId }: { rows: InboxRow[]; curre
     if (!error) { setRemovedIds((p) => new Set(p).add(r.id)); router.refresh(); }
   }
 
-  // Realtime: keep the inbox live without a manual refresh. A new message,
-  // reaction, or conversation change re-runs the server fetch (debounced),
-  // so previews, ordering, and unread badges update on their own.
+  // Seed readIds from sessionStorage so navigating to a thread and back doesn't
+  // re-show the unread badge for conversations we already opened this session.
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(sessionStorage.getItem("hypefy:inbox:read") ?? "[]") as string[];
+      if (stored.length) setReadIds(new Set(stored));
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Realtime: keep the inbox live without a manual refresh.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const refresh = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => router.refresh(), 350);
+      timer = setTimeout(() => router.refresh(), 150);
     };
     const channel = supabase
-      .channel("inbox-realtime")
+      .channel(`inbox-realtime:${currentUserId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
         const m = payload.new as { sender_id?: string; conversation_id?: string };
-        if (m.sender_id === currentUserId) return; // my own sends are handled on open
-        // A fresh message means this conversation is unread again, even if I
-        // opened it earlier this session.
+        if (m.sender_id === currentUserId) return;
+        // New incoming message: revoke the "already read" flag so the unread badge reappears.
         if (m.conversation_id) {
           setReadIds((prev) => {
             if (!prev.has(m.conversation_id!)) return prev;
             const next = new Set(prev);
             next.delete(m.conversation_id!);
+            try { sessionStorage.setItem("hypefy:inbox:read", JSON.stringify([...next])); } catch { /* ignore */ }
             return next;
           });
         }
         refresh();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, () => refresh())
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations" }, () => refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, refresh)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations" }, refresh)
+      // When my last_read_at updates (i.e. I opened the thread on another device / tab),
+      // mark that conversation as read locally so the badge clears immediately.
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "conversation_members",
+        filter: `user_id=eq.${currentUserId}`,
+      }, (payload) => {
+        const m = payload.new as { conversation_id?: string; last_read_at?: string };
+        if (m.conversation_id && m.last_read_at) {
+          setReadIds((prev) => {
+            const next = new Set(prev).add(m.conversation_id!);
+            try { sessionStorage.setItem("hypefy:inbox:read", JSON.stringify([...next])); } catch { /* ignore */ }
+            return next;
+          });
+        }
+        refresh();
+      })
       .subscribe();
     return () => {
       if (timer) clearTimeout(timer);
@@ -268,7 +292,11 @@ export function MessagesInbox({ rows, currentUserId }: { rows: InboxRow[]; curre
           href={`/messages/${r.id}`}
           onClick={(e) => {
             if (suppressClick.current) { e.preventDefault(); suppressClick.current = false; return; }
-            setReadIds((prev) => new Set(prev).add(r.id));
+            setReadIds((prev) => {
+              const next = new Set(prev).add(r.id);
+              try { sessionStorage.setItem("hypefy:inbox:read", JSON.stringify([...next])); } catch { /* ignore */ }
+              return next;
+            });
           }}
           onPointerDown={() => onPressStart(r)}
           onPointerUp={onPressEnd}
