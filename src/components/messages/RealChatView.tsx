@@ -137,6 +137,20 @@ export function RealChatView({
   const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(initialOtherLastReadAt);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+
+  // Prefill the composer when arriving from a Note reply ("?prefill=…"), so the
+  // indirect-confession payoff lands as a quoted draft. Clears the param after.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const prefill = params.get("prefill");
+    if (prefill) {
+      setText(prefill);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("prefill");
+      window.history.replaceState({}, "", url.toString());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [replyTo, setReplyTo] = useState<ChatMsg | null>(null);
   const [editing, setEditing] = useState<ChatMsg | null>(null);
   const [menu, setMenu] = useState<{ msg: ChatMsg; rect: DOMRect } | null>(null);

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MessagesHeader } from "@/components/messages/MessagesHeader";
 import { MessagesInbox, type InboxRow } from "@/components/messages/MessagesInbox";
+import { NotesRail, type NoteRow } from "@/components/notes/NotesRail";
 
 export default async function MessagesPage() {
   const supabase = await createClient();
@@ -13,6 +14,9 @@ export default async function MessagesPage() {
     .select("display_name, username, avatar_hue, avatar_url")
     .eq("id", user.id)
     .maybeSingle();
+
+  // Notes from my circle (own note first) — powers the rail atop the inbox
+  const { data: notes } = await supabase.rpc("get_notes");
 
   // Conversations I'm a member of (RLS filters to mine), newest first
   const { data: convs } = await supabase
@@ -169,6 +173,16 @@ export default async function MessagesPage() {
         username={(me as any)?.username ?? null}
         avatarUrl={(me as any)?.avatar_url ?? null}
         hue={(me as any)?.avatar_hue ?? 280}
+      />
+      <NotesRail
+        rows={(notes as NoteRow[]) ?? []}
+        me={{
+          id: user.id,
+          name: (me as any)?.display_name ?? (me as any)?.username ?? "You",
+          username: (me as any)?.username ?? null,
+          hue: (me as any)?.avatar_hue ?? 280,
+          avatarUrl: (me as any)?.avatar_url ?? null,
+        }}
       />
       <MessagesInbox rows={rows} currentUserId={user.id} />
     </>

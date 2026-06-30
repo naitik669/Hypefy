@@ -114,6 +114,39 @@ export type Database = {
           },
         ]
       }
+      close_friends: {
+        Row: {
+          created_at: string
+          friend_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          friend_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          friend_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "close_friends_friend_id_fkey"
+            columns: ["friend_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "close_friends_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collection_items: {
         Row: {
           collection_id: string
@@ -616,6 +649,38 @@ export type Database = {
             columns: ["shot_id"]
             isOneToOne: false
             referencedRelation: "shots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notes: {
+        Row: {
+          audience: string
+          created_at: string
+          expires_at: string
+          text: string
+          user_id: string
+        }
+        Insert: {
+          audience?: string
+          created_at?: string
+          expires_at?: string
+          text: string
+          user_id: string
+        }
+        Update: {
+          audience?: string
+          created_at?: string
+          expires_at?: string
+          text?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1142,6 +1207,7 @@ export type Database = {
         Returns: undefined
       }
       block_user: { Args: { p_blocked: string }; Returns: undefined }
+      clear_note: { Args: Record<PropertyKey, never>; Returns: undefined }
       create_comment:
         | {
             Args: { p_body: string; p_owner_id?: string; p_post_id: string }
@@ -1176,6 +1242,20 @@ export type Database = {
       }
       end_call: { Args: { p_call_id: string }; Returns: undefined }
       get_affinity: { Args: { p_lookback_days?: number }; Returns: Json }
+      get_notes: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          audience: string
+          avatar_hue: number
+          avatar_url: string
+          created_at: string
+          display_name: string
+          is_self: boolean
+          text: string
+          user_id: string
+          username: string
+        }[]
+      }
       get_or_create_dm: { Args: { p_other: string }; Returns: string }
       get_suggested_people: {
         Args: { p_limit?: number }
@@ -1193,7 +1273,11 @@ export type Database = {
       }
       get_trending_tags: {
         Args: { p_limit?: number }
-        Returns: { recent: number; score: number; tag: string }[]
+        Returns: {
+          recent: number
+          score: number
+          tag: string
+        }[]
       }
       increment_post_view: { Args: { p_post_id: string }; Returns: undefined }
       is_conv_member: { Args: { conv: string }; Returns: boolean }
@@ -1206,7 +1290,10 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: undefined
       }
-      mark_notifications_read: { Args: never; Returns: undefined }
+      mark_notifications_read: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       quick_reply_call: {
         Args: { p_call_id: string; p_reply: string }
         Returns: undefined
@@ -1234,6 +1321,16 @@ export type Database = {
         Args: { p_conversation_id: string; p_role: string; p_user_id: string }
         Returns: undefined
       }
+      set_note: {
+        Args: { p_audience?: string; p_text: string }
+        Returns: {
+          audience: string
+          created_at: string
+          expires_at: string
+          text: string
+          user_id: string
+        }
+      }
       set_verified: {
         Args: { p_user_id: string; p_value: boolean }
         Returns: undefined
@@ -1259,7 +1356,7 @@ export type Database = {
         Args: { p_emoji: string; p_message_id: string }
         Returns: undefined
       }
-      touch_last_seen: { Args: never; Returns: undefined }
+      touch_last_seen: { Args: Record<PropertyKey, never>; Returns: undefined }
       unsend_message: { Args: { p_message_id: string }; Returns: undefined }
       update_conversation: {
         Args: {
