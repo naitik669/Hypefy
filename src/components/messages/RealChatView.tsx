@@ -14,6 +14,7 @@ import { GifPicker } from "@/components/messages/GifPicker";
 import { GroupInfoSheet } from "@/components/messages/GroupInfoSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { presenceLabel } from "@/lib/presence";
+import { PresenceDot } from "@/components/presence/PresenceDot";
 
 type PostPreview = {
   id: string;
@@ -975,15 +976,13 @@ export function RealChatView({
           <Link href={other.username ? `/u/${other.username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
             <div className="relative shrink-0">
               <Avatar name={other.name} hue={other.hue} size={36} src={other.avatarUrl ?? undefined} />
-              {presenceLabel(otherLastSeen)?.online && (
-                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background bg-green-500" />
-              )}
+              <PresenceDot lastSeenAt={otherLastSeen} size="sm" />
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{other.name}</p>
               {(() => {
                 const pres = presenceLabel(otherLastSeen);
-                if (pres) return <p className={`truncate text-xs ${pres.online ? "text-green-500" : "text-muted"}`}>{pres.text}</p>;
+                if (pres) return <p className={`truncate text-xs ${pres.status === "online" ? "text-green-500" : pres.status === "idle" ? "text-yellow-400" : "text-muted"}`}>{pres.text}</p>;
                 return other.username ? <p className="truncate text-xs text-muted">@{other.username}</p> : null;
               })()}
             </div>

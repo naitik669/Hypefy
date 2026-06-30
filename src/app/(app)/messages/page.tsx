@@ -71,16 +71,17 @@ export default async function MessagesPage() {
     });
 
     // All other members per conversation (for groups we need everyone)
-    const membersByConv = new Map<string, { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null; online: boolean }[]>();
+    const membersByConv = new Map<string, { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null; online: boolean; lastSeenAt: string | null; showActivity: boolean }[]>();
     (membersRes.data ?? []).forEach((m: any) => {
       const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
       if (!p) return;
       const arr = membersByConv.get(m.conversation_id) ?? [];
+      const showActivity = p.show_activity !== false;
       const online =
-        p.show_activity !== false &&
+        showActivity &&
         !!p.last_seen_at &&
         Date.now() - new Date(p.last_seen_at).getTime() < 90_000;
-      arr.push({ id: p.id, name: p.display_name ?? p.username ?? "User", username: p.username ?? null, hue: p.avatar_hue ?? 280, avatarUrl: p.avatar_url ?? null, online });
+      arr.push({ id: p.id, name: p.display_name ?? p.username ?? "User", username: p.username ?? null, hue: p.avatar_hue ?? 280, avatarUrl: p.avatar_url ?? null, online, lastSeenAt: showActivity ? (p.last_seen_at ?? null) : null, showActivity });
       membersByConv.set(m.conversation_id, arr);
     });
 
@@ -150,6 +151,7 @@ export default async function MessagesPage() {
           unread,
           unreadCount: unreadCountByConv.get(c.id) ?? 0,
           online: !isGroup && (members[0]?.online ?? false),
+          lastSeenAt: !isGroup ? (members[0]?.lastSeenAt ?? null) : null,
           muted: mutedByConv.has(c.id),
           pinned: pinnedByConv.has(c.id),
           isRequest: !isGroup && requestByConv.get(c.id) === false,

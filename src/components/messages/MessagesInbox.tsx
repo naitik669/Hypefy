@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PresenceDot } from "@/components/presence/PresenceDot";
 
 export type InboxRow = {
   id: string;
@@ -25,6 +26,7 @@ export type InboxRow = {
   unread: boolean;
   unreadCount: number;
   online: boolean;
+  lastSeenAt: string | null;
   muted: boolean;
   pinned: boolean;
   isRequest: boolean;
@@ -277,9 +279,7 @@ export function MessagesInbox({ rows, currentUserId }: { rows: InboxRow[]; curre
         >
           <div className="relative shrink-0">
             {r.isGroup ? <GroupAvatar /> : <Avatar name={r.name} hue={r.hue} size={52} src={r.avatarUrl ?? undefined} />}
-            {r.online && !r.isGroup && (
-              <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-green-500" />
-            )}
+            {!r.isGroup && <PresenceDot lastSeenAt={r.lastSeenAt} size="md" />}
           </div>
           <div className="min-w-0 flex-1">
             <p className={`truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
