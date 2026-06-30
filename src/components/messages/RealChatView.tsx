@@ -1317,12 +1317,14 @@ export function RealChatView({
                               key={r.emoji}
                               type="button"
                               onClick={() => setReactionSheet(m.id)}
-                              className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[12px] leading-none ${
-                                r.mine ? "bg-accent/20 ring-1 ring-accent/40" : "bg-surface ring-1 ring-border"
+                              className={`animate-react-pop flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[13px] leading-none shadow-sm transition-transform active:scale-90 ${
+                                r.mine
+                                  ? "bg-accent text-accent-ink ring-1 ring-accent"
+                                  : "bg-elevated text-foreground ring-1 ring-white/10"
                               }`}
                             >
                               <span>{r.emoji}</span>
-                              {r.count > 1 && <span className="font-semibold text-foreground">{r.count}</span>}
+                              {r.count > 1 && <span className="ml-0.5 text-[11px] font-bold">{r.count}</span>}
                             </button>
                           ))}
                         </div>

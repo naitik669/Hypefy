@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, MessageCircle, Users, Check, Ban, Loader2, BellOff, Bell, Pin, PinOff, Trash2 } from "lucide-react";
@@ -107,7 +107,7 @@ function preview(r: InboxRow) {
   return (r.lastMine ? "You: " : "") + body;
 }
 
-export function MessagesInbox({ rows, currentUserId }: { rows: InboxRow[]; currentUserId: string }) {
+export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRow[]; currentUserId: string; children?: React.ReactNode }) {
   const supabase = createClient();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("all");
@@ -367,6 +367,9 @@ export function MessagesInbox({ rows, currentUserId }: { rows: InboxRow[]; curre
           />
         </div>
       </div>
+
+      {/* Status rail (or any slot passed from parent) */}
+      {children}
 
       {/* Filter tabs */}
       <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-1 pt-3">

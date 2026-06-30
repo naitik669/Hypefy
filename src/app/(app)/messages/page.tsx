@@ -176,17 +176,18 @@ export default async function MessagesPage() {
         avatarUrl={(me as any)?.avatar_url ?? null}
         hue={(me as any)?.avatar_hue ?? 280}
       />
-      <NotesRail
-        rows={(notes as NoteRow[]) ?? []}
-        me={{
-          id: user.id,
-          name: (me as any)?.display_name ?? (me as any)?.username ?? "You",
-          username: (me as any)?.username ?? null,
-          hue: (me as any)?.avatar_hue ?? 280,
-          avatarUrl: (me as any)?.avatar_url ?? null,
-        }}
-      />
-      <MessagesInbox rows={rows} currentUserId={user.id} />
+      <MessagesInbox rows={rows} currentUserId={user.id}>
+        <NotesRail
+          rows={(notes as NoteRow[]) ?? []}
+          me={{
+            id: user.id,
+            name: (me as any)?.display_name ?? (me as any)?.username ?? "You",
+            username: (me as any)?.username ?? null,
+            hue: (me as any)?.avatar_hue ?? 280,
+            avatarUrl: (me as any)?.avatar_url ?? null,
+          }}
+        />
+      </MessagesInbox>
     </>
   );
 }

@@ -62,7 +62,7 @@ export function NotesRail({
         >
           <div className="relative">
             <div className="max-w-[72px] truncate rounded-2xl rounded-bl-sm bg-surface px-2.5 py-1 text-[11px] font-medium text-foreground">
-              {myNote ? myNote.text : "Note…"}
+              {myNote ? myNote.text : "Status…"}
             </div>
             <div className="mt-1 flex justify-center">
               <div className="relative">
@@ -75,7 +75,7 @@ export function NotesRail({
               </div>
             </div>
           </div>
-          <span className="max-w-[64px] truncate text-[11px] text-muted">Your note</span>
+          <span className="max-w-[64px] truncate text-[11px] text-muted">Your status</span>
         </button>
 
         {/* Circle's notes */}

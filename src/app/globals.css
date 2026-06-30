@@ -77,6 +77,18 @@ body {
   width: 100%;
 }
 
+/* Reaction pill bounce — plays once when a reaction pill mounts */
+@keyframes react-pop {
+  0%   { transform: scale(0.4); opacity: 0; }
+  55%  { transform: scale(1.2); opacity: 1; }
+  75%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+.animate-react-pop {
+  animation: react-pop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
 /* Hype star burst — used on tap */
 @keyframes hype-burst {
   0% {
