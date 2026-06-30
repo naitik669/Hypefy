@@ -153,7 +153,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const name = profile?.display_name ?? profile?.username ?? "User";
   const username = profile?.username;
   const hue = profile?.avatar_hue ?? 280;
-  const profileHref = username ? `/u/${username}` : "#";
+  const profileHref = post.user_id === uid ? "/profile" : username ? `/u/${username}` : "#";
 
   function showToast(msg: string) {
     setToast(msg);
