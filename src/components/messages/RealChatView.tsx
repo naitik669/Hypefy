@@ -15,6 +15,7 @@ import { GroupInfoSheet } from "@/components/messages/GroupInfoSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { presenceLabel } from "@/lib/presence";
 import { PresenceDot } from "@/components/presence/PresenceDot";
+import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
 
 type PostPreview = {
   id: string;
@@ -137,6 +138,8 @@ export function RealChatView({
   const [reactions, setReactions] = useState<ReactionRow[]>(initialReactions);
   const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(initialOtherLastReadAt);
   const [text, setText] = useState("");
+  const [dmCursor, setDmCursor] = useState(0);
+  const { suggestions: pickerSuggestions, reset: resetPicker } = useMentionHashtag(text, dmCursor);
   const [sending, setSending] = useState(false);
 
   // Prefill the composer when arriving from a Note reply ("?prefill=…"), so the
@@ -1452,13 +1455,23 @@ export function RealChatView({
             </button>
 
             {/* Text input */}
-            <input
-              value={text}
-              onChange={(e) => { setText(e.target.value); if (e.target.value) emitTyping(); }}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-              placeholder="Message…"
-              className="h-11 flex-1 rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
-            />
+            <div className="relative flex-1">
+              <input
+                value={text}
+                onChange={(e) => { setText(e.target.value); setDmCursor(e.target.selectionStart ?? 0); if (e.target.value) emitTyping(); }}
+                onSelect={(e) => setDmCursor((e.target as HTMLInputElement).selectionStart ?? 0)}
+                onBlur={() => setTimeout(resetPicker, 150)}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
+                placeholder="Message…"
+                className="h-11 w-full rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
+              />
+              <SuggestionDropdown suggestions={pickerSuggestions} onSelect={(s) => {
+                const { newValue, newCursor } = applySuggestion(text, dmCursor, s);
+                setText(newValue);
+                setDmCursor(newCursor);
+                resetPicker();
+              }} />
+            </div>
 
             {/* GIF toggle — only when no text and no attachment */}
             {!text.trim() && !attachment && (

@@ -7,6 +7,7 @@ import { extractHashtags, extractMentions } from "@/lib/content-utils";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { ImageCropper } from "@/components/post/ImageCropper";
 import { useUpload } from "@/components/upload/UploadProvider";
+import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
 
 const MAX_SIZE_MB = 10;
 const MAX_IMAGES = 10;
@@ -33,6 +34,29 @@ export function PostComposer({ userId }: { userId: string }) {
   const [ratioIdx, setRatioIdx] = useState(0); // index into RATIOS array
   const [caption, setCaption] = useState("");
   const [body, setBody] = useState("");
+  const captionRef = useRef<HTMLTextAreaElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const [captionCursor, setCaptionCursor] = useState(0);
+  const [bodyCursor, setBodyCursor] = useState(0);
+  const [activeField, setActiveField] = useState<"caption" | "body" | null>(null);
+  const activeText = activeField === "caption" ? caption : activeField === "body" ? body : "";
+  const activeCursor = activeField === "caption" ? captionCursor : bodyCursor;
+  const { suggestions: pickerSuggestions, reset: resetPicker } = useMentionHashtag(activeText, activeCursor);
+
+  function applyPickerSelection(s: Parameters<typeof applySuggestion>[2]): void {
+    if (activeField === "caption") {
+      const { newValue, newCursor } = applySuggestion(caption, captionCursor, s);
+      setCaption(newValue.slice(0, 280));
+      setCaptionCursor(newCursor);
+      setTimeout(() => captionRef.current?.setSelectionRange(newCursor, newCursor), 0);
+    } else if (activeField === "body") {
+      const { newValue, newCursor } = applySuggestion(body, bodyCursor, s);
+      setBody(newValue.slice(0, 1000));
+      setBodyCursor(newCursor);
+      setTimeout(() => bodyRef.current?.setSelectionRange(newCursor, newCursor), 0);
+    }
+    resetPicker();
+  }
   const [fileError, setFileError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
@@ -229,14 +253,19 @@ export function PostComposer({ userId }: { userId: string }) {
       )}
 
       {/* Caption */}
-      <div>
+      <div className="relative">
         <textarea
+          ref={captionRef}
           value={caption}
-          onChange={(e) => setCaption(e.target.value.slice(0, 280))}
+          onChange={(e) => { setCaption(e.target.value.slice(0, 280)); setCaptionCursor(e.target.selectionStart ?? 0); setActiveField("caption"); }}
+          onSelect={(e) => setCaptionCursor((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
+          onFocus={() => setActiveField("caption")}
+          onBlur={() => setTimeout(resetPicker, 150)}
           rows={2}
           placeholder="Write a caption…"
           className="input resize-none"
         />
+        {activeField === "caption" && <SuggestionDropdown suggestions={pickerSuggestions} onSelect={applyPickerSelection} />}
         {caption && (
           <div className="mt-1 rounded-xl border border-border/50 bg-elevated px-3 py-2 text-sm">
             <RichPostText text={caption} />
@@ -246,14 +275,19 @@ export function PostComposer({ userId }: { userId: string }) {
       </div>
 
       {/* Body / opinion */}
-      <div>
+      <div className="relative">
         <textarea
+          ref={bodyRef}
           value={body}
-          onChange={(e) => setBody(e.target.value.slice(0, 1000))}
+          onChange={(e) => { setBody(e.target.value.slice(0, 1000)); setBodyCursor(e.target.selectionStart ?? 0); setActiveField("body"); }}
+          onSelect={(e) => setBodyCursor((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
+          onFocus={() => setActiveField("body")}
+          onBlur={() => setTimeout(resetPicker, 150)}
           rows={3}
           placeholder="What do you want to say?"
           className="input resize-none"
         />
+        {activeField === "body" && <SuggestionDropdown suggestions={pickerSuggestions} onSelect={applyPickerSelection} />}
         {body && (
           <div className="mt-1 rounded-xl border border-border/50 bg-elevated px-3 py-2 text-sm">
             <RichPostText text={body} />

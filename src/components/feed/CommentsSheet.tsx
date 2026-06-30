@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ZoomViewer } from "@/components/ui/ZoomViewer";
 import { GifPicker } from "@/components/messages/GifPicker";
 import { formatCount } from "@/lib/format";
+import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
 
 const isGifBody = (body: string) => body.startsWith("https://");
 
@@ -79,6 +80,8 @@ export function CommentsSheet({
   const [loading, setLoading] = useState(false);
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
+  const [commentCursor, setCommentCursor] = useState(0);
+  const { suggestions: pickerSuggestions, reset: resetPicker } = useMentionHashtag(text, commentCursor);
   const [replyTo, setReplyTo] = useState<{ id: string; username: string } | null>(null);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
@@ -311,14 +314,25 @@ export function CommentsSheet({
             GIF
           </button>
 
-          <input
-            ref={inputRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && submitComment()}
-            placeholder={replyTo ? `Reply to @${replyTo.username}...` : "Add a comment..."}
-            className="h-10 flex-1 rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
-          />
+          <div className="relative flex-1">
+            <input
+              ref={inputRef}
+              value={text}
+              onChange={(e) => { setText(e.target.value); setCommentCursor(e.target.selectionStart ?? 0); }}
+              onSelect={(e) => setCommentCursor((e.target as HTMLInputElement).selectionStart ?? 0)}
+              onBlur={() => setTimeout(resetPicker, 150)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && submitComment()}
+              placeholder={replyTo ? `Reply to @${replyTo.username}...` : "Add a comment..."}
+              className="h-10 w-full rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
+            />
+            <SuggestionDropdown suggestions={pickerSuggestions} onSelect={(s) => {
+              const { newValue, newCursor } = applySuggestion(text, commentCursor, s);
+              setText(newValue);
+              setCommentCursor(newCursor);
+              setTimeout(() => inputRef.current?.setSelectionRange(newCursor, newCursor), 0);
+              resetPicker();
+            }} />
+          </div>
           <button
             type="button"
             onClick={submitComment}
