@@ -27,7 +27,7 @@ export function RichPostText({
             <Link
               key={i}
               href={`/search?q=${encodeURIComponent(`#${tag}`)}`}
-              className="font-semibold text-hashtag hover:underline"
+              className="font-bold text-hashtag hover:underline"
             >
               {part}
             </Link>
@@ -39,7 +39,7 @@ export function RichPostText({
             <Link
               key={i}
               href={`/u/${encodeURIComponent(handle)}`}
-              className="font-semibold text-verified hover:underline"
+              className="font-bold text-verified hover:underline"
             >
               {part}
             </Link>

@@ -32,7 +32,7 @@ const FILTERS: Filter[] = ["All", "Hypes", "Comments", "Follows", "Mentions"];
 const TYPE_MAP: Record<Filter, string[]> = {
   All: [],
   Hypes: ["hype_post", "hype_shot", "hype_comment", "repost"],
-  Comments: ["comment_post", "comment_shot"],
+  Comments: ["comment_post", "comment_shot", "comment_reply"],
   Follows: ["follow"],
   Mentions: ["mention_post", "mention_shot"],
 };
