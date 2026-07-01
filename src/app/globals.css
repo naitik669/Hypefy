@@ -75,6 +75,39 @@ body {
   width: 100%;
 }
 
+/* Route transition — every app page fades + rises in on navigation.
+   Driven by (app)/template.tsx, which React re-mounts on each route change. */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-page-enter {
+  /* `backwards` (not `both`): applies the start frame before playback so there's
+     no flash, but leaves NO residual transform afterwards — a lingering
+     translateY(0) would create a containing block and break `position: fixed`
+     children (sheets, sticky CTAs). */
+  animation: page-enter 0.34s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* Staggered content reveal — items fade + rise as they enter the viewport.
+   Toggled by adding `.is-visible` (IntersectionObserver). Starts hidden. */
+.reveal-up {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.5s ease, transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.reveal-up.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* Reaction pill bounce — plays once when a reaction pill mounts */
 @keyframes react-pop {
   0%   { transform: scale(0.4); opacity: 0; }
@@ -478,6 +511,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .animate-page-enter,
   .animate-hype-burst,
   .animate-drift,
   .animate-drift-slow,
@@ -505,6 +539,11 @@ body {
   }
   .animate-rise {
     opacity: 1;
+  }
+  .reveal-up {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
   .skeleton::after {
     animation: none;
