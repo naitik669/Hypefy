@@ -209,7 +209,7 @@ export function ProfileSetupForm({
       </Field>
 
       {/* CTA */}
-      <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[480px] bg-gradient-to-t from-background via-background to-transparent px-5 pb-7 pt-4">
+      <div className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-[480px] bg-gradient-to-t from-background via-background to-transparent px-5 pb-[calc(72px+env(safe-area-inset-bottom)+12px)] pt-4">
         {error && (
           <p className="mb-2 rounded-lg bg-danger/10 px-3 py-2 text-center text-xs text-danger">
             {error}
