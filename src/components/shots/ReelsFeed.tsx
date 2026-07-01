@@ -11,6 +11,7 @@ import { ShareSheet } from "@/components/feed/ShareSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { formatCount } from "@/lib/format";
 import { ExpandableText } from "@/components/ui/ExpandableText";
+import { haptics } from "@/lib/haptics";
 
 type ReelProfile = { display_name: string | null; avatar_hue: number | null; username: string | null } | null;
 
@@ -231,6 +232,7 @@ function ReelCard({
     setHyped(!prev);
     setHypeCount((c) => c + (prev ? -1 : 1));
     if (!prev) {
+      haptics.success();
       setHypeBurst(true);
       setShowParticles(true);
       setTimeout(() => setHypeBurst(false), 380);
@@ -260,6 +262,7 @@ function ReelCard({
     const prev = saved;
     setSavePending(true);
     setSaved(!prev);
+    haptics.select();
     try {
       if (prev) {
         await supabase.from("saved_shots").delete().eq("user_id", currentUserId).eq("shot_id", reel.id);

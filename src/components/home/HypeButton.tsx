@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Star } from "lucide-react";
 import { formatCount } from "@/lib/format";
 import { HypeParticles } from "@/components/feed/HypeParticles";
+import { haptics } from "@/lib/haptics";
 
 /** Controlled Hype button â€” state lives in the parent (PostCard). */
 export function HypeButton({
@@ -20,6 +21,7 @@ export function HypeButton({
 
   function handle() {
     if (!hyped) {
+      haptics.success();
       setBurst(true);
       setParticles(true);
       setTimeout(() => setBurst(false), 360);

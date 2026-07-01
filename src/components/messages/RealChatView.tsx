@@ -14,6 +14,7 @@ import { GifPicker } from "@/components/messages/GifPicker";
 import { GroupInfoSheet } from "@/components/messages/GroupInfoSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { presenceLabel } from "@/lib/presence";
+import { haptics } from "@/lib/haptics";
 import { PresenceDot } from "@/components/presence/PresenceDot";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
 
@@ -704,6 +705,7 @@ export function RealChatView({
     if (editing) { await saveEdit(); return; }
     const body = text.trim();
     if (!body || sending) return;
+    haptics.tap();
     setSending(true);
     setText("");
     emitStopTyping();

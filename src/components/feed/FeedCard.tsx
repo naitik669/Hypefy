@@ -15,6 +15,7 @@ import { EditPostSheet } from "@/components/feed/EditPostSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { formatCount } from "@/lib/format";
+import { haptics } from "@/lib/haptics";
 
 export type FeedPost = {
   id: string;
@@ -169,6 +170,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
     setHyped(!prev);
     setHypeCount((c) => c + (prev ? -1 : 1));
     if (!prev) {
+      haptics.success();
       setHypeBurst(true); setShowParticles(true);
       setTimeout(() => setHypeBurst(false), 380);
       setTimeout(() => setShowParticles(false), 640);
@@ -215,6 +217,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
     if (!uid) { showToast("Sign in to save"); return; }
     const prev = saved;
     setSavePending(true); setSaved(!prev);
+    haptics.select();
     if (!prev) {
       setSaveBurst(true);
       setTimeout(() => setSaveBurst(false), 360);

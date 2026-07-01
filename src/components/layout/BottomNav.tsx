@@ -7,6 +7,7 @@ import { House, PaperPlaneTilt, Lightning, Plus, X } from "@phosphor-icons/react
 import { CreateSheet } from "@/components/create/CreateSheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { createClient } from "@/lib/supabase/client";
+import { haptics } from "@/lib/haptics";
 
 export function BottomNav({
   avatarUrl,
@@ -65,6 +66,7 @@ export function BottomNav({
         <Link
           href="/messages"
           aria-label="Messages"
+          onClick={() => haptics.tap()}
           className={`relative flex h-12 w-12 flex-col items-center justify-center gap-1 transition-[color,transform] duration-200 active:scale-90 ${
             messagesActive ? "text-foreground" : "text-faint hover:text-muted"
           }`}
@@ -86,7 +88,7 @@ export function BottomNav({
         <button
           type="button"
           aria-label={createOpen ? "Close" : "Create"}
-          onClick={() => setCreateOpen((v) => !v)}
+          onClick={() => { haptics.tap(); setCreateOpen((v) => !v); }}
           className="flex h-11 w-[68px] -translate-y-1.5 items-center justify-center rounded-[20px] bg-accent text-accent-ink shadow-md transition-transform duration-200 will-change-transform hover:brightness-105 active:scale-90"
         >
           <span
@@ -102,6 +104,7 @@ export function BottomNav({
         <Link
           href="/profile"
           aria-label="Profile"
+          onClick={() => haptics.tap()}
           className="flex h-12 w-12 flex-col items-center justify-center gap-1 transition-transform duration-200 active:scale-90"
         >
           <Avatar
@@ -127,6 +130,7 @@ function NavItem({ href, label, Icon, active }: { href: string; label: string; I
     <Link
       href={href}
       aria-label={label}
+      onClick={() => haptics.tap()}
       className={`flex h-12 w-12 flex-col items-center justify-center gap-1 transition-[color,transform] duration-200 active:scale-90 ${active ? "text-foreground" : "text-faint hover:text-muted"}`}
     >
       <Icon
