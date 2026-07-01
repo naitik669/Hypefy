@@ -2,6 +2,18 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  images: {
+    // Allow next/image to optimise user media served from Supabase storage.
+    // Any host not listed here is handled by <OptimizedImage>, which falls
+    // back to a plain <img> so an unexpected URL can never break a render.
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "fyaioseridqabockidyp.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+    ],
+  },
   async headers() {
     return [
       {

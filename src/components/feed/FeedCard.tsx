@@ -16,6 +16,7 @@ import { HypeParticles } from "@/components/feed/HypeParticles";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { formatCount } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
+import { OptimizedImage } from "@/components/ui/OptimizedImage";
 
 export type FeedPost = {
   id: string;
@@ -279,9 +280,14 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
             style={{ transform: `translateX(-${imgIdx * 100}%)` }}
           >
             {images.map((src, i) => (
-              <div key={i} className="w-full shrink-0 select-none">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt={post.caption ?? "Post"} className="aspect-square w-full object-cover" draggable={false} loading="lazy" decoding="async" />
+              <div key={i} className="relative aspect-square w-full shrink-0 select-none">
+                <OptimizedImage
+                  src={src}
+                  alt={post.caption ?? "Post"}
+                  sizes="(max-width: 480px) 100vw, 448px"
+                  className="object-cover"
+                  draggable={false}
+                />
               </div>
             ))}
           </div>
