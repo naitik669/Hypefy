@@ -70,6 +70,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const [hypePending, setHypePending] = useState(false);
   const [hypeBurst, setHypeBurst] = useState(false);
   const [showParticles, setShowParticles] = useState(false);
+  const [saveBurst, setSaveBurst] = useState(false);
 
   const [saved, setSaved] = useState(post.initialSaved ?? false);
   const [savePending, setSavePending] = useState(false);
@@ -215,6 +216,8 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
     const prev = saved;
     setSavePending(true); setSaved(!prev);
     if (!prev) {
+      setSaveBurst(true);
+      setTimeout(() => setSaveBurst(false), 360);
       const { error } = await supabase.from("saved_posts").insert({ user_id: uid, post_id: post.id });
       if (error) { setSaved(prev); if (!/duplicate|unique/i.test(error.message)) showToast("Couldn't save"); }
       else showToast("Saved âœ“");
@@ -354,7 +357,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         <div className="flex items-center gap-5">
           <button type="button" onClick={toggleHype} disabled={hypePending}
             aria-pressed={hyped} aria-label="Hype"
-            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums disabled:opacity-70">
+            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-transform duration-150 active:scale-90 disabled:opacity-70">
             <span className="relative">
               <Star size={23} strokeWidth={2.2}
                 className={`${hypeBurst ? "animate-hype-burst" : ""} transition-colors ${hyped ? "text-hype" : "text-foreground"}`}
@@ -365,21 +368,23 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
           </button>
 
           <button type="button" onClick={() => setCommentsOpen(true)} aria-label="Comments"
-            className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            className="flex items-center gap-1.5 text-sm font-semibold text-foreground transition-transform duration-150 active:scale-90">
             <MessageCircle size={22} strokeWidth={2.2} />
             {formatCount(commentCount)}
           </button>
 
           <button type="button" onClick={() => setShareOpen(true)} aria-label="Share"
-            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground">
+            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 active:scale-90">
             <Send size={21} strokeWidth={2.2} />
             {((post as any).share_count ?? 0) > 0 && formatCount((post as any).share_count)}
           </button>
         </div>
 
         <button type="button" onClick={toggleSave} disabled={savePending} aria-label="Save"
-          className="text-foreground disabled:opacity-70">
-          <Bookmark size={21} strokeWidth={2.2} className={saved ? "text-accent" : ""} fill={saved ? "currentColor" : "none"} />
+          className="text-foreground transition-transform duration-150 active:scale-90 disabled:opacity-70">
+          <Bookmark size={21} strokeWidth={2.2}
+            className={`${saveBurst ? "animate-hype-burst" : ""} transition-colors ${saved ? "text-accent" : ""}`}
+            fill={saved ? "currentColor" : "none"} />
         </button>
       </div>
 

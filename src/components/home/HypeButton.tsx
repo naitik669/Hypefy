@@ -34,7 +34,7 @@ export function HypeButton({
       onClick={handle}
       aria-pressed={hyped}
       aria-label="Hype"
-      className="flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-colors"
+      className="flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-transform duration-150 active:scale-90"
     >
       <span className="relative">
         <Star
