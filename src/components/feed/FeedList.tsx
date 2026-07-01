@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
+import { Reveal } from "@/components/ui/Reveal";
 
 const PAGE_SIZE = 20;
 const SEEN_KEY = "hypefy_feed_seen";
@@ -123,8 +124,10 @@ export function FeedList({
 
   return (
     <div className="flex flex-col">
-      {posts.map((post) => (
-        <FeedCard key={post.id} post={post} currentUserId={currentUserId} />
+      {posts.map((post, i) => (
+        <Reveal key={post.id} delay={Math.min(i, 4) * 55}>
+          <FeedCard post={post} currentUserId={currentUserId} />
+        </Reveal>
       ))}
 
       {/* Sentinel + loading shimmer */}

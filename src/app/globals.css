@@ -101,11 +101,17 @@ body {
   opacity: 0;
   transform: translateY(14px);
   transition: opacity 0.5s ease, transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity, transform;
+  /* No `will-change: transform` here: it would establish a containing block
+     (like a real transform) and trap the fixed comment/share sheets each card
+     renders. The reveal is cheap enough to run without layer promotion. */
 }
 .reveal-up.is-visible {
   opacity: 1;
-  transform: translateY(0);
+  /* `none`, not translateY(0): the resting card must NOT establish a
+     containing block, or the fixed sheets it renders (comments/share) would
+     anchor to the card instead of the viewport. Chrome interpolates
+     translateY(14px) → none smoothly, so the reveal still animates. */
+  transform: none;
 }
 
 /* Reaction pill bounce — plays once when a reaction pill mounts */
