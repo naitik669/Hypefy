@@ -65,17 +65,21 @@ export function BottomNav({
         <Link
           href="/messages"
           aria-label="Messages"
-          className={`relative flex h-12 w-12 flex-col items-center justify-center gap-1 transition-colors ${
+          className={`relative flex h-12 w-12 flex-col items-center justify-center gap-1 transition-[color,transform] duration-200 active:scale-90 ${
             messagesActive ? "text-foreground" : "text-faint hover:text-muted"
           }`}
         >
-          <PaperPlaneTilt size={26} weight={messagesActive ? "fill" : "regular"} />
+          <PaperPlaneTilt
+            size={26}
+            weight={messagesActive ? "fill" : "regular"}
+            className={`transition-transform duration-300 ${messagesActive ? "-translate-y-0.5 scale-105" : ""}`}
+          />
           {unreadMsgs > 0 && !messagesActive && (
-            <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-accent-ink ring-2 ring-background">
+            <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 animate-react-pop items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-accent-ink ring-2 ring-background">
               {unreadMsgs > 9 ? "9+" : unreadMsgs}
             </span>
           )}
-          <span className={`h-1 w-1 rounded-full transition-colors ${messagesActive ? "bg-accent" : "bg-transparent"}`} />
+          <NavDot active={messagesActive} />
         </Link>
 
         {/* center create */}
@@ -83,22 +87,31 @@ export function BottomNav({
           type="button"
           aria-label={createOpen ? "Close" : "Create"}
           onClick={() => setCreateOpen((v) => !v)}
-          className="flex h-11 w-[68px] -translate-y-1.5 items-center justify-center rounded-[20px] bg-accent text-accent-ink shadow-md transition-all active:scale-95"
+          className="flex h-11 w-[68px] -translate-y-1.5 items-center justify-center rounded-[20px] bg-accent text-accent-ink shadow-md transition-transform duration-200 will-change-transform hover:brightness-105 active:scale-90"
         >
-          {createOpen ? <X size={24} weight="bold" aria-hidden /> : <Plus size={26} weight="bold" aria-hidden />}
+          <span
+            className="flex items-center justify-center transition-transform duration-300"
+            style={{ transform: createOpen ? "rotate(90deg)" : "rotate(0deg)" }}
+          >
+            {createOpen ? <X size={24} weight="bold" aria-hidden /> : <Plus size={26} weight="bold" aria-hidden />}
+          </span>
         </button>
 
         <NavItem href="/shots" label="Shots" Icon={Lightning} active={pathname.startsWith("/shots")} />
 
-        <Link href="/profile" aria-label="Profile" className="flex h-12 w-12 flex-col items-center justify-center gap-1">
+        <Link
+          href="/profile"
+          aria-label="Profile"
+          className="flex h-12 w-12 flex-col items-center justify-center gap-1 transition-transform duration-200 active:scale-90"
+        >
           <Avatar
             name={displayName}
             hue={avatarHue}
             src={avatarUrl ?? undefined}
             size={28}
-            className={`rounded-[9px] transition-all ${profileActive ? "opacity-100 brightness-100" : "opacity-80 brightness-90"}`}
+            className={`rounded-[9px] transition-all duration-300 ${profileActive ? "-translate-y-0.5 scale-105 opacity-100 brightness-100 ring-2 ring-accent/70" : "opacity-80 brightness-90"}`}
           />
-          <span className={`h-1 w-1 rounded-full transition-colors ${profileActive ? "bg-accent" : "bg-transparent"}`} />
+          <NavDot active={profileActive} />
         </Link>
       </nav>
 
@@ -114,10 +127,25 @@ function NavItem({ href, label, Icon, active }: { href: string; label: string; I
     <Link
       href={href}
       aria-label={label}
-      className={`flex h-12 w-12 flex-col items-center justify-center gap-1 transition-colors ${active ? "text-foreground" : "text-faint hover:text-muted"}`}
+      className={`flex h-12 w-12 flex-col items-center justify-center gap-1 transition-[color,transform] duration-200 active:scale-90 ${active ? "text-foreground" : "text-faint hover:text-muted"}`}
     >
-      <Icon size={26} weight={active ? "fill" : "regular"} />
-      <span className={`h-1 w-1 rounded-full transition-colors ${active ? "bg-accent" : "bg-transparent"}`} />
+      <Icon
+        size={26}
+        weight={active ? "fill" : "regular"}
+        className={`transition-transform duration-300 ${active ? "-translate-y-0.5 scale-105" : ""}`}
+      />
+      <NavDot active={active} />
     </Link>
+  );
+}
+
+/** Active indicator — a tiny dot that grows into a short accent pill. */
+function NavDot({ active }: { active: boolean }) {
+  return (
+    <span
+      className={`h-1 rounded-full transition-all duration-300 ${
+        active ? "w-4 bg-accent" : "w-1 bg-transparent"
+      }`}
+    />
   );
 }
