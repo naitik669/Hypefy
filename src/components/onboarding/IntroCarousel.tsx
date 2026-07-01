@@ -96,7 +96,7 @@ export function IntroCarousel() {
       {/* Pager — transform-based, one slide at a time */}
       <div
         className="relative flex-1 overflow-hidden"
-        style={{ touchAction: "pan-y" }}
+        style={{ touchAction: "pan-y", clipPath: "inset(0)", willChange: "transform" }}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         onWheel={onWheel}
