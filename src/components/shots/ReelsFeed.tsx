@@ -116,6 +116,9 @@ export function ReelsFeed({
             onToggleMute={() => setMuted((m) => !m)}
             isActive={i === activeIdx}
             onBack={() => router.back()}
+            // Buffer the current reel + its immediate neighbours so swiping to
+            // the next one is instant; keep the rest at metadata only.
+            preload={Math.abs(i - activeIdx) <= 1 ? "auto" : "metadata"}
           />
         </div>
       ))}
@@ -130,6 +133,7 @@ function ReelCard({
   onToggleMute,
   isActive,
   onBack,
+  preload = "metadata",
 }: {
   reel: Reel;
   currentUserId: string | null;
@@ -137,6 +141,7 @@ function ReelCard({
   onToggleMute: () => void;
   isActive: boolean;
   onBack: () => void;
+  preload?: "auto" | "metadata" | "none";
 }) {
   const supabase = createClient();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -347,7 +352,7 @@ function ReelCard({
         loop
         muted={muted}
         playsInline
-        preload="metadata"
+        preload={preload}
         onClick={handleTap}
         onTimeUpdate={(e) => {
           const v = e.currentTarget;
