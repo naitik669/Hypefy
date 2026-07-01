@@ -102,8 +102,11 @@ export function ReelsFeed({
       {reels.map((reel, i) => (
         <div
           key={reel.id}
-          className={`absolute inset-0 transition-transform duration-300 ease-out will-change-transform ${i === activeIdx ? "" : "pointer-events-none"}`}
-          style={{ transform: `translateY(calc(${i - activeIdx} * 100%))` }}
+          className={`absolute inset-0 will-change-transform ${i === activeIdx ? "" : "pointer-events-none"}`}
+          style={{
+            transform: `translateY(calc(${i - activeIdx} * 100%))`,
+            transition: "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
         >
           <ReelCard
             reel={reel}
@@ -137,6 +140,8 @@ function ReelCard({
   const supabase = createClient();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(true);
+  const [progress, setProgress] = useState(0); // 0..1 playback position
+  const [buffering, setBuffering] = useState(false);
 
   const name = reel.profiles?.display_name ?? reel.profiles?.username ?? "User";
   const handle = reel.profiles?.username;
@@ -175,7 +180,9 @@ function ReelCard({
       el.play().then(() => setPlaying(true)).catch(() => {});
     } else {
       el.pause();
+      el.currentTime = 0; // rewind so it restarts clean when revisited
       setPlaying(false);
+      setProgress(0);
     }
   }, [isActive]);
 
@@ -339,7 +346,21 @@ function ReelCard({
         playsInline
         preload="metadata"
         onClick={handleTap}
+        onTimeUpdate={(e) => {
+          const v = e.currentTarget;
+          if (v.duration) setProgress(v.currentTime / v.duration);
+        }}
+        onWaiting={() => setBuffering(true)}
+        onPlaying={() => setBuffering(false)}
+        onCanPlay={() => setBuffering(false)}
       />
+
+      {/* Buffering spinner — only while actively loading the visible reel */}
+      {buffering && isActive && playing && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+          <Loader2 size={40} className="animate-spin text-white/80" />
+        </div>
+      )}
 
       {/* Double-tap Hype burst â€” matches the feed */}
       {hypeBurst && (
@@ -439,6 +460,14 @@ function ReelCard({
             {reel.caption}
           </ExpandableText>
         )}
+      </div>
+
+      {/* Playback progress — thin accent bar hugging the bottom edge */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[3px] bg-white/15">
+        <div
+          className="h-full bg-accent"
+          style={{ width: `${Math.round(progress * 100)}%`, transition: "width 0.15s linear" }}
+        />
       </div>
 
       {/* Deleted confirmation */}
