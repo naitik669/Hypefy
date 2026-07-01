@@ -18,7 +18,7 @@ export function EmptyState({
   ctaHref?: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-8 py-24 text-center">
+    <div className="animate-rise flex flex-col items-center justify-center gap-3 px-8 py-24 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface text-muted">
         {Icon ? (
           <Icon size={28} />
