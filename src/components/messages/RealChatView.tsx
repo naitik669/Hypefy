@@ -275,6 +275,11 @@ export function RealChatView({
   idsRef.current = messages.map((m) => m.id);
   messagesRef.current = messages;
 
+  // Ids present at load (or prepended as older history) — used to animate ONLY
+  // messages that arrive live afterwards, so the initial history doesn't all
+  // animate in a jarring cascade on open.
+  const seenAtLoadRef = useRef<Set<string>>(new Set(initialMessages.map((m) => m.id)));
+
   const byId = useMemo(() => {
     const m = new Map<string, ChatMsg>();
     messages.forEach((x) => m.set(x.id, x));
@@ -474,6 +479,8 @@ export function RealChatView({
     if (older.length < MSG_PAGE) setHasMore(false);
 
     if (older.length > 0) {
+      // Older history should appear instantly (no entrance animation).
+      older.forEach((o) => seenAtLoadRef.current.add(o.id));
       prependRestore.current = prevHeight; // layout effect restores position
       justPrepended.current = true; // auto-scroll effect skips this change
       setMessages((prev) => {
@@ -1115,9 +1122,11 @@ export function RealChatView({
                 !sameDay(next.created_at, m.created_at) ||
                 new Date(next.created_at).getTime() - new Date(m.created_at).getTime() > 5 * 60 * 1000;
               const reacts = reactionsByMsg.get(m.id) ?? [];
+              // Animate only messages that arrived after the initial load.
+              const isNew = !seenAtLoadRef.current.has(m.id);
 
               return (
-                <div key={m.id}>
+                <div key={m.id} className={isNew ? "animate-msg-in" : undefined}>
                   {i === firstUnreadIndex && (
                     <div ref={unreadDividerRef} className="flex items-center gap-2 py-2">
                       <span className="h-px flex-1 bg-accent/30" />
