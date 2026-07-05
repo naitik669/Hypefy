@@ -5,6 +5,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { ShowsRow } from "@/components/home/ShowsRow";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FeedList } from "@/components/feed/FeedList";
+import { PeopleToFollow } from "@/components/feed/PeopleToFollow";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { UploadProgressBar } from "@/components/upload/UploadProvider";
 import { feedScore, diversify, postTags, tagAffinityFor } from "@/lib/feed-rank";
@@ -221,13 +222,16 @@ export default async function HomePage() {
         <UploadProgressBar />
 
         {posts.length === 0 ? (
-          <EmptyState
-            icon={PlusCircle}
-            title="Your feed is warming up"
-            text="Follow people or drop the first post — someone has to start the hype."
-            ctaLabel="Create Post"
-            ctaHref="/create/post"
-          />
+          <>
+            <EmptyState
+              icon={PlusCircle}
+              title="Your feed is warming up"
+              text="Follow people or drop the first post — someone has to start the hype."
+              ctaLabel="Create Post"
+              ctaHref="/create/post"
+            />
+            <PeopleToFollow currentUserId={user.id} followingIds={[...followingIds]} />
+          </>
         ) : (
           <FeedList
             initialPosts={posts.map((post: any) => ({

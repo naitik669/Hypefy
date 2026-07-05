@@ -4,9 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
 import { Reveal } from "@/components/ui/Reveal";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { PeopleToFollow } from "@/components/feed/PeopleToFollow";
 import { haptics } from "@/lib/haptics";
-import { Users } from "lucide-react";
 
 const PAGE_SIZE = 20;
 const SEEN_KEY = "hypefy_feed_seen";
@@ -209,12 +208,11 @@ export function FeedList({
       </div>
 
       {followingEmpty ? (
-        <EmptyState
-          icon={Users}
-          title="Nothing here yet"
-          text="Posts from people you follow show up here. Find a few creators to fill it up."
-          ctaLabel="Find people"
-          ctaHref="/discover"
+        <PeopleToFollow
+          currentUserId={currentUserId}
+          followingIds={followingIds}
+          heading="Nothing here yet"
+          sub="Follow people and their posts land right here."
         />
       ) : (
         activePosts.map((post, i) => (
