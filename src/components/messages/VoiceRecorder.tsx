@@ -8,6 +8,11 @@ type Status = "idle" | "recording" | "paused" | "sending";
 interface Props {
   onSend: (blob: Blob, durationSecs: number) => Promise<void>;
   onCancel: () => void;
+  /** Fires on every real recording-state transition (mic actually live vs.
+   *  paused/stopped) — lets the parent broadcast this to the other party,
+   *  mirroring the typing indicator. Not tied to the mic-permission prompt:
+   *  it only fires once audio is genuinely flowing. */
+  onStatusChange?: (recording: boolean) => void;
 }
 
 const BARS = 30;
@@ -39,7 +44,7 @@ function fmt(secs: number) {
  *  │  [🗑]  ~~live waveform~~  0:32 paused  [⏸/▶]  [➤]  │
  *  └─────────────────────────────────────────────────────┘
  */
-export function VoiceRecorder({ onSend, onCancel }: Props) {
+export function VoiceRecorder({ onSend, onCancel, onStatusChange }: Props) {
   const [status, setStatus] = useState<Status>("idle");
   const [elapsed, setElapsed] = useState(0);
   const [bars, setBars] = useState<number[]>(Array(BARS).fill(8));
@@ -68,6 +73,7 @@ export function VoiceRecorder({ onSend, onCancel }: Props) {
     return () => {
       cancelled = true;
       stopCleanup();
+      onStatusChange?.(false); // safety net for an unexpected unmount mid-recording
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -87,12 +93,19 @@ export function VoiceRecorder({ onSend, onCancel }: Props) {
     mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
     mr.start(150); // collect chunk every 150ms
     setStatus("recording");
+    onStatusChange?.(true);
     startTimer();
     startWaveform(stream);
   }
 
   function startTimer() {
-    timerRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+    // Also re-announces "still recording" every second — a recording can run
+    // up to MAX_SECS with only one start event otherwise, and the peer's
+    // indicator uses a short safety-net timeout to recover from a missed stop.
+    timerRef.current = setInterval(() => {
+      setElapsed((e) => e + 1);
+      onStatusChange?.(true);
+    }, 1000);
   }
   function stopTimer() {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
@@ -143,6 +156,7 @@ export function VoiceRecorder({ onSend, onCancel }: Props) {
     if (mediaRef.current?.state === "recording") {
       mediaRef.current.pause();
       setStatus("paused");
+      onStatusChange?.(false);
       stopTimer();
       stopWaveform();
     }
@@ -152,6 +166,7 @@ export function VoiceRecorder({ onSend, onCancel }: Props) {
     if (mediaRef.current?.state === "paused") {
       mediaRef.current.resume();
       setStatus("recording");
+      onStatusChange?.(true);
       startTimer();
       if (streamRef.current) startWaveform(streamRef.current);
     }
@@ -160,6 +175,7 @@ export function VoiceRecorder({ onSend, onCancel }: Props) {
   async function sendVoice() {
     if (status === "sending" || elapsed === 0) return;
     setStatus("sending");
+    onStatusChange?.(false);
     stopTimer();
     stopWaveform();
 
@@ -176,6 +192,7 @@ export function VoiceRecorder({ onSend, onCancel }: Props) {
   }
 
   function discard() {
+    onStatusChange?.(false);
     stopCleanup();
     onCancel();
   }

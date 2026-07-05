@@ -510,6 +510,18 @@ body {
   animation: dot-bounce 1.2s infinite ease-in-out;
 }
 
+/* Voice-recording indicator — thin equalizer bars pulsing height, staggered
+   per bar via animation-delay. Paired with a Mic icon in the chat bubble the
+   OTHER party sees while you're recording (mirrors the typing dots). */
+@keyframes mic-wave {
+  0%, 100% { height: 5px; }
+  50% { height: 15px; }
+}
+.animate-mic-wave {
+  height: 5px;
+  animation: mic-wave 0.9s ease-in-out infinite;
+}
+
 /* New-notification bell/star bulge: scales up, settles down, eases up again */
 @keyframes notif-bulge {
   0% {
@@ -555,6 +567,7 @@ body {
   .animate-ring-burst,
   .animate-dot-pop,
   .animate-dot-bounce,
+  .animate-mic-wave,
   .animate-orbit,
   .animate-orbit-reverse,
   .animate-notif-bulge {
