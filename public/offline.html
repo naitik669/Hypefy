@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Hypefy — Offline</title>
+    <style>
+      /* Fully self-contained: no external CSS/JS/chunks, so this page can never
+         go stale or fail to render when the network is down. */
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        height: 100%;
+        background: #0a0a0a;
+        color: #fff;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
+        gap: 14px;
+      }
+      .mark {
+        width: 64px; height: 64px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 20px;
+        background: #141414;
+        border: 1px solid #2a2a2a;
+        animation: float 3.2s ease-in-out infinite;
+      }
+      @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+      .wordmark { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-top: 4px; }
+      .dot { color: #c8ff00; }
+      h1 { font-size: 20px; font-weight: 800; margin-top: 8px; }
+      p { font-size: 14px; color: #8a8a8a; max-width: 300px; line-height: 1.5; }
+      button {
+        margin-top: 10px;
+        appearance: none; border: none; cursor: pointer;
+        background: #c8ff00; color: #0a0a0a;
+        font-weight: 700; font-size: 15px;
+        padding: 13px 26px; border-radius: 100px;
+        transition: transform 0.15s ease;
+      }
+      button:active { transform: scale(0.96); }
+      @media (prefers-reduced-motion: reduce) { .mark { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="mark" aria-hidden="true">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" fill="#c8ff00" />
+        </svg>
+      </div>
+      <div class="wordmark">Hypefy<span class="dot">.</span></div>
+      <h1>You're offline</h1>
+      <p>Looks like you've lost connection. Check your network and we'll get you back to the hype.</p>
+      <button onclick="location.reload()">Try again</button>
+    </div>
+  </body>
+</html>

@@ -1,14 +1,46 @@
 /**
- * Hypefy service worker — web push only (no offline caching, so deploys
- * never serve stale bundles).
+ * Hypefy service worker — web push + a minimal offline shell.
+ *
+ * Deliberately NOT a full offline cache: navigations are always network-first,
+ * so online users never get a stale HTML/JS bundle after a deploy. The only
+ * thing cached is a fully self-contained static `offline.html`, served purely
+ * as a fallback when a navigation fails because the device is offline.
  */
+const OFFLINE_CACHE = "hypefy-offline-v1";
+const OFFLINE_URL = "/offline.html";
 
-self.addEventListener("install", () => {
-  self.skipWaiting();
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(OFFLINE_CACHE)
+      .then((cache) => cache.add(OFFLINE_URL))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== OFFLINE_CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
+  );
+});
+
+/**
+ * Only intercept page navigations. Try the network first (fresh content, no
+ * stale bundles); if it fails — i.e. the user is offline — fall back to the
+ * cached branded offline page. All other requests (assets, API, RSC) pass
+ * straight through to the network untouched.
+ */
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  if (req.method !== "GET" || req.mode !== "navigate") return;
+  event.respondWith(
+    fetch(req).catch(() =>
+      caches.match(OFFLINE_URL, { ignoreSearch: true }).then((res) => res ?? Response.error()),
+    ),
+  );
 });
 
 self.addEventListener("push", (event) => {
