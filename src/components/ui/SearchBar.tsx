@@ -12,12 +12,15 @@ export function SearchBar({
   autoFocus = false,
   defaultValue,
   onChange,
+  onSubmit,
   href,
 }: {
   placeholder?: string;
   autoFocus?: boolean;
   defaultValue?: string;
   onChange?: (value: string) => void;
+  /** Fires on Enter — the deliberate "run this search" moment (vs. onChange, which fires every keystroke). */
+  onSubmit?: () => void;
   href?: string;
 }) {
   if (href) {
@@ -39,6 +42,7 @@ export function SearchBar({
         autoFocus={autoFocus}
         defaultValue={defaultValue}
         onChange={(e) => onChange?.(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") onSubmit?.(); }}
         placeholder={placeholder}
         className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-faint"
       />

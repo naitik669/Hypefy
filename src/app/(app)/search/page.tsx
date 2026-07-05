@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, SearchX, Loader2, Hash } from "lucide-react";
+import { ChevronLeft, SearchX, Loader2, Hash, Clock, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { FilterPills } from "@/components/ui/FilterPills";
@@ -21,6 +21,24 @@ type Profile = {
   bio: string | null;
 };
 
+const RECENT_KEY = "hypefy_recent_searches";
+const RECENT_CAP = 8;
+const SEARCH_DEBOUNCE_MS = 350;
+
+function loadRecent(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+function persistRecent(list: string[]) {
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_CAP)));
+  } catch { /* quota / private mode — non-fatal */ }
+}
+
 export default function SearchPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -35,6 +53,9 @@ export default function SearchPage() {
   const [userId, setUserId] = useState("");
   const [followedTags, setFollowedTags] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
+  const [recent, setRecent] = useState<string[]>([]);
+  const [trendingTags, setTrendingTags] = useState<{ tag: string; count: number }[]>([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Resolve current user (for FeedCard hype/save attribution) + seed from ?q=
   useEffect(() => {
@@ -46,12 +67,48 @@ export default function SearchPage() {
           .then(({ data: rows }) => setFollowedTags(new Set((rows ?? []).map((r: any) => r.tag))));
       }
     });
+    setRecent(loadRecent());
+    supabase.rpc("get_trending_tags", { p_limit: 10 }).then(({ data }) => {
+      setTrendingTags(((data ?? []) as any[]).map((t) => ({ tag: t.tag, count: t.recent ?? 0 })));
+    });
     if (query) {
       if (query.startsWith("#")) setTab("Tags");
       runSearch(query);
     }
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Record a completed search — moves to front, deduped, capped. Only called
+   *  on deliberate "run this" moments (Enter, a recent/trending chip tap), not
+   *  on every keystroke, so the list stays meaningful. */
+  function pushRecent(term: string) {
+    const t = term.trim();
+    if (!t) return;
+    setRecent((prev) => {
+      const next = [t, ...prev.filter((x) => x.toLowerCase() !== t.toLowerCase())].slice(0, RECENT_CAP);
+      persistRecent(next);
+      return next;
+    });
+  }
+  function removeRecentTerm(term: string) {
+    setRecent((prev) => {
+      const next = prev.filter((x) => x !== term);
+      persistRecent(next);
+      return next;
+    });
+  }
+  function clearAllRecent() {
+    setRecent([]);
+    persistRecent([]);
+  }
+  /** Kick off a search from a chip (recent or trending) — same effect as typing + Enter. */
+  function searchFromChip(term: string) {
+    setQuery(term);
+    if (term.startsWith("#")) setTab("Tags");
+    runSearch(term);
+    pushRecent(term);
+  }
 
   async function toggleTagFollow(tag: string) {
     const t = tag.replace(/^#/, "").toLowerCase();
@@ -157,7 +214,16 @@ export default function SearchPage() {
             placeholder="Search people, posts, #tags"
             autoFocus
             defaultValue={query}
-            onChange={(q) => { setQuery(q); runSearch(q); }}
+            onChange={(q) => {
+              setQuery(q);
+              if (debounceRef.current) clearTimeout(debounceRef.current);
+              debounceRef.current = setTimeout(() => runSearch(q), SEARCH_DEBOUNCE_MS);
+            }}
+            onSubmit={() => {
+              if (debounceRef.current) clearTimeout(debounceRef.current);
+              runSearch(query);
+              pushRecent(query);
+            }}
           />
         </div>
       </header>
@@ -190,8 +256,67 @@ export default function SearchPage() {
       )}
 
       {!isPending && !searched && (
-        <div className="px-4 py-6 text-center text-sm text-faint">
-          Search people or posts
+        <div className="px-4 py-4">
+          {recent.length === 0 && trendingTags.length === 0 && (
+            <p className="py-6 text-center text-sm text-faint">Search people or posts</p>
+          )}
+
+          {recent.length > 0 && (
+            <div className="mb-6">
+              <div className="mb-1 flex items-center justify-between">
+                <h2 className="text-sm font-bold text-muted">Recent</h2>
+                <button
+                  type="button"
+                  onClick={clearAllRecent}
+                  className="text-xs font-semibold text-muted transition-colors hover:text-foreground"
+                >
+                  Clear all
+                </button>
+              </div>
+              <div className="flex flex-col">
+                {recent.map((term) => (
+                  <div key={term} className="flex items-center gap-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => searchFromChip(term)}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-muted">
+                        <Clock size={16} />
+                      </span>
+                      <span className="truncate text-sm">{term}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeRecentTerm(term)}
+                      aria-label={`Remove "${term}" from recent searches`}
+                      className="shrink-0 p-1.5 text-faint transition-colors hover:text-foreground"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {trendingTags.length > 0 && (
+            <div>
+              <h2 className="mb-2 text-sm font-bold text-muted">Trending</h2>
+              <div className="flex flex-wrap gap-2">
+                {trendingTags.map((t) => (
+                  <button
+                    key={t.tag}
+                    type="button"
+                    onClick={() => searchFromChip(`#${t.tag}`)}
+                    className="rounded-pill border border-border bg-surface px-3.5 py-2 text-sm font-semibold text-hashtag transition-transform active:scale-95"
+                  >
+                    #{t.tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -208,7 +333,7 @@ export default function SearchPage() {
                     <div key={t.tag} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03]">
                       <button
                         type="button"
-                        onClick={() => { setQuery(`#${t.tag}`); setTab("Posts"); runSearch(`#${t.tag}`); }}
+                        onClick={() => { setQuery(`#${t.tag}`); setTab("Posts"); runSearch(`#${t.tag}`); pushRecent(`#${t.tag}`); }}
                         className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       >
                         <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface">
