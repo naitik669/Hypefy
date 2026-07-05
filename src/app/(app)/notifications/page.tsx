@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Bell, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Bell, Loader2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Avatar } from "@/components/ui/Avatar";
+import { haptics } from "@/lib/haptics";
 
 type Notif = {
   id: string;
@@ -25,6 +26,20 @@ type Notif = {
   thumb?: { url: string; isVideo: boolean } | null;
 };
 
+/** One or more notifications collapsed into a single row (same type + target). */
+type Group = {
+  key: string;
+  type: string;
+  ids: string[];
+  actors: NonNullable<Notif["actor"]>[];
+  actorCount: number; // distinct actors, may exceed actors.length (cap for the stack)
+  body: string;
+  isRead: boolean;
+  latestAt: string;
+  thumb: Notif["thumb"];
+  href: string;
+};
+
 type Filter = "All" | "Hypes" | "Comments" | "Follows" | "Mentions";
 
 const FILTERS: Filter[] = ["All", "Hypes", "Comments", "Follows", "Mentions"];
@@ -36,6 +51,10 @@ const TYPE_MAP: Record<Filter, string[]> = {
   Follows: ["follow"],
   Mentions: ["mention_post", "mention_shot"],
 };
+
+/** Types where bundling several rows into one loses information the user needs
+ *  to act on individually — never collapse these. */
+const NEVER_GROUP = new Set(["incoming_call", "new_message", "dm_post_shared"]);
 
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -53,6 +72,66 @@ function notifHref(n: Notif): string {
   return "#";
 }
 
+/**
+ * Collapse consecutive notifications that share the same (type, target) into
+ * one row — e.g. five separate "hyped your post" rows on the same post become
+ * "Aman and 4 others hyped your post". Calls, DMs, and shares stay singleton
+ * since each is individually actionable. Input must already be sorted newest
+ * first; group order follows first-seen (= most recent) order.
+ */
+function groupNotifs(list: Notif[]): Group[] {
+  const order: string[] = [];
+  const byKey = new Map<string, Group & { seenActorIds: Set<string> }>();
+
+  for (const n of list) {
+    const groupable = !NEVER_GROUP.has(n.type) && n.target_id;
+    const key = groupable ? `${n.type}|${n.target_type}|${n.target_id}` : `solo-${n.id}`;
+
+    let g = byKey.get(key);
+    if (!g) {
+      g = {
+        key,
+        type: n.type,
+        ids: [],
+        actors: [],
+        actorCount: 0,
+        body: n.body ?? "interacted with your content",
+        isRead: true,
+        latestAt: n.created_at,
+        thumb: n.thumb ?? null,
+        href: notifHref(n),
+        seenActorIds: new Set(),
+      };
+      byKey.set(key, g);
+      order.push(key);
+    }
+
+    g.ids.push(n.id);
+    if (!n.is_read) g.isRead = false;
+    if (!g.thumb && n.thumb) g.thumb = n.thumb;
+
+    const actorId = n.actor?.username ?? n.actor?.display_name ?? `anon-${n.id}`;
+    if (!g.seenActorIds.has(actorId)) {
+      g.seenActorIds.add(actorId);
+      g.actorCount += 1;
+      if (g.actors.length < 3 && n.actor) g.actors.push(n.actor);
+    }
+  }
+
+  return order.map((k) => {
+    const { seenActorIds: _drop, ...g } = byKey.get(k)!;
+    return g;
+  });
+}
+
+/** "Aman", "Aman and Leo", or "Aman and 4 others" */
+function actorSummary(g: Group): string {
+  const names = g.actors.map((a) => a.display_name ?? a.username ?? "Someone");
+  if (g.actorCount <= 1) return names[0] ?? "Someone";
+  if (g.actorCount === 2) return `${names[0]} and ${names[1] ?? "1 other"}`;
+  return `${names[0]} and ${g.actorCount - 1} others`;
+}
+
 export default function NotificationsPage() {
   const supabase = createClient();
   const [notifs, setNotifs] = useState<Notif[]>([]);
@@ -63,8 +142,6 @@ export default function NotificationsPage() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const PAGE = 50;
 
-  // Look up the post/shot/show a notification points at, so we can show a
-  // small preview thumbnail next to it (and not just the actor's avatar).
   async function withThumbs(list: Notif[]): Promise<Notif[]> {
     const postIds = list.filter((n) => n.target_type === "post" && n.target_id).map((n) => n.target_id!);
     const shotIds = list.filter((n) => n.target_type === "shot" && n.target_id).map((n) => n.target_id!);
@@ -135,7 +212,6 @@ export default function NotificationsPage() {
           { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
           async (payload) => {
             const n = payload.new as any;
-            // Fetch actor profile for the new row
             let actor = null;
             if (n.actor_id) {
               const { data } = await supabase
@@ -187,6 +263,17 @@ export default function NotificationsPage() {
 
   const allowed = TYPE_MAP[filter];
   const visible = allowed.length === 0 ? notifs : notifs.filter((n) => allowed.includes(n.type));
+  const groups = useMemo(() => groupNotifs(visible), [visible]);
+
+  async function clearGroup(ids: string[]) {
+    haptics.tap();
+    setNotifs((prev) => prev.filter((n) => !ids.includes(n.id)));
+    const { error } = await supabase.from("notifications").delete().in("id", ids);
+    if (error) {
+      // Extremely unlikely (RLS already verified), but don't silently lose data.
+      window.location.reload();
+    }
+  }
 
   return (
     <>
@@ -221,7 +308,7 @@ export default function NotificationsPage() {
             </div>
           ))}
         </div>
-      ) : visible.length === 0 ? (
+      ) : groups.length === 0 ? (
         <EmptyState
           icon={Bell}
           title="Quiet for now"
@@ -229,41 +316,9 @@ export default function NotificationsPage() {
         />
       ) : (
         <div className="flex flex-col pb-4">
-          {visible.map((n) => {
-            const actorName = n.actor?.display_name ?? n.actor?.username ?? "Someone";
-            const hue = n.actor?.avatar_hue ?? 280;
-            return (
-              <Link
-                key={n.id}
-                href={notifHref(n)}
-                className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.03] ${
-                  !n.is_read ? "bg-accent/[0.04]" : ""
-                }`}
-              >
-                <div className="relative shrink-0">
-                  <Avatar name={actorName} hue={hue} size={44} src={n.actor?.avatar_url ?? undefined} />
-                  {!n.is_read && (
-                    <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-background" />
-                  )}
-                </div>
-                <p className="min-w-0 flex-1 text-sm leading-snug">
-                  <span className="font-semibold">{actorName}</span>{" "}
-                  <span className="text-muted">{n.body ?? "interacted with your content"}</span>{" "}
-                  <span className="text-xs text-faint">{timeAgo(n.created_at)}</span>
-                </p>
-                {n.thumb && (
-                  <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface">
-                    {n.thumb.isVideo ? (
-                      <video src={n.thumb.url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
-                    ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={n.thumb.url} alt="" className="h-full w-full object-cover" />
-                    )}
-                  </div>
-                )}
-              </Link>
-            );
-          })}
+          {groups.map((g) => (
+            <NotifRow key={g.key} group={g} onClear={() => clearGroup(g.ids)} />
+          ))}
           {/* Infinite scroll sentinel */}
           <div ref={sentinelRef} className="py-2 flex justify-center">
             {loadingMore && <Loader2 size={18} className="animate-spin text-faint" />}
@@ -271,5 +326,119 @@ export default function NotificationsPage() {
         </div>
       )}
     </>
+  );
+}
+
+const SWIPE_REVEAL = 80; // px of delete affordance revealed — matches the button's w-20
+const SWIPE_COMMIT = 110; // px drag distance that commits the clear
+
+/** One notification row (single or grouped). Swipe left to reveal + confirm clear. */
+function NotifRow({ group: g, onClear }: { group: Group; onClear: () => void }) {
+  const [dragX, setDragX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const startX = useRef<number | null>(null);
+  const startDragX = useRef(0);
+
+  function onTouchStart(e: React.TouchEvent) {
+    startX.current = e.touches[0].clientX;
+    startDragX.current = dragX;
+    setDragging(true);
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    if (startX.current === null) return;
+    const dx = e.touches[0].clientX - startX.current;
+    const next = Math.max(-SWIPE_COMMIT - 20, Math.min(0, startDragX.current + dx));
+    setDragX(next);
+  }
+  function onTouchEnd() {
+    setDragging(false);
+    startX.current = null;
+    if (dragX <= -SWIPE_COMMIT) {
+      setLeaving(true);
+      setDragX(-400);
+      setTimeout(onClear, 200);
+    } else if (dragX <= -SWIPE_REVEAL / 2) {
+      setDragX(-SWIPE_REVEAL); // settle open
+    } else {
+      setDragX(0); // spring back closed
+    }
+  }
+
+  const actorName = actorSummary(g);
+  const showCluster = g.actors.length > 1;
+
+  return (
+    <div className="relative overflow-hidden">
+      {/* Delete affordance revealed behind the row */}
+      <button
+        type="button"
+        aria-label="Clear notification"
+        onClick={() => { setLeaving(true); setDragX(-400); setTimeout(onClear, 200); }}
+        className="absolute inset-y-0 right-0 flex w-20 items-center justify-center bg-danger text-white"
+      >
+        <Trash2 size={18} />
+      </button>
+
+      <Link
+        href={g.href}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onClick={(e) => { if (dragX !== 0) e.preventDefault(); }}
+        className={`relative flex items-center gap-3 bg-background px-4 py-3 transition-colors hover:bg-white/[0.03] ${
+          !g.isRead ? "bg-accent/[0.04]" : ""
+        }`}
+        style={{
+          transform: `translateX(${dragX}px)`,
+          transition: dragging ? "none" : "transform 0.25s cubic-bezier(0.16,1,0.3,1)",
+          opacity: leaving ? 0 : 1,
+        }}
+      >
+        <div className="relative shrink-0">
+          {showCluster ? (
+            <div className="relative h-11 w-11">
+              {g.actors.slice(0, 3).map((a, i) => (
+                <Avatar
+                  key={i}
+                  name={a.display_name ?? a.username ?? "?"}
+                  hue={a.avatar_hue ?? 280}
+                  src={a.avatar_url ?? undefined}
+                  size={i === 0 ? 34 : 22}
+                  className={`absolute ring-2 ring-background ${
+                    i === 0 ? "left-0 top-0 z-10" : i === 1 ? "bottom-0 right-0 z-20" : "bottom-0 left-0 z-20"
+                  }`}
+                />
+              ))}
+            </div>
+          ) : (
+            <Avatar
+              name={actorName}
+              hue={g.actors[0]?.avatar_hue ?? 280}
+              src={g.actors[0]?.avatar_url ?? undefined}
+              size={44}
+            />
+          )}
+          {!g.isRead && (
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-background" />
+          )}
+        </div>
+        <p className="min-w-0 flex-1 text-sm leading-snug">
+          <span className="font-semibold">{actorName}</span>{" "}
+          <span className="text-muted">{g.body}</span>{" "}
+          <span className="text-xs text-faint">{timeAgo(g.latestAt)}</span>
+        </p>
+        {g.thumb && (
+          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface">
+            {g.thumb.isVideo ? (
+              <video src={g.thumb.url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={g.thumb.url} alt="" className="h-full w-full object-cover" />
+            )}
+          </div>
+        )}
+      </Link>
+    </div>
   );
 }
