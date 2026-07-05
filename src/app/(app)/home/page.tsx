@@ -236,6 +236,7 @@ export default async function HomePage() {
               initialSaved: savedIds.has(post.id),
             }))}
             currentUserId={user.id}
+            followingIds={[...followingIds]}
           />
         )}
       </PullToRefresh>
