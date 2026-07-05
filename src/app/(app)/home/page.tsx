@@ -89,6 +89,16 @@ export default async function HomePage() {
     supabase.from("hashtag_follows").select("tag").eq("user_id", user.id),
   ]);
 
+  // People lists behind the Favourite / Hypers feed tabs — fetched lightly
+  // here (just ids) since FeedList only needs them to scope its own query
+  // when that tab is first opened.
+  const [{ data: favoriteRows }, { data: hyperRows }] = await Promise.all([
+    supabase.from("favorites").select("friend_id").eq("user_id", user.id),
+    supabase.from("close_friends").select("friend_id").eq("user_id", user.id),
+  ]);
+  const favoriteIds = (favoriteRows ?? []).map((r: any) => r.friend_id as string);
+  const hyperIds = (hyperRows ?? []).map((r: any) => r.friend_id as string);
+
   // Which active shows I've already viewed (server-side truth for the seen ring)
   const activeShowIds = (activeShows ?? []).map((s: any) => s.id);
   const { data: myViews } = activeShowIds.length > 0
@@ -241,6 +251,8 @@ export default async function HomePage() {
             }))}
             currentUserId={user.id}
             followingIds={[...followingIds]}
+            favoriteIds={favoriteIds}
+            hyperIds={hyperIds}
           />
         )}
       </PullToRefresh>

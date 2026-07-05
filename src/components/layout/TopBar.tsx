@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Compass } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import { FeedTabDropdown } from "@/components/layout/FeedTabDropdown";
 
 /** Home top bar — server component so it can seed the real unread count. */
 export async function TopBar() {
@@ -28,9 +29,7 @@ export async function TopBar() {
         <Compass size={22} strokeWidth={2.2} />
       </Link>
 
-      <span className="text-xl font-extrabold tracking-tight">
-        Hypefy<span className="text-accent">.</span>
-      </span>
+      <FeedTabDropdown />
 
       {user ? (
         <NotificationBell userId={user.id} initialUnread={unread} />

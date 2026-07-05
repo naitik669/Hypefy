@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Star, Heart } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
 import { Reveal } from "@/components/ui/Reveal";
 import { PeopleToFollow } from "@/components/feed/PeopleToFollow";
-import { haptics } from "@/lib/haptics";
+import { useFeedTab, type FeedTab } from "@/components/layout/FeedTabDropdown";
 
 const PAGE_SIZE = 20;
 const SEEN_KEY = "hypefy_feed_seen";
@@ -37,39 +38,55 @@ function normalize(data: unknown[] | null): FeedPost[] {
   })) as FeedPost[];
 }
 
-type Tab = "foryou" | "following";
+/** Every tab except For You is just "posts from this id list", newest first. */
+type IdsTab = Exclude<FeedTab, "foryou">;
+type IdsListState = { posts: FeedPost[]; done: boolean; init: boolean };
+const EMPTY_IDS_STATE: IdsListState = { posts: [], done: false, init: false };
 
 /**
- * Home feed with a For You / Following toggle and infinite scroll.
+ * Home feed. The active tab (For You / Following / Favourite / Hypers) comes
+ * from the `?feed=` URL param via useFeedTab — the dropdown under the Hypefy
+ * wordmark in TopBar writes that param, this component reads it, and the two
+ * stay in sync without any shared client state or prop drilling.
  *
  * - **For You**: the server renders the first scored page; scrolling appends
  *   the chronological tail (posts older than everything currently shown).
- * - **Following**: lazily loaded the first time it's opened — posts from people
- *   you follow (plus your own), newest first, paginated by created_at.
- *
- * Switching tabs never refetches the shell (TopBar/Shows stay put); each tab
- * keeps its own loaded posts and scroll cursor.
+ * - **Following / Favourite / Hypers**: each lazily loads its first page the
+ *   first time it's opened — posts from the relevant id list (plus your own),
+ *   newest first, paginated by created_at. Every tab keeps its own loaded
+ *   posts, so switching back and forth doesn't re-fetch.
  */
 export function FeedList({
   initialPosts,
   currentUserId,
   followingIds = [],
+  favoriteIds = [],
+  hyperIds = [],
 }: {
   initialPosts: FeedPost[];
   currentUserId: string;
   followingIds?: string[];
+  favoriteIds?: string[];
+  hyperIds?: string[];
 }) {
   const supabase = createClient();
-  const [tab, setTab] = useState<Tab>("foryou");
+  const tab = useFeedTab();
 
   // For You — seeded by the server.
   const [posts, setPosts] = useState<FeedPost[]>(initialPosts);
   const [fyDone, setFyDone] = useState(initialPosts.length < 10);
 
-  // Following — loaded client-side on first view.
-  const [fwPosts, setFwPosts] = useState<FeedPost[]>([]);
-  const [fwDone, setFwDone] = useState(false);
-  const [fwInit, setFwInit] = useState(false); // first page attempted?
+  // Following / Favourite / Hypers — each lazily loaded client-side.
+  const [idsState, setIdsState] = useState<Record<IdsTab, IdsListState>>({
+    following: EMPTY_IDS_STATE,
+    favourite: EMPTY_IDS_STATE,
+    hypers: EMPTY_IDS_STATE,
+  });
+  const idsByTab: Record<IdsTab, string[]> = {
+    following: followingIds,
+    favourite: favoriteIds,
+    hypers: hyperIds,
+  };
 
   const [loading, setLoading] = useState(false);
   const loadingRef = useRef(false);
@@ -78,7 +95,7 @@ export function FeedList({
 
   // Refs mirror state so the observer callback always reads fresh values.
   const postsRef = useRef(posts); postsRef.current = posts;
-  const fwPostsRef = useRef(fwPosts); fwPostsRef.current = fwPosts;
+  const idsStateRef = useRef(idsState); idsStateRef.current = idsState;
   const tabRef = useRef(tab); tabRef.current = tab;
 
   // Mark the initial (ranked) page as seen so the chronological tail won't
@@ -127,51 +144,50 @@ export function FeedList({
     }
   }
 
-  async function loadMoreFollowing() {
-    const ids = followingIds.length ? [...followingIds, currentUserId] : [currentUserId];
-    const current = fwPostsRef.current;
+  async function loadMoreIdsTab(t: IdsTab) {
+    const scopeIds = idsByTab[t].length ? [...idsByTab[t], currentUserId] : [currentUserId];
+    const current = idsStateRef.current[t].posts;
     let query = supabase
       .from("posts").select(POST_SELECT)
-      .in("user_id", ids)
+      .in("user_id", scopeIds)
       .order("created_at", { ascending: false })
       .limit(PAGE_SIZE);
     if (current.length) {
       query = supabase
         .from("posts").select(POST_SELECT)
-        .in("user_id", ids)
+        .in("user_id", scopeIds)
         .lt("created_at", current[current.length - 1].created_at)
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
     }
     const { data } = await query;
     const fresh = normalize(data).filter((p) => !current.some((x) => x.id === p.id));
-    if ((data?.length ?? 0) < PAGE_SIZE) setFwDone(true);
-    if (fresh.length) {
-      const withState = await withUserState(fresh);
-      setFwPosts((prev) => [...prev, ...withState]);
-    }
-    if (!fwInit) setFwInit(true);
+    const nowDone = (data?.length ?? 0) < PAGE_SIZE;
+    const withState = fresh.length ? await withUserState(fresh) : fresh;
+    setIdsState((prev) => ({
+      ...prev,
+      [t]: { posts: [...prev[t].posts, ...withState], done: nowDone || prev[t].done, init: true },
+    }));
   }
 
   async function loadMore() {
     if (loadingRef.current) return;
     const t = tabRef.current;
-    if (t === "foryou" && fyDone) return;
-    if (t === "following" && fwDone) return;
+    if (t === "foryou" ? fyDone : idsStateRef.current[t].done) return;
     loadingRef.current = true;
     setLoading(true);
     try {
       if (t === "foryou") await loadMoreForYou();
-      else await loadMoreFollowing();
+      else await loadMoreIdsTab(t);
     } finally {
       setLoading(false);
       loadingRef.current = false;
     }
   }
 
-  // Lazy-load the first Following page the first time that tab is opened.
+  // Lazy-load the first page of an ids-tab the first time it's opened.
   useEffect(() => {
-    if (tab === "following" && !fwInit && !loadingRef.current) loadMore();
+    if (tab !== "foryou" && !idsStateRef.current[tab].init && !loadingRef.current) loadMore();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -186,34 +202,34 @@ export function FeedList({
     observer.observe(el);
     return () => observer.disconnect();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, fyDone, fwDone]);
+  }, [tab, fyDone, idsState.following.done, idsState.favourite.done, idsState.hypers.done]);
 
-  function switchTab(next: Tab) {
-    if (next === tab) return;
-    haptics.tap();
-    setTab(next);
-    window.scrollTo({ top: 0 });
-  }
+  // Scroll to top whenever the tab actually changes (not on the initial mount).
+  const prevTabRef = useRef(tab);
+  useEffect(() => {
+    if (prevTabRef.current !== tab) {
+      window.scrollTo({ top: 0 });
+      prevTabRef.current = tab;
+    }
+  }, [tab]);
 
-  const activePosts = tab === "foryou" ? posts : fwPosts;
-  const activeDone = tab === "foryou" ? fyDone : fwDone;
-  const followingEmpty = tab === "following" && fwInit && fwPosts.length === 0;
+  const activePosts = tab === "foryou" ? posts : idsState[tab].posts;
+  const activeDone = tab === "foryou" ? fyDone : idsState[tab].done;
+  const idsEmpty = tab !== "foryou" && idsState[tab].init && idsState[tab].posts.length === 0;
 
   return (
     <div className="flex flex-col">
-      {/* For You / Following toggle — sticks just under the TopBar */}
-      <div className="sticky top-14 z-10 flex border-b border-border/60 bg-background/85 backdrop-blur-xl">
-        <TabButton label="For You" active={tab === "foryou"} onClick={() => switchTab("foryou")} />
-        <TabButton label="Following" active={tab === "following"} onClick={() => switchTab("following")} />
-      </div>
-
-      {followingEmpty ? (
-        <PeopleToFollow
-          currentUserId={currentUserId}
-          followingIds={followingIds}
-          heading="Nothing here yet"
-          sub="Follow people and their posts land right here."
-        />
+      {idsEmpty ? (
+        tab === "following" ? (
+          <PeopleToFollow
+            currentUserId={currentUserId}
+            followingIds={followingIds}
+            heading="Nothing here yet"
+            sub="Follow people and their posts land right here."
+          />
+        ) : (
+          <EmptyIdsTab tab={tab} />
+        )
       ) : (
         activePosts.map((post, i) => (
           <Reveal key={`${tab}-${post.id}`} delay={Math.min(i, 4) * 55}>
@@ -223,7 +239,7 @@ export function FeedList({
       )}
 
       {/* Sentinel + loading shimmer */}
-      {!activeDone && !followingEmpty && (
+      {!activeDone && !idsEmpty && (
         <div ref={sentinelRef} className="px-4 py-6">
           {loading && (
             <div className="flex items-center gap-3">
@@ -244,21 +260,18 @@ export function FeedList({
   );
 }
 
-function TabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function EmptyIdsTab({ tab }: { tab: "favourite" | "hypers" }) {
+  const isHyper = tab === "hypers";
+  const Icon = isHyper ? Star : Heart;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`relative flex-1 py-3 text-sm font-bold transition-colors ${
-        active ? "text-foreground" : "text-muted hover:text-foreground/80"
-      }`}
-    >
-      {label}
-      <span
-        className={`absolute inset-x-0 bottom-0 mx-auto h-0.5 w-10 rounded-full bg-accent transition-opacity duration-200 ${
-          active ? "opacity-100" : "opacity-0"
-        }`}
-      />
-    </button>
+    <div className="animate-rise flex flex-col items-center justify-center gap-3 px-8 py-24 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface text-muted">
+        <Icon size={28} />
+      </div>
+      <h2 className="text-lg font-bold">{isHyper ? "No Hypers yet" : "No Favourites yet"}</h2>
+      <p className="max-w-xs text-sm text-muted">
+        Visit someone&apos;s profile and tap the ⋯ menu to add them as {isHyper ? "a Hyper" : "a Favourite"}.
+      </p>
+    </div>
   );
 }

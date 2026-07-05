@@ -6,6 +6,7 @@ import { PublicProfileTabs } from "@/components/profile/PublicProfileTabs";
 import { ProfileShowcase } from "@/components/profile/ProfileShowcase";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { MessageButton } from "@/components/profile/MessageButton";
+import { HyperFavoriteButton } from "@/components/profile/HyperFavoriteButton";
 import { SignOutButton } from "@/components/SignOutButton";
 import { hueFromId } from "@/lib/profile";
 import { Lock } from "lucide-react";
@@ -43,14 +44,17 @@ export default async function PublicProfilePage({
   const stats = await fetchStats(supabase, profile.id);
 
   let isFollowing = false;
+  let isHyper = false;
+  let isFavourite = false;
   if (currentUser && !isOwn) {
-    const { data: followRow } = await supabase
-      .from("follows")
-      .select("id")
-      .eq("follower_id", currentUser.id)
-      .eq("following_id", profile.id)
-      .maybeSingle();
+    const [{ data: followRow }, { data: hyperRow }, { data: favRow }] = await Promise.all([
+      supabase.from("follows").select("id").eq("follower_id", currentUser.id).eq("following_id", profile.id).maybeSingle(),
+      supabase.from("close_friends").select("user_id").eq("user_id", currentUser.id).eq("friend_id", profile.id).maybeSingle(),
+      supabase.from("favorites").select("user_id").eq("user_id", currentUser.id).eq("friend_id", profile.id).maybeSingle(),
+    ]);
     isFollowing = !!followRow;
+    isHyper = !!hyperRow;
+    isFavourite = !!favRow;
   }
 
   // Private account: only the owner and followers see content
@@ -107,6 +111,12 @@ export default async function PublicProfilePage({
                 initialFollowing={isFollowing}
               />
               <MessageButton currentUserId={currentUser.id} targetUserId={profile.id} />
+              <HyperFavoriteButton
+                currentUserId={currentUser.id}
+                targetUserId={profile.id}
+                initialHyper={isHyper}
+                initialFavourite={isFavourite}
+              />
             </>
           ) : (
             <Link href="/signin" className="flex h-10 flex-1 items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-ink">
