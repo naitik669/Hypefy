@@ -131,7 +131,7 @@ export function ProfileSetupForm({
 
       {/* Username */}
       <Field label="Username">
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3">
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-accent/40">
           <span className="shrink-0 text-sm text-faint">hypefy.chat/@</span>
           <input
             value={username}

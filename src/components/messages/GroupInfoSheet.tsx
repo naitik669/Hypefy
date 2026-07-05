@@ -132,7 +132,7 @@ export function GroupInfoSheet({
           {/* Add-member search */}
           {adding && isAdmin && (
             <div className="mb-2 rounded-xl border border-border bg-surface p-2">
-              <div className="flex h-10 items-center gap-2 rounded-pill bg-elevated px-3">
+              <div className="flex h-10 items-center gap-2 rounded-pill bg-elevated px-3 focus-within:ring-2 focus-within:ring-accent/30">
                 <Search size={15} className="shrink-0 text-faint" />
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search people"
                   className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint" />

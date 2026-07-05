@@ -55,7 +55,7 @@ export function NoteEditorSheet({
       <div className="pb-4">
         <p className="mb-3 text-xs text-muted">Shared with your circle for 24 hours. Keep it short.</p>
 
-        <div className="relative rounded-2xl border border-border bg-surface px-4 py-3">
+        <div className="relative rounded-2xl border border-border bg-surface px-4 py-3 focus-within:border-accent/40">
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value.slice(0, MAX))}
