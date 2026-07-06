@@ -19,6 +19,19 @@ export default async function AppLayout({
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+
+  // Anonymous visitors can land here on PUBLIC pages (/p, /u, /shots/[id]
+  // via shared links — the middleware already guards the private routes).
+  // Render a bare shell for them; only signed-in users get the full app
+  // chrome, and only signed-in-but-incomplete users go to /setup-profile.
+  if (!user) {
+    return (
+      <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
+        <div className="flex-1">{children}</div>
+      </div>
+    );
+  }
+
   const profile = await getProfile(supabase);
   if (!profile?.profileCompleted) {
     redirect("/setup-profile");

@@ -56,22 +56,23 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Gate the in-app routes. Unauthenticated users are sent to the landing.
+  // Note: /shots/[id] deep links stay public (shareable, like /p and /u);
+  // only the /shots feed itself is gated.
   const protectedPrefixes = [
     "/home",
     "/shows",
     "/discover",
     "/messages",
     "/profile",
-    "/shots",
     "/setup-profile",
     "/create",
     "/notifications",
     "/search",
     "/settings",
   ];
-  const isProtected = protectedPrefixes.some((p) =>
-    request.nextUrl.pathname.startsWith(p),
-  );
+  const { pathname } = request.nextUrl;
+  const isProtected =
+    protectedPrefixes.some((p) => pathname.startsWith(p)) || pathname === "/shots";
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
