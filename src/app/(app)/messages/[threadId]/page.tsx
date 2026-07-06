@@ -16,7 +16,7 @@ export default async function ThreadPage({
   const [{ data: members }, { data: conv }] = await Promise.all([
     supabase
       .from("conversation_members")
-      .select("user_id, role, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity)")
+      .select("user_id, role, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, current_vibe)")
       .eq("conversation_id", threadId),
     supabase.from("conversations").select("type, title, avatar_url").eq("id", threadId).maybeSingle(),
   ]);
@@ -117,6 +117,7 @@ export default async function ThreadPage({
         avatarUrl: op?.avatar_url ?? null,
         lastSeenAt: (op as any)?.show_activity === false ? null : (op as any)?.last_seen_at ?? null,
         showActivity: (op as any)?.show_activity ?? true,
+        vibe: (op as any)?.current_vibe ?? null,
       }}
       group={group}
       members={membersMap}

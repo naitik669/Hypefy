@@ -27,6 +27,8 @@ export type InboxRow = {
   unreadCount: number;
   online: boolean;
   lastSeenAt: string | null;
+  /** The other person's current vibe (DMs only) — quiet mood signal. */
+  vibe?: string | null;
   muted: boolean;
   pinned: boolean;
   isRequest: boolean;
@@ -313,6 +315,7 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
             <p className={`truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
               {r.name}
               {r.isGroup && <span className="ml-1.5 text-xs font-normal text-faint">· {r.memberCount}</span>}
+              {r.vibe && <span className="ml-1.5 text-xs font-normal text-faint">{r.vibe}</span>}
             </p>
             <p className={`truncate text-sm ${unread ? "font-semibold text-foreground" : "text-muted"}`}>
               {preview(r)}

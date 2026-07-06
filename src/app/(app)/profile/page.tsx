@@ -66,6 +66,8 @@ export default async function ProfilePage() {
         currentUserId={user.id}
         stats={stats}
         verified={profile?.isVerified ?? false}
+        vibe={profile?.currentVibe ?? null}
+        vibeEditable
         actions={
           <>
             <Link

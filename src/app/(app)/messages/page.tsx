@@ -33,7 +33,7 @@ export default async function MessagesPage() {
       // The other participant in each conversation
       supabase
         .from("conversation_members")
-        .select("conversation_id, user_id, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity)")
+        .select("conversation_id, user_id, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, current_vibe)")
         .in("conversation_id", convIds)
         .neq("user_id", user.id),
       // Latest messages across these conversations
@@ -71,7 +71,7 @@ export default async function MessagesPage() {
     });
 
     // All other members per conversation (for groups we need everyone)
-    const membersByConv = new Map<string, { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null; online: boolean; lastSeenAt: string | null; showActivity: boolean }[]>();
+    const membersByConv = new Map<string, { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null; online: boolean; lastSeenAt: string | null; showActivity: boolean; vibe: string | null }[]>();
     (membersRes.data ?? []).forEach((m: any) => {
       const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
       if (!p) return;
@@ -81,7 +81,7 @@ export default async function MessagesPage() {
         showActivity &&
         !!p.last_seen_at &&
         Date.now() - new Date(p.last_seen_at).getTime() < 90_000;
-      arr.push({ id: p.id, name: p.display_name ?? p.username ?? "User", username: p.username ?? null, hue: p.avatar_hue ?? 280, avatarUrl: p.avatar_url ?? null, online, lastSeenAt: showActivity ? (p.last_seen_at ?? null) : null, showActivity });
+      arr.push({ id: p.id, name: p.display_name ?? p.username ?? "User", username: p.username ?? null, hue: p.avatar_hue ?? 280, avatarUrl: p.avatar_url ?? null, online, lastSeenAt: showActivity ? (p.last_seen_at ?? null) : null, showActivity, vibe: p.current_vibe ?? null });
       membersByConv.set(m.conversation_id, arr);
     });
 
@@ -152,6 +152,7 @@ export default async function MessagesPage() {
           unreadCount: unreadCountByConv.get(c.id) ?? 0,
           online: !isGroup && (members[0]?.online ?? false),
           lastSeenAt: !isGroup ? (members[0]?.lastSeenAt ?? null) : null,
+          vibe: !isGroup ? (members[0]?.vibe ?? null) : null,
           muted: mutedByConv.has(c.id),
           pinned: pinnedByConv.has(c.id),
           isRequest: !isGroup && requestByConv.get(c.id) === false,
