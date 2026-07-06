@@ -1,6 +1,9 @@
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { JoinBanner } from "@/components/growth/JoinBanner";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { PublicProfileTabs } from "@/components/profile/PublicProfileTabs";
 import { ProfileShowcase } from "@/components/profile/ProfileShowcase";
@@ -22,6 +25,48 @@ async function fetchStats(supabase: any, userId: string) {
   return { posts: (postsRes.count ?? 0) + (shotsRes.count ?? 0), followers: followersRes.count ?? 0, following: followingRes.count ?? 0 };
 }
 
+// Shared between generateMetadata and the page render (deduped per request).
+const getProfileByUsername = cache(async (username: string) => {
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("username", username.toLowerCase())
+    .eq("profile_completed", true)
+    .maybeSingle();
+  return profile;
+});
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}): Promise<Metadata> {
+  const { username } = await params;
+  const profile = await getProfileByUsername(username);
+  if (!profile) return {};
+  const name = profile.display_name ?? profile.username ?? "User";
+  const title = `${name} (@${profile.username})`;
+  const description = profile.bio ?? `Follow ${name} on Hypefy — where your personality lives.`;
+  const image = (profile as any).avatar_url as string | null;
+  return {
+    title,
+    description,
+    openGraph: {
+      title: `${title} · Hypefy`,
+      description,
+      type: "profile",
+      ...(image ? { images: [{ url: image }] } : {}),
+    },
+    twitter: {
+      card: "summary",
+      title: `${title} · Hypefy`,
+      description,
+      ...(image ? { images: [image] } : {}),
+    },
+  };
+}
+
 export default async function PublicProfilePage({
   params,
 }: {
@@ -31,13 +76,7 @@ export default async function PublicProfilePage({
   const supabase = await createClient();
   const { data: { user: currentUser } } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("username", username.toLowerCase())
-    .eq("profile_completed", true)
-    .maybeSingle();
-
+  const profile = await getProfileByUsername(username);
   if (!profile) notFound();
 
   const isOwn = currentUser?.id === profile.id;
@@ -150,6 +189,8 @@ export default async function PublicProfilePage({
           currentUserId={currentUser?.id ?? null}
         />
       )}
+
+      {!currentUser && <JoinBanner />}
     </>
   );
 }

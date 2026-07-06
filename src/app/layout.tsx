@@ -13,13 +13,30 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Hypefy",
+  metadataBase: new URL("https://www.hypefy.chat"),
+  title: {
+    default: "Hypefy",
+    template: "%s · Hypefy",
+  },
   description: "Where your personality lives.",
   applicationName: "Hypefy",
   appleWebApp: {
     capable: true,
     title: "Hypefy",
     statusBarStyle: "black-translucent",
+  },
+  openGraph: {
+    siteName: "Hypefy",
+    type: "website",
+    title: "Hypefy",
+    description: "Where your personality lives.",
+    images: [{ url: "/og-default.png", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Hypefy",
+    description: "Where your personality lives.",
+    images: ["/og-default.png"],
   },
 };
 

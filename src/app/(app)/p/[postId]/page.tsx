@@ -1,13 +1,62 @@
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
+import { JoinBanner } from "@/components/growth/JoinBanner";
 
 type Thumb = { id: string; image_url: string | null; image_urls: string[] | null; caption: string | null };
 
 function cover(p: Thumb): string | null {
   return p.image_url ?? p.image_urls?.[0] ?? null;
+}
+
+// Shared between generateMetadata and the page render (React cache dedupes
+// within a single request), so the OG tags don't cost an extra round-trip.
+const getPostWithAuthor = cache(async (postId: string) => {
+  const supabase = await createClient();
+  const { data: raw } = await supabase.from("posts").select("*").eq("id", postId).maybeSingle();
+  if (!raw) return null;
+  const { data: ownerProf } = await supabase
+    .from("profiles")
+    .select("id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified")
+    .eq("id", (raw as any).user_id)
+    .maybeSingle();
+  return { raw: raw as any, ownerProf: ownerProf as any };
+});
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ postId: string }>;
+}): Promise<Metadata> {
+  const { postId } = await params;
+  const result = await getPostWithAuthor(postId);
+  if (!result) return {};
+  const { raw, ownerProf } = result;
+  const username = ownerProf?.username ?? null;
+  const title = username ? `@${username} on Hypefy` : "Post on Hypefy";
+  const description =
+    (raw.caption as string | null) ?? (raw.body as string | null)?.slice(0, 160) ?? "Where your personality lives.";
+  const image = (raw.image_url as string | null) ?? (raw.image_urls as string[] | null)?.[0] ?? null;
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "article",
+      ...(image ? { images: [{ url: image }] } : {}),
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title,
+      description,
+      ...(image ? { images: [image] } : {}),
+    },
+  };
 }
 
 export default async function PostDetailPage({
@@ -21,18 +70,11 @@ export default async function PostDetailPage({
   const uid = user?.id ?? "";
 
   // The single target post (this is what an embed/chat link should open).
-  const { data: raw } = await supabase.from("posts").select("*").eq("id", postId).maybeSingle();
-  if (!raw) notFound();
+  const result = await getPostWithAuthor(postId);
+  if (!result) notFound();
+  const { raw, ownerProf } = result;
   const ownerId = (raw as any).user_id as string;
   const isOwn = uid === ownerId;
-
-  // Author profile (fetched separately — embedding it in the single-row query
-  // above intermittently returned null).
-  const { data: ownerProf } = await supabase
-    .from("profiles")
-    .select("id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified")
-    .eq("id", ownerId)
-    .maybeSingle();
 
   // Can the viewer see the owner's other posts? (private + non-follower → no)
   let canSeeMore = isOwn;
@@ -105,6 +147,8 @@ export default async function PostDetailPage({
         <ThumbSection title={username ? `More from @${username}` : "More from this person"} items={moreFrom} />
       )}
       {moreLike.length > 0 && <ThumbSection title="More like this" items={moreLike} />}
+
+      {!user && <JoinBanner />}
     </>
   );
 }
