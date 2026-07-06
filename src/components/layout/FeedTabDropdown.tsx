@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { haptics } from "@/lib/haptics";
 
 export type FeedTab = "foryou" | "following" | "favourite" | "hypers";
@@ -10,7 +10,6 @@ export type FeedTab = "foryou" | "following" | "favourite" | "hypers";
 const OPTIONS: { value: FeedTab; label: string }[] = [
   { value: "foryou", label: "For You" },
   { value: "following", label: "Following" },
-  { value: "favourite", label: "Favourite" },
   { value: "hypers", label: "Hypers" },
 ];
 
@@ -60,10 +59,6 @@ export function FeedTabDropdown() {
         <span className="text-xl font-extrabold tracking-tight">
           Hypefy<span className="text-accent">.</span>
         </span>
-        <ChevronDown
-          size={16}
-          className={`text-muted transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-        />
       </button>
 
       {open && (

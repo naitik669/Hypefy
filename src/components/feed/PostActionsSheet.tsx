@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, UserCheck, Link2, Flag, Trash2, Check, Loader2, Pencil } from "lucide-react";
+import { UserPlus, UserCheck, Link2, Flag, Trash2, Check, Loader2, Pencil, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 
@@ -20,6 +20,7 @@ export function PostActionsSheet({
   currentUserId,
   onDelete,
   onEdit,
+  onHyperChange,
 }: {
   open: boolean;
   onClose: () => void;
@@ -29,6 +30,7 @@ export function PostActionsSheet({
   currentUserId: string;
   onDelete?: () => void;
   onEdit?: () => void;
+  onHyperChange?: () => void;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -37,11 +39,13 @@ export function PostActionsSheet({
 
   const [following, setFollowing] = useState(false);
   const [followPending, setFollowPending] = useState(false);
+  const [isHyper, setIsHyper] = useState(false);
+  const [hyperPending, setHyperPending] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Fetch follow state when opened
+  // Fetch follow + Hyper state when opened
   useEffect(() => {
     if (!open || isOwn || !currentUserId) return;
     supabase
@@ -51,6 +55,13 @@ export function PostActionsSheet({
       .eq("following_id", postUserId)
       .maybeSingle()
       .then(({ data }) => setFollowing(!!data));
+    supabase
+      .from("close_friends")
+      .select("user_id")
+      .eq("user_id", currentUserId)
+      .eq("friend_id", postUserId)
+      .maybeSingle()
+      .then(({ data }) => setIsHyper(!!data));
   }, [open, isOwn, currentUserId, postUserId, supabase]);
 
   // Close on outside click
@@ -88,6 +99,20 @@ export function PostActionsSheet({
       if (error) setFollowing(prev);
     }
     setFollowPending(false);
+    onClose();
+  }
+
+  async function toggleHyper() {
+    if (hyperPending) return;
+    setHyperPending(true);
+    const prev = isHyper;
+    setIsHyper(!prev);
+    const { error } = prev
+      ? await supabase.from("close_friends").delete().eq("user_id", currentUserId).eq("friend_id", postUserId)
+      : await supabase.from("close_friends").insert({ user_id: currentUserId, friend_id: postUserId });
+    if (error) setIsHyper(prev);
+    else { onHyperChange?.(); router.refresh(); }
+    setHyperPending(false);
     onClose();
   }
 
@@ -134,6 +159,20 @@ export function PostActionsSheet({
                 <UserPlus size={17} className="text-muted" />
               )}
               {following ? `Unfollow @${postUsername ?? "user"}` : `Follow @${postUsername ?? "user"}`}
+            </button>
+          )}
+
+          {/* Add / Remove Hyper (only other users) */}
+          {!isOwn && (
+            <button type="button" onClick={toggleHyper}
+              className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/5 active:bg-white/8"
+            >
+              {hyperPending ? (
+                <Loader2 size={17} className="animate-spin text-muted" />
+              ) : (
+                <Star size={17} className={isHyper ? "text-hype" : "text-muted"} fill={isHyper ? "currentColor" : "none"} />
+              )}
+              {isHyper ? "Remove from Hypers" : "Add to Hypers"}
             </button>
           )}
 

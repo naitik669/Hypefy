@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
 import { Reveal } from "@/components/ui/Reveal";
 import { PeopleToFollow } from "@/components/feed/PeopleToFollow";
+import { AddHypersPrompt } from "@/components/feed/AddHypersPrompt";
 import { useFeedTab, type FeedTab } from "@/components/layout/FeedTabDropdown";
 
 const PAGE_SIZE = 20;
@@ -145,7 +146,18 @@ export function FeedList({
   }
 
   async function loadMoreIdsTab(t: IdsTab) {
-    const scopeIds = idsByTab[t].length ? [...idsByTab[t], currentUserId] : [currentUserId];
+    // Following/Hypers scope strictly to those people — showing your own
+    // posts there just crowds out the "nothing here yet" prompts. Favourite
+    // keeps the old behavior (includes your own posts) since it's unchanged.
+    const scopeIds = t === "favourite"
+      ? (idsByTab[t].length ? [...idsByTab[t], currentUserId] : [currentUserId])
+      : idsByTab[t];
+
+    if (scopeIds.length === 0) {
+      setIdsState((prev) => ({ ...prev, [t]: { posts: [], done: true, init: true } }));
+      return;
+    }
+
     const current = idsStateRef.current[t].posts;
     let query = supabase
       .from("posts").select(POST_SELECT)
@@ -216,10 +228,15 @@ export function FeedList({
   const activePosts = tab === "foryou" ? posts : idsState[tab].posts;
   const activeDone = tab === "foryou" ? fyDone : idsState[tab].done;
   const idsEmpty = tab !== "foryou" && idsState[tab].init && idsState[tab].posts.length === 0;
+  // Zero Hypers picked takes priority over post content — otherwise a user's
+  // own posts (always included in the scope query) would mask the empty state.
+  const noHypersPicked = tab === "hypers" && hyperIds.length === 0;
 
   return (
     <div className="flex flex-col">
-      {idsEmpty ? (
+      {noHypersPicked ? (
+        <AddHypersPrompt currentUserId={currentUserId} />
+      ) : idsEmpty ? (
         tab === "following" ? (
           <PeopleToFollow
             currentUserId={currentUserId}
@@ -239,7 +256,7 @@ export function FeedList({
       )}
 
       {/* Sentinel + loading shimmer */}
-      {!activeDone && !idsEmpty && (
+      {!activeDone && !idsEmpty && !noHypersPicked && (
         <div ref={sentinelRef} className="px-4 py-6">
           {loading && (
             <div className="flex items-center gap-3">
@@ -253,7 +270,7 @@ export function FeedList({
         </div>
       )}
 
-      {activeDone && activePosts.length > 10 && (
+      {!noHypersPicked && activeDone && activePosts.length > 10 && (
         <p className="py-8 text-center text-xs text-faint">You&apos;re all caught up ⚡</p>
       )}
     </div>

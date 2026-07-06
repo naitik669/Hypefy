@@ -45,15 +45,18 @@ export default async function PublicProfilePage({
 
   let isFollowing = false;
   let isHyper = false;
+  let isMutualHyper = false;
   let isFavourite = false;
   if (currentUser && !isOwn) {
-    const [{ data: followRow }, { data: hyperRow }, { data: favRow }] = await Promise.all([
+    const [{ data: followRow }, { data: hyperRow }, { data: reverseHyperRow }, { data: favRow }] = await Promise.all([
       supabase.from("follows").select("id").eq("follower_id", currentUser.id).eq("following_id", profile.id).maybeSingle(),
       supabase.from("close_friends").select("user_id").eq("user_id", currentUser.id).eq("friend_id", profile.id).maybeSingle(),
+      supabase.from("close_friends").select("user_id").eq("user_id", profile.id).eq("friend_id", currentUser.id).maybeSingle(),
       supabase.from("favorites").select("user_id").eq("user_id", currentUser.id).eq("friend_id", profile.id).maybeSingle(),
     ]);
     isFollowing = !!followRow;
     isHyper = !!hyperRow;
+    isMutualHyper = !!hyperRow && !!reverseHyperRow;
     isFavourite = !!favRow;
   }
 
@@ -94,6 +97,8 @@ export default async function PublicProfilePage({
         currentUserId={currentUser?.id ?? null}
         stats={stats}
         verified={!!(profile as any).is_verified}
+        isHyper={isHyper}
+        isMutualHyper={isMutualHyper}
         actions={
           isOwn ? (
             <>

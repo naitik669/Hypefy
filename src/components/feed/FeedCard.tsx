@@ -14,6 +14,8 @@ import { ShareSheet } from "@/components/feed/ShareSheet";
 import { EditPostSheet } from "@/components/feed/EditPostSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { HyperStar } from "@/components/ui/HyperStar";
+import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { formatCount } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
@@ -113,6 +115,8 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const [avatarZoomOpen, setAvatarZoomOpen] = useState(false);
   const [liveCaption, setLiveCaption] = useState(post.caption);
   const [liveBody, setLiveBody] = useState(post.body);
+  const [isHyper, setIsHyper] = useState(false);
+  const [isMutualHyper, setIsMutualHyper] = useState(false);
 
   const lastTapRef = useRef(0);
 
@@ -151,6 +155,36 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post.id]);
+
+  // ── Hyper relationship: does the viewer have this author as a Hyper,
+  // and is it mutual (they've added the viewer back too)? Re-run after the
+  // ··· menu's "Add/Remove Hyper" action so the badge updates immediately.
+  const syncHyperRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    let active = true;
+    async function syncHyper() {
+      let id = uid;
+      if (!id) {
+        const { data } = await supabase.auth.getUser();
+        id = data.user?.id ?? "";
+      }
+      if (!id || id === post.user_id) return;
+      const { data } = await supabase
+        .from("close_friends")
+        .select("user_id, friend_id")
+        .or(`and(user_id.eq.${id},friend_id.eq.${post.user_id}),and(user_id.eq.${post.user_id},friend_id.eq.${id})`);
+      if (!active) return;
+      const rows = data ?? [];
+      const iAdded = rows.some((r: any) => r.user_id === id && r.friend_id === post.user_id);
+      const theyAdded = rows.some((r: any) => r.user_id === post.user_id && r.friend_id === id);
+      setIsHyper(iAdded);
+      setIsMutualHyper(iAdded && theyAdded);
+    }
+    syncHyperRef.current = syncHyper;
+    syncHyper();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post.id, uid]);
 
   const profile = post.profiles;
   const name = profile?.display_name ?? profile?.username ?? "User";
@@ -257,6 +291,8 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <Link href={profileHref} className="truncate text-sm font-semibold hover:underline">{name}</Link>
           {profile?.is_verified && <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />}
+          {isHyper && <HyperStar className="h-3.5 w-3.5 shrink-0" />}
+          {isMutualHyper && <MutualHyperBadge />}
           <span className="ml-1 text-xs text-faint">· {timeAgo(post.created_at)}</span>
         </div>
         {/* THREE DOTS -- fully functional */}
@@ -436,6 +472,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
       <PostActionsSheet open={actionsOpen} onClose={() => setActionsOpen(false)}
         postId={post.id} postUserId={post.user_id} postUsername={username ?? null}
         currentUserId={uid}
+        onHyperChange={() => syncHyperRef.current()}
         onDelete={() => setDeleted(true)}
         onEdit={() => setEditOpen(true)} />
 

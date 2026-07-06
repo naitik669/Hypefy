@@ -3,6 +3,8 @@ import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { FollowStats } from "@/components/profile/FollowStats";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { HyperStar } from "@/components/ui/HyperStar";
+import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 
 /**
  * Profile hero — banner, the squircle avatar overlapping its bottom-left
@@ -25,6 +27,8 @@ export function ProfileHeader({
   stats,
   actions,
   verified = false,
+  isHyper = false,
+  isMutualHyper = false,
 }: {
   name: string;
   username: string | null;
@@ -41,6 +45,8 @@ export function ProfileHeader({
   stats: { posts: number; followers: number; following: number };
   actions?: ReactNode;
   verified?: boolean;
+  isHyper?: boolean;
+  isMutualHyper?: boolean;
 }) {
   return (
     <>
@@ -72,6 +78,8 @@ export function ProfileHeader({
           <span className="flex items-center gap-1 text-base font-bold leading-tight">
             {name}
             {verified && <VerifiedStar className="h-4 w-4 shrink-0 text-verified" />}
+            {isHyper && <HyperStar className="h-4 w-4 shrink-0" />}
+            {isMutualHyper && <MutualHyperBadge />}
           </span>
           {username && <p className="mt-0.5 text-sm text-muted">@{username}</p>}
           {bio && <p className="mt-1.5 text-sm leading-snug">{bio}</p>}
