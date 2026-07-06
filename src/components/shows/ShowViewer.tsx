@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
+import { ShowViewersSheet } from "@/components/shows/ShowViewersSheet";
 
 type ShowProfile = { display_name: string | null; avatar_hue: number | null; username: string | null; avatar_url?: string | null } | null;
 
@@ -128,6 +129,7 @@ function ShowScreen({
   const progressRef = useRef(0);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [viewersOpen, setViewersOpen] = useState(false);
   const [actionPending, setActionPending] = useState<"delete" | "showcase" | null>(null);
 
   const isOwner = !!currentUserId && currentUserId === show.user_id;
@@ -269,7 +271,7 @@ function ShowScreen({
   }, [show.id]);
 
   useEffect(() => {
-    if (paused || menuOpen) return;
+    if (paused || menuOpen || viewersOpen) return;
     const lastP = progressRef.current;
     function tick(now: number) {
       if (startRef.current === 0) startRef.current = now - lastP * DURATION;
@@ -280,7 +282,7 @@ function ShowScreen({
     }
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [show.id, paused, menuOpen, onNext]);
+  }, [show.id, paused, menuOpen, viewersOpen, onNext]);
 
   function openLinkedPost() {
     if (!linkedPost) return;
@@ -480,16 +482,30 @@ function ShowScreen({
         </div>
       )}
 
-      {/* ── Owner view count ── */}
+      {/* ── Owner view count → opens the viewers list ── */}
       {isOwner && viewCount !== null && !menuOpen && (
-        <div className="pointer-events-none absolute left-4 z-20 flex items-center gap-1.5" style={{ bottom: show.caption ? 128 : 96 }}>
-          <span className="flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 backdrop-blur-sm">
+        <div className="absolute left-4 z-20 flex items-center gap-1.5" style={{ bottom: show.caption ? 128 : 96 }}>
+          <button
+            type="button"
+            aria-label="See who viewed"
+            onClick={(e) => { e.stopPropagation(); setViewersOpen(true); }}
+            className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 backdrop-blur-sm transition-transform active:scale-95"
+          >
             <Eye size={13} className="text-white/80" />
             <span className="text-xs font-semibold text-white/90">
               {viewCount} {viewCount === 1 ? "view" : "views"}
             </span>
-          </span>
+          </button>
         </div>
+      )}
+
+      {isOwner && (
+        <ShowViewersSheet
+          open={viewersOpen}
+          onClose={() => setViewersOpen(false)}
+          showId={show.id}
+          ownerId={show.user_id}
+        />
       )}
 
       {/* ── Reply + Hype bar (viewers only) ── */}
