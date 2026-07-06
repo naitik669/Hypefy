@@ -1,0 +1,71 @@
+"use client";
+
+import { useState } from "react";
+import { Share2, Check, UserPlus, ChevronRight } from "lucide-react";
+import { haptics } from "@/lib/haptics";
+
+const SITE = "https://www.hypefy.chat";
+
+/** Native-share (clipboard fallback) of the user's profile link. */
+async function shareProfile(username: string | null) {
+  haptics.tap();
+  const url = username ? `${SITE}/u/${username}` : SITE;
+  const text = "Come find me on Hypefy — where your personality lives.";
+  try {
+    if (navigator.share) {
+      await navigator.share({ url, text });
+      return "shared";
+    }
+  } catch {
+    /* user dismissed the sheet — fall through to nothing */
+    return "dismissed";
+  }
+  await navigator.clipboard.writeText(url).catch(() => {});
+  return "copied";
+}
+
+/** Square icon button for the profile-header action row. */
+export function InviteIconButton({ username }: { username: string | null }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label="Share profile"
+      onClick={async () => {
+        if ((await shareProfile(username)) === "copied") {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        }
+      }}
+      className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-elevated text-foreground transition-colors hover:bg-elevated/70 active:scale-[0.99]"
+    >
+      {copied ? <Check size={18} className="text-accent" /> : <Share2 size={18} />}
+    </button>
+  );
+}
+
+/** Full-width row for the settings hub, styled like its nav links. */
+export function InviteRow({ username }: { username: string | null }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        if ((await shareProfile(username)) === "copied") {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        }
+      }}
+      className="flex w-full items-center gap-3 rounded-2xl px-2 py-3.5 text-left transition-colors hover:bg-white/[0.03]"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+        <UserPlus size={20} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold">Invite friends</p>
+        <p className="truncate text-xs text-muted">{copied ? "Link copied ✓" : "Share your profile link"}</p>
+      </div>
+      <ChevronRight size={18} className="shrink-0 text-faint" />
+    </button>
+  );
+}

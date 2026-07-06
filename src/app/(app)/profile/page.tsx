@@ -5,6 +5,7 @@ import { getProfile, hueFromId } from "@/lib/profile";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
 import { ProfileShowcase } from "@/components/profile/ProfileShowcase";
+import { InviteIconButton } from "@/components/growth/InviteButton";
 
 async function fetchStats(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const [postsRes, shotsRes, followersRes, followingRes] = await Promise.all([
@@ -80,6 +81,7 @@ export default async function ProfilePage() {
             >
               <BarChart3 size={18} />
             </Link>
+            <InviteIconButton username={profile?.username ?? null} />
             <Link
               href="/settings"
               aria-label="Settings"

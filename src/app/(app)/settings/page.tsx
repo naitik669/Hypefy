@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { ChevronRight, UserCircle, Shield, Lock, Bell } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SignOutButton } from "@/components/SignOutButton";
 import { AccountSwitcher } from "@/components/settings/AccountSwitcher";
+import { InviteRow } from "@/components/growth/InviteButton";
 
 const ITEMS = [
   { href: "/settings/profile", label: "Edit profile", sub: "Photo, banner, name, bio, tags", icon: UserCircle },
@@ -11,7 +13,14 @@ const ITEMS = [
   { href: "/settings/notifications", label: "Notifications", sub: "What pings you", icon: Bell },
 ];
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: prof } = user
+    ? await supabase.from("profiles").select("username").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const username = (prof?.username as string | null) ?? null;
+
   return (
     <>
       <PageHeader title="Settings" showBack />
@@ -48,6 +57,14 @@ export default function SettingsPage() {
               </Link>
             ))}
           </div>
+        </section>
+
+        {/* Grow the circle */}
+        <section>
+          <p className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">
+            Friends
+          </p>
+          <InviteRow username={username} />
         </section>
 
         {/* Sign out */}
