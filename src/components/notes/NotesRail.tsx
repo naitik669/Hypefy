@@ -257,6 +257,7 @@ export function NotesRail({
         onClose={() => setEditorOpen(false)}
         current={myNote}
         onSaved={(n) => setMyNote(n)}
+        me={{ name: me.name, hue: me.hue, avatarUrl: me.avatarUrl }}
       />
 
       {/* Quick reaction picker (long-press on a friend's note) */}

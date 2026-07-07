@@ -87,7 +87,14 @@ export function ProfileHeader({
             {isMutualHyper && <MutualHyperBadge />}
           </span>
           {username && <p className="mt-0.5 text-sm text-muted">@{username}</p>}
-          <VibePill vibe={vibe} editable={vibeEditable} userId={vibeEditable ? userId : undefined} />
+          <VibePill
+            vibe={vibe}
+            editable={vibeEditable}
+            userId={vibeEditable ? userId : undefined}
+            name={name}
+            hue={hue}
+            avatarUrl={avatarUrl ?? null}
+          />
           {bio && <p className="mt-1.5 text-sm leading-snug">{bio}</p>}
         </div>
 

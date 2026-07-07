@@ -7,7 +7,7 @@ import { haptics } from "@/lib/haptics";
 export type StatusValue = { emoji: string; text: string };
 
 /** Curated pool the dice rolls from — emoji and text always land as a pair. */
-const DICE_POOL: StatusValue[] = [
+export const DICE_POOL: StatusValue[] = [
   { emoji: "🎧", text: "locked in" },
   { emoji: "🪫", text: "low battery" },
   { emoji: "🔥", text: "on one" },
@@ -41,7 +41,7 @@ const DICE_POOL: StatusValue[] = [
 ];
 
 /** Quick strip shown when the emoji slot is tapped. */
-const EMOJI_STRIP = ["🎧", "🔥", "🧊", "💀", "✨", "🎮", "❤️", "🌙", "🫠", "⚡", "🥱", "📚", "🌧️", "☕", "🦋", "🤫"];
+export const EMOJI_STRIP = ["🎧", "🔥", "🧊", "💀", "✨", "🎮", "❤️", "🌙", "🫠", "⚡", "🥱", "📚", "🌧️", "☕", "🦋", "🤫"];
 
 /** Grab the leading emoji cluster (handles ZWJ sequences + variation selectors). */
 export function splitStatus(raw: string | null): StatusValue {
@@ -111,7 +111,7 @@ export function StatusComposer({
           placeholder="🙂"
           aria-label="Status emoji"
           inputMode="text"
-          className="h-14 w-14 shrink-0 rounded-2xl border border-border bg-surface text-center text-[26px] leading-none outline-none transition-colors placeholder:opacity-35 focus:border-accent/40"
+          className="h-14 w-14 shrink-0 rounded-2xl border border-border bg-surface text-center text-[26px] leading-none outline-none transition-colors placeholder:opacity-35 focus:border-white/25"
         />
         <input
           value={value.text}
@@ -120,7 +120,7 @@ export function StatusComposer({
           placeholder={placeholder}
           autoFocus={autoFocus}
           aria-label="Status text"
-          className="h-14 min-w-0 flex-1 rounded-2xl border border-border bg-surface px-4 text-[15px] font-medium outline-none transition-colors placeholder:text-faint focus:border-accent/40"
+          className="h-14 min-w-0 flex-1 rounded-2xl border border-border bg-surface px-4 text-[15px] font-medium outline-none transition-colors placeholder:text-faint focus:border-white/25"
         />
         <button
           type="button"
@@ -145,7 +145,7 @@ export function StatusComposer({
                 setStripOpen(false);
               }}
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl transition-transform active:scale-90 ${
-                value.emoji === e ? "bg-accent/15 ring-1 ring-accent/40" : "hover:bg-white/[0.05]"
+                value.emoji === e ? "bg-white/[0.08]" : "hover:bg-white/[0.05]"
               }`}
             >
               {e}
@@ -167,10 +167,10 @@ export function StatusComposer({
                 onChange({ emoji: p.emoji, text: p.text.slice(0, maxTextLen) });
                 setStripOpen(false);
               }}
-              className={`rounded-pill border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors ${
                 active
-                  ? "border-accent/40 bg-accent/[0.08] text-accent"
-                  : "border-border bg-surface text-muted hover:text-foreground"
+                  ? "border-white/20 bg-white/[0.08] text-foreground"
+                  : "border-border bg-surface text-muted hover:border-white/20 hover:text-foreground"
               }`}
             >
               {p.emoji} {p.text}
