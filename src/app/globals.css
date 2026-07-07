@@ -30,10 +30,35 @@
   --radius-pill: 100px;
 }
 
+/*
+  ── Type scale (Plus Jakarta Sans everywhere) ────────────────────────
+  micro    10px  font-black      counters/badges ONLY (UnreadBadge)
+  caption  12px  medium/semibold timestamps, hints, eyebrows (text-xs)
+  body     14px  medium/semibold default UI text, buttons (text-sm)
+  emphasis 15px  semibold        chat bubbles, composer inputs (text-[15px])
+  title    17px  extrabold -tracking-tight  modal + page headers (text-[17px])
+  display  20px  bold            stats, hero numbers (text-xl)
+  Eyebrow pattern: text-xs font-bold uppercase tracking-widest text-faint
+
+  ── Overlay z ladder ─────────────────────────────────────────────────
+  content < in-app notifier 150 < sheets/modals/menus 200 < confirm 210 < call 230
+*/
+
 html {
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
   width: 100%;
+}
+
+/* Keyboard focus — visible accent ring only for keyboard users;
+   pointer taps keep the clean look. */
+:focus-visible {
+  outline: 2px solid rgba(200, 255, 0, 0.7);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
 }
 
 /* Hide scrollbars for horizontal scrollers (Shows row, etc.) */
@@ -225,11 +250,61 @@ body {
   animation: roll-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Floating menus unfurl from their anchor (origin set per-menu) */
+@keyframes menu-pop {
+  from { opacity: 0; transform: scale(0.94) translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-menu-pop {
+  transform-origin: top right;
+  animation: menu-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* List rows entering / leaving (notifications, results) */
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-row-in {
+  animation: row-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes row-out {
+  from { opacity: 1; max-height: 80px; }
+  to { opacity: 0; max-height: 0; transform: translateX(12px); }
+}
+.animate-row-out {
+  overflow: hidden;
+  animation: row-out 0.25s ease-in forwards;
+}
+
+/* Tab-content crossfade (profile tabs, category switches) */
+@keyframes fade-swap {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-fade-swap {
+  animation: fade-swap 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Media blur-up: applied when an image finishes loading */
+@keyframes img-in {
+  from { opacity: 0; filter: blur(8px); }
+  to { opacity: 1; filter: blur(0); }
+}
+.animate-img-in {
+  animation: img-in 0.35s ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-modal-pop,
   .animate-bubble-float,
   .animate-dice-spin,
   .animate-roll-in,
+  .animate-menu-pop,
+  .animate-row-in,
+  .animate-row-out,
+  .animate-fade-swap,
+  .animate-img-in,
   .animate-rise {
     animation: none;
     opacity: 1;
