@@ -80,6 +80,7 @@ export function StatusComposer({
   autoFocus?: boolean;
 }) {
   const [stripOpen, setStripOpen] = useState(false);
+  const [rollCount, setRollCount] = useState(0);
   const emojiInputRef = useRef<HTMLInputElement>(null);
   const lastRollRef = useRef(-1);
 
@@ -89,6 +90,7 @@ export function StatusComposer({
     if (i === lastRollRef.current) i = (i + 1) % DICE_POOL.length; // never repeat back-to-back
     lastRollRef.current = i;
     onChange({ emoji: DICE_POOL[i].emoji, text: DICE_POOL[i].text.slice(0, maxTextLen) });
+    setRollCount((c) => c + 1); // re-keys the dice icon so it tumbles
     setStripOpen(false);
   }
 
@@ -126,9 +128,11 @@ export function StatusComposer({
           type="button"
           onClick={roll}
           aria-label="Random vibe"
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-surface text-muted transition-all hover:text-foreground active:scale-90 active:rotate-12"
+          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-surface text-muted transition-colors hover:text-foreground"
         >
-          <Dices size={22} />
+          <span key={rollCount} className={rollCount ? "animate-dice-spin" : undefined}>
+            <Dices size={22} />
+          </span>
         </button>
       </div>
 

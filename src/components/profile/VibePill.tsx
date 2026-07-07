@@ -84,15 +84,21 @@ export function VibePill({
         </button>
       )}
 
-      <CenterModal open={open} onClose={() => setOpen(false)} title="Your vibe">
+      <CenterModal open={open} onClose={() => setOpen(false)} title="Your vibe" subtitle="shows next to your name across Hypefy">
         <div className="flex flex-col gap-4">
           {/* Live preview — the pill exactly as it sits on your profile */}
-          <div className="flex items-center gap-3 rounded-3xl bg-surface/60 px-4 py-4">
+          <div className="relative flex items-center gap-3 overflow-hidden rounded-3xl bg-surface/60 px-4 py-4">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0"
+              style={{ background: "radial-gradient(ellipse 80% 90% at 18% 50%, rgba(200,255,0,0.05), transparent 70%)" }}
+            />
             <Avatar name={name ?? "You"} hue={hue} size={44} src={avatarUrl ?? undefined} />
             <div className="min-w-0">
               <p className="truncate text-sm font-bold leading-tight">{name ?? "You"}</p>
               <span
-                className={`mt-1 inline-flex max-w-full items-center rounded-pill border border-border bg-elevated px-2.5 py-1 text-xs font-semibold ${
+                key={joinStatus(draft) || "empty"}
+                className={`animate-roll-in mt-1 inline-flex max-w-full items-center rounded-pill border border-border bg-elevated px-2.5 py-1 text-xs font-semibold ${
                   joinStatus(draft) ? "" : "text-faint"
                 }`}
               >

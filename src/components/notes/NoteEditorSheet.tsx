@@ -50,6 +50,7 @@ export function NoteEditorSheet({
   const [audience, setAudience] = useState<"mutual" | "close">(current?.audience ?? "mutual");
   const [busy, setBusy] = useState(false);
   const [stripOpen, setStripOpen] = useState(false);
+  const [rollCount, setRollCount] = useState(0);
   const textRef = useRef<HTMLInputElement>(null);
   const lastRollRef = useRef(-1);
 
@@ -59,6 +60,7 @@ export function NoteEditorSheet({
       setDraft(splitStatus(current?.text ?? null));
       setAudience(current?.audience ?? "mutual");
       setStripOpen(false);
+      setRollCount(0);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -69,6 +71,7 @@ export function NoteEditorSheet({
     if (i === lastRollRef.current) i = (i + 1) % DICE_POOL.length;
     lastRollRef.current = i;
     setDraft({ emoji: DICE_POOL[i].emoji, text: DICE_POOL[i].text.slice(0, MAX_TEXT) });
+    setRollCount((c) => c + 1); // re-keys the bubble + dice so both animate
     setStripOpen(false);
   }
 
@@ -94,55 +97,65 @@ export function NoteEditorSheet({
   }
 
   return (
-    <CenterModal open={open} onClose={onClose} title="Leave a note">
+    <CenterModal open={open} onClose={onClose} title="Leave a note" subtitle="your circle sees it for 24 hours">
       <div className="flex flex-col gap-4">
-        {/* ── Live preview: the note exactly as your circle sees it ── */}
-        <div className="relative flex flex-col items-center rounded-3xl bg-surface/60 px-4 pb-5 pt-7">
-          {/* Thought bubble — this IS the input */}
-          <div className="relative w-full max-w-[280px]">
-            <div className="flex items-center gap-2 rounded-[22px] rounded-bl-md border border-white/[0.08] bg-elevated px-3.5 py-3 shadow-[0_10px_28px_rgba(0,0,0,0.4)]">
-              <button
-                type="button"
-                aria-label="Pick emoji"
-                onClick={() => setStripOpen((v) => !v)}
-                className={`shrink-0 text-[24px] leading-none transition-transform active:scale-90 ${draft.emoji ? "" : "opacity-30 grayscale"}`}
-              >
-                {draft.emoji || "🙂"}
-              </button>
-              <input
-                ref={textRef}
-                value={draft.text}
-                onChange={(e) => setDraft({ ...draft, text: e.target.value.slice(0, MAX_TEXT) })}
-                onFocus={() => setStripOpen(false)}
-                placeholder="say something…"
-                autoFocus={!current}
-                aria-label="Note text"
-                className="min-w-0 flex-1 bg-transparent text-[15px] font-medium outline-none placeholder:text-faint"
-              />
-              {draft.text.length > MAX_TEXT - 10 && (
-                <span className="shrink-0 text-[10px] tabular-nums text-faint">{MAX_TEXT - draft.text.length}</span>
-              )}
-            </div>
-            {/* Bubble tail — steps down toward the avatar */}
-            <span className="absolute -bottom-2.5 left-1/2 h-3 w-3 -translate-x-5 rounded-full border border-white/[0.08] bg-elevated" />
-            <span className="absolute -bottom-5 left-1/2 h-1.5 w-1.5 -translate-x-2 rounded-full border border-white/[0.08] bg-elevated" />
+        {/* ── The stage: your note exactly as your circle sees it ── */}
+        <div className="relative flex flex-col items-center overflow-hidden rounded-3xl bg-surface/60 px-4 pb-6 pt-8">
+          {/* Soft spotlight pulling focus to the bubble + avatar */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{ background: "radial-gradient(ellipse 75% 60% at 50% 42%, rgba(200,255,0,0.055), transparent 70%)" }}
+          />
 
-            {/* Dice — floats off the bubble's shoulder */}
+          {/* Thought bubble — this IS the input; it idles like it's floating */}
+          <div className="animate-bubble-float relative w-full max-w-[280px]">
+            <div key={rollCount} className={rollCount ? "animate-roll-in" : undefined}>
+              <div className="flex items-center gap-2 rounded-[22px] rounded-bl-md border border-white/[0.09] bg-elevated px-3.5 py-3 shadow-[0_14px_36px_rgba(0,0,0,0.45)]">
+                <button
+                  type="button"
+                  aria-label="Pick emoji"
+                  onClick={() => setStripOpen((v) => !v)}
+                  className={`shrink-0 text-[24px] leading-none transition-transform active:scale-90 ${draft.emoji ? "" : "opacity-30 grayscale"}`}
+                >
+                  {draft.emoji || "🙂"}
+                </button>
+                <input
+                  ref={textRef}
+                  value={draft.text}
+                  onChange={(e) => setDraft({ ...draft, text: e.target.value.slice(0, MAX_TEXT) })}
+                  onFocus={() => setStripOpen(false)}
+                  placeholder="say something…"
+                  autoFocus={!current}
+                  aria-label="Note text"
+                  className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold tracking-[-0.01em] outline-none placeholder:font-medium placeholder:text-faint"
+                />
+                {draft.text.length > MAX_TEXT - 10 && (
+                  <span className="shrink-0 text-[10px] tabular-nums text-faint">{MAX_TEXT - draft.text.length}</span>
+                )}
+              </div>
+              {/* Bubble tail — steps down toward the avatar */}
+              <span className="absolute -bottom-2.5 left-1/2 h-3 w-3 -translate-x-5 rounded-full border border-white/[0.09] bg-elevated" />
+              <span className="absolute -bottom-5 left-1/2 h-1.5 w-1.5 -translate-x-2 rounded-full border border-white/[0.09] bg-elevated" />
+            </div>
+
+            {/* Dice — perched on the bubble's shoulder, tumbles on each roll */}
             <button
               type="button"
               onClick={roll}
               aria-label="Random note"
-              className="absolute -right-2.5 -top-3.5 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background text-muted shadow-lg transition-all hover:text-foreground active:rotate-12 active:scale-90"
+              className="absolute -right-2.5 -top-3.5 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background text-muted shadow-lg transition-colors hover:text-foreground"
             >
-              <Dices size={17} />
+              <span key={rollCount} className={rollCount ? "animate-dice-spin" : undefined}>
+                <Dices size={17} />
+              </span>
             </button>
           </div>
 
           {/* Your pfp under the bubble */}
-          <div className="mt-4">
+          <div className="relative mt-5">
             <Avatar name={me?.name ?? "You"} hue={me?.hue ?? 280} size={64} src={me?.avatarUrl ?? undefined} />
           </div>
-          <span className="mt-1.5 text-[11px] text-faint">visible to your circle · 24h</span>
         </div>
 
         {/* Emoji strip (opens from the bubble's emoji) */}
