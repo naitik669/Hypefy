@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, UserCheck, Link2, Flag, Trash2, Check, Loader2, Pencil, Star } from "lucide-react";
+import { UserPlus, UserCheck, Link2, Flag, Trash2, Pencil, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ReportSheet } from "@/components/ui/ReportSheet";
+import { FloatingMenu, MenuItem, MenuDivider } from "@/components/ui/FloatingMenu";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/ToastProvider";
 
 /**
- * Floating dropdown popover that appears near the ··· button.
- * Not a bottom sheet — renders as a card positioned at the top-right
- * of the post card, just below where the button was tapped.
+ * Post ··· menu — anchored popover at the card's top-right (FloatingMenu
+ * shell), with report portaled to a sheet and delete gated behind a
+ * confirmation dialog.
  */
 export function PostActionsSheet({
   open,
@@ -34,16 +37,15 @@ export function PostActionsSheet({
 }) {
   const supabase = createClient();
   const router = useRouter();
-  const menuRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
   const isOwn = postUserId === currentUserId;
 
   const [following, setFollowing] = useState(false);
   const [followPending, setFollowPending] = useState(false);
   const [isHyper, setIsHyper] = useState(false);
   const [hyperPending, setHyperPending] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [showReport, setShowReport] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Fetch follow + Hyper state when opened
   useEffect(() => {
@@ -64,18 +66,7 @@ export function PostActionsSheet({
       .then(({ data }) => setIsHyper(!!data));
   }, [open, isOwn, currentUserId, postUserId, supabase]);
 
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    function handle(e: MouseEvent) {
-      if (showReport) return; // report sheet is portaled outside the menu
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
-    }
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, [open, onClose, showReport]);
-
-  if (!open) return null;
+  if (!open && !confirmDelete) return null;
 
   async function toggleFollow() {
     if (followPending) return;
@@ -92,6 +83,7 @@ export function PostActionsSheet({
           type: "follow", target_type: "profile", target_id: postUserId,
           body: "started following you",
         });
+        toast(`Following @${postUsername ?? "user"}`, "success");
       } else setFollowing(prev);
     } else {
       const { error } = await supabase.from("follows").delete()
@@ -111,7 +103,11 @@ export function PostActionsSheet({
       ? await supabase.from("close_friends").delete().eq("user_id", currentUserId).eq("friend_id", postUserId)
       : await supabase.from("close_friends").insert({ user_id: currentUserId, friend_id: postUserId });
     if (error) setIsHyper(prev);
-    else { onHyperChange?.(); router.refresh(); }
+    else {
+      toast(prev ? "Removed from Hypers" : "Added to Hypers ★", "success");
+      onHyperChange?.();
+      router.refresh();
+    }
     setHyperPending(false);
     onClose();
   }
@@ -120,103 +116,74 @@ export function PostActionsSheet({
     const url = `${window.location.origin}/p/${postId}`;
     try { if (navigator.share) { await navigator.share({ url }); onClose(); return; } } catch {}
     await navigator.clipboard.writeText(url).catch(() => {});
-    setCopied(true);
-    setTimeout(() => { setCopied(false); onClose(); }, 800);
+    toast("Link copied", "success");
+    onClose();
   }
 
   async function deletePost() {
-    if (deleting) return;
-    setDeleting(true);
     const { error } = await supabase.from("posts").delete().eq("id", postId);
-    setDeleting(false);
-    if (!error) { onDelete?.(); onClose(); router.refresh(); }
+    if (error) {
+      toast("Couldn't delete post", "error");
+      return;
+    }
+    setConfirmDelete(false);
+    onDelete?.();
+    onClose();
+    router.refresh();
+    toast("Post deleted");
   }
 
   return (
     <>
-      {/* Invisible backdrop */}
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-
-      {/* Floating card — positioned at top-right of the post (CSS from parent) */}
-      <div
-        ref={menuRef}
-        className="absolute right-4 top-12 z-50 min-w-[190px] overflow-hidden rounded-2xl border border-border bg-elevated shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+      <FloatingMenu
+        open={open}
+        onClose={onClose}
+        className="absolute right-4 top-12 min-w-[200px]"
+        notch
       >
-        {/* Small notch/triangle pointing up toward the button */}
-        <div className="absolute -top-2 right-4 h-3 w-3 rotate-45 border-l border-t border-border bg-elevated" />
+        {!isOwn && (
+          <MenuItem
+            icon={following ? UserCheck : UserPlus}
+            active={following}
+            pending={followPending}
+            label={following ? `Unfollow @${postUsername ?? "user"}` : `Follow @${postUsername ?? "user"}`}
+            onClick={toggleFollow}
+          />
+        )}
+        {!isOwn && (
+          <MenuItem
+            icon={Star}
+            active={isHyper}
+            pending={hyperPending}
+            label={isHyper ? "Remove from Hypers" : "Add to Hypers"}
+            onClick={toggleHyper}
+          />
+        )}
+        <MenuItem icon={Link2} label="Share" onClick={share} />
+        {!isOwn && (
+          <>
+            <MenuDivider />
+            <MenuItem icon={Flag} label="Report" danger onClick={() => setShowReport(true)} />
+          </>
+        )}
+        {isOwn && (
+          <>
+            <MenuDivider />
+            <MenuItem icon={Pencil} label="Edit post" onClick={() => { onClose(); onEdit?.(); }} />
+            <MenuItem icon={Trash2} label="Delete post" danger onClick={() => { setConfirmDelete(true); onClose(); }} />
+          </>
+        )}
+      </FloatingMenu>
 
-        <div className="flex flex-col py-1.5">
-          {/* Follow / Unfollow (only other users) */}
-          {!isOwn && (
-            <button type="button" onClick={toggleFollow}
-              className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/5 active:bg-white/8"
-            >
-              {followPending ? (
-                <Loader2 size={17} className="animate-spin text-muted" />
-              ) : following ? (
-                <UserCheck size={17} className="text-accent" />
-              ) : (
-                <UserPlus size={17} className="text-muted" />
-              )}
-              {following ? `Unfollow @${postUsername ?? "user"}` : `Follow @${postUsername ?? "user"}`}
-            </button>
-          )}
-
-          {/* Add / Remove Hyper (only other users) */}
-          {!isOwn && (
-            <button type="button" onClick={toggleHyper}
-              className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/5 active:bg-white/8"
-            >
-              {hyperPending ? (
-                <Loader2 size={17} className="animate-spin text-muted" />
-              ) : (
-                <Star size={17} className={isHyper ? "text-hype" : "text-muted"} fill={isHyper ? "currentColor" : "none"} />
-              )}
-              {isHyper ? "Remove from Hypers" : "Add to Hypers"}
-            </button>
-          )}
-
-          {/* Share */}
-          <button type="button" onClick={share}
-            className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/5"
-          >
-            {copied ? <Check size={17} className="text-accent" /> : <Link2 size={17} className="text-muted" />}
-            {copied ? "Copied!" : "Share"}
-          </button>
-
-          {/* Report (only other users' posts) */}
-          {!isOwn && (
-            <>
-              <div className="mx-3 my-1 h-px bg-border" />
-              <button type="button" onClick={() => setShowReport(true)}
-                className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-danger hover:bg-danger/5"
-              >
-                <Flag size={17} />
-                Report
-              </button>
-            </>
-          )}
-
-          {/* Delete (own posts) */}
-          {isOwn && (
-            <>
-              <div className="mx-3 my-1 h-px bg-border" />
-              <button type="button" onClick={() => { onClose(); onEdit?.(); }}
-                className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/5"
-              >
-                <Pencil size={17} className="text-muted" />
-                Edit post
-              </button>
-              <button type="button" onClick={deletePost}
-                className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-danger hover:bg-danger/5"
-              >
-                {deleting ? <Loader2 size={17} className="animate-spin" /> : <Trash2 size={17} />}
-                {deleting ? "Deleting…" : "Delete post"}
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        onClose={() => { setConfirmDelete(false); onClose(); }}
+        onConfirm={deletePost}
+        icon={Trash2}
+        title="Delete this post"
+        body="It disappears from every feed, along with its hypes and comments. There's no undo."
+        confirmLabel="Delete post"
+      />
 
       <ReportSheet
         open={showReport}

@@ -4,6 +4,7 @@ import { getProfile } from "@/lib/profile";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { CallProvider } from "@/components/calls/CallProvider";
 import { UploadProvider } from "@/components/upload/UploadProvider";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 import { PresenceHeartbeat } from "@/components/presence/PresenceHeartbeat";
 import { InAppNotifier } from "@/components/messages/InAppNotifier";
 
@@ -73,21 +74,23 @@ export default async function AppLayout({
   }
 
   return (
-    <CallProvider userId={user!.id}>
-      <UploadProvider>
-        <PresenceHeartbeat />
-        <InAppNotifier currentUserId={user!.id} />
-        <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
-          <div className="flex-1 pb-[84px]">{children}</div>
-          <BottomNav
-            avatarUrl={profile.avatarUrl}
-            avatarHue={profile.avatarHue ?? 200}
-            displayName={profile.displayName ?? "U"}
-            currentUserId={user!.id}
-            initialUnreadMsgs={initialUnreadMsgs}
-          />
-        </div>
-      </UploadProvider>
-    </CallProvider>
+    <ToastProvider>
+      <CallProvider userId={user!.id}>
+        <UploadProvider>
+          <PresenceHeartbeat />
+          <InAppNotifier currentUserId={user!.id} />
+          <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
+            <div className="flex-1 pb-[84px]">{children}</div>
+            <BottomNav
+              avatarUrl={profile.avatarUrl}
+              avatarHue={profile.avatarHue ?? 200}
+              displayName={profile.displayName ?? "U"}
+              currentUserId={user!.id}
+              initialUnreadMsgs={initialUnreadMsgs}
+            />
+          </div>
+        </UploadProvider>
+      </CallProvider>
+    </ToastProvider>
   );
 }

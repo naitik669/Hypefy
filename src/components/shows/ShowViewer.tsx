@@ -9,6 +9,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ShowViewersSheet } from "@/components/shows/ShowViewersSheet";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 type ShowProfile = { display_name: string | null; avatar_hue: number | null; username: string | null; avatar_url?: string | null } | null;
 
@@ -130,6 +131,7 @@ function ShowScreen({
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [viewersOpen, setViewersOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionPending, setActionPending] = useState<"delete" | "showcase" | null>(null);
 
   const isOwner = !!currentUserId && currentUserId === show.user_id;
@@ -253,6 +255,7 @@ function ShowScreen({
     setActionPending("delete");
     await supabase.from("shows").delete().eq("id", show.id);
     setActionPending(null);
+    setConfirmDelete(false);
     setMenuOpen(false);
     onClose();
   }
@@ -271,7 +274,7 @@ function ShowScreen({
   }, [show.id]);
 
   useEffect(() => {
-    if (paused || menuOpen || viewersOpen) return;
+    if (paused || menuOpen || viewersOpen || confirmDelete) return;
     const lastP = progressRef.current;
     function tick(now: number) {
       if (startRef.current === 0) startRef.current = now - lastP * DURATION;
@@ -282,7 +285,7 @@ function ShowScreen({
     }
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [show.id, paused, menuOpen, viewersOpen, onNext]);
+  }, [show.id, paused, menuOpen, viewersOpen, confirmDelete, onNext]);
 
   function openLinkedPost() {
     if (!linkedPost) return;
@@ -508,6 +511,18 @@ function ShowScreen({
         />
       )}
 
+      {isOwner && (
+        <ConfirmDialog
+          open={confirmDelete}
+          onClose={() => { setConfirmDelete(false); setPaused(false); }}
+          onConfirm={deleteShow}
+          icon={Trash2}
+          title="Delete this Show"
+          body="It disappears for everyone right away, along with its views and hypes."
+          confirmLabel="Delete Show"
+        />
+      )}
+
       {/* ── Reply + Hype bar (viewers only) ── */}
       {!menuOpen && !isOwner && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/70 to-transparent px-3 pb-6 pt-12">
@@ -589,12 +604,10 @@ function ShowScreen({
             <button
               type="button"
               disabled={actionPending !== null}
-              onClick={deleteShow}
+              onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
               className="flex w-full items-center gap-3 px-5 py-4 text-left text-danger transition-colors hover:bg-danger/10 disabled:opacity-50"
             >
-              {actionPending === "delete"
-                ? <Loader2 size={20} className="animate-spin" />
-                : <Trash2 size={20} />}
+              <Trash2 size={20} />
               <div>
                 <p className="text-sm font-semibold">Delete Show</p>
                 <p className="text-xs opacity-70">Removes this Show permanently</p>

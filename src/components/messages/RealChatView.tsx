@@ -13,6 +13,9 @@ import { VoiceMessage } from "@/components/messages/VoiceMessage";
 import { GifPicker } from "@/components/messages/GifPicker";
 import { GroupInfoSheet } from "@/components/messages/GroupInfoSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
+import { FloatingMenu, MenuItem, MenuDivider } from "@/components/ui/FloatingMenu";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/ToastProvider";
 import { presenceLabel } from "@/lib/presence";
 import { haptics } from "@/lib/haptics";
 import { PresenceDot } from "@/components/presence/PresenceDot";
@@ -176,7 +179,7 @@ export function RealChatView({
   // a separate event so it doesn't interfere with the typing timers.
   const [recordingIds, setRecordingIds] = useState<string[]>([]);
   const recordingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const [toast, setToast] = useState<string | null>(null);
+  const showToast = useToast();
   const [callChooser, setCallChooser] = useState(false);
   const [headerMenu, setHeaderMenu] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
@@ -306,11 +309,6 @@ export function RealChatView({
     for (const [mid, em] of tmp) out.set(mid, [...em.entries()].map(([emoji, v]) => ({ emoji, ...v })));
     return out;
   }, [reactions, currentUserId]);
-
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(null), 1600);
-  }
 
   /** Derives the display status for one of my outgoing messages. */
   function getMsgStatus(m: ChatMsg): MsgStatus {
@@ -1057,69 +1055,44 @@ export function RealChatView({
           </button>
 
           {/* Call type popover -- anchored to the phone icon */}
-          {callChooser && (
-            <>
-              <div className="fixed inset-0 z-40" onPointerDown={() => setCallChooser(false)} />
-              <div className="absolute right-9 top-12 z-50 w-44 overflow-hidden rounded-2xl border border-border bg-elevated py-1 shadow-2xl">
-                <button type="button"
-                  onClick={() => { setCallChooser(false); placeCall("audio"); }}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/5">
-                  <Phone size={17} className="text-accent" /> Audio call
-                </button>
-                <button type="button"
-                  onClick={() => { setCallChooser(false); placeCall("video"); }}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/5">
-                  <Video size={17} className="text-accent" /> Video call
-                </button>
-              </div>
-            </>
-          )}
+          <FloatingMenu
+            open={callChooser}
+            onClose={() => setCallChooser(false)}
+            className="absolute right-9 top-12 w-44"
+          >
+            <MenuItem icon={Phone} active label="Audio call" onClick={() => { setCallChooser(false); placeCall("audio"); }} />
+            <MenuItem icon={Video} active label="Video call" onClick={() => { setCallChooser(false); placeCall("video"); }} />
+          </FloatingMenu>
 
-          {headerMenu && (
-            <>
-              <div className="fixed inset-0 z-40" onPointerDown={() => setHeaderMenu(false)} />
-              <div className="absolute right-1 top-12 z-50 w-52 overflow-hidden rounded-2xl border border-border bg-elevated py-1 shadow-2xl">
-                {!isGroup && other.username && (
-                  <Link href={`/u/${other.username}`} onClick={() => setHeaderMenu(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-white/5">
-                    <UserCircle size={17} className="text-muted" /> View profile
-                  </Link>
-                )}
-                {isGroup && (
-                  <button type="button"
-                    onClick={() => { setHeaderMenu(false); setGroupInfoOpen(true); }}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/5">
-                    <Users size={17} className="text-muted" /> Group info
-                  </button>
-                )}
-                <button type="button"
-                  onClick={toggleMute}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/5">
-                  <BellOff size={17} className={muted ? "text-accent" : "text-muted"} />
-                  {muted ? "Unmute notifications" : "Mute notifications"}
-                </button>
-                <button type="button"
-                  onClick={() => { setHeaderMenu(false); setConfirmLeave(true); }}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/5">
-                  <LogOut size={17} className="text-muted" /> {isGroup ? "Leave group" : "Delete chat"}
-                </button>
-                <div className="my-1 h-px bg-border" />
-                {isGroup ? (
-                  <button type="button"
-                    onClick={() => { setHeaderMenu(false); setReportGroupOpen(true); }}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-400 hover:bg-white/5">
-                    <Ban size={17} /> Report group
-                  </button>
-                ) : (
-                  <button type="button"
-                    onClick={blockUser}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-400 hover:bg-white/5">
-                    <Ban size={17} /> Block user
-                  </button>
-                )}
-              </div>
-            </>
-          )}
+          <FloatingMenu
+            open={headerMenu}
+            onClose={() => setHeaderMenu(false)}
+            className="absolute right-1 top-12 w-52"
+          >
+            {!isGroup && other.username && (
+              <MenuItem icon={UserCircle} label="View profile" onClick={() => { setHeaderMenu(false); router.push(`/u/${other.username}`); }} />
+            )}
+            {isGroup && (
+              <MenuItem icon={Users} label="Group info" onClick={() => { setHeaderMenu(false); setGroupInfoOpen(true); }} />
+            )}
+            <MenuItem
+              icon={BellOff}
+              active={muted}
+              label={muted ? "Unmute notifications" : "Mute notifications"}
+              onClick={toggleMute}
+            />
+            <MenuItem
+              icon={LogOut}
+              label={isGroup ? "Leave group" : "Delete chat"}
+              onClick={() => { setHeaderMenu(false); setConfirmLeave(true); }}
+            />
+            <MenuDivider />
+            {isGroup ? (
+              <MenuItem icon={Ban} danger label="Report group" onClick={() => { setHeaderMenu(false); setReportGroupOpen(true); }} />
+            ) : (
+              <MenuItem icon={Ban} danger label="Block user" onClick={blockUser} />
+            )}
+          </FloatingMenu>
         </div>
       </header>
 
@@ -1642,15 +1615,15 @@ export function RealChatView({
                 </div>
                 {/* Actions */}
                 <div className={`w-44 overflow-hidden rounded-2xl bg-elevated p-1 shadow-xl ring-1 ring-border ${mine ? "ml-auto" : ""}`}>
-                  <MenuItem icon={<Reply size={17} />} label="Reply" onClick={() => { setReplyTo(menu.msg); setMenu(null); }} />
-                  {menu.msg.body && <MenuItem icon={<Copy size={17} />} label="Copy" onClick={() => { copy(menu.msg); setMenu(null); }} />}
+                  <CtxItem icon={<Reply size={17} />} label="Reply" onClick={() => { setReplyTo(menu.msg); setMenu(null); }} />
+                  {menu.msg.body && <CtxItem icon={<Copy size={17} />} label="Copy" onClick={() => { copy(menu.msg); setMenu(null); }} />}
                   {menu.msg.sender_id === currentUserId && menu.msg.kind === "text" && !menu.msg.is_unsent && (
-                    <MenuItem icon={<Pencil size={17} />} label="Edit" onClick={() => { startEdit(menu.msg); setMenu(null); }} />
+                    <CtxItem icon={<Pencil size={17} />} label="Edit" onClick={() => { startEdit(menu.msg); setMenu(null); }} />
                   )}
                   {mine ? (
-                    <MenuItem danger icon={<Trash2 size={17} />} label="Unsend" onClick={() => { unsend(menu.msg); setMenu(null); }} />
+                    <CtxItem danger icon={<Trash2 size={17} />} label="Unsend" onClick={() => { unsend(menu.msg); setMenu(null); }} />
                   ) : (
-                    <MenuItem danger icon={<Flag size={17} />} label="Report" onClick={() => { setReportMsg(menu.msg); setMenu(null); }} />
+                    <CtxItem danger icon={<Flag size={17} />} label="Report" onClick={() => { setReportMsg(menu.msg); setMenu(null); }} />
                   )}
                 </div>
               </div>
@@ -1735,42 +1708,25 @@ export function RealChatView({
       )}
 
       {/* Confirm leave / delete chat */}
-      {confirmLeave && (
-        <>
-          <div className="fixed inset-0 z-[200] bg-black/60" onClick={() => setConfirmLeave(false)} />
-          <div className="fixed inset-x-6 top-1/2 z-[210] -translate-y-1/2 rounded-2xl bg-elevated p-5 ring-1 ring-border">
-            <p className="text-base font-bold">{isGroup ? "Leave this group?" : "Delete this chat?"}</p>
-            <p className="mt-1 text-sm text-muted">
-              {isGroup
-                ? "You'll stop receiving messages and the chat disappears from your inbox."
-                : "The conversation disappears from your inbox. The other person keeps their copy."}
-            </p>
-            <div className="mt-4 flex gap-2">
-              <button type="button" onClick={() => setConfirmLeave(false)}
-                className="flex-1 rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-white/5">
-                Cancel
-              </button>
-              <button type="button" onClick={leaveConversation}
-                className="flex-1 rounded-xl bg-danger py-2.5 text-sm font-bold text-white">
-                {isGroup ? "Leave" : "Delete"}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-24 left-1/2 z-[210] -translate-x-1/2 rounded-pill bg-elevated px-4 py-2 text-sm font-semibold shadow-lg ring-1 ring-border">
-          {toast}
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirmLeave}
+        onClose={() => setConfirmLeave(false)}
+        onConfirm={async () => { await leaveConversation(); }}
+        icon={LogOut}
+        title={isGroup ? "Leave this group" : "Delete this chat"}
+        body={
+          isGroup
+            ? "You'll stop receiving messages and the chat disappears from your inbox."
+            : "The conversation disappears from your inbox. The other person keeps their copy."
+        }
+        confirmLabel={isGroup ? "Leave group" : "Delete chat"}
+      />
     </div>
   );
 }
 
 
-function MenuItem({ icon, label, onClick, danger }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
+function CtxItem({ icon, label, onClick, danger }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
   return (
     <button type="button" onClick={onClick}
       className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-white/5 ${danger ? "text-danger" : "text-foreground"}`}>

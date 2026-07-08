@@ -2,8 +2,8 @@
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type PostUpload = {
   userId: string;
@@ -21,8 +21,8 @@ export const useUpload = () => useContext(UploadCtx);
 export function UploadProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const router = useRouter();
+  const toast = useToast();
   const [progress, setProgress] = useState<number | null>(null);
-  const [toast, setToast] = useState<{ kind: "success" | "error"; msg: string } | null>(null);
   const trickle = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopTrickle = () => { if (trickle.current) { clearInterval(trickle.current); trickle.current = null; } };
@@ -63,30 +63,20 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
       stopTrickle();
       setProgress(100);
-      setToast({ kind: "success", msg: "Post shared" });
+      toast("Post shared", "success");
       router.refresh();
       setTimeout(() => setProgress(null), 700);
-      setTimeout(() => setToast(null), 2600);
     } catch {
       stopTrickle();
       setProgress(null);
-      setToast({ kind: "error", msg: "Couldn't share your post" });
-      setTimeout(() => setToast(null), 3200);
+      toast("Couldn't share your post", "error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, router]);
+  }, [supabase, router, toast]);
 
   return (
     <UploadCtx.Provider value={{ progress, uploadPost }}>
       {children}
-      {toast && (
-        <div className="fixed bottom-24 left-1/2 z-[210] flex -translate-x-1/2 items-center gap-2 rounded-pill bg-elevated px-4 py-2.5 text-sm font-semibold shadow-lg ring-1 ring-border">
-          {toast.kind === "success"
-            ? <Check size={16} className="text-accent" />
-            : <AlertCircle size={16} className="text-danger" />}
-          {toast.msg}
-        </div>
-      )}
     </UploadCtx.Provider>
   );
 }

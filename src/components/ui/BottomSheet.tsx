@@ -23,14 +23,26 @@ export function BottomSheet({
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  // Escape closes the sheet, matching CenterModal/FloatingMenu behavior.
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!mounted || !open) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60"
+      className="fixed inset-0 z-[200] flex items-end justify-center bg-black/70 backdrop-blur-[6px]"
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
         className="animate-rise w-full max-w-[480px] max-h-[85dvh] overflow-y-auto rounded-t-3xl border-t border-border bg-elevated pb-[calc(env(safe-area-inset-bottom)+12px)]"
         onClick={(e) => e.stopPropagation()}
       >

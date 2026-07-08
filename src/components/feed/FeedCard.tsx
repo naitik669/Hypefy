@@ -19,6 +19,7 @@ import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { formatCount } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export type FeedPost = {
   id: string;
@@ -104,7 +105,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
     if (galleryIsTouchEvent.current) return;
     handleImageTap(); // desktop mouse click
   }
-  const [toast, setToast] = useState<string | null>(null);
+  const showToast = useToast();
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState(post.comment_count);
   const [shareOpen, setShareOpen] = useState(false);
@@ -192,10 +193,6 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const hue = profile?.avatar_hue ?? 280;
   const profileHref = post.user_id === uid ? "/profile" : username ? `/u/${username}` : "#";
 
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(null), 1500);
-  }
 
   async function toggleHype() {
     if (hypePending) return;
@@ -221,7 +218,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
       }
     } catch {
       setHyped(prev); setHypeCount(prevCount);
-      showToast("Couldn't hype. Try again.");
+      showToast("Couldn't hype. Try again.", "error");
     } finally {
       setHypePending(false);
     }
@@ -257,11 +254,11 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
       setSaveBurst(true);
       setTimeout(() => setSaveBurst(false), 360);
       const { error } = await supabase.from("saved_posts").insert({ user_id: uid, post_id: post.id });
-      if (error) { setSaved(prev); if (!/duplicate|unique/i.test(error.message)) showToast("Couldn't save"); }
-      else showToast("Saved âœ“");
+      if (error) { setSaved(prev); if (!/duplicate|unique/i.test(error.message)) showToast("Couldn't save", "error"); }
+      else showToast("Saved", "success");
     } else {
       const { error } = await supabase.from("saved_posts").delete().eq("user_id", uid).eq("post_id", post.id);
-      if (error) { setSaved(prev); showToast("Couldn't unsave"); }
+      if (error) { setSaved(prev); showToast("Couldn't unsave", "error"); }
       else showToast("Removed");
     }
     setSavePending(false);
@@ -479,13 +476,6 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
       <EditPostSheet open={editOpen} onClose={() => setEditOpen(false)}
         postId={post.id} initialCaption={liveCaption} initialBody={liveBody}
         onSaved={(c, b) => { setLiveCaption(c || null); setLiveBody(b || null); }} />
-
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-[88px] left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-pill bg-elevated px-4 py-2 text-sm font-semibold shadow-lg ring-1 ring-border">
-          {toast}
-        </div>
-      )}
     </article>
   );
 }

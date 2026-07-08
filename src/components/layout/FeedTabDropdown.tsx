@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check } from "lucide-react";
+import { FloatingMenu } from "@/components/ui/FloatingMenu";
 import { haptics } from "@/lib/haptics";
 
 export type FeedTab = "foryou" | "following" | "favourite" | "hypers";
@@ -30,16 +31,6 @@ export function FeedTabDropdown() {
   const router = useRouter();
   const active = useFeedTab();
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onDocClick(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("click", onDocClick);
-    return () => document.removeEventListener("click", onDocClick);
-  }, [open]);
 
   function select(tab: FeedTab) {
     haptics.tap();
@@ -48,7 +39,7 @@ export function FeedTabDropdown() {
   }
 
   return (
-    <div ref={wrapRef} className="relative">
+    <div className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -61,23 +52,27 @@ export function FeedTabDropdown() {
         </span>
       </button>
 
-      {open && (
-        <div className="absolute left-0 top-full z-30 mt-2 w-48 overflow-hidden rounded-2xl border border-border bg-elevated py-1 shadow-2xl">
-          {OPTIONS.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              onClick={() => select(o.value)}
-              className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5 ${
-                active === o.value ? "font-bold text-foreground" : "text-muted"
-              }`}
-            >
-              {o.label}
-              {active === o.value && <Check size={15} className="text-accent" />}
-            </button>
-          ))}
-        </div>
-      )}
+      <FloatingMenu
+        open={open}
+        onClose={() => setOpen(false)}
+        className="absolute left-0 top-full mt-2 w-48"
+        origin="top-left"
+      >
+        {OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            role="menuitem"
+            onClick={() => select(o.value)}
+            className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5 ${
+              active === o.value ? "font-bold text-foreground" : "text-muted"
+            }`}
+          >
+            {o.label}
+            {active === o.value && <Check size={15} className="text-accent" />}
+          </button>
+        ))}
+      </FloatingMenu>
     </div>
   );
 }
