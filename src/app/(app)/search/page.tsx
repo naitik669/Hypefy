@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Avatar } from "@/components/ui/Avatar";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
+import { ListRowSkeleton } from "@/components/skeletons/Skeletons";
 import Link from "next/link";
 
 type Profile = {
@@ -235,19 +236,10 @@ export default function SearchPage() {
       )}
 
       {isPending && (
-        <div className="flex items-center justify-center py-10">
-          <div className="w-full px-4">
-            {/* Shimmer skeleton rows shaped like people results */}
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 py-2.5">
-                <div className="skeleton h-12 w-12 shrink-0 rounded-[30%]" />
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <div className="skeleton h-3 rounded" style={{ width: `${40 + (i % 3) * 15}%` }} />
-                  <div className="skeleton h-2.5 w-20 rounded" />
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="flex flex-col pt-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <ListRowSkeleton key={i} avatarSize={46} />
+          ))}
         </div>
       )}
 

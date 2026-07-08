@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FolderPlus, Plus, X, Check, Loader2, Trash2, ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type SavedPost = { id: string; image_url: string | null; image_urls?: string[] | null; caption: string | null };
 type Collection = { id: string; name: string; cover_url: string | null; count: number };
@@ -175,7 +176,12 @@ function CollectionModal({ collection, savedPosts, onClose }: { collection: Coll
             )}
           </div>
         ) : itemIds === null ? null : inCollection.length === 0 ? (
-          <p className="px-6 py-16 text-center text-sm text-faint">Nothing here yet. Tap Add to fill this collection.</p>
+          <EmptyState
+            variant="compact"
+            icon={FolderPlus}
+            title="Nothing in here yet"
+            text="Tap Add to fill this collection with your saved posts."
+          />
         ) : (
           <div className="grid grid-cols-3 gap-1.5 p-1.5">
             {inCollection.map((p) => (

@@ -5,6 +5,7 @@ import { Search, Star, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { haptics } from "@/lib/haptics";
 
 type Viewer = {
@@ -140,9 +141,12 @@ export function ShowViewersSheet({
             ))}
           </div>
         ) : list.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted">
-            {q ? "No viewers match that search." : "No views yet — give it a minute."}
-          </p>
+          <EmptyState
+            variant="compact"
+            icon={Search}
+            title={q ? "No one matches that" : "No views yet"}
+            text={q ? "Try a different name or handle." : "Your Show just went up — give it a minute."}
+          />
         ) : (
           <div className="flex flex-col">
             {list.map((v) => {

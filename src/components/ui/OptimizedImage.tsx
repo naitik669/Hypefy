@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 
 /**
@@ -21,7 +24,9 @@ function canOptimize(src: string): boolean {
  * Fill-mode image that optimises allowlisted hosts (resized srcset + WebP/AVIF)
  * and falls back to a plain lazy <img> for any other URL — so unexpected user
  * media never crashes the render. The parent must be `position: relative` with
- * a defined size (e.g. `relative aspect-square w-full`).
+ * a defined size (e.g. `relative aspect-square w-full`). Media blur-up: a
+ * surface-colored placeholder sits behind, and the pixels settle in with a
+ * short blur→sharp fade — no layout shift, no white flash.
  */
 export function OptimizedImage({
   src,
@@ -38,28 +43,36 @@ export function OptimizedImage({
   draggable?: boolean;
   priority?: boolean;
 }) {
-  if (canOptimize(src)) {
-    return (
-      <Image
-        src={src}
-        alt={alt}
-        fill
-        sizes={sizes}
-        className={className}
-        draggable={draggable}
-        priority={priority}
-      />
-    );
-  }
+  const [loaded, setLoaded] = useState(false);
+  const loadCls = loaded ? "animate-img-in" : "opacity-0";
+
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      className={`absolute inset-0 h-full w-full ${className}`}
-      draggable={draggable}
-      loading="lazy"
-      decoding="async"
-    />
+    <>
+      {/* Placeholder behind the image — vanishes once pixels arrive */}
+      {!loaded && <span aria-hidden className="absolute inset-0 bg-surface" />}
+      {canOptimize(src) ? (
+        <Image
+          src={src}
+          alt={alt}
+          fill
+          sizes={sizes}
+          className={`${className} ${loadCls}`}
+          draggable={draggable}
+          priority={priority}
+          onLoad={() => setLoaded(true)}
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={alt}
+          className={`absolute inset-0 h-full w-full ${className} ${loadCls}`}
+          draggable={draggable}
+          loading="lazy"
+          decoding="async"
+          onLoad={() => setLoaded(true)}
+        />
+      )}
+    </>
   );
 }

@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { FollowButton } from "@/components/profile/FollowButton";
 
 type Row = {
@@ -75,9 +76,12 @@ export function FollowListSheet({
             <Loader2 size={22} className="animate-spin text-muted" />
           </div>
         ) : rows.length === 0 ? (
-          <p className="py-8 text-center text-sm text-faint">
-            {mode === "followers" ? "No followers yet." : "Not following anyone yet."}
-          </p>
+          <EmptyState
+            variant="compact"
+            icon={Users}
+            title={mode === "followers" ? "No followers yet" : "Not following anyone"}
+            text={mode === "followers" ? "Share a post — followers find you fast here." : "Find your people in Discover."}
+          />
         ) : (
           rows.map((r) => {
             const name = r.display_name ?? r.username ?? "User";

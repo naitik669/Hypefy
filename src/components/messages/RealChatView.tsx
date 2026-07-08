@@ -14,6 +14,7 @@ import { GifPicker } from "@/components/messages/GifPicker";
 import { GroupInfoSheet } from "@/components/messages/GroupInfoSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { FloatingMenu, MenuItem, MenuDivider } from "@/components/ui/FloatingMenu";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 import { presenceLabel } from "@/lib/presence";
@@ -1650,7 +1651,7 @@ export function RealChatView({
           <BottomSheet open onClose={() => setReactionSheet(null)} title="Reactions">
             <div className="flex flex-col pb-3">
               {rows.length === 0 ? (
-                <p className="px-1 py-6 text-center text-sm text-muted">No reactions yet.</p>
+                <EmptyState variant="compact" icon={Star} title="No reactions yet" text="Long-press a message to drop the first one." />
               ) : (
                 rows.map((r) => {
                   const isMine = r.user_id === currentUserId;
