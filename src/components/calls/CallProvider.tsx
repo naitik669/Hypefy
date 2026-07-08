@@ -56,11 +56,11 @@ const RTC_CONFIG: RTCConfiguration = buildRtcConfig();
 const RING_TIMEOUT = 30_000;
 
 export const QUICK_REPLIES = [
-  "I'm busy",
+  "Busy right now",
   "Call you later",
-  "Text me",
-  "Give me 5 minutes",
-  "Can't talk right now",
+  "In a meeting",
+  "Driving",
+  "What's up?",
 ];
 
 type Ctx = { startCall: (a: StartArgs) => void; inCall: boolean };
@@ -446,7 +446,7 @@ function CallUI({
   const showRemoteVideo = call.type === "video" && call.status === "connected" && !!remoteStream;
 
   return (
-    <div className="fixed inset-0 z-[230] mx-auto flex max-w-[480px] flex-col items-center justify-between overflow-hidden bg-black px-6 py-14">
+    <div className="animate-page-enter fixed inset-0 z-[230] mx-auto flex max-w-[480px] flex-col items-center justify-between overflow-hidden bg-black px-6 py-14">
       {showRemoteVideo && <video ref={remoteVid} autoPlay playsInline className="absolute inset-0 h-full w-full object-cover" />}
       {call.type === "audio" && <video ref={remoteVid} autoPlay playsInline className="hidden" />}
       {call.type === "video" && call.status === "connected" && (
@@ -457,7 +457,16 @@ function CallUI({
       <div className="z-10 flex flex-1 flex-col items-center justify-center gap-5">
         {!showRemoteVideo && (
           <>
-            <Avatar name={call.peerName} hue={call.peerHue} size={120} />
+            <div className="relative">
+              {/* Ringing pulse — only while the call wants your attention */}
+              {call.status !== "connected" && (
+                <>
+                  <span className="animate-ring-burst absolute inset-0 rounded-full border-2 border-white/25" />
+                  <span className="animate-ring-burst absolute inset-0 rounded-full border border-white/15" style={{ animationDelay: "0.55s" }} />
+                </>
+              )}
+              <Avatar name={call.peerName} hue={call.peerHue} size={120} />
+            </div>
             <div className="text-center">
               <p className="text-xl font-bold text-white">{call.peerName}</p>
               <p className="mt-1 text-sm text-white/60">{statusText}</p>
@@ -475,9 +484,13 @@ function CallUI({
       <div className="z-10 w-full">
         {showReplies ? (
           <div className="mx-auto flex max-w-sm flex-col gap-2">
-            {QUICK_REPLIES.map((r) => (
+            <p className="pb-1 text-center text-xs font-bold uppercase tracking-widest text-white/40">
+              Reply instead
+            </p>
+            {QUICK_REPLIES.map((r, i) => (
               <button key={r} type="button" onClick={() => onQuickReply(r)}
-                className="w-full rounded-2xl bg-white/10 px-4 py-3 text-center text-sm font-semibold text-white backdrop-blur-sm active:scale-[0.99]">
+                className="animate-rise w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-center text-sm font-semibold text-white backdrop-blur-sm transition-transform active:scale-[0.98]"
+                style={{ animationDelay: `${i * 45}ms` }}>
                 {r}
               </button>
             ))}

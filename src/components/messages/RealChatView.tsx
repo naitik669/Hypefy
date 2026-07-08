@@ -281,6 +281,7 @@ export function RealChatView({
   /** Tracks the last tap per message to detect double-tap (star reaction) */
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLInputElement>(null);
   idsRef.current = messages.map((m) => m.id);
   messagesRef.current = messages;
 
@@ -1124,6 +1125,15 @@ export function RealChatView({
             <p className="text-xs text-muted">
               {isGroup ? `${group!.memberCount} members` : "This is the start of your conversation."}
             </p>
+            {!isGroup && (
+              <button
+                type="button"
+                onClick={() => { setText("hey 👋"); composerRef.current?.focus(); }}
+                className="mt-2 rounded-pill border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-transform active:scale-95"
+              >
+                Say hi 👋
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-1.5">
@@ -1508,6 +1518,7 @@ export function RealChatView({
             {/* Text input */}
             <div className="relative flex-1">
               <input
+                ref={composerRef}
                 value={text}
                 onChange={(e) => { setText(e.target.value); setDmCursor(e.target.selectionStart ?? 0); if (e.target.value) emitTyping(); }}
                 onSelect={(e) => setDmCursor((e.target as HTMLInputElement).selectionStart ?? 0)}

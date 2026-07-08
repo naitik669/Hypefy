@@ -410,6 +410,17 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
         </p>
       ) : (
         <div className="flex flex-col pt-1">
+          {/* Requests explainer — what this tab is and what accepting does */}
+          {tab === "requests" && (
+            <div className="mx-4 mb-2 mt-2 rounded-2xl border border-border bg-surface px-4 py-3">
+              <p className="text-sm font-semibold">Message requests</p>
+              <p className="mt-0.5 text-xs leading-snug text-muted">
+                People you don&apos;t follow land here first. They can&apos;t see when you&apos;ve
+                read it until you approve — blocking is silent.
+              </p>
+            </div>
+          )}
+
           {/* Pinned section — top of the "All" tab */}
           {pinnedRows.length > 0 && (
             <>
