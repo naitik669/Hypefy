@@ -5,6 +5,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { CallProvider } from "@/components/calls/CallProvider";
 import { UploadProvider } from "@/components/upload/UploadProvider";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PresenceHeartbeat } from "@/components/presence/PresenceHeartbeat";
 import { InAppNotifier } from "@/components/messages/InAppNotifier";
 
@@ -79,6 +80,7 @@ export default async function AppLayout({
         <UploadProvider>
           <PresenceHeartbeat />
           <InAppNotifier currentUserId={user!.id} />
+          <InstallPrompt />
           <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
             <div className="flex-1 pb-[84px]">{children}</div>
             <BottomNav

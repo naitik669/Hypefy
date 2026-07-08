@@ -20,6 +20,9 @@ export const metadata: Metadata = {
   },
   description: "Where your personality lives.",
   applicationName: "Hypefy",
+  icons: {
+    apple: "/icons/icon-192.png",
+  },
   appleWebApp: {
     capable: true,
     title: "Hypefy",
