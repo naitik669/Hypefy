@@ -131,7 +131,7 @@ export function ProfileSetupForm({
 
       {/* Username */}
       <Field label="Username">
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-accent/40">
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-white/25">
           <span className="shrink-0 text-sm text-faint">hypefy.chat/@</span>
           <input
             value={username}
@@ -219,7 +219,7 @@ export function ProfileSetupForm({
           type="button"
           onClick={submit}
           disabled={pending || !formValid}
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-pill bg-accent text-base font-bold text-accent-ink shadow-[0_0_24px_2px_rgba(200,255,0,0.35)] transition-transform active:scale-[0.98] disabled:opacity-50"
+          className="flex h-14 w-full items-center justify-center gap-2 rounded-pill bg-accent text-base font-bold text-accent-ink shadow-[0_0_24px_2px_rgba(163,230,53,0.35)] transition-transform active:scale-[0.98] disabled:opacity-50"
         >
           {pending ? "Entering…" : "Enter Hypefy"}
           {!pending && <ArrowRight size={20} strokeWidth={2.6} />}

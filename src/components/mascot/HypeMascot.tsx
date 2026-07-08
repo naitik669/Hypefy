@@ -35,7 +35,7 @@ export function HypeMascot({
       {/* Soft ambient glow */}
       <div
         className="pointer-events-none absolute inset-0 rounded-full blur-2xl"
-        style={{ background: "radial-gradient(circle, rgba(200,255,0,0.30) 0%, transparent 68%)" }}
+        style={{ background: "radial-gradient(circle, rgba(163,230,53,0.30) 0%, transparent 68%)" }}
       />
 
       <svg viewBox="0 0 100 116" width={px} height={h} className="relative" fill="none">

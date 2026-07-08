@@ -3,7 +3,7 @@
 // Run: node scripts/gen-og-image.mjs
 import sharp from "sharp";
 
-const ACCENT = "#c8ff00";
+const ACCENT = "#a3e635";
 const BG = "#0a0a0a";
 
 const svg = `<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">

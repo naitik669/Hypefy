@@ -187,7 +187,7 @@ export function GifPicker({ onSelect }: Props) {
     <div className="flex h-[340px] flex-col overflow-hidden rounded-2xl border border-border bg-elevated shadow-2xl">
 
       {/* ── Search bar ── */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-3 py-2 focus-within:border-accent/40">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-3 py-2 focus-within:border-white/25">
         <Search size={14} className="shrink-0 text-faint" />
         <input
           ref={inputRef}

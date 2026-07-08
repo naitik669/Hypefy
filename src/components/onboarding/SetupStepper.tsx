@@ -266,7 +266,7 @@ function StepUsername({
   return (
     <div>
       <StepHeader title="Claim your username" sub="Pick a unique name people can find you with." />
-      <div className="mt-5 flex h-12 items-center gap-1 rounded-xl border border-border bg-surface px-3 focus-within:border-accent/40">
+      <div className="mt-5 flex h-12 items-center gap-1 rounded-xl border border-border bg-surface px-3 focus-within:border-white/25">
         <span className="shrink-0 text-sm text-faint">hypefy.chat/@</span>
         <input
           autoFocus

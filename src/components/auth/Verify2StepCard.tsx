@@ -86,7 +86,7 @@ export function Verify2StepCard({ email }: { email: string }) {
             placeholder="Enter code"
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-            className="h-12 w-full rounded-xl border border-white/5 bg-white/[0.06] px-4 text-center text-lg font-bold tracking-[0.4em] text-foreground placeholder:tracking-normal placeholder:text-faint outline-none transition focus:border-accent/40 focus:ring-2 focus:ring-accent/30"
+            className="h-12 w-full rounded-xl border border-white/5 bg-white/[0.06] px-4 text-center text-lg font-bold tracking-[0.4em] text-foreground placeholder:tracking-normal placeholder:text-faint outline-none transition focus:border-white/25 focus:border-white/25"
           />
           {error && <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
           <button

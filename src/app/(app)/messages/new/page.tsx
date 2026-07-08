@@ -90,7 +90,7 @@ export default function NewChatPage() {
 
       <div className="px-4 pb-28 pt-3">
         {/* Search */}
-        <div className="flex h-11 items-center gap-2 rounded-pill border border-border bg-surface px-3.5 focus-within:border-accent/40">
+        <div className="flex h-11 items-center gap-2 rounded-pill border border-border bg-surface px-3.5 focus-within:border-white/25">
           <Search size={17} className="shrink-0 text-faint" />
           <input
             value={q}

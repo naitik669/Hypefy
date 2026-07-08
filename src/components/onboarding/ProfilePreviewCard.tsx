@@ -31,7 +31,7 @@ export function ProfilePreviewCard({
         className={compact ? "h-12 w-full" : "h-16 w-full"}
         style={{
           background:
-            "linear-gradient(120deg, rgba(200,255,0,0.16), rgba(200,255,0,0.02) 60%), #111",
+            "linear-gradient(120deg, rgba(163,230,53,0.16), rgba(163,230,53,0.02) 60%), #111",
         }}
       />
 

@@ -314,7 +314,7 @@ export function ShareSheet({
       )}
 
       {/* Search */}
-      <div className="mb-3 flex h-10 items-center gap-2 rounded-pill border border-border bg-surface px-3 focus-within:border-accent/40">
+      <div className="mb-3 flex h-10 items-center gap-2 rounded-pill border border-border bg-surface px-3 focus-within:border-white/25">
         <Search size={15} className="shrink-0 text-faint" />
         <input
           value={query}

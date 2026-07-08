@@ -51,13 +51,13 @@ export default function GlobalError({
             }}
           >
             <svg width="32" height="32" viewBox="0 0 40 40" aria-hidden>
-              <circle cx="20" cy="20" r="14" stroke="#c8ff00" strokeWidth="2.6" strokeLinecap="round" strokeDasharray="2 4.2" fill="none" />
-              <circle cx="20" cy="20" r="3.2" fill="#c8ff00" />
+              <circle cx="20" cy="20" r="14" stroke="#a3e635" strokeWidth="2.6" strokeLinecap="round" strokeDasharray="2 4.2" fill="none" />
+              <circle cx="20" cy="20" r="3.2" fill="#a3e635" />
             </svg>
           </div>
           <div>
             <h1 style={{ margin: 0, fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em" }}>
-              Something broke<span style={{ color: "#c8ff00" }}>.</span>
+              Something broke<span style={{ color: "#a3e635" }}>.</span>
             </h1>
             <p style={{ margin: "6px auto 0", maxWidth: 260, fontSize: 14, lineHeight: 1.45, color: "#8a8a8a" }}>
               Not you — us. Head back and we&apos;ll get the hype going again.
@@ -69,7 +69,7 @@ export default function GlobalError({
             style={{
               marginTop: 4,
               borderRadius: 999,
-              background: "#c8ff00",
+              background: "#a3e635",
               color: "#0a0a0a",
               border: 0,
               padding: "10px 22px",

@@ -118,7 +118,7 @@ export function ShowViewersSheet({
     <BottomSheet open={open} onClose={onClose} title="Viewers">
       <div className="flex flex-col gap-3 pb-3">
         {/* Search */}
-        <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-accent/40">
+        <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-white/25">
           <Search size={16} className="shrink-0 text-muted" />
           <input
             value={q}

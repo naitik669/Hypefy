@@ -16,7 +16,7 @@ export function HyperStar({ className = "" }: { className?: string }) {
         <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#FFD000" />
           <stop offset="55%" stopColor="#FF7A00" />
-          <stop offset="100%" stopColor="#C8FF00" />
+          <stop offset="100%" stopColor="#A3E635" />
         </linearGradient>
       </defs>
       <path

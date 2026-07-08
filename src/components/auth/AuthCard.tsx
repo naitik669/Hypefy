@@ -240,7 +240,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
             placeholder="Enter your email address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="h-12 w-full rounded-xl border border-white/5 bg-white/[0.06] px-4 text-sm text-foreground placeholder:text-faint outline-none transition focus:border-accent/40 focus:ring-2 focus:ring-accent/30"
+            className="h-12 w-full rounded-xl border border-white/5 bg-white/[0.06] px-4 text-sm text-foreground placeholder:text-faint outline-none transition focus:border-white/25 focus:border-white/25"
           />
           <div className="relative">
             <input
@@ -251,7 +251,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-12 w-full rounded-xl border border-white/5 bg-white/[0.06] pl-4 pr-11 text-sm text-foreground placeholder:text-faint outline-none transition focus:border-accent/40 focus:ring-2 focus:ring-accent/30"
+              className="h-12 w-full rounded-xl border border-white/5 bg-white/[0.06] pl-4 pr-11 text-sm text-foreground placeholder:text-faint outline-none transition focus:border-white/25 focus:border-white/25"
             />
             <button
               type="button"

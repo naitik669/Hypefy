@@ -36,7 +36,7 @@ export function SearchBar({
   }
 
   return (
-    <div className="flex h-11 items-center gap-2 rounded-pill border border-border bg-surface px-4 focus-within:border-accent/40">
+    <div className="flex h-11 items-center gap-2 rounded-pill border border-border bg-surface px-4 focus-within:border-white/25">
       <Search size={18} className="text-muted" />
       <input
         autoFocus={autoFocus}

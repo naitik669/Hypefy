@@ -91,7 +91,7 @@ export function VibePill({
             <div
               aria-hidden
               className="pointer-events-none absolute inset-0"
-              style={{ background: "radial-gradient(ellipse 80% 90% at 18% 50%, rgba(200,255,0,0.05), transparent 70%)" }}
+              style={{ background: "radial-gradient(ellipse 80% 90% at 18% 50%, rgba(163,230,53,0.05), transparent 70%)" }}
             />
             <Avatar name={name ?? "You"} hue={hue} size={44} src={avatarUrl ?? undefined} />
             <div className="min-w-0">

@@ -105,7 +105,7 @@ export function NoteEditorSheet({
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0"
-            style={{ background: "radial-gradient(ellipse 75% 60% at 50% 42%, rgba(200,255,0,0.055), transparent 70%)" }}
+            style={{ background: "radial-gradient(ellipse 75% 60% at 50% 42%, rgba(163,230,53,0.055), transparent 70%)" }}
           />
 
           {/* Thought bubble — this IS the input; it idles like it's floating */}

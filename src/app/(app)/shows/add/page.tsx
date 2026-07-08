@@ -451,7 +451,7 @@ export default function AddShowPage() {
                 onChange={(e) => setCaption(e.target.value.slice(0, 150))}
                 onBlur={() => { if (!caption.trim()) setShowCaption(false); }}
                 placeholder="Add a caption…"
-                className="w-full rounded-2xl bg-black/35 px-4 py-3 text-base text-white outline-none backdrop-blur-sm placeholder:text-white/55 focus:ring-2 focus:ring-accent/50"
+                className="w-full rounded-2xl bg-black/35 px-4 py-3 text-base text-white outline-none backdrop-blur-sm placeholder:text-white/55 focus:ring-1 focus:ring-white/30"
               />
             ) : (
               <button type="button" onClick={() => setShowCaption(true)}

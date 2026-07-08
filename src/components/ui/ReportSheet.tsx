@@ -119,7 +119,7 @@ export function ReportSheet({
             onChange={(e) => setDetails(e.target.value)}
             placeholder="Add details (optional)"
             rows={2}
-            className="mt-2 w-full resize-none rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-faint focus:border-accent/40"
+            className="mt-2 w-full resize-none rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-faint focus:border-white/25"
           />
 
           <button

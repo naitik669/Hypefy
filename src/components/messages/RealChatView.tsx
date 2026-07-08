@@ -1525,7 +1525,7 @@ export function RealChatView({
                 onBlur={() => setTimeout(resetPicker, 150)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
                 placeholder="Message…"
-                className="h-11 w-full rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-2 focus:ring-accent/30"
+                className="h-11 w-full rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:border-white/25"
               />
               <SuggestionDropdown suggestions={pickerSuggestions} onSelect={(s) => {
                 const { newValue, newCursor } = applySuggestion(text, dmCursor, s);

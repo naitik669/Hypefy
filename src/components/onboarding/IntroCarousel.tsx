@@ -271,7 +271,7 @@ function MockProfile() {
       {/* Banner */}
       <div
         className="h-16 w-full"
-        style={{ background: "linear-gradient(115deg, rgba(200,255,0,0.20), rgba(109,40,217,0.28) 75%), #121212" }}
+        style={{ background: "linear-gradient(115deg, rgba(163,230,53,0.20), rgba(109,40,217,0.28) 75%), #121212" }}
       />
 
       <div className="px-4 pb-4">

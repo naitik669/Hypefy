@@ -107,7 +107,7 @@ export function GroupInfoSheet({
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={!isAdmin || savingName}
-              className="h-11 flex-1 rounded-xl bg-surface px-3 text-sm outline-none focus:ring-2 focus:ring-accent/30 disabled:opacity-70"
+              className="h-11 flex-1 rounded-xl bg-surface px-3 text-sm outline-none focus:border-white/25 disabled:opacity-70"
             />
             {isAdmin && name.trim() !== title && (
               <button type="button" onClick={saveName} disabled={savingName}
@@ -132,7 +132,7 @@ export function GroupInfoSheet({
           {/* Add-member search */}
           {adding && isAdmin && (
             <div className="mb-2 rounded-xl border border-border bg-surface p-2">
-              <div className="flex h-10 items-center gap-2 rounded-pill bg-elevated px-3 focus-within:ring-2 focus-within:ring-accent/30">
+              <div className="flex h-10 items-center gap-2 rounded-pill bg-elevated px-3 focus-within:ring-1 focus-within:ring-white/25">
                 <Search size={15} className="shrink-0 text-faint" />
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search people"
                   className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint" />

@@ -16,7 +16,7 @@
   --color-muted: #8a8a8a; /* secondary text */
   --color-faint: #555555; /* tertiary / inactive icons */
 
-  --color-accent: #c8ff00; /* brand: electric lime */
+  --color-accent: #a3e635; /* brand: electric lime — deepened for calm on black */
   --color-accent-ink: #0a0a0a; /* text on accent fills */
   --color-hype: #ffd000; /* active Hype star */
   --color-verified: #3897f0; /* Verified Star (blue) */
@@ -51,13 +51,20 @@ html {
 }
 
 /* Keyboard focus — visible accent ring only for keyboard users;
-   pointer taps keep the clean look. */
+   pointer taps keep the clean look. Form fields opt out: browsers mark
+   them focus-visible even on tap, which double-halos with their own
+   focus styles — they carry a quiet border treatment instead. */
 :focus-visible {
-  outline: 2px solid rgba(200, 255, 0, 0.7);
+  outline: 2px solid rgba(163, 230, 53, 0.55);
   outline-offset: 2px;
   border-radius: 4px;
 }
 :focus:not(:focus-visible) {
+  outline: none;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
   outline: none;
 }
 
@@ -87,8 +94,7 @@ html {
   color: var(--color-faint);
 }
 .input:focus {
-  border-color: rgba(200, 255, 0, 0.4);
-  box-shadow: 0 0 0 3px rgba(200, 255, 0, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 body {

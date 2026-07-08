@@ -23,7 +23,7 @@ export function BannerPicker({
             <div
               className={`h-16 w-28 rounded-xl border-2 transition-all ${
                 selected
-                  ? "border-accent shadow-[0_0_14px_-2px_rgba(200,255,0,0.6)]"
+                  ? "border-accent shadow-[0_0_14px_-2px_rgba(163,230,53,0.6)]"
                   : "border-border"
               }`}
               style={{ background: b.gradient }}

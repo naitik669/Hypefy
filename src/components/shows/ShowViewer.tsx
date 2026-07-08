@@ -545,7 +545,7 @@ function ShowScreen({
               onBlur={() => setPaused(false)}
               placeholder={`Reply to ${name}…`}
               disabled={sendingReply}
-              className="h-11 flex-1 rounded-pill border border-white/25 bg-white/10 px-4 text-sm text-white outline-none backdrop-blur-sm placeholder:text-white/45 disabled:opacity-60 focus:ring-2 focus:ring-accent/50"
+              className="h-11 flex-1 rounded-pill border border-white/25 bg-white/10 px-4 text-sm text-white outline-none backdrop-blur-sm placeholder:text-white/45 disabled:opacity-60 focus:ring-1 focus:ring-white/30"
             />
             <button
               type="button"

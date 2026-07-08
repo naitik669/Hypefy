@@ -36,7 +36,7 @@ export const BANNERS: Banner[] = [
     id: "lime-pulse",
     label: "Lime Pulse",
     gradient:
-      "radial-gradient(120% 150% at 25% -20%, rgba(200,255,0,0.40), transparent 55%), #0d0d0d",
+      "radial-gradient(120% 150% at 25% -20%, rgba(163,230,53,0.40), transparent 55%), #0d0d0d",
   },
   {
     id: "purple-night",
@@ -53,7 +53,7 @@ export const BANNERS: Banner[] = [
     id: "neon-grid",
     label: "Neon Grid",
     gradient:
-      "repeating-linear-gradient(0deg, transparent 0 21px, rgba(200,255,0,0.10) 21px 22px), repeating-linear-gradient(90deg, transparent 0 21px, rgba(200,255,0,0.10) 21px 22px), #0a0a0a",
+      "repeating-linear-gradient(0deg, transparent 0 21px, rgba(163,230,53,0.10) 21px 22px), repeating-linear-gradient(90deg, transparent 0 21px, rgba(163,230,53,0.10) 21px 22px), #0a0a0a",
   },
   {
     id: "creator-mode",

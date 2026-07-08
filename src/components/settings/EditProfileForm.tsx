@@ -235,7 +235,7 @@ export function EditProfileForm({
 
       {/* Username */}
       <Field label="Username">
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-accent/40">
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-white/25">
           <span className="shrink-0 text-sm text-faint">@</span>
           <input value={username} onChange={(e) => onUsernameChange(e.target.value)} placeholder="username"
             className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-faint" />

@@ -4,7 +4,7 @@
 import sharp from "sharp";
 import { mkdirSync } from "node:fs";
 
-const ACCENT = "#c8ff00";
+const ACCENT = "#a3e635";
 const BG = "#0a0a0a";
 
 /**

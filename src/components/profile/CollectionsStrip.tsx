@@ -58,7 +58,7 @@ export function CollectionsStrip({ userId, savedPosts }: { userId: string; saved
             <input
               autoFocus value={newName} onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && createCollection()}
-              placeholder="Name" className="h-8 w-full rounded-lg bg-elevated px-2 text-xs outline-none focus:ring-2 focus:ring-accent/30" />
+              placeholder="Name" className="h-8 w-full rounded-lg bg-elevated px-2 text-xs outline-none focus:border-white/25" />
             <div className="flex gap-1">
               <button type="button" onClick={createCollection} className="flex h-7 flex-1 items-center justify-center rounded-lg bg-accent text-accent-ink"><Check size={14} /></button>
               <button type="button" onClick={() => { setCreating(false); setNewName(""); }} className="flex h-7 w-7 items-center justify-center rounded-lg bg-elevated text-muted"><X size={14} /></button>

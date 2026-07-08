@@ -89,7 +89,7 @@ export function UploadProgressBar() {
     <div className="h-0.5 w-full bg-border/40">
       <div
         className="h-full bg-accent transition-[width] duration-300 ease-out"
-        style={{ width: `${progress}%`, boxShadow: "0 0 8px rgba(200,255,0,0.6)" }}
+        style={{ width: `${progress}%`, boxShadow: "0 0 8px rgba(163,230,53,0.6)" }}
       />
     </div>
   );
