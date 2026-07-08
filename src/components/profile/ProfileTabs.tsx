@@ -168,7 +168,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
       </div>
 
       {/* Posts grid */}
-      <div className="mt-3">
+      <div key={tab} className="animate-fade-swap mt-3">
       {tab === "Posts" && (
         posts === null ? (
           <GridSkeleton />

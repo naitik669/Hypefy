@@ -316,8 +316,8 @@ export default function NotificationsPage() {
         />
       ) : (
         <div className="flex flex-col pb-4">
-          {groups.map((g) => (
-            <NotifRow key={g.key} group={g} onClear={() => clearGroup(g.ids)} />
+          {groups.map((g, i) => (
+            <NotifRow key={g.key} group={g} index={i} onClear={() => clearGroup(g.ids)} />
           ))}
           {/* Infinite scroll sentinel */}
           <div ref={sentinelRef} className="py-2 flex justify-center">
@@ -333,7 +333,7 @@ const SWIPE_REVEAL = 80; // px of delete affordance revealed — matches the but
 const SWIPE_COMMIT = 110; // px drag distance that commits the clear
 
 /** One notification row (single or grouped). Swipe left to reveal + confirm clear. */
-function NotifRow({ group: g, onClear }: { group: Group; onClear: () => void }) {
+function NotifRow({ group: g, index = 0, onClear }: { group: Group; index?: number; onClear: () => void }) {
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -369,7 +369,10 @@ function NotifRow({ group: g, onClear }: { group: Group; onClear: () => void }) 
   const showCluster = g.actors.length > 1;
 
   return (
-    <div className="relative overflow-hidden">
+    <div
+      className="animate-row-in relative overflow-hidden"
+      style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
+    >
       {/* Delete affordance revealed behind the row */}
       <button
         type="button"

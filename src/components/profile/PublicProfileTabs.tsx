@@ -93,9 +93,13 @@ export function PublicProfileTabs({
         })}
       </div>
 
-      <div className="mt-3">
+      <div key={tab} className="animate-fade-swap mt-3">
       {loading ? (
-        <div className="py-12 text-center text-sm text-faint">Loading...</div>
+        <div className="grid grid-cols-3 gap-1.5 px-1.5">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="skeleton aspect-square rounded-xl" />
+          ))}
+        </div>
       ) : tab === "Posts" || (tab === "Saved" && isOwn) ? (
         activePosts.length === 0 ? (
           <EmptyState
