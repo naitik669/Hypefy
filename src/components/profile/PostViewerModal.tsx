@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
+import { ViewPing } from "@/components/feed/ViewPing";
 
 /**
  * Full-screen post viewer opened from the profile grid (and /p/[postId]).
@@ -49,6 +50,8 @@ export function PostViewerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      {/* Count a view for the post that was actually tapped open */}
+      {posts[startIdx] && <ViewPing postId={posts[startIdx].id} />}
       {/* Top bar */}
       <div className="flex h-12 shrink-0 items-center gap-1 border-b border-border/60 bg-background/90 px-3 backdrop-blur-xl">
         <button

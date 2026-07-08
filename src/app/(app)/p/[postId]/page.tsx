@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
 import { JoinBanner } from "@/components/growth/JoinBanner";
+import { ViewPing } from "@/components/feed/ViewPing";
 
 type Thumb = { id: string; image_url: string | null; image_urls: string[] | null; caption: string | null };
 
@@ -141,6 +142,7 @@ export default async function PostDetailPage({
   return (
     <>
       <PageHeader title="Post" showBack />
+      <ViewPing postId={postId} />
       <FeedCard post={post} currentUserId={uid} />
 
       {moreFrom.length > 0 && (
