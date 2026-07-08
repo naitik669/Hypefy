@@ -63,15 +63,19 @@ export function FeedList({
   followingIds = [],
   favoriteIds = [],
   hyperIds = [],
+  blockedIds = [],
 }: {
   initialPosts: FeedPost[];
   currentUserId: string;
   followingIds?: string[];
   favoriteIds?: string[];
   hyperIds?: string[];
+  blockedIds?: string[];
 }) {
   const supabase = createClient();
   const tab = useFeedTab();
+  // Authors the viewer has blocked — pagination batches skip them too.
+  const blockedSet = new Set(blockedIds);
 
   // For You — seeded by the server.
   const [posts, setPosts] = useState<FeedPost[]>(initialPosts);
@@ -134,7 +138,7 @@ export function FeedList({
       .limit(PAGE_SIZE);
 
     const fresh = normalize(data).filter(
-      (p) => !current.some((x) => x.id === p.id) && !seenRef.current.has(p.id),
+      (p) => !current.some((x) => x.id === p.id) && !seenRef.current.has(p.id) && !blockedSet.has(p.user_id),
     );
     if ((data?.length ?? 0) < PAGE_SIZE) setFyDone(true);
     fresh.forEach((p) => seenRef.current.add(p.id));
@@ -173,7 +177,7 @@ export function FeedList({
         .limit(PAGE_SIZE);
     }
     const { data } = await query;
-    const fresh = normalize(data).filter((p) => !current.some((x) => x.id === p.id));
+    const fresh = normalize(data).filter((p) => !current.some((x) => x.id === p.id) && !blockedSet.has(p.user_id));
     const nowDone = (data?.length ?? 0) < PAGE_SIZE;
     const withState = fresh.length ? await withUserState(fresh) : fresh;
     setIdsState((prev) => ({

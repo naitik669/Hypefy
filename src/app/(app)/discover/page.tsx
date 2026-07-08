@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { DiscoverView } from "@/components/discover/DiscoverView";
 import { tagAffinityFor } from "@/lib/feed-rank";
+import { getBlockedIds } from "@/lib/blocked";
 
 function one(p: any) {
   return { ...p, profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles };
@@ -86,9 +87,10 @@ export default async function DiscoverPage() {
   const authorAff = ((affRes.data as any)?.authors ?? {}) as Record<string, number>;
   const tagAff = ((affRes.data as any)?.tags ?? {}) as Record<string, number>;
   const followedTags = new Set<string>((followedTagRes.data ?? []).map((r: any) => r.tag));
+  const blockedIds = await getBlockedIds(supabase);
 
-  const posts = (postsRes.data ?? []).map(one).map((p: any) => ({ ...p, _score: score(p, now, interests, authorAff, tagAff, followedTags) }));
-  const shots = (shotsRes.data ?? []).map(one).map((s: any) => ({ ...s, _score: score(s, now, interests, authorAff, tagAff, followedTags) }));
+  const posts = (postsRes.data ?? []).map(one).filter((p: any) => !blockedIds.has(p.user_id)).map((p: any) => ({ ...p, _score: score(p, now, interests, authorAff, tagAff, followedTags) }));
+  const shots = (shotsRes.data ?? []).map(one).filter((s: any) => !blockedIds.has(s.user_id)).map((s: any) => ({ ...s, _score: score(s, now, interests, authorAff, tagAff, followedTags) }));
 
   const trendingPosts = [...posts].sort((a, b) => b._score - a._score).slice(0, 12);
   const trendingIds = new Set(trendingPosts.map((p) => p.id));
@@ -99,8 +101,8 @@ export default async function DiscoverPage() {
   const tags = ((trendingRes.data ?? []) as any[]).map((t) => ({ tag: t.tag, count: t.recent ?? 0 }));
 
   // Friendly-circle people suggestions (ranked: friends-of-friends, shared interests, reciprocity)
-  const people = (suggestedRes.data ?? []) as any[];
-  const newPeople = (newPeopleRes.data ?? []) as any[];
+  const people = ((suggestedRes.data ?? []) as any[]).filter((p) => !blockedIds.has(p.id));
+  const newPeople = ((newPeopleRes.data ?? []) as any[]).filter((p) => !blockedIds.has(p.id));
 
   // ── Curated buckets, carved from the post pool (no extra queries) ──
   const tagsOf = (p: any) =>

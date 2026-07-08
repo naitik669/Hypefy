@@ -55,6 +55,7 @@ export default function SearchPage() {
   const [followedTags, setFollowedTags] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [recent, setRecent] = useState<string[]>([]);
+  const blockedRef = useRef<Set<string>>(new Set());
   const [trendingTags, setTrendingTags] = useState<{ tag: string; count: number }[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -66,6 +67,10 @@ export default function SearchPage() {
       if (uid) {
         supabase.from("hashtag_follows").select("tag").eq("user_id", uid)
           .then(({ data: rows }) => setFollowedTags(new Set((rows ?? []).map((r: any) => r.tag))));
+        supabase.from("blocked_users").select("blocked_id").eq("blocker_id", uid)
+          .then(({ data: rows }) => {
+            blockedRef.current = new Set((rows ?? []).map((r: any) => r.blocked_id as string));
+          });
       }
     });
     setRecent(loadRecent());
@@ -185,8 +190,8 @@ export default function SearchPage() {
               .order("hype_count", { ascending: false })
               .limit(20);
 
-      setPeople(peopleRes.data ?? []);
-      const np = normPosts(postsRes.data ?? []);
+      setPeople((peopleRes.data ?? []).filter((p: Profile) => !blockedRef.current.has(p.id)));
+      const np = normPosts(postsRes.data ?? []).filter((p) => !blockedRef.current.has(p.user_id));
       setPosts(np);
       setTags(isUser ? [] : tagsFrom(np, isTag ? undefined : term));
       if (isTag) setTab((t) => (t === "People" ? "Posts" : t));

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, UserCheck, Link2, Flag, Trash2, Pencil, Star } from "lucide-react";
+import { UserPlus, UserCheck, Link2, Flag, Trash2, Pencil, Star, Ban } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { FloatingMenu, MenuItem, MenuDivider } from "@/components/ui/FloatingMenu";
@@ -46,6 +46,7 @@ export function PostActionsSheet({
   const [hyperPending, setHyperPending] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
 
   // Fetch follow + Hyper state when opened
   useEffect(() => {
@@ -66,7 +67,7 @@ export function PostActionsSheet({
       .then(({ data }) => setIsHyper(!!data));
   }, [open, isOwn, currentUserId, postUserId, supabase]);
 
-  if (!open && !confirmDelete) return null;
+  if (!open && !confirmDelete && !confirmBlock) return null;
 
   async function toggleFollow() {
     if (followPending) return;
@@ -120,6 +121,18 @@ export function PostActionsSheet({
     onClose();
   }
 
+  async function blockAuthor() {
+    const { error } = await supabase.rpc("block_user", { p_blocked: postUserId });
+    if (error) {
+      toast("Couldn't block — try again", "error");
+      return;
+    }
+    setConfirmBlock(false);
+    onClose();
+    toast(`Blocked @${postUsername ?? "user"}`, "success");
+    router.refresh();
+  }
+
   async function deletePost() {
     const { error } = await supabase.from("posts").delete().eq("id", postId);
     if (error) {
@@ -163,6 +176,12 @@ export function PostActionsSheet({
         {!isOwn && (
           <>
             <MenuDivider />
+            <MenuItem
+              icon={Ban}
+              label={`Block @${postUsername ?? "user"}`}
+              danger
+              onClick={() => { setConfirmBlock(true); onClose(); }}
+            />
             <MenuItem icon={Flag} label="Report" danger onClick={() => setShowReport(true)} />
           </>
         )}
@@ -174,6 +193,16 @@ export function PostActionsSheet({
           </>
         )}
       </FloatingMenu>
+
+      <ConfirmDialog
+        open={confirmBlock}
+        onClose={() => { setConfirmBlock(false); onClose(); }}
+        onConfirm={blockAuthor}
+        icon={Ban}
+        title={`Block @${postUsername ?? "user"}`}
+        body="They won't be able to message or call you, and their posts vanish from your feeds. They aren't notified."
+        confirmLabel="Block"
+      />
 
       <ConfirmDialog
         open={confirmDelete}

@@ -16,14 +16,15 @@ export const REPORT_REASONS = [
   "Other",
 ];
 
-export type ReportTarget = "post" | "shot" | "comment" | "user" | "show" | "conversation";
+// Must stay in sync with the reports.target_type check constraint.
+export type ReportTarget = "post" | "shot" | "comment" | "message" | "profile" | "conversation";
 
 const LABELS: Record<ReportTarget, string> = {
   post: "post",
   shot: "Shot",
   comment: "comment",
-  user: "account",
-  show: "Show",
+  message: "message",
+  profile: "account",
   conversation: "group",
 };
 

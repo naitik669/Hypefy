@@ -9,6 +9,7 @@ import { PeopleToFollow } from "@/components/feed/PeopleToFollow";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { UploadProgressBar } from "@/components/upload/UploadProvider";
 import { feedScore, diversify, postTags, tagAffinityFor } from "@/lib/feed-rank";
+import { getBlockedIds } from "@/lib/blocked";
 
 function normalise(raw: unknown[] | null) {
   return (raw ?? []).map((p: any) => ({
@@ -27,10 +28,10 @@ export default async function HomePage() {
   const nowIso = new Date().toISOString();
 
   // Follow graph first: the followed-posts query depends on it.
-  const { data: followRows } = await supabase
-    .from("follows")
-    .select("following_id")
-    .eq("follower_id", user.id);
+  const [{ data: followRows }, blockedIds] = await Promise.all([
+    supabase.from("follows").select("following_id").eq("follower_id", user.id),
+    getBlockedIds(supabase),
+  ]);
   const followingIds = new Set(
     (followRows ?? []).map((r: any) => r.following_id as string),
   );
@@ -110,9 +111,11 @@ export default async function HomePage() {
     : { data: [] as any[] };
   const viewedShowIds = new Set((myViews ?? []).map((v: any) => v.show_id as string));
 
-  // Merge followed + global, dedupe (followed posts can appear in both slices)
+  // Merge followed + global, dedupe (followed posts can appear in both slices).
+  // Blocked authors never make it into the pool.
   const byId = new Map<string, any>();
   for (const p of [...normalise(followedPosts), ...normalise(rawPosts)]) {
+    if (blockedIds.has(p.user_id)) continue;
     if (!byId.has(p.id)) byId.set(p.id, p);
   }
 
@@ -121,6 +124,7 @@ export default async function HomePage() {
   for (const r of (followedReposts ?? []) as any[]) {
     const post = Array.isArray(r.posts) ? r.posts[0] : r.posts;
     if (!post) continue;
+    if (blockedIds.has(post.user_id) || blockedIds.has(r.user_id)) continue;
     const reposterProfile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
     const reposter = reposterProfile?.display_name ?? reposterProfile?.username ?? null;
     const normalised = {
@@ -203,6 +207,7 @@ export default async function HomePage() {
   // Group by user: keep most-recent-activity order, but enter at their OLDEST show.
   const byUser = new Map<string, { id: string; name: string; hue: number; avatar_url: string | null; allIds: string[] }>();
   for (const s of (activeShows ?? []) as any[]) {
+    if (blockedIds.has(s.user_id)) continue;
     const p = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
     const existing = byUser.get(s.user_id);
     if (!existing) {
@@ -253,6 +258,7 @@ export default async function HomePage() {
             followingIds={[...followingIds]}
             favoriteIds={favoriteIds}
             hyperIds={hyperIds}
+            blockedIds={[...blockedIds]}
           />
         )}
       </PullToRefresh>

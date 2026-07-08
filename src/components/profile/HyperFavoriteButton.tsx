@@ -1,33 +1,84 @@
 "use client";
 
-import { useState } from "react";
-import { MoreHorizontal, Star, Heart, Check } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { MoreHorizontal, Star, Heart, Check, Ban, Flag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ReportSheet } from "@/components/ui/ReportSheet";
+import { useToast } from "@/components/ui/ToastProvider";
 import { haptics } from "@/lib/haptics";
 
 /**
- * Overflow menu on a public profile for adding this person to your Hypers
- * (closest friends — backed by close_friends) or Favourites (backed by
- * favorites). Both are private, personal lists that scope the Home feed's
- * Hypers / Favourite tabs — the other person is never notified either way.
+ * Overflow menu on a public profile: personal lists (Hypers / Favourites —
+ * private, the other person is never notified) plus the safety actions —
+ * block/unblock and report.
  */
 export function HyperFavoriteButton({
   currentUserId,
   targetUserId,
+  targetUsername,
   initialHyper,
   initialFavourite,
 }: {
   currentUserId: string;
   targetUserId: string;
+  targetUsername?: string | null;
   initialHyper: boolean;
   initialFavourite: boolean;
 }) {
   const supabase = createClient();
+  const router = useRouter();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [isHyper, setIsHyper] = useState(initialHyper);
   const [isFavourite, setIsFavourite] = useState(initialFavourite);
   const [pending, setPending] = useState<"hyper" | "favourite" | null>(null);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+
+  // Blocked state loads lazily when the sheet opens.
+  useEffect(() => {
+    if (!open) return;
+    supabase
+      .from("blocked_users")
+      .select("id")
+      .eq("blocker_id", currentUserId)
+      .eq("blocked_id", targetUserId)
+      .maybeSingle()
+      .then(({ data }) => setIsBlocked(!!data));
+  }, [open, currentUserId, targetUserId, supabase]);
+
+  async function blockUser() {
+    const { error } = await supabase.rpc("block_user", { p_blocked: targetUserId });
+    if (error) {
+      toast("Couldn't block — try again", "error");
+      return;
+    }
+    setConfirmBlock(false);
+    setOpen(false);
+    toast(`Blocked ${targetUsername ? `@${targetUsername}` : "user"}`, "success");
+    router.push("/home");
+    router.refresh();
+  }
+
+  async function unblockUser() {
+    haptics.select();
+    const { error } = await supabase
+      .from("blocked_users")
+      .delete()
+      .eq("blocker_id", currentUserId)
+      .eq("blocked_id", targetUserId);
+    if (error) {
+      toast("Couldn't unblock — try again", "error");
+      return;
+    }
+    setIsBlocked(false);
+    toast("Unblocked", "success");
+    router.refresh();
+  }
 
   async function toggleHyper() {
     if (pending) return;
@@ -103,8 +154,73 @@ export function HyperFavoriteButton({
             </div>
             {isFavourite && <Check size={18} className="shrink-0 text-accent" />}
           </button>
+
+          {/* Safety actions */}
+          <div className="mx-2 my-1 h-px bg-border" />
+
+          {isBlocked ? (
+            <button
+              type="button"
+              onClick={unblockUser}
+              className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-white/5"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface text-muted">
+                <Ban size={18} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Unblock{targetUsername ? ` @${targetUsername}` : ""}</p>
+                <p className="text-xs text-muted">They can find and message you again</p>
+              </div>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmBlock(true)}
+              className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-danger/5"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger/10 text-danger">
+                <Ban size={18} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-danger">Block{targetUsername ? ` @${targetUsername}` : ""}</p>
+                <p className="text-xs text-muted">Their posts disappear and they can't message or call you</p>
+              </div>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setReportOpen(true)}
+            className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-danger/5"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger/10 text-danger">
+              <Flag size={18} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-danger">Report{targetUsername ? ` @${targetUsername}` : ""}</p>
+              <p className="text-xs text-muted">They won't know it came from you</p>
+            </div>
+          </button>
         </div>
       </BottomSheet>
+
+      <ConfirmDialog
+        open={confirmBlock}
+        onClose={() => setConfirmBlock(false)}
+        onConfirm={blockUser}
+        icon={Ban}
+        title={`Block ${targetUsername ? `@${targetUsername}` : "this user"}`}
+        body="They won't be able to message or call you, and their posts vanish from your feeds. They aren't notified."
+        confirmLabel="Block"
+      />
+
+      <ReportSheet
+        open={reportOpen}
+        onClose={() => { setReportOpen(false); setOpen(false); }}
+        targetType="profile"
+        targetId={targetUserId}
+        currentUserId={currentUserId}
+      />
     </>
   );
 }

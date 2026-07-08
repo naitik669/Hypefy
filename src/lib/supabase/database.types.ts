@@ -384,6 +384,39 @@ export type Database = {
           },
         ]
       }
+      favorites: {
+        Row: {
+          created_at: string
+          friend_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          friend_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          friend_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_friend_id_fkey"
+            columns: ["friend_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follows: {
         Row: {
           created_at: string
@@ -653,6 +686,45 @@ export type Database = {
           },
         ]
       }
+      note_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          note_created_at: string
+          note_owner_id: string
+          reactor_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          note_created_at: string
+          note_owner_id: string
+          reactor_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          note_created_at?: string
+          note_owner_id?: string
+          reactor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_reactions_note_owner_id_fkey"
+            columns: ["note_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_reactions_reactor_id_fkey"
+            columns: ["reactor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           audience: string
@@ -730,6 +802,39 @@ export type Database = {
           {
             foreignKeyName: "notifications_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pinned_viewers: {
+        Row: {
+          created_at: string
+          owner_id: string
+          pinned_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          owner_id: string
+          pinned_user_id: string
+        }
+        Update: {
+          created_at?: string
+          owner_id?: string
+          pinned_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pinned_viewers_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pinned_viewers_pinned_user_id_fkey"
+            columns: ["pinned_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1207,7 +1312,7 @@ export type Database = {
         Returns: undefined
       }
       block_user: { Args: { p_blocked: string }; Returns: undefined }
-      clear_note: { Args: Record<PropertyKey, never>; Returns: undefined }
+      clear_note: { Args: never; Returns: undefined }
       create_comment:
         | {
             Args: { p_body: string; p_owner_id?: string; p_post_id: string }
@@ -1216,7 +1321,7 @@ export type Database = {
         | {
             Args: {
               p_body: string
-              p_owner_id?: string
+              p_owner_id: string
               p_parent_id?: string
               p_post_id: string
             }
@@ -1229,7 +1334,7 @@ export type Database = {
       create_shot_comment: {
         Args: {
           p_body: string
-          p_owner_id?: string
+          p_owner_id: string
           p_parent_id?: string
           p_shot_id: string
         }
@@ -1243,7 +1348,7 @@ export type Database = {
       end_call: { Args: { p_call_id: string }; Returns: undefined }
       get_affinity: { Args: { p_lookback_days?: number }; Returns: Json }
       get_notes: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           audience: string
           avatar_hue: number
@@ -1290,10 +1395,7 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: undefined
       }
-      mark_notifications_read: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      mark_notifications_read: { Args: never; Returns: undefined }
       quick_reply_call: {
         Args: { p_call_id: string; p_reply: string }
         Returns: undefined
@@ -1330,6 +1432,12 @@ export type Database = {
           text: string
           user_id: string
         }
+        SetofOptions: {
+          from: "*"
+          to: "notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       set_verified: {
         Args: { p_user_id: string; p_value: boolean }
@@ -1356,7 +1464,7 @@ export type Database = {
         Args: { p_emoji: string; p_message_id: string }
         Returns: undefined
       }
-      touch_last_seen: { Args: Record<PropertyKey, never>; Returns: undefined }
+      touch_last_seen: { Args: never; Returns: undefined }
       unsend_message: { Args: { p_message_id: string }; Returns: undefined }
       update_conversation: {
         Args: {

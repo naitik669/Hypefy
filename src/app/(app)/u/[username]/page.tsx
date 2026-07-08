@@ -160,6 +160,7 @@ export default async function PublicProfilePage({
               <HyperFavoriteButton
                 currentUserId={currentUser.id}
                 targetUserId={profile.id}
+                targetUsername={profile.username}
                 initialHyper={isHyper}
                 initialFavourite={isFavourite}
               />

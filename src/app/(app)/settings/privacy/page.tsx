@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PrivacySettings } from "@/components/settings/PrivacySettings";
+import { BlockedList } from "@/components/settings/BlockedList";
 
 export default async function PrivacySettingsPage() {
   const supabase = await createClient();
@@ -25,6 +26,14 @@ export default async function PrivacySettingsPage() {
           initialShowActivity={(profile as any)?.show_activity ?? true}
           initialTwoStep={!!(profile as any)?.two_step_enabled}
         />
+
+        {/* Blocked accounts */}
+        <section className="mt-8">
+          <p className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">
+            Blocked accounts
+          </p>
+          <BlockedList currentUserId={user.id} />
+        </section>
       </div>
     </>
   );
