@@ -76,7 +76,7 @@ export function MessagesHeader({
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <span className="truncate text-lg font-bold tracking-tight">{username ? `@${username}` : name}</span>
+        <span className="truncate text-[17px] font-extrabold tracking-tight">{username ? `@${username}` : name}</span>
         <ChevronDown size={20} className={`shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 

@@ -294,7 +294,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         </div>
         {/* THREE DOTS -- fully functional */}
         <button type="button" aria-label="More" onClick={() => setActionsOpen(true)}
-          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-white/5">
+          className="-mr-1 flex h-10 w-10 items-center justify-center rounded-full text-muted hover:bg-white/5">
           <MoreHorizontal size={20} />
         </button>
       </div>

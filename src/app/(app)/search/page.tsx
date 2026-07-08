@@ -256,7 +256,7 @@ export default function SearchPage() {
           {recent.length > 0 && (
             <div className="mb-6">
               <div className="mb-1 flex items-center justify-between">
-                <h2 className="text-sm font-bold text-muted">Recent</h2>
+                <h2 className="text-xs font-bold uppercase tracking-widest text-faint">Recent</h2>
                 <button
                   type="button"
                   onClick={clearAllRecent}
@@ -294,7 +294,7 @@ export default function SearchPage() {
 
           {trendingTags.length > 0 && (
             <div>
-              <h2 className="mb-2 text-sm font-bold text-muted">Trending</h2>
+              <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-faint">Trending</h2>
               <div className="flex flex-wrap gap-2">
                 {trendingTags.map((t) => (
                   <button
@@ -317,7 +317,7 @@ export default function SearchPage() {
           {/* Tags */}
           {showTags && tags.length > 0 && (
             <>
-              <h2 className="px-4 pb-1 pt-3 text-sm font-bold text-muted">Tags</h2>
+              <h2 className="px-4 pb-1 pt-3 text-xs font-bold uppercase tracking-widest text-faint">Tags</h2>
               <div className="flex flex-col">
                 {tags.map((t) => {
                   const isFollowed = followedTags.has(t.tag.replace(/^#/, "").toLowerCase());
@@ -357,7 +357,7 @@ export default function SearchPage() {
           {/* People */}
           {showPeople && people.length > 0 && (
             <>
-              <h2 className="px-4 pb-1 pt-3 text-sm font-bold text-muted">People</h2>
+              <h2 className="px-4 pb-1 pt-3 text-xs font-bold uppercase tracking-widest text-faint">People</h2>
               {people.map((u) => (
                 <Link
                   key={u.id}
@@ -377,7 +377,7 @@ export default function SearchPage() {
           {/* Posts */}
           {showPosts && posts.length > 0 && (
             <>
-              <h2 className="px-4 pb-2 pt-4 text-sm font-bold text-muted">Posts</h2>
+              <h2 className="px-4 pb-2 pt-4 text-xs font-bold uppercase tracking-widest text-faint">Posts</h2>
               <div className="flex flex-col">
                 {posts.map((p) => (
                   <FeedCard key={p.id} post={p} currentUserId={userId} />

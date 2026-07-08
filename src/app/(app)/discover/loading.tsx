@@ -7,7 +7,7 @@ export default function DiscoverLoading() {
   return (
     <>
       <header className="sticky top-0 z-20 flex h-14 items-center border-b border-border/60 bg-background/80 px-4 backdrop-blur-xl">
-        <h1 className="flex-1 text-lg font-bold tracking-tight">Discover</h1>
+        <h1 className="flex-1 text-[17px] font-extrabold tracking-tight">Discover</h1>
       </header>
 
       {/* Search bar placeholder */}

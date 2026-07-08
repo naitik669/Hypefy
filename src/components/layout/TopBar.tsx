@@ -24,7 +24,7 @@ export async function TopBar() {
       <Link
         href="/discover"
         aria-label="Discover"
-        className="flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5"
+        className="flex h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5"
       >
         <Compass size={22} strokeWidth={2.2} />
       </Link>

@@ -44,7 +44,7 @@ export default async function SettingsPage() {
               <Link
                 key={href}
                 href={href}
-                className="flex items-center gap-3 rounded-2xl px-2 py-3.5 transition-colors hover:bg-white/[0.03]"
+                className="flex items-center gap-3 rounded-2xl px-2 py-4 transition-colors hover:bg-white/[0.03]"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface text-foreground">
                   <Icon size={20} />

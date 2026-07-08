@@ -29,7 +29,7 @@ export function PageHeader({
       ) : (
         <span className="w-2" />
       )}
-      <h1 className="flex-1 truncate px-1 text-lg font-bold tracking-tight">{title}</h1>
+      <h1 className="flex-1 truncate px-1 text-[17px] font-extrabold tracking-tight">{title}</h1>
       {right && <div className="flex items-center gap-1">{right}</div>}
     </header>
   );

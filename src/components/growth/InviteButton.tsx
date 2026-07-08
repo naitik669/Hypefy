@@ -56,7 +56,7 @@ export function InviteRow({ username }: { username: string | null }) {
           setTimeout(() => setCopied(false), 1500);
         }
       }}
-      className="flex w-full items-center gap-3 rounded-2xl px-2 py-3.5 text-left transition-colors hover:bg-white/[0.03]"
+      className="flex w-full items-center gap-3 rounded-2xl px-2 py-4 text-left transition-colors hover:bg-white/[0.03]"
     >
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
         <UserPlus size={20} />
