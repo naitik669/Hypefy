@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { SettingToggle } from "@/components/settings/SettingToggle";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export function PrivacySettings({
   userId,
@@ -18,6 +19,7 @@ export function PrivacySettings({
   initialTwoStep: boolean;
 }) {
   const supabase = createClient();
+  const toast = useToast();
   const [isPrivate, setIsPrivate] = useState(initialIsPrivate);
   const [dmPrivacy, setDmPrivacy] = useState(initialDmPrivacy);
   const [showActivity, setShowActivity] = useState(initialShowActivity);
@@ -28,6 +30,8 @@ export function PrivacySettings({
     setSaving(true);
     const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
     setSaving(false);
+    if (error) toast("Couldn't save — try again", "error");
+    else toast("Saved", "success");
     return !error;
   }
 

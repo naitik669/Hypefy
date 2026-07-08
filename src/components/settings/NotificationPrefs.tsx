@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { SettingToggle } from "@/components/settings/SettingToggle";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export type NotifPrefs = {
   hypes?: boolean;
@@ -28,6 +29,7 @@ export function NotificationPrefs({
   initialPrefs: NotifPrefs;
 }) {
   const supabase = createClient();
+  const toast = useToast();
   // Everything defaults ON — prefs store explicit opt-outs
   const [prefs, setPrefs] = useState<NotifPrefs>(initialPrefs);
   const [saving, setSaving] = useState(false);
@@ -44,7 +46,8 @@ export function NotificationPrefs({
       .update({ notif_prefs: updated })
       .eq("id", userId);
     setSaving(false);
-    if (error) setPrefs(prev);
+    if (error) { setPrefs(prev); toast("Couldn't save — try again", "error"); }
+    else toast("Saved", "success");
   }
 
   return (
