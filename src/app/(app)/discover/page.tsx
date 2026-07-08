@@ -48,7 +48,9 @@ export default async function DiscoverPage() {
 
   const now = Date.now();
 
-  const [postsRes, shotsRes, meRes, affRes, followedTagRes, trendingRes, suggestedRes] = await Promise.all([
+  const weekAgo = new Date(now - 7 * 24 * 3_600_000).toISOString();
+
+  const [postsRes, shotsRes, meRes, affRes, followedTagRes, trendingRes, suggestedRes, newPeopleRes] = await Promise.all([
     supabase
       .from("posts")
       .select("id, caption, body, image_url, image_urls, hashtags, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles(id, display_name, username, avatar_hue, avatar_url)")
@@ -66,6 +68,15 @@ export default async function DiscoverPage() {
     supabase.from("hashtag_follows").select("tag").eq("user_id", user.id),
     supabase.rpc("get_trending_tags", { p_limit: 16 }),
     supabase.rpc("get_suggested_people", { p_limit: 12 }),
+    // New this week — freshly joined, completed profiles
+    supabase
+      .from("profiles")
+      .select("id, display_name, username, avatar_hue, avatar_url, is_verified, created_at")
+      .eq("profile_completed", true)
+      .neq("id", user.id)
+      .gt("created_at", weekAgo)
+      .order("created_at", { ascending: false })
+      .limit(8),
   ]);
 
   const interests = new Set<string>([
@@ -89,6 +100,38 @@ export default async function DiscoverPage() {
 
   // Friendly-circle people suggestions (ranked: friends-of-friends, shared interests, reciprocity)
   const people = (suggestedRes.data ?? []) as any[];
+  const newPeople = (newPeopleRes.data ?? []) as any[];
+
+  // ── Curated buckets, carved from the post pool (no extra queries) ──
+  const tagsOf = (p: any) =>
+    ((p.hashtags ?? []) as string[]).map((t) => t.replace(/^#/, "").toLowerCase());
+
+  // "Based on your interests": posts matching the user's own tags
+  const interestPosts =
+    interests.size > 0
+      ? posts
+          .filter((p: any) => tagsOf(p).some((t) => interests.has(t)))
+          .sort((a: any, b: any) => b._score - a._score)
+          .slice(0, 6)
+      : [];
+
+  // Interest-category rails — synonym buckets over the same pool
+  const CATEGORY_DEFS: { label: string; tags: string[] }[] = [
+    { label: "Technology", tags: ["tech", "technology", "coding", "code", "dev", "ai", "programming", "startup", "startups", "software"] },
+    { label: "Gaming", tags: ["gaming", "game", "games", "minecraft", "bedrock", "valorant", "gta", "fortnite", "esports"] },
+    { label: "Art & Design", tags: ["art", "design", "drawing", "sketch", "artist", "illustration", "animation"] },
+    { label: "Photography", tags: ["photo", "photography", "randompic", "picoftheday", "camera", "portrait"] },
+    { label: "Music", tags: ["music", "song", "rap", "singer", "playlist", "concert"] },
+    { label: "Memes", tags: ["meme", "memes", "funny", "lol", "shitpost"] },
+  ];
+  const categoryRails = CATEGORY_DEFS.map(({ label, tags: catTags }) => {
+    const set = new Set(catTags);
+    const items = posts
+      .filter((p: any) => tagsOf(p).some((t) => set.has(t)))
+      .sort((a: any, b: any) => b._score - a._score)
+      .slice(0, 8);
+    return { label, posts: items };
+  }).filter((c) => c.posts.length >= 2);
 
   return (
     <>
@@ -102,6 +145,9 @@ export default async function DiscoverPage() {
         freshPosts={freshPosts}
         trendingShots={trendingShots}
         people={(people ?? []) as any[]}
+        newPeople={newPeople}
+        interestPosts={interestPosts}
+        categoryRails={categoryRails}
         tags={tags}
       />
     </>

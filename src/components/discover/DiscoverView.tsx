@@ -30,13 +30,16 @@ function postImage(p: Post): string | null {
 }
 
 export function DiscoverView({
-  trendingPosts, freshPosts, trendingShots, people, tags,
+  trendingPosts, freshPosts, trendingShots, people, newPeople = [], interestPosts = [], categoryRails = [], tags,
 }: {
   currentUserId: string;
   trendingPosts: Post[];
   freshPosts: Post[];
   trendingShots: Shot[];
   people: Person[];
+  newPeople?: Person[];
+  interestPosts?: Post[];
+  categoryRails?: { label: string; posts: Post[] }[];
   tags: Tag[];
 }) {
   const supabase = createClient();
@@ -77,47 +80,77 @@ export function DiscoverView({
 
   return (
     <>
-      {/* Category chips */}
-      <div className="no-scrollbar sticky top-14 z-10 flex gap-2 overflow-x-auto bg-background/90 px-4 py-2.5 backdrop-blur-xl">
-        {CATEGORIES.map((c) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => setCat(c)}
-            className={`shrink-0 rounded-pill px-3.5 py-1.5 text-sm font-semibold transition-colors ${
-              cat === c ? "bg-accent text-accent-ink" : "bg-surface text-muted"
-            }`}
-          >
-            {c}
-          </button>
-        ))}
+      {/* Category chips — soft fade at the right edge hints there's more */}
+      <div className="sticky top-14 z-10 bg-background/90 backdrop-blur-xl">
+        <div
+          className="no-scrollbar flex gap-2 overflow-x-auto px-4 py-2.5"
+          style={{ maskImage: "linear-gradient(to right, black 92%, transparent)" }}
+        >
+          {CATEGORIES.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCat(c)}
+              className={`shrink-0 rounded-pill px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+                cat === c ? "bg-accent text-accent-ink" : "bg-surface text-muted"
+              }`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="pb-6">
+      <div key={cat} className="animate-fade-swap pb-6">
         {cat === "For You" && (
           <>
             {tags.length > 0 && <TagRail tags={tags} />}
             {trendingShots.length > 0 && (
-              <Section title="Shots">
-                <div className="no-scrollbar flex gap-2.5 overflow-x-auto px-4">
-                  {trendingShots.map((s) => <div key={s.id} className="w-36 shrink-0"><ShotTile shot={s} /></div>)}
+              <Section eyebrow="Watch" title="Trending Shots">
+                <div className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4">
+                  {trendingShots.map((s) => <div key={s.id} className="w-36 shrink-0 snap-start"><ShotTile shot={s} /></div>)}
                 </div>
               </Section>
             )}
             {trendingPosts.length > 0 && (
-              <Section title="Blowing up 🔥">
+              <Section eyebrow="Right now" title="Blowing up 🔥">
                 <Grid>{trendingPosts.map((p) => <PostTile key={p.id} post={p} />)}</Grid>
               </Section>
             )}
+            {interestPosts.length > 0 && (
+              <Section eyebrow="For you" title="Based on your interests">
+                <div className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto px-4">
+                  {interestPosts.map((p) => (
+                    <div key={p.id} className="w-32 shrink-0 snap-start"><PostTile post={p} /></div>
+                  ))}
+                </div>
+              </Section>
+            )}
             {people.length > 0 && (
-              <Section title="Suggested people">
+              <Section eyebrow="Follow" title="Creators">
                 <div className="flex flex-col">
                   {people.slice(0, 5).map((person) => <CreatorRow key={person.id} person={person} />)}
                 </div>
               </Section>
             )}
+            {newPeople.length > 0 && (
+              <Section eyebrow="Say hi first" title="New this week">
+                <div className="flex flex-col">
+                  {newPeople.slice(0, 5).map((person) => <CreatorRow key={person.id} person={person} />)}
+                </div>
+              </Section>
+            )}
+            {categoryRails.map(({ label, posts: catPosts }) => (
+              <Section key={label} eyebrow="Explore" title={label}>
+                <div className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto px-4">
+                  {catPosts.map((p) => (
+                    <div key={p.id} className="w-32 shrink-0 snap-start"><PostTile post={p} /></div>
+                  ))}
+                </div>
+              </Section>
+            ))}
             {fresh.length > 0 && (
-              <Section title="Fresh">
+              <Section eyebrow="Just posted" title="Fresh">
                 <Grid>{fresh.map((p) => <PostTile key={p.id} post={p} />)}</Grid>
                 {!noMore && (
                   <div className="px-4 pt-3">
@@ -189,10 +222,15 @@ export function DiscoverView({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ eyebrow, title, children }: { eyebrow?: string; title: string; children: React.ReactNode }) {
   return (
-    <section>
-      <h2 className="px-4 pb-2 pt-4 text-base font-bold tracking-tight">{title}</h2>
+    <section className="pt-5">
+      {eyebrow && (
+        <p className="px-4 text-[10px] font-bold uppercase tracking-widest text-faint">{eyebrow}</p>
+      )}
+      <h2 className={`px-4 pb-2.5 text-[17px] font-extrabold tracking-tight ${eyebrow ? "pt-0.5" : "pt-1"}`}>
+        {title}
+      </h2>
       {children}
     </section>
   );
@@ -204,7 +242,7 @@ function Grid({ children }: { children: React.ReactNode }) {
 
 function TagRail({ tags }: { tags: Tag[] }) {
   return (
-    <Section title="Trending tags">
+    <Section eyebrow="Rising" title="Trending tags">
       <div className="no-scrollbar flex gap-2 overflow-x-auto px-4">
         {tags.map(({ tag, count }) => (
           <Link key={tag} href={`/search?q=%23${encodeURIComponent(tag)}`}
