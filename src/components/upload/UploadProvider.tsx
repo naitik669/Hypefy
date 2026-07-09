@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useRef, useState } from "react"
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
+import type { Track } from "@/lib/music";
 
 type PostUpload = {
   userId: string;
@@ -12,6 +13,7 @@ type PostUpload = {
   body: string | null;
   hashtags: string[];
   mentions: string[];
+  track?: Track | null;
 };
 
 type Ctx = { progress: number | null; uploadPost: (a: PostUpload) => void };
@@ -55,9 +57,11 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         caption: a.caption,
         body: a.body,
         image_url: urls[0] ?? null,
-        image_urls: urls.length ? urls : null,
+        // NOT NULL column with a [] default — sending null breaks text-only posts.
+        image_urls: urls,
         hashtags: a.hashtags,
         mentions: a.mentions,
+        track: a.track ?? null,
       });
       if (insErr) throw insErr;
 

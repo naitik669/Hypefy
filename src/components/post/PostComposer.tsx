@@ -2,12 +2,15 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, X, Send, Crop, Plus } from "lucide-react";
+import { Image as ImageIcon, X, Send, Crop, Plus, Music } from "lucide-react";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { ImageCropper } from "@/components/post/ImageCropper";
 import { useUpload } from "@/components/upload/UploadProvider";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
+import { TrackPicker } from "@/components/music/TrackPicker";
+import { TrackChip } from "@/components/music/TrackChip";
+import type { Track } from "@/lib/music";
 
 const MAX_SIZE_MB = 10;
 const MAX_IMAGES = 10;
@@ -39,6 +42,8 @@ export function PostComposer({ userId }: { userId: string }) {
   const [captionCursor, setCaptionCursor] = useState(0);
   const [bodyCursor, setBodyCursor] = useState(0);
   const [activeField, setActiveField] = useState<"caption" | "body" | null>(null);
+  const [track, setTrack] = useState<Track | null>(null);
+  const [trackPickerOpen, setTrackPickerOpen] = useState(false);
   const activeText = activeField === "caption" ? caption : activeField === "body" ? body : "";
   const activeCursor = activeField === "caption" ? captionCursor : bodyCursor;
   const { suggestions: pickerSuggestions, reset: resetPicker } = useMentionHashtag(activeText, activeCursor);
@@ -151,6 +156,7 @@ export function PostComposer({ userId }: { userId: string }) {
       body: body.trim() || null,
       hashtags,
       mentions,
+      track,
     });
     router.push("/home");
   }
@@ -313,6 +319,22 @@ export function PostComposer({ userId }: { userId: string }) {
       )}
 
       <p className="text-xs text-faint">Use # to add hashtags · @ to mention someone</p>
+
+      {/* Song on the post */}
+      <div>
+        {track ? (
+          <TrackChip track={track} onRemove={() => setTrack(null)} />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setTrackPickerOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-pill border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-white/25 hover:text-foreground"
+          >
+            <Music size={13} /> Add a song
+          </button>
+        )}
+      </div>
+      <TrackPicker open={trackPickerOpen} onClose={() => setTrackPickerOpen(false)} onSelect={setTrack} />
 
       {/* Post button */}
       <button

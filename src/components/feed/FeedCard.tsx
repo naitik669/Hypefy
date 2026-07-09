@@ -20,6 +20,8 @@ import { formatCount } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { useToast } from "@/components/ui/ToastProvider";
+import { TrackChip } from "@/components/music/TrackChip";
+import { parseTrack } from "@/lib/music";
 
 export type FeedPost = {
   id: string;
@@ -44,6 +46,8 @@ export type FeedPost = {
   } | null;
   initialHyped?: boolean;
   initialSaved?: boolean;
+  /** Attached song ({id,title,artist,artwork,preview} jsonb) — see src/lib/music. */
+  track?: unknown;
   /** Display name of the followed user whose repost surfaced this post. */
   _repostedBy?: string | null;
 };
@@ -118,6 +122,7 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const [liveBody, setLiveBody] = useState(post.body);
   const [isHyper, setIsHyper] = useState(false);
   const [isMutualHyper, setIsMutualHyper] = useState(false);
+  const postTrack = parseTrack(post.track);
 
   const lastTapRef = useRef(0);
 
@@ -443,6 +448,13 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
           )}
           {liveBody && <p className="mt-1 text-foreground/85"><RichPostText text={liveBody} /></p>}
         </ExpandableText>
+      )}
+
+      {/* Attached song */}
+      {postTrack && (
+        <div className="px-4 pt-2">
+          <TrackChip track={postTrack} />
+        </div>
       )}
 
       {/* Sheets */}
