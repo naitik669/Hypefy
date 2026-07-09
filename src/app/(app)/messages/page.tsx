@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { MessagesHeader } from "@/components/messages/MessagesHeader";
 import { MessagesInbox, type InboxRow } from "@/components/messages/MessagesInbox";
 import { NotesRail, type NoteRow } from "@/components/notes/NotesRail";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 
 export default async function MessagesPage() {
   const supabase = await createClient();
@@ -177,18 +178,20 @@ export default async function MessagesPage() {
         avatarUrl={(me as any)?.avatar_url ?? null}
         hue={(me as any)?.avatar_hue ?? 280}
       />
-      <MessagesInbox rows={rows} currentUserId={user.id}>
-        <NotesRail
-          rows={(notes as NoteRow[]) ?? []}
-          me={{
-            id: user.id,
-            name: (me as any)?.display_name ?? (me as any)?.username ?? "You",
-            username: (me as any)?.username ?? null,
-            hue: (me as any)?.avatar_hue ?? 280,
-            avatarUrl: (me as any)?.avatar_url ?? null,
-          }}
-        />
-      </MessagesInbox>
+      <PullToRefresh>
+        <MessagesInbox rows={rows} currentUserId={user.id}>
+          <NotesRail
+            rows={(notes as NoteRow[]) ?? []}
+            me={{
+              id: user.id,
+              name: (me as any)?.display_name ?? (me as any)?.username ?? "You",
+              username: (me as any)?.username ?? null,
+              hue: (me as any)?.avatar_hue ?? 280,
+              avatarUrl: (me as any)?.avatar_url ?? null,
+            }}
+          />
+        </MessagesInbox>
+      </PullToRefresh>
     </>
   );
 }

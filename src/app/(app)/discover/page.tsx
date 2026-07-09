@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { DiscoverView } from "@/components/discover/DiscoverView";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { tagAffinityFor } from "@/lib/feed-rank";
 import { getBlockedIds } from "@/lib/blocked";
 
@@ -138,20 +139,22 @@ export default async function DiscoverPage() {
   return (
     <>
       <PageHeader title="Discover" />
-      <div className="px-4 py-3">
-        <SearchBar placeholder="Search people, posts, #tags" href="/search" />
-      </div>
-      <DiscoverView
-        currentUserId={user.id}
-        trendingPosts={trendingPosts}
-        freshPosts={freshPosts}
-        trendingShots={trendingShots}
-        people={(people ?? []) as any[]}
-        newPeople={newPeople}
-        interestPosts={interestPosts}
-        categoryRails={categoryRails}
-        tags={tags}
-      />
+      <PullToRefresh>
+        <div className="px-4 py-3">
+          <SearchBar placeholder="Search people, posts, #tags" href="/search" />
+        </div>
+        <DiscoverView
+          currentUserId={user.id}
+          trendingPosts={trendingPosts}
+          freshPosts={freshPosts}
+          trendingShots={trendingShots}
+          people={(people ?? []) as any[]}
+          newPeople={newPeople}
+          interestPosts={interestPosts}
+          categoryRails={categoryRails}
+          tags={tags}
+        />
+      </PullToRefresh>
     </>
   );
 }

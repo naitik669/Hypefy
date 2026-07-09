@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, Loader2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PushNudge } from "@/components/pwa/PushNudge";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Avatar } from "@/components/ui/Avatar";
 import { haptics } from "@/lib/haptics";
@@ -172,34 +173,35 @@ export default function NotificationsPage() {
     });
   }
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
+  // `silent` skips the skeleton — used by pull-to-refresh so the list just
+  // swaps in place instead of flashing empty.
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoading(false); return; }
 
-      const { data } = await supabase
-        .from("notifications")
-        .select("id, type, target_type, target_id, body, is_read, created_at, actor:actor_id(display_name, username, avatar_hue, avatar_url)")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(PAGE);
+    const { data } = await supabase
+      .from("notifications")
+      .select("id, type, target_type, target_id, body, is_read, created_at, actor:actor_id(display_name, username, avatar_hue, avatar_url)")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(PAGE);
 
-      const mapped: Notif[] = (data ?? []).map((n: any) => ({
-        ...n,
-        actor: Array.isArray(n.actor) ? n.actor[0] ?? null : n.actor,
-      }));
-      const withT = await withThumbs(mapped);
-      setNotifs(withT);
-      setHasMore(mapped.length === PAGE);
-      setLoading(false);
+    const mapped: Notif[] = (data ?? []).map((n: any) => ({
+      ...n,
+      actor: Array.isArray(n.actor) ? n.actor[0] ?? null : n.actor,
+    }));
+    const withT = await withThumbs(mapped);
+    setNotifs(withT);
+    setHasMore(mapped.length === PAGE);
+    setLoading(false);
 
-      // Mark all as read (RPC fires the UPDATE that clears the TopBar badge)
-      await supabase.rpc("mark_notifications_read");
-    }
-    load();
+    // Mark all as read (RPC fires the UPDATE that clears the TopBar badge)
+    await supabase.rpc("mark_notifications_read");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
+
+  useEffect(() => { load(); }, [load]);
 
   // Realtime: new notifications appear at the top without a refresh
   useEffect(() => {
@@ -282,6 +284,7 @@ export default function NotificationsPage() {
 
       <PushNudge />
 
+      <PullToRefresh onRefresh={() => load({ silent: true })}>
       {/* Filter pills */}
       <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-3 pt-3">
         {FILTERS.map((f) => (
@@ -328,6 +331,7 @@ export default function NotificationsPage() {
           </div>
         </div>
       )}
+      </PullToRefresh>
     </>
   );
 }

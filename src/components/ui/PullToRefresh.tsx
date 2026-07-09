@@ -9,10 +9,17 @@ const MAX_PULL = 110;
 
 /**
  * Touch pull-to-refresh. Only engages when the page is scrolled to the top;
- * pulling past the threshold triggers router.refresh() (re-runs the server
- * component query).
+ * pulling past the threshold triggers a refresh. By default that's
+ * router.refresh() (re-runs the server-component query); pass `onRefresh` for
+ * client-loaded pages to re-run their own fetch — its promise gates the spinner.
  */
-export function PullToRefresh({ children }: { children: React.ReactNode }) {
+export function PullToRefresh({
+  children,
+  onRefresh,
+}: {
+  children: React.ReactNode;
+  onRefresh?: () => void | Promise<void>;
+}) {
   const router = useRouter();
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -37,9 +44,15 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
     if (pull >= THRESHOLD && !refreshing) {
       setRefreshing(true);
       setPull(48); // hold the spinner visible
-      router.refresh();
-      // router.refresh() has no completion callback — release after a beat
-      setTimeout(() => { setRefreshing(false); setPull(0); }, 1200);
+      const release = () => { setRefreshing(false); setPull(0); };
+      if (onRefresh) {
+        // Gate the spinner on the caller's own fetch completing.
+        Promise.resolve(onRefresh()).finally(() => setTimeout(release, 250));
+      } else {
+        router.refresh();
+        // router.refresh() has no completion callback — release after a beat
+        setTimeout(release, 1200);
+      }
     } else {
       setPull(0);
     }
