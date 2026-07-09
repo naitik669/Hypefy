@@ -9,6 +9,8 @@ export type Track = {
   artist: string;
   artwork: string;
   preview: string;
+  /** Seconds into the 30s preview to start from (snippet selection). */
+  start?: number;
 };
 
 /** Parse a track jsonb column defensively — bad shapes become null. */
@@ -16,13 +18,23 @@ export function parseTrack(raw: unknown): Track | null {
   if (!raw || typeof raw !== "object") return null;
   const t = raw as Record<string, unknown>;
   if (!t.id || !t.title || !t.preview) return null;
+  const start = Number(t.start);
   return {
     id: String(t.id),
     title: String(t.title),
     artist: String(t.artist ?? ""),
     artwork: String(t.artwork ?? ""),
     preview: String(t.preview),
+    ...(Number.isFinite(start) && start > 0 ? { start } : {}),
   };
+}
+
+/**
+ * Media-fragment URL for a track — `#t=12` makes the <audio> element start
+ * 12s into the preview natively, no seek bookkeeping needed.
+ */
+function srcFor(track: Track): string {
+  return track.start ? `${track.preview}#t=${track.start}` : track.preview;
 }
 
 /**
@@ -61,7 +73,7 @@ export function playPreview(track: Track) {
     a.pause();
     return;
   }
-  a.src = track.preview;
+  a.src = srcFor(track);
   playingId = track.id;
   emit();
   a.play().catch(() => {
@@ -81,9 +93,9 @@ export function stopPreview() {
  */
 export function ensurePreviewPlaying(track: Track) {
   const a = ensureAudio();
-  const sameSrc = a.src === track.preview;
+  const sameSrc = a.src === srcFor(track);
   if (sameSrc && playingId === track.id && !a.paused) return;
-  if (!sameSrc) a.src = track.preview;
+  if (!sameSrc) a.src = srcFor(track);
   playingId = track.id;
   emit();
   a.play().catch(() => {
