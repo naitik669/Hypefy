@@ -5,6 +5,7 @@ import { Bell, Loader2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PushNudge } from "@/components/pwa/PushNudge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Avatar } from "@/components/ui/Avatar";
 import { haptics } from "@/lib/haptics";
@@ -278,6 +279,8 @@ export default function NotificationsPage() {
   return (
     <>
       <PageHeader title="Notifications" showBack />
+
+      <PushNudge />
 
       {/* Filter pills */}
       <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-3 pt-3">

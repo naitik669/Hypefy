@@ -3,15 +3,12 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { SettingToggle } from "@/components/settings/SettingToggle";
-
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
-  return outputArray;
-}
+import {
+  pushSupported,
+  getPushSubscription,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from "@/lib/push";
 
 /**
  * Device-level push toggle. Subscribes this browser to web push and stores the
@@ -25,14 +22,11 @@ export function PushToggle({ userId }: { userId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    if (!pushSupported()) {
       setSupported(false);
       return;
     }
-    navigator.serviceWorker.ready.then(async (reg) => {
-      const sub = await reg.pushManager.getSubscription();
-      setEnabled(!!sub);
-    });
+    getPushSubscription().then((sub) => setEnabled(!!sub));
   }, []);
 
   async function toggle(next: boolean) {
@@ -40,37 +34,14 @@ export function PushToggle({ userId }: { userId: string }) {
     setBusy(true);
     setError(null);
     try {
-      const reg = await navigator.serviceWorker.ready;
-
       if (next) {
-        const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-        if (!key) { setError("Push isn't configured on this deployment yet."); return; }
-
-        const permission = await Notification.requestPermission();
-        if (permission !== "granted") {
-          setError("Notifications are blocked — allow them in your browser settings.");
-          return;
-        }
-
-        const sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(key),
-        });
-        const json = sub.toJSON();
-        const { error: dbErr } = await supabase.from("push_subscriptions").upsert({
-          endpoint: sub.endpoint,
-          user_id: userId,
-          p256dh: json.keys?.p256dh ?? "",
-          auth: json.keys?.auth ?? "",
-        });
-        if (dbErr) { await sub.unsubscribe(); setError("Couldn't save subscription."); return; }
-        setEnabled(true);
+        const result = await subscribeToPush(supabase, userId);
+        if (result === "subscribed") setEnabled(true);
+        else if (result === "unconfigured") setError("Push isn't configured on this deployment yet.");
+        else if (result === "denied") setError("Notifications are blocked — allow them in your browser settings.");
+        else setError("Something went wrong enabling push.");
       } else {
-        const sub = await reg.pushManager.getSubscription();
-        if (sub) {
-          await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
-          await sub.unsubscribe();
-        }
+        await unsubscribeFromPush(supabase);
         setEnabled(false);
       }
     } catch {
