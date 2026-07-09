@@ -731,6 +731,7 @@ export type Database = {
           created_at: string
           expires_at: string
           text: string
+          track: Json | null
           user_id: string
         }
         Insert: {
@@ -738,6 +739,7 @@ export type Database = {
           created_at?: string
           expires_at?: string
           text: string
+          track?: Json | null
           user_id: string
         }
         Update: {
@@ -745,6 +747,7 @@ export type Database = {
           created_at?: string
           expires_at?: string
           text?: string
+          track?: Json | null
           user_id?: string
         }
         Relationships: [
@@ -856,6 +859,7 @@ export type Database = {
           repost_count: number
           save_count: number
           share_count: number
+          track: Json | null
           updated_at: string
           user_id: string
           view_count: number
@@ -874,6 +878,7 @@ export type Database = {
           repost_count?: number
           save_count?: number
           share_count?: number
+          track?: Json | null
           updated_at?: string
           user_id: string
           view_count?: number
@@ -892,6 +897,7 @@ export type Database = {
           repost_count?: number
           save_count?: number
           share_count?: number
+          track?: Json | null
           updated_at?: string
           user_id?: string
           view_count?: number
@@ -908,6 +914,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          anthem: Json | null
           avatar_hue: number | null
           avatar_url: string | null
           banner_id: string | null
@@ -931,6 +938,7 @@ export type Database = {
           username: string | null
         }
         Insert: {
+          anthem?: Json | null
           avatar_hue?: number | null
           avatar_url?: string | null
           banner_id?: string | null
@@ -954,6 +962,7 @@ export type Database = {
           username?: string | null
         }
         Update: {
+          anthem?: Json | null
           avatar_hue?: number | null
           avatar_url?: string | null
           banner_id?: string | null
@@ -1252,6 +1261,7 @@ export type Database = {
           is_showcase: boolean | null
           linked_post_id: string | null
           media_url: string
+          track: Json | null
           user_id: string
         }
         Insert: {
@@ -1263,6 +1273,7 @@ export type Database = {
           is_showcase?: boolean | null
           linked_post_id?: string | null
           media_url: string
+          track?: Json | null
           user_id: string
         }
         Update: {
@@ -1274,6 +1285,7 @@ export type Database = {
           is_showcase?: boolean | null
           linked_post_id?: string | null
           media_url?: string
+          track?: Json | null
           user_id?: string
         }
         Relationships: [
@@ -1430,6 +1442,7 @@ export type Database = {
           created_at: string
           expires_at: string
           text: string
+          track: Json | null
           user_id: string
         }
         SetofOptions: {
