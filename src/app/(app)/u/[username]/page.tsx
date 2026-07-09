@@ -140,6 +140,7 @@ export default async function PublicProfilePage({
         isMutualHyper={isMutualHyper}
         vibe={(profile as any).current_vibe ?? null}
         vibeEditable={isOwn}
+        anthem={(profile as any).anthem ?? null}
         actions={
           isOwn ? (
             <>

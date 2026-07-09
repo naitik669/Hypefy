@@ -23,6 +23,7 @@ export type Profile = {
   bannerId: string | null;
   bannerUrl: string | null;
   currentVibe: string | null;
+  anthem: unknown;
   interests: string[];
   profileTags: string[];
   profileCompleted: boolean;
@@ -133,6 +134,7 @@ function mapProfile(row: any): Profile {
     bannerId: row.banner_id,
     bannerUrl: row.banner_url,
     currentVibe: row.current_vibe,
+    anthem: row.anthem ?? null,
     interests: row.interests ?? [],
     profileTags: row.profile_tags ?? [],
     profileCompleted: row.profile_completed ?? false,

@@ -6,6 +6,7 @@ import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { HyperStar } from "@/components/ui/HyperStar";
 import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { VibePill } from "@/components/profile/VibePill";
+import { AnthemChip } from "@/components/profile/AnthemChip";
 
 /**
  * Profile hero — banner, the squircle avatar overlapping its bottom-left
@@ -32,6 +33,7 @@ export function ProfileHeader({
   isMutualHyper = false,
   vibe = null,
   vibeEditable = false,
+  anthem = null,
 }: {
   name: string;
   username: string | null;
@@ -52,6 +54,7 @@ export function ProfileHeader({
   isMutualHyper?: boolean;
   vibe?: string | null;
   vibeEditable?: boolean;
+  anthem?: unknown;
 }) {
   return (
     <>
@@ -95,6 +98,7 @@ export function ProfileHeader({
             hue={hue}
             avatarUrl={avatarUrl ?? null}
           />
+          <AnthemChip anthem={anthem} editable={vibeEditable} userId={vibeEditable ? userId : undefined} />
           {bio && <p className="mt-1.5 text-sm leading-snug">{bio}</p>}
         </div>
 
