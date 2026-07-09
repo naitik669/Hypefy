@@ -74,6 +74,29 @@ export function stopPreview() {
   if (audio && playingId) audio.pause();
 }
 
+/**
+ * Keep this track playing (no toggle): used by the Show viewer so re-entering
+ * the unpaused state resumes from where the preview left off instead of
+ * restarting. Only swaps src when the track actually changed.
+ */
+export function ensurePreviewPlaying(track: Track) {
+  const a = ensureAudio();
+  const sameSrc = a.src === track.preview;
+  if (sameSrc && playingId === track.id && !a.paused) return;
+  if (!sameSrc) a.src = track.preview;
+  playingId = track.id;
+  emit();
+  a.play().catch(() => {
+    playingId = null;
+    emit();
+  });
+}
+
+/** Pause without clearing the source, so ensurePreviewPlaying can resume. */
+export function pausePreview() {
+  audio?.pause();
+}
+
 function subscribe(cb: () => void) {
   listeners.add(cb);
   return () => {

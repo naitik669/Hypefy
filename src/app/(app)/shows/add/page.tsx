@@ -4,11 +4,13 @@ import { useRef, useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   X, Images, Type, Send, Loader2, User,
-  LayoutGrid, ChevronLeft, ChevronRight, ExternalLink,
+  LayoutGrid, ChevronLeft, ChevronRight, ExternalLink, Music,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { LiveCamera } from "@/components/shows/LiveCamera";
 import { Avatar } from "@/components/ui/Avatar";
+import { TrackPicker } from "@/components/music/TrackPicker";
+import type { Track } from "@/lib/music";
 
 type State = "camera" | "pick-post" | "pick-image" | "preview";
 
@@ -47,6 +49,8 @@ export default function AddShowPage() {
   const [showCaption, setShowCaption] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [track, setTrack] = useState<Track | null>(null);
+  const [trackPickerOpen, setTrackPickerOpen] = useState(false);
 
   // Post-share state
   const [posts, setPosts] = useState<PostOption[]>([]);
@@ -141,6 +145,7 @@ export default function AddShowPage() {
     if (previewUrl && capturedFile) URL.revokeObjectURL(previewUrl);
     setCapturedFile(null); setPreviewUrl(null);
     setCaption(""); setShowCaption(false);
+    setTrack(null);
     setError(null); setSelectedFlat(null); setSelectedPost(null);
     setState("camera");
   }
@@ -169,31 +174,24 @@ export default function AddShowPage() {
         linkedPostId = selectedFlat.postId;
       }
 
+      const base = {
+        user_id: user.id,
+        media_url: mediaUrl,
+        caption: caption.trim() || null,
+        track,
+      };
       // Try insert with linked_post_id; fall back without if column missing
       let insertErr: any = null;
       if (linkedPostId) {
-        const r1 = await supabase.from("shows").insert({
-          user_id: user.id,
-          media_url: mediaUrl,
-          caption: caption.trim() || null,
-          linked_post_id: linkedPostId,
-        });
+        const r1 = await supabase.from("shows").insert({ ...base, linked_post_id: linkedPostId });
         insertErr = r1.error;
         if (insertErr) {
           // Column doesn't exist yet — retry without
-          const r2 = await supabase.from("shows").insert({
-            user_id: user.id,
-            media_url: mediaUrl,
-            caption: caption.trim() || null,
-          });
+          const r2 = await supabase.from("shows").insert(base);
           insertErr = r2.error;
         }
       } else {
-        const r = await supabase.from("shows").insert({
-          user_id: user.id,
-          media_url: mediaUrl,
-          caption: caption.trim() || null,
-        });
+        const r = await supabase.from("shows").insert(base);
         insertErr = r.error;
       }
 
@@ -474,6 +472,26 @@ export default function AddShowPage() {
               <span className="text-sm font-semibold text-white">Your Show</span>
             </span>
             <span className="rounded-pill bg-white/15 px-3.5 py-2 text-sm font-semibold text-white/75 backdrop-blur-sm">24h</span>
+            <button
+              type="button"
+              aria-label={track ? `Song: ${track.title} — change or remove` : "Add a song"}
+              onClick={() => (track ? setTrack(null) : setTrackPickerOpen(true))}
+              className={`relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full backdrop-blur-sm transition-colors ${
+                track ? "bg-accent text-accent-ink" : "bg-white/15 text-white"
+              }`}
+            >
+              {track?.artwork ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={track.artwork} alt="" className="h-full w-full object-cover" />
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/35 text-white">
+                    <X size={14} />
+                  </span>
+                </>
+              ) : (
+                <Music size={18} />
+              )}
+            </button>
             <div className="flex-1" />
             <button type="button" onClick={share} disabled={pending} aria-label="Share to your Show"
               className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-ink shadow-lg transition-transform active:scale-95 disabled:opacity-60">
@@ -482,6 +500,8 @@ export default function AddShowPage() {
           </div>
         </>
       )}
+
+      <TrackPicker open={trackPickerOpen} onClose={() => setTrackPickerOpen(false)} onSelect={setTrack} />
     </div>
   );
 }

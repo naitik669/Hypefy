@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ShowViewersSheet } from "@/components/shows/ShowViewersSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { parseTrack, ensurePreviewPlaying, pausePreview, stopPreview } from "@/lib/music";
 
 type ShowProfile = { display_name: string | null; avatar_hue: number | null; username: string | null; avatar_url?: string | null } | null;
 
@@ -37,6 +38,8 @@ export type ShowItem = {
   linked_post_id?: string | null;
   linked_post?: LinkedPost;
   profiles: ShowProfile;
+  /** Attached song ({id,title,artist,artwork,preview} jsonb) — see src/lib/music. */
+  track?: unknown;
 };
 
 const DURATION = 5000;
@@ -166,6 +169,21 @@ function ShowScreen({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show.id, currentUserId, isOwner]);
+
+  const showTrack = parseTrack(show.track);
+
+  // Song on the Show: plays while this screen is up, pauses with the story
+  // timer (hold / menus / sheets), and stops when the screen unmounts.
+  useEffect(() => {
+    if (!showTrack) return;
+    if (paused || menuOpen || viewersOpen || confirmDelete) {
+      pausePreview();
+    } else {
+      ensurePreviewPlaying(showTrack);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showTrack?.id, paused, menuOpen, viewersOpen, confirmDelete]);
+  useEffect(() => () => stopPreview(), []);
 
   const linkedPost = show.linked_post ?? null;
   const postAuthorName = linkedPost?.profiles?.display_name ?? linkedPost?.profiles?.username ?? "User";
@@ -476,6 +494,29 @@ function ShowScreen({
             </div>
           )}
         </button>
+      )}
+
+      {/* ── Song pill ── */}
+      {showTrack && !menuOpen && (
+        <div
+          className="pointer-events-none absolute right-4 z-20 flex max-w-[60%] items-center gap-2 rounded-pill bg-black/50 py-1 pl-1 pr-3 backdrop-blur-sm"
+          style={{ bottom: show.caption ? 128 : 96 }}
+        >
+          {showTrack.artwork ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={showTrack.artwork}
+              alt=""
+              className={`h-6 w-6 shrink-0 rounded-full object-cover ${paused ? "" : "animate-[spin_4s_linear_infinite]"}`}
+            />
+          ) : (
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center text-white/80">♪</span>
+          )}
+          <p className="min-w-0 truncate text-[11px] font-semibold text-white/90">
+            {showTrack.title}
+            {showTrack.artist && <span className="font-normal text-white/55"> · {showTrack.artist}</span>}
+          </p>
+        </div>
       )}
 
       {/* ── Caption ── */}
