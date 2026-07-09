@@ -8,6 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { NoteEditorSheet, type MyNote } from "@/components/notes/NoteEditorSheet";
 import { haptics } from "@/lib/haptics";
+import { parseTrack, playPreview, usePlayingTrackId } from "@/lib/music";
 
 export type NoteRow = {
   user_id: string;
@@ -19,6 +20,7 @@ export type NoteRow = {
   username: string | null;
   avatar_hue: number | null;
   avatar_url: string | null;
+  track?: unknown;
 };
 
 /** Same quick set as chat message reactions. */
@@ -43,7 +45,10 @@ export function NotesRail({
   const supabase = createClient();
   const router = useRouter();
   const self = rows.find((r) => r.is_self) ?? null;
-  const [myNote, setMyNote] = useState<MyNote>(self ? { text: self.text, audience: self.audience } : null);
+  const [myNote, setMyNote] = useState<MyNote>(
+    self ? { text: self.text, audience: self.audience, track: parseTrack(self.track) } : null,
+  );
+  const playingTrackId = usePlayingTrackId();
   const [editorOpen, setEditorOpen] = useState(false);
   const [opening, setOpening] = useState<string | null>(null);
 
@@ -174,7 +179,16 @@ export function NotesRail({
   }
   function onPressEnd(note: NoteRow) {
     if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
-    if (!longPressFired.current) reply(note);
+    if (!longPressFired.current) {
+      // Music notes play their preview on tap; reply stays one long-press away.
+      const t = parseTrack(note.track);
+      if (t) {
+        haptics.tap();
+        playPreview(t);
+      } else {
+        reply(note);
+      }
+    }
   }
   function onPressCancel() {
     if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
@@ -193,8 +207,14 @@ export function NotesRail({
           className="flex w-16 shrink-0 flex-col items-center gap-1.5"
         >
           <div className="relative">
-            <div className="max-w-[72px] truncate rounded-2xl rounded-bl-sm bg-surface px-2.5 py-1 text-[11px] font-medium text-foreground">
-              {myNote ? myNote.text : "Status…"}
+            <div className="flex max-w-[72px] items-center gap-1 rounded-2xl rounded-bl-sm bg-surface px-2.5 py-1">
+              {myNote?.track?.artwork && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={myNote.track.artwork} alt="" className="h-3.5 w-3.5 shrink-0 rounded-full object-cover" />
+              )}
+              <span className="truncate text-[11px] font-medium text-foreground">
+                {myNote ? myNote.text : "Status…"}
+              </span>
             </div>
             <div className="mt-1 flex justify-center">
               <div className="relative">
@@ -226,6 +246,8 @@ export function NotesRail({
         {others.map((note) => {
           const label = note.display_name ?? note.username ?? "User";
           const myEmoji = myReactions.get(note.user_id);
+          const noteTrack = parseTrack(note.track);
+          const notePlaying = !!noteTrack && playingTrackId === noteTrack.id;
           return (
             <button
               key={note.user_id}
@@ -237,8 +259,24 @@ export function NotesRail({
               disabled={!!opening}
               className="flex w-16 shrink-0 flex-col items-center gap-1.5 disabled:opacity-60"
             >
-              <div className="relative max-w-[72px] rounded-2xl rounded-bl-sm bg-surface px-2.5 py-1">
-                <span className="block truncate text-[11px] font-medium text-foreground">{note.text}</span>
+              <div
+                className={`relative max-w-[72px] rounded-2xl rounded-bl-sm bg-surface px-2.5 py-1 ${
+                  notePlaying ? "ring-1 ring-accent/50" : ""
+                }`}
+              >
+                <span className="flex items-center gap-1">
+                  {noteTrack?.artwork && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={noteTrack.artwork}
+                      alt=""
+                      className={`h-3.5 w-3.5 shrink-0 rounded-full object-cover ${
+                        notePlaying ? "animate-[spin_4s_linear_infinite]" : ""
+                      }`}
+                    />
+                  )}
+                  <span className="block truncate text-[11px] font-medium text-foreground">{note.text}</span>
+                </span>
                 {myEmoji && (
                   <span className="absolute -bottom-1.5 -right-1 rounded-full border border-border bg-elevated px-1 text-[10px] leading-tight shadow-md">
                     {myEmoji}

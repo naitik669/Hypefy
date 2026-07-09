@@ -1369,6 +1369,7 @@ export type Database = {
           display_name: string
           is_self: boolean
           text: string
+          track: Json | null
           user_id: string
           username: string
         }[]
@@ -1436,7 +1437,7 @@ export type Database = {
         Returns: undefined
       }
       set_note: {
-        Args: { p_audience?: string; p_text: string }
+        Args: { p_audience?: string; p_text: string; p_track?: Json }
         Returns: {
           audience: string
           created_at: string

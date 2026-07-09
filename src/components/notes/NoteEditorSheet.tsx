@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Globe2, Star, Dices } from "lucide-react";
+import { Loader2, Globe2, Star, Dices, Music } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CenterModal } from "@/components/ui/CenterModal";
 import { Avatar } from "@/components/ui/Avatar";
+import { TrackPicker } from "@/components/music/TrackPicker";
+import { TrackChip } from "@/components/music/TrackChip";
+import { type Track } from "@/lib/music";
 import {
   splitStatus,
   joinStatus,
@@ -25,7 +28,7 @@ const NOTE_PRESETS: StatusValue[] = [
   { emoji: "🌙", text: "can't sleep, talk?" },
 ];
 
-export type MyNote = { text: string; audience: "mutual" | "close" } | null;
+export type MyNote = { text: string; audience: "mutual" | "close"; track: Track | null } | null;
 
 /**
  * Editor for the caller's own Note — a centered modal showing the status UI
@@ -48,6 +51,8 @@ export function NoteEditorSheet({
   const supabase = createClient();
   const [draft, setDraft] = useState<StatusValue>(() => splitStatus(current?.text ?? null));
   const [audience, setAudience] = useState<"mutual" | "close">(current?.audience ?? "mutual");
+  const [track, setTrack] = useState<Track | null>(current?.track ?? null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [stripOpen, setStripOpen] = useState(false);
   const [rollCount, setRollCount] = useState(0);
@@ -59,6 +64,7 @@ export function NoteEditorSheet({
     if (open) {
       setDraft(splitStatus(current?.text ?? null));
       setAudience(current?.audience ?? "mutual");
+      setTrack(current?.track ?? null);
       setStripOpen(false);
       setRollCount(0);
     }
@@ -79,10 +85,14 @@ export function NoteEditorSheet({
     const value = joinStatus(draft).slice(0, MAX);
     if (!value || busy) return;
     setBusy(true);
-    const { error } = await supabase.rpc("set_note", { p_text: value, p_audience: audience });
+    const { error } = await supabase.rpc("set_note", {
+      p_text: value,
+      p_audience: audience,
+      ...(track ? { p_track: track } : {}),
+    });
     setBusy(false);
     if (!error) {
-      onSaved({ text: value, audience });
+      onSaved({ text: value, audience, track });
       onClose();
     }
   }
@@ -155,6 +165,21 @@ export function NoteEditorSheet({
           {/* Your pfp under the bubble */}
           <div className="relative mt-5">
             <Avatar name={me?.name ?? "You"} hue={me?.hue ?? 280} size={64} src={me?.avatarUrl ?? undefined} />
+          </div>
+
+          {/* Song on the note — chip when set, quiet pitch when not */}
+          <div className="relative mt-4 flex justify-center">
+            {track ? (
+              <TrackChip track={track} onRemove={() => setTrack(null)} className="max-w-full" />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="flex items-center gap-1.5 rounded-pill border border-border bg-background/60 px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-white/20 hover:text-foreground"
+              >
+                <Music size={13} /> Add a song
+              </button>
+            )}
           </div>
         </div>
 
@@ -242,6 +267,8 @@ export function NoteEditorSheet({
           )}
         </div>
       </div>
+
+      <TrackPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={setTrack} />
     </CenterModal>
   );
 }
