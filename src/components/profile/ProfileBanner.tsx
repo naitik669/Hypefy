@@ -12,7 +12,9 @@ export function ProfileBanner({
 }) {
   return (
     <div
-      className={`relative w-full overflow-hidden ${className}`}
+      // block auto-width, not w-full: callers add mx-* margins, and margins
+      // don't shrink a 100%-width box — w-full made the banner overflow right.
+      className={`relative overflow-hidden ${className}`}
       style={bannerUrl ? undefined : { background: bannerGradient(bannerId) }}
     >
       {bannerUrl ? (
