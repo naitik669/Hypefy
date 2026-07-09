@@ -58,7 +58,7 @@ export function ProfileHeader({
 }) {
   return (
     <>
-      <ProfileBanner bannerId={bannerId} bannerUrl={bannerUrl} className="h-36 rounded-b-3xl" />
+      <ProfileBanner bannerId={bannerId} bannerUrl={bannerUrl} className="mx-2 mt-2 h-36 rounded-card" />
 
       <div className="px-4">
         {/* Avatar + stats */}
