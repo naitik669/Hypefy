@@ -7,6 +7,38 @@ import { createClient } from "@/lib/supabase/client";
 
 const MAX_SIZE_MB = 60;
 const ALLOWED_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/ogg"];
+const POSTER_WIDTH = 720;
+
+/**
+ * Grab a poster frame from the video (~0.5s in, past any black lead-in)
+ * as a JPEG blob. Returns null when the browser can't decode/seek —
+ * the Shot still posts, just without a thumbnail.
+ */
+function capturePoster(src: string): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.src = src;
+    const bail = setTimeout(() => resolve(null), 8000);
+    video.onerror = () => { clearTimeout(bail); resolve(null); };
+    video.onloadedmetadata = () => {
+      video.currentTime = Math.min(0.5, Math.max(0, video.duration - 0.1));
+    };
+    video.onseeked = () => {
+      clearTimeout(bail);
+      const scale = Math.min(1, POSTER_WIDTH / (video.videoWidth || POSTER_WIDTH));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round((video.videoWidth || POSTER_WIDTH) * scale);
+      canvas.height = Math.round((video.videoHeight || POSTER_WIDTH) * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(null); return; }
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.82);
+    };
+  });
+}
 
 /**
  * Shot composer — Shots are short VIDEO reels (permanent, vertical feed).
@@ -72,9 +104,25 @@ export function ShotComposer({ userId }: { userId: string }) {
       }
       const { data: pub } = supabase.storage.from("shot-media").getPublicUrl(path);
 
+      // Poster frame → Discover tiles, profile grids and OG cards. Optional:
+      // a failed capture never blocks the post itself.
+      let posterUrl: string | null = null;
+      if (preview) {
+        const posterBlob = await capturePoster(preview);
+        if (posterBlob) {
+          const posterPath = `${userId}/${Date.now()}-poster.jpg`;
+          const { error: posterErr } = await supabase.storage
+            .from("shot-media")
+            .upload(posterPath, posterBlob, { contentType: "image/jpeg", upsert: false });
+          if (!posterErr) {
+            posterUrl = supabase.storage.from("shot-media").getPublicUrl(posterPath).data.publicUrl;
+          }
+        }
+      }
+
       const { data: shot, error: insertErr } = await supabase
         .from("shots")
-        .insert({ user_id: userId, media_url: pub.publicUrl, caption: caption.trim() || null })
+        .insert({ user_id: userId, media_url: pub.publicUrl, caption: caption.trim() || null, poster_url: posterUrl })
         .select("id")
         .single();
 
