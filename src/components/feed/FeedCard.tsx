@@ -450,10 +450,10 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
         </ExpandableText>
       )}
 
-      {/* Attached song */}
+      {/* Attached song — starts on scroll-into-view, stops on scroll-away */}
       {postTrack && (
         <div className="px-4 pt-2">
-          <TrackChip track={postTrack} />
+          <TrackChip track={postTrack} autoPlayInView />
         </div>
       )}
 
