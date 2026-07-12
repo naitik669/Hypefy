@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Star, Send, Loader2, Flag, Check, ChevronDown, Trash2, CornerUpLeft, Copy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { ZoomViewer } from "@/components/ui/ZoomViewer";
@@ -160,8 +162,9 @@ export function CommentsSheet({
     mutateFn(id, (x) => ({ ...x, showReplies: !x.showReplies }));
   }
 
-  // Long-press target: the comment + the top-level id replies thread under.
-  const [actionC, setActionC] = useState<{ c: Comment; threadId: string } | null>(null);
+  // Long-press target: the comment, its thread id, and the press point so
+  // the menu pops up on the comment itself rather than sliding up a sheet.
+  const [actionC, setActionC] = useState<{ c: Comment; threadId: string; x: number; y: number } | null>(null);
 
   async function submitComment() {
     if (!text.trim() || posting) return;
@@ -283,7 +286,7 @@ export function CommentsSheet({
               onReport={reportComment}
               onDelete={deleteComment}
               onToggleReplies={toggleReplies}
-              onLongPress={(c, threadId) => setActionC({ c, threadId })}
+              onLongPress={(c, threadId, x, y) => setActionC({ c, threadId, x, y })}
             />
           ))}
         </div>
@@ -360,49 +363,53 @@ export function CommentsSheet({
       />
     )}
 
-    {/* Long-press comment actions */}
-    <BottomSheet open={!!actionC} onClose={() => setActionC(null)} title="Comment">
-      {actionC && (
-        <div className="flex flex-col gap-1 pb-3">
+    {/* Long-press comment actions — anchored popover at the press point.
+        Portaled to <body>: the sheet's entrance transform would otherwise
+        hijack position:fixed and anchor the menu to the sheet instead. */}
+    {actionC && typeof document !== "undefined" &&
+      createPortal(
+        <FloatingMenu
+          open
+          onClose={() => setActionC(null)}
+          origin="top-left"
+          className="fixed w-44"
+          style={{
+            left: Math.min(actionC.x, (typeof window !== "undefined" ? window.innerWidth : 400) - 192),
+            top: Math.min(actionC.y, (typeof window !== "undefined" ? window.innerHeight : 800) - 210),
+          }}
+        >
           {actionC.c.profiles?.username && (
-            <button
-              type="button"
+            <MenuItem
+              icon={CornerUpLeft}
+              label="Reply"
               onClick={() => { startReply(actionC.threadId, actionC.c.profiles!.username!); setActionC(null); }}
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium hover:bg-white/5"
-            >
-              <CornerUpLeft size={17} className="text-muted" /> Reply
-            </button>
+            />
           )}
           {!isGifBody(actionC.c.body) && (
-            <button
-              type="button"
+            <MenuItem
+              icon={Copy}
+              label="Copy"
               onClick={() => { navigator.clipboard?.writeText(actionC.c.body).catch(() => {}); setActionC(null); }}
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium hover:bg-white/5"
-            >
-              <Copy size={17} className="text-muted" /> Copy
-            </button>
+            />
           )}
           {actionC.c.user_id !== currentUserId && (
-            <button
-              type="button"
+            <MenuItem
+              icon={Flag}
+              label="Report"
               onClick={() => { reportComment(actionC.c.id); setActionC(null); }}
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium hover:bg-white/5"
-            >
-              <Flag size={17} className="text-muted" /> Report
-            </button>
+            />
           )}
           {actionC.c.user_id === currentUserId && (
-            <button
-              type="button"
+            <MenuItem
+              icon={Trash2}
+              label="Delete"
+              danger
               onClick={() => { deleteComment(actionC.c.id); setActionC(null); }}
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-danger hover:bg-danger/5"
-            >
-              <Trash2 size={17} /> Delete
-            </button>
+            />
           )}
-        </div>
+        </FloatingMenu>,
+        document.body,
       )}
-    </BottomSheet>
     </>
   );
 }
@@ -418,7 +425,7 @@ function CommentItem({
   onReport: (id: string) => void;
   onDelete: (id: string) => void;
   onToggleReplies: (id: string) => void;
-  onLongPress: (c: Comment, threadId: string) => void;
+  onLongPress: (c: Comment, threadId: string, x: number, y: number) => void;
 }) {
   const n = comment.profiles?.display_name ?? comment.profiles?.username ?? "User";
   const uname = comment.profiles?.username;
@@ -427,18 +434,23 @@ function CommentItem({
   const isOwnComment = comment.user_id === currentUserId;
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
 
-  // Hold-to-act: 450ms press (or right-click) on a comment body opens the
-  // action sheet — delete/copy/report/reply without hunting tiny buttons.
+  // Hold-to-act: 450ms press (or right-click) on a comment body pops the
+  // action menu right on the comment — delete/copy/report/reply in place.
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressPoint = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   function holdHandlers(c: Comment, threadId: string) {
     return {
-      onPointerDown: () => {
-        pressTimer.current = setTimeout(() => { pressTimer.current = null; onLongPress(c, threadId); }, 450);
+      onPointerDown: (e: React.PointerEvent) => {
+        pressPoint.current = { x: e.clientX, y: e.clientY };
+        pressTimer.current = setTimeout(() => {
+          pressTimer.current = null;
+          onLongPress(c, threadId, pressPoint.current.x, pressPoint.current.y);
+        }, 450);
       },
       onPointerUp: () => { if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; } },
       onPointerLeave: () => { if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; } },
       onPointerMove: () => { if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; } },
-      onContextMenu: (e: React.MouseEvent) => { e.preventDefault(); onLongPress(c, threadId); },
+      onContextMenu: (e: React.MouseEvent) => { e.preventDefault(); onLongPress(c, threadId, e.clientX, e.clientY); },
     };
   }
 

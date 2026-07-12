@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Star, Heart } from "lucide-react";
+import { Star, Heart, PlusCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
 import { Reveal } from "@/components/ui/Reveal";
 import { PeopleToFollow } from "@/components/feed/PeopleToFollow";
 import { AddHypersPrompt } from "@/components/feed/AddHypersPrompt";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useFeedTab, type FeedTab } from "@/components/layout/FeedTabDropdown";
 
 const PAGE_SIZE = 20;
@@ -286,6 +287,22 @@ export function FeedList({
 
       {!noHypersPicked && activeDone && activePosts.length > 10 && (
         <p className="py-8 text-center text-xs text-faint">You&apos;re all caught up ⚡</p>
+      )}
+
+      {/* End of the For You road — instead of a dead screen up front, the
+          warm-up prompt lives where the scrolling actually runs out. */}
+      {tab === "foryou" && fyDone && posts.length <= 10 && (
+        <div className="border-t border-border/60">
+          <EmptyState
+            icon={PlusCircle}
+            title={posts.length === 0 ? "Your feed is warming up" : "That's everything for now"}
+            text="Follow people or drop a post — someone has to start the hype."
+            ctaLabel="Create Post"
+            ctaHref="/create/post"
+            variant="compact"
+          />
+          <PeopleToFollow currentUserId={currentUserId} followingIds={followingIds} />
+        </div>
       )}
     </div>
   );

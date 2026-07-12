@@ -1,11 +1,8 @@
 import { redirect } from "next/navigation";
-import { PlusCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/TopBar";
 import { ShowsRow } from "@/components/home/ShowsRow";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { FeedList } from "@/components/feed/FeedList";
-import { PeopleToFollow } from "@/components/feed/PeopleToFollow";
 import { VibeNudge } from "@/components/feed/VibeNudge";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { UploadProgressBar } from "@/components/upload/UploadProvider";
@@ -245,32 +242,22 @@ export default async function HomePage() {
         <VibeNudge />
         <UploadProgressBar />
 
-        {posts.length === 0 ? (
-          <>
-            <EmptyState
-              icon={PlusCircle}
-              title="Your feed is warming up"
-              text="Follow people or drop the first post — someone has to start the hype."
-              ctaLabel="Create Post"
-              ctaHref="/create/post"
-            />
-            <PeopleToFollow currentUserId={user.id} followingIds={[...followingIds]} />
-          </>
-        ) : (
-          <FeedList
-            initialPosts={posts.map((post: any) => ({
-              ...post,
-              initialHyped: hypedIds.has(post.id),
-              initialSaved: savedIds.has(post.id),
-            }))}
-            currentUserId={user.id}
-            followingIds={[...followingIds]}
-            favoriteIds={favoriteIds}
-            hyperIds={hyperIds}
-            mutualHyperIds={mutualHyperIds}
-            blockedIds={[...blockedIds]}
-          />
-        )}
+        {/* Always the feed — FeedList renders the warm-up prompt at the END
+            when there's nothing (more) to scroll, so it never opens on a
+            dead "no users here" screen. */}
+        <FeedList
+          initialPosts={posts.map((post: any) => ({
+            ...post,
+            initialHyped: hypedIds.has(post.id),
+            initialSaved: savedIds.has(post.id),
+          }))}
+          currentUserId={user.id}
+          followingIds={[...followingIds]}
+          favoriteIds={favoriteIds}
+          hyperIds={hyperIds}
+          mutualHyperIds={mutualHyperIds}
+          blockedIds={[...blockedIds]}
+        />
       </PullToRefresh>
     </>
   );
