@@ -6,6 +6,7 @@ import { ShowsRow } from "@/components/home/ShowsRow";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FeedList } from "@/components/feed/FeedList";
 import { PeopleToFollow } from "@/components/feed/PeopleToFollow";
+import { VibeNudge } from "@/components/feed/VibeNudge";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { UploadProgressBar } from "@/components/upload/UploadProvider";
 import { feedScore, diversify, postTags, tagAffinityFor } from "@/lib/feed-rank";
@@ -241,6 +242,7 @@ export default async function HomePage() {
       <TopBar />
       <PullToRefresh>
         <ShowsRow shows={shows} currentUser={currentUserForRow} />
+        <VibeNudge />
         <UploadProgressBar />
 
         {posts.length === 0 ? (
