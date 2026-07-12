@@ -93,12 +93,19 @@ export default async function HomePage() {
   // People lists behind the Favourite / Hypers feed tabs — fetched lightly
   // here (just ids) since FeedList only needs them to scope its own query
   // when that tab is first opened.
-  const [{ data: favoriteRows }, { data: hyperRows }] = await Promise.all([
+  const [{ data: favoriteRows }, { data: hyperRows }, { data: reverseHyperRows }] = await Promise.all([
     supabase.from("favorites").select("friend_id").eq("user_id", user.id),
     supabase.from("close_friends").select("friend_id").eq("user_id", user.id),
+    // People who added ME as a Hyper — the reverse direction, so FeedCard can
+    // resolve the mutual-Hyper badge from props instead of a per-card query.
+    supabase.from("close_friends").select("user_id").eq("friend_id", user.id),
   ]);
   const favoriteIds = (favoriteRows ?? []).map((r: any) => r.friend_id as string);
   const hyperIds = (hyperRows ?? []).map((r: any) => r.friend_id as string);
+  const reverseHyperIds = (reverseHyperRows ?? []).map((r: any) => r.user_id as string);
+  // Mutual = I added them AND they added me.
+  const reverseSet = new Set(reverseHyperIds);
+  const mutualHyperIds = hyperIds.filter((id) => reverseSet.has(id));
 
   // Which active shows I've already viewed (server-side truth for the seen ring)
   const activeShowIds = (activeShows ?? []).map((s: any) => s.id);
@@ -258,6 +265,7 @@ export default async function HomePage() {
             followingIds={[...followingIds]}
             favoriteIds={favoriteIds}
             hyperIds={hyperIds}
+            mutualHyperIds={mutualHyperIds}
             blockedIds={[...blockedIds]}
           />
         )}

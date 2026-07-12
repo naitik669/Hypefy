@@ -63,6 +63,7 @@ export function FeedList({
   followingIds = [],
   favoriteIds = [],
   hyperIds = [],
+  mutualHyperIds = [],
   blockedIds = [],
 }: {
   initialPosts: FeedPost[];
@@ -70,12 +71,16 @@ export function FeedList({
   followingIds?: string[];
   favoriteIds?: string[];
   hyperIds?: string[];
+  mutualHyperIds?: string[];
   blockedIds?: string[];
 }) {
   const supabase = createClient();
   const tab = useFeedTab();
   // Authors the viewer has blocked — pagination batches skip them too.
   const blockedSet = new Set(blockedIds);
+  // Hyper status resolved once per page (avoids a close_friends query per card).
+  const hyperSet = new Set(hyperIds);
+  const mutualHyperSet = new Set(mutualHyperIds);
 
   // For You — seeded by the server.
   const [posts, setPosts] = useState<FeedPost[]>(initialPosts);
@@ -254,7 +259,12 @@ export function FeedList({
       ) : (
         activePosts.map((post, i) => (
           <Reveal key={`${tab}-${post.id}`} delay={Math.min(i, 4) * 55}>
-            <FeedCard post={post} currentUserId={currentUserId} />
+            <FeedCard
+              post={post}
+              currentUserId={currentUserId}
+              initialIsHyper={hyperSet.has(post.user_id)}
+              initialIsMutualHyper={mutualHyperSet.has(post.user_id)}
+            />
           </Reveal>
         ))
       )}

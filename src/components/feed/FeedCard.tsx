@@ -66,7 +66,19 @@ function getImages(post: FeedPost): string[] {
   return [...new Set(urls)];
 }
 
-export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserId: string }) {
+export function FeedCard({
+  post,
+  currentUserId,
+  initialIsHyper,
+  initialIsMutualHyper,
+}: {
+  post: FeedPost;
+  currentUserId: string;
+  /** Hyper status resolved by the parent (FeedList) — skips a per-card query.
+   *  Undefined for standalone cards (post page, profile viewer), which self-fetch. */
+  initialIsHyper?: boolean;
+  initialIsMutualHyper?: boolean;
+}) {
   const supabase = createClient();
   const images = getImages(post);
 
@@ -120,8 +132,8 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
   const [avatarZoomOpen, setAvatarZoomOpen] = useState(false);
   const [liveCaption, setLiveCaption] = useState(post.caption);
   const [liveBody, setLiveBody] = useState(post.body);
-  const [isHyper, setIsHyper] = useState(false);
-  const [isMutualHyper, setIsMutualHyper] = useState(false);
+  const [isHyper, setIsHyper] = useState(initialIsHyper ?? false);
+  const [isMutualHyper, setIsMutualHyper] = useState(initialIsMutualHyper ?? false);
   const postTrack = parseTrack(post.track);
 
   const lastTapRef = useRef(0);
@@ -187,7 +199,9 @@ export function FeedCard({ post, currentUserId }: { post: FeedPost; currentUserI
       setIsMutualHyper(iAdded && theyAdded);
     }
     syncHyperRef.current = syncHyper;
-    syncHyper();
+    // Parent (FeedList) already resolved the status for feed cards — only
+    // self-fetch for standalone cards. The ref still lets the ⋯ menu re-sync.
+    if (initialIsHyper === undefined) syncHyper();
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post.id, uid]);
