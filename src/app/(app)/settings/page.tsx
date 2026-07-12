@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, UserCircle, Shield, Lock, Bell } from "lucide-react";
+import { ChevronRight, UserCircle, Shield, Lock, Bell, Hash } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -11,6 +11,7 @@ const ITEMS = [
   { href: "/settings/account", label: "Account", sub: "Email and login", icon: Shield },
   { href: "/settings/privacy", label: "Privacy", sub: "Who can reach you", icon: Lock },
   { href: "/settings/notifications", label: "Notifications", sub: "What pings you", icon: Bell },
+  { href: "/settings/topics", label: "Topics you follow", sub: "Hashtags in your feed", icon: Hash },
 ];
 
 export default async function SettingsPage() {
