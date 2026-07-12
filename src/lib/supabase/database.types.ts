@@ -926,6 +926,7 @@ export type Database = {
           dm_privacy: string
           id: string
           interests: string[]
+          is_admin: boolean
           is_private: boolean
           is_verified: boolean
           last_seen_at: string | null
@@ -951,6 +952,7 @@ export type Database = {
           dm_privacy?: string
           id: string
           interests?: string[]
+          is_admin?: boolean
           is_private?: boolean
           is_verified?: boolean
           last_seen_at?: string | null
@@ -976,6 +978,7 @@ export type Database = {
           dm_privacy?: string
           id?: string
           interests?: string[]
+          is_admin?: boolean
           is_private?: boolean
           is_verified?: boolean
           last_seen_at?: string | null
@@ -1402,6 +1405,7 @@ export type Database = {
         }[]
       }
       increment_post_view: { Args: { p_post_id: string }; Returns: undefined }
+      is_admin: { Args: never; Returns: boolean }
       is_conv_member: { Args: { conv: string }; Returns: boolean }
       leave_conversation: {
         Args: { p_conversation_id: string }
