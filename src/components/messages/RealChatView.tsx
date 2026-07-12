@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Share } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { Avatar } from "@/components/ui/Avatar";
@@ -21,6 +21,7 @@ import { presenceLabel } from "@/lib/presence";
 import { haptics } from "@/lib/haptics";
 import { PresenceDot } from "@/components/presence/PresenceDot";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
+import { ForwardSheet } from "@/components/messages/ForwardSheet";
 
 type PostPreview = {
   id: string;
@@ -164,6 +165,7 @@ export function RealChatView({
   const [editing, setEditing] = useState<ChatMsg | null>(null);
   const [menu, setMenu] = useState<{ msg: ChatMsg; rect: DOMRect } | null>(null);
   const [reportMsg, setReportMsg] = useState<ChatMsg | null>(null);
+  const [forwardMsg, setForwardMsg] = useState<ChatMsg | null>(null);
   // Message id whose reaction list ("who reacted with what") is open
   const [reactionSheet, setReactionSheet] = useState<string | null>(null);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
@@ -1628,6 +1630,9 @@ export function RealChatView({
                 {/* Actions */}
                 <div className={`w-44 overflow-hidden rounded-2xl bg-elevated p-1 shadow-xl ring-1 ring-border ${mine ? "ml-auto" : ""}`}>
                   <CtxItem icon={<Reply size={17} />} label="Reply" onClick={() => { setReplyTo(menu.msg); setMenu(null); }} />
+                  {!menu.msg.is_unsent && (
+                    <CtxItem icon={<Share size={17} />} label="Forward" onClick={() => { setForwardMsg(menu.msg); setMenu(null); }} />
+                  )}
                   {menu.msg.body && <CtxItem icon={<Copy size={17} />} label="Copy" onClick={() => { copy(menu.msg); setMenu(null); }} />}
                   {menu.msg.sender_id === currentUserId && menu.msg.kind === "text" && !menu.msg.is_unsent && (
                     <CtxItem icon={<Pencil size={17} />} label="Edit" onClick={() => { startEdit(menu.msg); setMenu(null); }} />
@@ -1691,6 +1696,9 @@ export function RealChatView({
           </BottomSheet>
         );
       })()}
+
+      {/* Forward picker */}
+      <ForwardSheet open={!!forwardMsg} onClose={() => setForwardMsg(null)} msg={forwardMsg} />
 
       {/* Report reason sheet */}
       {reportMsg && (
