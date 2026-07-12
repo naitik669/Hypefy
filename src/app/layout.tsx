@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { RegisterSW } from "@/components/pwa/RegisterSW";
+import { ReferralTracker } from "@/components/growth/ReferralTracker";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -60,6 +61,7 @@ export default function RootLayout({
     <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <RegisterSW />
+        <ReferralTracker />
         {children}
       </body>
     </html>

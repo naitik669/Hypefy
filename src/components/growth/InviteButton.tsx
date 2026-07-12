@@ -6,10 +6,11 @@ import { haptics } from "@/lib/haptics";
 
 const SITE = "https://www.hypefy.chat";
 
-/** Native-share (clipboard fallback) of the user's profile link. */
+/** Native-share (clipboard fallback) of the user's profile link.
+ *  Carries ?ref=<username> so signups from it credit the inviter. */
 async function shareProfile(username: string | null) {
   haptics.tap();
-  const url = username ? `${SITE}/u/${username}` : SITE;
+  const url = username ? `${SITE}/u/${username}?ref=${encodeURIComponent(username)}` : SITE;
   const text = "Come find me on Hypefy — where your personality lives.";
   try {
     if (navigator.share) {
@@ -45,8 +46,13 @@ export function InviteIconButton({ username }: { username: string | null }) {
 }
 
 /** Full-width row for the settings hub, styled like its nav links. */
-export function InviteRow({ username }: { username: string | null }) {
+export function InviteRow({ username, joined = 0 }: { username: string | null; joined?: number }) {
   const [copied, setCopied] = useState(false);
+  const sub = copied
+    ? "Link copied ✓"
+    : joined > 0
+      ? `${joined} ${joined === 1 ? "friend" : "friends"} joined from your link 🎉`
+      : "Share your profile link";
   return (
     <button
       type="button"
@@ -63,7 +69,7 @@ export function InviteRow({ username }: { username: string | null }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold">Invite friends</p>
-        <p className="truncate text-xs text-muted">{copied ? "Link copied ✓" : "Share your profile link"}</p>
+        <p className="truncate text-xs text-muted">{sub}</p>
       </div>
       <ChevronRight size={18} className="shrink-0 text-faint" />
     </button>

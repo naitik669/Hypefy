@@ -932,6 +932,7 @@ export type Database = {
           notif_prefs: Json
           profile_completed: boolean
           profile_tags: string[]
+          referred_by: string | null
           show_activity: boolean
           two_step_enabled: boolean
           updated_at: string
@@ -956,6 +957,7 @@ export type Database = {
           notif_prefs?: Json
           profile_completed?: boolean
           profile_tags?: string[]
+          referred_by?: string | null
           show_activity?: boolean
           two_step_enabled?: boolean
           updated_at?: string
@@ -980,6 +982,7 @@ export type Database = {
           notif_prefs?: Json
           profile_completed?: boolean
           profile_tags?: string[]
+          referred_by?: string | null
           show_activity?: boolean
           two_step_enabled?: boolean
           updated_at?: string
@@ -1324,6 +1327,7 @@ export type Database = {
         Returns: undefined
       }
       block_user: { Args: { p_blocked: string }; Returns: undefined }
+      claim_referral: { Args: { p_ref_username: string }; Returns: boolean }
       clear_note: { Args: never; Returns: undefined }
       create_comment:
         | {

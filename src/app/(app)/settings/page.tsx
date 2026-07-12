@@ -17,9 +17,12 @@ const ITEMS = [
 export default async function SettingsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: prof } = user
-    ? await supabase.from("profiles").select("username").eq("id", user.id).maybeSingle()
-    : { data: null };
+  const [{ data: prof }, { count: joined }] = user
+    ? await Promise.all([
+        supabase.from("profiles").select("username").eq("id", user.id).maybeSingle(),
+        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("referred_by", user.id),
+      ])
+    : [{ data: null }, { count: 0 }];
   const username = (prof?.username as string | null) ?? null;
 
   return (
@@ -65,7 +68,7 @@ export default async function SettingsPage() {
           <p className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">
             Friends
           </p>
-          <InviteRow username={username} />
+          <InviteRow username={username} joined={joined ?? 0} />
         </section>
 
         {/* Sign out */}
