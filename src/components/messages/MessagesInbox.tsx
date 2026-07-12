@@ -36,6 +36,23 @@ export type InboxRow = {
   lastReaction?: { emoji: string; mine: boolean; onMine: boolean } | null;
 };
 
+/** A message-body snippet windowed around the query, with the match marked. */
+function highlightSnippet(body: string, query: string) {
+  const idx = body.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return body;
+  const start = Math.max(0, idx - 24);
+  const pre = (start > 0 ? "…" : "") + body.slice(start, idx);
+  const match = body.slice(idx, idx + query.length);
+  const post = body.slice(idx + query.length);
+  return (
+    <>
+      {pre}
+      <mark className="rounded bg-accent/25 px-0.5 text-foreground">{match}</mark>
+      {post}
+    </>
+  );
+}
+
 function GroupAvatar() {
   return (
     <div
@@ -114,6 +131,9 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
+  // conversation_id → a matching message body, for content search (2b).
+  const [contentMatches, setContentMatches] = useState<Map<string, string>>(new Map());
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Conversations the user has opened — optimistically clear their unread state.
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
@@ -243,6 +263,33 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
   const unreadCount = rows.filter((r) => isUnread(r) && !isPendingRequest(r) && !removedIds.has(r.id)).length;
   const requestCount = rows.filter((r) => isPendingRequest(r)).length;
 
+  // Content search: match recent message bodies for the typed query, keeping
+  // the first (newest) hit per conversation as the preview snippet.
+  useEffect(() => {
+    const query = q.trim();
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (query.length < 2) { setContentMatches(new Map()); return; }
+    searchTimer.current = setTimeout(async () => {
+      const ids = rows.map((r) => r.id);
+      if (ids.length === 0) return;
+      const { data } = await supabase
+        .from("messages")
+        .select("conversation_id, body, created_at")
+        .in("conversation_id", ids)
+        .eq("is_unsent", false)
+        .ilike("body", `%${query}%`)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      const map = new Map<string, string>();
+      (data ?? []).forEach((m: any) => {
+        if (m.body && !map.has(m.conversation_id)) map.set(m.conversation_id, m.body);
+      });
+      setContentMatches(map);
+    }, 300);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, rows]);
+
   const filtered = useMemo(() => {
     let list =
       tab === "unread"
@@ -253,12 +300,15 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
     const query = q.trim().toLowerCase();
     if (query) {
       list = list.filter(
-        (r) => r.name.toLowerCase().includes(query) || (r.username ?? "").toLowerCase().includes(query),
+        (r) =>
+          r.name.toLowerCase().includes(query) ||
+          (r.username ?? "").toLowerCase().includes(query) ||
+          contentMatches.has(r.id),
       );
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, tab, q, readIds, approvedIds, removedIds]);
+  }, [rows, tab, q, readIds, approvedIds, removedIds, contentMatches]);
 
   // Split "All" tab into Pinned + Unread + rest
   const pinnedRows = tab === "all" ? filtered.filter((r) => r.pinned) : [];
@@ -287,6 +337,15 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
     const unread = isUnread(r);
     const pending = isPendingRequest(r);
     const effectiveCount = unread ? r.unreadCount : 0;
+
+    // When the match came from message content (not the name), show that
+    // message as the preview with the query highlighted.
+    const query = q.trim();
+    const nameHit =
+      !!query &&
+      (r.name.toLowerCase().includes(query.toLowerCase()) ||
+        (r.username ?? "").toLowerCase().includes(query.toLowerCase()));
+    const matchBody = query && !nameHit ? contentMatches.get(r.id) : undefined;
 
     return (
       <div key={r.id} className={pending ? "px-4 py-3" : ""}>
@@ -318,7 +377,7 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
               {r.vibe && <span className="ml-1.5 text-xs font-normal text-faint">{r.vibe}</span>}
             </p>
             <p className={`truncate text-sm ${unread ? "font-semibold text-foreground" : "text-muted"}`}>
-              {preview(r)}
+              {matchBody ? highlightSnippet(matchBody, query) : preview(r)}
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
