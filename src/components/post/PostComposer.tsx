@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, X, Send, Crop, Plus, Music } from "lucide-react";
+import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText } from "lucide-react";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { ImageCropper } from "@/components/post/ImageCropper";
@@ -15,6 +15,7 @@ import type { Track } from "@/lib/music";
 const MAX_SIZE_MB = 10;
 const MAX_IMAGES = 10;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const DRAFT_KEY = "hypefy_post_draft";
 
 type Img = { id: string; file: File; url: string; origSrc: string };
 
@@ -44,9 +45,43 @@ export function PostComposer({ userId }: { userId: string }) {
   const [activeField, setActiveField] = useState<"caption" | "body" | null>(null);
   const [track, setTrack] = useState<Track | null>(null);
   const [trackPickerOpen, setTrackPickerOpen] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
   const activeText = activeField === "caption" ? caption : activeField === "body" ? body : "";
   const activeCursor = activeField === "caption" ? captionCursor : bodyCursor;
   const { suggestions: pickerSuggestions, reset: resetPicker } = useMentionHashtag(activeText, activeCursor);
+
+  // ── Draft persistence: text + song survive leaving the composer.
+  // Images are deliberately excluded — File objects don't outlive the page.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw) as { caption?: string; body?: string; track?: Track | null };
+      if (!d.caption && !d.body && !d.track) return;
+      setCaption((d.caption ?? "").slice(0, 280));
+      setBody((d.body ?? "").slice(0, 1000));
+      setTrack(d.track ?? null);
+      setDraftRestored(true);
+    } catch { /* corrupt draft — ignore */ }
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (!caption.trim() && !body.trim() && !track) {
+        localStorage.removeItem(DRAFT_KEY);
+      } else {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ caption, body, track }));
+      }
+    } catch { /* storage full/unavailable — drafts are best-effort */ }
+  }, [caption, body, track]);
+
+  function discardDraft() {
+    setCaption("");
+    setBody("");
+    setTrack(null);
+    setDraftRestored(false);
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+  }
 
   function applyPickerSelection(s: Parameters<typeof applySuggestion>[2]): void {
     if (activeField === "caption") {
@@ -158,11 +193,27 @@ export function PostComposer({ userId }: { userId: string }) {
       mentions,
       track,
     });
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
     router.push("/home");
   }
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-8 pt-2">
+      {/* Draft restored notice */}
+      {draftRestored && (
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2">
+          <FileText size={14} className="shrink-0 text-accent" />
+          <p className="min-w-0 flex-1 text-xs text-muted">Draft restored from last time.</p>
+          <button
+            type="button"
+            onClick={discardDraft}
+            className="shrink-0 text-xs font-semibold text-muted transition-colors hover:text-danger"
+          >
+            Discard
+          </button>
+        </div>
+      )}
+
       {/* ── Aspect-ratio picker ───────────────────────────────── */}
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold text-muted">Ratio</span>
