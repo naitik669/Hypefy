@@ -19,6 +19,7 @@ export function FloatingMenu({
   style,
   origin = "top-right",
   notch = false,
+  zIndex,
   children,
 }: {
   open: boolean;
@@ -29,6 +30,11 @@ export function FloatingMenu({
   origin?: "top-right" | "top-left" | "bottom-right" | "bottom-left";
   /** Small rotated square pointing at the anchor (post ⋯ menu style). */
   notch?: boolean;
+  /** Override the stack level (menu at zIndex, click-catcher just below).
+   *  Needed when the menu opens above another overlay (e.g. inside a sheet
+   *  at z-200) — otherwise the catcher sits UNDER it and outside taps
+   *  land on the overlay instead of closing the menu. */
+  zIndex?: number;
   children: React.ReactNode;
 }) {
   const trapRef = useFocusTrap<HTMLDivElement>(open);
@@ -53,13 +59,17 @@ export function FloatingMenu({
 
   return (
     <>
-      {/* Invisible click-catcher */}
-      <div className="fixed inset-0 z-[190]" onPointerDown={onClose} />
+      {/* Invisible click-catcher — always one layer below the menu */}
+      <div
+        className="fixed inset-0 z-[190]"
+        style={zIndex !== undefined ? { zIndex: zIndex - 1 } : undefined}
+        onPointerDown={onClose}
+      />
 
       <div
         ref={trapRef}
         role="menu"
-        style={style}
+        style={zIndex !== undefined ? { ...style, zIndex } : style}
         className={`animate-menu-pop z-[200] overflow-hidden rounded-2xl border border-border bg-elevated/95 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl ${originClass} ${className}`}
       >
         {notch && (

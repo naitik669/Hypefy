@@ -373,6 +373,7 @@ export function CommentsSheet({
           onClose={() => setActionC(null)}
           origin="top-left"
           className="fixed w-44"
+          zIndex={220}
           style={{
             left: Math.min(actionC.x, (typeof window !== "undefined" ? window.innerWidth : 400) - 192),
             top: Math.min(actionC.y, (typeof window !== "undefined" ? window.innerHeight : 800) - 210),
