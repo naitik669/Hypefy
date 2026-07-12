@@ -5,7 +5,6 @@ import { FollowStats } from "@/components/profile/FollowStats";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { HyperStar } from "@/components/ui/HyperStar";
 import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
-import { VibePill } from "@/components/profile/VibePill";
 import { AnthemChip } from "@/components/profile/AnthemChip";
 
 /**
@@ -31,8 +30,7 @@ export function ProfileHeader({
   verified = false,
   isHyper = false,
   isMutualHyper = false,
-  vibe = null,
-  vibeEditable = false,
+  anthemEditable = false,
   anthem = null,
 }: {
   name: string;
@@ -52,8 +50,7 @@ export function ProfileHeader({
   verified?: boolean;
   isHyper?: boolean;
   isMutualHyper?: boolean;
-  vibe?: string | null;
-  vibeEditable?: boolean;
+  anthemEditable?: boolean;
   anthem?: unknown;
 }) {
   return (
@@ -90,15 +87,7 @@ export function ProfileHeader({
             {isMutualHyper && <MutualHyperBadge />}
           </span>
           {username && <p className="mt-0.5 text-sm text-muted">@{username}</p>}
-          <VibePill
-            vibe={vibe}
-            editable={vibeEditable}
-            userId={vibeEditable ? userId : undefined}
-            name={name}
-            hue={hue}
-            avatarUrl={avatarUrl ?? null}
-          />
-          <AnthemChip anthem={anthem} editable={vibeEditable} userId={vibeEditable ? userId : undefined} />
+          <AnthemChip anthem={anthem} editable={anthemEditable} userId={anthemEditable ? userId : undefined} />
           {bio && <p className="mt-1.5 text-sm leading-snug">{bio}</p>}
         </div>
 

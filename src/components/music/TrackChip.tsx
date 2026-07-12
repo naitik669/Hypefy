@@ -52,7 +52,7 @@ export function TrackChip({
   return (
     <div
       ref={rootRef}
-      className={`inline-flex max-w-[230px] items-center gap-1.5 rounded-pill border border-border bg-surface py-0.5 pl-0.5 pr-2 ${className}`}
+      className={`inline-flex max-w-[230px] items-center gap-1.5 rounded-xl border border-border bg-surface py-0.5 pl-0.5 pr-2 ${className}`}
     >
       <button
         type="button"

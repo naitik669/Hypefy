@@ -45,6 +45,12 @@ let audio: HTMLAudioElement | null = null;
 let playingId: string | null = null;
 const listeners = new Set<() => void>();
 
+const MUTE_KEY = "hypefy_music_muted";
+let musicMuted = false;
+try {
+  musicMuted = typeof window !== "undefined" && localStorage.getItem(MUTE_KEY) === "1";
+} catch { /* storage unavailable */ }
+
 function emit() {
   listeners.forEach((l) => l());
 }
@@ -53,6 +59,7 @@ function ensureAudio(): HTMLAudioElement {
   if (!audio) {
     audio = new Audio();
     audio.preload = "none";
+    audio.muted = musicMuted;
     const clear = () => {
       // pause/error events are queued async — if another play() already
       // started (track switch), the element isn't paused anymore: keep state.
@@ -107,6 +114,22 @@ export function ensurePreviewPlaying(track: Track) {
 /** Pause without clearing the source, so ensurePreviewPlaying can resume. */
 export function pausePreview() {
   audio?.pause();
+}
+
+/** Global music mute — one tap silences every preview surface, persisted. */
+export function toggleMusicMuted() {
+  musicMuted = !musicMuted;
+  if (audio) audio.muted = musicMuted;
+  try { localStorage.setItem(MUTE_KEY, musicMuted ? "1" : "0"); } catch {}
+  emit();
+}
+
+export function useMusicMuted(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => musicMuted,
+    () => false,
+  );
 }
 
 function subscribe(cb: () => void) {

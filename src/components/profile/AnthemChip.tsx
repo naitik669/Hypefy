@@ -47,7 +47,7 @@ export function AnthemChip({
         <button
           type="button"
           onClick={() => setPickerOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-pill border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-white/25 hover:text-foreground"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-white/25 hover:text-foreground"
         >
           <Music size={13} /> Set an anthem
         </button>

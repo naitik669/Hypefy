@@ -22,7 +22,6 @@ export type Profile = {
   avatarHue: number | null;
   bannerId: string | null;
   bannerUrl: string | null;
-  currentVibe: string | null;
   anthem: unknown;
   interests: string[];
   profileTags: string[];
@@ -133,7 +132,6 @@ function mapProfile(row: any): Profile {
     avatarHue: row.avatar_hue,
     bannerId: row.banner_id,
     bannerUrl: row.banner_url,
-    currentVibe: row.current_vibe,
     anthem: row.anthem ?? null,
     interests: row.interests ?? [],
     profileTags: row.profile_tags ?? [],

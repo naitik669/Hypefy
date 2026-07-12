@@ -41,7 +41,9 @@ export function ReelsFeed({
   const router = useRouter();
   const supabase = createClient();
   const [reels, setReels] = useState<Reel[]>(initialReels);
-  const [muted, setMuted] = useState(true);
+  // Audible by default; ReelCard falls back to muted if the browser blocks
+  // unmuted autoplay (no user gesture yet, e.g. a direct page load).
+  const [muted, setMuted] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const swipeTouchStartY = useRef(0);
   const fetchingMore = useRef(false);
@@ -114,6 +116,7 @@ export function ReelsFeed({
             currentUserId={currentUserId}
             muted={muted}
             onToggleMute={() => setMuted((m) => !m)}
+            onAutoplayBlocked={() => setMuted(true)}
             isActive={i === activeIdx}
             onBack={() => router.back()}
             // Buffer the current reel + its immediate neighbours so swiping to
@@ -131,6 +134,7 @@ function ReelCard({
   currentUserId,
   muted,
   onToggleMute,
+  onAutoplayBlocked,
   isActive,
   onBack,
   preload = "metadata",
@@ -139,6 +143,7 @@ function ReelCard({
   currentUserId: string | null;
   muted: boolean;
   onToggleMute: () => void;
+  onAutoplayBlocked: () => void;
   isActive: boolean;
   onBack: () => void;
   preload?: "auto" | "metadata" | "none";
@@ -183,13 +188,23 @@ function ReelCard({
     const el = videoRef.current;
     if (!el) return;
     if (isActive) {
-      el.play().then(() => setPlaying(true)).catch(() => {});
+      el.play().then(() => setPlaying(true)).catch(() => {
+        // Unmuted autoplay is blocked before the first user gesture (direct
+        // page load) — fall back to muted so the reel still starts, and sync
+        // the global toggle so the speaker icon tells the truth.
+        if (!el.muted) {
+          onAutoplayBlocked();
+          el.muted = true;
+          el.play().then(() => setPlaying(true)).catch(() => {});
+        }
+      });
     } else {
       el.pause();
       el.currentTime = 0; // rewind so it restarts clean when revisited
       setPlaying(false);
       setProgress(0);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive]);
 
   // Load hype + saved state for the current user.

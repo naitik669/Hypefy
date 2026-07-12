@@ -68,7 +68,7 @@ function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null 
 }
 
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
-type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null; lastSeenAt?: string | null; showActivity?: boolean; vibe?: string | null };
+type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null; lastSeenAt?: string | null; showActivity?: boolean };
 type GroupMember = { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null; role: string };
 type GroupMeta = { title: string; memberCount: number; avatarUrl?: string | null; members?: GroupMember[]; myRole?: string };
 
@@ -1032,10 +1032,7 @@ export function RealChatView({
               <PresenceDot lastSeenAt={otherLastSeen} size="sm" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">
-                {other.name}
-                {other.vibe && <span className="ml-1.5 text-xs font-normal text-faint">{other.vibe}</span>}
-              </p>
+              <p className="truncate text-sm font-semibold">{other.name}</p>
               {(() => {
                 const pres = presenceLabel(otherLastSeen);
                 if (pres) return <p className={`truncate text-xs ${pres.status === "online" ? "text-green-500" : pres.status === "idle" ? "text-yellow-400" : "text-muted"}`}>{pres.text}</p>;
@@ -1527,7 +1524,7 @@ export function RealChatView({
                 onBlur={() => setTimeout(resetPicker, 150)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
                 placeholder="Message…"
-                className="h-11 w-full rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:border-white/25"
+                className="h-11 w-full rounded-2xl bg-surface px-4 text-sm outline-none placeholder:text-faint focus:border-white/25"
               />
               <SuggestionDropdown suggestions={pickerSuggestions} onSelect={(s) => {
                 const { newValue, newCursor } = applySuggestion(text, dmCursor, s);

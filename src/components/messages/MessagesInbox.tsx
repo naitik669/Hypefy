@@ -27,8 +27,6 @@ export type InboxRow = {
   unreadCount: number;
   online: boolean;
   lastSeenAt: string | null;
-  /** The other person's current vibe (DMs only) — quiet mood signal. */
-  vibe?: string | null;
   muted: boolean;
   pinned: boolean;
   isRequest: boolean;
@@ -374,7 +372,6 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
             <p className={`truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
               {r.name}
               {r.isGroup && <span className="ml-1.5 text-xs font-normal text-faint">· {r.memberCount}</span>}
-              {r.vibe && <span className="ml-1.5 text-xs font-normal text-faint">{r.vibe}</span>}
             </p>
             <p className={`truncate text-sm ${unread ? "font-semibold text-foreground" : "text-muted"}`}>
               {matchBody ? highlightSnippet(matchBody, query) : preview(r)}
@@ -419,7 +416,7 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
     <>
       {/* Search */}
       <div className="px-4 pt-3">
-        <div className="flex h-11 items-center gap-2 rounded-pill border border-border bg-surface px-3.5 focus-within:border-white/25">
+        <div className="flex h-11 items-center gap-2 rounded-2xl border border-border bg-surface px-3.5 focus-within:border-white/25">
           <Search size={17} className="shrink-0 text-faint" />
           <input
             value={q}

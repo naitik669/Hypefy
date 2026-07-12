@@ -21,6 +21,7 @@ import { haptics } from "@/lib/haptics";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { useToast } from "@/components/ui/ToastProvider";
 import { TrackChip } from "@/components/music/TrackChip";
+import { MusicMuteButton } from "@/components/music/MusicMuteButton";
 import { parseTrack } from "@/lib/music";
 import { PollBlock, parsePoll } from "@/components/feed/PollBlock";
 
@@ -473,10 +474,12 @@ export function FeedCard({
         <PollBlock postId={post.id} poll={postPoll} currentUserId={uid} isOwn={uid === post.user_id} />
       )}
 
-      {/* Attached song — starts on scroll-into-view, stops on scroll-away */}
+      {/* Attached song — starts on scroll-into-view, stops on scroll-away.
+          The speaker toggle mutes music globally (persisted). */}
       {postTrack && (
-        <div className="px-4 pt-2">
+        <div className="flex items-center gap-1.5 px-4 pt-2">
           <TrackChip track={postTrack} autoPlayInView />
+          <MusicMuteButton />
         </div>
       )}
 
