@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import type { Track } from "@/lib/music";
@@ -16,8 +17,21 @@ type PostUpload = {
   track?: Track | null;
 };
 
-type Ctx = { progress: number | null; uploadPost: (a: PostUpload) => void };
-const UploadCtx = createContext<Ctx>({ progress: null, uploadPost: () => {} });
+type Ctx = {
+  progress: number | null;
+  /** The last upload that failed — kept so the user can retry it. */
+  failed: PostUpload | null;
+  uploadPost: (a: PostUpload) => void;
+  retryUpload: () => void;
+  dismissFailed: () => void;
+};
+const UploadCtx = createContext<Ctx>({
+  progress: null,
+  failed: null,
+  uploadPost: () => {},
+  retryUpload: () => {},
+  dismissFailed: () => {},
+});
 export const useUpload = () => useContext(UploadCtx);
 
 export function UploadProvider({ children }: { children: React.ReactNode }) {
@@ -25,6 +39,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const toast = useToast();
   const [progress, setProgress] = useState<number | null>(null);
+  const [failed, setFailed] = useState<PostUpload | null>(null);
   const trickle = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopTrickle = () => { if (trickle.current) { clearInterval(trickle.current); trickle.current = null; } };
@@ -39,6 +54,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
   const uploadPost = useCallback(async (a: PostUpload) => {
     setProgress(6);
+    setFailed(null);
     startTrickle();
     try {
       const urls: string[] = [];
@@ -73,21 +89,58 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     } catch {
       stopTrickle();
       setProgress(null);
+      // Stash the payload (Files still valid) so the user can one-tap retry.
+      setFailed(a);
       toast("Couldn't share your post", "error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, router, toast]);
 
+  const retryUpload = useCallback(() => {
+    if (failed) uploadPost(failed);
+  }, [failed, uploadPost]);
+
+  const dismissFailed = useCallback(() => setFailed(null), []);
+
   return (
-    <UploadCtx.Provider value={{ progress, uploadPost }}>
+    <UploadCtx.Provider value={{ progress, failed, uploadPost, retryUpload, dismissFailed }}>
       {children}
     </UploadCtx.Provider>
   );
 }
 
-/** Thin upload progress line — rendered on Home beneath the Shows row. */
+/**
+ * Upload status — rendered on Home beneath the Shows row. Shows the thin
+ * progress line while uploading, or a retry banner when the last upload failed.
+ */
 export function UploadProgressBar() {
-  const { progress } = useUpload();
+  const { progress, failed, retryUpload, dismissFailed } = useUpload();
+
+  if (progress == null && failed) {
+    return (
+      <div className="flex items-center gap-3 border-b border-border/60 bg-danger/10 px-4 py-2.5">
+        <p className="min-w-0 flex-1 text-sm font-medium text-foreground">
+          Couldn&apos;t share your post.
+        </p>
+        <button
+          type="button"
+          onClick={retryUpload}
+          className="shrink-0 rounded-pill bg-accent px-3.5 py-1.5 text-xs font-bold text-accent-ink transition-transform active:scale-95"
+        >
+          Retry
+        </button>
+        <button
+          type="button"
+          onClick={dismissFailed}
+          aria-label="Dismiss"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:text-foreground"
+        >
+          <X size={16} />
+        </button>
+      </div>
+    );
+  }
+
   if (progress == null) return null;
   return (
     <div className="h-0.5 w-full bg-border/40">
