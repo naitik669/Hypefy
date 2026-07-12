@@ -15,6 +15,7 @@ type PostUpload = {
   hashtags: string[];
   mentions: string[];
   track?: Track | null;
+  poll?: { options: string[] } | null;
 };
 
 type Ctx = {
@@ -78,6 +79,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         hashtags: a.hashtags,
         mentions: a.mentions,
         track: a.track ?? null,
+        poll: a.poll ?? null,
       });
       if (insErr) throw insErr;
 

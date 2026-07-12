@@ -22,6 +22,7 @@ import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { useToast } from "@/components/ui/ToastProvider";
 import { TrackChip } from "@/components/music/TrackChip";
 import { parseTrack } from "@/lib/music";
+import { PollBlock, parsePoll } from "@/components/feed/PollBlock";
 
 export type FeedPost = {
   id: string;
@@ -48,6 +49,8 @@ export type FeedPost = {
   initialSaved?: boolean;
   /** Attached song ({id,title,artist,artwork,preview} jsonb) — see src/lib/music. */
   track?: unknown;
+  /** Poll ({options: string[]} jsonb) — see PollBlock. */
+  poll?: unknown;
   /** Display name of the followed user whose repost surfaced this post. */
   _repostedBy?: string | null;
 };
@@ -135,6 +138,7 @@ export function FeedCard({
   const [isHyper, setIsHyper] = useState(initialIsHyper ?? false);
   const [isMutualHyper, setIsMutualHyper] = useState(initialIsMutualHyper ?? false);
   const postTrack = parseTrack(post.track);
+  const postPoll = parsePoll(post.poll);
 
   const lastTapRef = useRef(0);
 
@@ -462,6 +466,11 @@ export function FeedCard({
           )}
           {liveBody && <p className="mt-1 text-foreground/85"><RichPostText text={liveBody} /></p>}
         </ExpandableText>
+      )}
+
+      {/* Poll */}
+      {postPoll && (
+        <PollBlock postId={post.id} poll={postPoll} currentUserId={uid} isOwn={uid === post.user_id} />
       )}
 
       {/* Attached song — starts on scroll-into-view, stops on scroll-away */}

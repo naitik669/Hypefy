@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText } from "lucide-react";
+import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText, BarChart2 } from "lucide-react";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { ImageCropper } from "@/components/post/ImageCropper";
@@ -46,6 +46,8 @@ export function PostComposer({ userId }: { userId: string }) {
   const [track, setTrack] = useState<Track | null>(null);
   const [trackPickerOpen, setTrackPickerOpen] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  // Poll: null = no poll; otherwise 2-4 option strings (blanks dropped on post).
+  const [pollOptions, setPollOptions] = useState<string[] | null>(null);
   const activeText = activeField === "caption" ? caption : activeField === "body" ? body : "";
   const activeCursor = activeField === "caption" ? captionCursor : bodyCursor;
   const { suggestions: pickerSuggestions, reset: resetPicker } = useMentionHashtag(activeText, activeCursor);
@@ -179,6 +181,10 @@ export function PostComposer({ userId }: { userId: string }) {
     });
   }
 
+  // Blank options are dropped; a poll only ships with 2+ real choices.
+  const cleanPollOptions = (pollOptions ?? []).map((o) => o.trim()).filter(Boolean);
+  const cleanPoll = cleanPollOptions.length >= 2 ? { options: cleanPollOptions.slice(0, 4) } : null;
+
   function handlePost() {
     if (submitted || !canPost) return;
     setSubmitted(true);
@@ -192,6 +198,7 @@ export function PostComposer({ userId }: { userId: string }) {
       hashtags,
       mentions,
       track,
+      poll: cleanPoll,
     });
     try { localStorage.removeItem(DRAFT_KEY); } catch {}
     router.push("/home");
@@ -371,8 +378,8 @@ export function PostComposer({ userId }: { userId: string }) {
 
       <p className="text-xs text-faint">Use # to add hashtags · @ to mention someone</p>
 
-      {/* Song on the post */}
-      <div>
+      {/* Song + poll attachments */}
+      <div className="flex flex-wrap items-center gap-2">
         {track ? (
           <TrackChip track={track} onRemove={() => setTrack(null)} />
         ) : (
@@ -384,7 +391,65 @@ export function PostComposer({ userId }: { userId: string }) {
             <Music size={13} /> Add a song
           </button>
         )}
+        {pollOptions === null && (
+          <button
+            type="button"
+            onClick={() => setPollOptions(["", ""])}
+            className="inline-flex items-center gap-1.5 rounded-pill border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-white/25 hover:text-foreground"
+          >
+            <BarChart2 size={13} /> Add a poll
+          </button>
+        )}
       </div>
+
+      {/* Poll options editor */}
+      {pollOptions !== null && (
+        <div className="flex flex-col gap-2 rounded-2xl border border-border bg-surface p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-widest text-faint">Poll</p>
+            <button
+              type="button"
+              onClick={() => setPollOptions(null)}
+              aria-label="Remove poll"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-muted hover:text-foreground"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          {pollOptions.map((opt, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                value={opt}
+                onChange={(e) =>
+                  setPollOptions((prev) => prev!.map((o, j) => (j === i ? e.target.value.slice(0, 60) : o)))
+                }
+                placeholder={`Option ${i + 1}`}
+                className="input h-10 flex-1 text-sm"
+              />
+              {pollOptions.length > 2 && (
+                <button
+                  type="button"
+                  onClick={() => setPollOptions((prev) => prev!.filter((_, j) => j !== i))}
+                  aria-label={`Remove option ${i + 1}`}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:text-foreground"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          ))}
+          {pollOptions.length < 4 && (
+            <button
+              type="button"
+              onClick={() => setPollOptions((prev) => [...prev!, ""])}
+              className="self-start rounded-pill border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:text-foreground"
+            >
+              + Add option
+            </button>
+          )}
+          <p className="text-[11px] text-faint">Your caption is the question. 2–4 options.</p>
+        </div>
+      )}
       <TrackPicker open={trackPickerOpen} onClose={() => setTrackPickerOpen(false)} onSelect={setTrack} />
 
       {/* Post button */}

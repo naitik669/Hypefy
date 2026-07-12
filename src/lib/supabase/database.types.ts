@@ -844,6 +844,42 @@ export type Database = {
           },
         ]
       }
+      poll_votes: {
+        Row: {
+          created_at: string
+          option_idx: number
+          post_id: string
+          voter_id: string
+        }
+        Insert: {
+          created_at?: string
+          option_idx: number
+          post_id: string
+          voter_id: string
+        }
+        Update: {
+          created_at?: string
+          option_idx?: number
+          post_id?: string
+          voter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poll_votes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poll_votes_voter_id_fkey"
+            columns: ["voter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           body: string | null
@@ -856,6 +892,7 @@ export type Database = {
           image_url: string | null
           image_urls: string[]
           mentions: string[]
+          poll: Json | null
           repost_count: number
           save_count: number
           share_count: number
@@ -875,6 +912,7 @@ export type Database = {
           image_url?: string | null
           image_urls?: string[]
           mentions?: string[]
+          poll?: Json | null
           repost_count?: number
           save_count?: number
           share_count?: number
@@ -894,6 +932,7 @@ export type Database = {
           image_url?: string | null
           image_urls?: string[]
           mentions?: string[]
+          poll?: Json | null
           repost_count?: number
           save_count?: number
           share_count?: number
