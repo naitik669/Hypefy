@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Loader2 } from "lucide-react";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 
 /**
  * Hypefy's anchored popover — the one visual shell for every context menu
@@ -30,6 +31,8 @@ export function FloatingMenu({
   notch?: boolean;
   children: React.ReactNode;
 }) {
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
+
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -54,6 +57,7 @@ export function FloatingMenu({
       <div className="fixed inset-0 z-[190]" onPointerDown={onClose} />
 
       <div
+        ref={trapRef}
         role="menu"
         style={style}
         className={`animate-menu-pop z-[200] overflow-hidden rounded-2xl border border-border bg-elevated/95 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl ${originClass} ${className}`}

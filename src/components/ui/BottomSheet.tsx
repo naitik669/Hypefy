@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 
 /**
  * Slide-up bottom sheet rendered via createPortal at document.body.
@@ -23,6 +24,8 @@ export function BottomSheet({
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  const trapRef = useFocusTrap<HTMLDivElement>(mounted && open);
+
   // Escape closes the sheet, matching CenterModal/FloatingMenu behavior.
   useEffect(() => {
     if (!open) return;
@@ -41,6 +44,7 @@ export function BottomSheet({
       onClick={onClose}
     >
       <div
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         className="animate-rise w-full max-w-[480px] max-h-[85dvh] overflow-y-auto rounded-t-3xl border-t border-border bg-elevated pb-[calc(env(safe-area-inset-bottom)+12px)]"
