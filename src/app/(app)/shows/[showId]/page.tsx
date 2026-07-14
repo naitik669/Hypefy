@@ -40,7 +40,7 @@ export default async function ShowPage({
 
   const extraCols = [
     hasIsShowcase  ? "is_showcase"   : "",
-    hasLinkedPost  ? "linked_post_id, linked_post:posts(id, caption, image_url, image_urls, profiles(display_name, username, avatar_hue, avatar_url))" : "",
+    hasLinkedPost  ? "linked_post_id, linked_post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(display_name, username, avatar_hue, avatar_url))" : "",
   ].filter(Boolean).join(", ");
 
   const selectStr = extraCols ? `${baseSelect}, ${extraCols}` : baseSelect;

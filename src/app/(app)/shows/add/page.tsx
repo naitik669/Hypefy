@@ -66,7 +66,7 @@ export default function AddShowPage() {
       if (!user) { setLoadingPosts(false); return; }
       supabase
         .from("posts")
-        .select("id, caption, image_url, image_urls, profiles(display_name, username, avatar_hue, avatar_url)")
+        .select("id, caption, image_url, image_urls, profiles!posts_user_id_fkey(display_name, username, avatar_hue, avatar_url)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(30)

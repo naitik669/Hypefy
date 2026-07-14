@@ -79,7 +79,7 @@ const QUICK = ["❤️", "🥰", "😂", "👍", "😮", "😢"];
 const MSG_PAGE = 30;
 /** Select used for both the initial server load and client pagination. */
 const MSG_SELECT =
-  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, created_at, post:posts(id, caption, image_url, image_urls, profiles(username, display_name, avatar_hue)), shot:shots(id, media_url, caption, profiles(username, display_name, avatar_hue))";
+  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, created_at, post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(username, display_name, avatar_hue)), shot:shots(id, media_url, caption, profiles(username, display_name, avatar_hue))";
 
 /** Flatten Supabase's nested post/shot+profile joins into ChatMsg shape. */
 function mapMessageRow(m: any): ChatMsg {
@@ -426,7 +426,7 @@ export function RealChatView({
   async function hydratePost(msgId: string, postId: string) {
     const { data } = await supabase
       .from("posts")
-      .select("id, caption, image_url, image_urls, profiles(username, display_name, avatar_hue, avatar_url)")
+      .select("id, caption, image_url, image_urls, profiles!posts_user_id_fkey(username, display_name, avatar_hue, avatar_url)")
       .eq("id", postId)
       .maybeSingle();
     if (!data) return;

@@ -179,13 +179,13 @@ export default function SearchPage() {
         : isTag
           ? await supabase
               .from("posts")
-              .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)")
+              .select("*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)")
               .contains("hashtags", [term])
               .order("hype_count", { ascending: false })
               .limit(20)
           : await supabase
               .from("posts")
-              .select("*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)")
+              .select("*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)")
               .or(`caption.ilike.%${term}%,body.ilike.%${term}%`)
               .order("hype_count", { ascending: false })
               .limit(20);

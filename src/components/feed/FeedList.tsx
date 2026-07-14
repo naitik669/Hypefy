@@ -14,7 +14,7 @@ const PAGE_SIZE = 20;
 const SEEN_KEY = "hypefy_feed_seen";
 const SEEN_CAP = 500;
 const POST_SELECT =
-  "*, profiles(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)";
+  "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)";
 
 /** Recently-seen post ids (capped ring in localStorage) — lets the
  *  chronological tail skip posts already shown in recent sessions. */
@@ -285,17 +285,17 @@ export function FeedList({
         </div>
       )}
 
-      {!noHypersPicked && activeDone && activePosts.length > 10 && (
+      {!noHypersPicked && tab !== "foryou" && activeDone && activePosts.length > 10 && (
         <p className="py-8 text-center text-xs text-faint">You&apos;re all caught up ⚡</p>
       )}
 
-      {/* End of the For You road — instead of a dead screen up front, the
-          warm-up prompt lives where the scrolling actually runs out. */}
-      {tab === "foryou" && fyDone && posts.length <= 10 && (
-        <div className="border-t border-border/60">
+      {/* End of the For You road — once the posts run out, close the feed
+          with the caught-up prompt + people to follow, never a dead screen. */}
+      {tab === "foryou" && fyDone && (
+        <div className={posts.length > 0 ? "border-t border-border/60" : ""}>
           <EmptyState
             icon={PlusCircle}
-            title={posts.length === 0 ? "Your feed is warming up" : "That's everything for now"}
+            title={posts.length === 0 ? "Your feed is warming up" : "You're all caught up ⚡"}
             text="Follow people or drop a post — someone has to start the hype."
             ctaLabel="Create Post"
             ctaHref="/create/post"

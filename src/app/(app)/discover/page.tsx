@@ -55,13 +55,13 @@ export default async function DiscoverPage() {
   const [postsRes, shotsRes, meRes, affRes, followedTagRes, trendingRes, suggestedRes, newPeopleRes] = await Promise.all([
     supabase
       .from("posts")
-      .select("id, caption, body, image_url, image_urls, hashtags, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles(id, display_name, username, avatar_hue, avatar_url)")
+      .select("id, caption, body, image_url, image_urls, hashtags, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url)")
       .neq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(150),
     supabase
       .from("shots")
-      .select("id, media_url, poster_url, caption, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles(id, display_name, username, avatar_hue, avatar_url)")
+      .select("id, media_url, poster_url, caption, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url)")
       .neq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(80),

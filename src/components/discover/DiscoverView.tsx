@@ -57,7 +57,7 @@ export function DiscoverView({
     const cursor = last?.created_at ?? new Date().toISOString();
     const { data } = await supabase
       .from("posts")
-      .select("id, caption, body, image_url, image_urls, hype_count, comment_count, created_at, profiles(display_name, username, avatar_hue)")
+      .select("id, caption, body, image_url, image_urls, hype_count, comment_count, created_at, profiles!posts_user_id_fkey(display_name, username, avatar_hue)")
       .lt("created_at", cursor)
       .order("created_at", { ascending: false })
       .limit(12);
