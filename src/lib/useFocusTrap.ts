@@ -21,17 +21,18 @@ export function useFocusTrap<T extends HTMLElement>(active: boolean) {
 
     const prevFocused = document.activeElement as HTMLElement | null;
 
-    // Move focus inside — first focusable, else the container itself.
+    // Move focus onto the CONTAINER, not the first item: focusing a button
+    // programmatically can trigger the global focus-visible accent ring on a
+    // menu nobody keyboarded into (it shows up as a stray lime line). The
+    // container is invisible to the ring; pressing Tab from it enters the
+    // items and rings them legitimately.
     const focusables = () =>
       Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
         (el) => el.offsetParent !== null || el === document.activeElement,
       );
-    const first = focusables()[0];
-    if (first) first.focus();
-    else {
-      container.setAttribute("tabindex", "-1");
-      container.focus();
-    }
+    container.setAttribute("tabindex", "-1");
+    container.style.outline = "none";
+    container.focus();
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== "Tab") return;
