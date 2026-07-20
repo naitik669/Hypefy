@@ -459,7 +459,7 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
       {filtered.length === 0 ? (
         <p className="px-4 py-12 text-center text-sm text-faint">
           {tab === "requests"
-            ? "No requests — your door is clear."
+            ? "No requests, your door is clear."
             : tab === "unread"
               ? "All caught up. Zero noise. 🎉"
               : "Nobody by that name."}
@@ -472,7 +472,7 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
               <p className="text-sm font-semibold">Message requests</p>
               <p className="mt-0.5 text-xs leading-snug text-muted">
                 People you don&apos;t follow land here first. They can&apos;t see when you&apos;ve
-                read it until you approve — blocking is silent.
+                read it until you approve, blocking is silent.
               </p>
             </div>
           )}

@@ -11,7 +11,7 @@ const SITE = "https://www.hypefy.chat";
 async function shareProfile(username: string | null) {
   haptics.tap();
   const url = username ? `${SITE}/u/${username}?ref=${encodeURIComponent(username)}` : SITE;
-  const text = "Come find me on Hypefy — where your personality lives.";
+  const text = "Come find me on Hypefy, where your personality lives.";
   try {
     if (navigator.share) {
       await navigator.share({ url, text });

@@ -51,7 +51,7 @@ export function InstallPrompt() {
       const snoozedAt = Number(localStorage.getItem(SNOOZE_KEY) ?? "0");
       if (Date.now() - snoozedAt < SNOOZE_DAYS * 86_400_000) return;
     } catch {
-      return; // storage unavailable (private mode) — skip quietly
+      return; // storage unavailable (private mode), skip quietly
     }
     if (visits < MIN_VISITS) return;
 
@@ -106,7 +106,7 @@ export function InstallPrompt() {
             <p className="text-sm font-bold leading-tight">
               Get the app<span className="text-accent">.</span>
             </p>
-            <p className="truncate text-xs text-muted">Hypefy on your home screen — faster, full screen.</p>
+            <p className="truncate text-xs text-muted">Hypefy on your home screen, faster, full screen.</p>
           </div>
           <button
             type="button"

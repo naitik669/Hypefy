@@ -81,7 +81,7 @@ export function ReelsFeed({
   }
   function onSwipeTouchEnd(e: React.TouchEvent) {
     const dy = swipeTouchStartY.current - e.changedTouches[0].clientY;
-    if (Math.abs(dy) < 40) return; // too small — treat as tap, not swipe
+    if (Math.abs(dy) < 40) return; // too small, treat as tap, not swipe
     if (dy > 0) {
       // Swipe up — advance to next reel
       setActiveIdx((i) => Math.min(i + 1, reels.length - 1));

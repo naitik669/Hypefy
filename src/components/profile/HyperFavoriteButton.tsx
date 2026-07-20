@@ -54,7 +54,7 @@ export function HyperFavoriteButton({
   async function blockUser() {
     const { error } = await supabase.rpc("block_user", { p_blocked: targetUserId });
     if (error) {
-      toast("Couldn't block — try again", "error");
+      toast("Couldn't block, try again", "error");
       return;
     }
     setConfirmBlock(false);
@@ -72,7 +72,7 @@ export function HyperFavoriteButton({
       .eq("blocker_id", currentUserId)
       .eq("blocked_id", targetUserId);
     if (error) {
-      toast("Couldn't unblock — try again", "error");
+      toast("Couldn't unblock, try again", "error");
       return;
     }
     setIsBlocked(false);
@@ -134,7 +134,7 @@ export function HyperFavoriteButton({
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">Hypers</p>
-              <p className="text-xs text-muted">Your closest friends — see their posts here first</p>
+              <p className="text-xs text-muted">Your closest friends, see their posts here first</p>
             </div>
             {isHyper && <Check size={18} className="shrink-0 text-accent" />}
           </button>

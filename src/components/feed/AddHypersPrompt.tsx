@@ -91,7 +91,7 @@ export function AddHypersPrompt({ currentUserId }: { currentUserId: string }) {
         </div>
         <h2 className="text-lg font-bold">No Hypers yet</h2>
         <p className="max-w-xs text-sm text-muted">
-          Hypers are your closest friends — pick a few below to see their posts here first.
+          Hypers are your closest friends, pick a few below to see their posts here first.
         </p>
       </div>
 

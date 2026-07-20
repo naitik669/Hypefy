@@ -30,7 +30,7 @@ export function PrivacySettings({
     setSaving(true);
     const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
     setSaving(false);
-    if (error) toast("Couldn't save — try again", "error");
+    if (error) toast("Couldn't save, try again", "error");
     else toast("Saved", "success");
     return !error;
   }

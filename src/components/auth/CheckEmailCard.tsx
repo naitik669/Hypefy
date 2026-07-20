@@ -60,13 +60,13 @@ export function CheckEmailCard({ email }: { email: string }) {
           ) : (
             " your email"
           )}{" "}
-          to activate your account — then you&apos;re in. ⚡
+          to activate your account, then you&apos;re in. ⚡
         </p>
 
         {/* Status line */}
         {status === "sent" && (
           <p className="mt-4 rounded-lg bg-accent/10 px-3 py-2 text-xs text-accent">
-            Sent again — check your inbox (and spam).
+            Sent again, check your inbox (and spam).
           </p>
         )}
         {status === "error" && (

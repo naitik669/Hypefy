@@ -8,6 +8,7 @@ import { Reveal } from "@/components/ui/Reveal";
 import { PeopleToFollow } from "@/components/feed/PeopleToFollow";
 import { AddHypersPrompt } from "@/components/feed/AddHypersPrompt";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { CaughtUp } from "@/components/feed/CaughtUp";
 import { useFeedTab, type FeedTab } from "@/components/layout/FeedTabDropdown";
 
 const PAGE_SIZE = 20;
@@ -30,7 +31,7 @@ function saveSeen(seen: Set<string>) {
   try {
     const arr = [...seen].slice(-SEEN_CAP);
     localStorage.setItem(SEEN_KEY, JSON.stringify(arr));
-  } catch { /* quota / private mode — non-fatal */ }
+  } catch { /* quota / private mode, non-fatal */ }
 }
 
 function normalize(data: unknown[] | null): FeedPost[] {
@@ -286,21 +287,25 @@ export function FeedList({
       )}
 
       {!noHypersPicked && tab !== "foryou" && activeDone && activePosts.length > 10 && (
-        <p className="py-8 text-center text-xs text-faint">You&apos;re all caught up ⚡</p>
+        <CaughtUp />
       )}
 
       {/* End of the For You road — once the posts run out, close the feed
-          with the caught-up prompt + people to follow, never a dead screen. */}
+          with the caught-up moment + people to follow, never a dead screen. */}
       {tab === "foryou" && fyDone && (
         <div className={posts.length > 0 ? "border-t border-border/60" : ""}>
-          <EmptyState
-            icon={PlusCircle}
-            title={posts.length === 0 ? "Your feed is warming up" : "You're all caught up ⚡"}
-            text="Follow people or drop a post — someone has to start the hype."
-            ctaLabel="Create Post"
-            ctaHref="/create/post"
-            variant="compact"
-          />
+          {posts.length === 0 ? (
+            <EmptyState
+              icon={PlusCircle}
+              title="Your feed is warming up"
+              text="Follow people or drop a post, someone has to start the hype."
+              ctaLabel="Create Post"
+              ctaHref="/create/post"
+              variant="compact"
+            />
+          ) : (
+            <CaughtUp />
+          )}
           <PeopleToFollow currentUserId={currentUserId} followingIds={followingIds} />
         </div>
       )}

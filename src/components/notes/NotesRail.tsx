@@ -127,7 +127,7 @@ export function NotesRail({
       setOpening(null);
       return;
     }
-    const prefill = encodeURIComponent(`Replying to your note "${note.text}" — `);
+    const prefill = encodeURIComponent(`Replying to your note "${note.text}": `);
     router.push(`/messages/${convId}?prefill=${prefill}`);
   }
 

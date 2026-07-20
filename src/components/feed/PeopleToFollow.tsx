@@ -110,7 +110,7 @@ export function PeopleToFollow({
     return (
       <div className="px-6 py-14 text-center">
         <p className="text-sm font-semibold">No suggestions right now</p>
-        <p className="mt-1 text-xs text-muted">Check back soon — the community is growing.</p>
+        <p className="mt-1 text-xs text-muted">Check back soon, the community is growing.</p>
       </div>
     );
   }

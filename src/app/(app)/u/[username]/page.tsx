@@ -47,7 +47,7 @@ export async function generateMetadata({
   if (!profile) return {};
   const name = profile.display_name ?? profile.username ?? "User";
   const title = `${name} (@${profile.username})`;
-  const description = profile.bio ?? `Follow ${name} on Hypefy — where your personality lives.`;
+  const description = profile.bio ?? `Follow ${name} on Hypefy, where your personality lives.`;
   const image = (profile as any).avatar_url as string | null;
   return {
     title,

@@ -22,7 +22,7 @@ const copy = {
   },
   signup: {
     title: "Create account",
-    subtitle: "Join Hypefy — where your personality lives.",
+    subtitle: "Join Hypefy, where your personality lives.",
     cta: "Sign up",
     googleLabel: "Continue with Google",
     footerText: "Already have an account?",
@@ -179,7 +179,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
       redirectTo: `${window.location.origin}/auth/callback`,
     });
     if (error) setError(error.message);
-    else setNotice("Password reset link sent — check your inbox.");
+    else setNotice("Password reset link sent, check your inbox.");
   }
 
   async function handleGoogle() {

@@ -55,7 +55,7 @@ export function BlockedList({ currentUserId }: { currentUserId: string }) {
     setPendingId(row.id);
     const { error } = await supabase.from("blocked_users").delete().eq("id", row.id);
     if (error) {
-      toast("Couldn't unblock — try again", "error");
+      toast("Couldn't unblock, try again", "error");
     } else {
       setRows((prev) => (prev ?? []).filter((r) => r.id !== row.id));
       toast(`Unblocked ${row.username ? `@${row.username}` : row.name}`, "success");
@@ -82,7 +82,7 @@ export function BlockedList({ currentUserId }: { currentUserId: string }) {
         variant="compact"
         icon={Ban}
         title="Nobody blocked"
-        text="Block someone from their profile or a post's ⋯ menu — they land here."
+        text="Block someone from their profile or a post's ⋯ menu, they land here."
       />
     );
   }

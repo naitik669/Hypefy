@@ -474,7 +474,7 @@ export default function AddShowPage() {
             <span className="rounded-pill bg-white/15 px-3.5 py-2 text-sm font-semibold text-white/75 backdrop-blur-sm">24h</span>
             <button
               type="button"
-              aria-label={track ? `Song: ${track.title} — change or remove` : "Add a song"}
+              aria-label={track ? `Song: ${track.title}, change or remove` : "Add a song"}
               onClick={() => (track ? setTrack(null) : setTrackPickerOpen(true))}
               className={`relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full backdrop-blur-sm transition-colors ${
                 track ? "bg-accent text-accent-ink" : "bg-white/15 text-white"

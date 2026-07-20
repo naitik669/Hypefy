@@ -80,7 +80,7 @@ export function FollowListSheet({
             variant="compact"
             icon={Users}
             title={mode === "followers" ? "No followers yet" : "Not following anyone"}
-            text={mode === "followers" ? "Share a post — followers find you fast here." : "Find your people in Discover."}
+            text={mode === "followers" ? "Share a post, followers find you fast here." : "Find your people in Discover."}
           />
         ) : (
           rows.map((r) => {

@@ -79,7 +79,7 @@ export function ForwardSheet({
     const { data: convId, error: convErr } = await supabase.rpc("get_or_create_dm", { p_other: friend.id });
     if (convErr || !convId) { setBusy(null); return; }
     const body =
-      msg.kind === "text" && msg.body ? `↪️ Forwarded — ${msg.body}` : msg.body;
+      msg.kind === "text" && msg.body ? `↪️ Forwarded: ${msg.body}` : msg.body;
     const { error } = await supabase.rpc("send_message", {
       p_conversation_id: convId,
       p_body: body,

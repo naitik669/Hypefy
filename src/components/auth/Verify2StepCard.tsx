@@ -44,7 +44,7 @@ export function Verify2StepCard({ email }: { email: string }) {
     setError(null);
     const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
     if (error) setError(error.message);
-    else { setNotice("New code sent — check your inbox."); setCooldown(30); }
+    else { setNotice("New code sent, check your inbox."); setCooldown(30); }
   }
 
   if (!email) {

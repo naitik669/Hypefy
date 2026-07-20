@@ -124,7 +124,7 @@ export function PostActionsSheet({
   async function blockAuthor() {
     const { error } = await supabase.rpc("block_user", { p_blocked: postUserId });
     if (error) {
-      toast("Couldn't block — try again", "error");
+      toast("Couldn't block, try again", "error");
       return;
     }
     setConfirmBlock(false);

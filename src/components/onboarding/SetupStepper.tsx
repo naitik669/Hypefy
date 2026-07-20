@@ -279,7 +279,7 @@ function StepUsername({
         {status === "available" && <Check size={16} className="shrink-0 text-accent" />}
       </div>
       {status === "taken" && <p className="mt-1.5 text-xs text-danger">That username is taken.</p>}
-      {status === "available" && <p className="mt-1.5 text-xs text-accent">Nice — that one's free.</p>}
+      {status === "available" && <p className="mt-1.5 text-xs text-accent">Nice, that one's free.</p>}
       {status === "invalid" && value.length > 0 && (
         <p className="mt-1.5 text-xs text-muted">3–20 characters: a–z, 0–9, dot, underscore.</p>
       )}

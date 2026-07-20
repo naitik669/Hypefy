@@ -197,7 +197,7 @@ function Copy({ slide, active }: { slide: (typeof SLIDES)[number]; active: boole
     posts: {
       title: <>Post what matters</>,
       lead: "Your world, your way.",
-      text: "Share your thoughts, images, and moments — then let people Hype what hits.",
+      text: "Share your thoughts, images, and moments, then let people Hype what hits.",
     },
     shots: {
       title: <>Share quick Shots</>,

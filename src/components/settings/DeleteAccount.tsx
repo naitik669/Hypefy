@@ -58,7 +58,7 @@ export function DeleteAccount({ username }: { username: string | null }) {
       ) : (
         <div className="mt-3 flex flex-col gap-2">
           <p className="text-xs text-muted">
-            Type <span className="font-bold text-foreground">{confirmWord}</span> to confirm. Everything is wiped — no recovery.
+            Type <span className="font-bold text-foreground">{confirmWord}</span> to confirm. Everything is wiped, no recovery.
           </p>
           <input
             value={typed}

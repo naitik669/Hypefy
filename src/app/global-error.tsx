@@ -60,7 +60,7 @@ export default function GlobalError({
               Something broke<span style={{ color: "#a3e635" }}>.</span>
             </h1>
             <p style={{ margin: "6px auto 0", maxWidth: 260, fontSize: 14, lineHeight: 1.45, color: "#8a8a8a" }}>
-              Not you — us. Head back and we&apos;ll get the hype going again.
+              Not you, us. Head back and we&apos;ll get the hype going again.
             </p>
           </div>
           <button

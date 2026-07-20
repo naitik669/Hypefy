@@ -145,7 +145,7 @@ export function ShowViewersSheet({
             variant="compact"
             icon={Search}
             title={q ? "No one matches that" : "No views yet"}
-            text={q ? "Try a different name or handle." : "Your Show just went up — give it a minute."}
+            text={q ? "Try a different name or handle." : "Your Show just went up, give it a minute."}
           />
         ) : (
           <div className="flex flex-col">

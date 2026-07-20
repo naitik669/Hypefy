@@ -36,7 +36,7 @@ export default async function InsightsPage() {
       <PageHeader title="Insights" showBack />
 
       {rows.length === 0 ? (
-        <EmptyState icon={Eye} title="No data yet" text="Post something — your reach and engagement will show up here." />
+        <EmptyState icon={Eye} title="No data yet" text="Post something, your reach and engagement will show up here." />
       ) : (
         <div className="px-4 pb-10 pt-3">
           {/* Totals */}

@@ -20,7 +20,7 @@ export default function TermsPage() {
 
       <h2>2. Your content</h2>
       <ul>
-        <li>You own the content you post — posts, Shots, Shows, comments, and messages.</li>
+        <li>You own the content you post, posts, Shots, Shows, comments, and messages.</li>
         <li>
           By posting, you grant Hypefy a worldwide, non-exclusive, royalty-free license to host,
           display, and distribute that content within the Service so other users can see it.
@@ -31,7 +31,7 @@ export default function TermsPage() {
       <h2>3. Prohibited conduct</h2>
       <ul>
         <li>No illegal content, harassment, hate speech, or threats.</li>
-        <li>No sexually explicit content involving minors — zero tolerance, reported to authorities.</li>
+        <li>No sexually explicit content involving minors, zero tolerance, reported to authorities.</li>
         <li>No spam, scams, impersonation, or platform manipulation (fake hypes, bot follows).</li>
         <li>No posting others&apos; private information without consent.</li>
         <li>No attempts to breach, probe, or overload the Service&apos;s infrastructure.</li>

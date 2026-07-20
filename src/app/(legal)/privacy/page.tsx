@@ -13,19 +13,19 @@ export default function PrivacyPage() {
       <h2>1. What we collect</h2>
       <ul>
         <li>
-          <strong>Account data</strong> — email address, password (hashed; we never see it),
+          <strong>Account data</strong>: email address, password (hashed; we never see it),
           and your profile (name, username, bio, avatar, banner, tags).
         </li>
         <li>
-          <strong>Content</strong> — posts, Shots, Shows, comments, messages, reactions,
+          <strong>Content</strong>: posts, Shots, Shows, comments, messages, reactions,
           and media you upload.
         </li>
         <li>
-          <strong>Activity</strong> — follows, hypes, saves, show views, and read receipts,
+          <strong>Activity</strong>: follows, hypes, saves, show views, and read receipts,
           used to rank feeds and power features like seen-states.
         </li>
         <li>
-          <strong>Push subscriptions</strong> — if you enable push notifications, your
+          <strong>Push subscriptions</strong>: if you enable push notifications, your
           browser&apos;s push endpoint (no location or device-identity data).
         </li>
       </ul>
@@ -40,7 +40,7 @@ export default function PrivacyPage() {
       <h2>3. Where your data lives</h2>
       <p>
         Hypefy runs on Supabase (database, auth, storage) and Vercel (hosting). GIF search
-        is powered by GIPHY — search queries for GIFs are proxied through our server to
+        is powered by GIPHY, search queries for GIFs are proxied through our server to
         GIPHY&apos;s API. These providers process data on our behalf under their own privacy
         terms.
       </p>
@@ -56,7 +56,7 @@ export default function PrivacyPage() {
         <li>Private account, who-can-message-you, and per-type notification settings live in Settings → Privacy / Notifications.</li>
         <li>You can delete individual posts, Shots, Shows, comments, and messages.</li>
         <li>
-          <strong>Delete your account</strong> in Settings → Account — this permanently removes
+          <strong>Delete your account</strong> in Settings → Account, this permanently removes
           your profile, content, messages, and subscriptions.
         </li>
       </ul>

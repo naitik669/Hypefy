@@ -204,7 +204,7 @@ export function ShotComposer({ userId }: { userId: string }) {
           <div className="flex flex-col items-center gap-2">
             <Video size={40} className="text-faint" />
             <p className="text-sm text-muted">Tap to choose a video</p>
-            <p className="text-xs text-faint">MP4 · WebM · MOV — up to {MAX_SIZE_MB}MB</p>
+            <p className="text-xs text-faint">MP4 · WebM · MOV · up to {MAX_SIZE_MB}MB</p>
           </div>
         )}
       </div>

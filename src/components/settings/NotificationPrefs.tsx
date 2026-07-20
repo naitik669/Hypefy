@@ -46,7 +46,7 @@ export function NotificationPrefs({
       .update({ notif_prefs: updated })
       .eq("id", userId);
     setSaving(false);
-    if (error) { setPrefs(prev); toast("Couldn't save — try again", "error"); }
+    if (error) { setPrefs(prev); toast("Couldn't save, try again", "error"); }
     else toast("Saved", "success");
   }
 

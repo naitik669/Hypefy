@@ -38,7 +38,7 @@ export function PushToggle({ userId }: { userId: string }) {
         const result = await subscribeToPush(supabase, userId);
         if (result === "subscribed") setEnabled(true);
         else if (result === "unconfigured") setError("Push isn't configured on this deployment yet.");
-        else if (result === "denied") setError("Notifications are blocked — allow them in your browser settings.");
+        else if (result === "denied") setError("Notifications are blocked, allow them in your browser settings.");
         else setError("Something went wrong enabling push.");
       } else {
         await unsubscribeFromPush(supabase);

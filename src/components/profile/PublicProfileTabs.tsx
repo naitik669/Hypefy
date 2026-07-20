@@ -156,7 +156,7 @@ export function PublicProfileTabs({
           <EmptyState
             icon={Zap}
             title="No Shots fired"
-            text="Short videos, big energy — none yet."
+            text="Short videos, big energy, none yet."
             ctaLabel={isOwn ? "Add Shot" : undefined}
             ctaHref={isOwn ? "/create/shot" : undefined}
           />

@@ -49,13 +49,13 @@ export function PushNudge() {
     const result = await subscribeToPush(supabase, user.id);
     setBusy(false);
     if (result === "subscribed") {
-      toast("Push is on — you'll get pinged", "success");
+      toast("Push is on, you'll get pinged", "success");
       setVisible(false);
     } else if (result === "denied") {
       toast("Notifications are blocked in your browser", "error");
       snooze();
     } else {
-      toast("Couldn't turn on push — try again later", "error");
+      toast("Couldn't turn on push, try again later", "error");
     }
   }
 

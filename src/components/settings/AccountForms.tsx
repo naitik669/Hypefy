@@ -22,7 +22,7 @@ export function AccountForms({ currentEmail }: { currentEmail: string }) {
       setEmailMsg({ ok: false, text: error.message });
       return;
     }
-    setEmailMsg({ ok: true, text: "Check both inboxes — confirm the change from the links we sent." });
+    setEmailMsg({ ok: true, text: "Check both inboxes, confirm the change from the links we sent." });
     setNewEmail("");
   }
 

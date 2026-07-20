@@ -20,7 +20,7 @@ export default function AppError({
           That didn&apos;t load<span className="text-accent">.</span>
         </h1>
         <p className="mx-auto mt-1.5 max-w-[260px] text-sm leading-snug text-muted">
-          Something broke on our side. Try again — it usually clears right up.
+          Something broke on our side. Try again, it usually clears right up.
         </p>
       </div>
       <button
