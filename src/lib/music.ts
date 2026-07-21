@@ -11,6 +11,8 @@ export type Track = {
   preview: string;
   /** Seconds into the 30s preview to start from (snippet selection). */
   start?: number;
+  /** Apple Music / iTunes song page — attribution + full listen. */
+  appleUrl?: string;
 };
 
 /** Parse a track jsonb column defensively — bad shapes become null. */
@@ -26,6 +28,7 @@ export function parseTrack(raw: unknown): Track | null {
     artwork: String(t.artwork ?? ""),
     preview: String(t.preview),
     ...(Number.isFinite(start) && start > 0 ? { start } : {}),
+    ...(t.appleUrl ? { appleUrl: String(t.appleUrl) } : {}),
   };
 }
 

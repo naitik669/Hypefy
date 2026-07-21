@@ -40,8 +40,9 @@ export default function PrivacyPage() {
       <h2>3. Where your data lives</h2>
       <p>
         Hypefy runs on Supabase (database, auth, storage) and Vercel (hosting). GIF search
-        is powered by GIPHY, search queries for GIFs are proxied through our server to
-        GIPHY&apos;s API. These providers process data on our behalf under their own privacy
+        is powered by GIPHY, and song search by Apple&apos;s iTunes Search API, search queries
+        are proxied through our server to those APIs, and music previews and artwork are served
+        directly by Apple. These providers process data on our behalf under their own privacy
         terms.
       </p>
 

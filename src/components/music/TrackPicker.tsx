@@ -274,7 +274,7 @@ export function TrackPicker({
           <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
             <Music size={28} className="text-faint" />
             <p className="text-sm text-muted">Search for a song to attach</p>
-            <p className="text-xs text-faint">30-second previews, free via iTunes</p>
+            <p className="text-xs text-faint">30-second previews provided by Apple Music</p>
           </div>
         )}
       </div>

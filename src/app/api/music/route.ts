@@ -14,6 +14,7 @@ export type Track = {
   artist: string;
   artwork: string; // 100x100 jpg
   preview: string; // ~30s m4a
+  appleUrl?: string; // Apple Music / iTunes song page (attribution + full listen)
 };
 
 export async function GET(req: NextRequest) {
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest) {
         artist: String(r.artistName ?? ""),
         artwork: String(r.artworkUrl100 ?? r.artworkUrl60 ?? ""),
         preview: String(r.previewUrl ?? ""),
+        appleUrl: String(r.trackViewUrl ?? "") || undefined,
       }))
       .filter((t) => t.id && t.title && t.preview);
 

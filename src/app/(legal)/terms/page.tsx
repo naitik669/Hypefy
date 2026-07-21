@@ -43,20 +43,40 @@ export default function TermsPage() {
         content in-app; reports are reviewed and acted on at our discretion.
       </p>
 
-      <h2>5. Termination</h2>
+      <h2>5. Copyright &amp; music</h2>
+      <ul>
+        <li>
+          Music previews in Hypefy are 30-second clips and artwork provided by Apple through the
+          public iTunes Search API, for promotional purposes. Hypefy does not host, store, or
+          distribute the underlying recordings; playback and artwork are served by Apple, and each
+          song links out to Apple Music. All rights in the music belong to their respective owners.
+        </li>
+        <li>
+          Respect copyright in the content you post. Don&apos;t upload media you don&apos;t have the
+          right to share.
+        </li>
+        <li>
+          If you believe content on Hypefy infringes your copyright, send a notice to
+          <a href="mailto:craziematez@gmail.com" className="text-accent"> craziematez@gmail.com</a> with
+          the work concerned, the infringing URL, your contact details, and a good-faith statement.
+          We remove infringing content promptly and may terminate repeat infringers.
+        </li>
+      </ul>
+
+      <h2>6. Termination</h2>
       <p>
         You can delete your account at any time from Settings → Account. We may suspend or
         terminate accounts that violate these Terms or harm the Service or its users.
       </p>
 
-      <h2>6. Disclaimers</h2>
+      <h2>7. Disclaimers</h2>
       <p>
         The Service is provided &quot;as is&quot; without warranties of any kind. To the maximum
         extent permitted by law, Hypefy is not liable for indirect, incidental, or consequential
         damages arising from your use of the Service.
       </p>
 
-      <h2>7. Changes</h2>
+      <h2>8. Changes</h2>
       <p>
         We may update these Terms. Material changes will be announced in-app. Continued use
         after changes means you accept the new Terms.

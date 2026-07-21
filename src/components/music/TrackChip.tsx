@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Music, Pause, X } from "lucide-react";
+import { Music, Pause, X, ArrowUpRight } from "lucide-react";
 import { type Track, playPreview, ensurePreviewPlaying, pausePreview, useIsPlaying } from "@/lib/music";
 
 /**
@@ -84,6 +84,19 @@ export function TrackChip({
         <span className="font-semibold">{track.title}</span>
         {track.artist && <span className="text-muted"> · {track.artist}</span>}
       </p>
+      {/* Full song on Apple Music — attribution + real listen (feed/anthem chips) */}
+      {track.appleUrl && !onRemove && (
+        <a
+          href={track.appleUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Open ${track.title} in Apple Music`}
+          className="-mr-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:text-foreground"
+        >
+          <ArrowUpRight size={13} />
+        </a>
+      )}
       {onRemove && (
         <button
           type="button"
