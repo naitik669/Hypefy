@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PresenceDot } from "@/components/presence/PresenceDot";
+import { parseTrack } from "@/lib/music";
 
 export type InboxRow = {
   id: string;
@@ -30,9 +31,25 @@ export type InboxRow = {
   muted: boolean;
   pinned: boolean;
   isRequest: boolean;
+  /** The other person's active status (DMs only) — shown as a bubble on the row. */
+  status?: { text: string; track?: unknown } | null;
   /** Set when a reaction is newer than the last message — becomes the preview */
   lastReaction?: { emoji: string; mine: boolean; onMine: boolean } | null;
 };
+
+/** The other person's active status, as a small speech bubble on their row. */
+function StatusBubble({ status }: { status: NonNullable<InboxRow["status"]> }) {
+  const track = parseTrack(status.track);
+  return (
+    <span className="ml-auto flex max-w-[52%] shrink items-center gap-1 rounded-lg rounded-bl-sm border border-border/70 bg-surface px-1.5 py-0.5">
+      {track?.artwork && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={track.artwork} alt="" className="h-3 w-3 shrink-0 rounded-full object-cover" />
+      )}
+      <span className="truncate text-[11px] font-medium text-foreground/90">{status.text}</span>
+    </span>
+  );
+}
 
 /** A message-body snippet windowed around the query, with the match marked. */
 function highlightSnippet(body: string, query: string) {
@@ -369,10 +386,13 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
             {!r.isGroup && <PresenceDot lastSeenAt={r.lastSeenAt} size="md" />}
           </div>
           <div className="min-w-0 flex-1">
-            <p className={`truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
-              {r.name}
-              {r.isGroup && <span className="ml-1.5 text-xs font-normal text-faint">· {r.memberCount}</span>}
-            </p>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className={`truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
+                {r.name}
+                {r.isGroup && <span className="ml-1.5 text-xs font-normal text-faint">· {r.memberCount}</span>}
+              </span>
+              {r.status && <StatusBubble status={r.status} />}
+            </div>
             <p className={`truncate text-sm ${unread ? "font-semibold text-foreground" : "text-muted"}`}>
               {matchBody ? highlightSnippet(matchBody, query) : preview(r)}
             </p>
