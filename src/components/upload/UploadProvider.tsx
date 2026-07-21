@@ -16,6 +16,8 @@ type PostUpload = {
   mentions: string[];
   track?: Track | null;
   poll?: { options: string[] } | null;
+  /** ISO timestamp to publish later — routes the post to scheduled_posts. */
+  scheduledAt?: string | null;
 };
 
 type Ctx = {
@@ -69,7 +71,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         setProgress(Math.min(85, 10 + ((i + 1) / a.files.length) * 72));
       }
 
-      const { error: insErr } = await supabase.from("posts").insert({
+      const record = {
         user_id: a.userId,
         caption: a.caption,
         body: a.body,
@@ -80,12 +82,18 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         mentions: a.mentions,
         track: a.track ?? null,
         poll: a.poll ?? null,
-      });
+      };
+
+      // Scheduled → its own table (a pg_cron job publishes it when due); the
+      // feed queries never see it, so nothing else changes.
+      const { error: insErr } = a.scheduledAt
+        ? await supabase.from("scheduled_posts").insert({ ...record, scheduled_at: a.scheduledAt })
+        : await supabase.from("posts").insert(record);
       if (insErr) throw insErr;
 
       stopTrickle();
       setProgress(100);
-      toast("Post shared", "success");
+      toast(a.scheduledAt ? "Post scheduled" : "Post shared", "success");
       router.refresh();
       setTimeout(() => setProgress(null), 700);
     } catch {

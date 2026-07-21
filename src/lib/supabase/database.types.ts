@@ -1213,6 +1213,59 @@ export type Database = {
           },
         ]
       }
+      scheduled_posts: {
+        Row: {
+          body: string | null
+          caption: string | null
+          created_at: string
+          hashtags: string[]
+          id: string
+          image_url: string | null
+          image_urls: string[]
+          mentions: string[]
+          poll: Json | null
+          scheduled_at: string
+          track: Json | null
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          caption?: string | null
+          created_at?: string
+          hashtags?: string[]
+          id?: string
+          image_url?: string | null
+          image_urls?: string[]
+          mentions?: string[]
+          poll?: Json | null
+          scheduled_at: string
+          track?: Json | null
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          caption?: string | null
+          created_at?: string
+          hashtags?: string[]
+          id?: string
+          image_url?: string | null
+          image_urls?: string[]
+          mentions?: string[]
+          poll?: Json | null
+          scheduled_at?: string
+          track?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shots: {
         Row: {
           caption: string | null

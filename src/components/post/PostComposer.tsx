@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText, BarChart2 } from "lucide-react";
+import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock } from "lucide-react";
+import Link from "next/link";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { ImageCropper } from "@/components/post/ImageCropper";
@@ -48,6 +49,8 @@ export function PostComposer({ userId }: { userId: string }) {
   const [draftRestored, setDraftRestored] = useState(false);
   // Poll: null = no poll; otherwise 2-4 option strings (blanks dropped on post).
   const [pollOptions, setPollOptions] = useState<string[] | null>(null);
+  // Schedule: null = post now; otherwise a datetime-local string to publish at.
+  const [scheduleAt, setScheduleAt] = useState<string | null>(null);
   const activeText = activeField === "caption" ? caption : activeField === "body" ? body : "";
   const activeCursor = activeField === "caption" ? captionCursor : bodyCursor;
   const { suggestions: pickerSuggestions, reset: resetPicker } = useMentionHashtag(activeText, activeCursor);
@@ -185,11 +188,14 @@ export function PostComposer({ userId }: { userId: string }) {
   const cleanPollOptions = (pollOptions ?? []).map((o) => o.trim()).filter(Boolean);
   const cleanPoll = cleanPollOptions.length >= 2 ? { options: cleanPollOptions.slice(0, 4) } : null;
 
+  // Only schedule when a future time is chosen; past/now falls back to posting now.
+  const willSchedule = !!scheduleAt && new Date(scheduleAt).getTime() > Date.now() + 30_000;
+
   function handlePost() {
     if (submitted || !canPost) return;
     setSubmitted(true);
     // Hand off to the global uploader so it keeps running after we navigate —
-    // Home shows a progress bar + a "Post shared" toast when it finishes.
+    // Home shows a progress bar + a toast when it finishes.
     uploadPost({
       userId,
       files: imgs.map((i) => i.file),
@@ -199,9 +205,10 @@ export function PostComposer({ userId }: { userId: string }) {
       mentions,
       track,
       poll: cleanPoll,
+      scheduledAt: willSchedule ? new Date(scheduleAt!).toISOString() : null,
     });
     try { localStorage.removeItem(DRAFT_KEY); } catch {}
-    router.push("/home");
+    router.push(willSchedule ? "/create/scheduled" : "/home");
   }
 
   return (
@@ -452,6 +459,47 @@ export function PostComposer({ userId }: { userId: string }) {
       )}
       <TrackPicker open={trackPickerOpen} onClose={() => setTrackPickerOpen(false)} onSelect={setTrack} />
 
+      {/* Schedule */}
+      <div className="flex items-center gap-2">
+        {scheduleAt === null ? (
+          <button
+            type="button"
+            onClick={() => {
+              // Default to one hour out, rounded, in the input's local format.
+              const d = new Date(Date.now() + 60 * 60 * 1000);
+              d.setSeconds(0, 0);
+              const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+              setScheduleAt(local);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-pill border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-white/25 hover:text-foreground"
+          >
+            <Clock size={13} /> Schedule for later
+          </button>
+        ) : (
+          <div className="flex flex-1 items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2">
+            <CalendarClock size={15} className="shrink-0 text-accent" />
+            <input
+              type="datetime-local"
+              value={scheduleAt}
+              min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+              onChange={(e) => setScheduleAt(e.target.value)}
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none [color-scheme:dark]"
+            />
+            <button
+              type="button"
+              onClick={() => setScheduleAt(null)}
+              aria-label="Cancel schedule"
+              className="shrink-0 text-muted hover:text-foreground"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
+        <Link href="/create/scheduled" className="ml-auto shrink-0 text-xs font-semibold text-muted hover:text-foreground">
+          Scheduled
+        </Link>
+      </div>
+
       {/* Post button */}
       <button
         type="button"
@@ -459,7 +507,8 @@ export function PostComposer({ userId }: { userId: string }) {
         disabled={!canPost || submitted}
         className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-accent text-base font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-50"
       >
-        <Send size={18} /> {submitted ? "Sharing…" : "Post"}
+        {willSchedule ? <CalendarClock size={18} /> : <Send size={18} />}
+        {submitted ? (willSchedule ? "Scheduling…" : "Sharing…") : willSchedule ? "Schedule" : "Post"}
       </button>
     </div>
   );
