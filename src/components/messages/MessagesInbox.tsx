@@ -346,7 +346,7 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
     const matchBody = query && !nameHit ? contentMatches.get(r.id) : undefined;
 
     return (
-      <div key={r.id} className={pending ? "px-4 py-3" : ""}>
+      <div key={r.id} className={`[content-visibility:auto] [contain-intrinsic-size:auto_76px] ${pending ? "px-4 py-3" : ""}`}>
         <Link
           href={`/messages/${r.id}`}
           onClick={(e) => {

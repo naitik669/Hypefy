@@ -260,7 +260,12 @@ export function FeedList({
         )
       ) : (
         activePosts.map((post, i) => (
-          <Reveal key={`${tab}-${post.id}`} delay={Math.min(i, 4) * 55}>
+          <Reveal
+            key={`${tab}-${post.id}`}
+            delay={Math.min(i, 4) * 55}
+            // content-visibility virtualizes: off-screen cards skip layout+paint
+            className="[content-visibility:auto] [contain-intrinsic-size:auto_480px]"
+          >
             <FeedCard
               post={post}
               currentUserId={currentUserId}
