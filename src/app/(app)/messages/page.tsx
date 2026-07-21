@@ -16,13 +16,8 @@ export default async function MessagesPage() {
     .eq("id", user.id)
     .maybeSingle();
 
-  // Statuses from my circle. Own note powers the top status bar; everyone
-  // else's is woven onto their conversation row below.
+  // Notes from my circle (own note first) — powers the rail atop the inbox
   const { data: notes } = await supabase.rpc("get_notes");
-  const notesByUser = new Map<string, { text: string; track: unknown }>();
-  (notes ?? []).forEach((n: any) => {
-    if (!n.is_self) notesByUser.set(n.user_id, { text: n.text, track: n.track ?? null });
-  });
 
   // Conversations I'm a member of (RLS filters to mine), newest first
   const { data: convs } = await supabase
@@ -158,7 +153,6 @@ export default async function MessagesPage() {
           unreadCount: unreadCountByConv.get(c.id) ?? 0,
           online: !isGroup && (members[0]?.online ?? false),
           lastSeenAt: !isGroup ? (members[0]?.lastSeenAt ?? null) : null,
-          status: !isGroup ? (notesByUser.get(members[0].id) ?? null) : null,
           muted: mutedByConv.has(c.id),
           pinned: pinnedByConv.has(c.id),
           isRequest: !isGroup && requestByConv.get(c.id) === false,
