@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, PenSquare, Plus, Check, Loader2, Phone } from "lucide-react";
+import { ChevronDown, PenSquare, Plus, Check, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { getSavedAccounts, upsertSavedAccount, removeSavedAccount, type SavedAccount } from "@/lib/saved-accounts";
@@ -81,14 +81,6 @@ export function MessagesHeader({
       </button>
 
       <Link
-        href="/calls"
-        aria-label="Call history"
-        className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5"
-      >
-        <Phone size={21} />
-      </Link>
-
-      <Link
         href="/messages/new"
         aria-label="New message"
         className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5"
@@ -99,7 +91,10 @@ export function MessagesHeader({
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-3 top-[52px] z-40 w-72 overflow-hidden rounded-2xl border border-border bg-elevated py-1 shadow-2xl">
+          <div
+            style={{ transformOrigin: "top left" }}
+            className="animate-menu-pop absolute left-3 top-[52px] z-40 w-72 overflow-hidden rounded-2xl border border-border bg-elevated py-1 shadow-2xl"
+          >
             <p className="px-4 pb-1 pt-2 text-[11px] font-bold uppercase tracking-widest text-faint">Switch account</p>
 
             {accounts.map((acct) => {
