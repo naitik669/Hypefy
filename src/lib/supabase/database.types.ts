@@ -479,6 +479,51 @@ export type Database = {
           },
         ]
       }
+      group_calls: {
+        Row: {
+          conversation_id: string
+          ended_at: string | null
+          id: string
+          started_at: string
+          started_by: string
+        }
+        Insert: {
+          conversation_id: string
+          ended_at?: string | null
+          id?: string
+          started_at?: string
+          started_by: string
+        }
+        Update: {
+          conversation_id?: string
+          ended_at?: string | null
+          id?: string
+          started_at?: string
+          started_by?: string
+        }
+        Relationships: []
+      }
+      group_call_participants: {
+        Row: {
+          call_id: string
+          joined_at: string
+          left_at: string | null
+          user_id: string
+        }
+        Insert: {
+          call_id: string
+          joined_at?: string
+          left_at?: string | null
+          user_id: string
+        }
+        Update: {
+          call_id?: string
+          joined_at?: string
+          left_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       hypes: {
         Row: {
           created_at: string
@@ -1499,6 +1544,9 @@ export type Database = {
       increment_post_view: { Args: { p_post_id: string }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       is_conv_member: { Args: { conv: string }; Returns: boolean }
+      start_group_call: { Args: { p_conversation_id: string }; Returns: string }
+      join_group_call: { Args: { p_call_id: string }; Returns: undefined }
+      leave_group_call: { Args: { p_call_id: string }; Returns: undefined }
       leave_conversation: {
         Args: { p_conversation_id: string }
         Returns: undefined

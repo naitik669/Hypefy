@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profile";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { CallProvider } from "@/components/calls/CallProvider";
+import { GroupCallProvider } from "@/components/calls/GroupCallProvider";
 import { UploadProvider } from "@/components/upload/UploadProvider";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
@@ -77,6 +78,7 @@ export default async function AppLayout({
   return (
     <ToastProvider>
       <CallProvider userId={user!.id}>
+       <GroupCallProvider userId={user!.id}>
         <UploadProvider>
           <PresenceHeartbeat />
           <InAppNotifier currentUserId={user!.id} />
@@ -92,6 +94,7 @@ export default async function AppLayout({
             />
           </div>
         </UploadProvider>
+       </GroupCallProvider>
       </CallProvider>
     </ToastProvider>
   );

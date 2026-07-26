@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Share } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
+import { useGroupCall } from "@/components/calls/GroupCallProvider";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { VoiceRecorder } from "@/components/messages/VoiceRecorder";
@@ -196,6 +197,15 @@ export function RealChatView({
   const [uploading, setUploading] = useState(false);
   const [muted, setMuted] = useState(false);
   const { startCall } = useCallControls();
+  const { startGroupCall } = useGroupCall();
+
+  function placeGroupCall(type: "audio" | "video") {
+    const others = (group?.members ?? [])
+      .filter((m) => m.id !== currentUserId)
+      .map((m) => ({ id: m.id, name: m.name, hue: m.hue, avatarUrl: m.avatarUrl }));
+    if (others.length === 0) return;
+    startGroupCall({ conversationId, title: group?.title ?? "Group call", type, members: others });
+  }
 
   // Load my mute state for this conversation
   useEffect(() => {
@@ -1044,7 +1054,7 @@ export function RealChatView({
 
         {/* Right actions: call + options */}
         <div className="relative flex shrink-0 items-center gap-0.5">
-          {!isGroup && (
+          {(!isGroup || (group?.members?.length ?? 0) > 1) && (
             <button type="button" onClick={() => { setHeaderMenu(false); setCallChooser((v) => !v); }} aria-label="Call"
               className={`flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/5 ${callChooser ? "text-accent" : "text-foreground"}`}>
               <Phone size={20} />
@@ -1061,8 +1071,8 @@ export function RealChatView({
             onClose={() => setCallChooser(false)}
             className="absolute right-9 top-12 w-44"
           >
-            <MenuItem icon={Phone} active label="Audio call" onClick={() => { setCallChooser(false); placeCall("audio"); }} />
-            <MenuItem icon={Video} active label="Video call" onClick={() => { setCallChooser(false); placeCall("video"); }} />
+            <MenuItem icon={Phone} active label="Audio call" onClick={() => { setCallChooser(false); isGroup ? placeGroupCall("audio") : placeCall("audio"); }} />
+            <MenuItem icon={Video} active label="Video call" onClick={() => { setCallChooser(false); isGroup ? placeGroupCall("video") : placeCall("video"); }} />
           </FloatingMenu>
 
           <FloatingMenu
