@@ -67,7 +67,7 @@ function timeAgo(iso: string) {
 }
 
 function notifHref(n: Notif): string {
-  if (n.type === "follow" || n.type === "referral_joined")
+  if (n.type === "follow" || n.type === "referral_joined" || n.type === "note_reaction")
     return n.actor?.username ? `/u/${n.actor.username}` : "#";
   if (n.type === "incoming_call" || n.type === "missed_call") return "/calls";
   if (n.target_type === "post" && n.target_id) return `/p/${n.target_id}`;

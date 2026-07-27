@@ -371,8 +371,8 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
             {!r.isGroup && <PresenceDot lastSeenAt={r.lastSeenAt} size="md" />}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <p className={`truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <p className={`min-w-0 truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
                 {r.name}
                 {r.isGroup && <span className="ml-1.5 text-xs font-normal text-faint">· {r.memberCount}</span>}
               </p>
