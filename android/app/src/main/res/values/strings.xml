@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Hypefy</string>
+    <string name="title_activity_main">Hypefy</string>
+    <string name="package_name">chat.hypefy.app</string>
+    <string name="custom_url_scheme">chat.hypefy.app</string>
+</resources>
