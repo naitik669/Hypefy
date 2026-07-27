@@ -42,7 +42,7 @@ export default async function ProfilePage() {
     // My active 24h status for the profile thought-bubble
     supabase
       .from("notes")
-      .select("text, audience, track")
+      .select("text, audience, track, created_at")
       .eq("user_id", user.id)
       .gt("expires_at", nowIso)
       .maybeSingle(),
@@ -50,7 +50,7 @@ export default async function ProfilePage() {
 
   const entryShowId = activeShowsRes.data?.[0]?.id ?? null;
   const myNote = myNoteRes.data
-    ? { text: (myNoteRes.data as any).text, audience: (myNoteRes.data as any).audience, track: (myNoteRes.data as any).track }
+    ? { text: (myNoteRes.data as any).text, audience: (myNoteRes.data as any).audience, track: (myNoteRes.data as any).track, createdAt: (myNoteRes.data as any).created_at }
     : null;
 
   const name = profile?.displayName || "Hypefy User";

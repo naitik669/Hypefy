@@ -70,6 +70,8 @@ export function ProfileHeader({
               note={note}
               editable={noteEditable}
               me={{ name, hue, avatarUrl: avatarUrl ?? null }}
+              ownerId={userId}
+              viewerId={currentUserId}
             />
             <ProfileAvatar
               name={name}

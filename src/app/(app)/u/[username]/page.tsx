@@ -104,20 +104,20 @@ export default async function PublicProfilePage({
 
   // The 24h status thought-bubble. Own note is read directly; others go through
   // get_notes_for (block + audience + private-account gated). Hidden when locked.
-  let note: { text: string; audience: "mutual" | "close"; track: unknown } | null = null;
+  let note: { text: string; audience: "mutual" | "close"; track: unknown; createdAt: string } | null = null;
   if (!isLocked) {
     if (isOwn) {
       const { data: myNote } = await supabase
         .from("notes")
-        .select("text, audience, track")
+        .select("text, audience, track, created_at")
         .eq("user_id", profile.id)
         .gt("expires_at", new Date().toISOString())
         .maybeSingle();
-      if (myNote) note = { text: (myNote as any).text, audience: (myNote as any).audience, track: (myNote as any).track };
+      if (myNote) note = { text: (myNote as any).text, audience: (myNote as any).audience, track: (myNote as any).track, createdAt: (myNote as any).created_at };
     } else if (currentUser) {
       const { data: notes } = await supabase.rpc("get_notes_for", { p_user_ids: [profile.id] });
       const row = (notes ?? [])[0] as any;
-      if (row) note = { text: row.text, audience: row.audience, track: row.track };
+      if (row) note = { text: row.text, audience: row.audience, track: row.track, createdAt: row.created_at };
     }
   }
 
