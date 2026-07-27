@@ -32,6 +32,8 @@ export type InboxRow = {
   isRequest: boolean;
   /** Set when a reaction is newer than the last message — becomes the preview */
   lastReaction?: { emoji: string; mine: boolean; onMine: boolean } | null;
+  /** The peer's active 24h status (1:1 only) — shown as a thought bubble */
+  note?: string | null;
 };
 
 /** A message-body snippet windowed around the query, with the match marked. */
@@ -369,10 +371,20 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
             {!r.isGroup && <PresenceDot lastSeenAt={r.lastSeenAt} size="md" />}
           </div>
           <div className="min-w-0 flex-1">
-            <p className={`truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
-              {r.name}
-              {r.isGroup && <span className="ml-1.5 text-xs font-normal text-faint">· {r.memberCount}</span>}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className={`truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
+                {r.name}
+                {r.isGroup && <span className="ml-1.5 text-xs font-normal text-faint">· {r.memberCount}</span>}
+              </p>
+              {!r.isGroup && r.note && (
+                <span
+                  title={r.note}
+                  className="inline-block max-w-[120px] shrink-0 truncate rounded-full rounded-bl-sm border border-white/[0.08] bg-surface px-1.5 py-0.5 text-[11px] font-medium leading-tight text-muted"
+                >
+                  {r.note}
+                </span>
+              )}
+            </div>
             <p className={`truncate text-sm ${unread ? "font-semibold text-foreground" : "text-muted"}`}>
               {matchBody ? highlightSnippet(matchBody, query) : preview(r)}
             </p>
@@ -426,9 +438,6 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
           />
         </div>
       </div>
-
-      {/* Status rail (or any slot passed from parent) */}
-      {children}
 
       {/* Filter tabs */}
       <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-1 pt-3">

@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MessagesHeader } from "@/components/messages/MessagesHeader";
 import { MessagesInbox, type InboxRow } from "@/components/messages/MessagesInbox";
-import { NotesRail, type NoteRow } from "@/components/notes/NotesRail";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 
 export default async function MessagesPage() {
@@ -15,9 +14,6 @@ export default async function MessagesPage() {
     .select("display_name, username, avatar_hue, avatar_url")
     .eq("id", user.id)
     .maybeSingle();
-
-  // Notes from my circle (own note first) — powers the rail atop the inbox
-  const { data: notes } = await supabase.rpc("get_notes");
 
   // Conversations I'm a member of (RLS filters to mine), newest first
   const { data: convs } = await supabase
@@ -86,6 +82,18 @@ export default async function MessagesPage() {
       membersByConv.set(m.conversation_id, arr);
     });
 
+    // 24h status of each 1:1 peer — shown as a thought bubble on the inbox row
+    // (block + audience gated by the RPC). Groups are skipped.
+    const noteByUser = new Map<string, string>();
+    const peerIds = (convs ?? [])
+      .filter((c: any) => c.type !== "group")
+      .map((c: any) => (membersByConv.get(c.id) ?? [])[0]?.id)
+      .filter(Boolean) as string[];
+    if (peerIds.length > 0) {
+      const { data: peerNotes } = await supabase.rpc("get_notes_for", { p_user_ids: peerIds });
+      (peerNotes ?? []).forEach((n: any) => noteByUser.set(n.user_id, n.text));
+    }
+
     const lastByConv = new Map<string, any>();
     (msgsRes.data ?? []).forEach((m: any) => {
       if (!lastByConv.has(m.conversation_id)) lastByConv.set(m.conversation_id, m);
@@ -153,6 +161,7 @@ export default async function MessagesPage() {
           unreadCount: unreadCountByConv.get(c.id) ?? 0,
           online: !isGroup && (members[0]?.online ?? false),
           lastSeenAt: !isGroup ? (members[0]?.lastSeenAt ?? null) : null,
+          note: !isGroup ? (noteByUser.get(members[0].id) ?? null) : null,
           muted: mutedByConv.has(c.id),
           pinned: pinnedByConv.has(c.id),
           isRequest: !isGroup && requestByConv.get(c.id) === false,
@@ -178,18 +187,7 @@ export default async function MessagesPage() {
         hue={(me as any)?.avatar_hue ?? 280}
       />
       <PullToRefresh>
-        <MessagesInbox rows={rows} currentUserId={user.id}>
-          <NotesRail
-            rows={(notes as NoteRow[]) ?? []}
-            me={{
-              id: user.id,
-              name: (me as any)?.display_name ?? (me as any)?.username ?? "You",
-              username: (me as any)?.username ?? null,
-              hue: (me as any)?.avatar_hue ?? 280,
-              avatarUrl: (me as any)?.avatar_url ?? null,
-            }}
-          />
-        </MessagesInbox>
+        <MessagesInbox rows={rows} currentUserId={user.id} />
       </PullToRefresh>
     </>
   );

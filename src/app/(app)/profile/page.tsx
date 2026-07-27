@@ -28,7 +28,7 @@ export default async function ProfilePage() {
   if (!user) return null;
 
   const nowIso = new Date().toISOString();
-  const [profile, stats, activeShowsRes] = await Promise.all([
+  const [profile, stats, activeShowsRes, myNoteRes] = await Promise.all([
     getProfile(supabase),
     fetchStats(supabase, user.id),
     // Active Shows for the avatar ring (oldest = entry)
@@ -39,9 +39,19 @@ export default async function ProfilePage() {
       .gt("expires_at", nowIso)
       .order("created_at", { ascending: true })
       .limit(1),
+    // My active 24h status for the profile thought-bubble
+    supabase
+      .from("notes")
+      .select("text, audience, track")
+      .eq("user_id", user.id)
+      .gt("expires_at", nowIso)
+      .maybeSingle(),
   ]);
 
   const entryShowId = activeShowsRes.data?.[0]?.id ?? null;
+  const myNote = myNoteRes.data
+    ? { text: (myNoteRes.data as any).text, audience: (myNoteRes.data as any).audience, track: (myNoteRes.data as any).track }
+    : null;
 
   const name = profile?.displayName || "Hypefy User";
   const bio = profile?.bio ?? null;
@@ -68,6 +78,8 @@ export default async function ProfilePage() {
         verified={profile?.isVerified ?? false}
         anthemEditable
         anthem={profile?.anthem ?? null}
+        note={myNote}
+        noteEditable
         actions={
           <>
             <Link

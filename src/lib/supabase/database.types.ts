@@ -1518,6 +1518,20 @@ export type Database = {
           username: string
         }[]
       }
+      get_notes_for: {
+        Args: { p_user_ids: string[] }
+        Returns: {
+          audience: string
+          avatar_hue: number
+          avatar_url: string
+          created_at: string
+          display_name: string
+          text: string
+          track: Json | null
+          user_id: string
+          username: string
+        }[]
+      }
       get_or_create_dm: { Args: { p_other: string }; Returns: string }
       get_suggested_people: {
         Args: { p_limit?: number }

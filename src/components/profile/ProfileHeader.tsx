@@ -6,6 +6,7 @@ import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { HyperStar } from "@/components/ui/HyperStar";
 import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { AnthemChip } from "@/components/profile/AnthemChip";
+import { ProfileStatusBubble, type ProfileNote } from "@/components/profile/ProfileStatusBubble";
 
 /**
  * Profile hero — banner, the squircle avatar overlapping its bottom-left
@@ -32,6 +33,8 @@ export function ProfileHeader({
   isMutualHyper = false,
   anthemEditable = false,
   anthem = null,
+  note = null,
+  noteEditable = false,
 }: {
   name: string;
   username: string | null;
@@ -52,6 +55,8 @@ export function ProfileHeader({
   isMutualHyper?: boolean;
   anthemEditable?: boolean;
   anthem?: unknown;
+  note?: ProfileNote;
+  noteEditable?: boolean;
 }) {
   return (
     <>
@@ -60,7 +65,12 @@ export function ProfileHeader({
       <div className="px-4">
         {/* Avatar + stats */}
         <div className="flex items-end gap-4">
-          <div className="-mt-11 inline-block rounded-[26px] shadow-[0_8px_20px_rgba(0,0,0,0.45)]">
+          <div className="relative -mt-11 inline-block rounded-[26px] shadow-[0_8px_20px_rgba(0,0,0,0.45)]">
+            <ProfileStatusBubble
+              note={note}
+              editable={noteEditable}
+              me={{ name, hue, avatarUrl: avatarUrl ?? null }}
+            />
             <ProfileAvatar
               name={name}
               hue={hue}

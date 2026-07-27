@@ -102,6 +102,25 @@ export default async function PublicProfilePage({
   // Private account: only the owner and followers see content
   const isLocked = !!profile.is_private && !isOwn && !isFollowing;
 
+  // The 24h status thought-bubble. Own note is read directly; others go through
+  // get_notes_for (block + audience + private-account gated). Hidden when locked.
+  let note: { text: string; audience: "mutual" | "close"; track: unknown } | null = null;
+  if (!isLocked) {
+    if (isOwn) {
+      const { data: myNote } = await supabase
+        .from("notes")
+        .select("text, audience, track")
+        .eq("user_id", profile.id)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle();
+      if (myNote) note = { text: (myNote as any).text, audience: (myNote as any).audience, track: (myNote as any).track };
+    } else if (currentUser) {
+      const { data: notes } = await supabase.rpc("get_notes_for", { p_user_ids: [profile.id] });
+      const row = (notes ?? [])[0] as any;
+      if (row) note = { text: row.text, audience: row.audience, track: row.track };
+    }
+  }
+
   const name = profile.display_name ?? profile.username ?? "User";
   const hue = profile.avatar_hue ?? hueFromId(profile.id);
   const bannerId = profile.banner_id ?? "lime-pulse";
@@ -140,6 +159,8 @@ export default async function PublicProfilePage({
         isMutualHyper={isMutualHyper}
         anthemEditable={isOwn}
         anthem={(profile as any).anthem ?? null}
+        note={note}
+        noteEditable={isOwn}
         actions={
           isOwn ? (
             <>
