@@ -4,79 +4,180 @@ export default function PrivacyPage() {
   return (
     <>
       <h1>Privacy Policy</h1>
-      <p className="text-xs text-faint">Last updated: June 10, 2026</p>
+      <p className="text-xs text-faint">Last updated: July 27, 2026</p>
 
-      <p>
-        This policy explains what Hypefy collects, why, and what control you have over it.
+      <p className="rounded-xl border border-border bg-surface p-3 text-xs text-muted">
+        Placeholders shown in [brackets] must be completed with your registered
+        legal details before public launch, and this policy should be reviewed by
+        a qualified privacy professional. It is drafted for an operator based in
+        India (Digital Personal Data Protection Act, 2023) and to a global standard
+        aligned with the GDPR.
       </p>
 
-      <h2>1. What we collect</h2>
+      <p>
+        This Privacy Policy explains how [Legal Entity Name] (&quot;Hypefy,&quot;
+        &quot;we,&quot; &quot;us&quot;) collects, uses, shares, and protects your
+        personal data when you use the Hypefy applications and services (the
+        &quot;Service&quot;), and the choices and rights you have. We act as the
+        data fiduciary / controller for this data.
+      </p>
+
+      <h2>1. Data we collect</h2>
       <ul>
         <li>
-          <strong>Account data</strong>: email address, password (hashed; we never see it),
-          and your profile (name, username, bio, avatar, banner, tags).
+          <strong>Account data:</strong> your email address and, for password
+          sign-ups, a password (stored only as a salted hash — we never see it).
+          If you sign in with Google, we receive basic identity information from
+          that sign-in.
         </li>
         <li>
-          <strong>Content</strong>: posts, Shots, Shows, comments, messages, reactions,
-          and media you upload.
+          <strong>Profile data:</strong> display name, username, bio, avatar,
+          banner, tags, anthem, and other details you add. You may confirm your age
+          or date of birth at sign-up to meet age requirements.
         </li>
         <li>
-          <strong>Activity</strong>: follows, hypes, saves, show views, and read receipts,
-          used to rank feeds and power features like seen-states.
+          <strong>Content:</strong> posts, Shots, Shows, status notes, comments,
+          messages, reactions, and media you upload.
         </li>
         <li>
-          <strong>Push subscriptions</strong>: if you enable push notifications, your
-          browser&apos;s push endpoint (no location or device-identity data).
+          <strong>Activity data:</strong> follows, hypes, saves, poll votes, views,
+          and read receipts, used to rank feeds and power features such as
+          seen-states.
+        </li>
+        <li>
+          <strong>Device and technical data:</strong> IP address, device and
+          browser type, and app interactions, processed to keep the Service secure
+          and working.
+        </li>
+        <li>
+          <strong>Diagnostics:</strong> if the app encounters an error, we send
+          limited error reports (error type, message, technical stack trace, and
+          the in-app path where it occurred) to our error-monitoring provider to
+          diagnose and fix problems.
+        </li>
+        <li>
+          <strong>Push subscriptions:</strong> if you enable notifications, the
+          push endpoint or device token needed to deliver them.
         </li>
       </ul>
 
-      <h2>2. What we don&apos;t do</h2>
+      <h2>2. How we use your data and our legal bases</h2>
+      <p>We use your data to:</p>
       <ul>
-        <li>We don&apos;t sell your data.</li>
-        <li>We don&apos;t show third-party ads or share data with ad networks.</li>
-        <li>We don&apos;t track you across other websites.</li>
+        <li>provide, operate, and secure the Service and your account (to perform our contract with you);</li>
+        <li>personalize feeds, discovery, and notifications (our legitimate interests, or your consent where required);</li>
+        <li>keep the Service safe, prevent abuse, and enforce our Terms (legitimate interests and legal obligations);</li>
+        <li>respond to your reports, requests, and support enquiries (to perform our contract and meet legal duties);</li>
+        <li>comply with applicable law, including intermediary and grievance obligations.</li>
       </ul>
-
-      <h2>3. Where your data lives</h2>
       <p>
-        Hypefy runs on Supabase (database, auth, storage) and Vercel (hosting). GIF search
-        is powered by GIPHY, and song search by Apple&apos;s iTunes Search API, search queries
-        are proxied through our server to those APIs, and music previews and artwork are served
-        directly by Apple. These providers process data on our behalf under their own privacy
-        terms.
+        Where we rely on consent (for example, push notifications or, where
+        required, certain personalization), you can withdraw it at any time without
+        affecting prior processing.
       </p>
 
-      <h2>4. Messages</h2>
+      <h2>3. What we do not do</h2>
+      <ul>
+        <li>We do not sell your personal data.</li>
+        <li>We do not show third-party ads or share your data with ad networks.</li>
+        <li>We do not track you across unrelated websites.</li>
+      </ul>
+
+      <h2>4. Who we share data with (processors)</h2>
       <p>
-        Direct messages are private to conversation members. Hypefy staff do not read your
-        messages except when required to investigate a report you or another participant files.
+        We share data with service providers who process it on our behalf under
+        contract:
+      </p>
+      <ul>
+        <li><strong>Supabase</strong> — database, authentication, and media storage.</li>
+        <li><strong>Vercel</strong> — application hosting and delivery.</li>
+        <li><strong>Sentry</strong> — error monitoring and diagnostics.</li>
+        <li><strong>GIPHY</strong> — GIF search (your search query is proxied through our server).</li>
+        <li><strong>Apple (iTunes Search API)</strong> — song search; previews and artwork are served directly by Apple.</li>
+      </ul>
+      <p>
+        We may also disclose data where required by law, to respond to valid legal
+        process, or to protect the rights, safety, and security of users and the
+        public.
       </p>
 
-      <h2>5. Your controls</h2>
-      <ul>
-        <li>Private account, who-can-message-you, and per-type notification settings live in Settings → Privacy / Notifications.</li>
-        <li>You can delete individual posts, Shots, Shows, comments, and messages.</li>
-        <li>
-          <strong>Delete your account</strong> in Settings → Account, this permanently removes
-          your profile, content, messages, and subscriptions.
-        </li>
-      </ul>
+      <h2>5. International transfers</h2>
+      <p>
+        Our providers may process data outside your country, including outside
+        India or the EEA. Where we transfer personal data internationally, we rely
+        on appropriate safeguards permitted under applicable law (such as standard
+        contractual clauses) to protect it.
+      </p>
 
       <h2>6. Data retention</h2>
       <p>
-        Content stays until you delete it or your account. Shows auto-expire after 24 hours.
-        Deleted accounts are removed from production systems immediately; residual backups
-        expire on a rolling basis.
+        We keep content until you delete it or your account. Shows and status notes
+        expire automatically (after 24 hours). When you delete your account, we
+        remove your profile, content, messages, and subscriptions from production
+        systems; residual copies in encrypted backups expire on a rolling basis, and
+        we may retain limited data where the law requires or to resolve disputes.
       </p>
 
-      <h2>7. Changes</h2>
-      <p>Material changes to this policy will be announced in-app.</p>
-
-      <h2>8. Contact</h2>
+      <h2>7. Your rights</h2>
       <p>
-        Privacy questions or data requests:{" "}
-        <a href="mailto:craziematez@gmail.com" className="text-accent">craziematez@gmail.com</a>.
+        Subject to applicable law (including India&apos;s DPDP Act, the GDPR, and
+        similar laws), you can:
       </p>
+      <ul>
+        <li>access the personal data we hold about you and request a copy — you can export your data in-app from Settings → Account;</li>
+        <li>correct or update inaccurate data;</li>
+        <li>delete your account and data in-app from Settings → Account;</li>
+        <li>object to or restrict certain processing, and withdraw consent;</li>
+        <li>nominate another person to exercise your rights in the event of death or incapacity (DPDP);</li>
+        <li>lodge a complaint with your data protection authority, or with our Grievance Officer (below).</li>
+      </ul>
+
+      <h2>8. Children&apos;s privacy</h2>
+      <p>
+        The Service is not intended for children under 13, and we do not knowingly
+        collect their personal data. For users identified as minors under applicable
+        law, we apply additional protections and, where required, seek verifiable
+        parental consent. If you believe a child has provided us data without proper
+        consent, contact our Grievance Officer and we will act promptly.
+      </p>
+
+      <h2>9. Messages</h2>
+      <p>
+        Direct messages are private to the members of a conversation. Hypefy staff
+        do not read your messages except where necessary to investigate a report
+        that you or another participant files, or where required by law.
+      </p>
+
+      <h2>10. Cookies and local storage</h2>
+      <p>
+        We use essential cookies and local storage to keep you signed in, remember
+        preferences (such as drafts), and secure the Service. These are necessary
+        for the Service to function; we do not use advertising or cross-site
+        tracking cookies.
+      </p>
+
+      <h2>11. Security and breach notification</h2>
+      <p>
+        We use reasonable technical and organizational measures — including
+        encryption in transit, hashed passwords, and access controls — to protect
+        your data. No system is perfectly secure, but if a personal data breach
+        occurs that affects you, we will notify you and the relevant authorities as
+        required by applicable law.
+      </p>
+
+      <h2>12. Changes to this policy</h2>
+      <p>
+        We may update this policy from time to time. We will announce material
+        changes in-app or by other reasonable means and update the date above.
+      </p>
+
+      <h2>13. Contact and Grievance Officer</h2>
+      <p>Privacy questions or data requests:</p>
+      <ul>
+        <li>General: <a href="mailto:[privacy@hypefy.chat]" className="text-accent">[privacy@hypefy.chat]</a></li>
+        <li>Grievance Officer: [Grievance Officer Name], <a href="mailto:[grievance@hypefy.chat]" className="text-accent">[grievance@hypefy.chat]</a></li>
+        <li>Address: [Registered Address]</li>
+      </ul>
     </>
   );
 }

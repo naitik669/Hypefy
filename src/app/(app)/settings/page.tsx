@@ -79,6 +79,8 @@ export default async function SettingsPage() {
           <Link href="/terms" className="underline hover:text-muted">Terms of Service</Link>
           <span className="mx-2">·</span>
           <Link href="/privacy" className="underline hover:text-muted">Privacy Policy</Link>
+          <span className="mx-2">·</span>
+          <Link href="/guidelines" className="underline hover:text-muted">Community Guidelines</Link>
         </p>
       </div>
     </>

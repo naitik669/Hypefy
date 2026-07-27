@@ -43,6 +43,9 @@ export function AuthCard({ mode }: { mode: Mode }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  // Signup-only: age gate + explicit consent (both required to create an account)
+  const [dob, setDob] = useState("");
+  const [consent, setConsent] = useState(false);
   // ?add=1 — reached via Settings → "Add account". Keeps the existing
   // session saved in the switcher instead of just discarding it.
   const [addMode, setAddMode] = useState(false);
@@ -59,6 +62,21 @@ export function AuthCard({ mode }: { mode: Mode }) {
     }
     if (params.get("add") === "1") setAddMode(true);
   }, [mode]);
+
+  // Age from the entered date of birth (null if unset/invalid).
+  const age = (() => {
+    if (!dob) return null;
+    const b = new Date(dob);
+    if (Number.isNaN(b.getTime())) return null;
+    const now = new Date();
+    let a = now.getFullYear() - b.getFullYear();
+    const m = now.getMonth() - b.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < b.getDate())) a--;
+    return a;
+  })();
+  // Signup can't proceed until the user is 13+ and has accepted the policies.
+  const signupBlocked = mode === "signup" && (!consent || age === null || age < 13);
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   async function saveSessionAsAccount(session: { user: { id: string; email?: string | null }; access_token: string; refresh_token: string }) {
     const { data: profile } = await supabase
@@ -119,11 +137,23 @@ export function AuthCard({ mode }: { mode: Mode }) {
         router.push("/home");
         router.refresh();
       } else {
+        // Age gate + consent — must pass before we create the account.
+        if (age === null || age < 13) {
+          setError("You must be at least 13 years old to use Hypefy.");
+          setLoading(false);
+          return;
+        }
+        if (!consent) {
+          setError("Please accept the Terms, Privacy Policy, and Community Guidelines.");
+          setLoading(false);
+          return;
+        }
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/auth/callback`,
+            data: { date_of_birth: dob, age_confirmed: true },
           },
         });
         if (error) {
@@ -184,6 +214,17 @@ export function AuthCard({ mode }: { mode: Mode }) {
 
   async function handleGoogle() {
     setError(null);
+    // Same age + consent gate applies to Google sign-up.
+    if (mode === "signup") {
+      if (age === null || age < 13) {
+        setError("You must be at least 13 years old to use Hypefy.");
+        return;
+      }
+      if (!consent) {
+        setError("Please accept the Terms, Privacy Policy, and Community Guidelines.");
+        return;
+      }
+    }
     setGoogleLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -274,6 +315,39 @@ export function AuthCard({ mode }: { mode: Mode }) {
             </button>
           )}
 
+          {mode === "signup" && (
+            <>
+              <label className="flex flex-col gap-1 text-[11px] font-medium text-muted">
+                Date of birth
+                <input
+                  type="date"
+                  required
+                  max={todayStr}
+                  value={dob}
+                  onChange={(e) => setDob(e.target.value)}
+                  className="h-12 w-full rounded-xl border border-white/5 bg-white/[0.06] px-4 text-sm text-foreground outline-none transition focus:border-white/25 [color-scheme:dark]"
+                />
+              </label>
+              {age !== null && age < 13 && (
+                <p className="text-[11px] text-danger">You must be at least 13 years old to use Hypefy.</p>
+              )}
+              <label className="flex items-start gap-2 text-[11px] leading-relaxed text-faint">
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
+                />
+                <span>
+                  I am 13 or older and agree to the{" "}
+                  <Link href="/terms" className="underline hover:text-muted">Terms</Link>,{" "}
+                  <Link href="/privacy" className="underline hover:text-muted">Privacy Policy</Link>, and{" "}
+                  <Link href="/guidelines" className="underline hover:text-muted">Community Guidelines</Link>.
+                </span>
+              </label>
+            </>
+          )}
+
           {error && (
             <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
               {error}
@@ -282,7 +356,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || signupBlocked}
             className="mt-1 flex h-12 w-full items-center justify-center rounded-xl bg-white text-sm font-semibold text-black transition hover:bg-white/90 active:scale-[0.99] disabled:opacity-60"
           >
             {loading ? "Please wait…" : t.cta}
@@ -303,7 +377,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
             <button
               type="button"
               onClick={handleGoogle}
-              disabled={googleLoading}
+              disabled={googleLoading || signupBlocked}
               className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/5 bg-white/[0.06] text-sm font-medium text-foreground/90 transition hover:bg-white/[0.1] active:scale-[0.99] disabled:opacity-60"
             >
               <GoogleGlyph className="h-[18px] w-[18px]" />
@@ -330,13 +404,6 @@ export function AuthCard({ mode }: { mode: Mode }) {
           </p>
         )}
 
-        {mode === "signup" && (
-          <p className="mt-3 text-center text-[11px] leading-relaxed text-faint">
-            By signing up you agree to our{" "}
-            <Link href="/terms" className="underline hover:text-muted">Terms of Service</Link> and{" "}
-            <Link href="/privacy" className="underline hover:text-muted">Privacy Policy</Link>.
-          </p>
-        )}
       </div>
     </div>
   );
