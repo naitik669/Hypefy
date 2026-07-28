@@ -48,12 +48,12 @@ function countAll(list: Comment[]): number {
   return list.reduce((n, c) => n + 1 + countAll(c.replies), 0);
 }
 
-function buildTree(flat: RawComment[]): Comment[] {
+function buildTree(flat: RawComment[], hypedIds: Set<string>): Comment[] {
   const map = new Map<string, Comment>();
   const roots: Comment[] = [];
 
   for (const c of flat) {
-    map.set(c.id, { ...c, hyped: false, localHypeCount: c.hype_count, reported: false, replies: [], showReplies: false });
+    map.set(c.id, { ...c, hyped: hypedIds.has(c.id), localHypeCount: c.hype_count, reported: false, replies: [], showReplies: false });
   }
   for (const c of map.values()) {
     if (c.parent_id && map.has(c.parent_id)) {
@@ -91,21 +91,33 @@ export function CommentsSheet({
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    supabase
-      .from("comments")
-      .select("id, user_id, body, hype_count, created_at, parent_id, profiles(display_name, username, avatar_hue, avatar_url)")
-      .eq(targetType === "shot" ? "shot_id" : "post_id", postId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: true })
-      .then(({ data }) => {
-        const flat: RawComment[] = (data ?? []).map((c: any) => ({
-          ...c,
-          profiles: Array.isArray(c.profiles) ? c.profiles[0] ?? null : c.profiles,
-        }));
-        setTree(buildTree(flat));
-        setLoading(false);
-      });
-  }, [open, postId, targetType, supabase]);
+    (async () => {
+      const { data } = await supabase
+        .from("comments")
+        .select("id, user_id, body, hype_count, created_at, parent_id, profiles(display_name, username, avatar_hue, avatar_url)")
+        .eq(targetType === "shot" ? "shot_id" : "post_id", postId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: true });
+      const flat: RawComment[] = (data ?? []).map((c: any) => ({
+        ...c,
+        profiles: Array.isArray(c.profiles) ? c.profiles[0] ?? null : c.profiles,
+      }));
+      // Seed which comments the viewer has already hyped, so the star reflects
+      // reality on reopen (previously hard-coded false → empty star + double-toggle).
+      let hypedIds = new Set<string>();
+      if (currentUserId && flat.length > 0) {
+        const { data: hypeRows } = await supabase
+          .from("hypes")
+          .select("target_id")
+          .eq("user_id", currentUserId)
+          .eq("target_type", "comment")
+          .in("target_id", flat.map((c) => c.id));
+        hypedIds = new Set((hypeRows ?? []).map((h: any) => h.target_id as string));
+      }
+      setTree(buildTree(flat, hypedIds));
+      setLoading(false);
+    })();
+  }, [open, postId, targetType, currentUserId, supabase]);
 
   useEffect(() => { if (!open) { setReplyTo(null); setText(""); setGifPickerOpen(false); } }, [open]);
 
