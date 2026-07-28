@@ -54,7 +54,7 @@ const TYPE_MAP: Record<Filter, string[]> = {
   Hypes: ["hype_post", "hype_shot", "hype_comment", "repost"],
   Comments: ["comment_post", "comment_shot", "comment_reply"],
   Follows: ["follow"],
-  Mentions: ["mention_post", "mention_shot"],
+  Mentions: ["mention_post"],
 };
 
 /** Types where bundling several rows into one loses information the user needs
