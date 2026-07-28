@@ -12,6 +12,7 @@ export type ReportRow = {
   table: "reports" | "message_reports";
   targetType: string;
   targetId: string;
+  targetUsername?: string | null;
   conversationId?: string;
   reason: string | null;
   details: string | null;
@@ -24,7 +25,7 @@ function targetHref(r: ReportRow): string | null {
   switch (r.targetType) {
     case "post": return `/p/${r.targetId}`;
     case "shot": return `/shots/${r.targetId}`;
-    case "profile": return `/u/${r.targetId}`; // may be an id — still useful context
+    case "profile": return r.targetUsername ? `/u/${r.targetUsername}` : null;
     case "message":
     case "conversation": return r.conversationId ? `/messages/${r.conversationId}` : null;
     default: return null;

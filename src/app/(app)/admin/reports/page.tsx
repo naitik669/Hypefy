@@ -27,12 +27,27 @@ export default async function AdminReportsPage() {
 
   const one = (p: any) => (Array.isArray(p) ? p[0] : p) ?? null;
 
+  // Resolve usernames for profile-target reports so "View target" links to a
+  // real /u/<username> route instead of /u/<uuid> (which 404s).
+  const profileTargetIds = [
+    ...new Set((content ?? []).filter((r: any) => r.target_type === "profile").map((r: any) => r.target_id as string)),
+  ];
+  const usernameById = new Map<string, string>();
+  if (profileTargetIds.length > 0) {
+    const { data: targets } = await supabase
+      .from("profiles")
+      .select("id, username")
+      .in("id", profileTargetIds);
+    (targets ?? []).forEach((p: any) => { if (p.username) usernameById.set(p.id, p.username); });
+  }
+
   const rows: ReportRow[] = [
     ...(content ?? []).map((r: any) => ({
       id: r.id,
       table: "reports" as const,
       targetType: r.target_type as string,
       targetId: r.target_id as string,
+      targetUsername: r.target_type === "profile" ? usernameById.get(r.target_id) ?? null : null,
       reason: r.reason,
       details: r.details,
       status: r.status,

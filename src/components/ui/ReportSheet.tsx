@@ -69,7 +69,7 @@ export function ReportSheet({
       target_id: targetId,
       reason,
       details: details.trim() || null,
-      status: "pending",
+      status: "open",
     });
     setSubmitting(false);
     // 23505 = unique violation → already reported. Treat as success.
