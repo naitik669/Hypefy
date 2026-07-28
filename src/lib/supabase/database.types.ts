@@ -384,6 +384,24 @@ export type Database = {
           },
         ]
       }
+      follow_requests: {
+        Row: {
+          created_at: string
+          requester_id: string
+          target_id: string
+        }
+        Insert: {
+          created_at?: string
+          requester_id: string
+          target_id: string
+        }
+        Update: {
+          created_at?: string
+          requester_id?: string
+          target_id?: string
+        }
+        Relationships: []
+      }
       favorites: {
         Row: {
           created_at: string
@@ -1520,6 +1538,8 @@ export type Database = {
       }
       follow_user: { Args: { p_target: string }; Returns: string }
       unfollow_user: { Args: { p_target: string }; Returns: undefined }
+      approve_follow_request: { Args: { p_requester: string }; Returns: undefined }
+      deny_follow_request: { Args: { p_requester: string }; Returns: undefined }
       react_to_note: { Args: { p_owner: string; p_emoji: string }; Returns: undefined }
       clear_note_reaction: { Args: { p_owner: string }; Returns: undefined }
       get_notes_for: {

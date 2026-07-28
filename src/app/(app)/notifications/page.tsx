@@ -16,6 +16,7 @@ type Notif = {
   type: string;
   target_type: string | null;
   target_id: string | null;
+  actor_id: string | null;
   body: string | null;
   is_read: boolean;
   created_at: string;
@@ -40,6 +41,8 @@ type Group = {
   latestAt: string;
   thumb: Notif["thumb"];
   href: string;
+  /** Actor id of the first notification — for actionable types (follow_request) */
+  actorId: string | null;
 };
 
 type Filter = "All" | "Hypes" | "Comments" | "Follows" | "Mentions";
@@ -56,7 +59,7 @@ const TYPE_MAP: Record<Filter, string[]> = {
 
 /** Types where bundling several rows into one loses information the user needs
  *  to act on individually — never collapse these. */
-const NEVER_GROUP = new Set(["incoming_call", "new_message", "dm_post_shared"]);
+const NEVER_GROUP = new Set(["incoming_call", "new_message", "dm_post_shared", "follow_request"]);
 
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -67,7 +70,10 @@ function timeAgo(iso: string) {
 }
 
 function notifHref(n: Notif): string {
-  if (n.type === "follow" || n.type === "referral_joined" || n.type === "note_reaction")
+  if (
+    n.type === "follow" || n.type === "referral_joined" || n.type === "note_reaction" ||
+    n.type === "follow_request" || n.type === "follow_accepted"
+  )
     return n.actor?.username ? `/u/${n.actor.username}` : "#";
   if (n.type === "incoming_call" || n.type === "missed_call") return "/calls";
   if (n.target_type === "post" && n.target_id) return `/p/${n.target_id}`;
@@ -104,6 +110,7 @@ function groupNotifs(list: Notif[]): Group[] {
         latestAt: n.created_at,
         thumb: n.thumb ?? null,
         href: notifHref(n),
+        actorId: n.actor_id ?? null,
         seenActorIds: new Set(),
       };
       byKey.set(key, g);
@@ -184,7 +191,7 @@ export default function NotificationsPage() {
 
     const { data } = await supabase
       .from("notifications")
-      .select("id, type, target_type, target_id, body, is_read, created_at, actor:actor_id(display_name, username, avatar_hue, avatar_url)")
+      .select("id, type, target_type, target_id, actor_id, body, is_read, created_at, actor:actor_id(display_name, username, avatar_hue, avatar_url)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(PAGE);
@@ -250,7 +257,7 @@ export default function NotificationsPage() {
       if (!oldest) { setLoadingMore(false); return; }
       const { data } = await supabase
         .from("notifications")
-        .select("id, type, target_type, target_id, body, is_read, created_at, actor:actor_id(display_name, username, avatar_hue, avatar_url)")
+        .select("id, type, target_type, target_id, actor_id, body, is_read, created_at, actor:actor_id(display_name, username, avatar_hue, avatar_url)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .lt("created_at", oldest)
@@ -278,6 +285,16 @@ export default function NotificationsPage() {
       // Extremely unlikely (RLS already verified), but don't silently lose data.
       window.location.reload();
     }
+  }
+
+  // Approve/deny a private-account follow request straight from its row. The
+  // RPC removes the follow_request notification server-side, so we just drop it
+  // from local state (no separate delete).
+  async function resolveRequest(g: Group, approve: boolean) {
+    if (!g.actorId) return;
+    haptics.tap();
+    setNotifs((prev) => prev.filter((n) => !g.ids.includes(n.id)));
+    await supabase.rpc(approve ? "approve_follow_request" : "deny_follow_request", { p_requester: g.actorId });
   }
 
   return (
@@ -325,7 +342,13 @@ export default function NotificationsPage() {
       ) : (
         <div className="flex flex-col pb-4">
           {groups.map((g, i) => (
-            <NotifRow key={g.key} group={g} index={i} onClear={() => clearGroup(g.ids)} />
+            <NotifRow
+              key={g.key}
+              group={g}
+              index={i}
+              onClear={() => clearGroup(g.ids)}
+              onResolveRequest={(approve) => resolveRequest(g, approve)}
+            />
           ))}
           {/* Infinite scroll sentinel */}
           <div ref={sentinelRef} className="py-2 flex justify-center">
@@ -342,7 +365,7 @@ const SWIPE_REVEAL = 80; // px of delete affordance revealed — matches the but
 const SWIPE_COMMIT = 110; // px drag distance that commits the clear
 
 /** One notification row (single or grouped). Swipe left to reveal + confirm clear. */
-function NotifRow({ group: g, index = 0, onClear }: { group: Group; index?: number; onClear: () => void }) {
+function NotifRow({ group: g, index = 0, onClear, onResolveRequest }: { group: Group; index?: number; onClear: () => void; onResolveRequest?: (approve: boolean) => void }) {
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -451,6 +474,26 @@ function NotifRow({ group: g, index = 0, onClear }: { group: Group; index?: numb
           </div>
         )}
       </Link>
+
+      {/* Private-account follow request — approve/deny inline */}
+      {g.type === "follow_request" && onResolveRequest && (
+        <div className="flex gap-2 bg-background px-4 pb-3 pl-[68px]">
+          <button
+            type="button"
+            onClick={() => onResolveRequest(true)}
+            className="flex h-9 flex-1 items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.98]"
+          >
+            Approve
+          </button>
+          <button
+            type="button"
+            onClick={() => onResolveRequest(false)}
+            className="flex h-9 flex-1 items-center justify-center rounded-xl border border-border bg-surface text-sm font-semibold text-muted transition-colors hover:text-foreground"
+          >
+            Deny
+          </button>
+        </div>
+      )}
     </div>
   );
 }
