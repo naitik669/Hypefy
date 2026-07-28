@@ -75,20 +75,11 @@ export function PostActionsSheet({
     const prev = following;
     setFollowing(!prev);
     if (!prev) {
-      const { error } = await supabase
-        .from("follows")
-        .insert({ follower_id: currentUserId, following_id: postUserId });
-      if (!error) {
-        await supabase.from("notifications").insert({
-          user_id: postUserId, actor_id: currentUserId,
-          type: "follow", target_type: "profile", target_id: postUserId,
-          body: "started following you",
-        });
-        toast(`Following @${postUsername ?? "user"}`, "success");
-      } else setFollowing(prev);
+      const { error } = await supabase.rpc("follow_user", { p_target: postUserId });
+      if (!error) toast(`Following @${postUsername ?? "user"}`, "success");
+      else setFollowing(prev);
     } else {
-      const { error } = await supabase.from("follows").delete()
-        .eq("follower_id", currentUserId).eq("following_id", postUserId);
+      const { error } = await supabase.rpc("unfollow_user", { p_target: postUserId });
       if (error) setFollowing(prev);
     }
     setFollowPending(false);

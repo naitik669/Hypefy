@@ -85,37 +85,18 @@ export function ProfileStatusBubble({
     haptics.select();
     setPickerOpen(false);
 
+    // react_to_note / clear_note_reaction are SECURITY DEFINER RPCs that own the
+    // reaction row + its owner notification (clients can't insert notifications).
     if (prev === emoji) {
       setMyReaction(null);
-      const { error } = await supabase
-        .from("note_reactions")
-        .delete()
-        .eq("note_owner_id", ownerId)
-        .eq("reactor_id", viewerId);
+      const { error } = await supabase.rpc("clear_note_reaction", { p_owner: ownerId });
       if (error) setMyReaction(emoji);
       return;
     }
 
     setMyReaction(emoji);
-    const { error } = await supabase.from("note_reactions").upsert(
-      { note_owner_id: ownerId, reactor_id: viewerId, emoji, note_created_at: note.createdAt },
-      { onConflict: "note_owner_id,reactor_id" },
-    );
-    if (error) {
-      setMyReaction(prev);
-      return;
-    }
-    // Quiet ping for the owner — only on a fresh reaction, not emoji swaps.
-    if (!prev) {
-      await supabase.from("notifications").insert({
-        user_id: ownerId,
-        actor_id: viewerId,
-        type: "note_reaction",
-        target_type: "profile",
-        target_id: ownerId,
-        body: `reacted ${emoji} to your status`,
-      });
-    }
+    const { error } = await supabase.rpc("react_to_note", { p_owner: ownerId, p_emoji: emoji });
+    if (error) setMyReaction(prev);
   }
 
   if (!note && !editable) return null;

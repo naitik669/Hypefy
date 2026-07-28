@@ -1518,6 +1518,10 @@ export type Database = {
           username: string
         }[]
       }
+      follow_user: { Args: { p_target: string }; Returns: string }
+      unfollow_user: { Args: { p_target: string }; Returns: undefined }
+      react_to_note: { Args: { p_owner: string; p_emoji: string }; Returns: undefined }
+      clear_note_reaction: { Args: { p_owner: string }; Returns: undefined }
       get_notes_for: {
         Args: { p_user_ids: string[] }
         Returns: {

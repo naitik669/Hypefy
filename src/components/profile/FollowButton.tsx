@@ -26,40 +26,14 @@ export function FollowButton({
     setFollowing(!prev);
     setPending(true);
 
+    // follow_user / unfollow_user are SECURITY DEFINER RPCs that own the follow
+    // row + its notification (clients can no longer insert notifications).
     if (!prev) {
-      const { error } = await supabase
-        .from("follows")
-        .insert({ follower_id: currentUserId, following_id: targetUserId });
-      if (!error) {
-        // Create follow notification
-        await supabase.from("notifications").insert({
-          user_id: targetUserId,
-          actor_id: currentUserId,
-          type: "follow",
-          target_type: "profile",
-          target_id: targetUserId,
-          body: "started following you",
-        });
-      } else {
-        setFollowing(prev);
-      }
+      const { error } = await supabase.rpc("follow_user", { p_target: targetUserId });
+      if (error) setFollowing(prev);
     } else {
-      const { error } = await supabase
-        .from("follows")
-        .delete()
-        .eq("follower_id", currentUserId)
-        .eq("following_id", targetUserId);
-      if (error) {
-        setFollowing(prev);
-      } else {
-        // Clean up the "started following you" notification
-        await supabase
-          .from("notifications")
-          .delete()
-          .eq("user_id", targetUserId)
-          .eq("actor_id", currentUserId)
-          .eq("type", "follow");
-      }
+      const { error } = await supabase.rpc("unfollow_user", { p_target: targetUserId });
+      if (error) setFollowing(prev);
     }
     setPending(false);
   }

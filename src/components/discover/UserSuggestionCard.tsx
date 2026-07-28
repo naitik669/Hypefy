@@ -20,32 +20,11 @@ export function UserSuggestionCard({ user }: { user: SuggestedUser & { avatarUrl
     const prev = following;
     setFollowing(!prev);
 
-    // Need current user id
-    const { data: { user: me } } = await supabase.auth.getUser();
-    if (!me) { setFollowing(prev); setPending(false); return; }
-
     if (!prev) {
-      const { error } = await supabase
-        .from("follows")
-        .insert({ follower_id: me.id, following_id: user.id });
-      if (!error) {
-        await supabase.from("notifications").insert({
-          user_id: user.id,
-          actor_id: me.id,
-          type: "follow",
-          target_type: "profile",
-          target_id: user.id,
-          body: "started following you",
-        });
-      } else {
-        setFollowing(prev);
-      }
+      const { error } = await supabase.rpc("follow_user", { p_target: user.id });
+      if (error) setFollowing(prev);
     } else {
-      const { error } = await supabase
-        .from("follows")
-        .delete()
-        .eq("follower_id", me.id)
-        .eq("following_id", user.id);
+      const { error } = await supabase.rpc("unfollow_user", { p_target: user.id });
       if (error) setFollowing(prev);
     }
     setPending(false);

@@ -44,29 +44,11 @@ export function FollowSuggestions({
     });
 
     if (isFollowed) {
-      const { error } = await supabase
-        .from("follows")
-        .delete()
-        .eq("follower_id", currentUserId)
-        .eq("following_id", id);
-      if (!error) {
-        await supabase.from("notifications").delete()
-          .eq("user_id", id).eq("actor_id", currentUserId).eq("type", "follow");
-      } else {
-        setFollowed((prev) => new Set(prev).add(id));
-      }
+      const { error } = await supabase.rpc("unfollow_user", { p_target: id });
+      if (error) setFollowed((prev) => new Set(prev).add(id));
     } else {
-      const { error } = await supabase
-        .from("follows")
-        .insert({ follower_id: currentUserId, following_id: id });
-      if (!error) {
-        await supabase.from("notifications").insert({
-          user_id: id, actor_id: currentUserId, type: "follow",
-          target_type: "profile", target_id: id, body: "started following you",
-        });
-      } else {
-        setFollowed((prev) => { const next = new Set(prev); next.delete(id); return next; });
-      }
+      const { error } = await supabase.rpc("follow_user", { p_target: id });
+      if (error) setFollowed((prev) => { const next = new Set(prev); next.delete(id); return next; });
     }
     setPendingId(null);
   }
