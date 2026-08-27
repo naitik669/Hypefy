@@ -41,16 +41,19 @@ export function PollBlock({
   useEffect(() => {
     let active = true;
     (async () => {
-      const { data } = await supabase.from("poll_votes").select("voter_id, option_idx").eq("post_id", postId);
+      // Tallies come from an RPC: individual ballots are private (RLS lets you
+      // read only your own row), so counts must be aggregated server-side.
+      const [tallyRes, mineRes] = await Promise.all([
+        supabase.rpc("get_poll_counts", { p_post_id: postId }),
+        supabase.from("poll_votes").select("option_idx").eq("post_id", postId).maybeSingle(),
+      ]);
       if (!active) return;
       const next = poll.options.map(() => 0);
-      let mine: number | null = null;
-      (data ?? []).forEach((v: any) => {
-        if (v.option_idx >= 0 && v.option_idx < next.length) next[v.option_idx] += 1;
-        if (v.voter_id === currentUserId) mine = v.option_idx;
+      (tallyRes.data ?? []).forEach((row: any) => {
+        if (row.option_idx >= 0 && row.option_idx < next.length) next[row.option_idx] = Number(row.votes);
       });
       setCounts(next);
-      setMyVote(mine);
+      setMyVote((mineRes.data as any)?.option_idx ?? null);
       setLoaded(true);
     })();
     return () => { active = false; };

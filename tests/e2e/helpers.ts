@@ -1,8 +1,23 @@
 import { Page, expect } from "@playwright/test";
 
-/** Test account (throwaway). Override via env for CI. */
-export const TEST_EMAIL = process.env.E2E_EMAIL ?? "hypefy.postertest@gmail.com";
-export const TEST_PASSWORD = process.env.E2E_PASSWORD ?? "PosterTest#2026";
+/**
+ * Test account credentials — env-only, never committed. Set E2E_EMAIL and
+ * E2E_PASSWORD in .env.local (gitignored) or CI secrets. Previously these had
+ * hardcoded fallbacks, which leaked a live account password into git history.
+ */
+function required(name: string): string {
+  const v = process.env[name];
+  if (!v) {
+    throw new Error(
+      `${name} is not set. E2E tests need a throwaway account: ` +
+        `set E2E_EMAIL and E2E_PASSWORD in .env.local or your CI secrets.`,
+    );
+  }
+  return v;
+}
+
+export const TEST_EMAIL = required("E2E_EMAIL");
+export const TEST_PASSWORD = required("E2E_PASSWORD");
 
 /** Sign in through the real /signin UI and land on an authenticated page. */
 export async function signIn(page: Page) {

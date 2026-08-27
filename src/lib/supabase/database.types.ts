@@ -1557,6 +1557,11 @@ export type Database = {
         }[]
       }
       get_or_create_dm: { Args: { p_other: string }; Returns: string }
+      get_poll_counts: {
+        Args: { p_post_id: string }
+        Returns: { option_idx: number; votes: number }[]
+      }
+      api_rate_limit: { Args: { p_action: string }; Returns: undefined }
       get_suggested_people: {
         Args: { p_limit?: number }
         Returns: {

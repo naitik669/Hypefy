@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { guardApi } from "@/lib/api-guard";
 
 /**
  * GET /api/gifs?q=query
@@ -9,6 +10,9 @@ import * as Sentry from "@sentry/nextjs";
  * Uses GIPHY_API_KEY (no NEXT_PUBLIC_ prefix — server-only).
  */
 export async function GET(req: NextRequest) {
+  const blocked = await guardApi("gifs");
+  if (blocked) return blocked;
+
   const key = process.env.GIPHY_API_KEY;
   if (!key) {
     return NextResponse.json({ error: "GIPHY_API_KEY not configured" }, { status: 503 });

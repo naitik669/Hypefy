@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { guardApi } from "@/lib/api-guard";
 
 /**
  * GET /api/music?q=query
@@ -18,6 +19,9 @@ export type Track = {
 };
 
 export async function GET(req: NextRequest) {
+  const blocked = await guardApi("music");
+  if (blocked) return blocked;
+
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (!q) return NextResponse.json({ tracks: [] });
 

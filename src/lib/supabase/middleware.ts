@@ -8,12 +8,18 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
-  // Until Supabase env vars are configured, skip auth handling so the app
-  // still runs locally. Remove-safe once keys are in .env.local.
+  // Missing Supabase env used to short-circuit auth entirely, which meant a
+  // misconfigured production deploy served every protected route to anyone.
+  // Fail closed: only development may run unauthenticated.
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
     !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   ) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "Supabase env vars are missing. Refusing to serve requests without auth.",
+      );
+    }
     return supabaseResponse;
   }
 
@@ -59,6 +65,7 @@ export async function updateSession(request: NextRequest) {
   // Note: /shots/[id] deep links stay public (shareable, like /p and /u);
   // only the /shots feed itself is gated.
   const protectedPrefixes = [
+    "/admin",
     "/home",
     "/shows",
     "/discover",

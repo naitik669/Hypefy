@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { guardApi } from "@/lib/api-guard";
 
 /**
  * POST /api/client-error
@@ -10,6 +11,9 @@ import * as Sentry from "@sentry/nextjs";
  * self-limits to a few reports per session.
  */
 export async function POST(req: NextRequest) {
+  const blocked = await guardApi("client_error");
+  if (blocked) return blocked;
+
   try {
     const body = await req.json();
     const message = String(body?.message ?? "").slice(0, 500);
