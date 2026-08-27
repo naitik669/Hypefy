@@ -27,3 +27,32 @@ export async function guardApi(action: "gifs" | "music" | "client_error"): Promi
 
   return null;
 }
+
+/**
+ * Per-IP sliding window for endpoints that must stay reachable while signed
+ * out. In-memory, so it is per-instance and resets on deploy — deliberately
+ * coarse. It exists to blunt a flood, not to be an exact quota; the callers
+ * also size-cap payloads and self-limit client-side.
+ */
+const ipHits = new Map<string, number[]>();
+
+export function ipRateLimited(req: Request, limit: number, windowMs: number): boolean {
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown";
+
+  const now = Date.now();
+  const recent = (ipHits.get(ip) ?? []).filter((t) => now - t < windowMs);
+  recent.push(now);
+  ipHits.set(ip, recent);
+
+  // Opportunistic sweep so the map can't grow without bound.
+  if (ipHits.size > 5000) {
+    for (const [k, v] of ipHits) {
+      if (v.every((t) => now - t >= windowMs)) ipHits.delete(k);
+    }
+  }
+
+  return recent.length > limit;
+}

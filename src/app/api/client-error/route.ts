@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { guardApi } from "@/lib/api-guard";
+import { ipRateLimited } from "@/lib/api-guard";
 
 /**
  * POST /api/client-error
@@ -9,10 +9,16 @@ import { guardApi } from "@/lib/api-guard";
  * free of the Sentry SDK; uncaught errors are POSTed here and forwarded to
  * the existing server-side Sentry. Payloads are size-capped and the client
  * self-limits to a few reports per session.
+ *
+ * Deliberately NOT auth-gated: the errors most worth catching happen on
+ * /signup and /signin, where nobody is signed in yet. Requiring a session
+ * would silently drop exactly those. Abuse is bounded by a per-IP window
+ * instead of a user-scoped one.
  */
 export async function POST(req: NextRequest) {
-  const blocked = await guardApi("client_error");
-  if (blocked) return blocked;
+  if (ipRateLimited(req, 20, 60 * 60 * 1000)) {
+    return NextResponse.json({ ok: false }, { status: 429 });
+  }
 
   try {
     const body = await req.json();

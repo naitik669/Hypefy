@@ -7,6 +7,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { HypefyMark } from "@/components/HypefyMark";
 import { upsertSavedAccount } from "@/lib/saved-accounts";
+import { DateOfBirthPicker } from "@/components/ui/DateOfBirthPicker";
 
 type Mode = "signin" | "signup";
 
@@ -76,7 +77,6 @@ export function AuthCard({ mode }: { mode: Mode }) {
   })();
   // Signup can't proceed until the user is 13+ and has accepted the policies.
   const signupBlocked = mode === "signup" && (!consent || age === null || age < 13);
-  const todayStr = new Date().toISOString().slice(0, 10);
 
   async function saveSessionAsAccount(session: { user: { id: string; email?: string | null }; access_token: string; refresh_token: string }) {
     const { data: profile } = await supabase
@@ -317,17 +317,12 @@ export function AuthCard({ mode }: { mode: Mode }) {
 
           {mode === "signup" && (
             <>
-              <label className="flex flex-col gap-1 text-[11px] font-medium text-muted">
-                Date of birth
-                <input
-                  type="date"
-                  required
-                  max={todayStr}
-                  value={dob}
-                  onChange={(e) => setDob(e.target.value)}
-                  className="h-12 w-full rounded-xl border border-white/5 bg-white/[0.06] px-4 text-sm text-foreground outline-none transition focus:border-white/25 [color-scheme:dark]"
-                />
-              </label>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="dob" className="text-[11px] font-medium text-muted">
+                  Date of birth
+                </label>
+                <DateOfBirthPicker id="dob" value={dob} onChange={setDob} />
+              </div>
               {age !== null && age < 13 && (
                 <p className="text-[11px] text-danger">You must be at least 13 years old to use Hypefy.</p>
               )}
