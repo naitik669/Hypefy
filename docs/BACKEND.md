@@ -2,19 +2,28 @@
 
 Supabase project: `fyaioseridqabockidyp`. **All migrations are applied to the
 live project and tracked in Supabase's `supabase_migrations.schema_migrations`
-table** (61 migrations as of this writing) and are now also mirrored into the
-repo at `supabase/migrations/0001_baseline.sql` (consolidated history) with a
-current snapshot in `supabase/schema.sql` — see "Migrations" below. This
-document is the source-of-truth inventory so the schema is not a hidden
-dependency. **No service-role key is used on the client** — every write goes
-through RLS-protected tables or `SECURITY DEFINER` RPCs. The service role is
-used only in two server routes (`/api/account/delete`, `/api/push`).
+table**, and are mirrored into the repo under `supabase/migrations/` — 30 files,
+where `0001_baseline.sql` consolidates the original ~40 into one baseline and
+each later file is incremental. A current snapshot lives in
+`supabase/schema.sql`. See "Migrations" below. This document is the
+source-of-truth inventory so the schema is not a hidden dependency.
+**No service-role key is used on the client** — every write goes through
+RLS-protected tables or `SECURITY DEFINER` RPCs. The service role is used only
+in two server routes (`/api/account/delete`, `/api/push`).
+
+**RPC grants:** `anon` holds EXECUTE on **no** SECURITY DEFINER function
+(`0027_lock_down_anon_rpcs.sql`). Note that revoking from `anon` alone is a
+no-op — Postgres grants EXECUTE to `PUBLIC` by default and `anon` inherits it,
+so grants are revoked from `PUBLIC` and re-granted to `authenticated`.
+Internal-only functions (`rate_limit`, `set_verified`,
+`publish_due_scheduled_posts`, `capture_creator_daily_stats`, and all trigger
+functions) are granted to neither role.
 
 Generated TypeScript types for the whole schema live in
 `src/lib/supabase/database.types.ts` (regenerate via Supabase
 `generate_typescript_types`).
 
-## Tables (public schema — 25)
+## Tables (public schema — 36)
 
 | Table | Purpose | Key columns |
 |---|---|---|
@@ -40,12 +49,28 @@ Generated TypeScript types for the whole schema live in
 | `call_sessions` | 1:1 audio/video calls | conversation_id, caller_id, receiver_id, type, status, quick_reply, started_at, answered_at, ended_at |
 | `reports` / `message_reports` | Moderation | reporter_id, target_type (post/comment/message/profile/shot/user/show/conversation), target_id, reason, details, status |
 | `push_subscriptions` | Web push devices | user_id, endpoint (unique), p256dh, auth |
+| `notes` | 24h micro-status atop DMs | user_id (pk), text (≤60), audience('mutual'\|'close'), track (jsonb), expires_at |
+| `note_reactions` | Emoji reactions on a note | note_owner_id, reactor_id (pk pair), emoji, note_created_at |
+| `close_friends` | Your Hypers (close-friends circle) | user_id, friend_id (pk pair) — owner-only RLS |
+| `favorites` | Favourited people (feed tab) | user_id, friend_id (pk pair) — owner-only RLS |
+| `follow_requests` | Pending follows for private accounts | requester_id, target_id (pk pair) |
+| `poll_votes` | One changeable vote per person per poll | post_id, voter_id (pk pair), option_idx. **Read policy is own-row only** — tallies come from `get_poll_counts` so individual ballots stay private |
+| `scheduled_posts` | Posts queued for later publish | id, user_id, publish_at, payload — published by pg_cron |
+| `pinned_viewers` | Viewers pinned to the top of a Show's list | show_id, viewer_id |
+| `group_calls` / `group_call_participants` | Multi-party calls | conversation_id, host_id, status / call_id, user_id, joined_at, left_at |
+| `creator_daily_stats` | Nightly views/followers snapshot for Insights | user_id, day (pk pair), views, followers — views have no per-event history, so this is the only source of view trend |
+| `rate_events` | Sliding-window rate limiter log | user_id, action, created_at. RLS on with **no policies** — only the SECURITY DEFINER limiter touches it |
 
 ## RPCs (SECURITY DEFINER)
 
 | RPC | Args | Notes |
 |---|---|---|
-| `toggle_hype` | p_target_type, p_target_id, p_owner_id | Idempotent like; returns `{hyped, hype_count}` json; owner notification |
+| `toggle_hype` | p_target_type, p_target_id, p_owner_id | Idempotent like; returns `{hyped, hype_count}` json; owner notification. Narrow the json with `hypeResult()` from `src/lib/supabase/typed.ts` |
+| `get_inbox_summary` | p_conversation_ids[] | Last message + unread count per conversation, membership-scoped. Replaces fetching every message client-side |
+| `get_poll_counts` | p_post_id | Aggregate tallies; individual ballots are not readable |
+| `get_creator_timeseries` | p_days | Per-day hypes/comments/saves/follows for the caller — retroactive, derived from `created_at` |
+| `get_user_streak` | p_user_id | current/longest posting streak + totals, derived on read (gaps-and-islands) |
+| `api_rate_limit` | p_action | Limits held server-side; wraps `rate_limit` so callers can't raise their own cap |
 | `create_comment` | p_post_id, p_body, p_parent_id, p_owner_id | Increments comment_count, notifies, parses mentions |
 | `create_shot_comment` | p_shot_id, p_body, p_owner_id, p_parent_id | Same for shots |
 | `get_or_create_dm` | p_other | Returns conversation id; enforces dm_privacy |
@@ -118,12 +143,26 @@ evaluate RLS on UPDATE/DELETE (their policies reference non-PK columns).
 ## Migrations
 
 Migration history is tracked in `supabase_migrations.schema_migrations` on the
-live project (61 migrations, `20260602050451_create_profiles` →
-`20260628052448_reports_target_type_align`) and is **mirrored into the repo**:
+live project and is **mirrored into the repo** as 30 files under
+`supabase/migrations/`:
 
 - `supabase/migrations/0001_baseline.sql` — the consolidated history extracted
   from the live project; applying it reproduces the live `public` schema.
+- `0002`–`0030` — incremental changes since the baseline. Recent ones:
+  `0026_rate_limiting` (sliding-window limiter + triggers),
+  `0027_lock_down_anon_rpcs` (revoke PUBLIC/anon on SECURITY DEFINER functions,
+  `get_notes_for` null-uid guard, private poll ballots, `api_rate_limit`),
+  `0028_inbox_summary` (per-conversation last message + unread count),
+  `0029_creator_insights` (`creator_daily_stats` + timeseries RPC),
+  `0030_streaks` (`get_user_streak`).
 - `supabase/schema.sql` — a current full snapshot (mirrors the baseline).
+
+### Scheduled jobs (pg_cron)
+
+| Job | Schedule | Command |
+|---|---|---|
+| `publish-scheduled-posts` | `* * * * *` | `select public.publish_due_scheduled_posts();` |
+| `capture-creator-daily-stats` | `10 0 * * *` | `select public.capture_creator_daily_stats();` |
 
 New schema changes should be authored as new numbered migration files and
 applied via the Supabase CLI or `apply_migration`, then `database.types.ts`
