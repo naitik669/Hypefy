@@ -1557,6 +1557,17 @@ export type Database = {
         }[]
       }
       get_or_create_dm: { Args: { p_other: string }; Returns: string }
+      get_inbox_summary: {
+        Args: { p_conversation_ids: string[] }
+        Returns: {
+          conversation_id: string
+          last_body: string | null
+          last_kind: string | null
+          last_created_at: string | null
+          last_sender_id: string | null
+          unread_count: number
+        }[]
+      }
       get_poll_counts: {
         Args: { p_post_id: string }
         Returns: { option_idx: number; votes: number }[]

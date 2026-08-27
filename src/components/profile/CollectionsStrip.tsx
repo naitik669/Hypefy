@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FolderPlus, Plus, X, Check, Loader2, Trash2, ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type SavedPost = { id: string; image_url: string | null; image_urls?: string[] | null; caption: string | null };
 type Collection = { id: string; name: string; cover_url: string | null; count: number };
@@ -19,6 +20,7 @@ function cover(p: SavedPost): string | null {
  */
 export function CollectionsStrip({ userId, savedPosts }: { userId: string; savedPosts: SavedPost[] }) {
   const supabase = createClient();
+  const stripToast = useToast();
   const [collections, setCollections] = useState<Collection[] | null>(null);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -44,7 +46,8 @@ export function CollectionsStrip({ userId, savedPosts }: { userId: string; saved
     const name = newName.trim();
     if (!name) return;
     const { error } = await supabase.from("collections").insert({ user_id: userId, name });
-    if (!error) { setNewName(""); setCreating(false); load(); }
+    if (error) { stripToast("Couldn't create that collection."); return; }
+    setNewName(""); setCreating(false); load();
   }
 
   if (collections === null) return null;
@@ -101,6 +104,7 @@ export function CollectionsStrip({ userId, savedPosts }: { userId: string; saved
 
 function CollectionModal({ collection, savedPosts, onClose }: { collection: Collection; savedPosts: SavedPost[]; onClose: () => void }) {
   const supabase = createClient();
+  const showToast = useToast();
   const [itemIds, setItemIds] = useState<Set<string> | null>(null);
   const [picker, setPicker] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -114,25 +118,35 @@ function CollectionModal({ collection, savedPosts, onClose }: { collection: Coll
   async function toggle(post: SavedPost) {
     if (!itemIds) return;
     setBusy(true);
-    if (itemIds.has(post.id)) {
-      await supabase.from("collection_items").delete().eq("collection_id", collection.id).eq("post_id", post.id);
-      itemIds.delete(post.id);
-    } else {
-      await supabase.from("collection_items").insert({ collection_id: collection.id, post_id: post.id });
-      itemIds.add(post.id);
-      // First item becomes the cover.
-      if (itemIds.size === 1) {
-        const c = cover(post);
-        if (c) await supabase.from("collections").update({ cover_url: c }).eq("id", collection.id);
-      }
-    }
-    setItemIds(new Set(itemIds));
+    const wasIn = itemIds.has(post.id);
+    const { error } = wasIn
+      ? await supabase.from("collection_items").delete().eq("collection_id", collection.id).eq("post_id", post.id)
+      : await supabase.from("collection_items").insert({ collection_id: collection.id, post_id: post.id });
     setBusy(false);
+    if (error) {
+      // Previously silent — the tile flipped state while the DB was unchanged.
+      showToast(wasIn ? "Couldn't remove that post." : "Couldn't add that post.");
+      return;
+    }
+
+    if (wasIn) itemIds.delete(post.id);
+    else itemIds.add(post.id);
+    setItemIds(new Set(itemIds));
+
+    // First item becomes the cover.
+    if (!wasIn && itemIds.size === 1) {
+      const c = cover(post);
+      if (c) await supabase.from("collections").update({ cover_url: c }).eq("id", collection.id);
+    }
   }
 
   async function remove() {
     if (!confirm(`Delete "${collection.name}"?`)) return;
-    await supabase.from("collections").delete().eq("id", collection.id);
+    const { error } = await supabase.from("collections").delete().eq("id", collection.id);
+    if (error) {
+      showToast("Couldn't delete that collection.");
+      return;
+    }
     onClose();
   }
 

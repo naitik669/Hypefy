@@ -11,6 +11,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ShowViewersSheet } from "@/components/shows/ShowViewersSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { parseTrack, ensurePreviewPlaying, pausePreview, stopPreview } from "@/lib/music";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type ShowProfile = { display_name: string | null; avatar_hue: number | null; username: string | null; avatar_url?: string | null } | null;
 
@@ -125,6 +126,7 @@ function ShowScreen({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const showToast = useToast();
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const [reply, setReply] = useState("");
@@ -271,8 +273,13 @@ function ShowScreen({
 
   async function deleteShow() {
     setActionPending("delete");
-    await supabase.from("shows").delete().eq("id", show.id);
+    const { error } = await supabase.from("shows").delete().eq("id", show.id);
     setActionPending(null);
+    if (error) {
+      // Previously silent: the sheet closed as if the Show were gone.
+      showToast("Couldn't delete that Show. Try again.");
+      return;
+    }
     setConfirmDelete(false);
     setMenuOpen(false);
     onClose();
@@ -281,9 +288,13 @@ function ShowScreen({
   async function toggleShowcase() {
     setActionPending("showcase");
     const next = !isShowcase;
-    await supabase.from("shows").update({ is_showcase: next }).eq("id", show.id);
-    onShowcaseToggle(show.id, next);
+    const { error } = await supabase.from("shows").update({ is_showcase: next }).eq("id", show.id);
     setActionPending(null);
+    if (error) {
+      showToast("Couldn't update your showcase. Try again.");
+      return;
+    }
+    onShowcaseToggle(show.id, next);
     setMenuOpen(false);
   }
 

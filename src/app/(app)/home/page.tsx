@@ -64,7 +64,7 @@ export default async function HomePage() {
     // Current user profile for "Your Show" bubble + interest signals
     supabase.from("profiles").select("display_name, username, avatar_hue, avatar_url, interests, profile_tags").eq("id", user.id).maybeSingle(),
     // Current user's own active Shows â€” oldest first
-    supabase.from("shows").select("id").eq("user_id", user.id).gt("expires_at", nowIso).order("created_at", { ascending: true }),
+    supabase.from("shows").select("id").eq("user_id", user.id).gt("expires_at", nowIso).order("created_at", { ascending: true }).limit(50),
     // Active Shows from OTHERS â€” newest first
     supabase
       .from("shows")
@@ -85,18 +85,21 @@ export default async function HomePage() {
     // Interaction affinity (authors + tags I engage with) for personalization
     supabase.rpc("get_affinity", { p_lookback_days: 60 }),
     // Hashtags I follow
-    supabase.from("hashtag_follows").select("tag").eq("user_id", user.id),
+    supabase.from("hashtag_follows").select("tag").eq("user_id", user.id).limit(200),
   ]);
 
   // People lists behind the Favourite / Hypers feed tabs — fetched lightly
   // here (just ids) since FeedList only needs them to scope its own query
   // when that tab is first opened.
   const [{ data: favoriteRows }, { data: hyperRows }, { data: reverseHyperRows }] = await Promise.all([
-    supabase.from("favorites").select("friend_id").eq("user_id", user.id),
-    supabase.from("close_friends").select("friend_id").eq("user_id", user.id),
+    supabase.from("favorites").select("friend_id").eq("user_id", user.id).limit(500),
+    supabase.from("close_friends").select("friend_id").eq("user_id", user.id).limit(500),
     // People who added ME as a Hyper — the reverse direction, so FeedCard can
     // resolve the mutual-Hyper badge from props instead of a per-card query.
-    supabase.from("close_friends").select("user_id").eq("friend_id", user.id),
+    // Unlike the others this grows with popularity, not with your own actions,
+    // so the cap matters: a widely-added account would otherwise pull thousands
+    // of rows on every home render.
+    supabase.from("close_friends").select("user_id").eq("friend_id", user.id).limit(1000),
   ]);
   const favoriteIds = (favoriteRows ?? []).map((r: any) => r.friend_id as string);
   const hyperIds = (hyperRows ?? []).map((r: any) => r.friend_id as string);

@@ -5,6 +5,7 @@ import { Link2, Tv, Repeat2, Check, Search, Loader2, ChevronLeft, ChevronRight }
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type Friend = {
   id: string;
@@ -31,6 +32,7 @@ export function ShareSheet({
   initialImageIdx?: number;
 }) {
   const supabase = createClient();
+  const showToast = useToast();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
@@ -161,7 +163,10 @@ export function ShareSheet({
           linked_post_id: postId,
         });
         if (error) {
-          await supabase.from("shows").insert({ user_id: user.id, media_url: resolvedUrl });
+          // linked_post_id may predate the column; retry without it.
+          const { error: fallbackErr } = await supabase
+            .from("shows").insert({ user_id: user.id, media_url: resolvedUrl });
+          if (fallbackErr) { showToast("Couldn't add to your Show."); return; }
         }
       }
 
@@ -188,7 +193,7 @@ export function ShareSheet({
         setReposted(false);
         return;
       }
-      if (error) return;
+      if (error) { showToast("Couldn't repost. Try again."); return; }
       setReposted(true);
       setTimeout(() => { setReposted(false); onClose(); }, 900);
     } finally {
@@ -200,24 +205,33 @@ export function ShareSheet({
     if (sendingDm || sent.size === 0) return;
     setSendingDm(true);
     const ids = [...sent];
-    await Promise.all(
+    // Per-recipient success/failure: sends used to fail silently, so a share
+    // that reached nobody still showed the "Sent" confirmation.
+    const results = await Promise.all(
       ids.map(async (uid) => {
         const { data: convId, error } = await supabase.rpc("get_or_create_dm", { p_other: uid });
-        if (error || !convId) return;
-        if (targetType === "shot") {
-          await supabase.rpc("send_message", {
-            p_conversation_id: convId, p_body: null, p_kind: "shot",
-            p_post_id: null, p_shot_id: postId, p_reply_to_id: null,
-          });
-        } else {
-          await supabase.rpc("send_message", {
-            p_conversation_id: convId, p_body: null, p_kind: "post",
-            p_post_id: postId, p_reply_to_id: null,
-          });
-        }
+        if (error || !convId) return false;
+        const { error: sendErr } = targetType === "shot"
+          ? await supabase.rpc("send_message", {
+              p_conversation_id: convId, p_body: null, p_kind: "shot",
+              p_post_id: null, p_shot_id: postId, p_reply_to_id: null,
+            })
+          : await supabase.rpc("send_message", {
+              p_conversation_id: convId, p_body: null, p_kind: "post",
+              p_post_id: postId, p_reply_to_id: null,
+            });
+        return !sendErr;
       }),
     );
     setSendingDm(false);
+
+    const failed = results.filter((ok) => !ok).length;
+    if (failed === ids.length) {
+      showToast("Couldn't send. Try again.");
+      return;
+    }
+    if (failed > 0) showToast(`Sent to ${ids.length - failed} of ${ids.length}.`);
+
     setDmDone(true);
     setTimeout(() => { setDmDone(false); setSent(new Set()); onClose(); }, 900);
   }

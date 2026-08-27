@@ -10,6 +10,7 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Avatar } from "@/components/ui/Avatar";
 import { haptics } from "@/lib/haptics";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type Notif = {
   id: string;
@@ -145,6 +146,7 @@ function actorSummary(g: Group): string {
 
 export default function NotificationsPage() {
   const supabase = createClient();
+  const showToast = useToast();
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -293,8 +295,17 @@ export default function NotificationsPage() {
   async function resolveRequest(g: Group, approve: boolean) {
     if (!g.actorId) return;
     haptics.tap();
+    const before = notifs;
     setNotifs((prev) => prev.filter((n) => !g.ids.includes(n.id)));
-    await supabase.rpc(approve ? "approve_follow_request" : "deny_follow_request", { p_requester: g.actorId });
+    const { error } = await supabase.rpc(
+      approve ? "approve_follow_request" : "deny_follow_request",
+      { p_requester: g.actorId },
+    );
+    if (error) {
+      // Was silent: the row disappeared while the request stayed pending.
+      setNotifs(before);
+      showToast(approve ? "Couldn't approve that request." : "Couldn't deny that request.");
+    }
   }
 
   return (

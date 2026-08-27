@@ -33,12 +33,10 @@ export default async function MessagesPage() {
         .select("conversation_id, user_id, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity)")
         .in("conversation_id", convIds)
         .neq("user_id", user.id),
-      // Latest messages across these conversations
-      supabase
-        .from("messages")
-        .select("conversation_id, body, kind, created_at, sender_id")
-        .in("conversation_id", convIds)
-        .order("created_at", { ascending: false }),
+      // Last message + unread count per conversation, aggregated in the DB.
+      // This used to pull every message across all 50 conversations into the
+      // app just to derive these two things.
+      supabase.rpc("get_inbox_summary", { p_conversation_ids: convIds }),
       // My membership state per conversation (read + request + block)
       supabase
         .from("conversation_members")
@@ -94,9 +92,21 @@ export default async function MessagesPage() {
       (peerNotes ?? []).forEach((n: any) => noteByUser.set(n.user_id, n.text));
     }
 
+    // One row per conversation from get_inbox_summary — already the newest
+    // message, so no client-side "first wins" pass is needed.
     const lastByConv = new Map<string, any>();
-    (msgsRes.data ?? []).forEach((m: any) => {
-      if (!lastByConv.has(m.conversation_id)) lastByConv.set(m.conversation_id, m);
+    const unreadCountByConv = new Map<string, number>();
+    (msgsRes.data ?? []).forEach((s: any) => {
+      if (s.last_created_at) {
+        lastByConv.set(s.conversation_id, {
+          conversation_id: s.conversation_id,
+          body: s.last_body,
+          kind: s.last_kind,
+          created_at: s.last_created_at,
+          sender_id: s.last_sender_id,
+        });
+      }
+      unreadCountByConv.set(s.conversation_id, s.unread_count ?? 0);
     });
 
     const readByConv = new Map<string, string | null>();
@@ -110,16 +120,6 @@ export default async function MessagesPage() {
       if (m.blocked_at) blockedByConv.add(m.conversation_id);
       if (m.muted_at) mutedByConv.add(m.conversation_id);
       if (m.pinned_at) pinnedByConv.add(m.conversation_id);
-    });
-
-    // Count unread messages per conversation (messages after my last_read_at, not sent by me)
-    const unreadCountByConv = new Map<string, number>();
-    (msgsRes.data ?? []).forEach((m: any) => {
-      if (m.sender_id === user.id) return;
-      const lastRead = readByConv.get(m.conversation_id) ?? null;
-      if (!lastRead || new Date(m.created_at) > new Date(lastRead)) {
-        unreadCountByConv.set(m.conversation_id, (unreadCountByConv.get(m.conversation_id) ?? 0) + 1);
-      }
     });
 
     rows = (convs ?? [])

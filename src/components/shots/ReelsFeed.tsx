@@ -12,6 +12,7 @@ import { HypeParticles } from "@/components/feed/HypeParticles";
 import { formatCount } from "@/lib/format";
 import { ExpandableText } from "@/components/ui/ExpandableText";
 import { haptics } from "@/lib/haptics";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type ReelProfile = { display_name: string | null; avatar_hue: number | null; username: string | null } | null;
 
@@ -149,6 +150,7 @@ function ReelCard({
   preload?: "auto" | "metadata" | "none";
 }) {
   const supabase = createClient();
+  const showToast = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(true);
   const [progress, setProgress] = useState(0); // 0..1 playback position
@@ -283,16 +285,15 @@ function ReelCard({
     setSavePending(true);
     setSaved(!prev);
     haptics.select();
-    try {
-      if (prev) {
-        await supabase.from("saved_shots").delete().eq("user_id", currentUserId).eq("shot_id", reel.id);
-      } else {
-        await supabase.from("saved_shots").insert({ user_id: currentUserId, shot_id: reel.id });
-      }
-    } catch {
+    // supabase-js resolves with { error } instead of throwing, so the previous
+    // try/catch never fired and a failed save left the icon stuck flipped.
+    const { error } = prev
+      ? await supabase.from("saved_shots").delete().eq("user_id", currentUserId).eq("shot_id", reel.id)
+      : await supabase.from("saved_shots").insert({ user_id: currentUserId, shot_id: reel.id });
+    setSavePending(false);
+    if (error) {
       setSaved(prev);
-    } finally {
-      setSavePending(false);
+      showToast(prev ? "Couldn't unsave that Shot." : "Couldn't save that Shot.");
     }
   }
 

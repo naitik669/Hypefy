@@ -89,7 +89,8 @@ export function HyperFavoriteButton({
     const { error } = prev
       ? await supabase.from("close_friends").delete().eq("user_id", currentUserId).eq("friend_id", targetUserId)
       : await supabase.from("close_friends").insert({ user_id: currentUserId, friend_id: targetUserId });
-    if (error) setIsHyper(prev);
+    // Rolled back silently before, which just looked like a dead button.
+    if (error) { setIsHyper(prev); toast("Couldn't update your Hypers."); }
     setPending(null);
   }
 
@@ -102,7 +103,7 @@ export function HyperFavoriteButton({
     const { error } = prev
       ? await supabase.from("favorites").delete().eq("user_id", currentUserId).eq("friend_id", targetUserId)
       : await supabase.from("favorites").insert({ user_id: currentUserId, friend_id: targetUserId });
-    if (error) setIsFavourite(prev);
+    if (error) { setIsFavourite(prev); toast("Couldn't update your favourites."); }
     setPending(null);
   }
 

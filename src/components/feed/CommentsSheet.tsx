@@ -12,6 +12,7 @@ import { ZoomViewer } from "@/components/ui/ZoomViewer";
 import { GifPicker } from "@/components/messages/GifPicker";
 import { formatCount } from "@/lib/format";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
+import { useToast } from "@/components/ui/ToastProvider";
 
 const isGifBody = (body: string) => body.startsWith("https://");
 
@@ -77,6 +78,7 @@ export function CommentsSheet({
   targetType?: "post" | "shot";
 }) {
   const supabase = createClient();
+  const showToast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [tree, setTree] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -149,8 +151,13 @@ export function CommentsSheet({
 
   async function hypeComment(c: Comment) {
     if (!currentUserId) return;
-    mutateFn(c.id, (x) => ({ ...x, hyped: !x.hyped, localHypeCount: x.localHypeCount + (x.hyped ? -1 : 1) }));
-    await supabase.rpc("toggle_hype", { p_target_type: "comment", p_target_id: c.id, p_owner_id: null });
+    const flip = (x: Comment) => ({ ...x, hyped: !x.hyped, localHypeCount: x.localHypeCount + (x.hyped ? -1 : 1) });
+    mutateFn(c.id, flip);
+    const { error } = await supabase.rpc("toggle_hype", { p_target_type: "comment", p_target_id: c.id, p_owner_id: null });
+    if (error) {
+      mutateFn(c.id, flip); // undo the optimistic toggle
+      showToast("Couldn't hype that comment.");
+    }
   }
 
   function reportComment(id: string) {
@@ -160,7 +167,12 @@ export function CommentsSheet({
 
   async function deleteComment(id: string) {
     // Soft-delete: set deleted_at
-    await supabase.from("comments").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+    const { error } = await supabase.from("comments").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+    if (error) {
+      // Previously silent — the comment vanished locally but survived a reload.
+      showToast("Couldn't delete that comment.");
+      return;
+    }
     // Remove from tree immediately
     function removeById(list: Comment[]): Comment[] {
       return list

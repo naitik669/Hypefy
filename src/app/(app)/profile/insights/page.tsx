@@ -16,7 +16,8 @@ export default async function InsightsPage() {
     .from("posts")
     .select("id, caption, image_url, image_urls, view_count, hype_count, comment_count, save_count, created_at")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(200);
 
   const rows = posts ?? [];
   const totals = rows.reduce(
