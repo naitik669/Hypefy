@@ -101,8 +101,12 @@ export function IntroCarousel() {
         onPointerUp={onPointerUp}
         onWheel={onWheel}
       >
+        {/* absolute inset-0, not h-full: the pager sizes itself with flex-1, so
+            its specified height is `auto` and a percentage height on the track
+            can't resolve against it. The track collapsed to content height,
+            leaving a dead gap between the copy and the footer. */}
         <div
-          className="flex h-full"
+          className="absolute inset-0 flex"
           style={{
             transform: `translateX(-${index * 100}%)`,
             transition: "transform 0.55s cubic-bezier(0.16,1,0.3,1)",
@@ -370,12 +374,13 @@ function WelcomeVisual() {
           </div>
         </div>
 
-        {/* Shows row */}
+        {/* Shows row. Mirrors the real ShowsRow: squircle rings in solid
+            accent — not circles with a lime→purple gradient. */}
         <div className="flex gap-2.5 px-3 pb-2">
           {rings.map((r) => (
-            <div key={r.img} className="rounded-full p-[1.5px]" style={{ background: "linear-gradient(135deg, var(--color-accent), #6d28d9)" }}>
-              <div className="rounded-full bg-surface p-[1.5px]">
-                <div className="h-[26px] w-[26px] overflow-hidden rounded-full">
+            <div key={r.img} className="rounded-[11px] bg-accent p-[1.5px]">
+              <div className="rounded-[10px] bg-background p-[1.5px]">
+                <div className="h-[26px] w-[26px] overflow-hidden rounded-[8px]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={r.img} alt="" className="h-full w-full object-cover" style={{ objectPosition: r.pos }} draggable={false} />
                 </div>
@@ -387,7 +392,7 @@ function WelcomeVisual() {
         {/* A post */}
         <div className="px-3 pb-3">
           <div className="flex items-center gap-2 py-1.5">
-            <div className="h-[22px] w-[22px] shrink-0 overflow-hidden rounded-full">
+            <div className="h-[22px] w-[22px] shrink-0 overflow-hidden rounded-[7px]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/onboarding/maya.webp" alt="" className="h-full w-full object-cover" style={{ objectPosition: "50% 18%" }} draggable={false} />
             </div>
@@ -685,7 +690,7 @@ function ReelCard({ data, w, h, active = false }: { data: ReelData; w: number; h
       <div className="absolute inset-x-0 bottom-0 p-3 pr-11">
         <div className="flex items-center gap-2">
           {data.pfp ? (
-            <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full ring-2 ring-white/60">
+            <div className="h-7 w-7 shrink-0 overflow-hidden rounded-[9px] ring-2 ring-white/60">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={data.pfp}
@@ -696,7 +701,7 @@ function ReelCard({ data, w, h, active = false }: { data: ReelData; w: number; h
               />
             </div>
           ) : (
-            <Avatar name={data.handle} hue={data.hue ?? 280} size={26} className="rounded-full ring-2 ring-white/60" />
+            <Avatar name={data.handle} hue={data.hue ?? 280} size={26} className="ring-2 ring-white/60" />
           )}
           <span className="text-xs font-bold text-white">@{data.handle}</span>
         </div>
@@ -780,8 +785,11 @@ function MockDiscover() {
         className="absolute left-1/2 top-1/2 z-10 flex h-[68px] w-[68px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[22px] shadow-2xl ring-1 ring-white/15"
         style={{ background: "#262626" }}
       >
-        <span className="text-3xl font-extrabold tracking-tight text-white">
-          h<span className="text-accent">.</span>
+        {/* Capital H + accent dot, matching the app icon. The dot hangs to the
+            right of the glyph, so nudge the lockup left to optically centre the
+            H itself in the hub rather than centring the H-plus-dot box. */}
+        <span className="translate-x-[3px] text-3xl font-extrabold leading-none tracking-tight text-white">
+          H<span className="text-accent">.</span>
         </span>
       </div>
 
