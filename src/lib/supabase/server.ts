@@ -1,19 +1,19 @@
 import { createServerClient } from "@supabase/ssr";
+import type { Database } from "@/lib/supabase/database.types";
 import { cookies } from "next/headers";
 
 /**
  * Supabase client for use in Server Components, Route Handlers, and
  * Server Actions. Bridges Supabase auth to Next.js cookies.
  *
- * NOTE: Generated DB types live in ./database.types.ts. Wiring them in here
- * (`createServerClient<Database>`) surfaces ~40 pre-existing nullability /
- * RPC-return type mismatches across the app; that retrofit is tracked
- * separately. Use the types explicitly in new code in the meantime.
+ * Typed with the generated Database schema, so table columns and RPC
+ * signatures are checked at every call site. Embedded relations still come
+ * back as `T | T[]` — unwrap those with `one()` from ./typed.
  */
 export async function createClient() {
   const cookieStore = await cookies();
 
-  return createServerClient(
+  return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {

@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { RealChatView } from "@/components/messages/RealChatView";
+import { one } from "@/lib/supabase/typed";
 
 export default async function ThreadPage({
   params,
@@ -76,8 +77,7 @@ export default async function ThreadPage({
     .limit(30);
   const rawMsgs = (latestMsgs ?? []).slice().reverse();
 
-  const one = (x: any) => (Array.isArray(x) ? x[0] : x);
-  const profOf = (x: any) => { const p = one(x); return p ? one(p.profiles) : null; };
+  const profOf = (x: any) => { const p = one<any>(x); return p ? one<any>(p.profiles) : null; };
 
   const messages = (rawMsgs ?? []).map((m: any) => ({
     ...m,

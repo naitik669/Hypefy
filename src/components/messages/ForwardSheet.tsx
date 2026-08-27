@@ -82,11 +82,11 @@ export function ForwardSheet({
       msg.kind === "text" && msg.body ? `↪️ Forwarded: ${msg.body}` : msg.body;
     const { error } = await supabase.rpc("send_message", {
       p_conversation_id: convId,
-      p_body: body,
+      p_body: body ?? undefined,
       p_kind: msg.kind,
-      p_post_id: msg.post_id ?? null,
-      p_reply_to_id: null,
-      p_shot_id: msg.shot_id ?? null,
+      p_post_id: msg.post_id ?? undefined,
+      p_reply_to_id: undefined,
+      p_shot_id: msg.shot_id ?? undefined,
     });
     setBusy(null);
     if (!error) setSentTo((s) => new Set(s).add(friend.id));

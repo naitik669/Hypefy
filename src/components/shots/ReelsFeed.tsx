@@ -13,6 +13,7 @@ import { formatCount } from "@/lib/format";
 import { ExpandableText } from "@/components/ui/ExpandableText";
 import { haptics } from "@/lib/haptics";
 import { useToast } from "@/components/ui/ToastProvider";
+import { hypeResult } from "@/lib/supabase/typed";
 
 type ReelProfile = { display_name: string | null; avatar_hue: number | null; username: string | null } | null;
 
@@ -267,9 +268,10 @@ function ReelCard({
         p_owner_id: reel.user_id,
       });
       if (error) throw error;
-      if (data && typeof data === "object") {
-        setHyped(Boolean(data.hyped));
-        setHypeCount(Number(data.hype_count));
+      const res = hypeResult(data);
+      if (res) {
+        setHyped(res.hyped);
+        setHypeCount(res.hype_count);
       }
     } catch {
       setHyped(prev);

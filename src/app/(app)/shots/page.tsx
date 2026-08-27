@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ReelsFeed } from "@/components/shots/ReelsFeed";
 import { diversify } from "@/lib/feed-rank";
+import { one, jsonRecord } from "@/lib/supabase/typed";
 
 /** Personalized Shot score: engagement (capped) + tiered recency + author affinity. */
 function shotScore(s: any, now: number, authorAff: Record<string, number>) {
@@ -32,12 +33,12 @@ export default async function ShotsPage() {
     user ? supabase.rpc("get_affinity", { p_lookback_days: 60 }) : Promise.resolve({ data: null }),
   ]);
 
-  const authorAff = ((affRes.data as any)?.authors ?? {}) as Record<string, number>;
+  const authorAff = jsonRecord((affRes.data as any)?.authors);
   const now = Date.now();
 
   const reels = diversify(
     (shots ?? [])
-      .map((s: any) => ({ ...s, profiles: Array.isArray(s.profiles) ? s.profiles[0] ?? null : s.profiles }))
+      .map((s: any) => ({ ...s, profiles: one(s.profiles) }))
       .map((s: any) => ({ ...s, _score: shotScore(s, now, authorAff) }))
       .sort((a: any, b: any) =>
         b._score !== a._score ? b._score - a._score : new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),

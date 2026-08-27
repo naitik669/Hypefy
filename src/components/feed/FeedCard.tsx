@@ -23,6 +23,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { TrackChip } from "@/components/music/TrackChip";
 import { MusicMuteButton } from "@/components/music/MusicMuteButton";
 import { parseTrack } from "@/lib/music";
+import { hypeResult } from "@/lib/supabase/typed";
 import { PollBlock, parsePoll } from "@/components/feed/PollBlock";
 
 export type FeedPost = {
@@ -236,9 +237,10 @@ export function FeedCard({
         p_target_type: "post", p_target_id: post.id, p_owner_id: post.user_id,
       });
       if (error) throw error;
-      if (data && typeof data === "object") {
-        setHyped(Boolean(data.hyped));
-        setHypeCount(Number(data.hype_count));
+      const res = hypeResult(data);
+      if (res) {
+        setHyped(res.hyped);
+        setHypeCount(res.hype_count);
       }
     } catch {
       setHyped(prev); setHypeCount(prevCount);

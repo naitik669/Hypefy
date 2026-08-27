@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { CallLog, type CallEntry } from "@/components/calls/CallLog";
+import { one } from "@/lib/supabase/typed";
 
 type Prof = {
   id: string;
@@ -10,10 +11,6 @@ type Prof = {
   avatar_hue: number | null;
   avatar_url: string | null;
 } | null;
-
-function one(p: any): Prof {
-  return (Array.isArray(p) ? p[0] : p) ?? null;
-}
 
 export default async function CallsPage() {
   const supabase = await createClient();

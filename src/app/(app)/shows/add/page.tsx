@@ -174,6 +174,10 @@ export default function AddShowPage() {
         linkedPostId = selectedFlat.postId;
       }
 
+      // shows.media_url is NOT NULL. Without this guard an empty selection hit
+      // the DB and surfaced a raw Postgres constraint error to the user.
+      if (!mediaUrl) { setError("Pick a photo or video first."); return; }
+
       const base = {
         user_id: user.id,
         media_url: mediaUrl,

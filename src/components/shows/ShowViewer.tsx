@@ -12,6 +12,7 @@ import { ShowViewersSheet } from "@/components/shows/ShowViewersSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { parseTrack, ensurePreviewPlaying, pausePreview, stopPreview } from "@/lib/music";
 import { useToast } from "@/components/ui/ToastProvider";
+import { hypeResult } from "@/lib/supabase/typed";
 
 type ShowProfile = { display_name: string | null; avatar_hue: number | null; username: string | null; avatar_url?: string | null } | null;
 
@@ -219,7 +220,8 @@ function ShowScreen({
     try {
       const { data, error } = await supabase.rpc("toggle_hype", { p_target_type: "show", p_target_id: show.id, p_owner_id: show.user_id });
       if (error) throw error;
-      if (data && typeof data === "object") { setHyped(Boolean(data.hyped)); setHypeCount(Number(data.hype_count)); }
+      const res = hypeResult(data);
+      if (res) { setHyped(res.hyped); setHypeCount(res.hype_count); }
     } catch { setHyped(prev); setHypeCount(prevCount); }
     finally { setHypePending(false); }
   }
@@ -254,9 +256,9 @@ function ShowScreen({
       p_conversation_id: convId,
       p_body: body,
       p_kind: "text",
-      p_post_id: null,
-      p_reply_to_id: null,
-      p_shot_id: null,
+      p_post_id: undefined,
+      p_reply_to_id: undefined,
+      p_shot_id: undefined,
     });
 
     setSendingReply(false);

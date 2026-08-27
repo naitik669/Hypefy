@@ -45,7 +45,7 @@ export function GroupInfoSheet({
     const next = name.trim();
     if (!next || next === title) return;
     setSavingName(true);
-    const { error } = await supabase.rpc("update_conversation", { p_conversation_id: conversationId, p_title: next, p_avatar_url: null });
+    const { error } = await supabase.rpc("update_conversation", { p_conversation_id: conversationId, p_title: next, p_avatar_url: undefined });
     setSavingName(false);
     if (!error) router.refresh();
   }

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ReportsQueue, type ReportRow } from "@/components/admin/ReportsQueue";
+import { one } from "@/lib/supabase/typed";
 
 /** Owner-only moderation queue. Everyone else gets a 404, not a hint. */
 export default async function AdminReportsPage() {
@@ -27,7 +28,6 @@ export default async function AdminReportsPage() {
       .limit(100),
   ]);
 
-  const one = (p: any) => (Array.isArray(p) ? p[0] : p) ?? null;
 
   // Resolve usernames for profile-target reports so "View target" links to a
   // real /u/<username> route instead of /u/<uuid> (which 404s).

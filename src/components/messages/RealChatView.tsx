@@ -22,6 +22,7 @@ import { presenceLabel } from "@/lib/presence";
 import { haptics } from "@/lib/haptics";
 import { PresenceDot } from "@/components/presence/PresenceDot";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
+import { one } from "@/lib/supabase/typed";
 import { ForwardSheet } from "@/components/messages/ForwardSheet";
 
 type PostPreview = {
@@ -84,8 +85,7 @@ const MSG_SELECT =
 
 /** Flatten Supabase's nested post/shot+profile joins into ChatMsg shape. */
 function mapMessageRow(m: any): ChatMsg {
-  const one = (x: any) => (Array.isArray(x) ? x[0] : x);
-  const profOf = (x: any) => { const p = one(x); return p ? one(p.profiles) : null; };
+  const profOf = (x: any) => { const p = one<any>(x); return p ? one<any>(p.profiles) : null; };
   return {
     ...m,
     post: m.post ? { ...one(m.post), profiles: undefined } : null,
@@ -771,7 +771,7 @@ export function RealChatView({
     setMessages((p) => [...p, optimistic]);
 
     const { data, error } = await supabase.rpc("send_message", {
-      p_conversation_id: conversationId, p_body: body, p_kind: "text", p_post_id: null, p_reply_to_id: replyId,
+      p_conversation_id: conversationId, p_body: body ?? undefined, p_kind: "text", p_post_id: undefined, p_reply_to_id: replyId ?? undefined,
     });
     if (error || !data) {
       // Keep message visible but mark it failed
@@ -794,7 +794,7 @@ export function RealChatView({
     if (failed.kind !== "text" || !failed.body) return;
     setMessages((p) => p.map((m) => (m.id === failed.id ? { ...m, _status: "pending" as const } : m)));
     const { data, error } = await supabase.rpc("send_message", {
-      p_conversation_id: conversationId, p_body: failed.body, p_kind: "text", p_post_id: null, p_reply_to_id: failed.reply_to_id,
+      p_conversation_id: conversationId, p_body: failed.body ?? undefined, p_kind: "text", p_post_id: undefined, p_reply_to_id: failed.reply_to_id ?? undefined,
     });
     if (error || !data) {
       setMessages((p) => p.map((m) => (m.id === failed.id ? { ...m, _status: "failed" as const } : m)));
@@ -839,10 +839,10 @@ export function RealChatView({
 
     const { error } = await supabase.rpc("send_message", {
       p_conversation_id: conversationId,
-      p_body: body,
+      p_body: body ?? undefined,
       p_kind: "voice",
-      p_post_id: null,
-      p_reply_to_id: replyId,
+      p_post_id: undefined,
+      p_reply_to_id: replyId ?? undefined,
     });
 
     if (error) showToast("Couldn't send voice note.");
@@ -867,7 +867,7 @@ export function RealChatView({
 
     const { data, error } = await supabase.rpc("send_message", {
       p_conversation_id: conversationId, p_body: gifUrl, p_kind: "gif",
-      p_post_id: null, p_reply_to_id: replyId,
+      p_post_id: undefined, p_reply_to_id: replyId ?? undefined,
     });
     if (error || !data) {
       setMessages((p) => p.map((m) => m.id === tempId ? { ...m, _status: "failed" as const } : m));
@@ -936,7 +936,7 @@ export function RealChatView({
 
     const { data, error } = await supabase.rpc("send_message", {
       p_conversation_id: conversationId, p_body: publicUrl, p_kind: kind,
-      p_post_id: null, p_reply_to_id: replyId,
+      p_post_id: undefined, p_reply_to_id: replyId ?? undefined,
     });
     if (error || !data) {
       setMessages((p) => p.map((m) => m.id === tempId ? { ...m, _status: "failed" as const } : m));
@@ -975,7 +975,7 @@ export function RealChatView({
     if (!reportMsg) return;
     const m = reportMsg;
     setReportMsg(null);
-    const { error } = await supabase.rpc("report_message", { p_message_id: m.id, p_reason: reason, p_details: null });
+    const { error } = await supabase.rpc("report_message", { p_message_id: m.id, p_reason: reason, p_details: undefined });
     showToast(error ? "Report already sent" : "Report sent");
   }
 

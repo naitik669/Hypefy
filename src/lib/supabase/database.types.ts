@@ -1502,7 +1502,10 @@ export type Database = {
             Returns: string
           }
       create_group: {
-        Args: { p_member_ids: string[]; p_title: string }
+        // p_title is `text` with no default, so the generator infers it as
+        // required + non-null. The function body explicitly handles a NULL
+        // title (meaning "auto-name from members"), so it is nullable.
+        Args: { p_member_ids: string[]; p_title: string | null }
         Returns: string
       }
       create_shot_comment: {

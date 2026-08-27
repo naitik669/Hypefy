@@ -6,9 +6,11 @@ import { DiscoverView } from "@/components/discover/DiscoverView";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { tagAffinityFor } from "@/lib/feed-rank";
 import { getBlockedIds } from "@/lib/blocked";
+import { one as unwrap, jsonRecord } from "@/lib/supabase/typed";
 
+/** Flatten a row's embedded `profiles` join from `T | T[]` down to `T | null`. */
 function one(p: any) {
-  return { ...p, profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles };
+  return { ...p, profiles: unwrap(p.profiles) };
 }
 
 /** Tiered recency boost (newer content surfaces higher). */
@@ -61,7 +63,7 @@ export default async function DiscoverPage() {
       .limit(150),
     supabase
       .from("shots")
-      .select("id, media_url, poster_url, caption, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url)")
+      .select("id, media_url, poster_url, caption, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles!shots_user_id_fkey(id, display_name, username, avatar_hue, avatar_url)")
       .neq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(80),
@@ -85,8 +87,8 @@ export default async function DiscoverPage() {
     ...(((meRes.data as any)?.interests ?? []) as string[]),
     ...(((meRes.data as any)?.profile_tags ?? []) as string[]),
   ].map((t) => t.replace(/^#/, "").toLowerCase()));
-  const authorAff = ((affRes.data as any)?.authors ?? {}) as Record<string, number>;
-  const tagAff = ((affRes.data as any)?.tags ?? {}) as Record<string, number>;
+  const authorAff = jsonRecord((affRes.data as any)?.authors);
+  const tagAff = jsonRecord((affRes.data as any)?.tags);
   const followedTags = new Set<string>((followedTagRes.data ?? []).map((r: any) => r.tag));
   const blockedIds = await getBlockedIds(supabase);
 

@@ -153,7 +153,7 @@ export function CommentsSheet({
     if (!currentUserId) return;
     const flip = (x: Comment) => ({ ...x, hyped: !x.hyped, localHypeCount: x.localHypeCount + (x.hyped ? -1 : 1) });
     mutateFn(c.id, flip);
-    const { error } = await supabase.rpc("toggle_hype", { p_target_type: "comment", p_target_id: c.id, p_owner_id: null });
+    const { error } = await supabase.rpc("toggle_hype", { p_target_type: "comment", p_target_id: c.id, p_owner_id: undefined });
     if (error) {
       mutateFn(c.id, flip); // undo the optimistic toggle
       showToast("Couldn't hype that comment.");
@@ -199,13 +199,13 @@ export function CommentsSheet({
             p_shot_id: postId,
             p_body: text.trim(),
             p_owner_id: postOwnerId,
-            p_parent_id: replyTo?.id ?? null,
+            p_parent_id: replyTo?.id ?? undefined,
           })
         : await supabase.rpc("create_comment", {
             p_post_id: postId,
             p_body: text.trim(),
             p_owner_id: postOwnerId,
-            p_parent_id: replyTo?.id ?? null,
+            p_parent_id: replyTo?.id ?? undefined,
           });
     setPosting(false);
     if (error || !data) return;
@@ -253,13 +253,13 @@ export function CommentsSheet({
             p_shot_id: postId,
             p_body: gifUrl,
             p_owner_id: postOwnerId,
-            p_parent_id: replyTo?.id ?? null,
+            p_parent_id: replyTo?.id ?? undefined,
           })
         : await supabase.rpc("create_comment", {
             p_post_id: postId,
             p_body: gifUrl,
             p_owner_id: postOwnerId,
-            p_parent_id: replyTo?.id ?? null,
+            p_parent_id: replyTo?.id ?? undefined,
           });
     setPosting(false);
     if (error || !data) return;

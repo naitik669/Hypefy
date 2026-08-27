@@ -8,6 +8,7 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { UploadProgressBar } from "@/components/upload/UploadProvider";
 import { feedScore, diversify, postTags, tagAffinityFor } from "@/lib/feed-rank";
 import { getBlockedIds } from "@/lib/blocked";
+import { jsonRecord } from "@/lib/supabase/typed";
 
 function normalise(raw: unknown[] | null) {
   return (raw ?? []).map((p: any) => ({
@@ -152,8 +153,8 @@ export default async function HomePage() {
   ].map((t) => t.replace(/^#/, "").toLowerCase()));
 
   // Interaction affinity: authors + tags I actually engage with, plus tags I follow.
-  const authorAff = ((affinityData as any)?.authors ?? {}) as Record<string, number>;
-  const tagAff = ((affinityData as any)?.tags ?? {}) as Record<string, number>;
+  const authorAff = jsonRecord((affinityData as any)?.authors);
+  const tagAff = jsonRecord((affinityData as any)?.tags);
   const followedTags = new Set<string>((followedTagRows ?? []).map((r: any) => r.tag));
 
   // Rank by blended score; recency breaks ties. Then diversify authors.

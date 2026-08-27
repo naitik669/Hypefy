@@ -156,6 +156,9 @@ export function ShareSheet({
             ?? null;
         })();
 
+        // shows.media_url is NOT NULL — a text-only post has nothing to show.
+        if (!resolvedUrl) { showToast("That post has no image to share."); return; }
+
         // Try with linked_post_id; fall back gracefully if column not yet migrated
         const { error } = await supabase.from("shows").insert({
           user_id: user.id,
@@ -213,12 +216,12 @@ export function ShareSheet({
         if (error || !convId) return false;
         const { error: sendErr } = targetType === "shot"
           ? await supabase.rpc("send_message", {
-              p_conversation_id: convId, p_body: null, p_kind: "shot",
-              p_post_id: null, p_shot_id: postId, p_reply_to_id: null,
+              p_conversation_id: convId, p_body: undefined, p_kind: "shot",
+              p_post_id: undefined, p_shot_id: postId, p_reply_to_id: undefined,
             })
           : await supabase.rpc("send_message", {
-              p_conversation_id: convId, p_body: null, p_kind: "post",
-              p_post_id: postId, p_reply_to_id: null,
+              p_conversation_id: convId, p_body: undefined, p_kind: "post",
+              p_post_id: postId, p_reply_to_id: undefined,
             });
         return !sendErr;
       }),
