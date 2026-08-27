@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { HypefyMark } from "@/components/HypefyMark";
 
 /** Second-factor screen: enter the 6-digit code emailed at sign-in. */
 export function Verify2StepCard({ email }: { email: string }) {
@@ -110,7 +109,9 @@ export function Verify2StepCard({ email }: { email: string }) {
       </div>
 
       <div className="mt-6 flex justify-center opacity-40">
-        <HypefyMark className="h-5 w-5 text-white" />
+        <span className="text-sm font-extrabold tracking-tight text-foreground">
+          Hypefy<span className="text-accent">.</span>
+        </span>
       </div>
     </div>
   );

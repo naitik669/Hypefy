@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { HypefyMark } from "@/components/HypefyMark";
 import { upsertSavedAccount } from "@/lib/saved-accounts";
 import { DateOfBirthPicker } from "@/components/ui/DateOfBirthPicker";
 
@@ -251,7 +250,9 @@ export function AuthCard({ mode }: { mode: Mode }) {
 
         {/* Header */}
         <div className="flex flex-col items-center text-center">
-          <HypefyMark className="h-9 w-9 text-white" />
+          <span className="text-2xl font-extrabold tracking-tight text-foreground">
+            Hypefy<span className="text-accent">.</span>
+          </span>
           <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground">
             {t.title}
           </h1>

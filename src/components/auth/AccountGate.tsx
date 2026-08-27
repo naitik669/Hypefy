@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, Plus, Check, Loader2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
-import { HypefyMark } from "@/components/HypefyMark";
 import { AuthCard } from "@/components/auth/AuthCard";
 import {
   getSavedAccounts,
@@ -94,7 +93,9 @@ export function AccountGate({ mode }: { mode: "signin" | "signup" }) {
         />
 
         <div className="flex flex-col items-center text-center">
-          <HypefyMark className="h-9 w-9 text-white" />
+          <span className="text-2xl font-extrabold tracking-tight text-foreground">
+            Hypefy<span className="text-accent">.</span>
+          </span>
           <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground">
             Switch account
           </h1>
