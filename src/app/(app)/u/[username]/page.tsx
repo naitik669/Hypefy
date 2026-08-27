@@ -7,6 +7,7 @@ import { JoinBanner } from "@/components/growth/JoinBanner";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { PublicProfileTabs } from "@/components/profile/PublicProfileTabs";
 import { ProfileShowcase } from "@/components/profile/ProfileShowcase";
+import { StreakBadges } from "@/components/profile/StreakBadges";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { MessageButton } from "@/components/profile/MessageButton";
 import { HyperFavoriteButton } from "@/components/profile/HyperFavoriteButton";
@@ -197,6 +198,13 @@ export default async function PublicProfilePage({
           )
         }
       />
+
+      {/* Streak + milestones (hidden for locked private accounts) */}
+      {!isLocked && (
+        <div className="px-4">
+          <StreakBadges userId={profile.id} />
+        </div>
+      )}
 
       {/* Pinned highlights (hidden for locked private accounts) */}
       {!isLocked && <ProfileShowcase userId={profile.id} />}

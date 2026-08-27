@@ -5,6 +5,7 @@ import { getProfile, hueFromId } from "@/lib/profile";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
 import { ProfileShowcase } from "@/components/profile/ProfileShowcase";
+import { StreakBadges } from "@/components/profile/StreakBadges";
 import { InviteIconButton } from "@/components/growth/InviteButton";
 
 async function fetchStats(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
@@ -106,6 +107,11 @@ export default async function ProfilePage() {
           </>
         }
       />
+
+      {/* Posting streak + earned milestones */}
+      <div className="px-4">
+        <StreakBadges userId={user.id} />
+      </div>
 
       {/* Pinned Shots/Shows highlights */}
       <ProfileShowcase userId={user.id} />

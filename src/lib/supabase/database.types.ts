@@ -1592,6 +1592,15 @@ export type Database = {
         }[]
       }
       get_or_create_dm: { Args: { p_other: string }; Returns: string }
+      get_user_streak: {
+        Args: { p_user_id: string }
+        Returns: {
+          current_streak: number
+          longest_streak: number
+          total_posts: number
+          hypes_received: number
+        }[]
+      }
       get_creator_timeseries: {
         Args: { p_days?: number }
         Returns: {
