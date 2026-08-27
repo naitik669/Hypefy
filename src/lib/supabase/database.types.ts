@@ -183,6 +183,38 @@ export type Database = {
           },
         ]
       }
+      creator_daily_stats: {
+        Row: {
+          user_id: string
+          day: string
+          views: number
+          followers: number
+          captured_at: string
+        }
+        Insert: {
+          user_id: string
+          day: string
+          views?: number
+          followers?: number
+          captured_at?: string
+        }
+        Update: {
+          user_id?: string
+          day?: string
+          views?: number
+          followers?: number
+          captured_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_daily_stats_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collections: {
         Row: {
           cover_url: string | null
@@ -1560,6 +1592,16 @@ export type Database = {
         }[]
       }
       get_or_create_dm: { Args: { p_other: string }; Returns: string }
+      get_creator_timeseries: {
+        Args: { p_days?: number }
+        Returns: {
+          day: string
+          hypes: number
+          comments: number
+          saves: number
+          follows: number
+        }[]
+      }
       get_inbox_summary: {
         Args: { p_conversation_ids: string[] }
         Returns: {

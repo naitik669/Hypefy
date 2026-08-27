@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatCount } from "@/lib/format";
+import { InsightsChart, type SeriesPoint } from "@/components/profile/InsightsChart";
 
 /** Owner-only creator analytics: per-post and total reach/engagement. */
 export default async function InsightsPage() {
@@ -12,12 +13,24 @@ export default async function InsightsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
 
-  const { data: posts } = await supabase
-    .from("posts")
-    .select("id, caption, image_url, image_urls, view_count, hype_count, comment_count, save_count, created_at")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const [{ data: posts }, { data: series }, { data: viewHistory }] = await Promise.all([
+    supabase
+      .from("posts")
+      .select("id, caption, image_url, image_urls, view_count, hype_count, comment_count, save_count, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(200),
+    // Retroactive: derived from existing created_at timestamps.
+    supabase.rpc("get_creator_timeseries", { p_days: 30 }),
+    // Views have no per-event history, so they come from the nightly rollup
+    // and therefore only cover days since that job started running.
+    supabase
+      .from("creator_daily_stats")
+      .select("day, views, followers")
+      .eq("user_id", user.id)
+      .order("day", { ascending: true })
+      .limit(30),
+  ]);
 
   const rows = posts ?? [];
   const totals = rows.reduce(
@@ -31,6 +44,15 @@ export default async function InsightsPage() {
   );
 
   const cover = (p: any): string | null => p.image_url ?? p.image_urls?.[0] ?? null;
+
+  const chartSeries = (series ?? []) as SeriesPoint[];
+  // Follower delta across the rollup window — null until there are two
+  // snapshots to compare (i.e. the job has run on at least two days).
+  const history = viewHistory ?? [];
+  const followerDelta =
+    history.length >= 2
+      ? (history[history.length - 1].followers ?? 0) - (history[0].followers ?? 0)
+      : null;
 
   return (
     <>
@@ -47,6 +69,16 @@ export default async function InsightsPage() {
             <TotalCard icon={<MessageCircle size={16} />} label="Comments" value={totals.comments} />
             <TotalCard icon={<Bookmark size={16} />} label="Saves" value={totals.saves} />
           </div>
+
+          {/* Engagement over time */}
+          <h2 className="px-1 pb-2 pt-6 text-xs font-bold uppercase tracking-widest text-faint">Over time</h2>
+          <InsightsChart series={chartSeries} />
+
+          {followerDelta !== null && (
+            <p className="px-1 pt-2 text-xs text-muted">
+              {followerDelta >= 0 ? "+" : ""}{followerDelta} follower{Math.abs(followerDelta) === 1 ? "" : "s"} since tracking began
+            </p>
+          )}
 
           {/* Per-post breakdown */}
           <h2 className="px-1 pb-2 pt-6 text-xs font-bold uppercase tracking-widest text-faint">Per post</h2>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, PenSquare, Plus, Check, Loader2 } from "lucide-react";
+import { ChevronDown, PenSquare, Plus, Check, Loader2, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { getSavedAccounts, upsertSavedAccount, removeSavedAccount, type SavedAccount } from "@/lib/saved-accounts";
@@ -80,13 +80,25 @@ export function MessagesHeader({
         <ChevronDown size={20} className={`shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
-      <Link
-        href="/messages/new"
-        aria-label="New message"
-        className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5"
-      >
-        <PenSquare size={22} />
-      </Link>
+      <div className="flex shrink-0 items-center">
+        {/* Call log was previously reachable only by tapping a call
+            notification — invisible once that notification was cleared. */}
+        <Link
+          href="/calls"
+          aria-label="Call history"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5"
+        >
+          <Phone size={21} />
+        </Link>
+
+        <Link
+          href="/messages/new"
+          aria-label="New message"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5"
+        >
+          <PenSquare size={22} />
+        </Link>
+      </div>
 
       {open && (
         <>
