@@ -93,13 +93,13 @@ export function AccountGate({ mode }: { mode: "signin" | "signup" }) {
         />
 
         <div className="flex flex-col items-center text-center">
-          <span className="text-2xl font-extrabold tracking-tight text-foreground">
+          <span className="text-[15px] font-extrabold tracking-tight text-foreground/60">
             Hypefy<span className="text-accent">.</span>
           </span>
-          <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground">
+          <h1 className="mt-5 text-[26px] font-extrabold leading-none tracking-tight text-foreground">
             Switch account
           </h1>
-          <p className="mt-1 text-[13px] text-muted">
+          <p className="mt-2 text-[13px] text-muted">
             Pick an account or add a new one.
           </p>
         </div>

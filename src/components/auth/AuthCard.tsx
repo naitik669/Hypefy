@@ -248,15 +248,16 @@ export function AuthCard({ mode }: { mode: Mode }) {
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
         />
 
-        {/* Header */}
+        {/* Header. The wordmark is a brand stamp, not a title — it stays small
+            and recessive so the task ("Create account") is what reads first. */}
         <div className="flex flex-col items-center text-center">
-          <span className="text-2xl font-extrabold tracking-tight text-foreground">
+          <span className="text-[15px] font-extrabold tracking-tight text-foreground/60">
             Hypefy<span className="text-accent">.</span>
           </span>
-          <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground">
+          <h1 className="mt-5 text-[26px] font-extrabold leading-none tracking-tight text-foreground">
             {t.title}
           </h1>
-          <p className="mt-1 text-[13px] text-muted">
+          <p className="mt-2 text-[13px] text-muted">
             {addMode
               ? mode === "signin"
                 ? "Log in to an existing account to switch between profiles."
