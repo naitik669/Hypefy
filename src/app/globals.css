@@ -735,7 +735,8 @@ body {
   .animate-mic-wave,
   .animate-orbit,
   .animate-orbit-reverse,
-  .animate-notif-bulge {
+  .animate-notif-bulge,
+  .animate-toast-drop {
     animation: none;
   }
   .animate-rise {

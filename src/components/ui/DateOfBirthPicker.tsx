@@ -1,25 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, Calendar } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Cake } from "lucide-react";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 
-const MONTHS = [
+const MONTHS_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+const MONTHS_LONG = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-const MONTHS_SHORT = MONTHS.map((m) => m.slice(0, 3));
 
 const MIN_YEAR = 1900;
+const ITEM_H = 44;   // px per wheel row
+const VISIBLE = 5;   // rows shown at once (odd, so one sits centred)
+const PAD = ((VISIBLE - 1) / 2) * ITEM_H;
 
-function daysInMonth(year: number, monthIdx: number) {
-  return new Date(year, monthIdx + 1, 0).getDate();
-}
+const daysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
-function pad(n: number) {
-  return String(n).padStart(2, "0");
-}
-
-/** Parse a `yyyy-mm-dd` value without timezone drift. */
 function parseValue(v: string): { y: number; m: number; d: number } | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
   if (!match) return null;
@@ -28,17 +30,132 @@ function parseValue(v: string): { y: number; m: number; d: number } | null {
   return { y, m, d };
 }
 
-type Step = "year" | "month" | "day";
+type Option = { value: number; label: string };
 
 /**
- * Brand-styled date-of-birth picker.
+ * One drum of the wheel. Whatever row sits under the centre band is the value,
+ * so scrolling and tapping are the same gesture. Rows fade and shrink with
+ * distance from centre — that falloff is what makes the column read as a
+ * physical drum instead of a list.
+ */
+function WheelColumn({
+  options,
+  value,
+  onChange,
+  ariaLabel,
+  align = "center",
+}: {
+  options: Option[];
+  value: number;
+  onChange: (next: number) => void;
+  ariaLabel: string;
+  align?: "center" | "left" | "right";
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const index = clamp(options.findIndex((o) => o.value === value), 0, options.length - 1);
+
+  // Index we last wrote or read. Without this the column feeds back on itself:
+  // a scroll commits a value, the new value re-runs the align effect, that
+  // scroll fires another event, and the drum walks away on its own.
+  const committed = useRef(index);
+
+  // Align on mount without animating — the sheet is still coming up.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el) el.scrollTop = index * ITEM_H;
+    committed.current = index;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-align only when the value changed from outside (day 31 clamped to 28
+  // after switching to February, say) — never for our own scroll.
+  useEffect(() => {
+    if (index === committed.current) return;
+    const el = ref.current;
+    if (el) el.scrollTop = index * ITEM_H;
+    committed.current = index;
+  }, [index]);
+
+  function onScroll() {
+    if (settle.current) clearTimeout(settle.current);
+    settle.current = setTimeout(() => {
+      const el = ref.current;
+      if (!el) return;
+      const i = clamp(Math.round(el.scrollTop / ITEM_H), 0, options.length - 1);
+      if (i === committed.current) return;
+      committed.current = i;
+      const next = options[i];
+      if (next && next.value !== value) onChange(next.value);
+    }, 110);
+  }
+
+  function select(i: number) {
+    const el = ref.current;
+    committed.current = i;
+    el?.scrollTo({ top: i * ITEM_H, behavior: "smooth" });
+    const next = options[i];
+    if (next && next.value !== value) onChange(next.value);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    select(clamp(index + (e.key === "ArrowDown" ? 1 : -1), 0, options.length - 1));
+  }
+
+  const justify =
+    align === "left" ? "justify-start pl-5" : align === "right" ? "justify-end pr-5" : "justify-center";
+
+  return (
+    <div
+      ref={ref}
+      role="listbox"
+      aria-label={ariaLabel}
+      tabIndex={0}
+      onScroll={onScroll}
+      onKeyDown={onKeyDown}
+      className="no-scrollbar flex-1 snap-y snap-mandatory overflow-y-auto rounded-xl outline-none focus-visible:ring-1 focus-visible:ring-accent/50"
+      style={{ height: VISIBLE * ITEM_H }}
+    >
+      <div style={{ height: PAD }} aria-hidden />
+      {options.map((o, i) => {
+        const dist = Math.abs(i - index);
+        const opacity = dist === 0 ? 1 : dist === 1 ? 0.4 : dist === 2 ? 0.16 : 0.07;
+        const scale = dist === 0 ? 1 : dist === 1 ? 0.9 : 0.82;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="option"
+            aria-selected={dist === 0}
+            tabIndex={-1}
+            onClick={() => select(i)}
+            style={{ height: ITEM_H, opacity, transform: `scale(${scale})` }}
+            className={`flex w-full snap-center items-center ${justify} whitespace-nowrap tabular-nums transition-[opacity,transform] duration-150 ${
+              dist === 0 ? "text-[19px] font-extrabold text-foreground" : "text-[17px] font-semibold text-muted"
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+      <div style={{ height: PAD }} aria-hidden />
+    </div>
+  );
+}
+
+/**
+ * Date-of-birth picker.
  *
- * Replaces `<input type="date">`, whose calendar popup is drawn by the browser
- * and can't be themed, and whose `mm/dd/yyyy` hint renders in the input's text
+ * A wheel rather than a calendar: for a birthday the weekday carries no
+ * information anyone wants, yet a calendar grid spends its entire layout on
+ * encoding it. Three drums spend that space on the values that matter, and
+ * match the native birthday input on both iOS and Android.
+ *
+ * Replaces `<input type="date">`, whose popup is drawn by the browser and
+ * can't be themed, and whose mm/dd/yyyy hint renders in the input's text
  * colour rather than as a real placeholder.
- *
- * Year-first rather than a month calendar: entering a birthday means jumping
- * back ~20 years, which a calendar makes tedious.
  */
 export function DateOfBirthPicker({
   value,
@@ -51,73 +168,57 @@ export function DateOfBirthPicker({
 }) {
   const today = useMemo(() => new Date(), []);
   const maxYear = today.getFullYear();
-
   const parsed = parseValue(value);
+
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<Step>("year");
-  const [draftY, setDraftY] = useState<number | null>(parsed?.y ?? null);
-  const [draftM, setDraftM] = useState<number | null>(parsed?.m ?? null);
+  // Draft while the sheet is up; only written back on Done.
+  const [y, setY] = useState(parsed?.y ?? maxYear - 20);
+  const [m, setM] = useState(parsed?.m ?? 0);
+  const [d, setD] = useState(parsed?.d ?? 1);
 
-  const rootRef = useRef<HTMLDivElement>(null);
-  const yearScrollRef = useRef<HTMLDivElement>(null);
-
-  // Close on outside click / Escape.
-  useEffect(() => {
-    if (!open) return;
-    function onDown(e: PointerEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") { e.stopPropagation(); setOpen(false); }
-    }
-    document.addEventListener("pointerdown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  // Bring the relevant year into view when the year list opens.
-  useEffect(() => {
-    if (!open || step !== "year") return;
-    const el = yearScrollRef.current?.querySelector<HTMLElement>("[data-preferred='1']");
-    el?.scrollIntoView({ block: "center" });
-  }, [open, step]);
-
-  function openPicker() {
-    const p = parseValue(value);
-    setDraftY(p?.y ?? null);
-    setDraftM(p?.m ?? null);
-    setStep(p ? "day" : "year");
-    setOpen(true);
-  }
-
-  function commit(y: number, m: number, d: number) {
-    onChange(`${y}-${pad(m + 1)}-${pad(d)}`);
-    setOpen(false);
-  }
-
-  // Years newest-first: a birth year is far likelier to be recent than 1900.
+  // Options are filtered, not disabled — a future date can't be scrolled to at
+  // all, so there's no dead row to land on.
   const years = useMemo(() => {
-    const out: number[] = [];
-    for (let y = maxYear; y >= MIN_YEAR; y--) out.push(y);
+    const out: Option[] = [];
+    for (let yr = maxYear; yr >= MIN_YEAR; yr--) out.push({ value: yr, label: String(yr) });
     return out;
   }, [maxYear]);
 
-  // Default the year list near a plausible birth year rather than the top.
-  const preferredYear = parsed?.y ?? maxYear - 20;
+  const months = useMemo(() => {
+    const last = y === maxYear ? today.getMonth() : 11;
+    return MONTHS_SHORT.slice(0, last + 1).map((label, i) => ({ value: i, label }));
+  }, [y, maxYear, today]);
 
-  const label = parsed
-    ? `${MONTHS[parsed.m]} ${parsed.d}, ${parsed.y}`
-    : "Select your date of birth";
+  const days = useMemo(() => {
+    const cap = y === maxYear && m === today.getMonth() ? today.getDate() : daysInMonth(y, m);
+    return Array.from({ length: cap }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
+  }, [y, m, maxYear, today]);
+
+  // Keep the draft legal as the drums move: Feb 30 and future dates can't exist.
+  useEffect(() => { if (m > months.length - 1) setM(months.length - 1); }, [months.length, m]);
+  useEffect(() => { if (d > days.length) setD(days.length); }, [days.length, d]);
+
+  function openSheet() {
+    const p = parseValue(value);
+    setY(p?.y ?? maxYear - 20);
+    setM(p?.m ?? 0);
+    setD(p?.d ?? 1);
+    setOpen(true);
+  }
+
+  function commit() {
+    onChange(`${y}-${pad2(m + 1)}-${pad2(d)}`);
+    setOpen(false);
+  }
+
+  const label = parsed ? `${MONTHS_LONG[parsed.m]} ${parsed.d}, ${parsed.y}` : "Select your date of birth";
 
   return (
-    <div ref={rootRef} className="relative">
+    <>
       <button
         type="button"
         id={id}
-        onClick={() => (open ? setOpen(false) : openPicker())}
+        onClick={openSheet}
         aria-haspopup="dialog"
         aria-expanded={open}
         className={`flex h-12 w-full items-center justify-between rounded-xl border bg-white/[0.06] px-4 text-left text-sm outline-none transition ${
@@ -125,108 +226,47 @@ export function DateOfBirthPicker({
         } ${parsed ? "text-foreground" : "text-faint"}`}
       >
         <span>{label}</span>
-        <Calendar size={17} className="shrink-0 text-faint" />
+        <Cake size={17} className="shrink-0 text-faint" />
       </button>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label="Choose date of birth"
-          className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-border bg-elevated shadow-2xl"
-        >
-          {/* Header: breadcrumb back through year → month → day */}
-          <div className="flex h-11 items-center gap-1 border-b border-border/60 px-2">
-            {step !== "year" && (
-              <button
-                type="button"
-                aria-label="Back"
-                onClick={() => setStep(step === "day" ? "month" : "year")}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white/5 hover:text-foreground"
-              >
-                <ChevronLeft size={18} />
-              </button>
-            )}
-            <p className="px-1.5 text-sm font-bold">
-              {step === "year" && "Select year"}
-              {step === "month" && draftY}
-              {step === "day" && `${draftM !== null ? MONTHS_SHORT[draftM] : ""} ${draftY}`}
-            </p>
+      {/* A sheet, not a dropdown: the auth card is overflow-hidden, so an
+          absolutely-positioned popover gets clipped at the card's edge. */}
+      <BottomSheet open={open} onClose={() => setOpen(false)} title="When's your birthday?">
+        <div className="pb-2">
+          <div className="relative mt-1">
+            {/* Selection band — the one bright element. Behind the drums, so
+                the centred row reads as locked into it. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-xl border border-accent/35 bg-accent/[0.10]"
+              style={{ height: ITEM_H }}
+            />
+            {/* Feather the top and bottom so the drums look continuous rather
+                than abruptly clipped. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 z-10"
+              style={{
+                background:
+                  "linear-gradient(var(--color-elevated) 2%, transparent 30%, transparent 70%, var(--color-elevated) 98%)",
+              }}
+            />
+            <div className="flex">
+              <WheelColumn options={months} value={m} onChange={setM} ariaLabel="Month" align="right" />
+              <WheelColumn options={days} value={d} onChange={setD} ariaLabel="Day" />
+              <WheelColumn options={years} value={y} onChange={setY} ariaLabel="Year" align="left" />
+            </div>
           </div>
 
-          {step === "year" && (
-            <div ref={yearScrollRef} className="max-h-56 overflow-y-auto p-2">
-              <div className="grid grid-cols-4 gap-1">
-                {years.map((y) => (
-                  <button
-                    key={y}
-                    type="button"
-                    data-preferred={y === preferredYear ? "1" : undefined}
-                    onClick={() => { setDraftY(y); setStep("month"); }}
-                    className={`rounded-lg py-2 text-sm font-semibold tabular-nums transition-colors ${
-                      draftY === y
-                        ? "bg-accent text-accent-ink"
-                        : "text-muted hover:bg-white/5 hover:text-foreground"
-                    }`}
-                  >
-                    {y}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {step === "month" && draftY !== null && (
-            <div className="grid grid-cols-3 gap-1 p-2">
-              {MONTHS_SHORT.map((m, i) => {
-                // A future month in the current year can't be a birth month.
-                const disabled = draftY === maxYear && i > today.getMonth();
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => { setDraftM(i); setStep("day"); }}
-                    className={`rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:opacity-25 ${
-                      draftM === i
-                        ? "bg-accent text-accent-ink"
-                        : "text-muted hover:bg-white/5 hover:text-foreground disabled:hover:bg-transparent"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {step === "day" && draftY !== null && draftM !== null && (
-            <div className="grid grid-cols-7 gap-1 p-2">
-              {Array.from({ length: daysInMonth(draftY, draftM) }, (_, i) => i + 1).map((d) => {
-                const disabled =
-                  draftY === maxYear &&
-                  draftM === today.getMonth() &&
-                  d > today.getDate();
-                const selected = parsed?.y === draftY && parsed?.m === draftM && parsed?.d === d;
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => commit(draftY, draftM, d)}
-                    className={`aspect-square rounded-lg text-sm font-semibold tabular-nums transition-colors disabled:opacity-25 ${
-                      selected
-                        ? "bg-accent text-accent-ink"
-                        : "text-muted hover:bg-white/5 hover:text-foreground disabled:hover:bg-transparent"
-                    }`}
-                  >
-                    {d}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={commit}
+            className="mt-4 h-12 w-full rounded-xl bg-accent text-sm font-bold text-accent-ink transition active:scale-[0.99]"
+          >
+            Use {MONTHS_SHORT[m]} {d}, {y}
+          </button>
         </div>
-      )}
-    </div>
+      </BottomSheet>
+    </>
   );
 }
