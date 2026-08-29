@@ -131,6 +131,13 @@ grant execute on function public.send_message(uuid, text, text, uuid, uuid, uuid
 -- so two concurrent opens serialize on it. The second re-evaluates its
 -- `opened_at is null` against the now-committed row from the first and
 -- matches nothing — no separate unique constraint or FOR UPDATE needed.
+--
+-- The sender needs to see "Opened" once the recipient views it, but oneshots
+-- has `for select using (false)` — no client can read it, including the
+-- sender. Piggyback the flag onto messages.metadata instead: RealChatView
+-- already has a live subscription on messages UPDATE for this conversation
+-- (used by unsend/edit) that spreads whatever columns the row carries into
+-- state, so this needs no new realtime plumbing.
 create or replace function public.claim_oneshot(p_message_id uuid)
 returns text
 language plpgsql security definer set search_path = public as $$
@@ -152,6 +159,11 @@ begin
   if v_path is null then
     raise exception 'This photo is no longer available.';
   end if;
+
+  update public.messages
+    set metadata = jsonb_build_object('oneshot_opened', true, 'oneshot_opened_at', now())
+  where id = p_message_id;
+
   return v_path;
 end $$;
 

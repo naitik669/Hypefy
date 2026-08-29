@@ -92,6 +92,7 @@ const KIND_VERB: Record<string, string> = {
   image: "sent a photo",
   video: "sent a video",
   voice: "sent a voice note",
+  oneshot: "sent a view once photo",
 };
 
 function cap(s: string) {

@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Share } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Share, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { useGroupCall } from "@/components/calls/GroupCallProvider";
@@ -49,6 +49,10 @@ export type ChatMsg = {
   postProfile?: ShareProfile | null;
   shot?: ShotPreview | null;
   shotProfile?: ShareProfile | null;
+  /** claim_oneshot writes { oneshot_opened, oneshot_opened_at } here — the
+   *  only channel the sender has for "did they open it yet", since the
+   *  oneshots table itself is unreadable by any client. */
+  metadata?: { oneshot_opened?: boolean; oneshot_opened_at?: string } | null;
   /** Client-only: set on optimistic messages before server confirms */
   _status?: "pending" | "failed";
 };
@@ -65,6 +69,7 @@ function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null 
     case "voice": return "Voice note";
     case "shot": return "Shot";
     case "post": return "Post";
+    case "oneshot": return "Photo";
     default: return m.body ?? "Message";
   }
 }
@@ -81,7 +86,7 @@ const QUICK = ["❤️", "🥰", "😂", "👍", "😮", "😢"];
 const MSG_PAGE = 30;
 /** Select used for both the initial server load and client pagination. */
 const MSG_SELECT =
-  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, created_at, post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(username, display_name, avatar_hue)), shot:shots(id, media_url, caption, profiles(username, display_name, avatar_hue))";
+  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(username, display_name, avatar_hue)), shot:shots(id, media_url, caption, profiles(username, display_name, avatar_hue))";
 
 /** Flatten Supabase's nested post/shot+profile joins into ChatMsg shape. */
 function mapMessageRow(m: any): ChatMsg {
@@ -193,8 +198,16 @@ export function RealChatView({
     file: File;
     preview: string;
     type: "image" | "video";
+    /** View-once only ever applies to images — the private bucket accepts
+     *  image mimes only (see oneshot-media in 0033_oneshot.sql). */
+    viewOnce: boolean;
   } | null>(null);
   const [uploading, setUploading] = useState(false);
+  // Local-only, per-mount reveal state for OneShot bubbles: which message ids
+  // the viewer has tapped to open. Not persisted — if they leave and come
+  // back, tapping again just hits /api/oneshot again, which correctly 404s
+  // once the server-side claim is already consumed (that's the guarantee).
+  const [oneshotView, setOneshotView] = useState<Record<string, "loading" | "loaded" | "gone">>({});
   const [muted, setMuted] = useState(false);
   const { startCall } = useCallControls();
   const { startGroupCall } = useGroupCall();
@@ -894,7 +907,7 @@ export function RealChatView({
       return;
     }
     const preview = URL.createObjectURL(file);
-    setAttachment({ file, preview, type: isVideo ? "video" : "image" });
+    setAttachment({ file, preview, type: isVideo ? "video" : "image", viewOnce: false });
   }
 
   /** Upload the staged attachment to Supabase Storage and send as a message. */
@@ -905,9 +918,12 @@ export function RealChatView({
     const ext = attachment.file.name.split(".").pop()
       ?? (attachment.type === "video" ? "mp4" : "jpg");
     const path = `${currentUserId}/${Date.now()}.${ext}`;
+    const isOneShot = attachment.viewOnce && attachment.type === "image";
 
+    // OneShot goes to the private bucket (no public URL exists for it — the
+    // whole point). Everything else keeps the existing public-bucket path.
     const { error: uploadErr } = await supabase.storage
-      .from("chat-media")
+      .from(isOneShot ? "oneshot-media" : "chat-media")
       .upload(path, attachment.file, { contentType: attachment.file.type });
 
     if (uploadErr) {
@@ -916,17 +932,20 @@ export function RealChatView({
       return;
     }
 
-    const { data: { publicUrl } } = supabase.storage
-      .from("chat-media")
-      .getPublicUrl(path);
+    const publicUrl = isOneShot
+      ? null
+      : supabase.storage.from("chat-media").getPublicUrl(path).data.publicUrl;
 
     const replyId = replyTo?.id ?? null;
     setReplyTo(null);
-    const kind = attachment.type; // "image" | "video"
+    const kind = isOneShot ? "oneshot" : attachment.type; // "oneshot" | "image" | "video"
 
     const tempId = `temp-${Date.now()}`;
     const optimistic: ChatMsg = {
-      id: tempId, body: publicUrl, sender_id: currentUserId, kind,
+      // The sender's bubble never renders actual image bytes for a OneShot —
+      // even they don't get to re-view it after sending (claim_oneshot blocks
+      // sender_id === auth.uid()), so there's nothing to preview locally.
+      id: tempId, body: isOneShot ? null : publicUrl, sender_id: currentUserId, kind,
       post_id: null, reply_to_id: replyId, is_unsent: false,
       created_at: new Date().toISOString(), _status: "pending",
     };
@@ -935,8 +954,11 @@ export function RealChatView({
     setAttachment(null);
 
     const { data, error } = await supabase.rpc("send_message", {
-      p_conversation_id: conversationId, p_body: publicUrl, p_kind: kind,
+      p_conversation_id: conversationId,
+      p_body: isOneShot ? undefined : publicUrl ?? undefined,
+      p_kind: kind,
       p_post_id: undefined, p_reply_to_id: replyId ?? undefined,
+      p_storage_path: isOneShot ? path : undefined,
     });
     if (error || !data) {
       setMessages((p) => p.map((m) => m.id === tempId ? { ...m, _status: "failed" as const } : m));
@@ -1180,6 +1202,21 @@ export function RealChatView({
                       </span>
                     </div>
                   )}
+                  {m.kind === "system" ? (
+                    /* Chat-settings notices (screenshot alert / vanish mode /
+                       auto-delete) — an event the THREAD reports, not something
+                       either person "said". No sender chrome, no bubble tail,
+                       no read tick: it isn't a message, so it can't be unsent,
+                       replied to, or "seen". Centered and bold like Instagram's
+                       system notices, but in Hypefy's own voice — the accent
+                       lime dot instead of a generic gray box. */
+                    <div className="flex justify-center px-6 py-1">
+                      <p className="max-w-[85%] text-center text-[11px] font-bold leading-snug text-muted">
+                        <span className="mr-1 text-accent">•</span>
+                        {m.body}
+                      </p>
+                    </div>
+                  ) : (
                   <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                     <div className={`flex max-w-[80%] flex-col ${mine ? "items-end" : "items-start"}`}>
                       {showSender && (
@@ -1243,6 +1280,20 @@ export function RealChatView({
                             {m.shot.caption && <p className="line-clamp-1 text-[11px] text-white/85 drop-shadow">{m.shot.caption}</p>}
                           </div>
                         </Link>
+                      ) : m.kind === "oneshot" ? (
+                        <OneShotBubble
+                          m={m}
+                          mine={mine}
+                          view={oneshotView[m.id]}
+                          onReveal={() => {
+                            setOneshotView((v) => ({ ...v, [m.id]: "loading" }));
+                            haptics.tap();
+                          }}
+                          onLoaded={() => setOneshotView((v) => ({ ...v, [m.id]: "loaded" }))}
+                          onGone={() => setOneshotView((v) => ({ ...v, [m.id]: "gone" }))}
+                          timeLabel={timeLabel(m.created_at)}
+                          statusTick={mine ? <MsgStatusTick status={getMsgStatus(m)} /> : null}
+                        />
                       ) : (m.kind === "gif" || m.kind === "image") && m.body ? (
                         /* GIF / image — media bubble with time+status pill overlay */
                         <div
@@ -1400,6 +1451,7 @@ export function RealChatView({
                       )}
                     </div>
                   </div>
+                  )}
                 </div>
               );
             })}
@@ -1457,25 +1509,62 @@ export function RealChatView({
 
         {/* ── Attachment preview ── */}
         {attachment && !voiceMode && (
-          <div className="mb-2 flex items-start gap-2 rounded-xl border border-border/60 bg-surface p-2">
-            {attachment.type === "image" ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={attachment.preview} alt="" className="h-16 w-16 rounded-lg object-cover" />
-            ) : (
-              <video src={attachment.preview} className="h-16 w-16 rounded-lg bg-black object-cover" muted playsInline preload="metadata" />
-            )}
-            <div className="min-w-0 flex-1 py-1">
-              <p className="truncate text-xs font-semibold">{attachment.file.name}</p>
-              <p className="text-[10px] text-faint capitalize">{attachment.type}</p>
+          <div className="mb-2 flex flex-col gap-2 rounded-xl border border-border/60 bg-surface p-2">
+            <div className="flex items-start gap-2">
+              <div className="relative shrink-0">
+                {attachment.type === "image" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={attachment.preview} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                ) : (
+                  <video src={attachment.preview} className="h-16 w-16 rounded-lg bg-black object-cover" muted playsInline preload="metadata" />
+                )}
+                {attachment.viewOnce && (
+                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-ink ring-2 ring-surface">
+                    <Eye size={11} strokeWidth={2.5} />
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1 py-1">
+                <p className="truncate text-xs font-semibold">{attachment.file.name}</p>
+                <p className="text-[10px] text-faint capitalize">
+                  {attachment.viewOnce ? "View once photo" : attachment.type}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { URL.revokeObjectURL(attachment.preview); setAttachment(null); }}
+                aria-label="Remove attachment"
+                className="shrink-0 text-faint hover:text-muted"
+              >
+                <X size={16} />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => { URL.revokeObjectURL(attachment.preview); setAttachment(null); }}
-              aria-label="Remove attachment"
-              className="shrink-0 text-faint hover:text-muted"
-            >
-              <X size={16} />
-            </button>
+
+            {/* View-once only applies to images — the private bucket only
+                accepts image mimes, and streaming a whole video through the
+                proxy on every open isn't worth building for a prototype. */}
+            {attachment.type === "image" && (
+              <button
+                type="button"
+                onClick={() => setAttachment((a) => a && { ...a, viewOnce: !a.viewOnce })}
+                aria-pressed={attachment.viewOnce}
+                className={`flex items-center gap-1.5 self-start rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                  attachment.viewOnce ? "bg-accent text-accent-ink" : "bg-elevated text-muted hover:text-foreground"
+                }`}
+              >
+                <Eye size={12} strokeWidth={2.5} />
+                {attachment.viewOnce ? "View once — on" : "Send as view once"}
+              </button>
+            )}
+
+            {/* Honest disclosure at the point of sending, not hidden behind a
+                settings page — the web build has no way to detect or block a
+                screenshot at all. */}
+            {attachment.viewOnce && (
+              <p className="px-0.5 text-[10px] leading-snug text-faint">
+                Opens once, then it's gone. Hypefy can't stop someone from screenshotting their screen.
+              </p>
+            )}
           </div>
         )}
 
@@ -1759,6 +1848,102 @@ function CtxItem({ icon, label, onClick, danger }: { icon: React.ReactNode; labe
       className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-white/5 ${danger ? "text-danger" : "text-foreground"}`}>
       {icon}
       {label}
+    </button>
+  );
+}
+
+/**
+ * OneShot bubble — a view-once photo. The sender never sees actual image
+ * bytes here (their own bubble is a status card, matching that they can't
+ * re-view it either); the recipient gets a tap-to-reveal card that, on tap,
+ * points an <img> at the same-origin proxy route. The proxy claims the photo
+ * server-side on that request — this component never touches storage_path or
+ * any RPC directly, it only reacts to the fetch's own success/failure.
+ */
+function OneShotBubble({
+  m, mine, view, onReveal, onLoaded, onGone, timeLabel, statusTick,
+}: {
+  m: ChatMsg;
+  mine: boolean;
+  view: "loading" | "loaded" | "gone" | undefined;
+  onReveal: () => void;
+  onLoaded: () => void;
+  onGone: () => void;
+  timeLabel: string;
+  statusTick: React.ReactNode;
+}) {
+  if (mine) {
+    const opened = !!m.metadata?.oneshot_opened;
+    return (
+      <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-surface px-3.5 py-2.5" style={{ maxWidth: 220 }}>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${opened ? "bg-elevated text-faint" : "bg-accent/15 text-accent"}`}>
+          {opened ? <Eye size={15} /> : <EyeOff size={15} />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">Photo</p>
+          <p className="truncate text-[11px] text-muted">
+            {m._status === "pending" ? "Sending…" : opened ? "Opened" : "View once · Delivered"}
+          </p>
+        </div>
+        <span className="flex shrink-0 items-center gap-[3px]">
+          <span className="text-[9px] font-medium text-faint">{timeLabel}</span>
+          {statusTick}
+        </span>
+      </div>
+    );
+  }
+
+  if (view === "gone") {
+    return (
+      <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-surface px-3.5 py-2.5 text-muted" style={{ maxWidth: 220 }}>
+        <EyeOff size={15} className="shrink-0" />
+        <p className="text-sm">This photo is no longer available.</p>
+      </div>
+    );
+  }
+
+  if (view === "loading" || view === "loaded") {
+    return (
+      <div className="relative overflow-hidden rounded-2xl bg-black" style={{ maxWidth: 240 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/api/oneshot/${m.id}`}
+          alt="View once photo"
+          className={`w-full rounded-2xl object-cover transition-opacity ${view === "loaded" ? "opacity-100" : "opacity-0"}`}
+          onLoad={onLoaded}
+          onError={onGone}
+        />
+        {view === "loading" && (
+          <div className="absolute inset-0 flex min-h-[160px] items-center justify-center">
+            <span className="flex items-end gap-[3px]" aria-label="Loading">
+              {[0, 0.15, 0.3].map((delay, i) => (
+                <span key={i} className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/70" style={{ animationDelay: `${delay}s` }} />
+              ))}
+            </span>
+          </div>
+        )}
+        <span className="absolute bottom-1.5 right-2 rounded-full bg-black/50 px-1.5 py-[3px] text-[9px] font-medium text-white/85 backdrop-blur-sm">
+          {timeLabel}
+        </span>
+      </div>
+    );
+  }
+
+  // Unrevealed — tap to claim + load.
+  return (
+    <button
+      type="button"
+      onClick={onReveal}
+      className="flex items-center gap-2 rounded-2xl border border-accent/30 bg-accent/[0.08] px-3.5 py-2.5 text-left active:scale-[0.98]"
+      style={{ maxWidth: 220 }}
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/20 text-accent">
+        <Eye size={15} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-foreground">Tap to view</p>
+        <p className="truncate text-[11px] text-muted">Opens once, then it's gone</p>
+      </div>
     </button>
   );
 }
