@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Share, Eye, EyeOff } from "lucide-react";
+import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Share, Eye, EyeOff, FileText, Download, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { useGroupCall } from "@/components/calls/GroupCallProvider";
@@ -70,6 +70,9 @@ function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null 
     case "shot": return "Shot";
     case "post": return "Post";
     case "oneshot": return "Photo";
+    case "document": {
+      try { return JSON.parse(m.body ?? "")?.name ?? "Document"; } catch { return "Document"; }
+    }
     default: return m.body ?? "Message";
   }
 }
@@ -81,6 +84,31 @@ type GroupMeta = { title: string; memberCount: number; avatarUrl?: string | null
 
 const REPORT_REASONS = ["Spam", "Harassment", "Hate or abuse", "Scam", "Inappropriate content", "Other"];
 const QUICK = ["❤️", "🥰", "😂", "👍", "😮", "😢"];
+
+/** Document mimes the chat-media bucket accepts (0034_chat_documents.sql).
+ *  Kept in sync with that migration's allowlist — html/svg are deliberately
+ *  absent since both can carry script. */
+const DOC_MIMES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+  "application/zip",
+];
+/** Extensions too — some platforms' file pickers match on those, not mime. */
+const DOC_ACCEPT = `${DOC_MIMES.join(",")},.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip`;
+
+/** "2.4 MB" / "812 KB" — for document bubbles. */
+function fileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 /** How many messages per page (initial load + each scroll-up chunk). */
 const MSG_PAGE = 30;
@@ -196,12 +224,17 @@ export function RealChatView({
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
   const [attachment, setAttachment] = useState<{
     file: File;
+    /** Object URL for image/video thumbnails; empty for documents. */
     preview: string;
-    type: "image" | "video";
+    type: "image" | "video" | "document";
     /** View-once only ever applies to images — the private bucket accepts
      *  image mimes only (see oneshot-media in 0033_oneshot.sql). */
     viewOnce: boolean;
   } | null>(null);
+  // Which attachment sheet option was chosen — read by pickFile to validate
+  // the file against that intent, since one hidden <input> serves all three.
+  const [attachMenu, setAttachMenu] = useState(false);
+  const pickMode = useRef<"media" | "oneshot" | "document">("media");
   const [uploading, setUploading] = useState(false);
   // Local-only, per-mount reveal state for OneShot bubbles: which message ids
   // the viewer has tapped to open. Not persisted — if they leave and come
@@ -892,22 +925,66 @@ export function RealChatView({
     setSending(false);
   }
 
-  /** Handle file input change — build a preview and store the attachment. */
+  /** Handle file input change — validate against the chosen mode, build a
+   *  preview, and stage the attachment. */
   function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ""; // reset so the same file can be re-picked
     if (!file) return;
     setGifPickerOpen(false);
+
+    const mode = pickMode.current;
     const isVideo = file.type.startsWith("video/");
     const isImage = file.type.startsWith("image/");
+
+    if (mode === "document") {
+      // accept="" filters most of this in the picker, but a determined user
+      // can still choose "All files" on some platforms — and the bucket's
+      // mime allowlist would reject it server-side with a cryptic error, so
+      // catch it here with a message that actually says what happened.
+      if (isImage || isVideo) {
+        showToast("That's a photo or video — use Photo or video instead.");
+        return;
+      }
+      if (!DOC_MIMES.includes(file.type)) {
+        showToast("That file type can't be sent.");
+        return;
+      }
+      if (file.size > 25 * 1024 * 1024) {
+        showToast("Document is too large (max 25MB).");
+        return;
+      }
+      setAttachment({ file, preview: "", type: "document", viewOnce: false });
+      return;
+    }
+
     if (!isVideo && !isImage) { showToast("Only photos and videos can be sent."); return; }
+    if (mode === "oneshot" && !isImage) {
+      showToast("View once works with photos only.");
+      return;
+    }
     const maxMb = isVideo ? 50 : 10;
     if (file.size > maxMb * 1024 * 1024) {
       showToast(`${isVideo ? "Video" : "Photo"} is too large (max ${maxMb}MB).`);
       return;
     }
     const preview = URL.createObjectURL(file);
-    setAttachment({ file, preview, type: isVideo ? "video" : "image", viewOnce: false });
+    setAttachment({
+      file, preview,
+      type: isVideo ? "video" : "image",
+      viewOnce: mode === "oneshot",
+    });
+  }
+
+  /** Open the OS picker for one of the sheet's options. */
+  function openPicker(mode: "media" | "oneshot" | "document") {
+    pickMode.current = mode;
+    setAttachMenu(false);
+    const input = fileInputRef.current;
+    if (!input) return;
+    input.accept =
+      mode === "document" ? DOC_ACCEPT : mode === "oneshot" ? "image/*" : "image/*,video/*";
+    input.click();
   }
 
   /** Upload the staged attachment to Supabase Storage and send as a message. */
@@ -938,24 +1015,32 @@ export function RealChatView({
 
     const replyId = replyTo?.id ?? null;
     setReplyTo(null);
-    const kind = isOneShot ? "oneshot" : attachment.type; // "oneshot" | "image" | "video"
+    const kind = isOneShot ? "oneshot" : attachment.type; // "oneshot" | "image" | "video" | "document"
+
+    // Documents carry filename + size alongside the URL, mirroring how voice
+    // notes already pack {url, duration} into body — no schema change needed.
+    const outgoingBody = isOneShot
+      ? null
+      : attachment.type === "document"
+        ? JSON.stringify({ url: publicUrl, name: attachment.file.name, size: attachment.file.size })
+        : publicUrl;
 
     const tempId = `temp-${Date.now()}`;
     const optimistic: ChatMsg = {
       // The sender's bubble never renders actual image bytes for a OneShot —
       // even they don't get to re-view it after sending (claim_oneshot blocks
       // sender_id === auth.uid()), so there's nothing to preview locally.
-      id: tempId, body: isOneShot ? null : publicUrl, sender_id: currentUserId, kind,
+      id: tempId, body: outgoingBody, sender_id: currentUserId, kind,
       post_id: null, reply_to_id: replyId, is_unsent: false,
       created_at: new Date().toISOString(), _status: "pending",
     };
     setMessages((p) => [...p, optimistic]);
-    URL.revokeObjectURL(attachment.preview);
+    if (attachment.preview) URL.revokeObjectURL(attachment.preview);
     setAttachment(null);
 
     const { data, error } = await supabase.rpc("send_message", {
       p_conversation_id: conversationId,
-      p_body: isOneShot ? undefined : publicUrl ?? undefined,
+      p_body: outgoingBody ?? undefined,
       p_kind: kind,
       p_post_id: undefined, p_reply_to_id: replyId ?? undefined,
       p_storage_path: isOneShot ? path : undefined,
@@ -1302,7 +1387,44 @@ export function RealChatView({
                           timeLabel={timeLabel(m.created_at)}
                           statusTick={mine ? <MsgStatusTick status={getMsgStatus(m)} /> : null}
                         />
-                      ) : (m.kind === "gif" || m.kind === "image") && m.body ? (
+                      ) : m.kind === "document" && m.body ? (() => {
+                        // body is JSON { url, name, size } — same packing as voice.
+                        let docUrl = m.body, docName = "Document", docSize: number | undefined;
+                        try {
+                          const p = JSON.parse(m.body);
+                          docUrl = p.url ?? m.body;
+                          docName = p.name ?? "Document";
+                          docSize = typeof p.size === "number" ? p.size : undefined;
+                        } catch { /* pre-JSON row — fall back to the raw URL */ }
+                        return (
+                          <a
+                            href={docUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onPointerDown={(e) => onPressStart(m, e)}
+                            onPointerUp={onPressEnd}
+                            onPointerMove={onPressEnd}
+                            onPointerLeave={onPressEnd}
+                            onClick={(e) => { if (suppressClick.current) { e.preventDefault(); suppressClick.current = false; } }}
+                            onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                            className={`relative flex items-center gap-2.5 rounded-2xl px-3 py-2.5 ${
+                              mine ? "rounded-br-md bg-accent text-accent-ink" : "rounded-bl-md bg-surface text-foreground"
+                            }`}
+                            style={{ maxWidth: 240 }}
+                          >
+                            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${mine ? "bg-accent-ink/15" : "bg-elevated"}`}>
+                              <FileText size={17} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold">{docName}</span>
+                              <span className={`block text-[10px] ${mine ? "text-accent-ink/70" : "text-muted"}`}>
+                                {docSize !== undefined ? fileSize(docSize) : "Tap to open"}
+                              </span>
+                            </span>
+                            <Download size={15} className={`shrink-0 ${mine ? "text-accent-ink/70" : "text-muted"}`} />
+                          </a>
+                        );
+                      })() : (m.kind === "gif" || m.kind === "image") && m.body ? (
                         /* GIF / image — media bubble with time+status pill overlay */
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
@@ -1435,9 +1557,9 @@ export function RealChatView({
                         </div>
                       )}
 
-                      {/* External time+status — only for voice, post, and shot cards.
+                      {/* External time+status — for voice, document, post, and shot cards.
                           Plain text, gif, image, and video bubbles embed the time+tick inside themselves. */}
-                      {(m.kind === "voice" || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
+                      {(m.kind === "voice" || m.kind === "document" || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
                         (showTime || (mine && m._status === "failed")) && (
                         <div className={`flex items-center gap-1 px-1 pt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
                           {showTime && (
@@ -1523,8 +1645,13 @@ export function RealChatView({
                 {attachment.type === "image" ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={attachment.preview} alt="" className="h-16 w-16 rounded-lg object-cover" />
-                ) : (
+                ) : attachment.type === "video" ? (
                   <video src={attachment.preview} className="h-16 w-16 rounded-lg bg-black object-cover" muted playsInline preload="metadata" />
+                ) : (
+                  /* Documents have no visual preview — show the file glyph. */
+                  <span className="flex h-16 w-16 items-center justify-center rounded-lg bg-elevated text-hashtag">
+                    <FileText size={24} />
+                  </span>
                 )}
                 {attachment.viewOnce && (
                   <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-ink ring-2 ring-surface">
@@ -1534,36 +1661,21 @@ export function RealChatView({
               </div>
               <div className="min-w-0 flex-1 py-1">
                 <p className="truncate text-xs font-semibold">{attachment.file.name}</p>
-                <p className="text-[10px] text-faint capitalize">
-                  {attachment.viewOnce ? "View once photo" : attachment.type}
+                <p className="text-[10px] text-faint">
+                  {attachment.viewOnce
+                    ? "View once photo"
+                    : `${attachment.type === "document" ? "Document" : attachment.type === "video" ? "Video" : "Photo"} · ${fileSize(attachment.file.size)}`}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => { URL.revokeObjectURL(attachment.preview); setAttachment(null); }}
+                onClick={() => { if (attachment.preview) URL.revokeObjectURL(attachment.preview); setAttachment(null); }}
                 aria-label="Remove attachment"
                 className="shrink-0 text-faint hover:text-muted"
               >
                 <X size={16} />
               </button>
             </div>
-
-            {/* View-once only applies to images — the private bucket only
-                accepts image mimes, and streaming a whole video through the
-                proxy on every open isn't worth building for a prototype. */}
-            {attachment.type === "image" && (
-              <button
-                type="button"
-                onClick={() => setAttachment((a) => a && { ...a, viewOnce: !a.viewOnce })}
-                aria-pressed={attachment.viewOnce}
-                className={`flex items-center gap-1.5 self-start rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                  attachment.viewOnce ? "bg-accent text-accent-ink" : "bg-elevated text-muted hover:text-foreground"
-                }`}
-              >
-                <Eye size={12} strokeWidth={2.5} />
-                {attachment.viewOnce ? "View once — on" : "Send as view once"}
-              </button>
-            )}
 
             {/* Honest disclosure at the point of sending, not hidden behind a
                 settings page — the web build has no way to detect or block a
@@ -1609,11 +1721,14 @@ export function RealChatView({
           /* ── Text / GIF / attachment composer ── */
           <div className="flex items-center gap-1.5">
 
-            {/* Attachment button — always visible */}
+            {/* Attachment button — opens the type chooser rather than jumping
+                straight to the OS picker, so "view once" is a decision you make
+                up front instead of a toggle you have to notice afterwards. */}
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              aria-label="Attach photo or video"
+              onClick={() => { setGifPickerOpen(false); setAttachMenu(true); }}
+              aria-label="Attach"
+              aria-haspopup="dialog"
               className={`flex h-11 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-90 ${
                 attachment ? "text-accent" : "text-muted hover:bg-surface hover:text-foreground"
               }`}
@@ -1693,7 +1808,7 @@ export function RealChatView({
           </div>
         )}
 
-        {/* Hidden file input — triggered by the Paperclip button */}
+        {/* Hidden file input — `accept` is set per-option by openPicker() */}
         <input
           ref={fileInputRef}
           type="file"
@@ -1702,6 +1817,44 @@ export function RealChatView({
           onChange={pickFile}
         />
       </div>
+
+      {/* Attachment type chooser */}
+      <BottomSheet open={attachMenu} onClose={() => setAttachMenu(false)} title="Send">
+        <div className="flex flex-col gap-1 pb-2">
+          <AttachOption
+            icon={<ImageIcon size={18} />}
+            tint="text-verified"
+            bg="bg-verified/15"
+            label="Photo or video"
+            hint="From your gallery or camera"
+            onClick={() => openPicker("media")}
+          />
+          <AttachOption
+            icon={<Eye size={18} />}
+            tint="text-accent"
+            bg="bg-accent/15"
+            label="View once photo"
+            hint="Opens once, then it's gone"
+            onClick={() => openPicker("oneshot")}
+          />
+          <AttachOption
+            icon={<FileText size={18} />}
+            tint="text-hashtag"
+            bg="bg-hashtag/15"
+            label="Document"
+            hint="PDF, doc, sheet, text or zip"
+            onClick={() => openPicker("document")}
+          />
+          <AttachOption
+            icon={<span className="text-[11px] font-black tracking-wider">GIF</span>}
+            tint="text-hype"
+            bg="bg-hype/15"
+            label="GIF"
+            hint="Search and send a GIF"
+            onClick={() => { setAttachMenu(false); setGifPickerOpen(true); }}
+          />
+        </div>
+      </BottomSheet>
 
       {/* Long-press context menu (reactions + actions), anchored to the message */}
       {menu && (() => {
@@ -1856,6 +2009,34 @@ function CtxItem({ icon, label, onClick, danger }: { icon: React.ReactNode; labe
       className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-white/5 ${danger ? "text-danger" : "text-foreground"}`}>
       {icon}
       {label}
+    </button>
+  );
+}
+
+/** One row in the attachment chooser — icon bubble + label + hint. */
+function AttachOption({
+  icon, tint, bg, label, hint, onClick,
+}: {
+  icon: React.ReactNode;
+  tint: string;
+  bg: string;
+  label: string;
+  hint: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-3 rounded-2xl px-1 py-2.5 text-left transition-colors hover:bg-white/5 active:scale-[0.99]"
+    >
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${bg} ${tint}`}>
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-foreground">{label}</span>
+        <span className="block truncate text-[11px] text-muted">{hint}</span>
+      </span>
     </button>
   );
 }

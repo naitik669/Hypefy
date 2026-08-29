@@ -93,6 +93,7 @@ const KIND_VERB: Record<string, string> = {
   video: "sent a video",
   voice: "sent a voice note",
   oneshot: "sent a view once photo",
+  document: "sent a document",
 };
 
 function cap(s: string) {
@@ -109,6 +110,11 @@ function preview(r: InboxRow) {
   }
 
   if (!r.lastAt) return r.isGroup ? "New group" : "Say hi 👋";
+
+  // System notices (screenshot alert / vanish mode / auto-delete) are thread
+  // events, not something anyone said — so no "You: " prefix and no sender
+  // name. The body already reads as a full sentence naming who did it.
+  if (r.lastKind === "system") return r.lastBody ?? "Chat settings updated";
 
   const verb = r.lastKind ? KIND_VERB[r.lastKind] : undefined;
 
