@@ -105,19 +105,19 @@ const DOC_ACCEPT = `${DOC_MIMES.join(",")},.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx
 
 /** Rows in the attachment chooser, in priority order.
  *
- *  Every icon is brand lime by design — the colour is the menu's identity,
- *  not a per-row category code. Four competing hues in a 240px popup just
- *  read as noise, and none of them meant anything. */
+ *  Labels only — no descriptions. Every label already says what it does,
+ *  and the one row that genuinely needs a caveat (View once) gets it at
+ *  the point of sending, in the composer preview, where it is far harder
+ *  to miss than a grey subtitle in a picker. */
 const ATTACH_OPTIONS: {
   mode: "media" | "oneshot" | "document" | "gif";
   icon: React.ReactNode;
   label: string;
-  hint: string;
 }[] = [
-  { mode: "media", icon: <ImageIcon size={17} />, label: "Photo or video", hint: "From your gallery" },
-  { mode: "oneshot", icon: <Eye size={17} />, label: "View once photo", hint: "Opens once, then it's gone" },
-  { mode: "document", icon: <FileText size={17} />, label: "Document", hint: "PDF, doc, sheet, text" },
-  { mode: "gif", icon: <span className="text-[10px] font-black tracking-wider">GIF</span>, label: "GIF", hint: "Search and send" },
+  { mode: "media", icon: <ImageIcon size={16} />, label: "Photo or video" },
+  { mode: "oneshot", icon: <Eye size={16} />, label: "View once" },
+  { mode: "document", icon: <FileText size={16} />, label: "Document" },
+  { mode: "gif", icon: <span className="text-[9px] font-black tracking-wider">GIF</span>, label: "GIF" },
 ];
 
 /** "2.4 MB" / "812 KB" — for document bubbles. */
@@ -1762,7 +1762,7 @@ export function RealChatView({
                 origin="bottom-left"
                 exitMs={130}
                 bare
-                className="absolute bottom-[calc(100%+10px)] left-0 flex w-60 flex-col gap-2"
+                className="absolute bottom-[calc(100%+10px)] left-0 flex w-[190px] flex-col gap-1.5"
               >
                 {ATTACH_OPTIONS.map((o, i) => (
                   <button
@@ -1777,19 +1777,18 @@ export function RealChatView({
                     // first, so the stack reads as rising out of the button
                     // rather than dropping onto it.
                     style={{ animationDelay: `${(ATTACH_OPTIONS.length - 1 - i) * 45}ms` }}
-                    className="attach-tile animate-row-in group flex items-stretch overflow-hidden rounded-[14px] border border-border bg-elevated text-left shadow-[0_8px_20px_rgba(0,0,0,0.45)] transition-colors hover:bg-border"
+                    className="attach-tile animate-row-in group flex items-stretch overflow-hidden rounded-xl border border-border bg-elevated text-left shadow-[0_6px_16px_rgba(0,0,0,0.4)] transition-colors hover:bg-border"
                   >
                     {/* One surface, split by a hairline. The divider is a
                         white overlay rather than border-border so it stays
                         visible once the hover state lifts the tile TO
                         border-border — same-colour-on-same-colour would
                         make it vanish exactly when the row is focused. */}
-                    <span className="flex w-12 shrink-0 items-center justify-center border-r border-white/[0.08] text-muted transition-colors group-hover:text-accent">
+                    <span className="flex w-9 shrink-0 items-center justify-center border-r border-white/[0.08] text-muted transition-colors group-hover:text-accent">
                       {o.icon}
                     </span>
-                    <span className="min-w-0 flex-1 px-3 py-2">
-                      <span className="block truncate text-[13px] font-semibold text-foreground">{o.label}</span>
-                      <span className="block truncate text-[10px] leading-tight text-muted">{o.hint}</span>
+                    <span className="min-w-0 flex-1 truncate px-2.5 py-[9px] text-[13px] font-medium text-foreground">
+                      {o.label}
                     </span>
                   </button>
                 ))}
