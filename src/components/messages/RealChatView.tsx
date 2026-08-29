@@ -1777,15 +1777,17 @@ export function RealChatView({
                     // first, so the stack reads as rising out of the button
                     // rather than dropping onto it.
                     style={{ animationDelay: `${(ATTACH_OPTIONS.length - 1 - i) * 45}ms` }}
-                    className="attach-tile animate-row-in group flex items-center gap-1.5 text-left"
+                    className="attach-tile animate-row-in group flex items-stretch overflow-hidden rounded-[14px] border border-border bg-elevated text-left shadow-[0_8px_20px_rgba(0,0,0,0.45)] transition-colors hover:bg-border"
                   >
-                    {/* Icon and copy are two separate surfaces, not one row —
-                        they highlight together via `group` so the pair still
-                        reads as a single target. */}
-                    <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[14px] border border-border bg-elevated text-accent shadow-[0_8px_20px_rgba(0,0,0,0.45)] transition-colors group-hover:border-accent/40 group-hover:bg-border">
+                    {/* One surface, split by a hairline. The divider is a
+                        white overlay rather than border-border so it stays
+                        visible once the hover state lifts the tile TO
+                        border-border — same-colour-on-same-colour would
+                        make it vanish exactly when the row is focused. */}
+                    <span className="flex w-12 shrink-0 items-center justify-center border-r border-white/[0.08] text-muted transition-colors group-hover:text-accent">
                       {o.icon}
                     </span>
-                    <span className="min-w-0 flex-1 rounded-[14px] border border-border bg-elevated px-3 py-2 shadow-[0_8px_20px_rgba(0,0,0,0.45)] transition-colors group-hover:bg-border">
+                    <span className="min-w-0 flex-1 px-3 py-2">
                       <span className="block truncate text-[13px] font-semibold text-foreground">{o.label}</span>
                       <span className="block truncate text-[10px] leading-tight text-muted">{o.hint}</span>
                     </span>
