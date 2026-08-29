@@ -71,7 +71,7 @@ export default async function ThreadPage({
   // then reversed to chronological order for rendering).
   const { data: latestMsgs } = await supabase
     .from("messages")
-    .select("id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, created_at, post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(username, display_name, avatar_hue)), shot:shots(id, media_url, caption, profiles(username, display_name, avatar_hue))")
+    .select("id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(username, display_name, avatar_hue)), shot:shots(id, media_url, caption, profiles(username, display_name, avatar_hue))")
     .eq("conversation_id", threadId)
     .order("created_at", { ascending: false })
     .limit(30);

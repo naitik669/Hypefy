@@ -1284,7 +1284,15 @@ export function RealChatView({
                         <OneShotBubble
                           m={m}
                           mine={mine}
-                          view={oneshotView[m.id]}
+                          // Local state (set while this component is mounted)
+                          // always wins — a genuinely in-flight "loading" must
+                          // not be clobbered by the realtime metadata update
+                          // that claim_oneshot fires partway through the same
+                          // load. Only fall back to metadata when there's no
+                          // local state at all: a fresh mount/reload after a
+                          // claim already happened in an earlier session must
+                          // not show "Tap to view" for something already spent.
+                          view={oneshotView[m.id] ?? (!mine && m.metadata?.oneshot_opened ? "gone" : undefined)}
                           onReveal={() => {
                             setOneshotView((v) => ({ ...v, [m.id]: "loading" }));
                             haptics.tap();
