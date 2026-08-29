@@ -256,14 +256,25 @@ body {
   animation: roll-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Floating menus unfurl from their anchor (origin set per-menu) */
+/* Floating menus unfurl from their anchor. transform-origin is deliberately
+   NOT set here — FloatingMenu always applies a Tailwind origin-* class from
+   its `origin` prop, and hardcoding it here overrode that, so every menu
+   declaring bottom-left/top-left still grew from the top-right corner. */
 @keyframes menu-pop {
   from { opacity: 0; transform: scale(0.94) translateY(-4px); }
   to { opacity: 1; transform: none; }
 }
 .animate-menu-pop {
-  transform-origin: top right;
   animation: menu-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* Closing counterpart — faster and eased-in, so dismissal feels immediate
+   rather than a mirror of the entrance (a slow close reads as lag). */
+@keyframes menu-pop-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: scale(0.96) translateY(2px); }
+}
+.animate-menu-pop-out {
+  animation: menu-pop-out 0.13s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 /* List rows entering / leaving (notifications, results) */
@@ -736,8 +747,16 @@ body {
   .animate-orbit,
   .animate-orbit-reverse,
   .animate-notif-bulge,
-  .animate-toast-drop {
+  .animate-toast-drop,
+  .animate-menu-pop,
+  .animate-menu-pop-out,
+  .animate-row-in {
     animation: none;
+  }
+  /* menu-pop-out ends at opacity 0 via `forwards`; with the animation
+     disabled the element must still be visible until it unmounts. */
+  .animate-menu-pop-out {
+    opacity: 1;
   }
   .animate-rise {
     opacity: 1;

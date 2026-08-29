@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import { useFocusTrap } from "@/lib/useFocusTrap";
@@ -20,6 +20,7 @@ export function FloatingMenu({
   origin = "top-right",
   notch = false,
   zIndex,
+  exitMs,
   children,
 }: {
   open: boolean;
@@ -35,9 +36,31 @@ export function FloatingMenu({
    *  at z-200) — otherwise the catcher sits UNDER it and outside taps
    *  land on the overlay instead of closing the menu. */
   zIndex?: number;
+  /** Milliseconds to keep the menu mounted after `open` flips false, so a
+   *  closing animation can play. Opt-in: without it the menu unmounts
+   *  immediately, which is the long-standing behaviour every other caller
+   *  relies on. Must match the CSS duration of `animate-menu-pop-out`. */
+  exitMs?: number;
   children: React.ReactNode;
 }) {
   const trapRef = useFocusTrap<HTMLDivElement>(open);
+  // Kept mounted through the exit animation when exitMs is set.
+  const [leaving, setLeaving] = useState(false);
+  const wasOpen = useRef(open);
+
+  useEffect(() => {
+    if (!exitMs) return;
+    if (wasOpen.current && !open) {
+      setLeaving(true);
+      const t = setTimeout(() => setLeaving(false), exitMs);
+      wasOpen.current = open;
+      return () => clearTimeout(t);
+    }
+    wasOpen.current = open;
+    // Re-opening mid-exit must cancel the leaving state, or the fresh menu
+    // would render with the out-animation still applied and vanish.
+    if (open) setLeaving(false);
+  }, [open, exitMs]);
 
   useEffect(() => {
     if (!open) return;
@@ -48,7 +71,7 @@ export function FloatingMenu({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open && !leaving) return null;
 
   const originClass = {
     "top-right": "origin-top-right",
@@ -59,18 +82,22 @@ export function FloatingMenu({
 
   return (
     <>
-      {/* Invisible click-catcher — always one layer below the menu */}
-      <div
-        className="fixed inset-0 z-[190]"
-        style={zIndex !== undefined ? { zIndex: zIndex - 1 } : undefined}
-        onPointerDown={onClose}
-      />
+      {/* Invisible click-catcher — always one layer below the menu.
+          Skipped while leaving so a dismissed menu can't keep swallowing taps
+          during its exit animation. */}
+      {open && (
+        <div
+          className="fixed inset-0 z-[190]"
+          style={zIndex !== undefined ? { zIndex: zIndex - 1 } : undefined}
+          onPointerDown={onClose}
+        />
+      )}
 
       <div
         ref={trapRef}
         role="menu"
         style={zIndex !== undefined ? { ...style, zIndex } : style}
-        className={`animate-menu-pop z-[200] overflow-hidden rounded-2xl border border-border bg-elevated/95 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl ${originClass} ${className}`}
+        className={`${leaving ? "animate-menu-pop-out pointer-events-none" : "animate-menu-pop"} z-[200] overflow-hidden rounded-2xl border border-border bg-elevated/95 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl ${originClass} ${className}`}
       >
         {notch && (
           <div aria-hidden className="absolute -top-1.5 right-4 h-3 w-3 rotate-45 border-l border-t border-border bg-elevated" />

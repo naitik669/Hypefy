@@ -103,6 +103,25 @@ const DOC_MIMES = [
 /** Extensions too — some platforms' file pickers match on those, not mime. */
 const DOC_ACCEPT = `${DOC_MIMES.join(",")},.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip`;
 
+/** Rows in the attachment chooser, in priority order. */
+const ATTACH_OPTIONS: {
+  mode: "media" | "oneshot" | "document" | "gif";
+  icon: React.ReactNode;
+  tint: string;
+  bg: string;
+  label: string;
+  hint: string;
+}[] = [
+  { mode: "media", icon: <ImageIcon size={16} />, tint: "text-verified", bg: "bg-verified/15",
+    label: "Photo or video", hint: "From your gallery" },
+  { mode: "oneshot", icon: <Eye size={16} />, tint: "text-accent", bg: "bg-accent/15",
+    label: "View once photo", hint: "Opens once, then it's gone" },
+  { mode: "document", icon: <FileText size={16} />, tint: "text-hashtag", bg: "bg-hashtag/15",
+    label: "Document", hint: "PDF, doc, sheet, text" },
+  { mode: "gif", icon: <span className="text-[10px] font-black tracking-wider">GIF</span>, tint: "text-hype", bg: "bg-hype/15",
+    label: "GIF", hint: "Search and send" },
+];
+
 /** "2.4 MB" / "812 KB" — for document bubbles. */
 function fileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -1723,18 +1742,54 @@ export function RealChatView({
 
             {/* Attachment button — opens the type chooser rather than jumping
                 straight to the OS picker, so "view once" is a decision you make
-                up front instead of a toggle you have to notice afterwards. */}
-            <button
-              type="button"
-              onClick={() => { setGifPickerOpen(false); setAttachMenu(true); }}
-              aria-label="Attach"
-              aria-haspopup="dialog"
-              className={`flex h-11 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-90 ${
-                attachment ? "text-accent" : "text-muted hover:bg-surface hover:text-foreground"
-              }`}
-            >
-              <Paperclip size={19} />
-            </button>
+                up front instead of a toggle you have to notice afterwards.
+                relative, so the menu anchors to the clip itself. */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => { setGifPickerOpen(false); setAttachMenu((v) => !v); }}
+                aria-label="Attach"
+                aria-haspopup="menu"
+                aria-expanded={attachMenu}
+                className={`flex h-11 w-10 items-center justify-center rounded-full transition active:scale-90 ${
+                  attachMenu || attachment ? "text-accent" : "text-muted hover:bg-surface hover:text-foreground"
+                }`}
+              >
+                <Paperclip size={19} className={`transition-transform duration-200 ${attachMenu ? "rotate-45" : ""}`} />
+              </button>
+
+              <FloatingMenu
+                open={attachMenu}
+                onClose={() => setAttachMenu(false)}
+                origin="bottom-left"
+                exitMs={130}
+                className="absolute bottom-[calc(100%+10px)] left-0 w-60"
+              >
+                {ATTACH_OPTIONS.map((o, i) => (
+                  <button
+                    key={o.label}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      if (o.mode === "gif") { setAttachMenu(false); setGifPickerOpen(true); }
+                      else openPicker(o.mode);
+                    }}
+                    // Staggered so the rows cascade out of the clip instead of
+                    // the whole slab appearing at once.
+                    style={{ animationDelay: `${i * 40}ms` }}
+                    className="animate-row-in flex items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-white/5 active:bg-white/[0.08]"
+                  >
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${o.bg} ${o.tint}`}>
+                      {o.icon}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-semibold text-foreground">{o.label}</span>
+                      <span className="block truncate text-[10px] leading-tight text-muted">{o.hint}</span>
+                    </span>
+                  </button>
+                ))}
+              </FloatingMenu>
+            </div>
 
             {/* Text input */}
             <div className="relative flex-1">
@@ -1818,43 +1873,6 @@ export function RealChatView({
         />
       </div>
 
-      {/* Attachment type chooser */}
-      <BottomSheet open={attachMenu} onClose={() => setAttachMenu(false)} title="Send">
-        <div className="flex flex-col gap-1 pb-2">
-          <AttachOption
-            icon={<ImageIcon size={18} />}
-            tint="text-verified"
-            bg="bg-verified/15"
-            label="Photo or video"
-            hint="From your gallery or camera"
-            onClick={() => openPicker("media")}
-          />
-          <AttachOption
-            icon={<Eye size={18} />}
-            tint="text-accent"
-            bg="bg-accent/15"
-            label="View once photo"
-            hint="Opens once, then it's gone"
-            onClick={() => openPicker("oneshot")}
-          />
-          <AttachOption
-            icon={<FileText size={18} />}
-            tint="text-hashtag"
-            bg="bg-hashtag/15"
-            label="Document"
-            hint="PDF, doc, sheet, text or zip"
-            onClick={() => openPicker("document")}
-          />
-          <AttachOption
-            icon={<span className="text-[11px] font-black tracking-wider">GIF</span>}
-            tint="text-hype"
-            bg="bg-hype/15"
-            label="GIF"
-            hint="Search and send a GIF"
-            onClick={() => { setAttachMenu(false); setGifPickerOpen(true); }}
-          />
-        </div>
-      </BottomSheet>
 
       {/* Long-press context menu (reactions + actions), anchored to the message */}
       {menu && (() => {
@@ -2009,34 +2027,6 @@ function CtxItem({ icon, label, onClick, danger }: { icon: React.ReactNode; labe
       className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-white/5 ${danger ? "text-danger" : "text-foreground"}`}>
       {icon}
       {label}
-    </button>
-  );
-}
-
-/** One row in the attachment chooser — icon bubble + label + hint. */
-function AttachOption({
-  icon, tint, bg, label, hint, onClick,
-}: {
-  icon: React.ReactNode;
-  tint: string;
-  bg: string;
-  label: string;
-  hint: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-3 rounded-2xl px-1 py-2.5 text-left transition-colors hover:bg-white/5 active:scale-[0.99]"
-    >
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${bg} ${tint}`}>
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-foreground">{label}</span>
-        <span className="block truncate text-[11px] text-muted">{hint}</span>
-      </span>
     </button>
   );
 }
