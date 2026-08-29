@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowUp } from "lucide-react";
 import { haptics } from "@/lib/haptics";
 
@@ -10,6 +11,7 @@ import { haptics } from "@/lib/haptics";
  * replays it, and Back to top does what it says.
  */
 export function CaughtUp() {
+  const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
   const [seen, setSeen] = useState(false);
   const [replay, setReplay] = useState(0);
@@ -66,7 +68,14 @@ export function CaughtUp() {
 
       <button
         type="button"
-        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        onClick={() => {
+          haptics.tap();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          // Re-runs the server query; FeedList's initialPosts-sync effect
+          // picks up the fresh page, so this lands on a genuinely current
+          // feed, not just the top of the stale one.
+          router.refresh();
+        }}
         className={`mt-1 flex items-center gap-1.5 rounded-xl border border-border px-3.5 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-white/25 hover:text-foreground ${
           seen ? "animate-row-in" : "opacity-0"
         }`}

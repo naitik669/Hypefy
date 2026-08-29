@@ -110,14 +110,22 @@ export function FeedList({
   const idsStateRef = useRef(idsState); idsStateRef.current = idsState;
   const tabRef = useRef(tab); tabRef.current = tab;
 
-  // Mark the initial (ranked) page as seen so the chronological tail won't
-  // resurface them later.
+  // Re-sync the For You slice whenever the server sends a fresh ranked page.
+  // `initialPosts` is a new array reference on mount AND whenever router.refresh()
+  // re-runs the server query (pull-to-refresh, Back to top) — home/page.tsx reads
+  // no searchParams, so switching feed tabs never re-invokes the server component
+  // and can't spuriously trigger this. Without this effect, `posts` was seeded
+  // once via useState(initialPosts) and never updated again: a refresh re-ran the
+  // server query but the visible list stayed frozen on the first load.
   useEffect(() => {
+    setPosts(initialPosts);
+    setFyDone(initialPosts.length < 10);
+    // Mark the ranked page as seen so the chronological tail won't resurface it.
     seenRef.current = loadSeen();
     initialPosts.forEach((p) => seenRef.current.add(p.id));
     saveSeen(seenRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialPosts]);
 
   /** Attach the current user's hype/save state to a freshly fetched batch. */
   async function withUserState(fresh: FeedPost[]): Promise<FeedPost[]> {
