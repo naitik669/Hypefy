@@ -6,11 +6,14 @@ import { Loader2 } from "lucide-react";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 
 /**
- * Hypefy's anchored popover — the one visual shell for every context menu
+ * Hypefy's anchored popover — the default visual shell for context menus
  * (post ⋯, feed switcher, chat header, message long-press). Renders inline
  * next to its anchor (caller controls position via className/style), with
  * an invisible full-screen backdrop, Escape-to-close, and the menu-pop
  * entrance. Compose rows with <MenuItem/> and <MenuDivider/>.
+ *
+ * Pass `bare` to keep the behaviour but supply your own surface — see the
+ * chat attachment menu, whose rows are individual glass tiles.
  */
 export function FloatingMenu({
   open,
@@ -21,6 +24,7 @@ export function FloatingMenu({
   notch = false,
   zIndex,
   exitMs,
+  bare = false,
   children,
 }: {
   open: boolean;
@@ -41,6 +45,11 @@ export function FloatingMenu({
    *  immediately, which is the long-standing behaviour every other caller
    *  relies on. Must match the CSS duration of `animate-menu-pop-out`. */
   exitMs?: number;
+  /** Drop the panel chrome (surface, border, shadow, row padding) and render
+   *  children raw, keeping only the behaviour: click-catcher, Escape, focus
+   *  trap, stacking and the pop animation. For menus whose rows are their own
+   *  free-floating surfaces — there is no single slab to draw. */
+  bare?: boolean;
   children: React.ReactNode;
 }) {
   const trapRef = useFocusTrap<HTMLDivElement>(open);
@@ -97,12 +106,16 @@ export function FloatingMenu({
         ref={trapRef}
         role="menu"
         style={zIndex !== undefined ? { ...style, zIndex } : style}
-        className={`${leaving ? "animate-menu-pop-out pointer-events-none" : "animate-menu-pop"} z-[200] overflow-hidden rounded-2xl border border-border bg-elevated/95 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl ${originClass} ${className}`}
+        className={`${leaving ? "animate-menu-pop-out pointer-events-none" : "animate-menu-pop"} z-[200] ${
+          bare
+            ? ""
+            : "overflow-hidden rounded-2xl border border-border bg-elevated/95 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+        } ${originClass} ${className}`}
       >
-        {notch && (
+        {notch && !bare && (
           <div aria-hidden className="absolute -top-1.5 right-4 h-3 w-3 rotate-45 border-l border-t border-border bg-elevated" />
         )}
-        <div className="flex flex-col py-1.5">{children}</div>
+        {bare ? children : <div className="flex flex-col py-1.5">{children}</div>}
       </div>
     </>
   );

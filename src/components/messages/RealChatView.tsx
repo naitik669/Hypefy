@@ -103,23 +103,21 @@ const DOC_MIMES = [
 /** Extensions too — some platforms' file pickers match on those, not mime. */
 const DOC_ACCEPT = `${DOC_MIMES.join(",")},.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip`;
 
-/** Rows in the attachment chooser, in priority order. */
+/** Rows in the attachment chooser, in priority order.
+ *
+ *  Every icon is brand lime by design — the colour is the menu's identity,
+ *  not a per-row category code. Four competing hues in a 240px popup just
+ *  read as noise, and none of them meant anything. */
 const ATTACH_OPTIONS: {
   mode: "media" | "oneshot" | "document" | "gif";
   icon: React.ReactNode;
-  tint: string;
-  bg: string;
   label: string;
   hint: string;
 }[] = [
-  { mode: "media", icon: <ImageIcon size={16} />, tint: "text-verified", bg: "bg-verified/15",
-    label: "Photo or video", hint: "From your gallery" },
-  { mode: "oneshot", icon: <Eye size={16} />, tint: "text-accent", bg: "bg-accent/15",
-    label: "View once photo", hint: "Opens once, then it's gone" },
-  { mode: "document", icon: <FileText size={16} />, tint: "text-hashtag", bg: "bg-hashtag/15",
-    label: "Document", hint: "PDF, doc, sheet, text" },
-  { mode: "gif", icon: <span className="text-[10px] font-black tracking-wider">GIF</span>, tint: "text-hype", bg: "bg-hype/15",
-    label: "GIF", hint: "Search and send" },
+  { mode: "media", icon: <ImageIcon size={17} />, label: "Photo or video", hint: "From your gallery" },
+  { mode: "oneshot", icon: <Eye size={17} />, label: "View once photo", hint: "Opens once, then it's gone" },
+  { mode: "document", icon: <FileText size={17} />, label: "Document", hint: "PDF, doc, sheet, text" },
+  { mode: "gif", icon: <span className="text-[10px] font-black tracking-wider">GIF</span>, label: "GIF", hint: "Search and send" },
 ];
 
 /** "2.4 MB" / "812 KB" — for document bubbles. */
@@ -1763,7 +1761,8 @@ export function RealChatView({
                 onClose={() => setAttachMenu(false)}
                 origin="bottom-left"
                 exitMs={130}
-                className="absolute bottom-[calc(100%+10px)] left-0 w-60"
+                bare
+                className="absolute bottom-[calc(100%+10px)] left-0 flex w-60 flex-col gap-2"
               >
                 {ATTACH_OPTIONS.map((o, i) => (
                   <button
@@ -1774,12 +1773,13 @@ export function RealChatView({
                       if (o.mode === "gif") { setAttachMenu(false); setGifPickerOpen(true); }
                       else openPicker(o.mode);
                     }}
-                    // Staggered so the rows cascade out of the clip instead of
-                    // the whole slab appearing at once.
-                    style={{ animationDelay: `${i * 40}ms` }}
-                    className="animate-row-in flex items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-white/5 active:bg-white/[0.08]"
+                    // Staggered bottom-up: the tile nearest the clip appears
+                    // first, so the stack reads as rising out of the button
+                    // rather than dropping onto it.
+                    style={{ animationDelay: `${(ATTACH_OPTIONS.length - 1 - i) * 45}ms` }}
+                    className="glass-tile animate-row-in flex items-center gap-3 rounded-[18px] px-3 py-2.5 text-left"
                   >
-                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${o.bg} ${o.tint}`}>
+                    <span className="glass-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-accent">
                       {o.icon}
                     </span>
                     <span className="min-w-0 flex-1">
