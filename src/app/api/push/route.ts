@@ -20,6 +20,14 @@ function adminClient() {
 
 function pushCopy(type: string, actor: string, body: string | null) {
   switch (true) {
+    // Locked-chat masking: neither the actor's real name nor the message
+    // content ever reaches the notification shade. Body text for real
+    // messages is already generic static copy ("sent you a message") set by
+    // send_message, not the actual text — but the actor name alone would
+    // still reveal *who* you're talking to on a lock screen, which defeats a
+    // chat someone locked specifically to hide that contact.
+    case type === "locked_dm":
+      return { title: "Hypefy", body: "New message" };
     case type.startsWith("hype_"):
       return { title: `⭐ ${actor}`, body: body ?? "hyped your post" };
     case type === "repost":
@@ -63,17 +71,28 @@ export async function POST(req: NextRequest) {
 
   const supabase = adminClient();
 
-  const [{ data: subs }, { data: actorProfile }] = await Promise.all([
+  // A DM notification (type new_message / dm_post_shared, target_type
+  // conversation) needs one more read to know if the RECIPIENT locked this
+  // thread — locked_at is per-member, so it must be checked for n.user_id
+  // specifically, not the sender.
+  const isDmNotif = n.target_type === "conversation" && (n.type === "new_message" || n.type === "dm_post_shared");
+
+  const [{ data: subs }, { data: actorProfile }, { data: memberRow }] = await Promise.all([
     supabase.from("push_subscriptions").select("endpoint, p256dh, auth").eq("user_id", n.user_id),
     n.actor_id
       ? supabase.from("profiles").select("display_name, username").eq("id", n.actor_id).maybeSingle()
+      : Promise.resolve({ data: null } as any),
+    isDmNotif
+      ? supabase.from("conversation_members").select("locked_at")
+          .eq("conversation_id", n.target_id).eq("user_id", n.user_id).maybeSingle()
       : Promise.resolve({ data: null } as any),
   ]);
 
   if (!subs?.length) return NextResponse.json({ sent: 0 });
 
+  const isLocked = isDmNotif && !!memberRow?.locked_at;
   const actorName = actorProfile?.display_name ?? actorProfile?.username ?? "Someone";
-  const { title, body } = pushCopy(String(n.type ?? ""), actorName, n.body ?? null);
+  const { title, body } = pushCopy(isLocked ? "locked_dm" : String(n.type ?? ""), actorName, n.body ?? null);
   const payload = JSON.stringify({
     title,
     body,

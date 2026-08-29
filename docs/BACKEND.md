@@ -156,6 +156,15 @@ live project and is **mirrored into the repo** as 30 files under
   `0029_creator_insights` (`creator_daily_stats` + timeseries RPC),
   `0030_streaks` (`get_user_streak`).
 - `supabase/schema.sql` — a current full snapshot (mirrors the baseline).
+- `0031`–`0033` — chat privacy suite: `pgcrypto_and_locks` (`app_locks` table +
+  `set_lock_pin`/`verify_lock_pin`/`clear_lock_pin`/`has_lock_pin`, two
+  independent PIN scopes: app-wide and per-chat), `chat_privacy_settings`
+  (`conversation_members.locked_at`, `conversations.{screenshot_alert_at,
+  vanish_mode,auto_delete_after}`, `profiles.hide_read_receipts`, inbox
+  masking in `get_inbox_summary`, hourly `purge_expired_messages` cron), and
+  `oneshot` (view-once DM photos: private `oneshot-media` bucket, `oneshots`
+  table with `for select using (false)`, `claim_oneshot` atomic single-view
+  claim, `reap_oneshots` cron for unopened expiries).
 
 ### Scheduled jobs (pg_cron)
 
@@ -163,6 +172,25 @@ live project and is **mirrored into the repo** as 30 files under
 |---|---|---|
 | `publish-scheduled-posts` | `* * * * *` | `select public.publish_due_scheduled_posts();` |
 | `capture-creator-daily-stats` | `10 0 * * *` | `select public.capture_creator_daily_stats();` |
+| `purge-expired-messages` | `0 * * * *` | `select public.purge_expired_messages();` |
+| `reap-oneshots` | `*/5 * * * *` | `select public.reap_oneshots();` |
+
+### Secrets in Supabase Vault (not in migration files)
+
+`notify_push_webhook` (`0001_baseline.sql:2160,2202`) hardcodes its
+`x-push-secret` value directly in the migration — a mistake already baked
+into this repo's git history; rotating it requires also updating the
+`PUSH_WEBHOOK_SECRET` Vercel env var in the same change, so it hasn't been
+done opportunistically. **Don't repeat this for new secrets.** `reap_oneshots`
+reads its webhook header from `vault.decrypted_secrets` instead. To set up a
+fresh project, create the secret once outside of version control:
+
+```sql
+select vault.create_secret(
+  '<random-64-char-hex>', 'oneshot_reap_secret',
+  'x-oneshot-reap-secret header value for pg_net -> /api/oneshot/reap'
+);
+```
 
 New schema changes should be authored as new numbered migration files and
 applied via the Supabase CLI or `apply_migration`, then `database.types.ts`
