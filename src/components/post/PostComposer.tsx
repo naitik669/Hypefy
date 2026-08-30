@@ -228,9 +228,13 @@ export function PostComposer({ userId }: { userId: string }) {
         </div>
       )}
 
-      {/* ── Aspect-ratio picker ───────────────────────────────── */}
+      {/* ── Aspect-ratio picker ─────────────────────────────────
+          "Ratio" alone read as jargon sitting above an empty box. It sets
+          the frame every photo gets cropped to, and it is deliberately
+          still shown before a photo is picked, because it also sets the
+          shape of the drop zone below it. */}
       <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold text-muted">Ratio</span>
+        <span className="text-xs font-semibold text-muted">Photo shape</span>
         <div className="flex gap-1.5">
           {RATIOS.map((r, i) => (
             <button
@@ -323,9 +327,17 @@ export function PostComposer({ userId }: { userId: string }) {
         />
       )}
 
-      {/* Caption */}
+      {/* Caption — the line that sits beside your @name in the feed.
+          Labelled explicitly: two boxes differing only by placeholder text
+          gave no way to tell what either one was for, or why one allowed
+          280 characters and the other 1000. */}
       <div className="relative">
+        <label htmlFor="post-caption" className="mb-1.5 flex items-baseline gap-2">
+          <span className="text-xs font-bold text-foreground">Caption</span>
+          <span className="text-[11px] text-faint">Shows next to your name</span>
+        </label>
         <textarea
+          id="post-caption"
           ref={captionRef}
           value={caption}
           onChange={(e) => { setCaption(e.target.value.slice(0, 280)); setCaptionCursor(e.target.selectionStart ?? 0); setActiveField("caption"); }}
@@ -345,9 +357,15 @@ export function PostComposer({ userId }: { userId: string }) {
         <p className="mt-0.5 text-right text-xs text-faint">{caption.length}/280</p>
       </div>
 
-      {/* Body / opinion */}
+      {/* Body — the paragraph under the caption. Marked optional because it
+          is: a post is postable with only a photo, or only a caption. */}
       <div className="relative">
+        <label htmlFor="post-body" className="mb-1.5 flex items-baseline gap-2">
+          <span className="text-xs font-bold text-foreground">Say more</span>
+          <span className="text-[11px] text-faint">Optional · appears below the caption</span>
+        </label>
         <textarea
+          id="post-body"
           ref={bodyRef}
           value={body}
           onChange={(e) => { setBody(e.target.value.slice(0, 1000)); setBodyCursor(e.target.selectionStart ?? 0); setActiveField("body"); }}
@@ -355,7 +373,7 @@ export function PostComposer({ userId }: { userId: string }) {
           onFocus={() => setActiveField("body")}
           onBlur={() => setTimeout(resetPicker, 150)}
           rows={3}
-          placeholder="What do you want to say?"
+          placeholder="Add context, a story, your take…"
           className="input resize-none"
         />
         {activeField === "body" && <SuggestionDropdown suggestions={pickerSuggestions} onSelect={applyPickerSelection} />}
@@ -495,8 +513,10 @@ export function PostComposer({ userId }: { userId: string }) {
             </button>
           </div>
         )}
+        {/* "Scheduled" alone, sitting beside "Schedule for later", read as a
+            status label or a second toggle rather than a link to the list. */}
         <Link href="/create/scheduled" className="ml-auto shrink-0 text-xs font-semibold text-muted hover:text-foreground">
-          Scheduled
+          View scheduled
         </Link>
       </div>
 
