@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Music, Search, Play, Pause, ChevronLeft, Check } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Waveform } from "@/components/music/Waveform";
 import {
   type Track,
   playPreview,
@@ -158,22 +159,19 @@ export function TrackPicker({
               <span className="text-xs font-bold uppercase tracking-widest text-faint">Starts at</span>
               <span className="text-sm font-bold tabular-nums">{fmt(start)}</span>
             </div>
-            <input
-              type="range"
-              min={0}
+            <Waveform
+              src={snippet.preview}
+              start={start}
               max={MAX_START}
-              step={1}
-              value={start}
-              onChange={(e) => scrub(Number(e.target.value))}
-              aria-label="Snippet start point"
-              className="w-full accent-accent"
+              duration={PREVIEW_LEN}
+              onChange={scrub}
             />
             <div className="flex justify-between pt-1 text-[10px] tabular-nums text-faint">
               <span>0:00</span>
-              <span>{fmt(MAX_START)}</span>
+              <span>{fmt(PREVIEW_LEN)}</span>
             </div>
             <p className="pt-2 text-xs text-faint">
-              Drag to choose where the 30-second preview kicks in.
+              Drag anywhere on the wave — the lit part is what plays.
             </p>
           </div>
 
