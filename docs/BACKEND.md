@@ -210,3 +210,48 @@ unused-index cleanup candidates.)
 
 - **Hype** = like · **Shot** = short video reel · **Show** = 24h story (a
   separate feature from Shots) · **Discover** = explore.
+
+## Music: iTunes now, Spotify dormant
+
+Audio comes from the **iTunes Search API** (`/api/music`): 30-second preview
+MP3s, no key, no account, CORS-readable. Every listener hears them, which is
+the reason it is the source.
+
+**Spotify was evaluated and is intentionally parked, not deleted.** What was
+measured, so nobody re-litigates it from scratch:
+
+- Search works fine with Client Credentials, but `limit` is capped at 10 for
+  this app (11+ returns `400 Invalid limit`).
+- `preview_url` is **null for every track** — 0 of 60 across six queries.
+  Spotify stopped serving previews to newly-created apps, so there is no
+  audio file to play or to draw a waveform from.
+- The only way to get Spotify audio is the Web Playback SDK, which requires
+  **each listener** to be signed in with Spotify Premium. Non-Premium viewers
+  hear silence. An app-level token cannot stream at any tier: royalties must
+  be attributed to a subscriber, so this is a licensing limit, not a quota
+  one. Extended quota does **not** change it — it only lifts the 25-user
+  development cap.
+
+Kept for a future revival, all currently unreachable from the UI:
+
+| Piece | Where |
+|---|---|
+| OAuth + token refresh routes | `src/app/api/spotify/{auth,callback,token}` |
+| Config diagnostic | `src/app/api/spotify/diagnose` |
+| Server helpers | `src/lib/spotify.ts` |
+| Web Playback SDK wrapper | `src/lib/spotify-player.ts` |
+| Settings UI component | `src/components/settings/SpotifyConnect.tsx` |
+| Token table + RPCs | migration `0036_spotify_accounts.sql` |
+
+To revive: recreate `src/app/(app)/settings/music/page.tsx` (it rendered
+`SpotifyConnect`), point the callback's `back()` at it, and switch
+`/api/music` to the Spotify search in git history.
+
+`music.ts` already routes by track shape — a track with `uri` and no
+`preview` goes to the SDK, anything else to the shared `<audio>` element — so
+both sources can coexist, and `parseTrack` accepts either. Rows written during
+the Spotify experiment stay parseable.
+
+For full-length audio that plays for **everyone**, the route is a licensed
+catalogue you serve yourself (Feed.fm, Epidemic Sound partner tier, Jamendo),
+not a streaming platform's API.

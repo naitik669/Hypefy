@@ -6,9 +6,14 @@ import { exchangeCode, fetchSpotifyProfile, redirectUri } from "@/lib/spotify";
 
 export const runtime = "nodejs";
 
-/** Where to land afterwards, with a status the UI can react to. */
+/** Where to land afterwards, with a status the UI can react to.
+ *
+ *  DORMANT: Spotify is not offered to users right now — the audio source is
+ *  iTunes previews, which need no account. This whole flow is kept intact for
+ *  when it is revived. Reviving it means restoring the settings page (see
+ *  SpotifyConnect, which is still here) and pointing this back at it. */
 function back(origin: string, status: string) {
-  return NextResponse.redirect(new URL(`/settings/music?spotify=${status}`, origin));
+  return NextResponse.redirect(new URL(`/settings?spotify=${status}`, origin));
 }
 
 /**
