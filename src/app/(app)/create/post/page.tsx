@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/ui/PageHeader";
+
 import { PostComposer } from "@/components/post/PostComposer";
 
 export default async function CreatePostPage() {
@@ -16,9 +16,11 @@ export default async function CreatePostPage() {
     .eq("id", user.id)
     .maybeSingle();
 
+  // The header is rendered by the composer, not here: its back arrow has to
+  // retreat from Preview to Compose before it leaves the screen, which means
+  // it needs the step state.
   return (
     <>
-      <PageHeader title="New Post" showBack />
       <PostComposer
         userId={user.id}
         author={{

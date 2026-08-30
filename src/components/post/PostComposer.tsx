@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
 import { RichPostText } from "@/components/ui/RichPostText";
@@ -12,6 +12,7 @@ import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/compon
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { TrackChip } from "@/components/music/TrackChip";
 import { PostPreview, type PreviewAuthor } from "@/components/post/PostPreview";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { Track } from "@/lib/music";
 
 const MAX_SIZE_MB = 10;
@@ -41,12 +42,13 @@ const MIN_AR = 0.4;
 const MAX_AR = 3.0;
 const clampAR = (n: number) => Math.min(MAX_AR, Math.max(MIN_AR, n));
 
-/** Order and count of the panes. Labels are for assistive tech only — the
- *  visible indicator is bars, deliberately unlabelled. */
+/** Two pages: build it, then look at it.
+ *
+ *  Labels are for assistive tech and the header title only — the visible
+ *  indicator is bars, deliberately unlabelled. */
 const STEPS = [
-  { label: "Media" },
-  { label: "Write" },
-  { label: "Extras" },
+  { label: "New Post" },
+  { label: "Preview" },
 ] as const;
 
 export function PostComposer({ userId, author }: { userId: string; author: PreviewAuthor }) {
@@ -308,6 +310,14 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
   }
 
   return (
+    <>
+    {/* One back arrow for the whole flow: on Preview it returns to the
+        composer, on the composer it leaves the screen. */}
+    <PageHeader
+      title={STEPS[step].label}
+      showBack
+      onBack={step === 0 ? undefined : () => setStep(0)}
+    />
     <div className="flex flex-col gap-4 px-4 pb-8 pt-2">
       {/* ── Roadmap ─────────────────────────────────────────────
           Bars only. Naming the steps put a label on each pane that repeated
@@ -319,55 +329,19 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
           forcing Back/Next to reach a pane already on screen would be an
           artificial lock. The label lives in aria-label for screen readers,
           which do need it. */}
-      <div className="flex items-center gap-2">
-        {/* Back lives up here as well as in the footer. Once there are photos
-            and a preview the footer sits below the fold, and a 3px bar is not
-            an affordance anyone would try tapping — without this, stepping
-            backwards meant scrolling to find it. Rendered disabled rather
-            than hidden on the first step so the bars never shift sideways. */}
-        <button
-          type="button"
-          onClick={() => setStep((v) => Math.max(0, v - 1))}
-          disabled={step === 0}
-          aria-label="Previous step"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted transition-colors enabled:hover:border-white/25 enabled:hover:text-foreground disabled:opacity-30"
-        >
-          <ChevronLeft size={16} />
-        </button>
-
-        <nav aria-label="Post steps" className="flex flex-1 items-stretch gap-1.5">
-          {STEPS.map((s, i) => (
-            <button
-              key={s.label}
-              type="button"
-              onClick={() => setStep(i)}
-              aria-label={s.label}
-              aria-current={i === step ? "step" : undefined}
-              // Generous vertical padding: the bar is 3px, so without it the
-              // tap target was 19px — well under a usable touch size.
-              className="group min-w-0 flex-1 py-3"
-            >
-              <span
-                className={`block h-[3px] w-full rounded-full transition-colors ${
-                  i === step ? "bg-accent" : i < step ? "bg-accent/40" : "bg-border group-hover:bg-white/25"
-                }`}
-              />
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {/* Live preview — shown on every step, because the point of stepping
-          through is knowing what the thing looks like at each point. */}
-      <PostPreview
-        author={author}
-        imageUrls={imgs.map((i) => i.url)}
-        aspect={postAspect}
-        caption={caption}
-        body={body}
-        track={track}
-        pollOptions={pollOptions}
-      />
+      {/* Position only. One arrow in the header is the entire back story, so
+          these stay indicators rather than becoming a second control. */}
+      <nav aria-label="Post steps" className="flex items-stretch gap-1.5 pt-1">
+        {STEPS.map((s, i) => (
+          <span
+            key={s.label}
+            aria-current={i === step ? "step" : undefined}
+            className={`h-[3px] min-w-0 flex-1 rounded-full transition-colors ${
+              i === step ? "bg-accent" : i < step ? "bg-accent/40" : "bg-border"
+            }`}
+          />
+        ))}
+      </nav>
 
       {/* Draft restored notice */}
       {draftRestored && (
@@ -384,7 +358,7 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
         </div>
       )}
 
-      {/* ═══ Step 1 · Media ═══════════════════════════════════ */}
+      {/* ═══ Page 1 · Compose ═══════════════════════════════════ */}
       {step === 0 && (
       <>
       {/* ── Image area ────────────────────────────────────────── */}
@@ -473,34 +447,7 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
       )}
 
       {fileError && <p className="text-xs text-danger">{fileError}</p>}
-      </>
-      )}
 
-      {/* Mounted in every step, not inside one: the picker is opened
-          programmatically, and a cropper unmounted mid-crop would drop the
-          image being cropped. */}
-      <input
-        ref={fileRef}
-        type="file"
-        accept={ALLOWED_TYPES.join(",")}
-        multiple
-        className="hidden"
-        onChange={onFileChange}
-      />
-
-      {crop && (
-        <ImageCropper
-          src={crop.origSrc}
-          aspect={currentRatio.value ?? 1}
-          label={`Crop · ${currentRatio.label}`}
-          onCancel={onCropCancel}
-          onDone={onCropDone}
-        />
-      )}
-
-      {/* ═══ Step 2 · Write ═══════════════════════════════════ */}
-      {step === 1 && (
-      <>
       {/* Caption — the line that sits beside your @name in the feed.
           Labelled explicitly: two boxes differing only by placeholder text
           gave no way to tell what either one was for, or why one allowed
@@ -579,9 +526,41 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
       </>
       )}
 
-      {/* ═══ Step 3 · Extras ══════════════════════════════════ */}
-      {step === 2 && (
+      {/* Mounted outside both pages: the picker is opened programmatically,
+          and a cropper unmounted mid-crop would drop the image it is
+          cropping. */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept={ALLOWED_TYPES.join(",")}
+        multiple
+        className="hidden"
+        onChange={onFileChange}
+      />
+
+      {crop && (
+        <ImageCropper
+          src={crop.origSrc}
+          aspect={currentRatio.value ?? 1}
+          label={`Crop · ${currentRatio.label}`}
+          onCancel={onCropCancel}
+          onDone={onCropDone}
+        />
+      )}
+
+      {/* ═══ Page 2 · Preview + extras ════════════════════════ */}
+      {step === 1 && (
       <>
+      <PostPreview
+        author={author}
+        imageUrls={imgs.map((i) => i.url)}
+        aspect={postAspect}
+        caption={caption}
+        body={body}
+        track={track}
+        pollOptions={pollOptions}
+      />
+
       {/* Song + poll attachments */}
       <div className="flex flex-wrap items-center gap-2">
         {track ? (
@@ -703,40 +682,29 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
       )}
 
       {/* ── Step navigation ─────────────────────────────────────
-          Post sits alongside Back/Next rather than only on the last step: a
-          photo with a caption is already a complete post, and making someone
-          walk to step 3 to publish it would be ceremony, not guidance. */}
-      <div className="flex items-center gap-2 pt-1">
-        {step > 0 && (
-          <button
-            type="button"
-            onClick={() => setStep((v) => v - 1)}
-            className="flex h-12 shrink-0 items-center gap-1 rounded-xl border border-border px-4 text-sm font-semibold text-muted transition-colors hover:text-foreground"
-          >
-            <ChevronLeft size={16} /> Back
-          </button>
-        )}
-        {step < STEPS.length - 1 && (
-          <button
-            type="button"
-            onClick={() => setStep((v) => v + 1)}
-            className="flex h-12 flex-1 items-center justify-center gap-1 rounded-xl border border-border bg-surface text-sm font-bold text-foreground transition-colors hover:border-white/25"
-          >
-            Next <ChevronRight size={16} />
-          </button>
-        )}
+          One button per page. Going back is the header arrow's job, so
+          nothing down here competes with it. */}
+      {step === 0 ? (
+        <button
+          type="button"
+          onClick={() => setStep(1)}
+          disabled={!canPost}
+          className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-40"
+        >
+          Preview <ChevronRight size={17} />
+        </button>
+      ) : (
         <button
           type="button"
           onClick={handlePost}
           disabled={!canPost || submitted}
-          className={`flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-40 ${
-            step === STEPS.length - 1 ? "flex-1" : "shrink-0"
-          }`}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-40"
         >
           {willSchedule ? <CalendarClock size={17} /> : <Send size={17} />}
           {submitted ? (willSchedule ? "Scheduling…" : "Sharing…") : willSchedule ? "Schedule" : "Post"}
         </button>
-      </div>
+      )}
     </div>
+    </>
   );
 }

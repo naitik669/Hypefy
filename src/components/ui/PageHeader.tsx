@@ -7,10 +7,15 @@ import { ChevronLeft } from "lucide-react";
 export function PageHeader({
   title,
   showBack = false,
+  onBack,
   right,
 }: {
   title: string;
   showBack?: boolean;
+  /** Override what the arrow does. For screens with internal steps, so the
+   *  single back arrow retreats a step before it leaves the screen, instead
+   *  of the screen needing a second back control of its own. */
+  onBack?: () => void;
   right?: React.ReactNode;
 }) {
   const router = useRouter();
@@ -20,7 +25,7 @@ export function PageHeader({
       {showBack ? (
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => (onBack ? onBack() : router.back())}
           aria-label="Back"
           className="flex h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5"
         >
