@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Cake } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 
@@ -55,6 +55,35 @@ function WheelColumn({
   const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const index = clamp(options.findIndex((o) => o.value === value), 0, options.length - 1);
 
+  // Row that currently sits under the centre band. Tracked separately from
+  // `index` because `index` only catches up once the scroll has settled —
+  // driving the highlight from it made the whole drum fade out mid-scroll.
+  const [centered, setCentered] = useState(index);
+  const rowRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  /**
+   * Falloff, applied straight to the DOM.
+   *
+   * Kept out of React on purpose: this runs every scroll frame, and the year
+   * column is ~126 rows — re-rendering all of them per frame to change two
+   * numbers is what would make the wheel stutter. opacity and scale are both
+   * composited, so writing them directly costs no layout.
+   *
+   * `pos` is fractional, so rows interpolate as they travel rather than
+   * snapping between fixed steps. At whole numbers the curve reproduces the
+   * original values exactly: 1, 0.4, 0.16, then the 0.07 floor.
+   */
+  const paint = useCallback((pos: number) => {
+    const rows = rowRefs.current;
+    for (let i = 0; i < rows.length; i++) {
+      const el = rows[i];
+      if (!el) continue;
+      const d = Math.abs(i - pos);
+      el.style.opacity = String(Math.max(0.07, Math.pow(0.4, d)));
+      el.style.scale = String(Math.max(0.82, 1 - 0.1 * d));
+    }
+  }, []);
+
   // Index we last wrote or read. Without this the column feeds back on itself:
   // a scroll commits a value, the new value re-runs the align effect, that
   // scroll fires another event, and the drum walks away on its own.
@@ -65,6 +94,9 @@ function WheelColumn({
     const el = ref.current;
     if (el) el.scrollTop = index * ITEM_H;
     committed.current = index;
+    // First paint owns the falloff too — React no longer sets opacity/scale,
+    // so without this every row would render fully opaque for a frame.
+    paint(index);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -75,13 +107,25 @@ function WheelColumn({
     const el = ref.current;
     if (el) el.scrollTop = index * ITEM_H;
     committed.current = index;
-  }, [index]);
+    setCentered(index);
+    paint(index);
+  }, [index, paint]);
 
   function onScroll() {
+    const el = ref.current;
+    if (!el) return;
+
+    // Live, every frame: the row under the band is always the bright one.
+    const pos = el.scrollTop / ITEM_H;
+    paint(pos);
+    const near = clamp(Math.round(pos), 0, options.length - 1);
+    setCentered((prev) => (prev === near ? prev : near));
+
+    // Committing the value stays debounced. It re-renders the sibling drums
+    // (picking February rebuilds the day column), which is too much work to
+    // do on every row the finger passes over.
     if (settle.current) clearTimeout(settle.current);
     settle.current = setTimeout(() => {
-      const el = ref.current;
-      if (!el) return;
       const i = clamp(Math.round(el.scrollTop / ITEM_H), 0, options.length - 1);
       if (i === committed.current) return;
       committed.current = i;
@@ -120,20 +164,26 @@ function WheelColumn({
     >
       <div style={{ height: PAD }} aria-hidden />
       {options.map((o, i) => {
-        const dist = Math.abs(i - index);
-        const opacity = dist === 0 ? 1 : dist === 1 ? 0.4 : dist === 2 ? 0.16 : 0.07;
-        const scale = dist === 0 ? 1 : dist === 1 ? 0.9 : 0.82;
+        // Only the type styling is React's: it changes when the centred row
+        // changes, not every frame, and it alters font-size — animating that
+        // per frame would relayout the column on every scroll tick.
+        // opacity and scale belong to paint().
+        const on = i === centered;
         return (
           <button
             key={o.value}
+            // Cleanup matters here: the day column shrinks 31 → 28 when the
+            // month changes, and paint() would otherwise keep writing to
+            // detached nodes.
+            ref={(el) => { rowRefs.current[i] = el; return () => { rowRefs.current[i] = null; }; }}
             type="button"
             role="option"
-            aria-selected={dist === 0}
+            aria-selected={on}
             tabIndex={-1}
             onClick={() => select(i)}
-            style={{ height: ITEM_H, opacity, transform: `scale(${scale})` }}
-            className={`flex w-full snap-center items-center ${justify} whitespace-nowrap tabular-nums transition-[opacity,transform] duration-150 ${
-              dist === 0 ? "text-[19px] font-extrabold text-foreground" : "text-[17px] font-semibold text-muted"
+            style={{ height: ITEM_H }}
+            className={`flex w-full snap-center items-center ${justify} whitespace-nowrap tabular-nums ${
+              on ? "text-[19px] font-extrabold text-foreground" : "text-[17px] font-semibold text-muted"
             }`}
           >
             {o.label}
