@@ -32,7 +32,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Capacitor 8's CLI requires Node >= 22 and refuses to run on 20.
+          # ci.yml stays on 20 — it only builds Next, which is happy there.
+          node-version: 22
           cache: npm
       - run: npm ci
 
