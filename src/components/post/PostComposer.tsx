@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock } from "lucide-react";
+import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import Link from "next/link";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
 import { RichPostText } from "@/components/ui/RichPostText";
@@ -39,6 +39,13 @@ const RATIOS = [
 const MIN_AR = 0.4;
 const MAX_AR = 3.0;
 const clampAR = (n: number) => Math.min(MAX_AR, Math.max(MIN_AR, n));
+
+/** The three panes of the composer, in order. */
+const STEPS = [
+  { label: "Media", hint: "Photos and shape" },
+  { label: "Write", hint: "Caption and text" },
+  { label: "Extras", hint: "Song, poll, schedule" },
+] as const;
 
 export function PostComposer({ userId }: { userId: string }) {
   const router = useRouter();
@@ -119,6 +126,9 @@ export function PostComposer({ userId }: { userId: string }) {
     resetPicker();
   }
   const [fileError, setFileError] = useState<string | null>(null);
+  /** Which pane of the flow is showing. Post stays reachable from all of
+   *  them — the steps sequence the work, they do not gate publishing. */
+  const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
 
   const currentRatio = RATIOS[ratioIdx];
@@ -297,6 +307,49 @@ export function PostComposer({ userId }: { userId: string }) {
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-8 pt-2">
+      {/* ── Roadmap ─────────────────────────────────────────────
+          Steps are clickable, not just indicators. Nothing here is a
+          prerequisite for anything else, so forcing Back/Next to reach a
+          pane you can already see would be an artificial lock. */}
+      <nav aria-label="Post steps" className="flex items-stretch gap-1.5">
+        {STEPS.map((s, i) => {
+          const done = i < step;
+          const now = i === step;
+          return (
+            <button
+              key={s.label}
+              type="button"
+              onClick={() => setStep(i)}
+              aria-current={now ? "step" : undefined}
+              className="group flex min-w-0 flex-1 flex-col gap-1.5 text-left"
+            >
+              <span
+                className={`h-[3px] w-full rounded-full transition-colors ${
+                  now ? "bg-accent" : done ? "bg-accent/40" : "bg-border"
+                }`}
+              />
+              <span className="flex items-center gap-1">
+                <span
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold transition-colors ${
+                    now ? "bg-accent text-accent-ink" : done ? "bg-accent/25 text-accent" : "bg-border text-faint"
+                  }`}
+                >
+                  {done ? <Check size={9} strokeWidth={3.5} /> : i + 1}
+                </span>
+                <span
+                  className={`truncate text-[11px] font-bold transition-colors ${
+                    now ? "text-foreground" : "text-muted"
+                  }`}
+                >
+                  {s.label}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+      <p className="-mt-2 text-[11px] text-faint">{STEPS[step].hint}</p>
+
       {/* Draft restored notice */}
       {draftRestored && (
         <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2">
@@ -312,6 +365,9 @@ export function PostComposer({ userId }: { userId: string }) {
         </div>
       )}
 
+      {/* ═══ Step 1 · Media ═══════════════════════════════════ */}
+      {step === 0 && (
+      <>
       {/* ── Image area ────────────────────────────────────────── */}
       {imgs.length === 0 ? (
         <div
@@ -397,6 +453,13 @@ export function PostComposer({ userId }: { userId: string }) {
         </div>
       )}
 
+      {fileError && <p className="text-xs text-danger">{fileError}</p>}
+      </>
+      )}
+
+      {/* Mounted in every step, not inside one: the picker is opened
+          programmatically, and a cropper unmounted mid-crop would drop the
+          image being cropped. */}
       <input
         ref={fileRef}
         type="file"
@@ -405,7 +468,6 @@ export function PostComposer({ userId }: { userId: string }) {
         className="hidden"
         onChange={onFileChange}
       />
-      {fileError && <p className="text-xs text-danger">{fileError}</p>}
 
       {crop && (
         <ImageCropper
@@ -417,6 +479,9 @@ export function PostComposer({ userId }: { userId: string }) {
         />
       )}
 
+      {/* ═══ Step 2 · Write ═══════════════════════════════════ */}
+      {step === 1 && (
+      <>
       {/* Caption — the line that sits beside your @name in the feed.
           Labelled explicitly: two boxes differing only by placeholder text
           gave no way to tell what either one was for, or why one allowed
@@ -492,7 +557,12 @@ export function PostComposer({ userId }: { userId: string }) {
       )}
 
       <p className="text-xs text-faint">Use # to add hashtags · @ to mention someone</p>
+      </>
+      )}
 
+      {/* ═══ Step 3 · Extras ══════════════════════════════════ */}
+      {step === 2 && (
+      <>
       {/* Song + poll attachments */}
       <div className="flex flex-wrap items-center gap-2">
         {track ? (
@@ -610,16 +680,44 @@ export function PostComposer({ userId }: { userId: string }) {
         </Link>
       </div>
 
-      {/* Post button */}
-      <button
-        type="button"
-        onClick={handlePost}
-        disabled={!canPost || submitted}
-        className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-accent text-base font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-50"
-      >
-        {willSchedule ? <CalendarClock size={18} /> : <Send size={18} />}
-        {submitted ? (willSchedule ? "Scheduling…" : "Sharing…") : willSchedule ? "Schedule" : "Post"}
-      </button>
+      </>
+      )}
+
+      {/* ── Step navigation ─────────────────────────────────────
+          Post sits alongside Back/Next rather than only on the last step: a
+          photo with a caption is already a complete post, and making someone
+          walk to step 3 to publish it would be ceremony, not guidance. */}
+      <div className="flex items-center gap-2 pt-1">
+        {step > 0 && (
+          <button
+            type="button"
+            onClick={() => setStep((v) => v - 1)}
+            className="flex h-12 shrink-0 items-center gap-1 rounded-xl border border-border px-4 text-sm font-semibold text-muted transition-colors hover:text-foreground"
+          >
+            <ChevronLeft size={16} /> Back
+          </button>
+        )}
+        {step < STEPS.length - 1 && (
+          <button
+            type="button"
+            onClick={() => setStep((v) => v + 1)}
+            className="flex h-12 flex-1 items-center justify-center gap-1 rounded-xl border border-border bg-surface text-sm font-bold text-foreground transition-colors hover:border-white/25"
+          >
+            Next <ChevronRight size={16} />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={handlePost}
+          disabled={!canPost || submitted}
+          className={`flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-40 ${
+            step === STEPS.length - 1 ? "flex-1" : "shrink-0"
+          }`}
+        >
+          {willSchedule ? <CalendarClock size={17} /> : <Send size={17} />}
+          {submitted ? (willSchedule ? "Scheduling…" : "Sharing…") : willSchedule ? "Schedule" : "Post"}
+        </button>
+      </div>
     </div>
   );
 }
