@@ -23,7 +23,13 @@ export type Track = {
   title: string;
   artist: string;
   artwork: string;
-  preview: string; // 30s mp3
+  /** 30s mp3. Spotify returns null for this on newly-created apps, so it is
+   *  usually empty — playback goes through `uri` and the Web Playback SDK. */
+  preview: string;
+  /** `spotify:track:…` — what the Web Playback SDK plays, full length. */
+  uri?: string;
+  /** Length of the real track, for the snippet timeline. */
+  durationMs?: number;
   appleUrl?: string; // "listen on" link — the Spotify track page
 };
 
@@ -58,6 +64,8 @@ type SpotifyTrack = {
   artists?: { name?: string }[];
   album?: { images?: { url?: string; width?: number }[] };
   external_urls?: { spotify?: string };
+  uri?: string;
+  duration_ms?: number;
 };
 
 export async function GET(req: NextRequest) {
@@ -76,7 +84,9 @@ export async function GET(req: NextRequest) {
 
   try {
     const access = await getToken(id, secret);
-    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=20`;
+    // Capped at 10: these credentials reject 11+ with `400 Invalid limit`,
+    // despite the docs advertising 50.
+    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10`;
 
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${access}` },
@@ -107,20 +117,17 @@ export async function GET(req: NextRequest) {
           artist: (r.artists ?? []).map((a) => a.name).filter(Boolean).join(", "),
           artwork: String(art?.url ?? ""),
           preview: String(r.preview_url ?? ""),
+          uri: r.uri || undefined,
+          durationMs: typeof r.duration_ms === "number" ? r.duration_ms : undefined,
           appleUrl: r.external_urls?.spotify || undefined,
         };
       })
-      // A track with no preview has nothing to play and nothing to draw a
-      // waveform from, so it is not a usable result here.
-      .filter((t) => t.id && t.title && t.preview);
+      // Playable means either a URI the Playback SDK can take, or a preview
+      // mp3. Filtering on preview alone would drop the entire catalogue,
+      // since Spotify returns preview_url: null for newly-created apps.
+      .filter((t) => t.id && t.title && (t.uri || t.preview));
 
-    // Distinguish "no matches" from "matches exist but none are playable".
-    // Spotify returns preview_url: null for a lot of catalogue, and a bare
-    // empty list would look like the search itself had failed.
-    return NextResponse.json({
-      tracks,
-      ...(items.length > 0 && tracks.length === 0 ? { noPreviews: true } : {}),
-    });
+    return NextResponse.json({ tracks });
   } catch (err) {
     console.error("[/api/music]", err);
     Sentry.captureException(err, { tags: { route: "music" } });
