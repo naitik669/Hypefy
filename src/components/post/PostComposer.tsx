@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock, ChevronRight } from "lucide-react";
+import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
-import { RichPostText } from "@/components/ui/RichPostText";
 import { ImageCropper } from "@/components/post/ImageCropper";
 import { useUpload } from "@/components/upload/UploadProvider";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
@@ -470,11 +469,9 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
           className="input resize-none"
         />
         {activeField === "caption" && <SuggestionDropdown suggestions={pickerSuggestions} onSelect={applyPickerSelection} />}
-        {caption && (
-          <div className="mt-1 rounded-xl border border-border/50 bg-elevated px-3 py-2 text-sm">
-            <RichPostText text={caption} />
-          </div>
-        )}
+        {/* No echo box under the field. It restated the text you were looking
+            at while you typed it, and the Preview page now shows the styled
+            version properly, in place. */}
         <p className="mt-0.5 text-right text-xs text-faint">{caption.length}/280</p>
       </div>
 
@@ -498,11 +495,6 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
           className="input resize-none"
         />
         {activeField === "body" && <SuggestionDropdown suggestions={pickerSuggestions} onSelect={applyPickerSelection} />}
-        {body && (
-          <div className="mt-1 rounded-xl border border-border/50 bg-elevated px-3 py-2 text-sm">
-            <RichPostText text={body} />
-          </div>
-        )}
         <p className="mt-0.5 text-right text-xs text-faint">{body.length}/1000</p>
       </div>
 
@@ -550,44 +542,58 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
 
       {/* ═══ Page 2 · Preview + extras ════════════════════════ */}
       {step === 1 && (
-      <>
-      <PostPreview
-        author={author}
-        imageUrls={imgs.map((i) => i.url)}
-        aspect={postAspect}
-        caption={caption}
-        body={body}
-        track={track}
-        pollOptions={pollOptions}
-      />
+        <PostPreview
+          author={author}
+          imageUrls={imgs.map((i) => i.url)}
+          aspect={postAspect}
+          caption={caption}
+          body={body}
+          track={track}
+          pollOptions={pollOptions}
+        />
+      )}
 
-      {/* Song + poll attachments */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* ── Attachments ─────────────────────────────────────────
+          On the compose page, because they are things you add to the post,
+          not things you check on the way out.
+
+          A list, not dashed pills. As pills they read as optional garnish
+          and three of them wrapped into an untidy row; as full-width rows
+          they read as a menu of what a post can carry, and each one has
+          somewhere to show what you picked. */}
+      {step === 0 && (
+      <>
+      <div className="overflow-hidden rounded-2xl border border-border bg-surface">
         {track ? (
-          <TrackChip track={track} onRemove={() => setTrack(null)} />
+          <div className="border-b border-border p-3">
+            <TrackChip track={track} onRemove={() => setTrack(null)} />
+          </div>
         ) : (
           <button
             type="button"
             onClick={() => setTrackPickerOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-pill border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-white/25 hover:text-foreground"
+            className="flex w-full items-center gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-white/[0.03]"
           >
-            <Music size={13} /> Add a song
+            <Music size={16} className="shrink-0 text-muted" />
+            <span className="flex-1 text-sm font-semibold">Music</span>
+            <span className="text-xs text-faint">Add a song</span>
+            <ChevronRight size={15} className="shrink-0 text-faint" />
           </button>
         )}
-        {pollOptions === null && (
+
+        {pollOptions === null ? (
           <button
             type="button"
             onClick={() => setPollOptions(["", ""])}
-            className="inline-flex items-center gap-1.5 rounded-pill border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-white/25 hover:text-foreground"
+            className="flex w-full items-center gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-white/[0.03]"
           >
-            <BarChart2 size={13} /> Add a poll
+            <BarChart2 size={16} className="shrink-0 text-muted" />
+            <span className="flex-1 text-sm font-semibold">Poll</span>
+            <span className="text-xs text-faint">Ask something</span>
+            <ChevronRight size={15} className="shrink-0 text-faint" />
           </button>
-        )}
-      </div>
-
-      {/* Poll options editor */}
-      {pollOptions !== null && (
-        <div className="flex flex-col gap-2 rounded-2xl border border-border bg-surface p-3">
+        ) : (
+        <div className="flex flex-col gap-2 border-b border-border p-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold uppercase tracking-widest text-faint">Poll</p>
             <button
@@ -632,11 +638,8 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
           )}
           <p className="text-[11px] text-faint">Your caption is the question. 2–4 options.</p>
         </div>
-      )}
-      <TrackPicker open={trackPickerOpen} onClose={() => setTrackPickerOpen(false)} onSelect={setTrack} />
+        )}
 
-      {/* Schedule */}
-      <div className="flex items-center gap-2">
         {scheduleAt === null ? (
           <button
             type="button"
@@ -647,13 +650,16 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
               const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
               setScheduleAt(local);
             }}
-            className="inline-flex items-center gap-1.5 rounded-pill border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-white/25 hover:text-foreground"
+            className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-white/[0.03]"
           >
-            <Clock size={13} /> Schedule for later
+            <Clock size={16} className="shrink-0 text-muted" />
+            <span className="flex-1 text-sm font-semibold">Schedule</span>
+            <span className="text-xs text-faint">Post later</span>
+            <ChevronRight size={15} className="shrink-0 text-faint" />
           </button>
         ) : (
-          <div className="flex flex-1 items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2">
-            <CalendarClock size={15} className="shrink-0 text-accent" />
+          <div className="flex items-center gap-2 px-3.5 py-3">
+            <CalendarClock size={16} className="shrink-0 text-accent" />
             <input
               type="datetime-local"
               value={scheduleAt}
@@ -671,13 +677,15 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
             </button>
           </div>
         )}
-        {/* "Scheduled" alone, sitting beside "Schedule for later", read as a
-            status label or a second toggle rather than a link to the list. */}
-        <Link href="/create/scheduled" className="ml-auto shrink-0 text-xs font-semibold text-muted hover:text-foreground">
-          View scheduled
-        </Link>
       </div>
 
+      {/* "Scheduled" alone, next to a Schedule row, read as a status rather
+          than a link to the list. */}
+      <Link href="/create/scheduled" className="self-end text-xs font-semibold text-muted hover:text-foreground">
+        View scheduled
+      </Link>
+
+      <TrackPicker open={trackPickerOpen} onClose={() => setTrackPickerOpen(false)} onSelect={setTrack} />
       </>
       )}
 
@@ -694,15 +702,28 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
           Preview <ChevronRight size={17} />
         </button>
       ) : (
-        <button
-          type="button"
-          onClick={handlePost}
-          disabled={!canPost || submitted}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-40"
-        >
-          {willSchedule ? <CalendarClock size={17} /> : <Send size={17} />}
-          {submitted ? (willSchedule ? "Scheduling…" : "Sharing…") : willSchedule ? "Schedule" : "Post"}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Second way back, next to the thing you are deciding about. The
+              header arrow is easy to miss when your attention is on the
+              preview and the Post button at the other end of the screen. */}
+          <button
+            type="button"
+            onClick={() => setStep(0)}
+            aria-label="Back to editing"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border text-muted transition-colors hover:border-white/25 hover:text-foreground"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={handlePost}
+            disabled={!canPost || submitted}
+            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-40"
+          >
+            {willSchedule ? <CalendarClock size={17} /> : <Send size={17} />}
+            {submitted ? (willSchedule ? "Scheduling…" : "Sharing…") : willSchedule ? "Schedule" : "Post"}
+          </button>
+        </div>
       )}
     </div>
     </>
