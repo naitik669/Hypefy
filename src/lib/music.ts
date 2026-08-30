@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
+import { spotifyPlay, spotifyPause } from "@/lib/spotify-player";
 
 /** A song attached to a note/post/show/profile — shaped by /api/music. */
 export type Track = {
@@ -8,25 +9,41 @@ export type Track = {
   title: string;
   artist: string;
   artwork: string;
+  /** 30s mp3. Empty for Spotify tracks — Spotify stopped serving previews to
+   *  newly-created apps, so those play through `uri` and the Playback SDK. */
   preview: string;
-  /** Seconds into the 30s preview to start from (snippet selection). */
+  /** `spotify:track:…` — full-length playback via the Web Playback SDK. */
+  uri?: string;
+  /** Real track length in ms, so a snippet timeline can span the whole song
+   *  instead of a 30s preview. */
+  durationMs?: number;
+  /** Seconds into the track to start from (snippet selection). */
   start?: number;
-  /** Apple Music / iTunes song page — attribution + full listen. */
+  /** "Listen on" link — Apple Music or Spotify, depending on the source. */
   appleUrl?: string;
 };
 
-/** Parse a track jsonb column defensively — bad shapes become null. */
+/**
+ * Parse a track jsonb column defensively — bad shapes become null.
+ *
+ * Playable means a preview OR a Spotify uri: rows written before the switch
+ * have only the former, rows written after only the latter, and both have to
+ * keep working in the same feed.
+ */
 export function parseTrack(raw: unknown): Track | null {
   if (!raw || typeof raw !== "object") return null;
   const t = raw as Record<string, unknown>;
-  if (!t.id || !t.title || !t.preview) return null;
+  if (!t.id || !t.title || !(t.preview || t.uri)) return null;
   const start = Number(t.start);
+  const durationMs = Number(t.durationMs);
   return {
     id: String(t.id),
     title: String(t.title),
     artist: String(t.artist ?? ""),
     artwork: String(t.artwork ?? ""),
-    preview: String(t.preview),
+    preview: String(t.preview ?? ""),
+    ...(t.uri ? { uri: String(t.uri) } : {}),
+    ...(Number.isFinite(durationMs) && durationMs > 0 ? { durationMs } : {}),
     ...(Number.isFinite(start) && start > 0 ? { start } : {}),
     ...(t.appleUrl ? { appleUrl: String(t.appleUrl) } : {}),
   };
@@ -77,7 +94,31 @@ function ensureAudio(): HTMLAudioElement {
   return audio;
 }
 
+/** Spotify tracks have no preview mp3, so they route to the Playback SDK.
+ *  Everything else stays on the shared <audio> element. */
+function usesSpotify(track: Track): boolean {
+  return !!track.uri && !track.preview;
+}
+
 export function playPreview(track: Track) {
+  if (usesSpotify(track)) {
+    if (playingId === track.id) {
+      void spotifyPause();
+      playingId = null;
+      emit();
+      return;
+    }
+    // Stop any mp3 first — the two players are independent and would
+    // otherwise overlap.
+    audio?.pause();
+    playingId = track.id;
+    emit();
+    void spotifyPlay(track.uri!, (track.start ?? 0) * 1000).then((ok) => {
+      if (!ok) { playingId = null; emit(); }
+    });
+    return;
+  }
+
   const a = ensureAudio();
   if (playingId === track.id) {
     a.pause();
@@ -94,6 +135,8 @@ export function playPreview(track: Track) {
 
 export function stopPreview() {
   if (audio && playingId) audio.pause();
+  void spotifyPause();
+  if (playingId) { playingId = null; emit(); }
 }
 
 /**
@@ -102,6 +145,19 @@ export function stopPreview() {
  * restarting. Only swaps src when the track actually changed.
  */
 export function ensurePreviewPlaying(track: Track) {
+  if (usesSpotify(track)) {
+    audio?.pause();
+    playingId = track.id;
+    emit();
+    // Always restarts at `start`. The SDK cannot resume mid-snippet from a
+    // different offset, and for scrubbing — the only caller that repeats —
+    // restarting at the new point is the intended behaviour anyway.
+    void spotifyPlay(track.uri!, (track.start ?? 0) * 1000).then((ok) => {
+      if (!ok) { playingId = null; emit(); }
+    });
+    return;
+  }
+
   const a = ensureAudio();
   const sameSrc = a.src === srcFor(track);
   if (sameSrc && playingId === track.id && !a.paused) return;
@@ -117,6 +173,8 @@ export function ensurePreviewPlaying(track: Track) {
 /** Pause without clearing the source, so ensurePreviewPlaying can resume. */
 export function pausePreview() {
   audio?.pause();
+  void spotifyPause();
+  if (playingId) { playingId = null; emit(); }
 }
 
 /** Global music mute — one tap silences every preview surface, persisted. */

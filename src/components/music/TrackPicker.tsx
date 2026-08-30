@@ -5,6 +5,7 @@ import { Music, Search, Play, Pause, ChevronLeft, Check } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Waveform } from "@/components/music/Waveform";
+import { SnippetTimeline } from "@/components/music/SnippetTimeline";
 import {
   type Track,
   playPreview,
@@ -14,14 +15,23 @@ import {
   usePlayingTrackId,
 } from "@/lib/music";
 
-/** Apple previews run ~30s. A snippet is a fixed-length window taken from
- *  inside that, so the last legal start is whatever still fits the window. */
-const PREVIEW_LEN = 30;
+/** Fallback track length when a source gives none — Apple previews run ~30s.
+ *  Spotify tracks carry their real duration, so the timeline spans the whole
+ *  song rather than a preview. */
+const FALLBACK_LEN = 30;
 const SNIPPET_LEN = 15;
-const MAX_START = PREVIEW_LEN - SNIPPET_LEN;
 
+/** Seconds of song this track offers, and the last start that still fits a
+ *  full snippet inside it. */
+function spanOf(t: Track | null) {
+  const total = t?.durationMs ? t.durationMs / 1000 : FALLBACK_LEN;
+  return { total, maxStart: Math.max(0, total - SNIPPET_LEN) };
+}
+
+/** m:ss — the timeline spans a whole song now, so minutes are real. */
 function fmt(s: number) {
-  return `0:${String(Math.round(s)).padStart(2, "0")}`;
+  const t = Math.max(0, Math.round(s));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 }
 
 /**
@@ -115,6 +125,7 @@ export function TrackPicker({
   }
 
   const snippetPlaying = !!snippet && playingId === snippet.id;
+  const { total, maxStart } = spanOf(snippet);
 
   // ── Snippet step ─────────────────────────────────────────────
   if (snippet) {
@@ -155,26 +166,44 @@ export function TrackPicker({
             </button>
           </div>
 
-          {/* Start-point scrubber over the 30s preview */}
+          {/* Snippet window over the track.
+              A waveform is only possible when there are audio bytes to decode.
+              Spotify hands back a remote-controlled player instead, so those
+              tracks get a plain timeline — which now spans the whole song
+              rather than a 30-second preview. */}
           <div>
             <div className="flex items-baseline justify-between pb-2">
               <span className="text-xs font-bold uppercase tracking-widest text-faint">Plays</span>
-              <span className="text-sm font-bold tabular-nums">{fmt(start)} – {fmt(start + SNIPPET_LEN)}</span>
+              <span className="text-sm font-bold tabular-nums">
+                {fmt(start)} – {fmt(Math.min(start + SNIPPET_LEN, total))}
+              </span>
             </div>
-            <Waveform
-              src={snippet.preview}
-              start={start}
-              max={MAX_START}
-              duration={PREVIEW_LEN}
-              windowLen={SNIPPET_LEN}
-              onChange={scrub}
-            />
+
+            {snippet.preview ? (
+              <Waveform
+                src={snippet.preview}
+                start={start}
+                max={maxStart}
+                duration={total}
+                windowLen={SNIPPET_LEN}
+                onChange={scrub}
+              />
+            ) : (
+              <SnippetTimeline
+                start={start}
+                max={maxStart}
+                duration={total}
+                windowLen={SNIPPET_LEN}
+                onChange={scrub}
+              />
+            )}
+
             <div className="flex justify-between pt-1 text-[10px] tabular-nums text-faint">
               <span>0:00</span>
-              <span>{fmt(PREVIEW_LEN)}</span>
+              <span>{fmt(total)}</span>
             </div>
             <p className="pt-2 text-xs text-faint">
-              Drag the block anywhere on the wave. Every snippet is {SNIPPET_LEN} seconds.
+              Drag the block anywhere on the track. Every snippet is {SNIPPET_LEN} seconds.
             </p>
           </div>
 
