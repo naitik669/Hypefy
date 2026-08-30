@@ -12,6 +12,7 @@ import { TrackPicker } from "@/components/music/TrackPicker";
 import { TrackChip } from "@/components/music/TrackChip";
 import { PostPreview, type PreviewAuthor } from "@/components/post/PostPreview";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SchedulePicker } from "@/components/post/SchedulePicker";
 import type { Track } from "@/lib/music";
 
 const MAX_SIZE_MB = 10;
@@ -40,6 +41,15 @@ const RATIOS = [
 const MIN_AR = 0.4;
 const MAX_AR = 3.0;
 const clampAR = (n: number) => Math.min(MAX_AR, Math.max(MIN_AR, n));
+
+/** "Sat 30 Aug, 2:19 PM" from the composer's stored local datetime string. */
+function formatSchedule(v: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(v);
+  if (!m) return v;
+  return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).toLocaleString(undefined, {
+    weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
+  });
+}
 
 /** Two pages: build it, then look at it.
  *
@@ -72,6 +82,7 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
   const [activeField, setActiveField] = useState<"caption" | "body" | null>(null);
   const [track, setTrack] = useState<Track | null>(null);
   const [trackPickerOpen, setTrackPickerOpen] = useState(false);
+  const [schedulePickerOpen, setSchedulePickerOpen] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
   // Poll: null = no poll; otherwise 2-4 option strings (blanks dropped on post).
   const [pollOptions, setPollOptions] = useState<string[] | null>(null);
@@ -658,13 +669,7 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
         {scheduleAt === null ? (
           <button
             type="button"
-            onClick={() => {
-              // Default to one hour out, rounded, in the input's local format.
-              const d = new Date(Date.now() + 60 * 60 * 1000);
-              d.setSeconds(0, 0);
-              const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-              setScheduleAt(local);
-            }}
+            onClick={() => setSchedulePickerOpen(true)}
             className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-white/[0.03]"
           >
             <Clock size={16} className="shrink-0 text-muted" />
@@ -673,15 +678,16 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
             <ChevronRight size={15} className="shrink-0 text-faint" />
           </button>
         ) : (
-          <div className="flex items-center gap-2 px-3.5 py-3">
+          <div className="flex items-center gap-3 px-3.5 py-3">
             <CalendarClock size={16} className="shrink-0 text-accent" />
-            <input
-              type="datetime-local"
-              value={scheduleAt}
-              min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
-              onChange={(e) => setScheduleAt(e.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none [color-scheme:dark]"
-            />
+            <button
+              type="button"
+              onClick={() => setSchedulePickerOpen(true)}
+              className="min-w-0 flex-1 text-left"
+            >
+              <span className="block text-sm font-semibold">Scheduled</span>
+              <span className="block truncate text-xs text-muted">{formatSchedule(scheduleAt)}</span>
+            </button>
             <button
               type="button"
               onClick={() => setScheduleAt(null)}
@@ -701,6 +707,12 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
       </Link>
 
       <TrackPicker open={trackPickerOpen} onClose={() => setTrackPickerOpen(false)} onSelect={setTrack} />
+      <SchedulePicker
+        open={schedulePickerOpen}
+        value={scheduleAt}
+        onClose={() => setSchedulePickerOpen(false)}
+        onConfirm={setScheduleAt}
+      />
       </>
       )}
 

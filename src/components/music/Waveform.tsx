@@ -69,14 +69,17 @@ export function Waveform({
   start,
   max,
   duration,
+  windowLen,
   onChange,
 }: {
   src: string;
   start: number;
-  /** Latest allowed start, so a usable amount of song remains after it. */
+  /** Latest allowed start — `duration - windowLen`, so the window always fits. */
   max: number;
   /** Full length of the preview the bars represent. */
   duration: number;
+  /** Length of the snippet. The window is this wide and never resizes. */
+  windowLen: number;
   onChange: (next: number) => void;
 }) {
   const stripRef = useRef<HTMLDivElement>(null);
@@ -105,16 +108,20 @@ export function Waveform({
     return () => ac.abort();
   }, [src]);
 
-  /** Pointer x → seconds, clamped so the snippet always has room to run. */
+  /** Pointer x is the CENTRE of the window, not its left edge — you are
+   *  dragging a block, so it should sit under your finger rather than
+   *  trailing it by half its width. Clamped so the block stays on the strip. */
   function seek(clientX: number) {
     const el = stripRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     const ratio = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
-    onChange(Math.min(max, Math.round(ratio * duration)));
+    const centre = ratio * duration;
+    onChange(Math.min(max, Math.max(0, Math.round(centre - windowLen / 2))));
   }
 
-  const startRatio = Math.min(1, start / duration);
+  const startRatio = start / duration;
+  const widthRatio = windowLen / duration;
 
   return (
     <div
@@ -143,7 +150,11 @@ export function Waveform({
     >
       {peaks
         ? peaks.map((v, i) => {
-            const lit = i / BARS >= startRatio;
+            // Lit only inside the window — dimmed both before and after, so
+            // the bright run reads as a fixed block you slide, not a "from
+            // here to the end" selection.
+            const t = (i / BARS) * duration;
+            const lit = t >= start && t < start + windowLen;
             return (
               <span
                 key={i}
@@ -163,11 +174,13 @@ export function Waveform({
             />
           ))}
 
-      {/* Start handle */}
+      {/* The window itself — one block with a bracket on each edge. It is
+          not resizable on purpose: every snippet is the same length, so a
+          two-handle trimmer would offer a choice that does not exist. */}
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-y-1 w-[3px] rounded-full bg-foreground"
-        style={{ left: `calc(${startRatio * 100}% )` }}
+        className="pointer-events-none absolute inset-y-0 rounded-lg border-2 border-foreground/70"
+        style={{ left: `${startRatio * 100}%`, width: `${widthRatio * 100}%` }}
       />
 
       {failed && (

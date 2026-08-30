@@ -14,9 +14,11 @@ import {
   usePlayingTrackId,
 } from "@/lib/music";
 
-/** Apple previews run ~30s; leave at least 5s of snippet after the start. */
+/** Apple previews run ~30s. A snippet is a fixed-length window taken from
+ *  inside that, so the last legal start is whatever still fits the window. */
 const PREVIEW_LEN = 30;
-const MAX_START = PREVIEW_LEN - 5;
+const SNIPPET_LEN = 15;
+const MAX_START = PREVIEW_LEN - SNIPPET_LEN;
 
 function fmt(s: number) {
   return `0:${String(Math.round(s)).padStart(2, "0")}`;
@@ -156,14 +158,15 @@ export function TrackPicker({
           {/* Start-point scrubber over the 30s preview */}
           <div>
             <div className="flex items-baseline justify-between pb-2">
-              <span className="text-xs font-bold uppercase tracking-widest text-faint">Starts at</span>
-              <span className="text-sm font-bold tabular-nums">{fmt(start)}</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-faint">Plays</span>
+              <span className="text-sm font-bold tabular-nums">{fmt(start)} – {fmt(start + SNIPPET_LEN)}</span>
             </div>
             <Waveform
               src={snippet.preview}
               start={start}
               max={MAX_START}
               duration={PREVIEW_LEN}
+              windowLen={SNIPPET_LEN}
               onChange={scrub}
             />
             <div className="flex justify-between pt-1 text-[10px] tabular-nums text-faint">
@@ -171,7 +174,7 @@ export function TrackPicker({
               <span>{fmt(PREVIEW_LEN)}</span>
             </div>
             <p className="pt-2 text-xs text-faint">
-              Drag anywhere on the wave — the lit part is what plays.
+              Drag the block anywhere on the wave. Every snippet is {SNIPPET_LEN} seconds.
             </p>
           </div>
 
