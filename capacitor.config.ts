@@ -1,4 +1,5 @@
 import type { CapacitorConfig } from "@capacitor/cli";
+import { KeyboardResize } from "@capacitor/keyboard";
 
 /**
  * Hypefy is a server-rendered Next.js app (SSR + proxy + API routes), so it
@@ -31,6 +32,14 @@ const config: CapacitorConfig = {
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"],
+    },
+    Keyboard: {
+      // `native` lets Android resize the window itself, so the layout is
+      // shortened above the keyboard. The alternative, `body`, resizes the
+      // document and fights the app's own dvh-based layout; leaving it unset
+      // pans the WebView instead, which is what buries the chat composer.
+      resize: KeyboardResize.Native,
+      resizeOnFullScreen: true,
     },
   },
 };

@@ -18,6 +18,7 @@ import { FloatingMenu, MenuItem, MenuDivider } from "@/components/ui/FloatingMen
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CaptureGuard } from "@/components/native/CaptureGuard";
+import { useKeyboardInset } from "@/lib/useKeyboardInset";
 import { useToast } from "@/components/ui/ToastProvider";
 import { presenceLabel } from "@/lib/presence";
 import { haptics } from "@/lib/haptics";
@@ -327,6 +328,10 @@ export function RealChatView({
     startCall({ conversationId, peerId: other.id, peerName: other.name, peerHue: other.hue, type });
   }
   const endRef = useRef<HTMLDivElement>(null);
+
+  // Android shortens the window when the keyboard opens, which leaves a chat
+  // that was pinned to the newest message no longer showing it.
+  useKeyboardInset(() => endRef.current?.scrollIntoView({ block: "end" }));
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const unreadDividerRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
