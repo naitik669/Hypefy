@@ -319,24 +319,43 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
           forcing Back/Next to reach a pane already on screen would be an
           artificial lock. The label lives in aria-label for screen readers,
           which do need it. */}
-      <nav aria-label="Post steps" className="flex items-stretch gap-1.5">
-        {STEPS.map((s, i) => (
-          <button
-            key={s.label}
-            type="button"
-            onClick={() => setStep(i)}
-            aria-label={s.label}
-            aria-current={i === step ? "step" : undefined}
-            className="min-w-0 flex-1 py-2"
-          >
-            <span
-              className={`block h-[3px] w-full rounded-full transition-colors ${
-                i === step ? "bg-accent" : i < step ? "bg-accent/40" : "bg-border"
-              }`}
-            />
-          </button>
-        ))}
-      </nav>
+      <div className="flex items-center gap-2">
+        {/* Back lives up here as well as in the footer. Once there are photos
+            and a preview the footer sits below the fold, and a 3px bar is not
+            an affordance anyone would try tapping — without this, stepping
+            backwards meant scrolling to find it. Rendered disabled rather
+            than hidden on the first step so the bars never shift sideways. */}
+        <button
+          type="button"
+          onClick={() => setStep((v) => Math.max(0, v - 1))}
+          disabled={step === 0}
+          aria-label="Previous step"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted transition-colors enabled:hover:border-white/25 enabled:hover:text-foreground disabled:opacity-30"
+        >
+          <ChevronLeft size={16} />
+        </button>
+
+        <nav aria-label="Post steps" className="flex flex-1 items-stretch gap-1.5">
+          {STEPS.map((s, i) => (
+            <button
+              key={s.label}
+              type="button"
+              onClick={() => setStep(i)}
+              aria-label={s.label}
+              aria-current={i === step ? "step" : undefined}
+              // Generous vertical padding: the bar is 3px, so without it the
+              // tap target was 19px — well under a usable touch size.
+              className="group min-w-0 flex-1 py-3"
+            >
+              <span
+                className={`block h-[3px] w-full rounded-full transition-colors ${
+                  i === step ? "bg-accent" : i < step ? "bg-accent/40" : "bg-border group-hover:bg-white/25"
+                }`}
+              />
+            </button>
+          ))}
+        </nav>
+      </div>
 
       {/* Live preview — shown on every step, because the point of stepping
           through is knowing what the thing looks like at each point. */}
