@@ -1,5 +1,33 @@
 apply plugin: 'com.android.application'
 
+/**
+ * Version comes from git, not a hand-edited number.
+ *
+ * versionCode must increase on every build that is ever installed over
+ * another, and a literal in this file is exactly the kind of thing that gets
+ * forgotten — producing an APK Android silently refuses to install as an
+ * upgrade. Commit count is monotonic and needs no bookkeeping.
+ *
+ * Falls back to 1 / "dev" when git is unavailable (a source zip, or a build
+ * container without the .git directory), so the build never breaks over it.
+ */
+def gitOutput(String cmd, String fallback) {
+    try {
+        // rootProject.projectDir is android/, so its parent is the repo root
+        // where .git lives. Deriving it from user.dir would depend on where
+        // gradle happened to be invoked from.
+        def proc = cmd.execute(null, rootProject.projectDir.parentFile)
+        proc.waitFor()
+        def out = proc.in.text.trim()
+        return (proc.exitValue() == 0 && out) ? out : fallback
+    } catch (Exception ignored) {
+        return fallback
+    }
+}
+
+def buildVersionCode = gitOutput('git rev-list --count HEAD', '1') as Integer
+def buildVersionName = gitOutput('git rev-parse --short HEAD', 'dev')
+
 android {
     namespace = "chat.hypefy.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +35,8 @@ android {
         applicationId "chat.hypefy.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode buildVersionCode
+        versionName buildVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +44,32 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    /**
+     * Release signing is configured only when the environment supplies a
+     * keystore. Without one the release build falls back to the debug key, so
+     * a local `assembleRelease` still works — it just produces something only
+     * useful for testing, which is the honest outcome rather than a confusing
+     * build failure on a developer machine.
+     *
+     * Every value comes from the environment, so no secret is ever written
+     * into this file or the repo.
+     */
+    signingConfigs {
+        release {
+            def storePath = System.getenv("KEYSTORE_PATH")
+            if (storePath) {
+                storeFile file(storePath)
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
+            signingConfig System.getenv("KEYSTORE_PATH")
+                ? signingConfigs.release
+                : signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
