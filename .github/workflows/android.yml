@@ -21,6 +21,9 @@ jobs:
       GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
       FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+      # Optional. Unset means the release still uploads, it just is not
+      # auto-assigned to a group — see the distribute step.
+      FIREBASE_TESTER_GROUP: ${{ vars.FIREBASE_TESTER_GROUP }}
 
     steps:
       - uses: actions/checkout@v4
@@ -90,6 +93,10 @@ jobs:
         with:
           appId: ${{ secrets.FIREBASE_APP_ID }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          groups: testers
+          # Only assign a group when one is configured. Hardcoding "testers"
+          # failed the whole build with a 404 once the upload had already
+          # succeeded, which is the worst of both: the release existed, and CI
+          # said the run failed.
+          groups: ${{ env.FIREBASE_TESTER_GROUP }}
           file: android/app/build/outputs/apk/release/app-release.apk
           releaseNotes: ${{ github.event.head_commit.message }}
