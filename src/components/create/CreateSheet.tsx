@@ -56,7 +56,7 @@ const ACTIONS = [
  * without measuring anything. A JS constant could not do either.
  */
 const CARD_VARS = {
-  "--card-w": "min(74vw, 330px)",
+  "--card-w": "min(70vw, 310px)",
   "--card-h": "min(52vh, 440px)",
 } as React.CSSProperties;
 
@@ -260,7 +260,7 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
                 it, and a button nested in a button is invalid and swallows
                 its own clicks. Each card still exposes exactly one button —
                 add when centred, select when not. */}
-            {ACTIONS.map(({ key, icon: Icon, label, cta, href, tint }, i) => {
+            {ACTIONS.map(({ key, icon: Icon, label, desc, cta, href, tint }, i) => {
               const on = i === active;
               return (
                 <div
@@ -279,37 +279,56 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
                   <div className="relative min-h-0 flex-1">
                     <CardPreview kind={key} tint={tint} />
 
+                    {/* The control says what it does. A bare + floating on an
+                        abstract preview is a shape, not an instruction. The
+                        caption is inside the button so the whole stack is one
+                        target, rather than a label sitting beside a control
+                        that ignores taps on it. */}
                     {on && (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <button
                           type="button"
                           onClick={() => go(href)}
-                          aria-label={cta}
-                          style={{ background: `rgb(${tint})` }}
-                          // ring in the card's own surface colour rather than a
-                          // shadow — it separates the control from the artwork
-                          // behind it without reintroducing a glow.
-                          className="animate-modal-pop flex h-16 w-16 items-center justify-center rounded-full text-accent-ink ring-4 ring-surface transition active:scale-95"
+                          className="animate-modal-pop group/add flex flex-col items-center gap-2.5 outline-none"
                         >
-                          <Plus size={28} strokeWidth={2.5} />
+                          <span
+                            style={{ background: `rgb(${tint})` }}
+                            // ring in the card's own surface colour rather than
+                            // a shadow — separates the control from the artwork
+                            // behind it without reintroducing a glow.
+                            className="flex h-14 w-14 items-center justify-center rounded-full text-accent-ink ring-4 ring-surface transition group-active/add:scale-95"
+                          >
+                            <Plus size={26} strokeWidth={2.5} />
+                          </span>
+                          <span className="rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white">
+                            {cta}
+                          </span>
                         </button>
                       </div>
                     )}
                   </div>
 
+                  {/* Every card states what it is. "Shot" and "Show" are
+                      Hypefy's own words — a one-word label tells a new user
+                      nothing, so the description rides on the card instead of
+                      sitting under the carousel where it only ever described
+                      whichever card was already selected. */}
                   <div
-                    className="flex items-center gap-2 border-t px-3.5 py-3"
+                    className="border-t px-4 py-3.5"
                     style={{ borderColor: on ? `rgba(${tint}, 0.2)` : "rgba(255, 255, 255, 0.05)" }}
                   >
-                    <Icon
-                      size={15}
-                      strokeWidth={1.9}
-                      className="shrink-0"
-                      style={{ color: on ? `rgb(${tint})` : undefined }}
-                    />
-                    <span className={`text-[13px] font-semibold ${on ? "text-foreground" : "text-muted"}`}>
-                      {label}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <Icon
+                        size={15}
+                        strokeWidth={2}
+                        className="shrink-0"
+                        style={{ color: on ? `rgb(${tint})` : undefined }}
+                      />
+                      <h3 className={`text-[17px] font-bold leading-none tracking-tight ${on ? "text-foreground" : "text-muted"}`}>
+                        {label}
+                      </h3>
+                    </div>
+                    <p className="mt-1.5 text-[11.5px] leading-snug text-muted">{desc}</p>
                   </div>
 
                   {/* Off-centre cards stay tappable to bring them in. Last in
@@ -340,12 +359,6 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
           ))}
         </div>
 
-        {/* ── Caption + commit ─────────────────────────────────
-            Keyed on the active card so the copy re-enters instead of
-            swapping in place, which reads as the carousel handing off. */}
-        <p key={current.key} className="animate-row-in mt-2.5 text-center text-[13px] leading-relaxed text-muted">
-          {current.desc}
-        </p>
       </div>
     </BottomSheet>
   );
