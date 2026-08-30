@@ -8,10 +8,26 @@ export default async function CreatePostPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
 
+  // The composer previews the post as it will appear in the feed, so it needs
+  // the same author chip the feed draws.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name, username, avatar_hue, avatar_url")
+    .eq("id", user.id)
+    .maybeSingle();
+
   return (
     <>
       <PageHeader title="New Post" showBack />
-      <PostComposer userId={user.id} />
+      <PostComposer
+        userId={user.id}
+        author={{
+          name: profile?.display_name ?? profile?.username ?? "You",
+          username: profile?.username ?? null,
+          hue: profile?.avatar_hue ?? 280,
+          avatarUrl: profile?.avatar_url ?? null,
+        }}
+      />
     </>
   );
 }

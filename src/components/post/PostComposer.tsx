@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
 import { RichPostText } from "@/components/ui/RichPostText";
@@ -11,6 +11,7 @@ import { useUpload } from "@/components/upload/UploadProvider";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { TrackChip } from "@/components/music/TrackChip";
+import { PostPreview, type PreviewAuthor } from "@/components/post/PostPreview";
 import type { Track } from "@/lib/music";
 
 const MAX_SIZE_MB = 10;
@@ -40,14 +41,15 @@ const MIN_AR = 0.4;
 const MAX_AR = 3.0;
 const clampAR = (n: number) => Math.min(MAX_AR, Math.max(MIN_AR, n));
 
-/** The three panes of the composer, in order. */
+/** Order and count of the panes. Labels are for assistive tech only — the
+ *  visible indicator is bars, deliberately unlabelled. */
 const STEPS = [
-  { label: "Media", hint: "Photos and shape" },
-  { label: "Write", hint: "Caption and text" },
-  { label: "Extras", hint: "Song, poll, schedule" },
+  { label: "Media" },
+  { label: "Write" },
+  { label: "Extras" },
 ] as const;
 
-export function PostComposer({ userId }: { userId: string }) {
+export function PostComposer({ userId, author }: { userId: string; author: PreviewAuthor }) {
   const router = useRouter();
   const { uploadPost } = useUpload();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -308,47 +310,45 @@ export function PostComposer({ userId }: { userId: string }) {
   return (
     <div className="flex flex-col gap-4 px-4 pb-8 pt-2">
       {/* ── Roadmap ─────────────────────────────────────────────
-          Steps are clickable, not just indicators. Nothing here is a
-          prerequisite for anything else, so forcing Back/Next to reach a
-          pane you can already see would be an artificial lock. */}
+          Bars only. Naming the steps put a label on each pane that repeated
+          what the pane already showed, and the labels had to be vague enough
+          to cover everything inside them, so they said less than the content
+          did. Position is the only thing the indicator needs to carry.
+
+          Still buttons: nothing here is a prerequisite for anything else, so
+          forcing Back/Next to reach a pane already on screen would be an
+          artificial lock. The label lives in aria-label for screen readers,
+          which do need it. */}
       <nav aria-label="Post steps" className="flex items-stretch gap-1.5">
-        {STEPS.map((s, i) => {
-          const done = i < step;
-          const now = i === step;
-          return (
-            <button
-              key={s.label}
-              type="button"
-              onClick={() => setStep(i)}
-              aria-current={now ? "step" : undefined}
-              className="group flex min-w-0 flex-1 flex-col gap-1.5 text-left"
-            >
-              <span
-                className={`h-[3px] w-full rounded-full transition-colors ${
-                  now ? "bg-accent" : done ? "bg-accent/40" : "bg-border"
-                }`}
-              />
-              <span className="flex items-center gap-1">
-                <span
-                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold transition-colors ${
-                    now ? "bg-accent text-accent-ink" : done ? "bg-accent/25 text-accent" : "bg-border text-faint"
-                  }`}
-                >
-                  {done ? <Check size={9} strokeWidth={3.5} /> : i + 1}
-                </span>
-                <span
-                  className={`truncate text-[11px] font-bold transition-colors ${
-                    now ? "text-foreground" : "text-muted"
-                  }`}
-                >
-                  {s.label}
-                </span>
-              </span>
-            </button>
-          );
-        })}
+        {STEPS.map((s, i) => (
+          <button
+            key={s.label}
+            type="button"
+            onClick={() => setStep(i)}
+            aria-label={s.label}
+            aria-current={i === step ? "step" : undefined}
+            className="min-w-0 flex-1 py-2"
+          >
+            <span
+              className={`block h-[3px] w-full rounded-full transition-colors ${
+                i === step ? "bg-accent" : i < step ? "bg-accent/40" : "bg-border"
+              }`}
+            />
+          </button>
+        ))}
       </nav>
-      <p className="-mt-2 text-[11px] text-faint">{STEPS[step].hint}</p>
+
+      {/* Live preview — shown on every step, because the point of stepping
+          through is knowing what the thing looks like at each point. */}
+      <PostPreview
+        author={author}
+        imageUrls={imgs.map((i) => i.url)}
+        aspect={postAspect}
+        caption={caption}
+        body={body}
+        track={track}
+        pollOptions={pollOptions}
+      />
 
       {/* Draft restored notice */}
       {draftRestored && (
