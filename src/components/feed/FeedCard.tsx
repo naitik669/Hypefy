@@ -33,6 +33,10 @@ export type FeedPost = {
   body: string | null;
   image_url: string | null;
   image_urls?: string[];
+  /** width / height chosen in the composer. Null on posts made before 0035
+   *  and on text-only posts — those keep rendering square, which is the shape
+   *  they were actually composed and cropped at. */
+  aspect_ratio?: number | null;
   hashtags: string[];
   mentions: string[];
   hype_count: number;
@@ -339,7 +343,16 @@ export function FeedCard({
             style={{ transform: `translateX(-${imgIdx * 100}%)` }}
           >
             {images.map((src, i) => (
-              <div key={i} className="relative aspect-square w-full shrink-0 select-none">
+              // Frame the post in the shape it was composed at. This was
+              // hardcoded to aspect-square, so a 3:4 or 16:9 post — already
+              // cropped to that shape on upload — got cropped a second time
+              // back to a square here, and the picker in the composer had no
+              // visible effect at all.
+              <div
+                key={i}
+                className="relative w-full shrink-0 select-none"
+                style={{ aspectRatio: String(post.aspect_ratio ?? 1) }}
+              >
                 <OptimizedImage
                   src={src}
                   alt={post.caption ?? "Post"}

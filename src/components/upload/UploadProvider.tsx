@@ -16,6 +16,9 @@ type PostUpload = {
   mentions: string[];
   track?: Track | null;
   poll?: { options: string[] } | null;
+  /** width / height the post was composed at; null for text-only posts. The
+   *  feed frames the gallery with it instead of forcing every post square. */
+  aspectRatio?: number | null;
   /** ISO timestamp to publish later — routes the post to scheduled_posts. */
   scheduledAt?: string | null;
 };
@@ -82,6 +85,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         mentions: a.mentions,
         track: a.track ?? null,
         poll: a.poll ?? null,
+        aspect_ratio: a.aspectRatio ?? null,
       };
 
       // Scheduled → its own table (a pg_cron job publishes it when due); the

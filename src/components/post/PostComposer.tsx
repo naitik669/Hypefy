@@ -18,25 +18,41 @@ const MAX_IMAGES = 10;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const DRAFT_KEY = "hypefy_post_draft";
 
-type Img = { id: string; file: File; url: string; origSrc: string };
+/** `origFile` is kept alongside the cropped `file` so switching to Auto can
+ *  hand the untouched original back — a crop is destructive, and without the
+ *  original there is no way to return to the photo's real shape. */
+type Img = { id: string; file: File; url: string; origSrc: string; origFile: File };
 
-/** Supported aspect ratios for posts. value = width / height. */
+/** Supported aspect ratios for posts. value = width / height;
+ *  null means "whatever shape the photo already is". */
 const RATIOS = [
+  { label: "Auto", value: null,      cssRatio: null },
   { label: "1:1", value: 1,          cssRatio: "aspect-square" },
   { label: "3:4", value: 3 / 4,      cssRatio: "aspect-[3/4]" },
   { label: "4:3", value: 4 / 3,      cssRatio: "aspect-[4/3]" },
   { label: "16:9", value: 16 / 9,    cssRatio: "aspect-video" },
 ] as const;
 
+/** Matches the CHECK constraint on posts.aspect_ratio (0035). A panorama or
+ *  a very tall screenshot would otherwise be rejected by the insert, or
+ *  wreck the feed layout if it were not. */
+const MIN_AR = 0.4;
+const MAX_AR = 3.0;
+const clampAR = (n: number) => Math.min(MAX_AR, Math.max(MIN_AR, n));
+
 export function PostComposer({ userId }: { userId: string }) {
   const router = useRouter();
   const { uploadPost } = useUpload();
   const fileRef = useRef<HTMLInputElement>(null);
-  const queueRef = useRef<{ id: string; origSrc: string }[]>([]);
+  const queueRef = useRef<{ id: string; origSrc: string; file: File }[]>([]);
 
   const [imgs, setImgs] = useState<Img[]>([]);
-  const [crop, setCrop] = useState<{ id: string; origSrc: string } | null>(null);
-  const [ratioIdx, setRatioIdx] = useState(0); // index into RATIOS array
+  const [crop, setCrop] = useState<{ id: string; origSrc: string; file: File } | null>(null);
+  const [ratioIdx, setRatioIdx] = useState(0); // index into RATIOS array; 0 = Auto
+  /** Measured from the first photo when the shape is Auto. Every image in a
+   *  post shares one frame in the feed, so the first one sets it — the same
+   *  rule Instagram uses for multi-image posts. */
+  const [autoRatio, setAutoRatio] = useState<number | null>(null);
   const [caption, setCaption] = useState("");
   const [body, setBody] = useState("");
   const captionRef = useRef<HTMLTextAreaElement>(null);
@@ -106,6 +122,15 @@ export function PostComposer({ userId }: { userId: string }) {
   const [submitted, setSubmitted] = useState(false);
 
   const currentRatio = RATIOS[ratioIdx];
+  const isAuto = currentRatio.value === null;
+  /** The frame the composer previews in. Auto has no fixed Tailwind class —
+   *  it drives `aspect-ratio` inline from the measured photo, falling back to
+   *  square until the probe resolves (or before any photo is chosen). */
+  const frameClass = currentRatio.cssRatio ?? "";
+  const frameStyle: React.CSSProperties = isAuto ? { aspectRatio: String(autoRatio ?? 1) } : {};
+  /** Effective ratio: what the frame shows, and what the post is stored with. */
+  const postAspect = currentRatio.value ?? autoRatio ?? 1;
+  const frameWidth = postAspect >= 1 ? 200 : 140;
 
   const hashtags = extractHashtags(caption + " " + body);
   const mentions = extractMentions(caption + " " + body);
@@ -127,7 +152,7 @@ export function PostComposer({ userId }: { userId: string }) {
     setFileError(null);
 
     const slots = MAX_IMAGES - imgs.length;
-    const raw: { id: string; origSrc: string }[] = [];
+    const raw: { id: string; origSrc: string; file: File }[] = [];
     for (const f of files.slice(0, slots)) {
       if (!ALLOWED_TYPES.includes(f.type)) {
         setFileError("Only JPEG, PNG, and WebP images are allowed.");
@@ -137,22 +162,71 @@ export function PostComposer({ userId }: { userId: string }) {
         setFileError(`Each image must be under ${MAX_SIZE_MB}MB.`);
         continue;
       }
-      raw.push({ id: crypto.randomUUID(), origSrc: URL.createObjectURL(f) });
+      raw.push({ id: crypto.randomUUID(), origSrc: URL.createObjectURL(f), file: f });
     }
     if (files.length > slots) setFileError(`You can add up to ${MAX_IMAGES} images.`);
     if (!raw.length) return;
+
+    // Auto keeps the photo exactly as it is — no cropper, no re-encode. The
+    // whole point of the mode is that nothing gets cut off.
+    if (RATIOS[ratioIdx].value === null) {
+      const added: Img[] = raw.map((r) => ({
+        id: r.id, file: r.file, url: r.origSrc, origSrc: r.origSrc, origFile: r.file,
+      }));
+      setImgs((prev) => [...prev, ...added]);
+      if (imgs.length === 0) measureAuto(added[0].origSrc);
+      return;
+    }
+
     // Crop each selected image in sequence.
     queueRef.current = raw;
     advanceCrop();
   }
 
+  /** Read a photo's real shape so Auto has a ratio to store. */
+  function measureAuto(src: string) {
+    const probe = new window.Image();
+    probe.onload = () => {
+      if (probe.naturalHeight > 0) setAutoRatio(clampAR(probe.naturalWidth / probe.naturalHeight));
+    };
+    probe.src = src;
+  }
+
+  /** Changing the shape after photos are in has to rebuild them: a crop is
+   *  destructive, so going to Auto restores each original, and going to a
+   *  fixed frame re-runs the cropper over the originals rather than over
+   *  already-cropped output. */
+  function changeShape(nextIdx: number) {
+    if (nextIdx === ratioIdx) return;
+    setRatioIdx(nextIdx);
+    if (!imgs.length) return;
+
+    if (RATIOS[nextIdx].value === null) {
+      setImgs((prev) => prev.map((p) => {
+        if (p.url !== p.origSrc) URL.revokeObjectURL(p.url);
+        return { ...p, file: p.origFile, url: p.origSrc };
+      }));
+      measureAuto(imgs[0].origSrc);
+      return;
+    }
+    queueRef.current = imgs.map((p) => ({ id: p.id, origSrc: p.origSrc, file: p.origFile }));
+    advanceCrop();
+  }
+
   function onCropDone(blob: Blob, url: string) {
     if (!crop) return;
-    const next: Img = { id: crop.id, file: new File([blob], "post.jpg", { type: "image/jpeg" }), url, origSrc: crop.origSrc };
+    const next: Img = {
+      id: crop.id,
+      file: new File([blob], "post.jpg", { type: "image/jpeg" }),
+      url,
+      origSrc: crop.origSrc,
+      origFile: crop.file,
+    };
     setImgs((prev) => {
       const i = prev.findIndex((p) => p.id === crop.id);
       if (i >= 0) {
-        URL.revokeObjectURL(prev[i].url);
+        // Never revoke the original — Auto and every later re-crop read from it.
+        if (prev[i].url !== prev[i].origSrc) URL.revokeObjectURL(prev[i].url);
         const copy = [...prev];
         copy[i] = next;
         return copy;
@@ -170,7 +244,7 @@ export function PostComposer({ userId }: { userId: string }) {
 
   function recrop(img: Img) {
     queueRef.current = [];
-    setCrop({ id: img.id, origSrc: img.origSrc });
+    setCrop({ id: img.id, origSrc: img.origSrc, file: img.origFile });
   }
 
   function removeImg(id: string) {
@@ -180,7 +254,15 @@ export function PostComposer({ userId }: { userId: string }) {
         URL.revokeObjectURL(item.url);
         URL.revokeObjectURL(item.origSrc);
       }
-      return prev.filter((p) => p.id !== id);
+      const next = prev.filter((p) => p.id !== id);
+      // The first photo sets the Auto ratio, so dropping it has to re-measure
+      // — otherwise the post would be stored at the shape of a photo that is
+      // no longer in it.
+      if (isAuto && prev[0]?.id === id) {
+        if (next[0]) measureAuto(next[0].origSrc);
+        else setAutoRatio(null);
+      }
+      return next;
     });
   }
 
@@ -205,6 +287,8 @@ export function PostComposer({ userId }: { userId: string }) {
       mentions,
       track,
       poll: cleanPoll,
+      // Only meaningful with photos; a text-only post has no frame to keep.
+      aspectRatio: imgs.length ? postAspect : null,
       scheduledAt: willSchedule ? new Date(scheduleAt!).toISOString() : null,
     });
     try { localStorage.removeItem(DRAFT_KEY); } catch {}
@@ -228,35 +312,11 @@ export function PostComposer({ userId }: { userId: string }) {
         </div>
       )}
 
-      {/* ── Aspect-ratio picker ─────────────────────────────────
-          "Ratio" alone read as jargon sitting above an empty box. It sets
-          the frame every photo gets cropped to, and it is deliberately
-          still shown before a photo is picked, because it also sets the
-          shape of the drop zone below it. */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold text-muted">Photo shape</span>
-        <div className="flex gap-1.5">
-          {RATIOS.map((r, i) => (
-            <button
-              key={r.label}
-              type="button"
-              onClick={() => setRatioIdx(i)}
-              className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-colors ${
-                i === ratioIdx
-                  ? "bg-accent text-accent-ink"
-                  : "bg-surface text-muted hover:text-foreground"
-              }`}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* ── Image area ────────────────────────────────────────── */}
       {imgs.length === 0 ? (
         <div
-          className={`cursor-pointer ${currentRatio.cssRatio} w-full flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface text-center transition-colors hover:border-accent/50`}
+          className={`cursor-pointer ${frameClass} w-full flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface text-center transition-colors hover:border-accent/50`}
+          style={frameStyle}
           onClick={openPicker}
         >
           <ImageIcon size={32} className="text-faint" />
@@ -268,8 +328,8 @@ export function PostComposer({ userId }: { userId: string }) {
           {imgs.map((img, i) => (
             <div
               key={img.id}
-              className={`relative shrink-0 overflow-hidden rounded-2xl bg-surface ${currentRatio.cssRatio}`}
-              style={{ width: currentRatio.value >= 1 ? 200 : 140 }}
+              className={`relative shrink-0 overflow-hidden rounded-2xl bg-surface ${frameClass}`}
+              style={{ ...frameStyle, width: frameWidth }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={img.url} alt={`Image ${i + 1}`} className="h-full w-full object-cover" />
@@ -298,8 +358,8 @@ export function PostComposer({ userId }: { userId: string }) {
             <button
               type="button"
               onClick={openPicker}
-              className={`flex shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-border bg-surface text-faint transition-colors hover:border-accent/50 ${currentRatio.cssRatio}`}
-              style={{ width: currentRatio.value >= 1 ? 200 : 140 }}
+              className={`flex shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-border bg-surface text-faint transition-colors hover:border-accent/50 ${frameClass}`}
+              style={{ ...frameStyle, width: frameWidth }}
             >
               <Plus size={26} />
               <span className="text-xs">Add</span>
@@ -307,6 +367,36 @@ export function PostComposer({ userId }: { userId: string }) {
           )}
         </div>
       )}
+      {/* ── Photo shape ─────────────────────────────────────────
+          Only once there are photos to shape. Asking for a frame first meant
+          choosing a crop for an image nobody had picked yet, and the control
+          sat there dead on a text-only post.
+
+          Photos therefore always arrive under Auto (uncropped), and choosing
+          a fixed shape here re-crops them from the originals kept on each
+          Img — so the decision is reversible, including back to Auto. */}
+      {imgs.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="shrink-0 text-xs font-semibold text-muted">Photo shape</span>
+          <div className="flex gap-1.5">
+            {RATIOS.map((r, i) => (
+              <button
+                key={r.label}
+                type="button"
+                onClick={() => changeShape(i)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-colors ${
+                  i === ratioIdx
+                    ? "bg-accent text-accent-ink"
+                    : "bg-surface text-muted hover:text-foreground"
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <input
         ref={fileRef}
         type="file"
@@ -320,7 +410,7 @@ export function PostComposer({ userId }: { userId: string }) {
       {crop && (
         <ImageCropper
           src={crop.origSrc}
-          aspect={currentRatio.value}
+          aspect={currentRatio.value ?? 1}
           label={`Crop · ${currentRatio.label}`}
           onCancel={onCropCancel}
           onDone={onCropDone}

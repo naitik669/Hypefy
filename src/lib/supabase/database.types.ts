@@ -1126,6 +1126,7 @@ export type Database = {
       }
       posts: {
         Row: {
+          aspect_ratio: number | null
           body: string | null
           caption: string | null
           comment_count: number
@@ -1146,6 +1147,7 @@ export type Database = {
           view_count: number
         }
         Insert: {
+          aspect_ratio?: number | null
           body?: string | null
           caption?: string | null
           comment_count?: number
@@ -1166,6 +1168,7 @@ export type Database = {
           view_count?: number
         }
         Update: {
+          aspect_ratio?: number | null
           body?: string | null
           caption?: string | null
           comment_count?: number
@@ -1491,6 +1494,7 @@ export type Database = {
       }
       scheduled_posts: {
         Row: {
+          aspect_ratio: number | null
           body: string | null
           caption: string | null
           created_at: string
@@ -1505,6 +1509,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          aspect_ratio?: number | null
           body?: string | null
           caption?: string | null
           created_at?: string
@@ -1519,6 +1524,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          aspect_ratio?: number | null
           body?: string | null
           caption?: string | null
           created_at?: string
