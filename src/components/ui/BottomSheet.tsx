@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useFocusTrap } from "@/lib/useFocusTrap";
+import { useOverlayBackButton } from "@/lib/overlay-stack";
 
 /**
  * Slide-up bottom sheet rendered via createPortal at document.body.
@@ -25,6 +26,9 @@ export function BottomSheet({
   useEffect(() => { setMounted(true); }, []);
 
   const trapRef = useFocusTrap<HTMLDivElement>(mounted && open);
+
+  // Android hardware back closes the sheet before it navigates.
+  useOverlayBackButton(mounted && open, onClose);
 
   // Escape closes the sheet, matching CenterModal/FloatingMenu behavior.
   useEffect(() => {

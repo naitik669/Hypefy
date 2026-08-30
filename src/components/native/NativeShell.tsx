@@ -6,6 +6,7 @@ import { App } from "@capacitor/app";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { isNative, isAndroidApp, safeNative } from "@/lib/native";
+import { closeTopOverlay } from "@/lib/overlay-stack";
 
 /** Tab roots — back from here should leave the app, not unwind history. */
 const ROOT_ROUTES = ["/home", "/discover", "/messages", "/shots", "/profile"];
@@ -56,6 +57,10 @@ export function NativeShell() {
     let remove: (() => void) | undefined;
 
     void App.addListener("backButton", ({ canGoBack }) => {
+      // Dismiss what is on top of the screen first. Without this, back with a
+      // sheet open navigates the page away underneath it.
+      if (closeTopOverlay()) return;
+
       // At a tab root there is nowhere back to go, so exiting is correct and
       // is what every other Android app does.
       if (!canGoBack || ROOT_ROUTES.includes(pathnameRef.current)) {

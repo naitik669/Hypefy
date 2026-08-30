@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useOverlayBackButton } from "@/lib/overlay-stack";
 
 /**
  * Full-screen image viewer. Pinch to zoom (mobile), wheel to zoom (desktop),
@@ -14,6 +15,9 @@ export function ZoomViewer({ src, onClose }: { src: string; onClose: () => void 
   const drag = useRef<{ px: number; py: number; tx: number; ty: number } | null>(null);
   const pinch = useRef<{ dist: number; scale: number } | null>(null);
   const moved = useRef(false);
+
+  // Rendered only while open, so being mounted *is* being open.
+  useOverlayBackButton(true, onClose);
 
   // Lock background scroll while open.
   useEffect(() => {

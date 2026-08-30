@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import { useFocusTrap } from "@/lib/useFocusTrap";
+import { useOverlayBackButton } from "@/lib/overlay-stack";
 
 /**
  * Hypefy's anchored popover — the default visual shell for context menus
@@ -53,6 +54,9 @@ export function FloatingMenu({
   children: React.ReactNode;
 }) {
   const trapRef = useFocusTrap<HTMLDivElement>(open);
+
+  // Android hardware back dismisses the menu before it navigates.
+  useOverlayBackButton(open, onClose);
   // Kept mounted through the exit animation when exitMs is set.
   const [leaving, setLeaving] = useState(false);
   const wasOpen = useRef(open);

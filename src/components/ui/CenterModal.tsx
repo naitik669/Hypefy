@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useFocusTrap } from "@/lib/useFocusTrap";
+import { useOverlayBackButton } from "@/lib/overlay-stack";
 
 /**
  * Centered modal dialog — the elevated cousin of BottomSheet for focused,
@@ -27,6 +28,9 @@ export function CenterModal({
   useEffect(() => { setMounted(true); }, []);
 
   const trapRef = useFocusTrap<HTMLDivElement>(mounted && open);
+
+  // Android hardware back closes the modal before it navigates.
+  useOverlayBackButton(mounted && open, onClose);
 
   // Escape closes the dialog (BottomSheet/FloatingMenu already do this).
   useEffect(() => {
