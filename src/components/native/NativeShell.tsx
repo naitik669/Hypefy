@@ -39,6 +39,16 @@ export function NativeShell() {
   useEffect(() => {
     if (!isNative()) return;
     void safeNative(async () => {
+      // Stop the WebView drawing underneath the status bar.
+      //
+      // This is the root cause of headers being clipped, and it is global:
+      // every page was affected, including ones with no header of their own.
+      // Padding each header with env(safe-area-inset-top) only patches the
+      // ones you remember, and sticky headers still slide under the clock as
+      // soon as the page scrolls. Letting Android reserve the space instead
+      // fixes every screen at once and needs no CSS.
+      await StatusBar.setOverlaysWebView({ overlay: false });
+
       // Style.Dark means dark *background* with light content — the opposite
       // of how the name reads, and the right one for our near-black chrome.
       await StatusBar.setStyle({ style: Style.Dark });

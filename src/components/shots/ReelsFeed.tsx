@@ -48,6 +48,12 @@ export function ReelsFeed({
   const [muted, setMuted] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const swipeTouchStartY = useRef(0);
+  /** Live finger offset in px, null when no finger is down. Doubles as the
+   *  "is dragging" flag, which is what decides whether the transform
+   *  animates: following a finger must be instant, settling must not. */
+  const [drag, setDrag] = useState<number | null>(null);
+  const swipeStartedAt = useRef(0);
+  const stageRef = useRef<HTMLDivElement>(null);
   const fetchingMore = useRef(false);
   const [noMore, setNoMore] = useState(initialReels.length < 5);
 
@@ -80,28 +86,62 @@ export function ReelsFeed({
 
   function onSwipeTouchStart(e: React.TouchEvent) {
     swipeTouchStartY.current = e.touches[0].clientY;
+    swipeStartedAt.current = Date.now();
+    setDrag(0);
   }
-  function onSwipeTouchEnd(e: React.TouchEvent) {
-    const dy = swipeTouchStartY.current - e.changedTouches[0].clientY;
-    if (Math.abs(dy) < 40) return; // too small, treat as tap, not swipe
-    if (dy > 0) {
-      // Swipe up — advance to next reel
+
+  /**
+   * Follow the finger.
+   *
+   * Without this the screen sat frozen through the whole gesture and only
+   * jumped on release, which is what made swiping feel unresponsive — you got
+   * no indication a swipe was even being registered.
+   */
+  function onSwipeTouchMove(e: React.TouchEvent) {
+    if (drag === null) return;
+    let dy = e.touches[0].clientY - swipeTouchStartY.current;
+
+    // Resist at the ends so pulling past the last reel feels like a boundary
+    // rather than a broken screen. Downward at index 0 stays free, because
+    // that gesture exits Shots and should not fight the user.
+    const atEnd = activeIdx === reels.length - 1 && dy < 0;
+    if (atEnd) dy *= 0.3;
+
+    setDrag(dy);
+  }
+
+  function onSwipeTouchEnd() {
+    const dy = drag ?? 0;
+    setDrag(null);
+
+    const height = stageRef.current?.clientHeight ?? 1;
+    const elapsed = Math.max(1, Date.now() - swipeStartedAt.current);
+    const velocity = Math.abs(dy) / elapsed; // px per ms
+
+    // Distance OR speed. Distance alone ignored quick flicks, which are the
+    // most common way people move through a reels feed; a fast 30px flick
+    // read as a tap and did nothing.
+    const committed = Math.abs(dy) > height * 0.18 || velocity > 0.45;
+    if (!committed) return; // springs back via the transition
+
+    if (dy < 0) {
       setActiveIdx((i) => Math.min(i + 1, reels.length - 1));
+    } else if (activeIdx === 0) {
+      // Pulling down on the first reel leaves Shots.
+      router.back();
     } else {
-      // Swipe down — go back one reel, or exit Shots when on the first
-      if (activeIdx === 0) {
-        router.back();
-      } else {
-        setActiveIdx((i) => i - 1);
-      }
+      setActiveIdx((i) => i - 1);
     }
   }
 
   return (
     <div
-      className="fixed inset-x-0 top-0 bottom-[72px] z-10 mx-auto max-w-[480px] overflow-hidden bg-black"
+      ref={stageRef}
+      className="fixed inset-x-0 top-0 bottom-[72px] z-10 mx-auto max-w-[480px] touch-none overflow-hidden bg-black"
       onTouchStart={onSwipeTouchStart}
+      onTouchMove={onSwipeTouchMove}
       onTouchEnd={onSwipeTouchEnd}
+      onTouchCancel={() => setDrag(null)}
     >
       {/* Absolute-positioned reels: each fills the container, translated by index offset */}
       {reels.map((reel, i) => (
@@ -109,8 +149,13 @@ export function ReelsFeed({
           key={reel.id}
           className={`absolute inset-0 will-change-transform ${i === activeIdx ? "" : "pointer-events-none"}`}
           style={{
-            transform: `translateY(calc(${i - activeIdx} * 100%))`,
-            transition: "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+            transform: `translateY(calc(${i - activeIdx} * 100% + ${drag ?? 0}px))`,
+            // No transition while a finger is down — the reel has to track it
+            // exactly. On release the settle is shorter than the old 0.4s,
+            // which read as sluggish once the drag itself became live.
+            transition: drag === null
+              ? "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)"
+              : "none",
           }}
         >
           <ReelCard
