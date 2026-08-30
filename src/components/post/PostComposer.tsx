@@ -153,6 +153,21 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
     fileRef.current?.click();
   }
 
+  /** Post appears on both pages, so it is built once. Its label depends on
+   *  whether a schedule is set and whether a submit is in flight, and two
+   *  hand-copied versions of that would eventually disagree. */
+  const postButton = (className: string) => (
+    <button
+      type="button"
+      onClick={handlePost}
+      disabled={!canPost || submitted}
+      className={`flex h-12 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-40 ${className}`}
+    >
+      {willSchedule ? <CalendarClock size={17} /> : <Send size={17} />}
+      {submitted ? (willSchedule ? "Scheduling…" : "Sharing…") : willSchedule ? "Schedule" : "Post"}
+    </button>
+  );
+
   function advanceCrop() {
     const next = queueRef.current.shift();
     setCrop(next ?? null);
@@ -693,14 +708,21 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
           One button per page. Going back is the header arrow's job, so
           nothing down here competes with it. */}
       {step === 0 ? (
-        <button
-          type="button"
-          onClick={() => setStep(1)}
-          disabled={!canPost}
-          className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-40"
-        >
-          Preview <ChevronRight size={17} />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Preview is a step; Post is the commit. They differ by fill, not
+              only by wording — two accent buttons side by side would give
+              navigating and publishing the same visual weight, which is the
+              wrong signal on the one action that cannot be undone. */}
+          <button
+            type="button"
+            onClick={() => setStep(1)}
+            disabled={!canPost}
+            className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface text-sm font-bold text-foreground transition-colors hover:border-white/25 disabled:opacity-40"
+          >
+            Preview <ChevronRight size={17} />
+          </button>
+          {postButton("flex-1")}
+        </div>
       ) : (
         <div className="flex items-center gap-2">
           {/* Second way back, next to the thing you are deciding about. The
@@ -714,15 +736,7 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
           >
             <ChevronLeft size={18} />
           </button>
-          <button
-            type="button"
-            onClick={handlePost}
-            disabled={!canPost || submitted}
-            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-40"
-          >
-            {willSchedule ? <CalendarClock size={17} /> : <Send size={17} />}
-            {submitted ? (willSchedule ? "Scheduling…" : "Sharing…") : willSchedule ? "Schedule" : "Post"}
-          </button>
+          {postButton("flex-1")}
         </div>
       )}
     </div>
