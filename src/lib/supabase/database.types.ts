@@ -1685,6 +1685,45 @@ export type Database = {
           },
         ]
       }
+      spotify_accounts: {
+        Row: {
+          access_token: string
+          connected_at: string
+          display_name: string | null
+          expires_at: string
+          product: string | null
+          refresh_token: string
+          scope: string | null
+          spotify_user_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          connected_at?: string
+          display_name?: string | null
+          expires_at: string
+          product?: string | null
+          refresh_token: string
+          scope?: string | null
+          spotify_user_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          connected_at?: string
+          display_name?: string | null
+          expires_at?: string
+          product?: string | null
+          refresh_token?: string
+          scope?: string | null
+          spotify_user_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1751,6 +1790,7 @@ export type Database = {
       }
       decline_call: { Args: { p_call_id: string }; Returns: undefined }
       deny_follow_request: { Args: { p_requester: string }; Returns: undefined }
+      disconnect_spotify: { Args: never; Returns: undefined }
       edit_message: {
         Args: { p_body: string; p_message_id: string }
         Returns: undefined
@@ -1930,6 +1970,14 @@ export type Database = {
       set_verified: {
         Args: { p_user_id: string; p_value: boolean }
         Returns: undefined
+      }
+      spotify_connection_status: {
+        Args: never
+        Returns: {
+          connected: boolean
+          display_name: string
+          is_premium: boolean
+        }[]
       }
       start_call: {
         Args: {
