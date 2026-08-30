@@ -19,7 +19,7 @@ import {
  *  Spotify tracks carry their real duration, so the timeline spans the whole
  *  song rather than a preview. */
 const FALLBACK_LEN = 30;
-const SNIPPET_LEN = 15;
+const SNIPPET_LEN = 30;
 
 /** Seconds of song this track offers, and the last start that still fits a
  *  full snippet inside it. */
@@ -203,7 +203,12 @@ export function TrackPicker({
               <span>{fmt(total)}</span>
             </div>
             <p className="pt-2 text-xs text-faint">
-              Drag the block anywhere on the track. Every snippet is {SNIPPET_LEN} seconds.
+              {maxStart <= 0
+                ? // A 30s window on a 30s iTunes preview leaves nothing to
+                  // choose. Saying so beats a strip that silently refuses to
+                  // move.
+                  `This one is only ${fmt(total)} long, so all of it plays.`
+                : `Drag the block anywhere on the track. Every snippet is ${SNIPPET_LEN} seconds.`}
             </p>
           </div>
 
