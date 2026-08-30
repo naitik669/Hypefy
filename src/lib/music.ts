@@ -100,7 +100,26 @@ function usesSpotify(track: Track): boolean {
   return !!track.uri && !track.preview;
 }
 
-export function playPreview(track: Track) {
+/**
+ * Two kinds of playback share one audio element and want opposite things from
+ * the mute switch.
+ *
+ * Ambient playback — a song under a feed post or a Show — is exactly what the
+ * mute button exists for. Deliberate playback is the user pressing play inside
+ * a picker to *choose* a song, and muting that makes the picker unusable: you
+ * cannot pick the right moment of a track you cannot hear.
+ *
+ * So deliberate playback passes `audible` and ignores the mute. Nothing is
+ * persisted, and the next ambient play re-reads musicMuted, so the mute switch
+ * is untouched by any of this.
+ */
+export type PlayOpts = { audible?: boolean };
+
+function applyMute(a: HTMLAudioElement, opts?: PlayOpts) {
+  a.muted = opts?.audible ? false : musicMuted;
+}
+
+export function playPreview(track: Track, opts?: PlayOpts) {
   if (usesSpotify(track)) {
     if (playingId === track.id) {
       void spotifyPause();
@@ -124,6 +143,7 @@ export function playPreview(track: Track) {
     a.pause();
     return;
   }
+  applyMute(a, opts);
   a.src = srcFor(track);
   playingId = track.id;
   emit();
@@ -144,7 +164,7 @@ export function stopPreview() {
  * the unpaused state resumes from where the preview left off instead of
  * restarting. Only swaps src when the track actually changed.
  */
-export function ensurePreviewPlaying(track: Track) {
+export function ensurePreviewPlaying(track: Track, opts?: PlayOpts) {
   if (usesSpotify(track)) {
     audio?.pause();
     playingId = track.id;
@@ -161,6 +181,7 @@ export function ensurePreviewPlaying(track: Track) {
   const a = ensureAudio();
   const sameSrc = a.src === srcFor(track);
   if (sameSrc && playingId === track.id && !a.paused) return;
+  applyMute(a, opts);
   if (!sameSrc) a.src = srcFor(track);
   playingId = track.id;
   emit();

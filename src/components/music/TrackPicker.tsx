@@ -113,7 +113,7 @@ export function TrackPicker({
     if (!snippet) return;
     clearTimeout(scrubTimer.current);
     scrubTimer.current = setTimeout(() => {
-      ensurePreviewPlaying({ ...snippet, start: next || undefined });
+      ensurePreviewPlaying({ ...snippet, start: next || undefined }, { audible: true });
     }, 180);
   }
 
@@ -158,7 +158,7 @@ export function TrackPicker({
               type="button"
               aria-label={snippetPlaying ? "Pause" : "Play from selected point"}
               onClick={() =>
-                snippetPlaying ? pausePreview() : ensurePreviewPlaying({ ...snippet, start: start || undefined })
+                snippetPlaying ? pausePreview() : ensurePreviewPlaying({ ...snippet, start: start || undefined }, { audible: true })
               }
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition-transform active:scale-95"
             >
@@ -269,13 +269,13 @@ export function TrackPicker({
                     aria-label={playing ? "Pause preview" : "Play preview"}
                     onClick={(e) => {
                       e.stopPropagation();
-                      playPreview(t);
+                      playPreview(t, { audible: true });
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         e.stopPropagation();
-                        playPreview(t);
+                        playPreview(t, { audible: true });
                       }
                     }}
                     className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface"

@@ -21,7 +21,7 @@ export function PageHeader({
   const router = useRouter();
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-1 border-b border-border/60 bg-background/80 px-2 backdrop-blur-xl">
+    <header className="sticky top-0 z-20 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-1 border-b border-border/60 bg-background/80 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
       {showBack ? (
         <button
           type="button"
