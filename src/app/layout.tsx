@@ -4,6 +4,7 @@ import { RegisterSW } from "@/components/pwa/RegisterSW";
 import { ReferralTracker } from "@/components/growth/ReferralTracker";
 import { ClientErrorReporter } from "@/components/pwa/ClientErrorReporter";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -61,6 +62,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        {/* Page views + custom events. Renders nothing and no-ops off
+            Vercel, so local dev and the Android build are unaffected.
+            The native shell loads hypefy.chat, so app traffic is measured
+            here too rather than needing a separate mobile SDK. */}
+        <Analytics />
         <RegisterSW />
         <ReferralTracker />
         <ClientErrorReporter />
