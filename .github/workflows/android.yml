@@ -70,7 +70,11 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew assembleRelease --no-daemon
+        # Belt and braces: the exec bit is set in git, but a Windows
+        # checkout can drop it again and the failure (exit 126) is opaque.
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon
 
       # Always kept, so a build is retrievable even when distribution is not
       # configured yet or the upload step fails.
