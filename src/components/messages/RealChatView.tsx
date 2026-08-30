@@ -17,6 +17,7 @@ import { ReportSheet } from "@/components/ui/ReportSheet";
 import { FloatingMenu, MenuItem, MenuDivider } from "@/components/ui/FloatingMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { CaptureGuard } from "@/components/native/CaptureGuard";
 import { useToast } from "@/components/ui/ToastProvider";
 import { presenceLabel } from "@/lib/presence";
 import { haptics } from "@/lib/haptics";
@@ -2088,6 +2089,11 @@ function OneShotBubble({
   if (view === "loading" || view === "loaded") {
     return (
       <div className="relative overflow-hidden rounded-2xl bg-black" style={{ maxWidth: 240 }}>
+        {/* Blocks screenshots and screen recording for as long as the photo is
+            on screen. Only does anything in the native app — the web has no
+            capture API to prevent, which is why the send-time copy still says
+            so plainly rather than promising protection everywhere. */}
+        <CaptureGuard />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={`/api/oneshot/${m.id}`}
