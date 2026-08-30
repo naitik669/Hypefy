@@ -7,6 +7,8 @@ import { StatusBar, Style } from "@capacitor/status-bar";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { isNative, isAndroidApp, safeNative } from "@/lib/native";
 import { closeTopOverlay } from "@/lib/overlay-stack";
+import { createClient } from "@/lib/supabase/client";
+import { isAuthCallbackUrl, completeNativeSignIn } from "@/lib/native-auth";
 
 /** Tab roots — back from here should leave the app, not unwind history. */
 const ROOT_ROUTES = ["/home", "/discover", "/messages", "/shots", "/profile"];
@@ -68,6 +70,30 @@ export function NativeShell() {
         return;
       }
       router.back();
+    }).then((handle) => { remove = () => void handle.remove(); });
+
+    return () => remove?.();
+  }, [router]);
+
+  // ── Deep links: the return leg of native Google sign-in.
+  //
+  // Google rejects OAuth in a WebView, so the consent screen opens in a
+  // Custom Tab and hands the code back through `chat.hypefy://auth/callback`.
+  // The exchange has to happen here, in the app, because a session created in
+  // the Custom Tab lives in a cookie jar the WebView cannot read.
+  useEffect(() => {
+    if (!isNative()) return;
+    let remove: (() => void) | undefined;
+
+    void App.addListener("appUrlOpen", ({ url }) => {
+      if (!isAuthCallbackUrl(url)) return;
+      void completeNativeSignIn(createClient(), url).then((ok) => {
+        // Either way land on "/" and let the existing entry router decide
+        // between onboarding, profile setup and home — duplicating that
+        // decision here would be a second source of truth for it.
+        router.replace(ok ? "/" : "/signin?error=auth_failed");
+        router.refresh();
+      });
     }).then((handle) => { remove = () => void handle.remove(); });
 
     return () => remove?.();

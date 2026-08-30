@@ -7,6 +7,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { upsertSavedAccount } from "@/lib/saved-accounts";
 import { DateOfBirthPicker } from "@/components/ui/DateOfBirthPicker";
+import { isNative } from "@/lib/native";
+import { startNativeGoogleSignIn } from "@/lib/native-auth";
 
 type Mode = "signin" | "signup";
 
@@ -225,6 +227,19 @@ export function AuthCard({ mode }: { mode: Mode }) {
       }
     }
     setGoogleLoading(true);
+
+    // In the native shell Google rejects the WebView, so the consent screen
+    // has to open in a real browser and come back via a deep link.
+    if (isNative()) {
+      const message = await startNativeGoogleSignIn(supabase);
+      if (message) {
+        setError(message);
+        setGoogleLoading(false);
+      }
+      // Otherwise NativeShell finishes the flow when the deep link arrives.
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
