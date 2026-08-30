@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { createClient as createSupabase } from "@supabase/supabase-js";
 import webpush from "web-push";
+import { sendFcm, fcmConfigured } from "@/lib/fcm";
 
 /**
  * POST /api/push — called by a Supabase pg_net trigger on notifications INSERT.
@@ -77,18 +78,24 @@ export async function POST(req: NextRequest) {
   // specifically, not the sender.
   const isDmNotif = n.target_type === "conversation" && (n.type === "new_message" || n.type === "dm_post_shared");
 
-  const [{ data: subs }, { data: actorProfile }, { data: memberRow }] = await Promise.all([
-    supabase.from("push_subscriptions").select("endpoint, p256dh, auth").eq("user_id", n.user_id),
-    n.actor_id
-      ? supabase.from("profiles").select("display_name, username").eq("id", n.actor_id).maybeSingle()
-      : Promise.resolve({ data: null } as any),
-    isDmNotif
-      ? supabase.from("conversation_members").select("locked_at")
-          .eq("conversation_id", n.target_id).eq("user_id", n.user_id).maybeSingle()
-      : Promise.resolve({ data: null } as any),
-  ]);
+  const [{ data: subs }, { data: devices }, { data: actorProfile }, { data: memberRow }] =
+    await Promise.all([
+      supabase.from("push_subscriptions").select("endpoint, p256dh, auth").eq("user_id", n.user_id),
+      // Native (FCM) devices. A user can have both — browser and phone — and
+      // should be reachable on either.
+      supabase.from("push_devices").select("token").eq("user_id", n.user_id),
+      n.actor_id
+        ? supabase.from("profiles").select("display_name, username").eq("id", n.actor_id).maybeSingle()
+        : Promise.resolve({ data: null } as any),
+      isDmNotif
+        ? supabase.from("conversation_members").select("locked_at")
+            .eq("conversation_id", n.target_id).eq("user_id", n.user_id).maybeSingle()
+        : Promise.resolve({ data: null } as any),
+    ]);
 
-  if (!subs?.length) return NextResponse.json({ sent: 0 });
+  // Checks both transports: bailing on web subscriptions alone would mean a
+  // user with only the app installed never receives anything.
+  if (!subs?.length && !devices?.length) return NextResponse.json({ sent: 0 });
 
   const isLocked = isDmNotif && !!memberRow?.locked_at;
   const actorName = actorProfile?.display_name ?? actorProfile?.username ?? "Someone";
@@ -100,9 +107,13 @@ export async function POST(req: NextRequest) {
     tag: `hypefy-${n.type}-${n.target_id ?? n.id}`,
   });
 
+  const url = pushUrl(n, actorProfile?.username ?? null);
+  const tag = `hypefy-${n.type}-${n.target_id ?? n.id}`;
+
   let sent = 0;
-  await Promise.all(
-    subs.map(async (sub) => {
+  await Promise.all([
+    // ── Web push (browsers)
+    ...(subs ?? []).map(async (sub) => {
       try {
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
@@ -118,7 +129,22 @@ export async function POST(req: NextRequest) {
         }
       }
     }),
-  );
+
+    // ── Native push (FCM). Skipped entirely when unconfigured, so a
+    //    deployment without Firebase credentials keeps delivering web push
+    //    instead of failing the whole notification.
+    ...(fcmConfigured()
+      ? (devices ?? []).map(async (d) => {
+          const result = await sendFcm(d.token, { title, body, url, tag });
+          if (result === "sent") sent++;
+          // The app was uninstalled or the token rotated. Prune it, or every
+          // future push retries a token that can never deliver.
+          else if (result === "stale") {
+            await supabase.from("push_devices").delete().eq("token", d.token);
+          }
+        })
+      : []),
+  ]);
 
   return NextResponse.json({ sent });
 }

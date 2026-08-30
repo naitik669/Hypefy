@@ -9,6 +9,8 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
 } from "@/lib/push";
+import { isNative } from "@/lib/native";
+import { enableNativePush, disableNativePush, nativePushEnabled } from "@/lib/native-push";
 
 /**
  * Device-level push toggle. Subscribes this browser to web push and stores the
@@ -22,11 +24,19 @@ export function PushToggle({ userId }: { userId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Inside the native shell the OS delivers notifications, so browser push
+    // support is the wrong question — service-worker push does not exist there.
+    if (isNative()) {
+      setSupported(true);
+      void nativePushEnabled(supabase, userId).then(setEnabled);
+      return;
+    }
     if (!pushSupported()) {
       setSupported(false);
       return;
     }
     getPushSubscription().then((sub) => setEnabled(!!sub));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function toggle(next: boolean) {
@@ -34,6 +44,19 @@ export function PushToggle({ userId }: { userId: string }) {
     setBusy(true);
     setError(null);
     try {
+      if (isNative()) {
+        if (next) {
+          const result = await enableNativePush(supabase, userId);
+          if (result === "registered") setEnabled(true);
+          else if (result === "denied") setError("Notifications are off for Hypefy in your device settings.");
+          else setError("Couldn't register this device for notifications.");
+        } else {
+          await disableNativePush(supabase, userId);
+          setEnabled(false);
+        }
+        return;
+      }
+
       if (next) {
         const result = await subscribeToPush(supabase, userId);
         if (result === "subscribed") setEnabled(true);
