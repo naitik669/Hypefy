@@ -4,7 +4,7 @@ import { useCallback, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   ImageIcon, Film, Hourglass, Play, Star, MessageCircle,
-  Send, Bookmark, MoreHorizontal,
+  Send, Bookmark, MoreHorizontal, Plus,
 } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 
@@ -170,7 +170,7 @@ function CardPreview({ kind, tint }: { kind: string; tint: string }) {
 export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const reelRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [active, setActive] = useState(0);
 
   const center = useCallback((i: number) => {
@@ -207,14 +207,6 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
   function go(href: string) {
     onClose();
     router.push(href);
-  }
-
-  /** Tapping the centred card opens it; tapping a side card brings it in.
-   *  Keeps the old one-tap path intact for the default action instead of
-   *  charging every user an extra confirm step for the carousel. */
-  function onCardClick(i: number) {
-    if (i === active) go(ACTIONS[i].href);
-    else center(i);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -264,28 +256,47 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
             className="no-scrollbar relative flex snap-x snap-mandatory gap-3 overflow-x-auto py-3 outline-none"
             style={{ ...CARD_VARS, paddingInline: "calc(50% - var(--card-w) / 2)" }}
           >
-            {ACTIONS.map(({ key, icon: Icon, label, tint }, i) => {
+            {/* The card is a div, not a button: the add control lives inside
+                it, and a button nested in a button is invalid and swallows
+                its own clicks. Each card still exposes exactly one button —
+                add when centred, select when not. */}
+            {ACTIONS.map(({ key, icon: Icon, label, cta, href, tint }, i) => {
               const on = i === active;
               return (
-                <button
+                <div
                   key={key}
                   ref={(el) => { cardRefs.current[i] = el; }}
-                  type="button"
-                  onClick={() => onCardClick(i)}
                   aria-current={on}
-                  aria-label={on ? `${label} — open` : `${label} — select`}
                   style={{
                     width: "var(--card-w)",
                     height: "var(--card-h)",
                     borderColor: on ? `rgba(${tint}, 0.45)` : "rgba(255, 255, 255, 0.06)",
                   }}
-                  className={`flex shrink-0 snap-center flex-col overflow-hidden rounded-[20px] border bg-surface transition-all duration-200 ${
+                  className={`relative flex shrink-0 snap-center flex-col overflow-hidden rounded-[20px] border bg-surface transition-all duration-200 ${
                     on ? "scale-100 opacity-100 grayscale-0" : "scale-[0.92] opacity-50 grayscale"
                   }`}
                 >
-                  <div className="min-h-0 flex-1">
+                  <div className="relative min-h-0 flex-1">
                     <CardPreview kind={key} tint={tint} />
+
+                    {on && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={() => go(href)}
+                          aria-label={cta}
+                          style={{ background: `rgb(${tint})` }}
+                          // ring in the card's own surface colour rather than a
+                          // shadow — it separates the control from the artwork
+                          // behind it without reintroducing a glow.
+                          className="animate-modal-pop flex h-16 w-16 items-center justify-center rounded-full text-accent-ink ring-4 ring-surface transition active:scale-95"
+                        >
+                          <Plus size={28} strokeWidth={2.5} />
+                        </button>
+                      </div>
+                    )}
                   </div>
+
                   <div
                     className="flex items-center gap-2 border-t px-3.5 py-3"
                     style={{ borderColor: on ? `rgba(${tint}, 0.2)` : "rgba(255, 255, 255, 0.05)" }}
@@ -300,7 +311,18 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
                       {label}
                     </span>
                   </div>
-                </button>
+
+                  {/* Off-centre cards stay tappable to bring them in. Last in
+                      the stack so it covers the whole card. */}
+                  {!on && (
+                    <button
+                      type="button"
+                      onClick={() => center(i)}
+                      aria-label={`${label} — select`}
+                      className="absolute inset-0"
+                    />
+                  )}
+                </div>
               );
             })}
           </div>
@@ -324,15 +346,6 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
         <p key={current.key} className="animate-row-in mt-2.5 text-center text-[13px] leading-relaxed text-muted">
           {current.desc}
         </p>
-
-        <button
-          type="button"
-          onClick={() => go(current.href)}
-          style={{ background: `rgb(${current.tint})` }}
-          className="mt-3 h-12 w-full rounded-xl text-sm font-bold text-accent-ink transition active:scale-[0.99]"
-        >
-          {current.cta}
-        </button>
       </div>
     </BottomSheet>
   );
