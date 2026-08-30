@@ -1,8 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ImageIcon, Film, Hourglass, Play } from "lucide-react";
+import {
+  ImageIcon, Film, Hourglass, Play, Star, MessageCircle,
+  Send, Bookmark, MoreHorizontal,
+} from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 
 /**
@@ -44,64 +47,122 @@ const ACTIONS = [
   },
 ] as const;
 
-const CARD_W = 150;
+/**
+ * Card geometry lives in CSS, not JS.
+ *
+ * Sizing off the viewport is what lets the card be genuinely large on a
+ * phone and still sane on a tablet, and expressing the reel's side padding
+ * as `50% - var(--card-w)/2` is what centres the first and last cards
+ * without measuring anything. A JS constant could not do either.
+ */
+const CARD_VARS = {
+  "--card-w": "min(74vw, 330px)",
+  "--card-h": "min(52vh, 440px)",
+} as React.CSSProperties;
 
 /**
- * A miniature of what the action produces, drawn in divs — a framed photo
- * with caption lines, a tall reel, a segmented story bar. Cheaper and
- * sharper than thumbnails, and it stays honest: nothing here pretends to
- * be the user's real content.
+ * A miniature of the thing you are about to make — a post card with its
+ * author row and Hype rail, a reel with its side actions, a Show with its
+ * segment bar. Drawn in divs rather than screenshots, so it never goes
+ * stale against the real UI and never pretends to be the user's content.
  */
 function CardPreview({ kind, tint }: { kind: string; tint: string }) {
-  const wash = `linear-gradient(160deg, rgba(${tint}, 0.32) 0%, rgba(${tint}, 0.06) 100%)`;
+  const wash = `linear-gradient(160deg, rgba(${tint}, 0.34) 0%, rgba(${tint}, 0.07) 100%)`;
+  const lit = { color: `rgb(${tint})`, fill: `rgb(${tint})` };
 
   if (kind === "post") {
     return (
-      <div className="flex h-full w-full flex-col gap-1.5 p-3">
-        <div className="w-full flex-1 rounded-lg" style={{ background: wash }} />
-        <span className="h-1 w-full rounded-full bg-white/[0.13]" />
-        <span className="h-1 w-2/3 rounded-full bg-white/[0.08]" />
+      <div className="flex h-full w-full flex-col gap-2.5 p-3.5">
+        {/* author row */}
+        <div className="flex items-center gap-2">
+          <span className="h-7 w-7 shrink-0 rounded-full" style={{ background: `rgba(${tint}, 0.38)` }} />
+          <span className="min-w-0 flex-1">
+            <span className="block h-1.5 w-16 rounded-full bg-white/25" />
+            <span className="mt-1.5 block h-1 w-10 rounded-full bg-white/12" />
+          </span>
+          <MoreHorizontal size={13} className="shrink-0 text-white/25" />
+        </div>
+
+        {/* the photo */}
+        <div className="w-full flex-1 rounded-xl" style={{ background: wash }} />
+
+        {/* hype rail */}
+        <div className="flex items-center gap-3">
+          <Star size={14} style={lit} />
+          <MessageCircle size={14} className="text-white/35" />
+          <Send size={14} className="text-white/35" />
+          <span className="flex-1" />
+          <Bookmark size={14} className="text-white/35" />
+        </div>
+
+        {/* caption */}
+        <div className="space-y-1.5">
+          <span className="block h-1 w-full rounded-full bg-white/14" />
+          <span className="block h-1 w-2/3 rounded-full bg-white/9" />
+        </div>
       </div>
     );
   }
 
   if (kind === "shot") {
     return (
-      <div className="flex h-full w-full items-center justify-center p-3">
-        <div
-          className="flex h-full w-[52px] items-center justify-center rounded-lg"
-          style={{ background: wash }}
-        >
-          <Play size={15} strokeWidth={0} style={{ fill: `rgb(${tint})` }} className="translate-x-px" />
+      <div className="h-full w-full p-3">
+        <div className="relative h-full w-full overflow-hidden rounded-xl" style={{ background: wash }}>
+          <span className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/35">
+            <Play size={17} strokeWidth={0} style={{ fill: `rgb(${tint})` }} className="translate-x-px" />
+          </span>
+
+          {/* the vertical action rail Shots actually have */}
+          <div className="absolute bottom-3.5 right-2.5 flex flex-col items-center gap-3">
+            <Star size={14} style={lit} />
+            <MessageCircle size={14} className="text-white/45" />
+            <Send size={14} className="text-white/45" />
+          </div>
+
+          <div className="absolute inset-x-3.5 bottom-3.5 right-11 space-y-1.5">
+            <span className="block h-1.5 w-14 rounded-full bg-white/32" />
+            <span className="block h-1 w-20 rounded-full bg-white/16" />
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full w-full flex-col gap-1.5 p-3">
-      <div className="flex gap-1">
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className="h-[3px] flex-1 rounded-full"
-            style={{ background: i === 0 ? `rgb(${tint})` : `rgba(${tint}, 0.22)` }}
-          />
-        ))}
+    <div className="h-full w-full p-3">
+      <div className="relative h-full w-full overflow-hidden rounded-xl" style={{ background: wash }}>
+        {/* 24h segments — the one element that says "this expires" */}
+        <div className="absolute inset-x-2.5 top-2.5 flex gap-1">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="h-[3px] flex-1 rounded-full"
+              style={{ background: i === 0 ? `rgb(${tint})` : "rgba(255, 255, 255, 0.2)" }}
+            />
+          ))}
+        </div>
+
+        <div className="absolute inset-x-2.5 top-6 flex items-center gap-2">
+          <span className="h-6 w-6 rounded-full" style={{ background: `rgba(${tint}, 0.42)` }} />
+          <span className="h-1.5 w-12 rounded-full bg-white/28" />
+        </div>
+
+        <div className="absolute inset-x-3 bottom-3 flex h-8 items-center rounded-full border border-white/15 px-3">
+          <span className="h-1 w-16 rounded-full bg-white/18" />
+        </div>
       </div>
-      <div className="w-full flex-1 rounded-lg" style={{ background: wash }} />
     </div>
   );
 }
 
 /**
- * Create sheet — a horizontal drum, not a list of rows.
+ * Create sheet — a peeking carousel, not a list of rows.
  *
- * The same interaction the date picker already uses (DateOfBirthPicker's
- * WheelColumn): whatever sits under the centre is the selection, so
- * scrolling and tapping are one gesture. Turned on its side because there
- * are only three options — a vertical drum would spend the sheet's whole
- * width on three stacked rows, which is what the old design did.
+ * Whatever sits under the centre is the selection, so scrolling and tapping
+ * are one gesture — the same model the date picker's drum already uses.
+ * Turned on its side and sized to fill the sheet because three options with
+ * real previews earn the space; the old stacked rows spent the full width
+ * on three lines of text.
  *
  * Off-centre cards are desaturated rather than merely dimmed, so colour
  * itself marks the selection and only one card is ever in full colour.
@@ -110,12 +171,7 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
   const router = useRouter();
   const reelRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const raf = useRef<number | null>(null);
   const [active, setActive] = useState(0);
-
-  // Release the pending frame on unmount — the sheet unmounts its children
-  // on close, so a queued callback would fire against a dead ref.
-  useEffect(() => () => { if (raf.current !== null) cancelAnimationFrame(raf.current); }, []);
 
   const center = useCallback((i: number) => {
     const el = reelRef.current;
@@ -128,24 +184,24 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
   }, []);
 
   /** Nearest card to the viewport centre wins. Measured rather than derived
-   *  from scrollLeft/stride so the gap and any future card size change can't
-   *  silently drift the selection. */
+   *  from scrollLeft/stride, because the card width is a viewport expression
+   *  and JS has no constant to divide by.
+   *
+   *  Deliberately not deferred through requestAnimationFrame: scroll events
+   *  are already frame-paced, there are only three cards to compare, and an
+   *  rAF hop silently stops running whenever the tab is hidden. */
   function onScroll() {
-    if (raf.current !== null) return;
-    raf.current = requestAnimationFrame(() => {
-      raf.current = null;
-      const el = reelRef.current;
-      if (!el) return;
-      const mid = el.scrollLeft + el.clientWidth / 2;
-      let best = 0;
-      let bestDist = Infinity;
-      cardRefs.current.forEach((c, i) => {
-        if (!c) return;
-        const dist = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid);
-        if (dist < bestDist) { bestDist = dist; best = i; }
-      });
-      setActive((prev) => (prev === best ? prev : best));
+    const el = reelRef.current;
+    if (!el) return;
+    const mid = el.scrollLeft + el.clientWidth / 2;
+    let best = 0;
+    let bestDist = Infinity;
+    cardRefs.current.forEach((c, i) => {
+      if (!c) return;
+      const dist = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid);
+      if (dist < bestDist) { bestDist = dist; best = i; }
     });
+    setActive((prev) => (prev === best ? prev : best));
   }
 
   function go(href: string) {
@@ -172,10 +228,10 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
 
   return (
     <BottomSheet open={open} onClose={onClose}>
-      <div className="pb-4 pt-1">
+      <div className="pb-3 pt-0.5">
 
         {/* ── Sheet header ─────────────────────────────────────── */}
-        <div className="mb-3 flex items-center gap-2.5">
+        <div className="mb-2 flex items-center gap-2.5">
           <span
             className="h-[3px] w-5 rounded-full transition-colors duration-200"
             style={{ background: `rgb(${current.tint})` }}
@@ -183,20 +239,18 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
           <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-muted">Create</p>
         </div>
 
-        {/* ── Drum ─────────────────────────────────────────────
+        {/* ── Carousel ─────────────────────────────────────────
             Negative margins cancel the sheet's px-5 so the reel runs edge
-            to edge and cards can be seen leaving the frame. */}
+            to edge and the neighbouring cards peek in from both sides. */}
         <div className="relative -mx-5">
-          {/* Feathered edges, so the row reads as continuing past the sheet
-              rather than being cut off. Matches the date picker's drum. */}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10"
+            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8"
             style={{ background: "linear-gradient(to right, var(--color-elevated), transparent)" }}
           />
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10"
+            className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8"
             style={{ background: "linear-gradient(to left, var(--color-elevated), transparent)" }}
           />
 
@@ -207,10 +261,8 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
             tabIndex={0}
             role="group"
             aria-label="What do you want to create?"
-            // Half-container minus half-card as padding is what lets the
-            // first and last cards reach the centre — no measuring needed.
             className="no-scrollbar relative flex snap-x snap-mandatory gap-3 overflow-x-auto py-3 outline-none"
-            style={{ paddingInline: `calc(50% - ${CARD_W / 2}px)` }}
+            style={{ ...CARD_VARS, paddingInline: "calc(50% - var(--card-w) / 2)" }}
           >
             {ACTIONS.map(({ key, icon: Icon, label, tint }, i) => {
               const on = i === active;
@@ -223,27 +275,28 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
                   aria-current={on}
                   aria-label={on ? `${label} — open` : `${label} — select`}
                   style={{
-                    width: CARD_W,
+                    width: "var(--card-w)",
+                    height: "var(--card-h)",
                     borderColor: on ? `rgba(${tint}, 0.45)` : "rgba(255, 255, 255, 0.06)",
                   }}
-                  className={`flex aspect-[3/4] shrink-0 snap-center flex-col overflow-hidden rounded-2xl border bg-surface transition-all duration-200 ${
-                    on ? "scale-100 opacity-100 grayscale-0" : "scale-[0.9] opacity-55 grayscale"
+                  className={`flex shrink-0 snap-center flex-col overflow-hidden rounded-[20px] border bg-surface transition-all duration-200 ${
+                    on ? "scale-100 opacity-100 grayscale-0" : "scale-[0.92] opacity-50 grayscale"
                   }`}
                 >
                   <div className="min-h-0 flex-1">
                     <CardPreview kind={key} tint={tint} />
                   </div>
                   <div
-                    className="flex items-center gap-1.5 border-t px-3 py-2.5"
+                    className="flex items-center gap-2 border-t px-3.5 py-3"
                     style={{ borderColor: on ? `rgba(${tint}, 0.2)` : "rgba(255, 255, 255, 0.05)" }}
                   >
                     <Icon
-                      size={13}
+                      size={15}
                       strokeWidth={1.9}
                       className="shrink-0"
                       style={{ color: on ? `rgb(${tint})` : undefined }}
                     />
-                    <span className={`text-[12px] font-semibold ${on ? "text-foreground" : "text-muted"}`}>
+                    <span className={`text-[13px] font-semibold ${on ? "text-foreground" : "text-muted"}`}>
                       {label}
                     </span>
                   </div>
@@ -267,8 +320,8 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
 
         {/* ── Caption + commit ─────────────────────────────────
             Keyed on the active card so the copy re-enters instead of
-            swapping in place, which reads as the drum handing off. */}
-        <p key={current.key} className="animate-row-in mt-3 text-center text-[13px] leading-relaxed text-muted">
+            swapping in place, which reads as the carousel handing off. */}
+        <p key={current.key} className="animate-row-in mt-2.5 text-center text-[13px] leading-relaxed text-muted">
           {current.desc}
         </p>
 
@@ -276,7 +329,7 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
           type="button"
           onClick={() => go(current.href)}
           style={{ background: `rgb(${current.tint})` }}
-          className="mt-4 h-12 w-full rounded-xl text-sm font-bold text-accent-ink transition active:scale-[0.99]"
+          className="mt-3 h-12 w-full rounded-xl text-sm font-bold text-accent-ink transition active:scale-[0.99]"
         >
           {current.cta}
         </button>
