@@ -9,6 +9,7 @@ export function FollowButton({
   targetUserId,
   initialFollowing,
   initialRequested = false,
+  variant = "block",
   className = "",
 }: {
   currentUserId?: string;
@@ -16,6 +17,9 @@ export function FollowButton({
   targetUsername?: string | null;
   initialFollowing: boolean;
   initialRequested?: boolean;
+  /** "block" fills its row (profile header, sheets). "inline" is a pill sized
+   *  to sit at the end of a list row without stretching it. */
+  variant?: "block" | "inline";
   className?: string;
 }) {
   const supabase = createClient();
@@ -52,7 +56,11 @@ export function FollowButton({
       type="button"
       onClick={toggle}
       disabled={pending}
-      className={`flex h-10 flex-1 items-center justify-center rounded-xl text-sm font-bold transition-colors disabled:opacity-60 ${
+      className={`flex items-center justify-center font-bold transition-colors disabled:opacity-60 ${
+        variant === "inline"
+          ? "h-8 shrink-0 rounded-pill px-4 text-xs"
+          : "h-10 flex-1 rounded-xl text-sm"
+      } ${
         filled
           ? "bg-accent text-accent-ink"
           : "border border-border bg-surface text-foreground hover:bg-elevated"

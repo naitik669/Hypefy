@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Loader2, Trash2 } from "lucide-react";
+import { Bell, CheckCheck, Loader2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -9,6 +9,7 @@ import { PushNudge } from "@/components/pwa/PushNudge";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Avatar } from "@/components/ui/Avatar";
+import { FollowButton } from "@/components/profile/FollowButton";
 import { haptics } from "@/lib/haptics";
 import { useToast } from "@/components/ui/ToastProvider";
 
@@ -152,6 +153,9 @@ export default function NotificationsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [filter, setFilter] = useState<Filter>("All");
+  /** Actors I already follow — decides whether a follow row offers "Follow
+   *  back" or just says who followed me. */
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const sentinelRef = useRef<HTMLDivElement>(null);
   const PAGE = 50;
 
@@ -184,6 +188,26 @@ export default function NotificationsPage() {
     });
   }
 
+  /** One query for the whole page rather than one per row. */
+  const loadFollowState = useCallback(async (list: Notif[], myId: string) => {
+    const ids = [...new Set(
+      list.filter((n) => n.type === "follow" || n.type === "follow_accepted")
+          .map((n) => n.actor_id)
+          .filter(Boolean) as string[],
+    )];
+    if (ids.length === 0) return;
+    const { data } = await supabase
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", myId)
+      .in("following_id", ids);
+    setFollowingIds((prev) => {
+      const next = new Set(prev);
+      (data ?? []).forEach((f) => next.add(f.following_id));
+      return next;
+    });
+  }, [supabase]);
+
   // `silent` skips the skeleton — used by pull-to-refresh so the list just
   // swaps in place instead of flashing empty.
   const load = useCallback(async (opts?: { silent?: boolean }) => {
@@ -206,6 +230,7 @@ export default function NotificationsPage() {
     setNotifs(withT);
     setHasMore(mapped.length === PAGE);
     setLoading(false);
+    void loadFollowState(withT, user.id);
 
     // Mark all as read (RPC fires the UPDATE that clears the TopBar badge)
     await supabase.rpc("mark_notifications_read");
@@ -275,9 +300,22 @@ export default function NotificationsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMore, loading, loadingMore, notifs]);
 
+  /** The server-side mark already ran when the page opened (load() calls
+   *  mark_notifications_read), so this is purely the visual half: it drops the
+   *  New section and the unread stripes without a reload. */
+  function readAll() {
+    haptics.tap();
+    setNotifs((prev) => prev.map((n) => (n.is_read ? n : { ...n, is_read: true })));
+  }
+
   const allowed = TYPE_MAP[filter];
   const visible = allowed.length === 0 ? notifs : notifs.filter((n) => allowed.includes(n.type));
   const groups = useMemo(() => groupNotifs(visible), [visible]);
+  // Unread first, under their own heading — the reference splits the list this
+  // way so what is actually new is not buried in a week of history.
+  const newGroups = groups.filter((g) => !g.isRead);
+  const earlierGroups = groups.filter((g) => g.isRead);
+  const split = newGroups.length > 0 && earlierGroups.length > 0;
 
   async function clearGroup(ids: string[]) {
     haptics.tap();
@@ -310,7 +348,21 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <PageHeader title="Notifications" showBack />
+      <PageHeader
+        title="Activity"
+        showBack
+        right={
+          newGroups.length > 0 ? (
+            <button
+              type="button"
+              onClick={readAll}
+              className="flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-xs font-bold text-accent transition-colors hover:bg-accent/10"
+            >
+              <CheckCheck size={15} /> Read all
+            </button>
+          ) : undefined
+        }
+      />
 
       <PushNudge />
 
@@ -352,11 +404,24 @@ export default function NotificationsPage() {
         />
       ) : (
         <div className="flex flex-col pb-4">
-          {groups.map((g, i) => (
+          {split && <SectionLabel>New</SectionLabel>}
+          {newGroups.map((g, i) => (
             <NotifRow
               key={g.key}
               group={g}
               index={i}
+              following={!!g.actorId && followingIds.has(g.actorId)}
+              onClear={() => clearGroup(g.ids)}
+              onResolveRequest={(approve) => resolveRequest(g, approve)}
+            />
+          ))}
+          {split && <SectionLabel>Earlier</SectionLabel>}
+          {(split ? earlierGroups : groups).map((g, i) => (
+            <NotifRow
+              key={g.key}
+              group={g}
+              index={newGroups.length + i}
+              following={!!g.actorId && followingIds.has(g.actorId)}
               onClear={() => clearGroup(g.ids)}
               onResolveRequest={(approve) => resolveRequest(g, approve)}
             />
@@ -372,11 +437,20 @@ export default function NotificationsPage() {
   );
 }
 
+/** "New" / "Earlier" divider above a run of rows. */
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="px-4 pb-1 pt-3 text-[11px] font-bold uppercase tracking-widest text-faint">
+      {children}
+    </p>
+  );
+}
+
 const SWIPE_REVEAL = 80; // px of delete affordance revealed — matches the button's w-20
 const SWIPE_COMMIT = 110; // px drag distance that commits the clear
 
 /** One notification row (single or grouped). Swipe left to reveal + confirm clear. */
-function NotifRow({ group: g, index = 0, onClear, onResolveRequest }: { group: Group; index?: number; onClear: () => void; onResolveRequest?: (approve: boolean) => void }) {
+function NotifRow({ group: g, index = 0, following = false, onClear, onResolveRequest }: { group: Group; index?: number; following?: boolean; onClear: () => void; onResolveRequest?: (approve: boolean) => void }) {
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -410,6 +484,7 @@ function NotifRow({ group: g, index = 0, onClear, onResolveRequest }: { group: G
 
   const actorName = actorSummary(g);
   const showCluster = g.actors.length > 1;
+  const isFollowType = g.type === "follow" || g.type === "follow_accepted";
 
   return (
     <div
@@ -432,8 +507,8 @@ function NotifRow({ group: g, index = 0, onClear, onResolveRequest }: { group: G
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         onClick={(e) => { if (dragX !== 0) e.preventDefault(); }}
-        className={`relative flex items-center gap-3 bg-background px-4 py-3 transition-colors hover:bg-white/[0.03] ${
-          !g.isRead ? "bg-accent/[0.04]" : ""
+        className={`relative flex items-center gap-3 bg-background py-3 pl-4 pr-4 transition-colors hover:bg-white/[0.03] ${
+          !g.isRead ? "bg-accent/[0.04] before:absolute before:inset-y-1 before:left-0 before:w-[3px] before:rounded-r-full before:bg-accent before:content-['']" : ""
         }`}
         style={{
           transform: `translateX(${dragX}px)`,
@@ -474,6 +549,13 @@ function NotifRow({ group: g, index = 0, onClear, onResolveRequest }: { group: G
           <span className="text-muted">{g.body}</span>{" "}
           <span className="text-xs text-faint">{timeAgo(g.latestAt)}</span>
         </p>
+        {/* Follow back, without leaving the list. Only where there is nothing
+            else to open — a thumbnail means the row already has a destination. */}
+        {isFollowType && g.actorId && !g.thumb && (
+          <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+            <FollowButton targetUserId={g.actorId} initialFollowing={following} variant="inline" />
+          </span>
+        )}
         {g.thumb && (
           <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface">
             {g.thumb.isVideo ? (

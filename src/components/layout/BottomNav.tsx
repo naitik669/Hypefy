@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, PaperPlaneTilt, Lightning, Plus, X } from "@phosphor-icons/react";
+import { House, ChatCircleDots, Lightning, Plus, X } from "@phosphor-icons/react";
 import { CreateSheet } from "@/components/create/CreateSheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { createClient } from "@/lib/supabase/client";
@@ -71,7 +71,9 @@ export function BottomNav({
             messagesActive ? "text-foreground" : "text-faint hover:text-muted"
           }`}
         >
-          <PaperPlaneTilt
+          {/* A speech bubble, not a paper plane: the plane reads as "send",
+              which is one action inside a thread rather than the inbox itself. */}
+          <ChatCircleDots
             size={26}
             weight={messagesActive ? "fill" : "regular"}
             className={`transition-transform duration-300 ${messagesActive ? "-translate-y-0.5 scale-105" : ""}`}
