@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Onboarding guide to the Hypefy stack — architecture, data model, native shell, and the gotchas that cost time.">
+<title>Hypefy Codebase Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+  /* Light palette — complete, on bare :root. Neutrals carry a faint green
+     cast so they read as chosen rather than inherited grey. */
+  :root {
+    --paper:   #fcfdf8;
+    --surface: #f1f4e9;
+    --raised:  #e8ecdd;
+    --rule:    #dde3cf;
+    --ink:     #12140d;
+    --muted:   #5a6150;
+    --faint:   #858c78;
+    /* The brand lime (#a3e635) is unreadable as text on paper; deepened here
+       and restored to the true token on the dark ground. */
+    --accent:  #5f8a12;
+    --accent-soft: #eaf3d4;
+    --warn:    #9a6a00;
+    --danger:  #a8321f;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:   #0e100a;
+      --surface: #171a11;
+      --raised:  #1f2318;
+      --rule:    #2a2f20;
+      --ink:     #f3f5ec;
+      --muted:   #9aa189;
+      --faint:   #6d7460;
+      --accent:  #a3e635;
+      --accent-soft: #1e2713;
+      --warn:    #e0b64a;
+      --danger:  #ff6b57;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:   #0e100a;
+    --surface: #171a11;
+    --raised:  #1f2318;
+    --rule:    #2a2f20;
+    --ink:     #f3f5ec;
+    --muted:   #9aa189;
+    --faint:   #6d7460;
+    --accent:  #a3e635;
+    --accent-soft: #1e2713;
+    --warn:    #e0b64a;
+    --danger:  #ff6b57;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 56px;
+    align-items: start;
+  }
+
+  /* ── Masthead ─────────────────────────────────────────────── */
+  header.masthead {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--rule);
+    padding: 56px 0 28px;
+    margin-bottom: 44px;
+  }
+  .eyebrow {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-family: Archivo, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    line-height: 1.04;
+    letter-spacing: -0.025em;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 1.08rem;
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .stamp {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    margin-top: 24px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--faint);
+  }
+  .stamp b { color: var(--muted); font-weight: 500; }
+
+  /* ── Contents rail ────────────────────────────────────────── */
+  nav.toc { position: sticky; top: 28px; }
+  nav.toc p {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0 0 12px;
+  }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  nav.toc a {
+    display: block;
+    padding: 5px 10px;
+    border-left: 2px solid var(--rule);
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13.5px;
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  nav.toc a:hover, nav.toc a:focus-visible {
+    color: var(--ink);
+    border-left-color: var(--accent);
+    background: var(--surface);
+    outline: none;
+  }
+
+  /* ── Sections ─────────────────────────────────────────────── */
+  main { min-width: 0; }
+  section { margin-bottom: 60px; scroll-margin-top: 24px; }
+  .kicker {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0 0 8px;
+  }
+  h2 {
+    font-family: Archivo, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 1.62rem;
+    letter-spacing: -0.018em;
+    margin: 0 0 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule);
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: Archivo, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 1.06rem;
+    letter-spacing: -0.008em;
+    margin: 30px 0 8px;
+  }
+  p, li { max-width: 70ch; }
+  p { margin: 0 0 14px; }
+  ul { margin: 0 0 14px; padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--accent); }
+
+  code {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.855em;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1px 5px;
+    word-break: break-word;
+  }
+  pre {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 0 0 16px;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  /* ── Tables ───────────────────────────────────────────────── */
+  .tw { overflow-x: auto; margin: 0 0 18px; border: 1px solid var(--rule); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 500;
+    background: var(--surface);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.mono, td .v {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  td strong { font-weight: 600; }
+
+  /* ── Stat row ─────────────────────────────────────────────── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .stat { background: var(--paper); padding: 14px 16px; }
+  .stat .n {
+    font-family: Archivo, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 1.6rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  .stat .l {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-top: 4px;
+  }
+
+  /* ── Callouts ─────────────────────────────────────────────── */
+  .note {
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-radius: 0 8px 8px 0;
+    padding: 13px 16px;
+    margin: 0 0 18px;
+  }
+  .note.warn { border-left-color: var(--warn); }
+  .note.stop { border-left-color: var(--danger); }
+  .note p { margin: 0; font-size: 14.5px; }
+  .note p + p { margin-top: 8px; }
+  .note .h {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  /* ── Flow diagram ─────────────────────────────────────────── */
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .node {
+    flex: 1 1 150px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .node.hl { border-color: var(--accent); background: var(--accent-soft); }
+  .node .t {
+    font-family: Archivo, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 3px;
+  }
+  .node .d { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+
+  footer {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--rule);
+    padding-top: 20px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  @media (max-width: 940px) {
+    .wrap { grid-template-columns: 1fr; gap: 0; }
+    nav.toc { position: static; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--rule); }
+    nav.toc ol { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+    nav.toc a { border-left: none; border: 1px solid var(--rule); border-radius: 100px; padding: 4px 12px; font-size: 12.5px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Onboarding · Engineering</p>
+    <h1>Hypefy Codebase Map</h1>
+    <p class="standfirst">
+      A Gen-Z social app — posts, 24-hour Shows, short-video Shots, DMs, calls — running as
+      one Next.js codebase that serves both a website and an Android app. This is the tour
+      you get before your first pull request.
+    </p>
+    <div class="stamp">
+      <span><b>Repo</b> naitik669/Hypefy · private</span>
+      <span><b>Web</b> hypefy.chat</span>
+      <span><b>App</b> chat.hypefy.app</span>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <p>Contents</p>
+    <ol>
+      <li><a href="#glance">At a glance</a></li>
+      <li><a href="#shape">The shape of it</a></li>
+      <li><a href="#frontend">Frontend</a></li>
+      <li><a href="#data">Data access</a></li>
+      <li><a href="#database">Database</a></li>
+      <li><a href="#native">The Android app</a></li>
+      <li><a href="#realtime">Realtime &amp; media</a></li>
+      <li><a href="#ship">Build &amp; ship</a></li>
+      <li><a href="#map">Directory map</a></li>
+      <li><a href="#gotchas">Gotchas</a></li>
+      <li><a href="#setup">Run it locally</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- ══ AT A GLANCE ══ -->
+    <section id="glance">
+      <p class="kicker">Orientation</p>
+      <h2>At a glance</h2>
+
+      <div class="stats">
+        <div class="stat"><div class="n">135</div><div class="l">Components</div></div>
+        <div class="stat"><div class="n">40</div><div class="l">Tables</div></div>
+        <div class="stat"><div class="n">84</div><div class="l">DB functions</div></div>
+        <div class="stat"><div class="n">87</div><div class="l">RLS policies</div></div>
+        <div class="stat"><div class="n">37</div><div class="l">Migrations</div></div>
+        <div class="stat"><div class="n">11</div><div class="l">API routes</div></div>
+      </div>
+
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th>Layer</th><th>Choice</th><th>Version</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Framework</strong></td><td>Next.js — App Router, React Server Components</td><td class="mono">16.2.6</td></tr>
+            <tr><td><strong>UI</strong></td><td>React</td><td class="mono">19.2.4</td></tr>
+            <tr><td><strong>Language</strong></td><td>TypeScript, strict</td><td class="mono">5.x</td></tr>
+            <tr><td><strong>Styling</strong></td><td>Tailwind CSS v4 — <code>@theme</code> tokens, no config file</td><td class="mono">4.x</td></tr>
+            <tr><td><strong>Backend</strong></td><td>Supabase — Postgres, Auth, Storage, Realtime</td><td class="mono">js 2.106</td></tr>
+            <tr><td><strong>Native</strong></td><td>Capacitor — Android shell (iOS scaffolded, unused)</td><td class="mono">8.4.2</td></tr>
+            <tr><td><strong>Hosting</strong></td><td>Vercel</td><td class="mono">—</td></tr>
+            <tr><td><strong>Errors</strong></td><td>Sentry</td><td class="mono">10.62</td></tr>
+            <tr><td><strong>Analytics</strong></td><td>Vercel Analytics</td><td class="mono">2.0.1</td></tr>
+            <tr><td><strong>Icons</strong></td><td>lucide-react (primary), phosphor (occasional)</td><td class="mono">1.17</td></tr>
+            <tr><td><strong>Tests</strong></td><td>Vitest (4 files) · Playwright (deferred)</td><td class="mono">2.1.9</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        There is no state library, no ORM, and no component library. State is React state plus
+        Supabase Realtime; data access is the Supabase client directly; components are
+        hand-written on Tailwind tokens. If you are looking for Redux or Prisma, they are not
+        missing — they were never here.
+      </p>
+    </section>
+
+    <!-- ══ SHAPE ══ -->
+    <section id="shape">
+      <p class="kicker">Architecture</p>
+      <h2>The shape of it</h2>
+
+      <p>
+        One codebase, three runtimes. The single most useful thing to understand on day one is
+        that <strong>the Android app is not a separate build</strong> — it is a native shell whose
+        WebView loads the live website.
+      </p>
+
+      <div class="flow">
+        <div class="node">
+          <div class="t">Browser</div>
+          <div class="d">hypefy.chat — the PWA, service worker, web push</div>
+        </div>
+        <div class="node hl">
+          <div class="t">Android shell</div>
+          <div class="d">Capacitor WebView pointed at the same URL, plus native plugins</div>
+        </div>
+        <div class="node">
+          <div class="t">Vercel</div>
+          <div class="d">Next.js server — RSC, API routes, auth proxy</div>
+        </div>
+        <div class="node">
+          <div class="t">Supabase</div>
+          <div class="d">Postgres + RLS, Auth, Storage, Realtime, pg_cron</div>
+        </div>
+      </div>
+
+      <div class="note">
+        <span class="h">Why this matters</span>
+        <p>
+          <code>capacitor.config.ts</code> sets <code>server.url = https://www.hypefy.chat</code>.
+          So a Vercel deploy updates every installed app instantly — no store review, no OTA
+          service. Only changes to the <em>shell itself</em> (plugins, permissions, manifest,
+          icons) need a new APK.
+        </p>
+      </div>
+
+      <h3>Request path</h3>
+      <p>
+        <code>src/proxy.ts</code> is the entry point. In Next 16 "Proxy" is the renamed Middleware:
+        it runs before every non-static request, refreshes the Supabase session cookie, and
+        redirects unauthenticated users away from protected routes. The real work lives in
+        <code>src/lib/supabase/middleware.ts</code>.
+      </p>
+      <p>
+        Route groups carry the layout split: <code>(app)</code> is the signed-in shell with bottom
+        nav, <code>(auth)</code> is sign-in and sign-up, <code>(legal)</code> is static policy pages.
+        The root <code>page.tsx</code> is a smart router — logged out goes to onboarding, incomplete
+        profile to setup, otherwise home.
+      </p>
+    </section>
+
+    <!-- ══ FRONTEND ══ -->
+    <section id="frontend">
+      <p class="kicker">Layer · Client</p>
+      <h2>Frontend</h2>
+
+      <h3>Server vs client components</h3>
+      <p>
+        Pages are Server Components that fetch with the server Supabase client and pass plain
+        props down. Anything interactive is a <code>"use client"</code> component underneath.
+        The pattern to copy: <code>page.tsx</code> queries and shapes, the client component
+        renders and mutates.
+      </p>
+
+      <h3>Styling</h3>
+      <p>
+        Tailwind v4 with tokens declared in <code>src/app/globals.css</code> under
+        <code>@theme</code> — there is no <code>tailwind.config</code>. Use the semantic names,
+        not raw colors:
+      </p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Token</th><th>Value</th><th>Use for</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">background</td><td class="mono">#0a0a0a</td><td>App ground</td></tr>
+            <tr><td class="mono">surface / elevated</td><td class="mono">#141414 / #1e1e1e</td><td>Cards, sheets</td></tr>
+            <tr><td class="mono">border</td><td class="mono">#2a2a2a</td><td>Dividers, outlines</td></tr>
+            <tr><td class="mono">foreground / muted / faint</td><td class="mono">#fff / #8a8a8a / #555</td><td>Text hierarchy</td></tr>
+            <tr><td class="mono">accent</td><td class="mono">#a3e635</td><td>Brand — electric lime</td></tr>
+            <tr><td class="mono">hype</td><td class="mono">#ffd000</td><td>The Hype star only</td></tr>
+            <tr><td class="mono">verified</td><td class="mono">#3897f0</td><td>Verification badge only</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        <code>hype</code> and <code>verified</code> carry meaning elsewhere in the product — don't
+        borrow them as decoration.
+      </p>
+
+      <h3>Shared UI</h3>
+      <p>
+        <code>src/components/ui/</code> holds the primitives worth knowing before you build
+        anything: <code>BottomSheet</code>, <code>CenterModal</code>, <code>ConfirmDialog</code>,
+        <code>FloatingMenu</code>, <code>ZoomViewer</code>, <code>Avatar</code>,
+        <code>ToastProvider</code>. All overlays share an <code>open</code> / <code>onClose</code>
+        pair, which is what lets the Android back button dismiss them
+        (<code>src/lib/overlay-stack.ts</code>).
+      </p>
+
+      <h3>Vocabulary</h3>
+      <p>
+        The product has its own words, and they are used literally in code:
+        <strong>Hype</strong> = like · <strong>Shot</strong> = short video reel ·
+        <strong>Show</strong> = 24-hour story · <strong>OneShot</strong> = view-once photo ·
+        <strong>Note</strong> = short status your circle sees · <strong>Discover</strong> = explore.
+      </p>
+    </section>
+
+    <!-- ══ DATA ══ -->
+    <section id="data">
+      <p class="kicker">Layer · Data</p>
+      <h2>Data access</h2>
+
+      <p>There are three Supabase clients and picking the wrong one is the most common early mistake.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th>Client</th><th>File</th><th>When</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Browser</strong></td>
+              <td class="mono">lib/supabase/client.ts</td>
+              <td>Client Components. Writes the session to cookies, so the server sees it too. Runs as the user, under RLS.</td>
+            </tr>
+            <tr>
+              <td><strong>Server</strong></td>
+              <td class="mono">lib/supabase/server.ts</td>
+              <td>Server Components, Route Handlers. Also the user, also under RLS.</td>
+            </tr>
+            <tr>
+              <td><strong>Service role</strong></td>
+              <td class="mono">created inline in API routes</td>
+              <td>Bypasses RLS entirely. Only in <code>/api/*</code>, only where a user genuinely cannot be the actor — push fan-out, OneShot delivery, Spotify tokens.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note warn">
+        <span class="h">Security model</span>
+        <p>
+          Every one of the 40 tables has RLS enabled. Authorization lives in Postgres, not in
+          application code — so a missing policy is a locked door, not an open one. Sensitive
+          tables (<code>app_locks</code>, <code>spotify_accounts</code>, <code>rate_events</code>)
+          go further: RLS on with <em>zero</em> policies, plus <code>REVOKE ALL</code> from
+          <code>anon</code> and <code>authenticated</code>, so PostgREST cannot read them at all.
+          They are reachable only through <code>SECURITY DEFINER</code> functions.
+        </p>
+      </div>
+
+      <h3>Typed but not everywhere</h3>
+      <p>
+        <code>database.types.ts</code> is generated from the live schema and the browser client is
+        typed with it. The server and service-role clients are not, which is why you will see
+        <code>any</code> in some routes. Regenerate after every migration —
+        and see the Gotchas, because regeneration wipes a hand patch.
+      </p>
+
+      <h3>The feed</h3>
+      <p>
+        Ranking is a pure function in <code>src/lib/feed-rank.ts</code>, deliberately extracted so
+        it can be unit-tested away from the server component. It blends recency (decays over 48h),
+        social proximity, engagement, interest overlap, and per-author affinity. It is one of the
+        four things with tests.
+      </p>
+    </section>
+
+    <!-- ══ DATABASE ══ -->
+    <section id="database">
+      <p class="kicker">Layer · Postgres</p>
+      <h2>Database</h2>
+
+      <p>
+        Migrations are plain SQL in <code>supabase/migrations/</code>, numbered and append-only —
+        <code>0001_baseline</code> through <code>0037_push_devices</code>. Never edit an applied
+        migration; add a new one that <code>CREATE OR REPLACE</code>s what changed.
+      </p>
+
+      <h3>The 40 tables, grouped</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Area</th><th>Tables</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Identity</strong></td><td class="mono">profiles, follows, follow_requests, close_friends, blocked_users, favorites</td></tr>
+            <tr><td><strong>Content</strong></td><td class="mono">posts, shots, shows, notes, scheduled_posts, collections, collection_items</td></tr>
+            <tr><td><strong>Engagement</strong></td><td class="mono">hypes, comments, reposts, saved_posts, saved_shots, poll_votes, note_reactions, show_views</td></tr>
+            <tr><td><strong>Messaging</strong></td><td class="mono">conversations, conversation_members, messages, message_reactions, oneshots</td></tr>
+            <tr><td><strong>Calls</strong></td><td class="mono">call_sessions, group_calls, group_call_participants</td></tr>
+            <tr><td><strong>Platform</strong></td><td class="mono">notifications, push_subscriptions, push_devices, reports, message_reports, rate_events, app_locks, spotify_accounts, creator_daily_stats, hashtag_follows, pinned_viewers</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Scheduled work</h3>
+      <p>Four <code>pg_cron</code> jobs run inside Postgres, not on Vercel:</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Job</th><th>Schedule</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">publish-scheduled-posts</td><td class="mono">* * * * *</td><td>Moves due rows from <code>scheduled_posts</code> into <code>posts</code></td></tr>
+            <tr><td class="mono">reap-oneshots</td><td class="mono">*/5 * * * *</td><td>Deletes expired view-once media</td></tr>
+            <tr><td class="mono">purge-expired-messages</td><td class="mono">0 * * * *</td><td>Enforces per-chat auto-delete timers</td></tr>
+            <tr><td class="mono">capture-creator-daily-stats</td><td class="mono">10 0 * * *</td><td>Rolls up creator insights</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Storage buckets</h3>
+      <p>
+        <code>avatars</code>, <code>post-images</code>, <code>shot-media</code>,
+        <code>show-media</code>, <code>chat-media</code> are public-read. <code>oneshot-media</code>
+        is private with an insert policy and <em>no</em> select policy — view-once photos are
+        streamed by a service-role route that claims them atomically, so a second read finds
+        nothing.
+      </p>
+    </section>
+
+    <!-- ══ NATIVE ══ -->
+    <section id="native">
+      <p class="kicker">Layer · Native</p>
+      <h2>The Android app</h2>
+
+      <p>
+        The shell is thin, but it is not empty — and the difference between "a website in an app"
+        and an app is exactly this list:
+      </p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th>Capability</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Screenshot blocking</strong> — <code>FLAG_SECURE</code> while a OneShot photo is open. The one thing a browser cannot do.</td><td class="mono">android/…/SecureScreenPlugin.java<br>lib/secure-screen.ts</td></tr>
+            <tr><td><strong>Hardware back</strong> — closes overlays, then navigates, then exits at a tab root</td><td class="mono">components/native/NativeShell.tsx<br>lib/overlay-stack.ts</td></tr>
+            <tr><td><strong>Push</strong> — FCM device tokens, fanned out beside web push</td><td class="mono">lib/native-push.ts · lib/fcm.ts</td></tr>
+            <tr><td><strong>Google sign-in</strong> — Custom Tab + deep link, because Google blocks OAuth in WebViews</td><td class="mono">lib/native-auth.ts</td></tr>
+            <tr><td><strong>Keyboard, haptics, status bar, splash</strong></td><td class="mono">lib/useKeyboardInset.ts · lib/haptics.ts</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <span class="h">The rule for native code</span>
+        <p>
+          Everything routes through <code>src/lib/native.ts</code> (<code>isNative()</code>,
+          <code>safeNative()</code>) and <strong>no-ops off device</strong>. The same bundle serves
+          the website, so a native call must degrade silently rather than every feature growing an
+          <code>if (isNative)</code> branch.
+        </p>
+      </div>
+    </section>
+
+    <!-- ══ REALTIME ══ -->
+    <section id="realtime">
+      <p class="kicker">Layer · Live</p>
+      <h2>Realtime &amp; media</h2>
+
+      <p>
+        Eight components subscribe to Supabase Realtime channels — messages, presence, typing,
+        notifications, call signalling. There is no socket server; Postgres changes and broadcast
+        messages are the transport.
+      </p>
+      <p>
+        Voice and video are <strong>WebRTC peer-to-peer</strong>, signalled over a Realtime channel.
+        <code>CallProvider</code> handles 1:1; <code>GroupCallProvider</code> runs a full mesh, which
+        is why group calls are capped — every participant holds a connection to every other.
+        TURN credentials come from <code>NEXT_PUBLIC_TURN_*</code>.
+      </p>
+      <p>
+        Music is 30-second preview clips from the iTunes Search API via <code>/api/music</code>.
+        Spotify was evaluated and is <em>parked, not deleted</em> — the routes and SDK wrapper
+        remain, unreachable from the UI. <code>docs/BACKEND.md</code> records why, so nobody
+        repeats the investigation.
+      </p>
+    </section>
+
+    <!-- ══ SHIP ══ -->
+    <section id="ship">
+      <p class="kicker">Ops</p>
+      <h2>Build &amp; ship</h2>
+
+      <p>Two independent pipelines, because there are two update channels.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th>Change</th><th>Ships via</th><th>Speed</th></tr></thead>
+          <tbody>
+            <tr><td>Pages, UI, API routes — nearly every commit</td><td>Vercel deploy</td><td>Instant, app included</td></tr>
+            <tr><td>Plugins, permissions, manifest, icons</td><td><code>.github/workflows/android.yml</code></td><td>New APK</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        <code>ci.yml</code> runs lint (non-blocking), typecheck, unit tests and the Next build.
+        <code>android.yml</code> runs on every push to <code>main</code>: Capacitor sync, Gradle
+        release build, artifact upload, then Firebase App Distribution.
+      </p>
+      <p>
+        Version numbers come from git — <code>versionCode</code> is the commit count,
+        <code>versionName</code> the short SHA — so builds are always unique and monotonic with no
+        manual bookkeeping. Signing reads from environment variables and falls back to the debug key
+        when unset, so a local release build still works.
+      </p>
+    </section>
+
+    <!-- ══ MAP ══ -->
+    <section id="map">
+      <p class="kicker">Reference</p>
+      <h2>Directory map</h2>
+
+      <pre><code>src/
+  app/
+    (app)/          signed-in shell — home, messages, shots, profile, settings
+    (auth)/         sign-in, sign-up, verify
+    (legal)/        policy pages
+    api/            11 route handlers (push, music, gifs, oneshot, spotify…)
+    layout.tsx      root: fonts, Analytics, service worker, error reporter
+    page.tsx        smart entry router
+  components/       135 components, grouped by feature
+    ui/             shared primitives — start here
+    native/         NativeShell, CaptureGuard
+  lib/              33 modules — the logic that isn't a component
+    supabase/       client · server · middleware · typed · database.types
+  proxy.ts          Next 16 middleware — session refresh + route guards
+
+android/            Capacitor project (tracked in git)
+supabase/migrations 37 numbered SQL migrations
+docs/BACKEND.md     backend decisions and their reasoning</code></pre>
+
+      <h3>Files worth reading first</h3>
+      <ul>
+        <li><code>src/lib/supabase/middleware.ts</code> — how auth actually works</li>
+        <li><code>src/app/(app)/home/page.tsx</code> — the server-fetch pattern, at its densest</li>
+        <li><code>src/lib/feed-rank.ts</code> — the algorithm, pure and tested</li>
+        <li><code>src/components/messages/RealChatView.tsx</code> — the largest component; realtime, media, and most message features live here</li>
+        <li><code>docs/BACKEND.md</code> — decisions already made, and why</li>
+      </ul>
+    </section>
+
+    <!-- ══ GOTCHAS ══ -->
+    <section id="gotchas">
+      <p class="kicker">Reference</p>
+      <h2>Gotchas</h2>
+
+      <p>Things that have already cost someone an afternoon.</p>
+
+      <div class="note stop">
+        <span class="h">Regenerating types wipes a patch</span>
+        <p>
+          <code>create_group</code>'s <code>p_title</code> is nullable in SQL but the generator
+          infers it as required. The fix is hand-applied in <code>database.types.ts</code> with a
+          comment saying so — <strong>re-apply it after every regeneration</strong>.
+        </p>
+      </div>
+
+      <div class="note warn">
+        <span class="h">REVOKE from <code>anon</code> alone does nothing</span>
+        <p>
+          Postgres grants <code>EXECUTE</code> to <code>PUBLIC</code> by default and
+          <code>anon</code> inherits it. Revoke from <code>PUBLIC</code>, then grant back to
+          <code>authenticated</code>. Migration <code>0027</code> exists because of this.
+        </p>
+      </div>
+
+      <div class="note warn">
+        <span class="h">Line endings are CRLF</span>
+        <p>
+          Scripted multi-line find-and-replace with <code>\n</code> silently matches nothing. Use an
+          editor, or handle <code>\r\n</code>. Related: <code>gradlew</code> lost its executable bit
+          from a Windows checkout and failed CI with an opaque exit code 126.
+        </p>
+      </div>
+
+      <div class="note">
+        <span class="h">Lint has a known baseline</span>
+        <p>
+          Lint is non-blocking in CI because of pre-existing debt. Don't expect zero — compare the
+          error count before and after your change, and keep it flat.
+        </p>
+      </div>
+
+      <div class="note">
+        <span class="h">Two more</span>
+        <p>
+          <code>secrets</code> cannot be used in a GitHub Actions <code>if:</code> — lift them into
+          <code>env</code> first, or the whole workflow fails before any step runs.
+        </p>
+        <p>
+          <code>legacy-peer-deps</code> lives in <code>.npmrc</code> so local installs and
+          <code>npm ci</code> resolve identically. Leave it there.
+        </p>
+      </div>
+    </section>
+
+    <!-- ══ SETUP ══ -->
+    <section id="setup">
+      <p class="kicker">Getting started</p>
+      <h2>Run it locally</h2>
+
+      <pre><code>npm install
+cp .env.example .env.local   # fill in Supabase URL + keys
+npm run dev                  # http://localhost:3000</code></pre>
+
+      <p>Only <code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> and
+      <code>SUPABASE_SERVICE_ROLE_KEY</code> are needed to boot. The rest degrade gracefully:
+      no VAPID keys means no push, no Giphy key means no GIF search.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th>Command</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">npm run dev</td><td>Next dev server</td></tr>
+            <tr><td class="mono">npm run typecheck</td><td><code>tsc --noEmit</code> — run before every commit</td></tr>
+            <tr><td class="mono">npm test</td><td>Vitest</td></tr>
+            <tr><td class="mono">npm run cap:sync</td><td>Push web + plugin changes into the Android project</td></tr>
+            <tr><td class="mono">npm run cap:android</td><td>Open Android Studio</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <span class="h">Building the app</span>
+        <p>
+          You need a JDK and the Android SDK — Android Studio brings both. You usually don't:
+          every push to <code>main</code> produces an installable APK as a GitHub Actions artifact,
+          which is faster than building locally.
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    Written against <code>main</code> at migration <code>0037</code>. Counts are from the live
+    schema. When they drift, trust the repo.
+  </footer>
+
+</div>
+
+</body>
+</html>
