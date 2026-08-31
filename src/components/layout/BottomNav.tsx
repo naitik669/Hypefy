@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, ChatCircleDots, Lightning, Plus, X } from "@phosphor-icons/react";
+import { House, Chat, Lightning, Plus, X } from "@phosphor-icons/react";
 import { CreateSheet } from "@/components/create/CreateSheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { createClient } from "@/lib/supabase/client";
@@ -72,17 +72,30 @@ export function BottomNav({
           }`}
         >
           {/* A speech bubble, not a paper plane: the plane reads as "send",
-              which is one action inside a thread rather than the inbox itself. */}
-          <ChatCircleDots
-            size={26}
-            weight={messagesActive ? "fill" : "regular"}
-            className={`transition-transform duration-300 ${messagesActive ? "-translate-y-0.5 scale-105" : ""}`}
-          />
-          {unreadMsgs > 0 && !messagesActive && (
-            <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 animate-react-pop items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-accent-ink ring-2 ring-background">
-              {unreadMsgs > 9 ? "9+" : unreadMsgs}
-            </span>
-          )}
+              which is one action inside a thread rather than the inbox itself.
+              Plain Chat rather than a dotted variant — dots inside the bubble
+              compete with the count sitting on its corner.
+
+              The badge is positioned against this span, not the whole tab, so
+              it lands on the bubble's corner instead of floating in the
+              padding above it. */}
+          <span className="relative flex items-center justify-center">
+            <Chat
+              size={26}
+              weight={messagesActive ? "fill" : "regular"}
+              className={`transition-transform duration-300 ${messagesActive ? "-translate-y-0.5 scale-105" : ""}`}
+            />
+            {unreadMsgs > 0 && !messagesActive && (
+              // Red, not accent: a count you have not read is an alert, and
+              // the accent green is the same colour as the active-tab dot
+              // right below it. The background-coloured ring cuts the bubble's
+              // stroke away behind the badge so the two shapes stay readable
+              // where they overlap.
+              <span className="absolute -right-2 -top-1.5 flex h-[18px] min-w-[18px] animate-react-pop items-center justify-center rounded-full bg-danger px-1 text-[10px] font-black leading-none text-white ring-[3px] ring-background">
+                {unreadMsgs > 9 ? "9+" : unreadMsgs}
+              </span>
+            )}
+          </span>
           <NavDot active={messagesActive} />
         </Link>
 
