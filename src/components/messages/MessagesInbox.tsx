@@ -433,6 +433,15 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
 
   return (
     <>
+      {/* Large title. The sticky bar above stays the compact account switcher,
+          so this scrolls away the way a large title is supposed to. */}
+      <div className="flex items-baseline justify-between px-4 pb-1 pt-3">
+        <h1 className="text-[28px] font-extrabold leading-none tracking-tight">Messages</h1>
+        {unreadCount > 0 && (
+          <span className="text-xs font-bold text-accent">{unreadCount} unread</span>
+        )}
+      </div>
+
       {/* Search */}
       <div className="px-4 pt-3">
         <div className="flex h-11 items-center gap-2 rounded-2xl border border-border bg-surface px-3.5 focus-within:border-white/25">
@@ -520,7 +529,7 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
             <>
               {unreadRows.length > 0 && (
                 <p className="px-4 pb-1 pt-2 text-[11px] font-bold uppercase tracking-widest text-faint">
-                  Messages
+                  Earlier
                 </p>
               )}
               {otherRows.map((r) => <RowItem key={r.id} r={r} />)}
