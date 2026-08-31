@@ -12,6 +12,10 @@ type Friend = {
   display_name: string | null;
   username: string | null;
   avatar_hue: number | null;
+  /** The query has always fetched this; the type omitted it, so the cast to
+   *  Friend[] hid it from the renderer and everyone showed as a gradient
+   *  initial instead of their actual photo. */
+  avatar_url: string | null;
 };
 
 export function ShareSheet({
@@ -375,7 +379,7 @@ export function ShareSheet({
                   selected ? "bg-accent/10" : "hover:bg-white/[0.04]"
                 }`}
               >
-                <Avatar name={name} hue={f.avatar_hue ?? 280} size={46} />
+                <Avatar name={name} hue={f.avatar_hue ?? 280} size={46} src={f.avatar_url ?? undefined} />
                 <div className="min-w-0 flex-1 text-left">
                   <p className="truncate text-sm font-semibold">{name}</p>
                   {f.username && (

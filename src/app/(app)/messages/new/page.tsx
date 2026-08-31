@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
 
-type Person = { id: string; display_name: string | null; username: string | null; avatar_hue: number | null };
+type Person = { id: string; display_name: string | null; username: string | null; avatar_hue: number | null; avatar_url: string | null };
 
 export default function NewChatPage() {
   const router = useRouter();
@@ -110,7 +110,7 @@ export default function NewChatPage() {
                 onClick={() => toggle(p.id)}
                 className="flex shrink-0 items-center gap-1.5 rounded-pill bg-surface py-1 pl-1 pr-2.5"
               >
-                <Avatar name={p.display_name ?? p.username ?? "U"} hue={p.avatar_hue ?? 280} size={24} className="rounded-full" />
+                <Avatar name={p.display_name ?? p.username ?? "U"} hue={p.avatar_hue ?? 280} size={24} src={p.avatar_url ?? undefined} className="rounded-full" />
                 <span className="text-xs font-semibold">{p.display_name ?? p.username}</span>
                 <X size={12} />
               </button>
@@ -147,7 +147,7 @@ export default function NewChatPage() {
                   onClick={() => toggle(p.id)}
                   className={`flex items-center gap-3 rounded-xl px-1 py-2.5 transition-colors ${on ? "bg-accent/10" : "hover:bg-white/[0.03]"}`}
                 >
-                  <Avatar name={name} hue={p.avatar_hue ?? 280} size={46} />
+                  <Avatar name={name} hue={p.avatar_hue ?? 280} size={46} src={p.avatar_url ?? undefined} />
                   <div className="min-w-0 flex-1 text-left">
                     <p className="truncate text-sm font-semibold">{name}</p>
                     {p.username && <p className="truncate text-xs text-muted">@{p.username}</p>}

@@ -14,6 +14,7 @@ type Row = {
   display_name: string | null;
   username: string | null;
   avatar_hue: number | null;
+  avatar_url: string | null;
 };
 
 export function FollowListSheet({
@@ -89,7 +90,7 @@ export function FollowListSheet({
             return (
               <div key={r.id} className="flex items-center gap-3 py-2.5">
                 <Link href={r.username ? `/u/${r.username}` : "#"} onClick={onClose}>
-                  <Avatar name={name} hue={r.avatar_hue ?? 280} size={44} />
+                  <Avatar name={name} hue={r.avatar_hue ?? 280} size={44} src={r.avatar_url ?? undefined} />
                 </Link>
                 <Link href={r.username ? `/u/${r.username}` : "#"} onClick={onClose} className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{name}</p>
