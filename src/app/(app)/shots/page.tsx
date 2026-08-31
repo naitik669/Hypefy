@@ -27,7 +27,7 @@ export default async function ShotsPage() {
   const [{ data: shots }, affRes] = await Promise.all([
     supabase
       .from("shots")
-      .select("id, user_id, media_url, caption, created_at, hype_count, comment_count, save_count, profiles(display_name, avatar_hue, avatar_url, username)")
+      .select("id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, save_count, profiles(display_name, avatar_hue, avatar_url, username)")
       .order("created_at", { ascending: false })
       .limit(80),
     user ? supabase.rpc("get_affinity", { p_lookback_days: 60 }) : Promise.resolve({ data: null }),

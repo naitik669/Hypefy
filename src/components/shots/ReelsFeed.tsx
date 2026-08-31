@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Star, MessageCircle, Send, Bookmark, Volume2, VolumeX, Play, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2 } from "lucide-react";
+import { Star, MessageCircle, Send, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
@@ -15,12 +15,21 @@ import { haptics } from "@/lib/haptics";
 import { useToast } from "@/components/ui/ToastProvider";
 import { hypeResult } from "@/lib/supabase/typed";
 
-type ReelProfile = { display_name: string | null; avatar_hue: number | null; username: string | null } | null;
+type ReelProfile = {
+  display_name: string | null;
+  avatar_hue: number | null;
+  username: string | null;
+  avatar_url: string | null;
+} | null;
 
 export type Reel = {
   id: string;
   user_id: string;
   media_url: string;
+  /** First frame, captured at upload. Used as the video's poster so a reel
+   *  shows itself while it loads instead of an empty black rectangle. Null on
+   *  Shots uploaded before posters existed — see primeFrame below. */
+  poster_url: string | null;
   caption: string | null;
   created_at: string;
   hype_count?: number;
@@ -66,7 +75,7 @@ export function ReelsFeed({
     if (!oldest) { fetchingMore.current = false; return; }
     supabase
       .from("shots")
-      .select("id, user_id, media_url, caption, created_at, hype_count, comment_count, profiles(display_name, avatar_hue, username)")
+      .select("id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, profiles(display_name, avatar_hue, username, avatar_url)")
       .lt("created_at", oldest)
       .order("created_at", { ascending: false })
       .limit(10)
@@ -199,6 +208,12 @@ function ReelCard({
   const showToast = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(true);
+  /** The play/pause glyph is a confirmation, not a control: it flashes to show
+   *  the tap landed, then clears so it is not parked over the video. */
+  const [iconShown, setIconShown] = useState(false);
+  const iconTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** False until the video has painted something — poster or first frame. */
+  const [frameReady, setFrameReady] = useState(false);
   const [progress, setProgress] = useState(0); // 0..1 playback position
   const [buffering, setBuffering] = useState(false);
 
@@ -251,6 +266,9 @@ function ReelCard({
       el.currentTime = 0; // rewind so it restarts clean when revisited
       setPlaying(false);
       setProgress(0);
+      // Do not leave a glyph mid-fade on a reel nobody is looking at.
+      if (iconTimer.current) clearTimeout(iconTimer.current);
+      setIconShown(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive]);
@@ -372,6 +390,31 @@ function ReelCard({
       el.pause();
       setPlaying(false);
     }
+    flashIcon();
+  }
+
+  /** Show the glyph, then fade it out. Re-tapping restarts the timer rather
+   *  than stacking a second one. */
+  function flashIcon() {
+    if (iconTimer.current) clearTimeout(iconTimer.current);
+    setIconShown(true);
+    iconTimer.current = setTimeout(() => {
+      setIconShown(false);
+      iconTimer.current = null;
+    }, 1200);
+  }
+
+  /**
+   * Paint a real frame for Shots with no poster_url.
+   *
+   * A video that has never played renders as a flat black box, which is what
+   * made the feed look broken while loading. Nudging currentTime forces the
+   * decoder to produce one frame, so an idle reel shows its own opening
+   * instead of nothing. Only needed where the upload did not leave a poster.
+   */
+  function primeFrame(el: HTMLVideoElement) {
+    if (reel.poster_url || el.currentTime > 0) return;
+    try { el.currentTime = 0.05; } catch { /* seeking not ready yet */ }
   }
 
   // Replay the burst without un-hyping (already hyped).
@@ -411,20 +454,29 @@ function ReelCard({
       <video
         ref={videoRef}
         src={reel.media_url}
+        poster={reel.poster_url ?? undefined}
         className="absolute inset-0 h-full w-full bg-black object-cover"
         loop
         muted={muted}
         playsInline
         preload={preload}
         onClick={handleTap}
+        onLoadedMetadata={(e) => primeFrame(e.currentTarget)}
+        onLoadedData={() => setFrameReady(true)}
         onTimeUpdate={(e) => {
           const v = e.currentTarget;
           if (v.duration) setProgress(v.currentTime / v.duration);
         }}
         onWaiting={() => setBuffering(true)}
-        onPlaying={() => setBuffering(false)}
-        onCanPlay={() => setBuffering(false)}
+        onPlaying={() => { setBuffering(false); setFrameReady(true); }}
+        onCanPlay={() => { setBuffering(false); setFrameReady(true); }}
       />
+
+      {/* Placeholder for the gap before any frame exists. A tinted shimmer
+          reads as loading; the previous flat grey read as a dead player. */}
+      {!frameReady && !reel.poster_url && (
+        <div className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-b from-white/[0.07] via-transparent to-white/[0.04]" />
+      )}
 
       {/* Buffering spinner — only while actively loading the visible reel */}
       {buffering && isActive && playing && (
@@ -444,16 +496,28 @@ function ReelCard({
         </div>
       )}
 
-      {!playing && (
-        <button
-          type="button"
-          onClick={togglePlay}
-          aria-label="Play"
-          className="absolute inset-0 z-10 flex items-center justify-center"
+      {/* Play/pause glyph.
+          This used to be a full-screen <button>, which sat above the video and
+          swallowed every tap while paused — so double-tap-to-Hype only worked
+          on a playing reel. It is pointer-events-none now: the video below
+          keeps handling both gestures, and the glyph is purely feedback that
+          fades out on its own. The control itself stays reachable by keyboard
+          through the off-screen button after it. */}
+      {isActive && (
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-500 ${
+            iconShown ? "opacity-100" : "opacity-0"
+          }`}
         >
           <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm">
-            <Play size={30} className="ml-1 fill-white" />
+            {playing ? <Pause size={28} className="fill-white" /> : <Play size={30} className="ml-1 fill-white" />}
           </span>
+        </div>
+      )}
+      {isActive && (
+        <button type="button" onClick={togglePlay} className="sr-only">
+          {playing ? "Pause Shot" : "Play Shot"}
         </button>
       )}
 
@@ -521,7 +585,7 @@ function ReelCard({
       {/* Author + caption */}
       <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col gap-2 p-4 pr-16">
         <Link href={handle ? `/u/${handle}` : "#"} className="flex items-center gap-2.5">
-          <Avatar name={name} hue={hue} size={38} className="ring-2 ring-white/70" />
+          <Avatar name={name} hue={hue} size={38} src={reel.profiles?.avatar_url ?? undefined} className="ring-2 ring-white/70" />
           <span className="text-sm font-bold text-white drop-shadow">
             {handle ? `@${handle}` : name}
           </span>

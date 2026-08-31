@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ReelsFeed } from "@/components/shots/ReelsFeed";
 
 const SELECT =
-  "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, profiles(display_name, avatar_hue, username)";
+  "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, profiles(display_name, avatar_hue, username, avatar_url)";
 
 // Shared between generateMetadata and the page render (deduped per request).
 const getShot = cache(async (shotId: string) => {
