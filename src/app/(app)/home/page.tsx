@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/TopBar";
 import { ShowsRow } from "@/components/home/ShowsRow";
 import { FeedList } from "@/components/feed/FeedList";
-import { VibeNudge } from "@/components/feed/VibeNudge";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { UploadProgressBar } from "@/components/upload/UploadProvider";
 import { feedScore, diversify, postTags, tagAffinityFor } from "@/lib/feed-rank";
@@ -243,7 +242,6 @@ export default async function HomePage() {
       <TopBar />
       <PullToRefresh>
         <ShowsRow shows={shows} currentUser={currentUserForRow} />
-        <VibeNudge />
         <UploadProgressBar />
 
         {/* Always the feed — FeedList renders the warm-up prompt at the END
