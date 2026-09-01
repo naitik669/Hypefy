@@ -7,7 +7,6 @@ import Link from "next/link";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
 import { PostViewerModal } from "@/components/profile/PostViewerModal";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { GRID, GRID_WRAP, SKELETON_SPANS, spanFor } from "@/components/profile/postGrid";
 
 type Tab = "Posts" | "Shots" | "Saved";
 
@@ -96,18 +95,10 @@ export function PublicProfileTabs({
 
       <div key={tab} className="animate-fade-swap mt-3">
       {loading ? (
-        // Mirrors the real grid's mix of shapes so the layout does not
-        // visibly reflow when the posts land.
-        <div className={GRID_WRAP}>
-          <div className={GRID}>
-            {Array.from({ length: 9 }).map((_, i) => (
-              <div
-                key={i}
-                style={SKELETON_SPANS[i]}
-                className="skeleton h-full rounded-xl"
-              />
-            ))}
-          </div>
+        <div className="grid grid-cols-3 gap-1.5 px-1.5">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="skeleton aspect-square rounded-xl" />
+          ))}
         </div>
       ) : tab === "Posts" || (tab === "Saved" && isOwn) ? (
         activePosts.length === 0 ? (
@@ -120,21 +111,17 @@ export function PublicProfileTabs({
           />
         ) : (
           <>
-            {/* Shape-aware grid: portrait takes two rows, landscape two
-                columns. See postGrid.ts. */}
-            <div className={GRID_WRAP}>
-            <div className={GRID}>
+            {/* 3-column thumbnail grid */}
+            <div className="grid grid-cols-3 gap-1.5 px-1.5">
               {activePosts.map((p, i) => {
                 const thumb = getThumb(p);
                 const multi = ((p as any).image_urls?.length ?? 0) > 1;
-                const span = spanFor((p as any).aspect_ratio);
                 return (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => setViewerIdx(i)}
-                    style={span}
-                    className="relative h-full overflow-hidden rounded-xl bg-surface"
+                    className="relative aspect-square overflow-hidden rounded-xl bg-surface"
                   >
                     {thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -151,7 +138,6 @@ export function PublicProfileTabs({
                   </button>
                 );
               })}
-            </div>
             </div>
 
             {/* Post viewer modal */}
