@@ -23,7 +23,14 @@ export const metadata: Metadata = {
   },
   description: "Where your personality lives.",
   applicationName: "Hypefy",
+  // Declaring `icons` at all switches off Next's file-convention
+  // auto-linking, so src/app/icon.png would be served at /icon.png and
+  // never referenced. Both entries have to be spelled out.
   icons: {
+    icon: [
+      { url: "/icon.png", type: "image/png", sizes: "256x256" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
     apple: "/icons/icon-192.png",
   },
   appleWebApp: {
