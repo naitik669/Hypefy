@@ -1,6 +1,12 @@
 /**
- * Hypefy mark — a dashed aperture ring with a pulse core.
- * Placeholder brand glyph; will gain motion + personality later.
+ * The loading glyph — a dashed aperture ring with a pulse core.
+ *
+ * This used to double as the brand mark. It no longer does: the brand is
+ * "H." (see HypefyLogo), which cannot spin without looking broken. A ring
+ * reads correctly in motion, which is exactly what PullToRefresh and
+ * EmptyState need of it, so it stays on as the loading indicator.
+ *
+ * Reach for HypefyLogo anywhere the mark stands in for the brand.
  */
 export function HypefyMark({
   className = "",

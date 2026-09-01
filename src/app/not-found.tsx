@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { HypefyMark } from "@/components/HypefyMark";
+import { HypefyLogo } from "@/components/HypefyLogo";
 
 /** Brand 404 — same voice as the offline page, with a way back home. */
 export default function NotFound() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col items-center justify-center gap-4 bg-background px-8 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface">
-        <HypefyMark className="h-8 w-8 text-accent" />
+        <HypefyLogo className="h-8 w-8 text-foreground" />
       </div>
       <div>
         <p className="text-xs font-bold uppercase tracking-widest text-faint">404</p>

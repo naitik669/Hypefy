@@ -1,7 +1,7 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
-import { HypefyMark } from "@/components/HypefyMark";
+import { HypefyLogo } from "@/components/HypefyLogo";
 
 /** Route-level error boundary for the signed-in app — retry in place. */
 export default function AppError({
@@ -13,7 +13,7 @@ export default function AppError({
   return (
     <div className="flex min-h-[70dvh] flex-col items-center justify-center gap-4 px-8 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface">
-        <HypefyMark className="h-8 w-8 text-accent" />
+        <HypefyLogo className="h-8 w-8 text-foreground" />
       </div>
       <div>
         <h1 className="text-[17px] font-extrabold tracking-tight">

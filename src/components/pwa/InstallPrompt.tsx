@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, Share, PlusSquare, Download } from "lucide-react";
 import { CenterModal } from "@/components/ui/CenterModal";
-import { HypefyMark } from "@/components/HypefyMark";
+import { HypefyLogo } from "@/components/HypefyLogo";
 
 const SNOOZE_KEY = "hypefy_install_snooze";
 const VISITS_KEY = "hypefy_visits";
@@ -100,7 +100,7 @@ export function InstallPrompt() {
       <div className="animate-toast-drop fixed inset-x-0 bottom-[96px] z-[140] flex justify-center px-4">
         <div className="flex w-full max-w-[440px] items-center gap-3 rounded-2xl border border-border bg-elevated/95 px-3.5 py-3 shadow-[0_12px_36px_rgba(0,0,0,0.5)] backdrop-blur-xl">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface">
-            <HypefyMark className="h-6 w-6 text-accent" />
+            <HypefyLogo className="h-6 w-6 text-foreground" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold leading-tight">
