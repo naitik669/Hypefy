@@ -35,6 +35,14 @@ const OPEN_PATHS = [
   "/auth/callback",
   "/api/push",
   "/api/oneshot/reap",
+
+  // The legal pages are public by obligation, not convenience. Google's
+  // OAuth consent screen, both app stores, and the DPDP Act all require a
+  // privacy notice anyone can read without an account — gating these would
+  // fail a Google verification review and a Play listing alike.
+  "/privacy",
+  "/terms",
+  "/guidelines",
 ];
 
 const OPEN_PREFIXES = ["/_next/", "/icons/", "/onboarding/"];
