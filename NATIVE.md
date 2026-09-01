@@ -1,7 +1,7 @@
 # Hypefy native apps (Capacitor)
 
 Hypefy ships to Google Play and the App Store as a Capacitor shell that loads
-the live site (`https://www.hypefy.chat`). The app is server-rendered, so it
+the live site (`https://app.hypefy.chat`). The app is server-rendered, so it
 cannot be a static bundle — `capacitor.config.ts` uses `server.url` to point the
 native WebView at production. Auth already builds redirects from
 `window.location.origin`, so sessions resolve against the prod origin unchanged.

@@ -17,7 +17,7 @@ const config: CapacitorConfig = {
   appName: "Hypefy",
   webDir: "public",
   server: {
-    url: "https://www.hypefy.chat",
+    url: "https://app.hypefy.chat",
     cleartext: false,
   },
   ios: {

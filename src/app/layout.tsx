@@ -16,7 +16,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.hypefy.chat"),
+  metadataBase: new URL("https://app.hypefy.chat"),
   title: {
     default: "Hypefy",
     template: "%s · Hypefy",
@@ -64,7 +64,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {/* Page views + custom events. Renders nothing and no-ops off
             Vercel, so local dev and the Android build are unaffected.
-            The native shell loads hypefy.chat, so app traffic is measured
+            The native shell loads app.hypefy.chat, so app traffic is measured
             here too rather than needing a separate mobile SDK. */}
         <Analytics />
         <RegisterSW />

@@ -35,12 +35,17 @@ const nextConfig: NextConfig = {
           },
           // Basic XSS protection for older browsers
           { key: "X-XSS-Protection", value: "1; mode=block" },
+          // This project serves app.hypefy.chat — the private product,
+          // invite-gated while pre-launch. The public site is hypefy.chat,
+          // a separate Vercel project that indexes normally. Keep this host
+          // out of search results entirely.
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
         ],
       },
     ];
   },
-  // Note: www→root and HTTP→HTTPS redirects are handled by Vercel's CDN layer.
-  // Adding them here too causes ERR_TOO_MANY_REDIRECTS.
+  // Note: domain redirects are handled by Vercel's CDN layer. Adding them
+  // here too causes ERR_TOO_MANY_REDIRECTS.
 };
 
 export default withSentryConfig(nextConfig, {
