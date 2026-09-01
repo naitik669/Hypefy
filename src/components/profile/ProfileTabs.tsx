@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { CollectionsStrip } from "@/components/profile/CollectionsStrip";
-import { GRID, GRID_WRAP, isTall } from "@/components/profile/postGrid";
+import { GRID, GRID_WRAP, SKELETON_SPANS, spanFor } from "@/components/profile/postGrid";
 
 type Tab = "Posts" | "Shots" | "Saved";
 
@@ -278,11 +278,11 @@ export function ProfileTabs({ userId }: { userId: string }) {
 
 function PostThumb({ post }: { post: PostRow }) {
   const cover = post.image_url ?? post.image_urls?.[0] ?? null;
-  const tall = isTall(post.aspect_ratio);
+  const span = spanFor(post.aspect_ratio);
   return (
     <Link
       href={`/p/${post.id}`}
-      style={tall ? { gridRow: "span 2" } : undefined}
+      style={span}
       className="relative block h-full overflow-hidden rounded-xl bg-surface"
     >
       {cover ? (
@@ -307,16 +307,15 @@ function PostThumb({ post }: { post: PostRow }) {
 }
 
 function GridSkeleton() {
-  // Mirrors the real grid's rhythm, including a tall tile, so the layout
-  // does not visibly reflow when the posts land.
-  const tallAt = new Set([1, 3]);
+  // Mirrors the real grid's mix of shapes so the layout does not visibly
+  // reflow when the posts land.
   return (
     <div className={GRID_WRAP}>
       <div className={GRID}>
-        {Array.from({ length: 6 }).map((_, i) => (
+        {Array.from({ length: 9 }).map((_, i) => (
           <div
             key={i}
-            style={tallAt.has(i) ? { gridRow: "span 2" } : undefined}
+            style={SKELETON_SPANS[i]}
             className="h-full animate-pulse rounded-xl bg-surface"
           />
         ))}

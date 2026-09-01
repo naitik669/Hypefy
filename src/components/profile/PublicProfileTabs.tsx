@@ -7,7 +7,7 @@ import Link from "next/link";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
 import { PostViewerModal } from "@/components/profile/PostViewerModal";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { GRID, GRID_WRAP, isTall } from "@/components/profile/postGrid";
+import { GRID, GRID_WRAP, SKELETON_SPANS, spanFor } from "@/components/profile/postGrid";
 
 type Tab = "Posts" | "Shots" | "Saved";
 
@@ -96,14 +96,14 @@ export function PublicProfileTabs({
 
       <div key={tab} className="animate-fade-swap mt-3">
       {loading ? (
-        // Mirrors the real grid, tall tiles included, so the layout does
-        // not visibly reflow when the posts land.
+        // Mirrors the real grid's mix of shapes so the layout does not
+        // visibly reflow when the posts land.
         <div className={GRID_WRAP}>
           <div className={GRID}>
             {Array.from({ length: 9 }).map((_, i) => (
               <div
                 key={i}
-                style={i === 1 || i === 5 ? { gridRow: "span 2" } : undefined}
+                style={SKELETON_SPANS[i]}
                 className="skeleton h-full rounded-xl"
               />
             ))}
@@ -120,20 +120,20 @@ export function PublicProfileTabs({
           />
         ) : (
           <>
-            {/* Three columns, but portrait posts take two rows — see
-                postGrid.ts for why the wrapper exists. */}
+            {/* Shape-aware grid: portrait takes two rows, landscape two
+                columns. See postGrid.ts. */}
             <div className={GRID_WRAP}>
             <div className={GRID}>
               {activePosts.map((p, i) => {
                 const thumb = getThumb(p);
                 const multi = ((p as any).image_urls?.length ?? 0) > 1;
-                const tall = isTall((p as any).aspect_ratio);
+                const span = spanFor((p as any).aspect_ratio);
                 return (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => setViewerIdx(i)}
-                    style={tall ? { gridRow: "span 2" } : undefined}
+                    style={span}
                     className="relative h-full overflow-hidden rounded-xl bg-surface"
                   >
                     {thumb ? (
