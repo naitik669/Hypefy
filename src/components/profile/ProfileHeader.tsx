@@ -79,6 +79,18 @@ export function ProfileHeader({
               avatarUrl={avatarUrl}
               hasActiveShow={hasActiveShow}
               showId={entryShowId}
+              card={{
+                userId,
+                name,
+                username,
+                bio,
+                tags,
+                hue,
+                avatarUrl,
+                verified,
+                stats,
+                isOwn: currentUserId === userId,
+              }}
             />
           </div>
           <FollowStats

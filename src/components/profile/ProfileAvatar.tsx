@@ -3,15 +3,19 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AvatarImg } from "@/components/ui/AvatarImg";
-import { ZoomViewer } from "@/components/ui/ZoomViewer";
+import { ProfileCard, type ProfileCardData } from "@/components/profile/ProfileCard";
 
 const LONG_PRESS_MS = 450;
 
 /**
  * Profile avatar with story-ring + gesture handling:
  *  - tap, active Show  → opens the Show (with accent ring shown)
- *  - tap, no Show       → expands the profile photo full-screen
- *  - press & hold       → always expands the profile photo
+ *  - tap, no Show       → opens the profile card
+ *  - press & hold       → always opens the profile card
+ *
+ * Expanding used to show the raw photo. It now shows the card — identity,
+ * links and a QR — with the photo one tap further in, since the card is
+ * the thing worth sharing and the photo rarely was.
  */
 export function ProfileAvatar({
   name,
@@ -20,6 +24,7 @@ export function ProfileAvatar({
   size = 84,
   hasActiveShow = false,
   showId,
+  card,
 }: {
   name: string;
   hue: number;
@@ -27,16 +32,20 @@ export function ProfileAvatar({
   size?: number;
   hasActiveShow?: boolean;
   showId?: string | null;
+  /** Omitted on surfaces with no profile context; expanding is then a no-op. */
+  card?: ProfileCardData;
 }) {
   const router = useRouter();
-  const [zoomOpen, setZoomOpen] = useState(false);
+  const [cardOpen, setCardOpen] = useState(false);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPress = useRef(false);
 
-  const canZoom = !!avatarUrl;
+  // Gated on the card, not the photo: a profile with no avatar still has
+  // a name, links and a QR worth opening.
+  const canExpand = !!card;
 
   function expand() {
-    if (canZoom) setZoomOpen(true);
+    if (canExpand) setCardOpen(true);
   }
 
   function onPointerDown() {
@@ -69,7 +78,7 @@ export function ProfileAvatar({
     <>
       <button
         type="button"
-        aria-label={hasActiveShow ? `Watch ${name}'s Show` : `View ${name}'s photo`}
+        aria-label={hasActiveShow ? `Watch ${name}'s Show` : `Open ${name}'s profile card`}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         onPointerLeave={clearTimer}
@@ -89,7 +98,9 @@ export function ProfileAvatar({
         )}
       </button>
 
-      {zoomOpen && avatarUrl && <ZoomViewer src={avatarUrl} onClose={() => setZoomOpen(false)} />}
+      {cardOpen && card && (
+        <ProfileCard data={card} onClose={() => setCardOpen(false)} />
+      )}
     </>
   );
 }

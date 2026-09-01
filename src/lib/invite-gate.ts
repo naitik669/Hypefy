@@ -45,7 +45,18 @@ const OPEN_PATHS = [
   "/guidelines",
 ];
 
-const OPEN_PREFIXES = ["/_next/", "/icons/", "/onboarding/"];
+/**
+ * `/u/` is public so a shared profile — and the QR on a profile card —
+ * lands on something a stranger can actually read. The (app) layout
+ * already renders a bare shell plus a Join banner for anonymous visitors,
+ * which is what these deep links were designed for before the gate
+ * existed.
+ *
+ * `/p/` and `/shots/` stay walled for now. They were public by the same
+ * design, so reopening them is a one-line change here whenever you want
+ * post and shot share links working again.
+ */
+const OPEN_PREFIXES = ["/_next/", "/icons/", "/onboarding/", "/u/"];
 
 const OPEN_FILES = [
   "/favicon.ico",

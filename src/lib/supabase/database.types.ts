@@ -1198,6 +1198,41 @@ export type Database = {
           },
         ]
       }
+      profile_links: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          position: number
+          url: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          position?: number
+          url: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          position?: number
+          url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_links_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           anthem: Json | null
@@ -1206,6 +1241,8 @@ export type Database = {
           banner_id: string | null
           banner_url: string | null
           bio: string | null
+          card_layout: string
+          card_theme: string
           created_at: string
           current_vibe: string | null
           display_name: string | null
@@ -1233,6 +1270,8 @@ export type Database = {
           banner_id?: string | null
           banner_url?: string | null
           bio?: string | null
+          card_layout?: string
+          card_theme?: string
           created_at?: string
           current_vibe?: string | null
           display_name?: string | null
@@ -1260,6 +1299,8 @@ export type Database = {
           banner_id?: string | null
           banner_url?: string | null
           bio?: string | null
+          card_layout?: string
+          card_theme?: string
           created_at?: string
           current_vibe?: string | null
           display_name?: string | null
