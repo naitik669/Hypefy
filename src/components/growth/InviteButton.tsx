@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Share2, Check, UserPlus, ChevronRight } from "lucide-react";
 import { haptics } from "@/lib/haptics";
 
-const SITE = "https://www.hypefy.chat";
+const SITE = "https://app.hypefy.chat";
 
 /** Native-share (clipboard fallback) of the user's profile link.
  *  Carries ?ref=<username> so signups from it credit the inviter. */

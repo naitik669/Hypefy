@@ -118,7 +118,7 @@ export function ShareSheet({
   const path = targetType === "shot" ? `/shots/${postId}` : `/p/${postId}`;
   const postUrl = typeof window !== "undefined"
     ? `${window.location.origin}${path}`
-    : `https://hypefy.chat${path}`;
+    : `https://app.hypefy.chat${path}`;
 
   async function copyLink() {
     try { await navigator.clipboard.writeText(postUrl); } catch {}
