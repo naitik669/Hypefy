@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { CollectionsStrip } from "@/components/profile/CollectionsStrip";
+import { GRID, GRID_WRAP, isTall } from "@/components/profile/postGrid";
 
 type Tab = "Posts" | "Shots" | "Saved";
 
@@ -16,7 +17,7 @@ const tabs: { key: Tab; Icon: typeof Grid3x3 }[] = [
   { key: "Saved", Icon: Bookmark },
 ];
 
-type PostRow = { id: string; image_url: string | null; image_urls?: string[] | null; caption: string | null; created_at: string };
+type PostRow = { id: string; image_url: string | null; image_urls?: string[] | null; caption: string | null; created_at: string; aspect_ratio?: number | null };
 type ShotRow = { id: string; media_url: string; caption: string | null; created_at: string };
 
 const PAGE = 30; // items per page
@@ -66,7 +67,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
   async function loadPosts() {
     const { data } = await supabase
       .from("posts")
-      .select("id, image_url, image_urls, caption, created_at")
+      .select("id, image_url, image_urls, caption, created_at, aspect_ratio")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(PAGE);
@@ -81,7 +82,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
     if (!oldest) { setLoadingMore(false); return; }
     const { data } = await supabase
       .from("posts")
-      .select("id, image_url, image_urls, caption, created_at")
+      .select("id, image_url, image_urls, caption, created_at, aspect_ratio")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .lt("created_at", oldest)
@@ -123,7 +124,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
     const [postsRes, shotsRes] = await Promise.all([
       supabase
         .from("saved_posts")
-        .select("post_id, created_at, posts(id, image_url, image_urls, caption, created_at)")
+        .select("post_id, created_at, posts(id, image_url, image_urls, caption, created_at, aspect_ratio)")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(PAGE),
@@ -182,10 +183,12 @@ export function ProfileTabs({ userId }: { userId: string }) {
           />
         ) : (
           <div>
-            <div className="grid grid-cols-3 gap-1.5 px-1.5">
-              {posts.map((p) => (
-                <PostThumb key={p.id} post={p} />
-              ))}
+            <div className={GRID_WRAP}>
+              <div className={GRID}>
+                {posts.map((p) => (
+                  <PostThumb key={p.id} post={p} />
+                ))}
+              </div>
             </div>
             {postsHasMore && <div ref={postsSentinel} className="h-8" />}
           </div>
@@ -240,28 +243,30 @@ export function ProfileTabs({ userId }: { userId: string }) {
         ) : (
           <>
           <CollectionsStrip userId={userId} savedPosts={saved} />
-          <div className="grid grid-cols-3 gap-1.5 px-1.5">
-            {saved.map((p) => (
-              <PostThumb key={`p-${p.id}`} post={p} />
-            ))}
-            {savedShots.map((s) => (
-              <Link
-                key={`s-${s.id}`}
-                href={`/shots/${s.id}`}
-                className="relative block aspect-square overflow-hidden rounded-xl bg-surface"
-              >
-                <video
-                  src={s.media_url}
-                  className="h-full w-full object-cover"
-                  muted
-                  playsInline
-                  preload="metadata"
-                />
-                <span className="absolute right-1.5 top-1.5 text-white drop-shadow">
-                  <Play size={14} className="fill-white" />
-                </span>
-              </Link>
-            ))}
+          <div className={GRID_WRAP}>
+            <div className={GRID}>
+              {saved.map((p) => (
+                <PostThumb key={`p-${p.id}`} post={p} />
+              ))}
+              {savedShots.map((s) => (
+                <Link
+                  key={`s-${s.id}`}
+                  href={`/shots/${s.id}`}
+                  className="relative block h-full overflow-hidden rounded-xl bg-surface"
+                >
+                  <video
+                    src={s.media_url}
+                    className="h-full w-full object-cover"
+                    muted
+                    playsInline
+                    preload="metadata"
+                  />
+                  <span className="absolute right-1.5 top-1.5 text-white drop-shadow">
+                    <Play size={14} className="fill-white" />
+                  </span>
+                </Link>
+              ))}
+            </div>
           </div>
           </>
         )
@@ -273,8 +278,13 @@ export function ProfileTabs({ userId }: { userId: string }) {
 
 function PostThumb({ post }: { post: PostRow }) {
   const cover = post.image_url ?? post.image_urls?.[0] ?? null;
+  const tall = isTall(post.aspect_ratio);
   return (
-    <Link href={`/p/${post.id}`} className="relative block aspect-square overflow-hidden rounded-xl bg-surface">
+    <Link
+      href={`/p/${post.id}`}
+      style={tall ? { gridRow: "span 2" } : undefined}
+      className="relative block h-full overflow-hidden rounded-xl bg-surface"
+    >
       {cover ? (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -297,11 +307,20 @@ function PostThumb({ post }: { post: PostRow }) {
 }
 
 function GridSkeleton() {
+  // Mirrors the real grid's rhythm, including a tall tile, so the layout
+  // does not visibly reflow when the posts land.
+  const tallAt = new Set([1, 3]);
   return (
-    <div className="grid grid-cols-3 gap-1.5 px-1.5">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="aspect-square animate-pulse rounded-xl bg-surface" />
-      ))}
+    <div className={GRID_WRAP}>
+      <div className={GRID}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            style={tallAt.has(i) ? { gridRow: "span 2" } : undefined}
+            className="h-full animate-pulse rounded-xl bg-surface"
+          />
+        ))}
+      </div>
     </div>
   );
 }

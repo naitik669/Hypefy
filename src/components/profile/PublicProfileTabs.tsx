@@ -7,6 +7,7 @@ import Link from "next/link";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
 import { PostViewerModal } from "@/components/profile/PostViewerModal";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { GRID, GRID_WRAP, isTall } from "@/components/profile/postGrid";
 
 type Tab = "Posts" | "Shots" | "Saved";
 
@@ -95,10 +96,18 @@ export function PublicProfileTabs({
 
       <div key={tab} className="animate-fade-swap mt-3">
       {loading ? (
-        <div className="grid grid-cols-3 gap-1.5 px-1.5">
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div key={i} className="skeleton aspect-square rounded-xl" />
-          ))}
+        // Mirrors the real grid, tall tiles included, so the layout does
+        // not visibly reflow when the posts land.
+        <div className={GRID_WRAP}>
+          <div className={GRID}>
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div
+                key={i}
+                style={i === 1 || i === 5 ? { gridRow: "span 2" } : undefined}
+                className="skeleton h-full rounded-xl"
+              />
+            ))}
+          </div>
         </div>
       ) : tab === "Posts" || (tab === "Saved" && isOwn) ? (
         activePosts.length === 0 ? (
@@ -111,17 +120,21 @@ export function PublicProfileTabs({
           />
         ) : (
           <>
-            {/* 3-column thumbnail grid */}
-            <div className="grid grid-cols-3 gap-1.5 px-1.5">
+            {/* Three columns, but portrait posts take two rows — see
+                postGrid.ts for why the wrapper exists. */}
+            <div className={GRID_WRAP}>
+            <div className={GRID}>
               {activePosts.map((p, i) => {
                 const thumb = getThumb(p);
                 const multi = ((p as any).image_urls?.length ?? 0) > 1;
+                const tall = isTall((p as any).aspect_ratio);
                 return (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => setViewerIdx(i)}
-                    className="relative aspect-square overflow-hidden rounded-xl bg-surface"
+                    style={tall ? { gridRow: "span 2" } : undefined}
+                    className="relative h-full overflow-hidden rounded-xl bg-surface"
                   >
                     {thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -138,6 +151,7 @@ export function PublicProfileTabs({
                   </button>
                 );
               })}
+            </div>
             </div>
 
             {/* Post viewer modal */}
