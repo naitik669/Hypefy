@@ -35,11 +35,11 @@ const nextConfig: NextConfig = {
           },
           // Basic XSS protection for older browsers
           { key: "X-XSS-Protection", value: "1; mode=block" },
-          // This project serves app.hypefy.chat — the private product,
-          // invite-gated while pre-launch. The public site is hypefy.chat,
-          // a separate Vercel project that indexes normally. Keep this host
-          // out of search results entirely.
-          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+          // No X-Robots-Tag here. It was set while the app was invite-only
+          // and would now keep shared profiles, posts and Shots out of
+          // search entirely — including the /u/ links the profile QR
+          // resolves to, and the privacy and terms pages Google's OAuth
+          // review fetches.
         ],
       },
     ];
