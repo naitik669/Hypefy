@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { House, Chat, Lightning, Plus, X } from "@phosphor-icons/react";
-import { CreateSheet } from "@/components/create/CreateSheet";
+import { usePathname, useRouter } from "next/navigation";
+import { House, Chat, Lightning, Plus } from "@phosphor-icons/react";
 import { Avatar } from "@/components/ui/Avatar";
 import { createClient } from "@/lib/supabase/client";
 import { haptics } from "@/lib/haptics";
@@ -23,7 +22,7 @@ export function BottomNav({
   initialUnreadMsgs?: number;
 }) {
   const pathname = usePathname();
-  const [createOpen, setCreateOpen] = useState(false);
+  const router = useRouter();
   const [unreadMsgs, setUnreadMsgs] = useState(initialUnreadMsgs);
   const profileActive = pathname.startsWith("/profile");
   const messagesActive = pathname.startsWith("/messages");
@@ -102,15 +101,12 @@ export function BottomNav({
         {/* center create */}
         <button
           type="button"
-          aria-label={createOpen ? "Close" : "Create"}
-          onClick={() => { haptics.tap(); setCreateOpen((v) => !v); }}
+          aria-label="Create"
+          onClick={() => { haptics.tap(); router.push("/create"); }}
           className="flex h-11 w-[68px] -translate-y-1.5 items-center justify-center rounded-[20px] bg-accent text-accent-ink shadow-md transition-transform duration-200 will-change-transform hover:brightness-105 active:scale-90"
         >
-          <span
-            className="flex items-center justify-center transition-transform duration-300"
-            style={{ transform: createOpen ? "rotate(90deg)" : "rotate(0deg)" }}
-          >
-            {createOpen ? <X size={24} weight="bold" aria-hidden /> : <Plus size={26} weight="bold" aria-hidden />}
+          <span className="flex items-center justify-center">
+            <Plus size={26} weight="bold" aria-hidden />
           </span>
         </button>
 
@@ -133,7 +129,6 @@ export function BottomNav({
         </Link>
       </nav>
 
-      <CreateSheet open={createOpen} onClose={() => setCreateOpen(false)} />
     </>
   );
 }

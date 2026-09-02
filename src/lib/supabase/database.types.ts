@@ -1601,6 +1601,8 @@ export type Database = {
           poster_url: string | null
           save_count: number
           share_count: number
+          track: Json | null
+          hashtags: string[]
           user_id: string
         }
         Insert: {
@@ -1614,6 +1616,8 @@ export type Database = {
           poster_url?: string | null
           save_count?: number
           share_count?: number
+          track?: Json | null
+          hashtags?: string[]
           user_id: string
         }
         Update: {
@@ -1627,6 +1631,8 @@ export type Database = {
           poster_url?: string | null
           save_count?: number
           share_count?: number
+          track?: Json | null
+          hashtags?: string[]
           user_id?: string
         }
         Relationships: [
