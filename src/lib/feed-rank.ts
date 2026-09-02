@@ -23,6 +23,16 @@ export function feedScore(
   now: number,
   authorAffinity = 0,
   tagAffinity = 0,
+  /**
+   * Already hyped, commented on, or saved this post.
+   *
+   * A penalty rather than a filter, deliberately. Hiding interacted posts
+   * outright empties the feed for exactly the people who use the app most —
+   * the heaviest account here has hyped 31 of 32 posts, which would leave it
+   * a feed of one. Demoting keeps the feed full while pushing the familiar
+   * down.
+   */
+  interacted = false,
 ): number {
   const hours = (now - new Date(p.created_at).getTime()) / 3_600_000;
   const recency = Math.max(0, 48 - hours) * 2;
@@ -34,7 +44,35 @@ export function feedScore(
   const interest = interestMatch ? 18 : 0;
   const authorBoost = Math.min(Math.max(authorAffinity, 0) * 1.5, 30);
   const tagBoost = Math.min(Math.max(tagAffinity, 0) * 1.5, 15);
-  return recency + social + engagement + interest + authorBoost + tagBoost;
+  // Sized against the scale above: enough to sink a post below fresh
+  // unseen ones, not enough to bury a followed friend's new post under a
+  // stranger's.
+  const seenPenalty = interacted ? 55 : 0;
+  return recency + social + engagement + interest + authorBoost + tagBoost - seenPenalty;
+}
+
+/**
+ * Small deterministic per-post jitter, so refreshing reshuffles posts that
+ * scored close together instead of returning a byte-identical list.
+ *
+ * Seeded by post id and a caller-supplied bucket, so the order is stable
+ * within one refresh — a random() here would reorder mid-render and make
+ * React reconcile the wrong rows — but changes when the bucket does.
+ *
+ * The amplitude is small on purpose: it breaks ties, it does not outrank
+ * recency or a followed author.
+ */
+export function refreshJitter(id: string, seed: number, amplitude = 12): number {
+  let h = seed >>> 0;
+  for (let i = 0; i < id.length; i++) {
+    h = (Math.imul(h ^ id.charCodeAt(i), 0x01000193) >>> 0);
+  }
+  return ((h % 1000) / 1000) * amplitude;
+}
+
+/** Refresh bucket — changes every few minutes so a pull-to-refresh reorders. */
+export function refreshSeed(now: number, minutes = 3): number {
+  return Math.floor(now / (minutes * 60_000));
 }
 
 /**

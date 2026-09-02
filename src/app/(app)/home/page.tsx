@@ -5,7 +5,14 @@ import { ShowsRow } from "@/components/home/ShowsRow";
 import { FeedList } from "@/components/feed/FeedList";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { UploadProgressBar } from "@/components/upload/UploadProvider";
-import { feedScore, diversify, postTags, tagAffinityFor } from "@/lib/feed-rank";
+import {
+  feedScore,
+  diversify,
+  postTags,
+  tagAffinityFor,
+  refreshJitter,
+  refreshSeed,
+} from "@/lib/feed-rank";
 import { getBlockedIds } from "@/lib/blocked";
 import { jsonRecord } from "@/lib/supabase/typed";
 
@@ -156,20 +163,59 @@ export default async function HomePage() {
   const tagAff = jsonRecord((affinityData as any)?.tags);
   const followedTags = new Set<string>((followedTagRows ?? []).map((r: any) => r.tag));
 
+  // What the viewer has already interacted with, across the whole candidate
+  // pool rather than the final page. This used to run *after* ranking and
+  // only for the top 30, purely to set the icon state — so the ranker had no
+  // idea which posts the viewer had already seen and kept showing them first.
+  const candidateIds = [...byId.keys()];
+  const [hypesRes, savedRes, commentedRes] = await Promise.all(
+    candidateIds.length > 0
+      ? [
+          supabase
+            .from("hypes")
+            .select("target_id")
+            .eq("user_id", user.id)
+            .eq("target_type", "post")
+            .in("target_id", candidateIds),
+          supabase
+            .from("saved_posts")
+            .select("post_id")
+            .eq("user_id", user.id)
+            .in("post_id", candidateIds),
+          supabase
+            .from("comments")
+            .select("post_id")
+            .eq("user_id", user.id)
+            .in("post_id", candidateIds),
+        ]
+      : [{ data: [] }, { data: [] }, { data: [] }],
+  );
+
+  const hypedIds = new Set((hypesRes.data ?? []).map((h: any) => h.target_id));
+  const savedIds = new Set((savedRes.data ?? []).map((s: any) => s.post_id));
+  const commentedIds = new Set(
+    (commentedRes.data ?? []).map((c: any) => c.post_id).filter(Boolean),
+  );
+
   // Rank by blended score; recency breaks ties. Then diversify authors.
   const now = Date.now();
+  // Changes every few minutes, so a pull-to-refresh reshuffles posts that
+  // scored close together instead of replaying a byte-identical list.
+  const seed = refreshSeed(now);
   const ranked = [...byId.values()]
     .map((p: any) => ({
       ...p,
-      _score: feedScore(
-        p,
-        p.user_id === user.id,
-        followingIds.has(p.user_id),
-        myInterests.size > 0 && postTags(p).some((t) => myInterests.has(t)),
-        now,
-        authorAff[p.user_id] ?? 0,
-        tagAffinityFor(p, tagAff, followedTags),
-      ),
+      _score:
+        feedScore(
+          p,
+          p.user_id === user.id,
+          followingIds.has(p.user_id),
+          myInterests.size > 0 && postTags(p).some((t) => myInterests.has(t)),
+          now,
+          authorAff[p.user_id] ?? 0,
+          tagAffinityFor(p, tagAff, followedTags),
+          hypedIds.has(p.id) || savedIds.has(p.id) || commentedIds.has(p.id),
+        ) + refreshJitter(p.id, seed),
     }))
     .sort((a: any, b: any) =>
       b._score !== a._score
@@ -178,29 +224,6 @@ export default async function HomePage() {
     )
     .slice(0, 30);
   const posts = diversify(ranked);
-
-  // Fetch which posts current user has hyped/saved â€” for initial state
-  const postIds = posts.map((p: any) => p.id);
-  const [hypesRes, savedRes] = await Promise.all(
-    postIds.length > 0
-      ? [
-          supabase
-            .from("hypes")
-            .select("target_id")
-            .eq("user_id", user.id)
-            .eq("target_type", "post")
-            .in("target_id", postIds),
-          supabase
-            .from("saved_posts")
-            .select("post_id")
-            .eq("user_id", user.id)
-            .in("post_id", postIds),
-        ]
-      : [{ data: [] }, { data: [] }],
-  );
-
-  const hypedIds = new Set((hypesRes.data ?? []).map((h: any) => h.target_id));
-  const savedIds = new Set((savedRes.data ?? []).map((s: any) => s.post_id));
 
   const currentUserForRow = myProfile
     ? {

@@ -49,20 +49,27 @@ function writeFaves(next: GifResult[]) {
 }
 
 // ── API helper ────────────────────────────────────────────────────────────────
-async function apiFetch(query: string): Promise<{ gifs: GifResult[]; keyMissing: boolean }> {
+async function apiFetch(
+  query: string,
+): Promise<{ gifs: GifResult[]; keyMissing: boolean; failed: boolean }> {
   const key = query.trim() || "__trending__";
-  if (gifCache.has(key)) return { gifs: gifCache.get(key)!, keyMissing: false };
+  if (gifCache.has(key))
+    return { gifs: gifCache.get(key)!, keyMissing: false, failed: false };
   const url = query.trim() ? `/api/gifs?q=${encodeURIComponent(query.trim())}` : `/api/gifs`;
   try {
     const res = await fetch(url);
-    if (res.status === 503) return { gifs: [], keyMissing: true };
-    if (!res.ok) return { gifs: [], keyMissing: false };
+    // 503 is the one actionable case — the key is not configured.
+    if (res.status === 503) return { gifs: [], keyMissing: true, failed: false };
+    // Anything else (Giphy down, rate limited, session expired) used to fall
+    // through as an empty list and render "No GIFs found", which reads as
+    // "your search matched nothing" rather than "this is broken".
+    if (!res.ok) return { gifs: [], keyMissing: false, failed: true };
     const json = await res.json();
     const gifs = (json.gifs ?? []) as GifResult[];
     gifCache.set(key, gifs);
-    return { gifs, keyMissing: false };
+    return { gifs, keyMissing: false, failed: false };
   } catch {
-    return { gifs: [], keyMissing: false };
+    return { gifs: [], keyMissing: false, failed: true };
   }
 }
 
@@ -88,6 +95,7 @@ export function GifPicker({ onSelect }: Props) {
   const [faves, setFaves] = useState<GifResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [keyMissing, setKeyMissing] = useState(false);
+  const [failed, setFailed] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const catBarRef = useRef<HTMLDivElement>(null);
@@ -99,9 +107,10 @@ export function GifPicker({ onSelect }: Props) {
     const savedFaves = readFaves();
     setFaves(savedFaves);
     const gen = ++reqGen.current;
-    apiFetch("").then(({ gifs: result, keyMissing: km }) => {
+    apiFetch("").then(({ gifs: result, keyMissing: km, failed: f }) => {
       if (reqGen.current !== gen) return; // superseded by a newer request
       setKeyMissing(km);
+      setFailed(f);
       setGifs(result);
       setLoading(false);
     });
@@ -122,9 +131,10 @@ export function GifPicker({ onSelect }: Props) {
     const gen = ++reqGen.current;
     setLoading(true);
     try {
-      const { gifs: result, keyMissing: km } = await apiFetch(cat.query ?? "");
+      const { gifs: result, keyMissing: km, failed: f } = await apiFetch(cat.query ?? "");
       if (reqGen.current !== gen) return; // stale — a newer tab was clicked
       setKeyMissing(km);
+      setFailed(f);
       setGifs(result);
     } finally {
       if (reqGen.current === gen) setLoading(false);
@@ -143,9 +153,10 @@ export function GifPicker({ onSelect }: Props) {
     debounceRef.current = setTimeout(async () => {
       const gen = ++reqGen.current;
       try {
-        const { gifs: result, keyMissing: km } = await apiFetch(q);
+        const { gifs: result, keyMissing: km, failed: f } = await apiFetch(q);
         if (reqGen.current !== gen) return;
         setKeyMissing(km);
+        setFailed(f);
         setGifs(result);
       } finally {
         if (reqGen.current === gen) setLoading(false);
@@ -264,6 +275,16 @@ export function GifPicker({ onSelect }: Props) {
                 <span className="text-2xl">⭐</span>
                 <p className="text-xs font-semibold text-muted">No favourites yet</p>
                 <p className="text-[10px] text-faint">Tap the ★ on any GIF to save it here</p>
+              </>
+            ) : failed ? (
+              // Distinct from an empty search: "No GIFs found" reads as
+              // "nothing matched", which sends people hunting for better
+              // search terms when the service is simply unreachable.
+              <>
+                <p className="text-xs font-semibold text-muted">GIFs aren&rsquo;t loading</p>
+                <p className="text-[10px] text-faint">
+                  The GIF service didn&rsquo;t respond. Try again in a moment.
+                </p>
               </>
             ) : (
               <span className="text-xs text-faint">No GIFs found</span>

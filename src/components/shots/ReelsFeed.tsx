@@ -14,6 +14,7 @@ import { ExpandableText } from "@/components/ui/ExpandableText";
 import { haptics } from "@/lib/haptics";
 import { useToast } from "@/components/ui/ToastProvider";
 import { hypeResult } from "@/lib/supabase/typed";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 type ReelProfile = {
   display_name: string | null;
@@ -237,6 +238,7 @@ function ReelCard({
   const [ownerMenuOpen, setOwnerMenuOpen] = useState(false);
   const [inShowcase, setInShowcase] = useState(false);
   const [ownerAction, setOwnerAction] = useState<"delete" | "showcase" | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleted, setDeleted] = useState(false);
 
   // Double-tap-to-Hype (animations mirror the feed: 380ms burst + 640ms particles)
@@ -356,7 +358,13 @@ function ReelCard({
       ? await supabase.from("saved_shots").delete().eq("user_id", currentUserId).eq("shot_id", reel.id)
       : await supabase.from("saved_shots").insert({ user_id: currentUserId, shot_id: reel.id });
     setSavePending(false);
-    if (error) {
+
+    // A unique-violation means the Shot is already saved, which is the
+    // outcome the user wanted — treat it as success, the way the post path
+    // in FeedCard already does. Without this the row exists but the
+    // bookmark rolls back and toasts a failure, which is why saving a Shot
+    // appeared never to work.
+    if (error && !/duplicate|unique/i.test(error.message)) {
       setSaved(prev);
       showToast(prev ? "Couldn't unsave that Shot." : "Couldn't save that Shot.");
     }
@@ -364,20 +372,65 @@ function ReelCard({
 
   async function deleteShot() {
     setOwnerAction("delete");
-    const { error } = await supabase.from("shots").delete().eq("id", reel.id);
+
+    // Ask for the rows back. A delete filtered out by RLS succeeds with zero
+    // rows and no error, so without this the UI would report "Shot deleted"
+    // for a Shot that is still there.
+    const { data, error } = await supabase
+      .from("shots")
+      .delete()
+      .eq("id", reel.id)
+      .select("id");
     setOwnerAction(null);
-    if (error) return;
+
+    if (error || !data?.length) {
+      setOwnerMenuOpen(false);
+      showToast("Couldn't delete that Shot.");
+      return;
+    }
+
+    // Best-effort storage cleanup. The row is already gone, so a failure
+    // here orphans bytes rather than breaking anything the user sees —
+    // never block or roll back the delete on it.
+    void removeShotObjects();
+
     setOwnerMenuOpen(false);
     setDeleted(true);
     setTimeout(onBack, 700);
   }
 
+  /**
+   * Delete the Shot's video and poster from shot-media.
+   *
+   * Paths are derived from the public URLs because that is all the reel
+   * carries. Deleting the row alone left both objects in the bucket forever.
+   */
+  async function removeShotObjects() {
+    const paths = [reel.media_url, reel.poster_url]
+      .filter((u): u is string => !!u)
+      .map((u) => u.split("/shot-media/")[1])
+      .filter((p): p is string => !!p)
+      .map((p) => decodeURIComponent(p.split("?")[0]));
+
+    if (paths.length) await supabase.storage.from("shot-media").remove(paths);
+  }
+
   async function toggleShotShowcase() {
     setOwnerAction("showcase");
     const next = !inShowcase;
-    const { error } = await supabase.from("shots").update({ in_showcase: next }).eq("id", reel.id);
+    // Same zero-rows trap as delete: shots had no UPDATE policy until 0040,
+    // so this silently persisted nothing while the label flipped.
+    const { data, error } = await supabase
+      .from("shots")
+      .update({ in_showcase: next })
+      .eq("id", reel.id)
+      .select("id");
     setOwnerAction(null);
-    if (!error) setInShowcase(next);
+    if (error || !data?.length) {
+      showToast("Couldn't update your Showcase.");
+    } else {
+      setInShowcase(next);
+    }
     setOwnerMenuOpen(false);
   }
 
@@ -641,7 +694,7 @@ function ReelCard({
             <button
               type="button"
               disabled={ownerAction !== null}
-              onClick={deleteShot}
+              onClick={() => setConfirmDelete(true)}
               className="flex w-full items-center gap-3 px-5 py-4 text-left text-danger transition-colors hover:bg-danger/10 disabled:opacity-50"
             >
               {ownerAction === "delete" ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
@@ -663,6 +716,18 @@ function ReelCard({
           </div>
         </>
       )}
+
+      {/* Deleting a Shot is irreversible and the menu row sat one tap away
+          from it. Posts have always confirmed; Shots never did. */}
+      <ConfirmDialog
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={deleteShot}
+        icon={Trash2}
+        title="Delete this Shot"
+        body="It disappears from Shots and your profile, along with its hypes and comments. There's no undo."
+        confirmLabel="Delete Shot"
+      />
 
       {/* Sheets */}
       {currentUserId && (

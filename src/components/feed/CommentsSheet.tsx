@@ -208,7 +208,12 @@ export function CommentsSheet({
             p_parent_id: replyTo?.id ?? undefined,
           });
     setPosting(false);
-    if (error || !data) return;
+    if (error || !data) {
+      // Previously silent: the composer just cleared and the comment was
+      // never posted, which is indistinguishable from it having worked.
+      showToast("Couldn’t post that comment.");
+      return;
+    }
 
     const { data: row } = await supabase
       .from("comments")
@@ -262,7 +267,10 @@ export function CommentsSheet({
             p_parent_id: replyTo?.id ?? undefined,
           });
     setPosting(false);
-    if (error || !data) return;
+    if (error || !data) {
+      showToast("Couldn’t post that GIF.");
+      return;
+    }
 
     const { data: row } = await supabase
       .from("comments")

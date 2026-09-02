@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { feedScore, diversify, postTags, tagAffinityFor } from "@/lib/feed-rank";
+import {
+  feedScore,
+  diversify,
+  postTags,
+  tagAffinityFor,
+  refreshJitter,
+  refreshSeed,
+} from "@/lib/feed-rank";
 
 const now = Date.UTC(2026, 5, 28, 12, 0, 0);
 const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
@@ -87,5 +94,63 @@ describe("postTags", () => {
     expect(postTags({ hashtags: ["#FYP", "Trending"] })).toEqual(["fyp", "trending"]);
     expect(postTags({ hashtags: null })).toEqual([]);
     expect(postTags({})).toEqual([]);
+  });
+});
+
+describe("already-interacted demotion", () => {
+  it("demotes an interacted post below an identical untouched one", () => {
+    const p = { created_at: iso(0) };
+    const seen = feedScore(p, false, false, false, now, 0, 0, true);
+    const unseen = feedScore(p, false, false, false, now, 0, 0, false);
+    expect(seen).toBeLessThan(unseen);
+    expect(unseen - seen).toBe(55);
+  });
+
+  it("demotes rather than buries — a followed friend's seen post still beats a stale stranger", () => {
+    // The whole reason this is a penalty and not a filter: the heaviest
+    // account has interacted with nearly every post, so hiding them would
+    // leave almost no feed.
+    const seenFriend = feedScore({ created_at: iso(0) }, false, true, false, now, 0, 0, true);
+    const staleStranger = feedScore(
+      { created_at: iso(40 * 3_600_000) },
+      false,
+      false,
+      false,
+      now,
+    );
+    expect(seenFriend).toBeGreaterThan(staleStranger);
+  });
+
+  it("defaults to no penalty so existing callers are unaffected", () => {
+    const p = { created_at: iso(0) };
+    expect(feedScore(p, false, false, false, now)).toBe(
+      feedScore(p, false, false, false, now, 0, 0, false),
+    );
+  });
+});
+
+describe("refresh variety", () => {
+  it("is stable within a seed and changes across seeds", () => {
+    const a = refreshJitter("post-1", 100);
+    expect(refreshJitter("post-1", 100)).toBe(a);
+    expect(refreshJitter("post-1", 101)).not.toBe(a);
+  });
+
+  it("differs between posts under the same seed, so ties break apart", () => {
+    expect(refreshJitter("post-1", 100)).not.toBe(refreshJitter("post-2", 100));
+  });
+
+  it("stays within its amplitude so it cannot outrank recency", () => {
+    for (const id of ["a", "b", "post-xyz", "9f2c", "zzzz"]) {
+      const j = refreshJitter(id, 7);
+      expect(j).toBeGreaterThanOrEqual(0);
+      expect(j).toBeLessThan(12);
+    }
+  });
+
+  it("advances the seed as time passes", () => {
+    const t = Date.UTC(2026, 5, 28, 12, 0, 0);
+    expect(refreshSeed(t)).toBe(refreshSeed(t + 60_000));
+    expect(refreshSeed(t + 4 * 60_000)).toBeGreaterThan(refreshSeed(t));
   });
 });
