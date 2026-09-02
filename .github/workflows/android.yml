@@ -75,9 +75,12 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         # Belt and braces: the exec bit is set in git, but a Windows
         # checkout can drop it again and the failure (exit 126) is opaque.
+        # Both outputs, because they are not interchangeable: Play accepts
+        # only an .aab, and only an .apk can be sideloaded or sent through
+        # Firebase App Distribution.
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease bundleRelease --no-daemon
 
       # Always kept, so a build is retrievable even when distribution is not
       # configured yet or the upload step fails.
@@ -86,6 +89,22 @@ jobs:
           name: hypefy-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      # The Play Store artifact. Google has required an App Bundle for new
+      # apps since 2021, so assembleRelease alone can never produce a
+      # publishable build.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hypefy-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+      # Say so in the run summary rather than letting Play reject the
+      # upload with a signature error that reads like a Play problem.
+      - name: Warn when the bundle is debug-signed
+        if: env.KEYSTORE_BASE64 == ''
+        run: |
+          echo "::warning title=Debug-signed bundle::hypefy-aab is signed with the debug key and Google Play will reject it. Set KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD to produce an upload-signed bundle."
 
       - name: Send to testers
         if: env.FIREBASE_APP_ID != ''
