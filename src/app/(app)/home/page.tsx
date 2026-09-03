@@ -4,6 +4,8 @@ import { TopBar } from "@/components/layout/TopBar";
 import { ShowsRow } from "@/components/home/ShowsRow";
 import { FeedList } from "@/components/feed/FeedList";
 import { InterestNudge } from "@/components/feed/InterestNudge";
+import { FeatureHint } from "@/components/ui/FeatureHint";
+import { Clock } from "lucide-react";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { UploadProgressBar } from "@/components/upload/UploadProvider";
 import {
@@ -343,6 +345,16 @@ export default async function HomePage() {
       <TopBar />
       <PullToRefresh>
         <ShowsRow shows={shows} currentUser={currentUserForRow} />
+
+        {/* Shows are the least-understood thing in the app — 6 views against
+            168 hypes. The row itself never says what it is or that it
+            expires, so the first question it raises goes unanswered. */}
+        <FeatureHint
+          id="shows"
+          icon={<Clock size={14} />}
+          title="Shows disappear after 24 hours"
+          text="Tap a ring to watch. Yours vanishes after a day — your posts stay put."
+        />
 
         {/* Self-gating client component: it costs the server nothing and
             renders only for an account that has actually used the feed and

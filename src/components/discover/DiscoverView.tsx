@@ -9,20 +9,50 @@ import { UserSuggestionCard } from "@/components/discover/UserSuggestionCard";
 import { formatCount } from "@/lib/format";
 
 type Post = {
-  id: string; caption: string | null; body: string | null;
-  image_url: string | null; image_urls: string[] | null;
-  hype_count: number; comment_count: number;
-  profiles: { display_name: string | null; username: string | null; avatar_hue: number | null } | null;
+  id: string;
+  caption: string | null;
+  body: string | null;
+  image_url: string | null;
+  image_urls: string[] | null;
+  hype_count: number;
+  comment_count: number;
+  profiles: {
+    display_name: string | null;
+    username: string | null;
+    avatar_hue: number | null;
+  } | null;
 };
 type Shot = {
-  id: string; media_url: string; poster_url: string | null; caption: string | null;
-  hype_count: number; comment_count: number;
-  profiles: { display_name: string | null; username: string | null; avatar_hue: number | null } | null;
+  id: string;
+  media_url: string;
+  poster_url: string | null;
+  caption: string | null;
+  hype_count: number;
+  comment_count: number;
+  profiles: {
+    display_name: string | null;
+    username: string | null;
+    avatar_hue: number | null;
+  } | null;
 };
-type Person = { id: string; display_name: string | null; username: string | null; avatar_hue: number | null; avatar_url?: string | null; is_verified?: boolean | null };
+type Person = {
+  id: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_hue: number | null;
+  avatar_url?: string | null;
+  is_verified?: boolean | null;
+};
 type Tag = { tag: string; count: number };
 
-const CATEGORIES = ["For You", "Blowing Up", "Posts", "Shots", "People", "Tags"] as const;
+const CATEGORIES = [
+  "For You",
+  "Blowing Up",
+  "Posts",
+  "Shots",
+  "People",
+  "Tags",
+] as const;
 type Cat = (typeof CATEGORIES)[number];
 
 function postImage(p: Post): string | null {
@@ -30,7 +60,14 @@ function postImage(p: Post): string | null {
 }
 
 export function DiscoverView({
-  trendingPosts, freshPosts, trendingShots, people, newPeople = [], interestPosts = [], categoryRails = [], tags,
+  trendingPosts,
+  freshPosts,
+  trendingShots,
+  people,
+  newPeople = [],
+  interestPosts = [],
+  categoryRails = [],
+  tags,
 }: {
   currentUserId: string;
   trendingPosts: Post[];
@@ -57,12 +94,19 @@ export function DiscoverView({
     const cursor = last?.created_at ?? new Date().toISOString();
     const { data } = await supabase
       .from("posts")
-      .select("id, caption, body, image_url, image_urls, hype_count, comment_count, created_at, profiles!posts_user_id_fkey(display_name, username, avatar_hue)")
+      .select(
+        "id, caption, body, image_url, image_urls, hype_count, comment_count, created_at, profiles!posts_user_id_fkey(display_name, username, avatar_hue)"
+      )
       .lt("created_at", cursor)
       .order("created_at", { ascending: false })
       .limit(12);
     const mapped = (data ?? [])
-      .map((p: any) => ({ ...p, profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles }))
+      .map((p: any) => ({
+        ...p,
+        profiles: Array.isArray(p.profiles)
+          ? p.profiles[0] ?? null
+          : p.profiles,
+      }))
       .filter((p: any) => !allPosts.some((x) => x.id === p.id));
     if ((data?.length ?? 0) < 12) setNoMore(true);
     setExtraFresh((prev) => [...prev, ...mapped]);
@@ -70,11 +114,23 @@ export function DiscoverView({
   }
 
   const everythingEmpty =
-    trendingPosts.length === 0 && freshPosts.length === 0 && trendingShots.length === 0 && people.length === 0;
+    trendingPosts.length === 0 &&
+    freshPosts.length === 0 &&
+    trendingShots.length === 0 &&
+    people.length === 0;
 
   if (everythingEmpty) {
     return (
-      <EmptyState icon={Compass} title="The stage is empty" text="Hypefy gets louder as more people join. Check back soon." />
+      // "Check back soon" was the only dead end left in the app: every other
+      // empty state offers an action, and this one is likely a new account's
+      // first sight of Discover. Posting is the thing that actually fills it.
+      <EmptyState
+        icon={Compass}
+        title="Nothing to discover yet"
+        text="Discover fills up as people post. Be the reason it does."
+        ctaLabel="Create a post"
+        ctaHref="/create/post"
+      />
     );
   }
 
@@ -84,7 +140,9 @@ export function DiscoverView({
       <div className="sticky top-14 z-10 bg-background/90 backdrop-blur-xl">
         <div
           className="no-scrollbar flex gap-2 overflow-x-auto px-4 py-2.5"
-          style={{ maskImage: "linear-gradient(to right, black 92%, transparent)" }}
+          style={{
+            maskImage: "linear-gradient(to right, black 92%, transparent)",
+          }}
         >
           {CATEGORIES.map((c) => (
             <button
@@ -92,7 +150,9 @@ export function DiscoverView({
               type="button"
               onClick={() => setCat(c)}
               className={`shrink-0 rounded-pill px-3.5 py-1.5 text-sm font-semibold transition-colors ${
-                cat === c ? "bg-accent text-accent-ink" : "bg-surface text-muted"
+                cat === c
+                  ? "bg-accent text-accent-ink"
+                  : "bg-surface text-muted"
               }`}
             >
               {c}
@@ -108,20 +168,30 @@ export function DiscoverView({
             {trendingShots.length > 0 && (
               <Section eyebrow="Watch" title="Trending Shots">
                 <div className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4">
-                  {trendingShots.map((s) => <div key={s.id} className="w-36 shrink-0 snap-start"><ShotTile shot={s} /></div>)}
+                  {trendingShots.map((s) => (
+                    <div key={s.id} className="w-36 shrink-0 snap-start">
+                      <ShotTile shot={s} />
+                    </div>
+                  ))}
                 </div>
               </Section>
             )}
             {trendingPosts.length > 0 && (
               <Section eyebrow="Right now" title="Blowing up 🔥">
-                <Grid>{trendingPosts.map((p) => <PostTile key={p.id} post={p} />)}</Grid>
+                <Grid>
+                  {trendingPosts.map((p) => (
+                    <PostTile key={p.id} post={p} />
+                  ))}
+                </Grid>
               </Section>
             )}
             {interestPosts.length > 0 && (
               <Section eyebrow="For you" title="Based on your interests">
                 <div className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto px-4">
                   {interestPosts.map((p) => (
-                    <div key={p.id} className="w-32 shrink-0 snap-start"><PostTile post={p} /></div>
+                    <div key={p.id} className="w-32 shrink-0 snap-start">
+                      <PostTile post={p} />
+                    </div>
                   ))}
                 </div>
               </Section>
@@ -129,14 +199,18 @@ export function DiscoverView({
             {people.length > 0 && (
               <Section eyebrow="Follow" title="Creators">
                 <div className="flex flex-col">
-                  {people.slice(0, 5).map((person) => <CreatorRow key={person.id} person={person} />)}
+                  {people.slice(0, 5).map((person) => (
+                    <CreatorRow key={person.id} person={person} />
+                  ))}
                 </div>
               </Section>
             )}
             {newPeople.length > 0 && (
               <Section eyebrow="Say hi first" title="New this week">
                 <div className="flex flex-col">
-                  {newPeople.slice(0, 5).map((person) => <CreatorRow key={person.id} person={person} />)}
+                  {newPeople.slice(0, 5).map((person) => (
+                    <CreatorRow key={person.id} person={person} />
+                  ))}
                 </div>
               </Section>
             )}
@@ -144,14 +218,20 @@ export function DiscoverView({
               <Section key={label} eyebrow="Explore" title={label}>
                 <div className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto px-4">
                   {catPosts.map((p) => (
-                    <div key={p.id} className="w-32 shrink-0 snap-start"><PostTile post={p} /></div>
+                    <div key={p.id} className="w-32 shrink-0 snap-start">
+                      <PostTile post={p} />
+                    </div>
                   ))}
                 </div>
               </Section>
             ))}
             {fresh.length > 0 && (
               <Section eyebrow="Just posted" title="Fresh">
-                <Grid>{fresh.map((p) => <PostTile key={p.id} post={p} />)}</Grid>
+                <Grid>
+                  {fresh.map((p) => (
+                    <PostTile key={p.id} post={p} />
+                  ))}
+                </Grid>
                 {!noMore && (
                   <div className="px-4 pt-3">
                     <button
@@ -160,7 +240,11 @@ export function DiscoverView({
                       disabled={loadingMore}
                       className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface text-sm font-semibold text-muted transition-colors hover:text-foreground disabled:opacity-60"
                     >
-                      {loadingMore ? <Loader2 size={15} className="animate-spin" /> : "Show more"}
+                      {loadingMore ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : (
+                        "Show more"
+                      )}
                     </button>
                   </div>
                 )}
@@ -171,64 +255,110 @@ export function DiscoverView({
 
         {cat === "Blowing Up" && (
           <Section title="Blowing up 🔥">
-            <Grid>{trendingPosts.map((p) => <PostTile key={p.id} post={p} />)}</Grid>
+            <Grid>
+              {trendingPosts.map((p) => (
+                <PostTile key={p.id} post={p} />
+              ))}
+            </Grid>
           </Section>
         )}
 
         {cat === "Posts" && (
           <Section title="All posts">
-            <Grid>{allPosts.map((p) => <PostTile key={p.id} post={p} />)}</Grid>
+            <Grid>
+              {allPosts.map((p) => (
+                <PostTile key={p.id} post={p} />
+              ))}
+            </Grid>
           </Section>
         )}
 
-        {cat === "Shots" && (
-          trendingShots.length > 0 ? (
+        {cat === "Shots" &&
+          (trendingShots.length > 0 ? (
             <Section title="Shots">
               <div className="grid grid-cols-2 gap-2.5 px-4 sm:grid-cols-3">
-                {trendingShots.map((s) => <ShotTile key={s.id} shot={s} />)}
+                {trendingShots.map((s) => (
+                  <ShotTile key={s.id} shot={s} />
+                ))}
               </div>
             </Section>
-          ) : <EmptyState icon={Play} title="No Shots fired yet" text="Be the first one on the reel." />
-        )}
+          ) : (
+            <EmptyState
+              icon={Play}
+              title="No Shots fired yet"
+              text="Be the first one on the reel."
+            />
+          ))}
 
-        {cat === "People" && (
-          people.length > 0 ? (
+        {cat === "People" &&
+          (people.length > 0 ? (
             <div className="flex flex-col pt-2">
-              {people.map((person) => <CreatorRow key={person.id} person={person} />)}
+              {people.map((person) => (
+                <CreatorRow key={person.id} person={person} />
+              ))}
             </div>
-          ) : <EmptyState icon={Compass} title="No suggestions yet" text="As you follow people and post, your circle fills up here." />
-        )}
+          ) : (
+            <EmptyState
+              icon={Compass}
+              title="No suggestions yet"
+              text="As you follow people and post, your circle fills up here."
+            />
+          ))}
 
-        {cat === "Tags" && (
-          tags.length > 0 ? (
+        {cat === "Tags" &&
+          (tags.length > 0 ? (
             <div className="flex flex-col pt-2">
               {tags.map((t) => (
-                <Link key={t.tag} href={`/search?q=%23${encodeURIComponent(t.tag)}`}
-                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03]">
+                <Link
+                  key={t.tag}
+                  href={`/search?q=%23${encodeURIComponent(t.tag)}`}
+                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03]"
+                >
                   <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface">
                     <Hash size={18} className="text-hashtag" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">#{t.tag}</p>
-                    <p className="truncate text-xs text-muted">{t.count} {t.count === 1 ? "post" : "posts"}</p>
+                    <p className="truncate text-xs text-muted">
+                      {t.count} {t.count === 1 ? "post" : "posts"}
+                    </p>
                   </div>
                 </Link>
               ))}
             </div>
-          ) : <EmptyState icon={Hash} title="No tags trending" text="Throw #tags on your posts and start a wave." />
-        )}
+          ) : (
+            <EmptyState
+              icon={Hash}
+              title="No tags trending"
+              text="Throw #tags on your posts and start a wave."
+            />
+          ))}
       </div>
     </>
   );
 }
 
-function Section({ eyebrow, title, children }: { eyebrow?: string; title: string; children: React.ReactNode }) {
+function Section({
+  eyebrow,
+  title,
+  children,
+}: {
+  eyebrow?: string;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="pt-5">
       {eyebrow && (
-        <p className="px-4 text-[10px] font-bold uppercase tracking-widest text-faint">{eyebrow}</p>
+        <p className="px-4 text-[10px] font-bold uppercase tracking-widest text-faint">
+          {eyebrow}
+        </p>
       )}
-      <h2 className={`px-4 pb-2.5 text-[17px] font-extrabold tracking-tight ${eyebrow ? "pt-0.5" : "pt-1"}`}>
+      <h2
+        className={`px-4 pb-2.5 text-[17px] font-extrabold tracking-tight ${
+          eyebrow ? "pt-0.5" : "pt-1"
+        }`}
+      >
         {title}
       </h2>
       {children}
@@ -245,10 +375,15 @@ function TagRail({ tags }: { tags: Tag[] }) {
     <Section eyebrow="Rising" title="Trending tags">
       <div className="no-scrollbar flex gap-2 overflow-x-auto px-4">
         {tags.map(({ tag, count }) => (
-          <Link key={tag} href={`/search?q=%23${encodeURIComponent(tag)}`}
-            className="flex shrink-0 flex-col rounded-2xl border border-border bg-surface px-4 py-2.5">
+          <Link
+            key={tag}
+            href={`/search?q=%23${encodeURIComponent(tag)}`}
+            className="flex shrink-0 flex-col rounded-2xl border border-border bg-surface px-4 py-2.5"
+          >
             <span className="text-sm font-bold text-hashtag">#{tag}</span>
-            <span className="text-xs text-muted">{count} {count === 1 ? "post" : "posts"}</span>
+            <span className="text-xs text-muted">
+              {count} {count === 1 ? "post" : "posts"}
+            </span>
           </Link>
         ))}
       </div>
@@ -268,17 +403,36 @@ function PostTile({ post }: { post: Post }) {
   const img = postImage(post);
   const hue = post.profiles?.avatar_hue ?? 280;
   return (
-    <Link href={`/p/${post.id}`} className="group relative block aspect-square overflow-hidden rounded-2xl bg-surface">
+    <Link
+      href={`/p/${post.id}`}
+      className="group relative block aspect-square overflow-hidden rounded-2xl bg-surface"
+    >
       {img ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={img} alt={post.caption ?? "Post"} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+        <img
+          src={img}
+          alt={post.caption ?? "Post"}
+          loading="lazy"
+          decoding="async"
+          className="h-full w-full object-cover"
+        />
       ) : (
-        <div className="flex h-full w-full items-end p-3" style={{ background: `linear-gradient(140deg, hsl(${hue} 55% 22%), #141414)` }}>
-          <p className="line-clamp-4 text-xs font-medium text-white/90">{post.caption ?? post.body ?? ""}</p>
+        <div
+          className="flex h-full w-full items-end p-3"
+          style={{
+            background: `linear-gradient(140deg, hsl(${hue} 55% 22%), #141414)`,
+          }}
+        >
+          <p className="line-clamp-4 text-xs font-medium text-white/90">
+            {post.caption ?? post.body ?? ""}
+          </p>
         </div>
       )}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent p-2.5 pt-6">
-        <Stat icon={<Zap size={12} className="fill-accent text-accent" />} value={post.hype_count} />
+        <Stat
+          icon={<Zap size={12} className="fill-accent text-accent" />}
+          value={post.hype_count}
+        />
         <Stat icon={<MessageCircle size={12} />} value={post.comment_count} />
       </div>
     </Link>
@@ -287,18 +441,36 @@ function PostTile({ post }: { post: Post }) {
 
 function ShotTile({ shot }: { shot: Shot }) {
   return (
-    <Link href={`/shots/${shot.id}`} className="relative block aspect-[9/16] overflow-hidden rounded-2xl bg-black">
+    <Link
+      href={`/shots/${shot.id}`}
+      className="relative block aspect-[9/16] overflow-hidden rounded-2xl bg-black"
+    >
       {shot.poster_url ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={shot.poster_url} alt={shot.caption ?? "Shot"} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+        <img
+          src={shot.poster_url}
+          alt={shot.caption ?? "Shot"}
+          loading="lazy"
+          decoding="async"
+          className="h-full w-full object-cover"
+        />
       ) : (
-        <video src={shot.media_url} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+        <video
+          src={shot.media_url}
+          muted
+          playsInline
+          preload="metadata"
+          className="h-full w-full object-cover"
+        />
       )}
       <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
         <Play size={9} className="fill-white" /> Shot
       </span>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent p-2.5 pt-6">
-        <Stat icon={<Zap size={12} className="fill-accent text-accent" />} value={shot.hype_count} />
+        <Stat
+          icon={<Zap size={12} className="fill-accent text-accent" />}
+          value={shot.hype_count}
+        />
         <Stat icon={<MessageCircle size={12} />} value={shot.comment_count} />
       </div>
     </Link>
