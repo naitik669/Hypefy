@@ -2,13 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Star, MessageCircle, Send, Bookmark, MoreHorizontal, Maximize2, Repeat2, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Star,
+  MessageCircle,
+  Send,
+  Bookmark,
+  MoreHorizontal,
+  Maximize2,
+  Repeat2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ZoomViewer } from "@/components/ui/ZoomViewer";
 import { ExpandableText } from "@/components/ui/ExpandableText";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
+import { FeedImpression } from "@/components/feed/FeedImpression";
 import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
 import { EditPostSheet } from "@/components/feed/EditPostSheet";
@@ -71,7 +82,11 @@ function timeAgo(iso: string) {
 
 /** Deduplicate and merge single/multi image fields */
 function getImages(post: FeedPost): string[] {
-  const urls = post.image_urls?.length ? post.image_urls : post.image_url ? [post.image_url] : [];
+  const urls = post.image_urls?.length
+    ? post.image_urls
+    : post.image_url
+    ? [post.image_url]
+    : [];
   return [...new Set(urls)];
 }
 
@@ -119,7 +134,7 @@ export function FeedCard({
     if (Math.abs(dx) >= 30) {
       // Swipe detected — advance exactly ONE image regardless of velocity
       setImgIdx((i) =>
-        dx > 0 ? Math.min(i + 1, images.length - 1) : Math.max(i - 1, 0),
+        dx > 0 ? Math.min(i + 1, images.length - 1) : Math.max(i - 1, 0)
       );
     } else {
       handleImageTap(); // small move = tap
@@ -142,7 +157,9 @@ export function FeedCard({
   const [liveCaption, setLiveCaption] = useState(post.caption);
   const [liveBody, setLiveBody] = useState(post.body);
   const [isHyper, setIsHyper] = useState(initialIsHyper ?? false);
-  const [isMutualHyper, setIsMutualHyper] = useState(initialIsMutualHyper ?? false);
+  const [isMutualHyper, setIsMutualHyper] = useState(
+    initialIsMutualHyper ?? false
+  );
   const postTrack = parseTrack(post.track);
   const postPoll = parsePoll(post.poll);
 
@@ -163,12 +180,27 @@ export function FeedCard({
       // Always re-fetch the authoritative hype count + comment count
       const [hypeRow, savedRow, countRow] = await Promise.all([
         post.initialHyped === undefined
-          ? supabase.from("hypes").select("id").eq("user_id", id).eq("target_type", "post").eq("target_id", post.id).maybeSingle()
+          ? supabase
+              .from("hypes")
+              .select("id")
+              .eq("user_id", id)
+              .eq("target_type", "post")
+              .eq("target_id", post.id)
+              .maybeSingle()
           : Promise.resolve({ data: post.initialHyped ? { id: "x" } : null }),
         post.initialSaved === undefined
-          ? supabase.from("saved_posts").select("id").eq("user_id", id).eq("post_id", post.id).maybeSingle()
+          ? supabase
+              .from("saved_posts")
+              .select("id")
+              .eq("user_id", id)
+              .eq("post_id", post.id)
+              .maybeSingle()
           : Promise.resolve({ data: post.initialSaved ? { id: "x" } : null }),
-        supabase.from("posts").select("hype_count, comment_count").eq("id", post.id).maybeSingle(),
+        supabase
+          .from("posts")
+          .select("hype_count, comment_count")
+          .eq("id", post.id)
+          .maybeSingle(),
       ]);
 
       if (!active) return;
@@ -180,7 +212,9 @@ export function FeedCard({
       }
     }
     sync();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post.id]);
 
@@ -200,11 +234,17 @@ export function FeedCard({
       const { data } = await supabase
         .from("close_friends")
         .select("user_id, friend_id")
-        .or(`and(user_id.eq.${id},friend_id.eq.${post.user_id}),and(user_id.eq.${post.user_id},friend_id.eq.${id})`);
+        .or(
+          `and(user_id.eq.${id},friend_id.eq.${post.user_id}),and(user_id.eq.${post.user_id},friend_id.eq.${id})`
+        );
       if (!active) return;
       const rows = data ?? [];
-      const iAdded = rows.some((r: any) => r.user_id === id && r.friend_id === post.user_id);
-      const theyAdded = rows.some((r: any) => r.user_id === post.user_id && r.friend_id === id);
+      const iAdded = rows.some(
+        (r: any) => r.user_id === id && r.friend_id === post.user_id
+      );
+      const theyAdded = rows.some(
+        (r: any) => r.user_id === post.user_id && r.friend_id === id
+      );
       setIsHyper(iAdded);
       setIsMutualHyper(iAdded && theyAdded);
     }
@@ -212,7 +252,9 @@ export function FeedCard({
     // Parent (FeedList) already resolved the status for feed cards — only
     // self-fetch for standalone cards. The ref still lets the ⋯ menu re-sync.
     if (initialIsHyper === undefined) syncHyper();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post.id, uid]);
 
@@ -220,25 +262,32 @@ export function FeedCard({
   const name = profile?.display_name ?? profile?.username ?? "User";
   const username = profile?.username;
   const hue = profile?.avatar_hue ?? 280;
-  const profileHref = post.user_id === uid ? "/profile" : username ? `/u/${username}` : "#";
-
+  const profileHref =
+    post.user_id === uid ? "/profile" : username ? `/u/${username}` : "#";
 
   async function toggleHype() {
     if (hypePending) return;
-    if (!uid) { showToast("Sign in to hype"); return; }
-    const prev = hyped, prevCount = hypeCount;
+    if (!uid) {
+      showToast("Sign in to hype");
+      return;
+    }
+    const prev = hyped,
+      prevCount = hypeCount;
     setHypePending(true);
     setHyped(!prev);
     setHypeCount((c) => c + (prev ? -1 : 1));
     if (!prev) {
       haptics.success();
-      setHypeBurst(true); setShowParticles(true);
+      setHypeBurst(true);
+      setShowParticles(true);
       setTimeout(() => setHypeBurst(false), 380);
       setTimeout(() => setShowParticles(false), 640);
     }
     try {
       const { data, error } = await supabase.rpc("toggle_hype", {
-        p_target_type: "post", p_target_id: post.id, p_owner_id: post.user_id,
+        p_target_type: "post",
+        p_target_id: post.id,
+        p_owner_id: post.user_id,
       });
       if (error) throw error;
       const res = hypeResult(data);
@@ -247,7 +296,8 @@ export function FeedCard({
         setHypeCount(res.hype_count);
       }
     } catch {
-      setHyped(prev); setHypeCount(prevCount);
+      setHyped(prev);
+      setHypeCount(prevCount);
       showToast("Couldn't hype. Try again.", "error");
     } finally {
       setHypePending(false);
@@ -276,20 +326,35 @@ export function FeedCard({
 
   async function toggleSave() {
     if (savePending) return;
-    if (!uid) { showToast("Sign in to save"); return; }
+    if (!uid) {
+      showToast("Sign in to save");
+      return;
+    }
     const prev = saved;
-    setSavePending(true); setSaved(!prev);
+    setSavePending(true);
+    setSaved(!prev);
     haptics.select();
     if (!prev) {
       setSaveBurst(true);
       setTimeout(() => setSaveBurst(false), 360);
-      const { error } = await supabase.from("saved_posts").insert({ user_id: uid, post_id: post.id });
-      if (error) { setSaved(prev); if (!/duplicate|unique/i.test(error.message)) showToast("Couldn't save", "error"); }
-      else showToast("Saved", "success");
+      const { error } = await supabase
+        .from("saved_posts")
+        .insert({ user_id: uid, post_id: post.id });
+      if (error) {
+        setSaved(prev);
+        if (!/duplicate|unique/i.test(error.message))
+          showToast("Couldn't save", "error");
+      } else showToast("Saved", "success");
     } else {
-      const { error } = await supabase.from("saved_posts").delete().eq("user_id", uid).eq("post_id", post.id);
-      if (error) { setSaved(prev); showToast("Couldn't unsave", "error"); }
-      else showToast("Removed");
+      const { error } = await supabase
+        .from("saved_posts")
+        .delete()
+        .eq("user_id", uid)
+        .eq("post_id", post.id);
+      if (error) {
+        setSaved(prev);
+        showToast("Couldn't unsave", "error");
+      } else showToast("Removed");
     }
     setSavePending(false);
   }
@@ -298,6 +363,12 @@ export function FeedCard({
 
   return (
     <article className="relative border-b border-border/50 pb-3">
+      {/* Telemetry only — records that this card was actually on screen.
+          Nothing reads it yet; it exists so there is history to rank with
+          later. Skips the author's own posts. */}
+      {post.user_id !== uid && (
+        <FeedImpression postId={post.id} viewerId={uid} />
+      )}
       {/* Repost attribution */}
       {post._repostedBy && (
         <div className="flex items-center gap-1.5 px-4 pt-2.5 text-xs text-muted">
@@ -310,21 +381,42 @@ export function FeedCard({
         <button
           type="button"
           aria-label={`View ${name}'s photo`}
-          onClick={() => { if (profile?.avatar_url) setAvatarZoomOpen(true); else window.location.href = profileHref; }}
+          onClick={() => {
+            if (profile?.avatar_url) setAvatarZoomOpen(true);
+            else window.location.href = profileHref;
+          }}
           className="shrink-0 active:scale-95 transition-transform"
         >
-          <Avatar name={name} hue={hue} size={40} src={profile?.avatar_url ?? undefined} />
+          <Avatar
+            name={name}
+            hue={hue}
+            size={40}
+            src={profile?.avatar_url ?? undefined}
+          />
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-1">
-          <Link href={profileHref} className="truncate text-sm font-semibold hover:underline">{name}</Link>
-          {profile?.is_verified && <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />}
+          <Link
+            href={profileHref}
+            className="truncate text-sm font-semibold hover:underline"
+          >
+            {name}
+          </Link>
+          {profile?.is_verified && (
+            <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />
+          )}
           {isHyper && <HyperStar className="h-3.5 w-3.5 shrink-0" />}
           {isMutualHyper && <MutualHyperBadge />}
-          <span className="ml-1 text-xs text-faint">· {timeAgo(post.created_at)}</span>
+          <span className="ml-1 text-xs text-faint">
+            · {timeAgo(post.created_at)}
+          </span>
         </div>
         {/* THREE DOTS -- fully functional */}
-        <button type="button" aria-label="More" onClick={() => setActionsOpen(true)}
-          className="-mr-1 flex h-10 w-10 items-center justify-center rounded-full text-muted hover:bg-white/5">
+        <button
+          type="button"
+          aria-label="More"
+          onClick={() => setActionsOpen(true)}
+          className="-mr-1 flex h-10 w-10 items-center justify-center rounded-full text-muted hover:bg-white/5"
+        >
           <MoreHorizontal size={20} />
         </button>
       </div>
@@ -367,7 +459,11 @@ export function FeedCard({
           {/* Double-tap burst (centred over the gallery) */}
           {hypeBurst && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <Star size={88} className="animate-hype-pop text-hype drop-shadow-[0_4px_20px_rgba(255,208,0,0.5)]" fill="currentColor" />
+              <Star
+                size={88}
+                className="animate-hype-pop text-hype drop-shadow-[0_4px_20px_rgba(255,208,0,0.5)]"
+                fill="currentColor"
+              />
             </div>
           )}
           {showParticles && (
@@ -382,7 +478,10 @@ export function FeedCard({
               {imgIdx > 0 && (
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); setImgIdx((i) => Math.max(i - 1, 0)); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImgIdx((i) => Math.max(i - 1, 0));
+                  }}
                   aria-label="Previous image"
                   className="absolute left-2.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
                 >
@@ -392,7 +491,10 @@ export function FeedCard({
               {imgIdx < images.length - 1 && (
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); setImgIdx((i) => Math.min(i + 1, images.length - 1)); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImgIdx((i) => Math.min(i + 1, images.length - 1));
+                  }}
                   aria-label="Next image"
                   className="absolute right-2.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
                 >
@@ -405,7 +507,10 @@ export function FeedCard({
           {/* Expand â†’ full-screen pinch-to-zoom viewer */}
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); setZoomOpen(true); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setZoomOpen(true);
+            }}
             aria-label="View full image"
             className="absolute bottom-2.5 right-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
           >
@@ -423,8 +528,13 @@ export function FeedCard({
                   <button
                     key={i}
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setImgIdx(i); }}
-                    className={`h-1.5 rounded-full transition-all ${i === imgIdx ? "w-4 bg-white" : "w-1.5 bg-white/50"}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setImgIdx(i);
+                    }}
+                    className={`h-1.5 rounded-full transition-all ${
+                      i === imgIdx ? "w-4 bg-white" : "w-1.5 bg-white/50"
+                    }`}
                   />
                 ))}
               </div>
@@ -436,57 +546,103 @@ export function FeedCard({
       {/* Actions */}
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-5">
-          <button type="button" onClick={toggleHype} disabled={hypePending}
-            aria-pressed={hyped} aria-label="Hype"
-            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-transform duration-150 active:scale-90 disabled:opacity-70">
+          <button
+            type="button"
+            onClick={toggleHype}
+            disabled={hypePending}
+            aria-pressed={hyped}
+            aria-label="Hype"
+            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-transform duration-150 active:scale-90 disabled:opacity-70"
+          >
             <span className="relative">
-              <Star size={23} strokeWidth={2.2}
-                className={`${hypeBurst ? "animate-hype-burst" : ""} transition-colors ${hyped ? "text-hype" : "text-foreground"}`}
-                fill={hyped ? "currentColor" : "none"} />
+              <Star
+                size={23}
+                strokeWidth={2.2}
+                className={`${
+                  hypeBurst ? "animate-hype-burst" : ""
+                } transition-colors ${hyped ? "text-hype" : "text-foreground"}`}
+                fill={hyped ? "currentColor" : "none"}
+              />
               {showParticles && <HypeParticles size={9} />}
             </span>
-            <span className={hyped ? "text-hype" : "text-foreground"}>{formatCount(hypeCount)}</span>
+            <span className={hyped ? "text-hype" : "text-foreground"}>
+              {formatCount(hypeCount)}
+            </span>
           </button>
 
-          <button type="button" onClick={() => setCommentsOpen(true)} aria-label="Comments"
-            className="flex items-center gap-1.5 text-sm font-semibold text-foreground transition-transform duration-150 active:scale-90">
+          <button
+            type="button"
+            onClick={() => setCommentsOpen(true)}
+            aria-label="Comments"
+            className="flex items-center gap-1.5 text-sm font-semibold text-foreground transition-transform duration-150 active:scale-90"
+          >
             <MessageCircle size={22} strokeWidth={2.2} />
             {formatCount(commentCount)}
           </button>
 
-          <button type="button" onClick={() => setShareOpen(true)} aria-label="Share"
-            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 active:scale-90">
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            aria-label="Share"
+            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 active:scale-90"
+          >
             <Send size={21} strokeWidth={2.2} />
-            {((post as any).share_count ?? 0) > 0 && formatCount((post as any).share_count)}
+            {((post as any).share_count ?? 0) > 0 &&
+              formatCount((post as any).share_count)}
           </button>
         </div>
 
-        <button type="button" onClick={toggleSave} disabled={savePending} aria-label="Save"
-          className="text-foreground transition-transform duration-150 active:scale-90 disabled:opacity-70">
-          <Bookmark size={21} strokeWidth={2.2}
-            className={`${saveBurst ? "animate-hype-burst" : ""} transition-colors ${saved ? "text-accent" : ""}`}
-            fill={saved ? "currentColor" : "none"} />
+        <button
+          type="button"
+          onClick={toggleSave}
+          disabled={savePending}
+          aria-label="Save"
+          className="text-foreground transition-transform duration-150 active:scale-90 disabled:opacity-70"
+        >
+          <Bookmark
+            size={21}
+            strokeWidth={2.2}
+            className={`${
+              saveBurst ? "animate-hype-burst" : ""
+            } transition-colors ${saved ? "text-accent" : ""}`}
+            fill={saved ? "currentColor" : "none"}
+          />
         </button>
       </div>
 
       {/* Caption -- clamps long text with a more / less toggle */}
       {(liveCaption || liveBody) && (
-        <ExpandableText className="px-4 pt-2 text-sm leading-snug" clampClass="line-clamp-2">
+        <ExpandableText
+          className="px-4 pt-2 text-sm leading-snug"
+          clampClass="line-clamp-2"
+        >
           {liveCaption && (
             <p>
-              <Link href={profileHref} className="font-semibold hover:underline">
+              <Link
+                href={profileHref}
+                className="font-semibold hover:underline"
+              >
                 {username ? `@${username}` : name}
               </Link>{" "}
               <RichPostText text={liveCaption} />
             </p>
           )}
-          {liveBody && <p className="mt-1 text-foreground/85"><RichPostText text={liveBody} /></p>}
+          {liveBody && (
+            <p className="mt-1 text-foreground/85">
+              <RichPostText text={liveBody} />
+            </p>
+          )}
         </ExpandableText>
       )}
 
       {/* Poll */}
       {postPoll && (
-        <PollBlock postId={post.id} poll={postPoll} currentUserId={uid} isOwn={uid === post.user_id} />
+        <PollBlock
+          postId={post.id}
+          poll={postPoll}
+          currentUserId={uid}
+          isOwn={uid === post.user_id}
+        />
       )}
 
       {/* Attached song — starts on scroll-into-view, stops on scroll-away.
@@ -499,9 +655,14 @@ export function FeedCard({
       )}
 
       {/* Sheets */}
-      <CommentsSheet open={commentsOpen} onClose={() => setCommentsOpen(false)}
-        postId={post.id} postOwnerId={post.user_id} currentUserId={uid}
-        onCountChange={(n) => setCommentCount(n)} />
+      <CommentsSheet
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        postId={post.id}
+        postOwnerId={post.user_id}
+        currentUserId={uid}
+        onCountChange={(n) => setCommentCount(n)}
+      />
 
       <ShareSheet
         open={shareOpen}
@@ -516,19 +677,35 @@ export function FeedCard({
       )}
 
       {avatarZoomOpen && profile?.avatar_url && (
-        <ZoomViewer src={profile.avatar_url} onClose={() => setAvatarZoomOpen(false)} />
+        <ZoomViewer
+          src={profile.avatar_url}
+          onClose={() => setAvatarZoomOpen(false)}
+        />
       )}
 
-      <PostActionsSheet open={actionsOpen} onClose={() => setActionsOpen(false)}
-        postId={post.id} postUserId={post.user_id} postUsername={username ?? null}
+      <PostActionsSheet
+        open={actionsOpen}
+        onClose={() => setActionsOpen(false)}
+        postId={post.id}
+        postUserId={post.user_id}
+        postUsername={username ?? null}
         currentUserId={uid}
         onHyperChange={() => syncHyperRef.current()}
         onDelete={() => setDeleted(true)}
-        onEdit={() => setEditOpen(true)} />
+        onEdit={() => setEditOpen(true)}
+      />
 
-      <EditPostSheet open={editOpen} onClose={() => setEditOpen(false)}
-        postId={post.id} initialCaption={liveCaption} initialBody={liveBody}
-        onSaved={(c, b) => { setLiveCaption(c || null); setLiveBody(b || null); }} />
+      <EditPostSheet
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        postId={post.id}
+        initialCaption={liveCaption}
+        initialBody={liveBody}
+        onSaved={(c, b) => {
+          setLiveCaption(c || null);
+          setLiveBody(b || null);
+        }}
+      />
     </article>
   );
 }

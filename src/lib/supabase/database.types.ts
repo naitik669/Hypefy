@@ -1648,6 +1648,35 @@ export type Database = {
           },
         ]
       }
+      post_views: {
+        Row: {
+          created_at: string
+          post_id: string
+          viewed_on: string
+          viewer_id: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: string
+          viewed_on?: string
+          viewer_id: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: string
+          viewed_on?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_views_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       show_views: {
         Row: {
           created_at: string
