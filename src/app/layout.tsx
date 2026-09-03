@@ -5,6 +5,7 @@ import { ReferralTracker } from "@/components/growth/ReferralTracker";
 import { ClientErrorReporter } from "@/components/pwa/ClientErrorReporter";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
+import { PostAuthTasks } from "@/components/auth/PostAuthTasks";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -12,7 +13,15 @@ const jakarta = Plus_Jakarta_Sans({
   weight: ["400", "500", "600", "700", "800"],
   display: "swap",
   // Render immediately with a system stack if the web font is slow/unavailable.
-  fallback: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
+  fallback: [
+    "system-ui",
+    "-apple-system",
+    "Segoe UI",
+    "Roboto",
+    "Helvetica Neue",
+    "Arial",
+    "sans-serif",
+  ],
 });
 
 export const metadata: Metadata = {
@@ -77,6 +86,10 @@ export default function RootLayout({
         <RegisterSW />
         <ReferralTracker />
         <ClientErrorReporter />
+        {/* Finishes a Google sign-in that a full-page redirect cut short:
+            the age gate for new accounts, and the session snapshot when
+            adding one. Inert unless there is parked work. */}
+        <PostAuthTasks />
         {children}
       </body>
     </html>

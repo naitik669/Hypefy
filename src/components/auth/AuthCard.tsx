@@ -9,6 +9,7 @@ import { upsertSavedAccount } from "@/lib/saved-accounts";
 import { DateOfBirthPicker } from "@/components/ui/DateOfBirthPicker";
 import { isNative } from "@/lib/native";
 import { startNativeGoogleSignIn } from "@/lib/native-auth";
+import { stashPendingOAuth } from "@/lib/pending-oauth";
 
 type Mode = "signin" | "signup";
 
@@ -296,6 +297,17 @@ export function AuthCard({ mode }: { mode: Mode }) {
     }
     setGoogleLoading(true);
 
+    // Everything below this line is lost the moment the browser navigates
+    // to Google, so park it first and let PostAuthTasks finish on return.
+    if (addMode) {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) await saveSessionAsAccount(data.session);
+    }
+    stashPendingOAuth({
+      dob: mode === "signup" ? dob : null,
+      addAccount: addMode,
+    });
+
     // In the native shell Google rejects the WebView, so the consent screen
     // has to open in a real browser and come back via a deep link.
     if (isNative()) {
@@ -475,28 +487,30 @@ export function AuthCard({ mode }: { mode: Mode }) {
           </button>
         </form>
 
-        {/* Google — skipped when adding an account: its full-page OAuth
-            redirect can't safely snapshot the session being switched from */}
-        {!addMode && (
-          <>
-            <div className="my-5 flex items-center gap-3">
-              <span className="h-px flex-1 bg-white/10" />
-              <span className="text-[11px] font-medium tracking-widest text-faint">
-                OR
-              </span>
-              <span className="h-px flex-1 bg-white/10" />
-            </div>
-            <button
-              type="button"
-              onClick={handleGoogle}
-              disabled={googleLoading || signupBlocked}
-              className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/5 bg-white/[0.06] text-sm font-medium text-foreground/90 transition hover:bg-white/[0.1] active:scale-[0.99] disabled:opacity-60"
-            >
-              <GoogleGlyph className="h-[18px] w-[18px]" />
-              {googleLoading ? "Redirecting…" : t.googleLabel}
-            </button>
-          </>
-        )}
+        {/* Google works when adding an account too. The redirect still
+            cannot snapshot the outgoing session on its way out, so
+            handleGoogle saves it before navigating. */}
+        <>
+          <div className="my-5 flex items-center gap-3">
+            <span className="h-px flex-1 bg-white/10" />
+            <span className="text-[11px] font-medium tracking-widest text-faint">
+              OR
+            </span>
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+          <button
+            type="button"
+            onClick={handleGoogle}
+            // Deliberately NOT disabled by signupBlocked. A dead button
+            // beside untouched date-of-birth and consent fields reads as
+            // "Google signup is broken"; handleGoogle says what is missing.
+            disabled={googleLoading}
+            className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/5 bg-white/[0.06] text-sm font-medium text-foreground/90 transition hover:bg-white/[0.1] active:scale-[0.99] disabled:opacity-60"
+          >
+            <GoogleGlyph className="h-[18px] w-[18px]" />
+            {googleLoading ? "Redirecting…" : t.googleLabel}
+          </button>
+        </>
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-muted">
