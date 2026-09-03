@@ -14,6 +14,8 @@ type Post = {
   body: string | null;
   image_url: string | null;
   image_urls: string[] | null;
+  /** width / height; drives the masonry tile shape. */
+  aspect_ratio: number | null;
   hype_count: number;
   comment_count: number;
   profiles: {
@@ -366,8 +368,26 @@ function Section({
   );
 }
 
+/**
+ * Pinterest-style masonry.
+ *
+ * CSS multi-column rather than a grid: tiles keep their own height and the
+ * columns simply flow, which is what makes a browse feed feel browsable. A
+ * uniform grid of squares reads as a catalogue — fine on a profile, where
+ * the question is "who is this", and wrong here, where the question is
+ * "what is there".
+ *
+ * The trade-off is reading order: columns fill top-to-bottom, so items run
+ * down each column rather than across rows. That is how Pinterest behaves
+ * and is the right call for ranked discovery, where nothing depends on
+ * strict sequence.
+ */
 function Grid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-3 gap-1.5 px-3">{children}</div>;
+  return (
+    <div className="columns-2 gap-2 px-3 sm:columns-3 [&>*]:mb-2">
+      {children}
+    </div>
+  );
 }
 
 function TagRail({ tags }: { tags: Tag[] }) {
@@ -399,13 +419,24 @@ function Stat({ icon, value }: { icon: React.ReactNode; value: number }) {
   );
 }
 
+/** 9:16 to 16:9. Beyond that a single post starts dictating the layout. */
+function tileRatio(ratio: number | null | undefined): number {
+  if (typeof ratio !== "number" || !(ratio > 0)) return 1;
+  return Math.min(16 / 9, Math.max(9 / 16, ratio));
+}
+
 function PostTile({ post }: { post: Post }) {
   const img = postImage(post);
   const hue = post.profiles?.avatar_hue ?? 280;
   return (
     <Link
       href={`/p/${post.id}`}
-      className="group relative block aspect-square overflow-hidden rounded-2xl bg-surface"
+      // The post's own shape, not a forced square. aspect_ratio is
+      // width/height and is set on every post since 0035; anything older
+      // falls back to a square. Clamped to 9:16..16:9 so one extreme
+      // panorama cannot own the screen.
+      style={{ aspectRatio: String(tileRatio(post.aspect_ratio)) }}
+      className="group relative block break-inside-avoid overflow-hidden rounded-2xl bg-surface"
     >
       {img ? (
         // eslint-disable-next-line @next/next/no-img-element
