@@ -58,6 +58,8 @@ export function AccountSwitchPad({
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [switching, setSwitching] = useState(false);
+  /** Pointer was taken away mid-gesture; the stack stays up and is tapped. */
+  const [detached, setDetached] = useState(false);
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startY = useRef(0);
@@ -77,6 +79,7 @@ export function AccountSwitchPad({
   const close = useCallback(() => {
     setOpen(false);
     setActiveIdx(null);
+    setDetached(false);
   }, []);
 
   useEffect(() => () => cancelHold(), [cancelHold]);
@@ -103,6 +106,17 @@ export function AccountSwitchPad({
     // Hard navigation, not router.push: every server component on this page
     // was rendered for the previous user and has to be thrown away.
     window.location.href = "/home";
+  }
+
+  function commit(row: Row | null) {
+    close();
+    if (!row) return;
+    if (row.kind === "add") {
+      haptics.tap();
+      router.push("/signin?add=1");
+      return;
+    }
+    void switchTo(row.account);
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -164,17 +178,11 @@ export function AccountSwitchPad({
     }
 
     if (!open) return;
+    // The pointer was already taken away — the stack is being tapped now,
+    // so a stray release must not commit or dismiss it.
+    if (detached) return;
 
-    const chosen = activeIdx === null ? null : rows[activeIdx];
-    close();
-
-    if (!chosen) return;
-    if (chosen.kind === "add") {
-      haptics.tap();
-      router.push("/signin?add=1");
-      return;
-    }
-    void switchTo(chosen.account);
+    commit(activeIdx === null ? null : rows[activeIdx]);
   }
 
   return (
@@ -186,6 +194,7 @@ export function AccountSwitchPad({
           <div
             className="animate-switch-veil fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]"
             aria-hidden
+            onPointerDown={detached ? close : undefined}
           />
 
           <div
@@ -210,6 +219,18 @@ export function AccountSwitchPad({
                   }}
                   role="option"
                   aria-selected={active}
+                  // Only wired while detached: during a live drag the
+                  // pointer is captured by the trigger, so these never fire.
+                  onPointerEnter={detached ? () => setActiveIdx(i) : undefined}
+                  onPointerDown={
+                    detached
+                      ? (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          commit(row);
+                        }
+                      : undefined
+                  }
                   className="relative flex items-center justify-end"
                   style={{
                     // Stagger outwards from the thumb, so the stack unfurls
@@ -277,12 +298,16 @@ export function AccountSwitchPad({
         onPointerUp={onPointerUp}
         onPointerCancel={() => {
           cancelHold();
-          close();
+          // Deliberately does NOT close. Some WebViews cancel the pointer
+          // even with touch-action: none, and dropping the stack here is
+          // what made it flash up and vanish. Fall back to tap-to-choose.
+          if (open) {
+            setDetached(true);
+            setActiveIdx(null);
+          }
         }}
-        onContextMenu={(e) => {
-          // Android raises its own long-press menu over the avatar image.
-          if (open || didHold.current) e.preventDefault();
-        }}
+        onContextMenu={(e) => e.preventDefault()}
+        onDragStart={(e) => e.preventDefault()}
         onClickCapture={(e) => {
           // The hold ends in a click. Let it through only for a real tap.
           if (didHold.current) {
@@ -291,9 +316,18 @@ export function AccountSwitchPad({
             didHold.current = false;
           }
         }}
-        // Without this the browser claims the gesture for scrolling and stops
-        // sending moves the instant the thumb travels.
-        style={{ touchAction: open ? "none" : "manipulation" }}
+        // touch-action is read at TOUCHSTART, so it cannot be switched on
+        // once the hold completes — by then the browser has already reserved
+        // the gesture for panning and will cancel the pointer the moment the
+        // thumb moves. It has to be "none" from the very first contact.
+        // Long-press on a link or image also raises the WebView's own
+        // callout, which cancels the pointer too; hence the rest.
+        style={{
+          touchAction: "none",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+        }}
         className={`relative z-50 transition-transform duration-200 ${
           open ? "scale-95" : ""
         }`}
