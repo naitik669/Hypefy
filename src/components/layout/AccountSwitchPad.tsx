@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { useToast } from "@/components/ui/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { haptics } from "@/lib/haptics";
+import { AccountSwitchOverlay } from "@/components/auth/AccountSwitchOverlay";
 import {
   getSavedAccounts,
   removeSavedAccount,
@@ -57,7 +58,7 @@ export function AccountSwitchPad({
   const [rows, setRows] = useState<Row[]>([]);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
-  const [switching, setSwitching] = useState(false);
+  const [switching, setSwitching] = useState<SavedAccount | null>(null);
   /** Pointer was taken away mid-gesture; the stack stays up and is tapped. */
   const [detached, setDetached] = useState(false);
 
@@ -85,7 +86,7 @@ export function AccountSwitchPad({
   useEffect(() => () => cancelHold(), [cancelHold]);
 
   async function switchTo(account: SavedAccount) {
-    setSwitching(true);
+    setSwitching(account);
     const supabase = createClient();
     const { error } = await supabase.auth.setSession({
       access_token: account.accessToken,
@@ -97,7 +98,7 @@ export function AccountSwitchPad({
       // that fails every time it is chosen.
       removeSavedAccount(account.userId);
       setRows(buildRows(currentUserId));
-      setSwitching(false);
+      setSwitching(null);
       toast("That account needs signing in again", "error");
       return;
     }
@@ -187,6 +188,16 @@ export function AccountSwitchPad({
 
   return (
     <div className="relative flex items-center justify-center">
+      {/* The switch ends in a full page load; without this the tap looks
+          swallowed for the whole of it. */}
+      {switching && (
+        <AccountSwitchOverlay
+          name={switching.displayName || switching.username || switching.email}
+          username={switching.username}
+          avatarUrl={switching.avatarUrl}
+          avatarHue={switching.avatarHue}
+        />
+      )}
       {open && (
         <>
           {/* Dims the app and swallows the stray tap that would otherwise

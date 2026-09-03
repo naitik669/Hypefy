@@ -5,6 +5,7 @@ import { ChevronLeft, Plus, Check, Loader2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { AccountSwitchOverlay } from "@/components/auth/AccountSwitchOverlay";
 import {
   getSavedAccounts,
   removeSavedAccount,
@@ -32,14 +33,17 @@ export function AccountGate({ mode }: { mode: "signin" | "signup" }) {
     const isAdd = params.get("add") === "1";
     setAddMode(isAdd);
     setShowForm(params.get("view") === "form");
-    if (!isAdd) { setReady(true); return; }
+    if (!isAdd) {
+      setReady(true);
+      return;
+    }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setCurrentUserId(session?.user.id ?? null);
       setAccounts(getSavedAccounts());
       setReady(true);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function switchTo(account: SavedAccount) {
@@ -64,6 +68,18 @@ export function AccountGate({ mode }: { mode: "signin" | "signup" }) {
   }
 
   // Not the add-account flow — untouched normal sign-in/sign-up.
+  const target = accounts.find((a) => a.userId === switching);
+  if (target) {
+    return (
+      <AccountSwitchOverlay
+        name={target.displayName || target.username || target.email}
+        username={target.username}
+        avatarUrl={target.avatarUrl}
+        avatarHue={target.avatarHue}
+      />
+    );
+  }
+
   if (!ready) return null;
   if (!addMode) return <AuthCard mode={mode} />;
   if (showForm) {
@@ -112,13 +128,26 @@ export function AccountGate({ mode }: { mode: "signin" | "signup" }) {
               <div
                 key={account.userId}
                 className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition-colors ${
-                  isCurrent ? "border-accent/30 bg-accent/[0.06]" : "border-white/10 bg-white/[0.04]"
+                  isCurrent
+                    ? "border-accent/30 bg-accent/[0.06]"
+                    : "border-white/10 bg-white/[0.04]"
                 }`}
               >
-                <Avatar name={name(account)} hue={account.avatarHue ?? 280} size={40} src={account.avatarUrl ?? undefined} />
+                <Avatar
+                  name={name(account)}
+                  hue={account.avatarHue ?? 280}
+                  size={40}
+                  src={account.avatarUrl ?? undefined}
+                />
                 <div className="min-w-0 flex-1 text-left">
-                  <p className="truncate text-sm font-semibold text-foreground">{name(account)}</p>
-                  {account.username && <p className="truncate text-xs text-muted">@{account.username}</p>}
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {name(account)}
+                  </p>
+                  {account.username && (
+                    <p className="truncate text-xs text-muted">
+                      @{account.username}
+                    </p>
+                  )}
                 </div>
                 {isCurrent ? (
                   <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-accent">
@@ -132,7 +161,11 @@ export function AccountGate({ mode }: { mode: "signin" | "signup" }) {
                       disabled={!!switching}
                       className="flex h-8 min-w-[60px] items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] px-3 text-xs font-bold text-foreground transition-colors hover:border-accent/40 disabled:opacity-50"
                     >
-                      {isSwitching ? <Loader2 size={12} className="animate-spin" /> : "Switch"}
+                      {isSwitching ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        "Switch"
+                      )}
                     </button>
                     <button
                       type="button"
@@ -159,7 +192,9 @@ export function AccountGate({ mode }: { mode: "signin" | "signup" }) {
         </div>
 
         <p className="mt-6 text-center text-xs text-muted">
-          <a href="/settings" className="hover:text-foreground">Done</a>
+          <a href="/settings" className="hover:text-foreground">
+            Done
+          </a>
         </p>
       </div>
     </div>

@@ -16,6 +16,9 @@ import { saveProfile } from "@/app/setup-profile/actions";
 import { PROFILE_TAGS } from "@/lib/profile";
 import { APP_ORIGIN } from "@/lib/profile-card";
 import { haptics } from "@/lib/haptics";
+// The same editor Settings uses, so a photo is framed identically whether
+// it is set during setup or changed later.
+import { ImageCropper } from "@/components/post/ImageCropper";
 
 const HUES = [280, 200, 150, 30, 330, 95, 250, 10, 180, 45];
 const MAX_TAGS = 3;
@@ -67,6 +70,8 @@ export function SetupStepper({
   const [form, setForm] = useState<FormState>(initial);
   const [uStatus, setUStatus] = useState<UsernameStatus>("idle");
   const [uploading, setUploading] = useState(false);
+  /** Chosen file waiting to be framed. The cropper owns it until done. */
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -95,22 +100,33 @@ export function SetupStepper({
     }, 450);
   }
 
-  async function uploadAvatar(file: File) {
+  /** Gate the picked file before the cropper ever sees it. */
+  function pickAvatar(file: File) {
     setError(null);
     if (!file.type.startsWith("image/")) {
       setError("Please choose an image file.");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image must be under 5MB.");
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Image must be under 10MB.");
       return;
     }
+    setCropSrc(URL.createObjectURL(file));
+  }
+
+  /** Uploads what the cropper produced — always a square JPEG. */
+  async function uploadCropped(blob: Blob) {
+    setCropSrc(null);
     setUploading(true);
-    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-    const path = `${userId}/avatar-${Date.now()}.${ext}`;
+    setError(null);
+    const path = `${userId}/avatar-${Date.now()}.jpg`;
     const { error: upErr } = await supabase.storage
       .from("avatars")
-      .upload(path, file, { upsert: true, cacheControl: "3600" });
+      .upload(path, blob, {
+        upsert: true,
+        cacheControl: "3600",
+        contentType: "image/jpeg",
+      });
     if (upErr) {
       setError(upErr.message);
       setUploading(false);
@@ -167,6 +183,21 @@ export function SetupStepper({
 
   return (
     <div className="flex min-h-dvh flex-col">
+      {cropSrc && (
+        <ImageCropper
+          src={cropSrc}
+          aspect={1}
+          label="Frame your photo"
+          onCancel={() => {
+            URL.revokeObjectURL(cropSrc);
+            setCropSrc(null);
+          }}
+          onDone={(blob) => {
+            URL.revokeObjectURL(cropSrc);
+            void uploadCropped(blob);
+          }}
+        />
+      )}
       {/* Brand + progress. The wordmark is here because this is the first
           screen of a new account and the only one with no navigation — the
           rest of the app frames itself, this did not. */}
@@ -227,7 +258,7 @@ export function SetupStepper({
               avatarHue={form.avatarHue}
               avatarUrl={form.avatarUrl}
               uploading={uploading}
-              onUpload={uploadAvatar}
+              onUpload={pickAvatar}
               onColor={(h) => set("avatarHue", h)}
               onRemove={() => set("avatarUrl", null)}
             />
@@ -488,7 +519,9 @@ function StepAvatar({
                 onClick={() => onColor(h)}
                 className="h-11 w-11 rounded-2xl transition-transform active:scale-95"
                 style={{
-                  background: `linear-gradient(140deg, hsl(${h} 75% 52%), hsl(${(h + 50) % 360} 70% 38%))`,
+                  background: `linear-gradient(140deg, hsl(${h} 75% 52%), hsl(${
+                    (h + 50) % 360
+                  } 70% 38%))`,
                   outline:
                     avatarHue === h ? "3px solid var(--color-accent)" : "none",
                   outlineOffset: "2px",
@@ -543,7 +576,7 @@ function StepTags({
     onChange(
       selected.includes(tag)
         ? selected.filter((t) => t !== tag)
-        : [...selected, tag].slice(0, MAX_TAGS),
+        : [...selected, tag].slice(0, MAX_TAGS)
     );
   }
   return (
@@ -568,8 +601,8 @@ function StepTags({
                 on
                   ? "border-accent bg-accent text-accent-ink"
                   : muted
-                    ? "border-border/60 text-faint"
-                    : "border-border text-muted hover:text-foreground"
+                  ? "border-border/60 text-faint"
+                  : "border-border text-muted hover:text-foreground"
               }`}
             >
               {tag}

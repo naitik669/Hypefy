@@ -1,12 +1,16 @@
 import type { ReactNode } from "react";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
+import { BannerEditMenu } from "@/components/profile/BannerEditMenu";
 import { FollowStats } from "@/components/profile/FollowStats";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { HyperStar } from "@/components/ui/HyperStar";
 import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { AnthemChip } from "@/components/profile/AnthemChip";
-import { ProfileStatusBubble, type ProfileNote } from "@/components/profile/ProfileStatusBubble";
+import {
+  ProfileStatusBubble,
+  type ProfileNote,
+} from "@/components/profile/ProfileStatusBubble";
 
 /**
  * Profile hero — banner, the squircle avatar overlapping its bottom-left
@@ -60,7 +64,16 @@ export function ProfileHeader({
 }) {
   return (
     <>
-      <ProfileBanner bannerId={bannerId} bannerUrl={bannerUrl} className="mx-2 mt-2 h-36 rounded-card" />
+      {/* Relative wrapper, not the banner itself: ProfileBanner carries the
+          caller's margins, and the pencil has to sit inside those. */}
+      <div className="relative mx-2 mt-2">
+        <ProfileBanner
+          bannerId={bannerId}
+          bannerUrl={bannerUrl}
+          className="h-36 rounded-card"
+        />
+        {currentUserId === userId && <BannerEditMenu userId={userId} />}
+      </div>
 
       <div className="px-4">
         {/* Avatar + stats */}
@@ -106,12 +119,18 @@ export function ProfileHeader({
         <div className="mt-3">
           <span className="flex items-center gap-1 text-base font-bold leading-tight">
             {name}
-            {verified && <VerifiedStar className="h-4 w-4 shrink-0 text-verified" />}
+            {verified && (
+              <VerifiedStar className="h-4 w-4 shrink-0 text-verified" />
+            )}
             {isHyper && <HyperStar className="h-4 w-4 shrink-0" />}
             {isMutualHyper && <MutualHyperBadge />}
           </span>
           {username && <p className="mt-0.5 text-sm text-muted">@{username}</p>}
-          <AnthemChip anthem={anthem} editable={anthemEditable} userId={anthemEditable ? userId : undefined} />
+          <AnthemChip
+            anthem={anthem}
+            editable={anthemEditable}
+            userId={anthemEditable ? userId : undefined}
+          />
           {bio && <p className="mt-1.5 text-sm leading-snug">{bio}</p>}
         </div>
 
