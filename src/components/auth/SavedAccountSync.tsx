@@ -43,20 +43,33 @@ export function SavedAccountSync() {
       );
       if (!existing) return;
 
-      // Same identity, current credentials.
-      if (
-        existing.accessToken === session.access_token &&
-        existing.refreshToken === session.refresh_token
-      ) {
-        return;
-      }
+      // Refresh the display fields too, not just the tokens. They were
+      // snapshotted when the account was added, so a photo or name set
+      // afterwards never reached the switcher — which is why another
+      // account showed a letter where its picture should be.
+      void (async () => {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("display_name, username, avatar_hue, avatar_url")
+          .eq("id", session.user.id)
+          .maybeSingle();
 
-      upsertSavedAccount({
-        ...existing,
-        email: session.user.email ?? existing.email,
-        accessToken: session.access_token,
-        refreshToken: session.refresh_token,
-      });
+        const next = {
+          ...existing,
+          email: session.user.email ?? existing.email,
+          displayName: (profile as any)?.display_name ?? existing.displayName,
+          username: (profile as any)?.username ?? existing.username,
+          avatarHue: (profile as any)?.avatar_hue ?? existing.avatarHue,
+          avatarUrl: (profile as any)?.avatar_url ?? existing.avatarUrl,
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+        };
+
+        // Nothing moved — skip the write so other tabs are not woken by a
+        // storage event for an identical value.
+        if (JSON.stringify(next) === JSON.stringify(existing)) return;
+        upsertSavedAccount(next);
+      })();
     });
 
     return () => subscription.unsubscribe();

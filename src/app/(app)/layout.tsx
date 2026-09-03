@@ -7,6 +7,7 @@ import { GroupCallProvider } from "@/components/calls/GroupCallProvider";
 import { UploadProvider } from "@/components/upload/UploadProvider";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { NativeShell } from "@/components/native/NativeShell";
+import { AppSplash } from "@/components/layout/AppSplash";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PresenceHeartbeat } from "@/components/presence/PresenceHeartbeat";
 import { InAppNotifier } from "@/components/messages/InAppNotifier";
@@ -22,7 +23,9 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   // Anonymous visitors can land here on PUBLIC pages (/p, /u, /shots/[id]
   // via shared links — the middleware already guards the private routes).
@@ -60,10 +63,18 @@ export default async function AppLayout({
       .order("created_at", { ascending: false });
 
     // Map: conversation_id → {sender_id, created_at} of the LATEST message
-    const latestByConv = new Map<string, { sender_id: string; created_at: string }>();
+    const latestByConv = new Map<
+      string,
+      { sender_id: string; created_at: string }
+    >();
     for (const m of latestMsgs ?? []) {
-      const msg = m as { conversation_id: string; sender_id: string; created_at: string };
-      if (!latestByConv.has(msg.conversation_id)) latestByConv.set(msg.conversation_id, msg);
+      const msg = m as {
+        conversation_id: string;
+        sender_id: string;
+        created_at: string;
+      };
+      if (!latestByConv.has(msg.conversation_id))
+        latestByConv.set(msg.conversation_id, msg);
     }
 
     initialUnreadMsgs = (myMembers ?? []).filter((mem: any) => {
@@ -79,24 +90,26 @@ export default async function AppLayout({
   return (
     <ToastProvider>
       <CallProvider userId={user!.id}>
-       <GroupCallProvider userId={user!.id}>
-        <UploadProvider>
-          <NativeShell />
-          <PresenceHeartbeat />
-          <InAppNotifier currentUserId={user!.id} />
-          <InstallPrompt />
-          <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
-            <div className="flex-1 pb-[84px]">{children}</div>
-            <BottomNav
-              avatarUrl={profile.avatarUrl}
-              avatarHue={profile.avatarHue ?? 200}
-              displayName={profile.displayName ?? "U"}
-              currentUserId={user!.id}
-              initialUnreadMsgs={initialUnreadMsgs}
-            />
-          </div>
-        </UploadProvider>
-       </GroupCallProvider>
+        <GroupCallProvider userId={user!.id}>
+          <UploadProvider>
+            {/* Once per session, over the app rather than instead of it. */}
+            <AppSplash />
+            <NativeShell />
+            <PresenceHeartbeat />
+            <InAppNotifier currentUserId={user!.id} />
+            <InstallPrompt />
+            <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
+              <div className="flex-1 pb-[84px]">{children}</div>
+              <BottomNav
+                avatarUrl={profile.avatarUrl}
+                avatarHue={profile.avatarHue ?? 200}
+                displayName={profile.displayName ?? "U"}
+                currentUserId={user!.id}
+                initialUnreadMsgs={initialUnreadMsgs}
+              />
+            </div>
+          </UploadProvider>
+        </GroupCallProvider>
       </CallProvider>
     </ToastProvider>
   );

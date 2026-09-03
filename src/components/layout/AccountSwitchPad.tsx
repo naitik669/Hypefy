@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Plus } from "@phosphor-icons/react";
 import { Avatar } from "@/components/ui/Avatar";
@@ -200,13 +201,18 @@ export function AccountSwitchPad({
       )}
       {open && (
         <>
-          {/* Dims the app and swallows the stray tap that would otherwise
-              land on whatever sits under the raised tiles. */}
-          <div
-            className="animate-switch-veil fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]"
-            aria-hidden
-            onPointerDown={detached ? close : undefined}
-          />
+          {/* Portalled for the same reason as the switch overlay: the nav
+              carries backdrop-blur, which makes it the containing block for
+              fixed children, so this dimmed the tab bar and nothing else. */}
+          {typeof document !== "undefined" &&
+            createPortal(
+              <div
+                className="animate-switch-veil fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]"
+                aria-hidden
+                onPointerDown={detached ? close : undefined}
+              />,
+              document.body
+            )}
 
           <div
             className="absolute bottom-[calc(100%+14px)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3"
