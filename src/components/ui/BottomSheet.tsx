@@ -23,12 +23,62 @@ export function BottomSheet({
   children: React.ReactNode;
 }) {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const trapRef = useFocusTrap<HTMLDivElement>(mounted && open);
 
   // Android hardware back closes the sheet before it navigates.
   useOverlayBackButton(mounted && open, onClose);
+
+  /**
+   * Freeze the page behind the sheet.
+   *
+   * The backdrop catches taps, but not a drag: a swipe on a non-scrollable
+   * overlay chains to the nearest scrollable ancestor, which is the document
+   * — so the feed carried on scrolling underneath whatever was being read.
+   *
+   * position:fixed rather than overflow:hidden because iOS ignores the
+   * latter on body; the scroll offset is stashed and restored so closing the
+   * sheet does not fling you back to the top of the feed.
+   *
+   * Counted, because sheets stack — a GIF picker over comments closing must
+   * not unlock the page while the comments are still open.
+   */
+  useEffect(() => {
+    if (!open) return;
+
+    const body = document.body;
+    const depth = Number(body.dataset.sheetDepth ?? "0");
+    body.dataset.sheetDepth = String(depth + 1);
+
+    if (depth === 0) {
+      const y = window.scrollY;
+      body.dataset.sheetScrollY = String(y);
+      body.style.position = "fixed";
+      body.style.top = `-${y}px`;
+      body.style.left = "0";
+      body.style.right = "0";
+      body.style.width = "100%";
+    }
+
+    return () => {
+      const now = Number(body.dataset.sheetDepth ?? "1") - 1;
+      body.dataset.sheetDepth = String(Math.max(0, now));
+      if (now > 0) return;
+
+      const y = Number(body.dataset.sheetScrollY ?? "0");
+      body.style.position = "";
+      body.style.top = "";
+      body.style.left = "";
+      body.style.right = "";
+      body.style.width = "";
+      delete body.dataset.sheetDepth;
+      delete body.dataset.sheetScrollY;
+      window.scrollTo(0, y);
+    };
+  }, [open]);
 
   // Escape closes the sheet, matching CenterModal/FloatingMenu behavior.
   useEffect(() => {
@@ -74,6 +124,6 @@ export function BottomSheet({
         <div className="px-5">{children}</div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

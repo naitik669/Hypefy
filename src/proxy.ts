@@ -21,6 +21,15 @@ export async function proxy(request: NextRequest) {
     );
 
     if (!ok) {
+      // An API route must never answer with the gate PAGE. Rewriting sent
+      // back HTML under a 200, so a client fetch sailed past both its
+      // status checks and then threw parsing markup as JSON — which is how
+      // the GIF picker came to report a generic failure. JSON with a real
+      // status lets callers tell "not allowed" from "broken".
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "invite_required" }, { status: 401 });
+      }
+
       // Rewrite rather than redirect: the visitor keeps the URL they asked
       // for, so following the link again after entering the code lands
       // them where they meant to go.
