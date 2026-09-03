@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "@phosphor-icons/react";
 import { Avatar } from "@/components/ui/Avatar";
@@ -41,6 +42,15 @@ import {
 const HOLD_MS = 320;
 /** Movement that cancels the hold — treat it as a scroll, not a press. */
 const CANCEL_SLOP_PX = 10;
+/**
+ * Accounts shown at once. The stack grows upward from a tab at the bottom
+ * of the screen, so an unbounded list runs off the top and the first
+ * entries become unreachable. Four plus the "+" is about the tallest run a
+ * thumb covers without the wrist leaving the phone.
+ */
+const WINDOW = 4;
+/** How often the window advances while the thumb rests on an edge row. */
+const SCROLL_MS = 260;
 /** Username preview cap, so a long name cannot reach the screen edge. */
 const NAME_MAX = 14;
 
@@ -56,7 +66,11 @@ export function AccountSwitchPad({
   const router = useRouter();
   const toast = useToast();
 
-  const [rows, setRows] = useState<Row[]>([]);
+  const [accounts, setAccounts] = useState<SavedAccount[]>([]);
+  /** Index of the first account in the visible window. */
+  const [offset, setOffset] = useState(0);
+  /** -1 back towards the tab, +1 further up the list, 0 parked. */
+  const [scrollDir, setScrollDir] = useState<-1 | 0 | 1>(0);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [switching, setSwitching] = useState<SavedAccount | null>(null);
@@ -69,7 +83,31 @@ export function AccountSwitchPad({
   /** Set once the hold completes, so the trailing click is swallowed. */
   const didHold = useRef(false);
   const rowEls = useRef<(HTMLElement | null)[]>([]);
+  /** Last offset a tick was felt for, so haptics stay out of the updater. */
+  const lastFelt = useRef(0);
   const triggerRef = useRef<HTMLDivElement | null>(null);
+
+  // "+" is pinned above the window and never scrolls, so the way out of the
+  // list is always in the same place.
+  //
+  // The window is rendered in REVERSE: accounts[offset] sits nearest the
+  // thumb and later ones stack upward. The gesture starts at a tab on the
+  // bottom edge, so "further into the list" has to mean "further up" — the
+  // only direction with any room. Ordered the other way, the accounts you
+  // had not reached yet were hidden below the nav, where a thumb cannot go.
+  const visible = accounts.slice(offset, offset + WINDOW);
+  const rows: Row[] = [
+    { kind: "add" },
+    ...[...visible]
+      .reverse()
+      .map((account) => ({ kind: "account" as const, account })),
+  ];
+  /** More accounts further up the list, reached by moving the thumb up. */
+  const moreAbove = accounts.length - offset - WINDOW;
+  /** Accounts already passed, sitting back down towards the tab. */
+  const moreBelow = offset;
+
+  const stopScroll = useCallback(() => setScrollDir(0), []);
 
   const cancelHold = useCallback(() => {
     if (holdTimer.current) {
@@ -79,12 +117,41 @@ export function AccountSwitchPad({
   }, []);
 
   const close = useCallback(() => {
+    stopScroll();
     setOpen(false);
     setActiveIdx(null);
     setDetached(false);
-  }, []);
+  }, [stopScroll]);
 
-  useEffect(() => () => cancelHold(), [cancelHold]);
+  // The walk lives in an effect keyed on direction rather than a timer built
+  // inside a pointer handler: a handler only runs when the finger MOVES, and
+  // resting still is precisely the gesture here — so the timer it created got
+  // stranded instead of ticking.
+  useEffect(() => {
+    if (scrollDir === 0) return;
+    const max = Math.max(0, accounts.length - WINDOW);
+    const id = setInterval(() => {
+      setOffset((o) => Math.max(0, Math.min(max, o + scrollDir)));
+    }, SCROLL_MS);
+    return () => clearInterval(id);
+  }, [scrollDir, accounts.length]);
+
+  // A tick is worth feeling, but not from inside a state updater — those must
+  // be pure, and React is free to run them more than once.
+  useEffect(() => {
+    if (offset !== lastFelt.current) {
+      lastFelt.current = offset;
+      if (open) haptics.select();
+    }
+  }, [offset, open]);
+
+  useEffect(
+    () => () => {
+      cancelHold();
+      stopScroll();
+    },
+    [cancelHold, stopScroll]
+  );
 
   async function switchTo(account: SavedAccount) {
     setSwitching(account);
@@ -98,7 +165,8 @@ export function AccountSwitchPad({
       // Refresh tokens expire. Drop the dead entry rather than leaving a tile
       // that fails every time it is chosen.
       removeSavedAccount(account.userId);
-      setRows(buildRows(currentUserId));
+      setAccounts(otherAccounts(currentUserId));
+      setOffset(0);
       setSwitching(null);
       toast("That account needs signing in again", "error");
       return;
@@ -129,7 +197,8 @@ export function AccountSwitchPad({
 
     cancelHold();
     holdTimer.current = setTimeout(() => {
-      setRows(buildRows(currentUserId));
+      setAccounts(otherAccounts(currentUserId));
+      setOffset(0);
       rowEls.current = [];
       didHold.current = true;
       setOpen(true);
@@ -169,10 +238,25 @@ export function AccountSwitchPad({
       setActiveIdx(hit);
       if (hit !== null) haptics.select();
     }
+
+    // Edge scrolling. Resting on the account nearest the top walks the
+    // window up through the list; the one nearest the thumb walks it back
+    // down. The thumb never has to leave the screen or let go, which is the
+    // point — releasing is what commits.
+    //
+    // rows[0] is the pinned "+", so the first account is index 1.
+    const atTop = hit === 1;
+    const atBottom = hit === rows.length - 1 && rows.length > 1;
+    // Up the stack walks further into the list; back down returns.
+    const wantUp = atTop && moreAbove > 0;
+    const wantDown = atBottom && moreBelow > 0;
+
+    setScrollDir(wantUp ? 1 : wantDown ? -1 : 0);
   }
 
   function onPointerUp(e: React.PointerEvent) {
     cancelHold();
+    stopScroll();
     try {
       triggerRef.current?.releasePointerCapture(e.pointerId);
     } catch {
@@ -233,9 +317,8 @@ export function AccountSwitchPad({
                     row.account.email
                   : "Add account";
 
-              return (
+              const rowEl = (
                 <div
-                  key={row.kind === "add" ? "add" : row.account.userId}
                   ref={(el) => {
                     rowEls.current[i] = el;
                   }}
@@ -308,7 +391,18 @@ export function AccountSwitchPad({
                   </div>
                 </div>
               );
+
+              // The count sits directly under the pinned "+", which is where
+              // the accounts it stands for will appear as the window walks up.
+              return (
+                <Fragment key={row.kind === "add" ? "add" : row.account.userId}>
+                  {rowEl}
+                  {i === 0 && moreAbove > 0 && <MoreMarker n={moreAbove} />}
+                </Fragment>
+              );
             })}
+
+            {moreBelow > 0 && <MoreMarker n={moreBelow} />}
           </div>
         </>
       )}
@@ -360,15 +454,26 @@ export function AccountSwitchPad({
   );
 }
 
+/**
+ * How many accounts lie beyond the window in that direction. Deliberately
+ * not a hit target: resting the thumb on the edge row is what scrolls, and a
+ * second mechanism for the same thing is one more thing to get wrong.
+ */
+function MoreMarker({ n }: { n: number }) {
+  if (n <= 0) return null;
+  return (
+    <span
+      aria-hidden
+      className="rounded-full bg-surface/90 px-2 py-0.5 text-[10px] font-bold text-faint ring-1 ring-border/70"
+    >
+      +{n}
+    </span>
+  );
+}
+
 /** Current account excluded — switching to the one you are on is a no-op. */
-function buildRows(currentUserId: string): Row[] {
-  const others = getSavedAccounts().filter((a) => a.userId !== currentUserId);
-  // "+" furthest from the thumb: accounts are the common case and deserve the
-  // shortest reach.
-  return [
-    { kind: "add" },
-    ...others.map((account) => ({ kind: "account" as const, account })),
-  ];
+function otherAccounts(currentUserId: string): SavedAccount[] {
+  return getSavedAccounts().filter((a) => a.userId !== currentUserId);
 }
 
 function truncateName(name: string) {
