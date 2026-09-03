@@ -152,6 +152,13 @@ export function AuthCard({ mode }: { mode: Mode }) {
         if (addMode) {
           if (prevSession) await saveSessionAsAccount(prevSession);
           if (data.session) await saveSessionAsAccount(data.session);
+
+          // Hard navigation, matching switchTo. router.push keeps Next's
+          // router cache, whose /home payload was rendered for the account
+          // being switched away from — so a freshly added account landed on
+          // the previous user's feed and looked like it had not worked.
+          window.location.href = "/home";
+          return;
         }
         router.push("/home");
         router.refresh();

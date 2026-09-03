@@ -6,6 +6,7 @@ import { ClientErrorReporter } from "@/components/pwa/ClientErrorReporter";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { PostAuthTasks } from "@/components/auth/PostAuthTasks";
+import { SavedAccountSync } from "@/components/auth/SavedAccountSync";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -90,6 +91,9 @@ export default function RootLayout({
             the age gate for new accounts, and the session snapshot when
             adding one. Inert unless there is parked work. */}
         <PostAuthTasks />
+        {/* Refresh-token rotation makes a stored account snapshot go stale
+            the moment it is used; this keeps the switcher in step. */}
+        <SavedAccountSync />
         {children}
       </body>
     </html>
