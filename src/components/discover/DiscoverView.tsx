@@ -278,7 +278,7 @@ export function DiscoverView({
         {cat === "Shots" &&
           (trendingShots.length > 0 ? (
             <Section title="Shots">
-              <div className="grid grid-cols-3 gap-1.5 px-3">
+              <div className="grid grid-cols-2 gap-2.5 px-4 sm:grid-cols-3">
                 {trendingShots.map((s) => (
                   <ShotTile key={s.id} shot={s} />
                 ))}
@@ -383,7 +383,11 @@ function Section({
  * strict sequence.
  */
 function Grid({ children }: { children: React.ReactNode }) {
-  return <div className="columns-3 gap-1.5 px-3 [&>*]:mb-1.5">{children}</div>;
+  return (
+    <div className="columns-2 gap-2 px-3 sm:columns-3 [&>*]:mb-2">
+      {children}
+    </div>
+  );
 }
 
 function TagRail({ tags }: { tags: Tag[] }) {
