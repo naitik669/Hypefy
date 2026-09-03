@@ -39,7 +39,14 @@ export function GateCard() {
 
       // Full reload rather than router.push: the gate cookie has to be
       // present on the next request for the proxy to let it through.
-      window.location.replace("/");
+      //
+      // Back to the URL that was asked for, not "/". The proxy REWRITES to
+      // /gate instead of redirecting exactly so the address bar still holds
+      // the intended destination — sending everyone to the feed threw that
+      // away, so following a link into the app (add-account, a shared post)
+      // landed on home and read as that feature being broken.
+      const intended = window.location.pathname + window.location.search;
+      window.location.replace(intended.startsWith("/gate") ? "/" : intended);
     } catch {
       setError("Check your connection and try again.");
       setBusy(false);
