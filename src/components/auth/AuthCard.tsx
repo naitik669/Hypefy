@@ -44,6 +44,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [otpLoading, setOtpLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   // Signup-only: age gate + explicit consent (both required to create an account)
   const [dob, setDob] = useState("");
@@ -77,9 +78,14 @@ export function AuthCard({ mode }: { mode: Mode }) {
     return a;
   })();
   // Signup can't proceed until the user is 13+ and has accepted the policies.
-  const signupBlocked = mode === "signup" && (!consent || age === null || age < 13);
+  const signupBlocked =
+    mode === "signup" && (!consent || age === null || age < 13);
 
-  async function saveSessionAsAccount(session: { user: { id: string; email?: string | null }; access_token: string; refresh_token: string }) {
+  async function saveSessionAsAccount(session: {
+    user: { id: string; email?: string | null };
+    access_token: string;
+    refresh_token: string;
+  }) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("id, display_name, username, avatar_hue, avatar_url")
@@ -104,7 +110,9 @@ export function AuthCard({ mode }: { mode: Mode }) {
 
     // Adding another account: snapshot whoever's currently signed in
     // before we overwrite the client's active session below.
-    const prevSession = addMode ? (await supabase.auth.getSession()).data.session : null;
+    const prevSession = addMode
+      ? (await supabase.auth.getSession()).data.session
+      : null;
 
     try {
       if (mode === "signin") {
@@ -124,8 +132,17 @@ export function AuthCard({ mode }: { mode: Mode }) {
             .eq("id", data.user.id)
             .maybeSingle();
           if ((prof as any)?.two_step_enabled) {
+            // Send the code BEFORE dropping the password session. If the
+            // send fails after a signOut the account is unreachable: no
+            // session, no code, and a verify screen that can never be
+            // satisfied. Failing here still leaves them signed in.
+            const { error: otpError } = await supabase.auth.signInWithOtp({
+              email,
+              options: { shouldCreateUser: false },
+            });
+            if (otpError) throw otpError;
+
             await supabase.auth.signOut();
-            await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
             router.push(`/verify-2step?email=${encodeURIComponent(email)}`);
             return;
           }
@@ -145,7 +162,9 @@ export function AuthCard({ mode }: { mode: Mode }) {
           return;
         }
         if (!consent) {
-          setError("Please accept the Terms, Privacy Policy, and Community Guidelines.");
+          setError(
+            "Please accept the Terms, Privacy Policy, and Community Guidelines."
+          );
           setLoading(false);
           return;
         }
@@ -159,8 +178,16 @@ export function AuthCard({ mode }: { mode: Mode }) {
         });
         if (error) {
           // Confirmations off: Supabase returns an explicit error.
-          if (/already registered|already exists|already in use/i.test(error.message)) {
-            router.push(`/signin?exists=1&email=${encodeURIComponent(email)}${addMode ? "&add=1&view=form" : ""}`);
+          if (
+            /already registered|already exists|already in use/i.test(
+              error.message
+            )
+          ) {
+            router.push(
+              `/signin?exists=1&email=${encodeURIComponent(email)}${
+                addMode ? "&add=1&view=form" : ""
+              }`
+            );
             return;
           }
           throw error;
@@ -168,7 +195,11 @@ export function AuthCard({ mode }: { mode: Mode }) {
         // Confirmations on: Supabase hides existing emails (enumeration
         // protection) by returning a user with an empty identities array.
         if (data.user && (data.user.identities?.length ?? 0) === 0) {
-          router.push(`/signin?exists=1&email=${encodeURIComponent(email)}${addMode ? "&add=1&view=form" : ""}`);
+          router.push(
+            `/signin?exists=1&email=${encodeURIComponent(email)}${
+              addMode ? "&add=1&view=form" : ""
+            }`
+          );
           return;
         }
         // New account. If a session exists, go straight to setup; otherwise
@@ -199,6 +230,38 @@ export function AuthCard({ mode }: { mode: Mode }) {
     }
   }
 
+  /**
+   * Passwordless sign-in: email a one-time code instead of asking for a
+   * password. Shares the verify screen with two-step, since from that
+   * screen on the two flows are identical — enter the code, get a session.
+   *
+   * shouldCreateUser stays false so this cannot quietly mint an account
+   * for a mistyped address; unknown emails are turned away by Supabase.
+   */
+  async function handleEmailCode() {
+    setError(null);
+    setNotice(null);
+    if (!email.trim()) {
+      setError("Enter your email above, then ask for a code.");
+      return;
+    }
+
+    setOtpLoading(true);
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { shouldCreateUser: false },
+    });
+    setOtpLoading(false);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    router.push(
+      `/verify-2step?email=${encodeURIComponent(email.trim())}&reason=otp`
+    );
+  }
+
   async function handleForgotPassword() {
     setError(null);
     setNotice(null);
@@ -206,8 +269,11 @@ export function AuthCard({ mode }: { mode: Mode }) {
       setError("Enter your email above, then tap Forgot Password.");
       return;
     }
+    // The callback exchanges the recovery code and then forwards to `next`.
+    // Without it the link lands on "/" — signed in, password unchanged,
+    // which is the whole reason reset appeared to do nothing.
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/auth/callback`,
+      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
     });
     if (error) setError(error.message);
     else setNotice("Password reset link sent, check your inbox.");
@@ -222,7 +288,9 @@ export function AuthCard({ mode }: { mode: Mode }) {
         return;
       }
       if (!consent) {
-        setError("Please accept the Terms, Privacy Policy, and Community Guidelines.");
+        setError(
+          "Please accept the Terms, Privacy Policy, and Community Guidelines."
+        );
         return;
       }
     }
@@ -289,7 +357,10 @@ export function AuthCard({ mode }: { mode: Mode }) {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className={`flex flex-col gap-3 ${notice ? "mt-3" : "mt-6"}`}>
+        <form
+          onSubmit={handleSubmit}
+          className={`flex flex-col gap-3 ${notice ? "mt-3" : "mt-6"}`}
+        >
           <input
             type="email"
             inputMode="email"
@@ -303,7 +374,9 @@ export function AuthCard({ mode }: { mode: Mode }) {
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              autoComplete={
+                mode === "signin" ? "current-password" : "new-password"
+              }
               required
               minLength={6}
               placeholder="Password"
@@ -323,25 +396,40 @@ export function AuthCard({ mode }: { mode: Mode }) {
           </div>
 
           {mode === "signin" && (
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              className="-mt-1 self-end text-xs text-muted transition-colors hover:text-foreground"
-            >
-              Forgot Password?
-            </button>
+            <div className="-mt-1 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleEmailCode}
+                disabled={otpLoading}
+                className="text-xs text-muted transition-colors hover:text-foreground disabled:opacity-60"
+              >
+                {otpLoading ? "Sending code…" : "Email me a code instead"}
+              </button>
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="text-xs text-muted transition-colors hover:text-foreground"
+              >
+                Forgot Password?
+              </button>
+            </div>
           )}
 
           {mode === "signup" && (
             <>
               <div className="flex flex-col gap-1">
-                <label htmlFor="dob" className="text-[11px] font-medium text-muted">
+                <label
+                  htmlFor="dob"
+                  className="text-[11px] font-medium text-muted"
+                >
                   Date of birth
                 </label>
                 <DateOfBirthPicker id="dob" value={dob} onChange={setDob} />
               </div>
               {age !== null && age < 13 && (
-                <p className="text-[11px] text-danger">You must be at least 13 years old to use Hypefy.</p>
+                <p className="text-[11px] text-danger">
+                  You must be at least 13 years old to use Hypefy.
+                </p>
               )}
               <label className="flex items-start gap-2 text-[11px] leading-relaxed text-faint">
                 <input
@@ -352,9 +440,21 @@ export function AuthCard({ mode }: { mode: Mode }) {
                 />
                 <span>
                   I am 13 or older and agree to the{" "}
-                  <Link href="/terms" className="underline hover:text-muted">Terms</Link>,{" "}
-                  <Link href="/privacy" className="underline hover:text-muted">Privacy Policy</Link>, and{" "}
-                  <Link href="/guidelines" className="underline hover:text-muted">Community Guidelines</Link>.
+                  <Link href="/terms" className="underline hover:text-muted">
+                    Terms
+                  </Link>
+                  ,{" "}
+                  <Link href="/privacy" className="underline hover:text-muted">
+                    Privacy Policy
+                  </Link>
+                  , and{" "}
+                  <Link
+                    href="/guidelines"
+                    className="underline hover:text-muted"
+                  >
+                    Community Guidelines
+                  </Link>
+                  .
                 </span>
               </label>
             </>
@@ -415,7 +515,6 @@ export function AuthCard({ mode }: { mode: Mode }) {
             </Link>
           </p>
         )}
-
       </div>
     </div>
   );

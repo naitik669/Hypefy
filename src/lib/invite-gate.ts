@@ -33,6 +33,12 @@ const OPEN_PATHS = [
   "/gate",
   "/api/gate",
   "/auth/callback",
+
+  // Account recovery has to survive the wall. The callback forwards here
+  // after spending the recovery code, so gating it would strand anyone
+  // resetting a password on a device that has no gate cookie. The page is
+  // useless without a valid recovery session, so it opens nothing else.
+  "/reset-password",
   "/api/push",
   "/api/oneshot/reap",
 
@@ -71,7 +77,7 @@ export function isOpenPath(pathname: string): boolean {
   if (OPEN_PREFIXES.some((p) => pathname.startsWith(p))) return true;
   // Static assets served straight out of /public.
   return /\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|webmanifest)$/.test(
-    pathname,
+    pathname
   );
 }
 
@@ -96,7 +102,7 @@ export async function expectedToken(code: string): Promise<string> {
     encoder.encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
-    ["sign"],
+    ["sign"]
   );
 
   const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(code));
@@ -122,7 +128,7 @@ export function safeEqual(a: string, b: string): boolean {
 
 /** Does this request already carry a valid gate cookie? */
 export async function hasValidGateCookie(
-  cookieValue: string | undefined,
+  cookieValue: string | undefined
 ): Promise<boolean> {
   const code = process.env.APP_INVITE_CODE;
   if (!code) return true; // gate disabled
