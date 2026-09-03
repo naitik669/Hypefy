@@ -165,10 +165,20 @@ body {
 
 /* Reaction pill bounce — plays once when a reaction pill mounts */
 @keyframes react-pop {
-  0%   { transform: scale(0.4); opacity: 0; }
-  55%  { transform: scale(1.2); opacity: 1; }
-  75%  { transform: scale(0.9); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .animate-react-pop {
@@ -230,8 +240,13 @@ body {
 
 /* Thought bubble idle hover — barely-there, like it's actually floating */
 @keyframes bubble-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
 }
 .animate-bubble-float {
   animation: bubble-float 3.4s ease-in-out infinite;
@@ -239,9 +254,15 @@ body {
 
 /* Dice tumble on roll */
 @keyframes dice-spin {
-  0% { transform: rotate(0deg) scale(1); }
-  50% { transform: rotate(190deg) scale(1.2); }
-  100% { transform: rotate(360deg) scale(1); }
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(190deg) scale(1.2);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
 }
 .animate-dice-spin {
   animation: dice-spin 0.5s cubic-bezier(0.34, 1.4, 0.64, 1);
@@ -249,8 +270,14 @@ body {
 
 /* Rolled content landing in place */
 @keyframes roll-in {
-  from { opacity: 0; transform: translateY(6px) scale(0.97); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .animate-roll-in {
   animation: roll-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -261,8 +288,14 @@ body {
    its `origin` prop, and hardcoding it here overrode that, so every menu
    declaring bottom-left/top-left still grew from the top-right corner. */
 @keyframes menu-pop {
-  from { opacity: 0; transform: scale(0.94) translateY(-4px); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .animate-menu-pop {
   animation: menu-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
@@ -270,8 +303,14 @@ body {
 /* Closing counterpart — faster and eased-in, so dismissal feels immediate
    rather than a mirror of the entrance (a slow close reads as lag). */
 @keyframes menu-pop-out {
-  from { opacity: 1; transform: none; }
-  to { opacity: 0; transform: scale(0.96) translateY(2px); }
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(2px);
+  }
 }
 .animate-menu-pop-out {
   animation: menu-pop-out 0.13s cubic-bezier(0.4, 0, 1, 1) forwards;
@@ -293,15 +332,28 @@ body {
 
 /* List rows entering / leaving (notifications, results) */
 @keyframes row-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .animate-row-in {
   animation: row-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes row-out {
-  from { opacity: 1; max-height: 80px; }
-  to { opacity: 0; max-height: 0; transform: translateX(12px); }
+  from {
+    opacity: 1;
+    max-height: 80px;
+  }
+  to {
+    opacity: 0;
+    max-height: 0;
+    transform: translateX(12px);
+  }
 }
 .animate-row-out {
   overflow: hidden;
@@ -310,8 +362,14 @@ body {
 
 /* Tab-content crossfade (profile tabs, category switches) */
 @keyframes fade-swap {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .animate-fade-swap {
   animation: fade-swap 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -319,8 +377,14 @@ body {
 
 /* Media blur-up: applied when an image finishes loading */
 @keyframes img-in {
-  from { opacity: 0; filter: blur(8px); }
-  to { opacity: 1; filter: blur(0); }
+  from {
+    opacity: 0;
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
 }
 .animate-img-in {
   animation: img-in 0.35s ease-out;
@@ -328,15 +392,26 @@ body {
 
 /* End-of-feed "caught up" moment: badge springs in, ring + check draw on */
 @keyframes caughtup-pop {
-  0% { transform: scale(0.5); opacity: 0; }
-  65% { transform: scale(1.12); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  65% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 .animate-caughtup-pop {
   animation: caughtup-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes caughtup-draw {
-  to { stroke-dashoffset: 0; }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 .caughtup-ring {
   stroke-dasharray: 126;
@@ -704,8 +779,13 @@ body {
    per bar via animation-delay. Paired with a Mic icon in the chat bubble the
    OTHER party sees while you're recording (mirrors the typing dots). */
 @keyframes mic-wave {
-  0%, 100% { height: 5px; }
-  50% { height: 15px; }
+  0%,
+  100% {
+    height: 5px;
+  }
+  50% {
+    height: 15px;
+  }
 }
 .animate-mic-wave {
   height: 5px;
@@ -782,5 +862,41 @@ body {
   }
   .skeleton::after {
     animation: none;
+  }
+}
+
+/* ── Account switch pad ───────────────────────────────────────────────
+   The held-thumb account switcher on the profile tab. Tiles rise from
+   behind the nav bar and settle, staggered outwards from the thumb. */
+@keyframes switch-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes switch-veil {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-switch-veil {
+  animation: switch-veil 180ms ease-out backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-switch-veil {
+    animation: none;
+  }
+  /* switch-rise is applied as an inline style (each row carries its own
+     stagger delay), so it cannot be switched off by class alone. */
+  [role="listbox"][aria-label="Switch account"] > * {
+    animation: none !important;
   }
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { House, Chat, Lightning, Plus } from "@phosphor-icons/react";
 import { Avatar } from "@/components/ui/Avatar";
+import { AccountSwitchPad } from "@/components/layout/AccountSwitchPad";
 import { createClient } from "@/lib/supabase/client";
 import { haptics } from "@/lib/haptics";
 
@@ -37,29 +38,46 @@ export function BottomNav({
     const supabase = createClient();
     const ch = supabase
       .channel(`bottomnav-msgs:${currentUserId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (p) => {
-        const m = p.new as { sender_id: string };
-        if (m.sender_id !== currentUserId && !messagesActive) {
-          setUnreadMsgs((n) => n + 1);
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages" },
+        (p) => {
+          const m = p.new as { sender_id: string };
+          if (m.sender_id !== currentUserId && !messagesActive) {
+            setUnreadMsgs((n) => n + 1);
+          }
         }
-      })
-      .on("postgres_changes", {
-        event: "UPDATE", schema: "public", table: "conversation_members",
-        filter: `user_id=eq.${currentUserId}`,
-      }, (p) => {
-        // When last_read_at updates (opened a thread), decrement by 1
-        const m = p.new as { last_read_at: string | null };
-        if (m.last_read_at) setUnreadMsgs((n) => Math.max(0, n - 1));
-      })
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "conversation_members",
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        (p) => {
+          // When last_read_at updates (opened a thread), decrement by 1
+          const m = p.new as { last_read_at: string | null };
+          if (m.last_read_at) setUnreadMsgs((n) => Math.max(0, n - 1));
+        }
+      )
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      supabase.removeChannel(ch);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
 
   return (
     <>
       <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto flex h-[72px] w-full max-w-[480px] items-center justify-around border-t border-border/60 bg-background/85 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
-        <NavItem href="/home" label="Home" Icon={House} active={pathname.startsWith("/home")} />
+        <NavItem
+          href="/home"
+          label="Home"
+          Icon={House}
+          active={pathname.startsWith("/home")}
+        />
 
         {/* Messages with live unread badge */}
         <Link
@@ -82,7 +100,9 @@ export function BottomNav({
             <Chat
               size={26}
               weight={messagesActive ? "fill" : "regular"}
-              className={`transition-transform duration-300 ${messagesActive ? "-translate-y-0.5 scale-105" : ""}`}
+              className={`transition-transform duration-300 ${
+                messagesActive ? "-translate-y-0.5 scale-105" : ""
+              }`}
             />
             {unreadMsgs > 0 && !messagesActive && (
               // Red, not accent: a count you have not read is an alert, and
@@ -102,7 +122,10 @@ export function BottomNav({
         <button
           type="button"
           aria-label="Create"
-          onClick={() => { haptics.tap(); router.push("/create"); }}
+          onClick={() => {
+            haptics.tap();
+            router.push("/create");
+          }}
           className="flex h-11 w-[68px] -translate-y-1.5 items-center justify-center rounded-[20px] bg-accent text-accent-ink shadow-md transition-transform duration-200 will-change-transform hover:brightness-105 active:scale-90"
         >
           <span className="flex items-center justify-center">
@@ -110,43 +133,69 @@ export function BottomNav({
           </span>
         </button>
 
-        <NavItem href="/shots" label="Shots" Icon={Lightning} active={pathname.startsWith("/shots")} />
+        <NavItem
+          href="/shots"
+          label="Shots"
+          Icon={Lightning}
+          active={pathname.startsWith("/shots")}
+        />
 
-        <Link
-          href="/profile"
-          aria-label="Profile"
-          onClick={() => haptics.tap()}
-          className="flex h-12 w-12 flex-col items-center justify-center gap-1 transition-transform duration-200 active:scale-90"
-        >
-          <Avatar
-            name={displayName}
-            hue={avatarHue}
-            src={avatarUrl ?? undefined}
-            size={28}
-            className={`rounded-[9px] transition-all duration-300 ${profileActive ? "-translate-y-0.5 scale-105 opacity-100 brightness-100 ring-2 ring-accent/70" : "opacity-80 brightness-90"}`}
-          />
-          <NavDot active={profileActive} />
-        </Link>
+        {/* Tap goes to the profile as always; holding raises the account
+            switcher and the thumb picks from it without lifting. */}
+        <AccountSwitchPad currentUserId={currentUserId}>
+          <Link
+            href="/profile"
+            aria-label="Profile"
+            onClick={() => haptics.tap()}
+            className="flex h-12 w-12 flex-col items-center justify-center gap-1 transition-transform duration-200 active:scale-90"
+          >
+            <Avatar
+              name={displayName}
+              hue={avatarHue}
+              src={avatarUrl ?? undefined}
+              size={28}
+              className={`rounded-[9px] transition-all duration-300 ${
+                profileActive
+                  ? "-translate-y-0.5 scale-105 opacity-100 brightness-100 ring-2 ring-accent/70"
+                  : "opacity-80 brightness-90"
+              }`}
+            />
+            <NavDot active={profileActive} />
+          </Link>
+        </AccountSwitchPad>
       </nav>
-
     </>
   );
 }
 
 type PhosphorIcon = typeof House;
 
-function NavItem({ href, label, Icon, active }: { href: string; label: string; Icon: PhosphorIcon; active: boolean }) {
+function NavItem({
+  href,
+  label,
+  Icon,
+  active,
+}: {
+  href: string;
+  label: string;
+  Icon: PhosphorIcon;
+  active: boolean;
+}) {
   return (
     <Link
       href={href}
       aria-label={label}
       onClick={() => haptics.tap()}
-      className={`flex h-12 w-12 flex-col items-center justify-center gap-1 transition-[color,transform] duration-200 active:scale-90 ${active ? "text-foreground" : "text-faint hover:text-muted"}`}
+      className={`flex h-12 w-12 flex-col items-center justify-center gap-1 transition-[color,transform] duration-200 active:scale-90 ${
+        active ? "text-foreground" : "text-faint hover:text-muted"
+      }`}
     >
       <Icon
         size={26}
         weight={active ? "fill" : "regular"}
-        className={`transition-transform duration-300 ${active ? "-translate-y-0.5 scale-105" : ""}`}
+        className={`transition-transform duration-300 ${
+          active ? "-translate-y-0.5 scale-105" : ""
+        }`}
       />
       <NavDot active={active} />
     </Link>
