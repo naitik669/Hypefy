@@ -2,12 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { sanitizeInterests } from "@/lib/profile";
 
 export type UpdateProfileInput = {
   username: string;
   displayName: string;
   bio: string;
   profileTags: string[];
+  interests?: string[];
   avatarHue: number;
   avatarUrl?: string | null;
   bannerId?: string | null;
@@ -15,10 +17,12 @@ export type UpdateProfileInput = {
 };
 
 export async function updateProfile(
-  input: UpdateProfileInput,
+  input: UpdateProfileInput
 ): Promise<{ error: string } | { ok: true }> {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return { error: "You're signed out. Sign in and try again." };
 
   const username = input.username.trim().toLowerCase();
@@ -36,6 +40,7 @@ export async function updateProfile(
       display_name: input.displayName.trim(),
       bio: input.bio.trim() || null,
       profile_tags: input.profileTags,
+      interests: sanitizeInterests(input.interests ?? []),
       avatar_hue: input.avatarHue,
       avatar_url: input.avatarUrl ?? null,
       banner_id: input.bannerId ?? null,
@@ -52,5 +57,37 @@ export async function updateProfile(
 
   revalidatePath("/profile");
   revalidatePath(`/u/${username}`);
+  // Home is the RSC that turns interests into the ranker's interest set.
+  revalidatePath("/home");
+  return { ok: true };
+}
+
+/**
+ * Interests on their own, for the in-feed nudge.
+ *
+ * A server action rather than a client update, and not for tidiness: only
+ * a server action can revalidatePath("/home"), and /home is where
+ * interests are read and handed to feedScore. Writing this from the client
+ * would save the row and leave the cached feed exactly as it was, so the
+ * whole feature would appear to do nothing.
+ */
+export async function updateInterests(
+  interests: string[]
+): Promise<{ error: string } | { ok: true }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You're signed out. Sign in and try again." };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ interests: sanitizeInterests(interests) })
+    .eq("id", user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/home");
+  revalidatePath("/profile");
   return { ok: true };
 }

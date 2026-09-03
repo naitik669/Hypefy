@@ -10,29 +10,12 @@ import { AddHypersPrompt } from "@/components/feed/AddHypersPrompt";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CaughtUp } from "@/components/feed/CaughtUp";
 import { useFeedTab, type FeedTab } from "@/components/layout/FeedTabDropdown";
+import { loadSeen, saveSeen } from "@/lib/feed-seen";
 
 const PAGE_SIZE = 20;
-const SEEN_KEY = "hypefy_feed_seen";
-const SEEN_CAP = 500;
 const POST_SELECT =
   "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)";
 
-/** Recently-seen post ids (capped ring in localStorage) — lets the
- *  chronological tail skip posts already shown in recent sessions. */
-function loadSeen(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]") as string[]);
-  } catch {
-    return new Set();
-  }
-}
-function saveSeen(seen: Set<string>) {
-  try {
-    const arr = [...seen].slice(-SEEN_CAP);
-    localStorage.setItem(SEEN_KEY, JSON.stringify(arr));
-  } catch { /* quota / private mode, non-fatal */ }
-}
 
 function normalize(data: unknown[] | null): FeedPost[] {
   return (data ?? []).map((p: any) => ({

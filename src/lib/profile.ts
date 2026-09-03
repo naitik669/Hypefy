@@ -58,8 +58,7 @@ export const BANNERS: Banner[] = [
   {
     id: "creator-mode",
     label: "Creator Mode",
-    gradient:
-      "linear-gradient(120deg, #3a1a5a 0%, #1a2a6a 45%, #0a4a4a 100%)",
+    gradient: "linear-gradient(120deg, #3a1a5a 0%, #1a2a6a 45%, #0a4a4a 100%)",
   },
   {
     id: "rainbow-glow",
@@ -114,6 +113,22 @@ export const INTERESTS = [
   "Movies",
 ] as const;
 
+/**
+ * Keep only real interests, deduped and capped.
+ *
+ * These reach the feed ranker, so an arbitrary client string would become
+ * a ranking input nobody can see or audit. Unknown values are dropped
+ * rather than rejected — a stale client sending a retired interest should
+ * save the rest, not fail the whole edit.
+ */
+export function sanitizeInterests(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  const allowed = INTERESTS as readonly string[];
+  return [...new Set(input.filter((i): i is string => typeof i === "string"))]
+    .filter((i) => allowed.includes(i))
+    .slice(0, INTERESTS.length);
+}
+
 /** Deterministic avatar hue from a string id so users get a stable color. */
 export function hueFromId(id: string): number {
   let h = 0;
@@ -142,7 +157,7 @@ function mapProfile(row: any): Profile {
 
 /** Fetch the signed-in user's profile (server or client supabase client). */
 export async function getProfile(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient
 ): Promise<Profile | null> {
   const {
     data: { user },

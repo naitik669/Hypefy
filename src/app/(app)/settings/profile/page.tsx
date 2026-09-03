@@ -6,7 +6,9 @@ import { EditProfileForm } from "@/components/settings/EditProfileForm";
 
 export default async function EditProfilePage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
 
   const profile = await getProfile(supabase);
@@ -14,7 +16,9 @@ export default async function EditProfilePage() {
   return (
     <>
       <PageHeader title="Edit profile" showBack />
-      <p className="px-5 pb-1 pt-1 text-sm text-muted">Update how you appear on Hypefy.</p>
+      <p className="px-5 pb-1 pt-1 text-sm text-muted">
+        Update how you appear on Hypefy.
+      </p>
       <EditProfileForm
         userId={user.id}
         initial={{
@@ -26,6 +30,7 @@ export default async function EditProfilePage() {
           bannerId: profile?.bannerId ?? DEFAULT_BANNER_ID,
           bannerUrl: profile?.bannerUrl ?? null,
           profileTags: profile?.profileTags ?? [],
+          interests: profile?.interests ?? [],
         }}
       />
     </>
