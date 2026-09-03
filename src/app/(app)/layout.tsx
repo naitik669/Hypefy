@@ -7,7 +7,6 @@ import { GroupCallProvider } from "@/components/calls/GroupCallProvider";
 import { UploadProvider } from "@/components/upload/UploadProvider";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { NativeShell } from "@/components/native/NativeShell";
-import { AppSplash } from "@/components/layout/AppSplash";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PresenceHeartbeat } from "@/components/presence/PresenceHeartbeat";
 import { InAppNotifier } from "@/components/messages/InAppNotifier";
@@ -92,8 +91,6 @@ export default async function AppLayout({
       <CallProvider userId={user!.id}>
         <GroupCallProvider userId={user!.id}>
           <UploadProvider>
-            {/* Once per session, over the app rather than instead of it. */}
-            <AppSplash />
             <NativeShell />
             <PresenceHeartbeat />
             <InAppNotifier currentUserId={user!.id} />

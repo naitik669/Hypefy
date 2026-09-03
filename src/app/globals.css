@@ -938,3 +938,39 @@ body {
     animation: none;
   }
 }
+
+/* ── Opening splash ───────────────────────────────────────────────────
+   Server-rendered into the first HTML so it paints before hydration and
+   before the app shell's queries resolve. Visibility is driven entirely by
+   a data attribute on <html>, so React renders the markup once and never
+   has to touch it again — no DOM removal, no hydration mismatch.
+
+     (unset)  first paint, splash visible
+     done     fading out
+     off      gone, and never painted at all on a repeat load
+*/
+#hypefy-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background);
+  opacity: 1;
+  transition: opacity 420ms ease-out;
+}
+html[data-splash="done"] #hypefy-splash {
+  opacity: 0;
+  pointer-events: none;
+}
+html[data-splash="off"] #hypefy-splash {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #hypefy-splash {
+    transition: none;
+  }
+}
