@@ -2,12 +2,30 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, X, Send, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Image as ImageIcon,
+  X,
+  Send,
+  Crop,
+  Plus,
+  Music,
+  FileText,
+  BarChart2,
+  Clock,
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import Link from "next/link";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
+import { TopicSuggestions } from "@/components/post/TopicSuggestions";
 import { ImageCropper } from "@/components/post/ImageCropper";
 import { useUpload } from "@/components/upload/UploadProvider";
-import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
+import {
+  useMentionHashtag,
+  applySuggestion,
+  SuggestionDropdown,
+} from "@/components/ui/MentionHashtagPicker";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { TrackChip } from "@/components/music/TrackChip";
 import { PostPreview, type PreviewAuthor } from "@/components/post/PostPreview";
@@ -23,16 +41,22 @@ const DRAFT_KEY = "hypefy_post_draft";
 /** `origFile` is kept alongside the cropped `file` so switching to Auto can
  *  hand the untouched original back — a crop is destructive, and without the
  *  original there is no way to return to the photo's real shape. */
-type Img = { id: string; file: File; url: string; origSrc: string; origFile: File };
+type Img = {
+  id: string;
+  file: File;
+  url: string;
+  origSrc: string;
+  origFile: File;
+};
 
 /** Supported aspect ratios for posts. value = width / height;
  *  null means "whatever shape the photo already is". */
 const RATIOS = [
-  { label: "Auto", value: null,      cssRatio: null },
-  { label: "1:1", value: 1,          cssRatio: "aspect-square" },
-  { label: "3:4", value: 3 / 4,      cssRatio: "aspect-[3/4]" },
-  { label: "4:3", value: 4 / 3,      cssRatio: "aspect-[4/3]" },
-  { label: "16:9", value: 16 / 9,    cssRatio: "aspect-video" },
+  { label: "Auto", value: null, cssRatio: null },
+  { label: "1:1", value: 1, cssRatio: "aspect-square" },
+  { label: "3:4", value: 3 / 4, cssRatio: "aspect-[3/4]" },
+  { label: "4:3", value: 4 / 3, cssRatio: "aspect-[4/3]" },
+  { label: "16:9", value: 16 / 9, cssRatio: "aspect-video" },
 ] as const;
 
 /** Matches the CHECK constraint on posts.aspect_ratio (0035). A panorama or
@@ -46,28 +70,42 @@ const clampAR = (n: number) => Math.min(MAX_AR, Math.max(MIN_AR, n));
 function formatSchedule(v: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(v);
   if (!m) return v;
-  return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).toLocaleString(undefined, {
-    weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
-  });
+  return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).toLocaleString(
+    undefined,
+    {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "numeric",
+      minute: "2-digit",
+    }
+  );
 }
 
 /** Two pages: build it, then look at it.
  *
  *  Labels are for assistive tech and the header title only — the visible
  *  indicator is bars, deliberately unlabelled. */
-const STEPS = [
-  { label: "New Post" },
-  { label: "Preview" },
-] as const;
+const STEPS = [{ label: "New Post" }, { label: "Preview" }] as const;
 
-export function PostComposer({ userId, author }: { userId: string; author: PreviewAuthor }) {
+export function PostComposer({
+  userId,
+  author,
+}: {
+  userId: string;
+  author: PreviewAuthor;
+}) {
   const router = useRouter();
   const { uploadPost } = useUpload();
   const fileRef = useRef<HTMLInputElement>(null);
   const queueRef = useRef<{ id: string; origSrc: string; file: File }[]>([]);
 
   const [imgs, setImgs] = useState<Img[]>([]);
-  const [crop, setCrop] = useState<{ id: string; origSrc: string; file: File } | null>(null);
+  const [crop, setCrop] = useState<{
+    id: string;
+    origSrc: string;
+    file: File;
+  } | null>(null);
   const [ratioIdx, setRatioIdx] = useState(0); // index into RATIOS array; 0 = Auto
   /** Measured from the first photo when the shape is Auto. Every image in a
    *  post shares one frame in the feed, so the first one sets it — the same
@@ -79,7 +117,9 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [captionCursor, setCaptionCursor] = useState(0);
   const [bodyCursor, setBodyCursor] = useState(0);
-  const [activeField, setActiveField] = useState<"caption" | "body" | null>(null);
+  const [activeField, setActiveField] = useState<"caption" | "body" | null>(
+    null
+  );
   const [track, setTrack] = useState<Track | null>(null);
   const [trackPickerOpen, setTrackPickerOpen] = useState(false);
   const [schedulePickerOpen, setSchedulePickerOpen] = useState(false);
@@ -88,9 +128,11 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
   const [pollOptions, setPollOptions] = useState<string[] | null>(null);
   // Schedule: null = post now; otherwise a datetime-local string to publish at.
   const [scheduleAt, setScheduleAt] = useState<string | null>(null);
-  const activeText = activeField === "caption" ? caption : activeField === "body" ? body : "";
+  const activeText =
+    activeField === "caption" ? caption : activeField === "body" ? body : "";
   const activeCursor = activeField === "caption" ? captionCursor : bodyCursor;
-  const { suggestions: pickerSuggestions, reset: resetPicker } = useMentionHashtag(activeText, activeCursor);
+  const { suggestions: pickerSuggestions, reset: resetPicker } =
+    useMentionHashtag(activeText, activeCursor);
 
   // ── Draft persistence: text + song survive leaving the composer.
   // Images are deliberately excluded — File objects don't outlive the page.
@@ -98,13 +140,19 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
-      const d = JSON.parse(raw) as { caption?: string; body?: string; track?: Track | null };
+      const d = JSON.parse(raw) as {
+        caption?: string;
+        body?: string;
+        track?: Track | null;
+      };
       if (!d.caption && !d.body && !d.track) return;
       setCaption((d.caption ?? "").slice(0, 280));
       setBody((d.body ?? "").slice(0, 1000));
       setTrack(d.track ?? null);
       setDraftRestored(true);
-    } catch { /* corrupt draft — ignore */ }
+    } catch {
+      /* corrupt draft — ignore */
+    }
   }, []);
 
   useEffect(() => {
@@ -112,9 +160,14 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
       if (!caption.trim() && !body.trim() && !track) {
         localStorage.removeItem(DRAFT_KEY);
       } else {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ caption, body, track }));
+        localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ caption, body, track })
+        );
       }
-    } catch { /* storage full/unavailable — drafts are best-effort */ }
+    } catch {
+      /* storage full/unavailable — drafts are best-effort */
+    }
   }, [caption, body, track]);
 
   function discardDraft() {
@@ -122,20 +175,34 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
     setBody("");
     setTrack(null);
     setDraftRestored(false);
-    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {}
   }
 
-  function applyPickerSelection(s: Parameters<typeof applySuggestion>[2]): void {
+  function applyPickerSelection(
+    s: Parameters<typeof applySuggestion>[2]
+  ): void {
     if (activeField === "caption") {
-      const { newValue, newCursor } = applySuggestion(caption, captionCursor, s);
+      const { newValue, newCursor } = applySuggestion(
+        caption,
+        captionCursor,
+        s
+      );
       setCaption(newValue.slice(0, 280));
       setCaptionCursor(newCursor);
-      setTimeout(() => captionRef.current?.setSelectionRange(newCursor, newCursor), 0);
+      setTimeout(
+        () => captionRef.current?.setSelectionRange(newCursor, newCursor),
+        0
+      );
     } else if (activeField === "body") {
       const { newValue, newCursor } = applySuggestion(body, bodyCursor, s);
       setBody(newValue.slice(0, 1000));
       setBodyCursor(newCursor);
-      setTimeout(() => bodyRef.current?.setSelectionRange(newCursor, newCursor), 0);
+      setTimeout(
+        () => bodyRef.current?.setSelectionRange(newCursor, newCursor),
+        0
+      );
     }
     resetPicker();
   }
@@ -151,14 +218,17 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
    *  it drives `aspect-ratio` inline from the measured photo, falling back to
    *  square until the probe resolves (or before any photo is chosen). */
   const frameClass = currentRatio.cssRatio ?? "";
-  const frameStyle: React.CSSProperties = isAuto ? { aspectRatio: String(autoRatio ?? 1) } : {};
+  const frameStyle: React.CSSProperties = isAuto
+    ? { aspectRatio: String(autoRatio ?? 1) }
+    : {};
   /** Effective ratio: what the frame shows, and what the post is stored with. */
   const postAspect = currentRatio.value ?? autoRatio ?? 1;
   const frameWidth = postAspect >= 1 ? 200 : 140;
 
   const hashtags = extractHashtags(caption + " " + body);
   const mentions = extractMentions(caption + " " + body);
-  const canPost = caption.trim().length > 0 || body.trim().length > 0 || imgs.length > 0;
+  const canPost =
+    caption.trim().length > 0 || body.trim().length > 0 || imgs.length > 0;
 
   function openPicker() {
     fileRef.current?.click();
@@ -175,7 +245,13 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
       className={`flex h-12 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-40 ${className}`}
     >
       {willSchedule ? <CalendarClock size={17} /> : <Send size={17} />}
-      {submitted ? (willSchedule ? "Scheduling…" : "Sharing…") : willSchedule ? "Schedule" : "Post"}
+      {submitted
+        ? willSchedule
+          ? "Scheduling…"
+          : "Sharing…"
+        : willSchedule
+        ? "Schedule"
+        : "Post"}
     </button>
   );
 
@@ -201,16 +277,25 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
         setFileError(`Each image must be under ${MAX_SIZE_MB}MB.`);
         continue;
       }
-      raw.push({ id: crypto.randomUUID(), origSrc: URL.createObjectURL(f), file: f });
+      raw.push({
+        id: crypto.randomUUID(),
+        origSrc: URL.createObjectURL(f),
+        file: f,
+      });
     }
-    if (files.length > slots) setFileError(`You can add up to ${MAX_IMAGES} images.`);
+    if (files.length > slots)
+      setFileError(`You can add up to ${MAX_IMAGES} images.`);
     if (!raw.length) return;
 
     // Auto keeps the photo exactly as it is — no cropper, no re-encode. The
     // whole point of the mode is that nothing gets cut off.
     if (RATIOS[ratioIdx].value === null) {
       const added: Img[] = raw.map((r) => ({
-        id: r.id, file: r.file, url: r.origSrc, origSrc: r.origSrc, origFile: r.file,
+        id: r.id,
+        file: r.file,
+        url: r.origSrc,
+        origSrc: r.origSrc,
+        origFile: r.file,
       }));
       setImgs((prev) => [...prev, ...added]);
       if (imgs.length === 0) measureAuto(added[0].origSrc);
@@ -226,7 +311,8 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
   function measureAuto(src: string) {
     const probe = new window.Image();
     probe.onload = () => {
-      if (probe.naturalHeight > 0) setAutoRatio(clampAR(probe.naturalWidth / probe.naturalHeight));
+      if (probe.naturalHeight > 0)
+        setAutoRatio(clampAR(probe.naturalWidth / probe.naturalHeight));
     };
     probe.src = src;
   }
@@ -241,14 +327,20 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
     if (!imgs.length) return;
 
     if (RATIOS[nextIdx].value === null) {
-      setImgs((prev) => prev.map((p) => {
-        if (p.url !== p.origSrc) URL.revokeObjectURL(p.url);
-        return { ...p, file: p.origFile, url: p.origSrc };
-      }));
+      setImgs((prev) =>
+        prev.map((p) => {
+          if (p.url !== p.origSrc) URL.revokeObjectURL(p.url);
+          return { ...p, file: p.origFile, url: p.origSrc };
+        })
+      );
       measureAuto(imgs[0].origSrc);
       return;
     }
-    queueRef.current = imgs.map((p) => ({ id: p.id, origSrc: p.origSrc, file: p.origFile }));
+    queueRef.current = imgs.map((p) => ({
+      id: p.id,
+      origSrc: p.origSrc,
+      file: p.origFile,
+    }));
     advanceCrop();
   }
 
@@ -277,7 +369,8 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
 
   function onCropCancel() {
     // Skip this one; if it was never committed, free its object URL.
-    if (crop && !imgs.some((p) => p.id === crop.id)) URL.revokeObjectURL(crop.origSrc);
+    if (crop && !imgs.some((p) => p.id === crop.id))
+      URL.revokeObjectURL(crop.origSrc);
     advanceCrop();
   }
 
@@ -306,11 +399,17 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
   }
 
   // Blank options are dropped; a poll only ships with 2+ real choices.
-  const cleanPollOptions = (pollOptions ?? []).map((o) => o.trim()).filter(Boolean);
-  const cleanPoll = cleanPollOptions.length >= 2 ? { options: cleanPollOptions.slice(0, 4) } : null;
+  const cleanPollOptions = (pollOptions ?? [])
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const cleanPoll =
+    cleanPollOptions.length >= 2
+      ? { options: cleanPollOptions.slice(0, 4) }
+      : null;
 
   // Only schedule when a future time is chosen; past/now falls back to posting now.
-  const willSchedule = !!scheduleAt && new Date(scheduleAt).getTime() > Date.now() + 30_000;
+  const willSchedule =
+    !!scheduleAt && new Date(scheduleAt).getTime() > Date.now() + 30_000;
 
   function handlePost() {
     if (submitted || !canPost) return;
@@ -330,21 +429,23 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
       aspectRatio: imgs.length ? postAspect : null,
       scheduledAt: willSchedule ? new Date(scheduleAt!).toISOString() : null,
     });
-    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {}
     router.push(willSchedule ? "/create/scheduled" : "/home");
   }
 
   return (
     <>
-    {/* One back arrow for the whole flow: on Preview it returns to the
+      {/* One back arrow for the whole flow: on Preview it returns to the
         composer, on the composer it leaves the screen. */}
-    <PageHeader
-      title={STEPS[step].label}
-      showBack
-      onBack={step === 0 ? undefined : () => setStep(0)}
-    />
-    <div className="flex flex-col gap-4 px-4 pb-8 pt-2">
-      {/* ── Roadmap ─────────────────────────────────────────────
+      <PageHeader
+        title={STEPS[step].label}
+        showBack
+        onBack={step === 0 ? undefined : () => setStep(0)}
+      />
+      <div className="flex flex-col gap-4 px-4 pb-8 pt-2">
+        {/* ── Roadmap ─────────────────────────────────────────────
           Bars only. Naming the steps put a label on each pane that repeated
           what the pane already showed, and the labels had to be vague enough
           to cover everything inside them, so they said less than the content
@@ -354,94 +455,110 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
           forcing Back/Next to reach a pane already on screen would be an
           artificial lock. The label lives in aria-label for screen readers,
           which do need it. */}
-      {/* Position only. One arrow in the header is the entire back story, so
+        {/* Position only. One arrow in the header is the entire back story, so
           these stay indicators rather than becoming a second control. */}
-      <nav aria-label="Post steps" className="flex items-stretch gap-1.5 pt-1">
-        {STEPS.map((s, i) => (
-          <span
-            key={s.label}
-            aria-current={i === step ? "step" : undefined}
-            className={`h-[3px] min-w-0 flex-1 rounded-full transition-colors ${
-              i === step ? "bg-accent" : i < step ? "bg-accent/40" : "bg-border"
-            }`}
-          />
-        ))}
-      </nav>
-
-      {/* Draft restored notice */}
-      {draftRestored && (
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2">
-          <FileText size={14} className="shrink-0 text-accent" />
-          <p className="min-w-0 flex-1 text-xs text-muted">Draft restored from last time.</p>
-          <button
-            type="button"
-            onClick={discardDraft}
-            className="shrink-0 text-xs font-semibold text-muted transition-colors hover:text-danger"
-          >
-            Discard
-          </button>
-        </div>
-      )}
-
-      {/* ═══ Page 1 · Compose ═══════════════════════════════════ */}
-      {step === 0 && (
-      <>
-      {/* ── Image area ────────────────────────────────────────── */}
-      {imgs.length === 0 ? (
-        <div
-          className={`cursor-pointer ${frameClass} w-full flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface text-center transition-colors hover:border-accent/50`}
-          style={frameStyle}
-          onClick={openPicker}
+        <nav
+          aria-label="Post steps"
+          className="flex items-stretch gap-1.5 pt-1"
         >
-          <ImageIcon size={32} className="text-faint" />
-          <p className="text-sm text-muted">Tap to add photos</p>
-          <p className="text-xs text-faint">Up to {MAX_IMAGES} · JPEG, PNG, WebP · max {MAX_SIZE_MB}MB each</p>
-        </div>
-      ) : (
-        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-          {imgs.map((img, i) => (
-            <div
-              key={img.id}
-              className={`relative shrink-0 overflow-hidden rounded-2xl bg-surface ${frameClass}`}
-              style={{ ...frameStyle, width: frameWidth }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img.url} alt={`Image ${i + 1}`} className="h-full w-full object-cover" />
-              <button
-                type="button"
-                onClick={() => recrop(img)}
-                aria-label="Re-crop"
-                className="absolute left-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm"
-              >
-                <Crop size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={() => removeImg(img.id)}
-                aria-label="Remove image"
-                className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm"
-              >
-                <X size={14} />
-              </button>
-              <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-                {i + 1}/{imgs.length}
-              </span>
-            </div>
+          {STEPS.map((s, i) => (
+            <span
+              key={s.label}
+              aria-current={i === step ? "step" : undefined}
+              className={`h-[3px] min-w-0 flex-1 rounded-full transition-colors ${
+                i === step
+                  ? "bg-accent"
+                  : i < step
+                  ? "bg-accent/40"
+                  : "bg-border"
+              }`}
+            />
           ))}
-          {imgs.length < MAX_IMAGES && (
+        </nav>
+
+        {/* Draft restored notice */}
+        {draftRestored && (
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2">
+            <FileText size={14} className="shrink-0 text-accent" />
+            <p className="min-w-0 flex-1 text-xs text-muted">
+              Draft restored from last time.
+            </p>
             <button
               type="button"
-              onClick={openPicker}
-              className={`flex shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-border bg-surface text-faint transition-colors hover:border-accent/50 ${frameClass}`}
-              style={{ ...frameStyle, width: frameWidth }}
+              onClick={discardDraft}
+              className="shrink-0 text-xs font-semibold text-muted transition-colors hover:text-danger"
             >
-              <Plus size={26} />
-              <span className="text-xs">Add</span>
+              Discard
             </button>
-          )}
-        </div>
-      )}
-      {/* ── Photo shape ─────────────────────────────────────────
+          </div>
+        )}
+
+        {/* ═══ Page 1 · Compose ═══════════════════════════════════ */}
+        {step === 0 && (
+          <>
+            {/* ── Image area ────────────────────────────────────────── */}
+            {imgs.length === 0 ? (
+              <div
+                className={`cursor-pointer ${frameClass} w-full flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface text-center transition-colors hover:border-accent/50`}
+                style={frameStyle}
+                onClick={openPicker}
+              >
+                <ImageIcon size={32} className="text-faint" />
+                <p className="text-sm text-muted">Tap to add photos</p>
+                <p className="text-xs text-faint">
+                  Up to {MAX_IMAGES} · JPEG, PNG, WebP · max {MAX_SIZE_MB}MB
+                  each
+                </p>
+              </div>
+            ) : (
+              <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+                {imgs.map((img, i) => (
+                  <div
+                    key={img.id}
+                    className={`relative shrink-0 overflow-hidden rounded-2xl bg-surface ${frameClass}`}
+                    style={{ ...frameStyle, width: frameWidth }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={img.url}
+                      alt={`Image ${i + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => recrop(img)}
+                      aria-label="Re-crop"
+                      className="absolute left-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm"
+                    >
+                      <Crop size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeImg(img.id)}
+                      aria-label="Remove image"
+                      className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm"
+                    >
+                      <X size={14} />
+                    </button>
+                    <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                      {i + 1}/{imgs.length}
+                    </span>
+                  </div>
+                ))}
+                {imgs.length < MAX_IMAGES && (
+                  <button
+                    type="button"
+                    onClick={openPicker}
+                    className={`flex shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-border bg-surface text-faint transition-colors hover:border-accent/50 ${frameClass}`}
+                    style={{ ...frameStyle, width: frameWidth }}
+                  >
+                    <Plus size={26} />
+                    <span className="text-xs">Add</span>
+                  </button>
+                )}
+              </div>
+            )}
+            {/* ── Photo shape ─────────────────────────────────────────
           Only once there are photos to shape. Asking for a frame first meant
           choosing a crop for an image nobody had picked yet, and the control
           sat there dead on a text-only post.
@@ -449,137 +566,204 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
           Photos therefore always arrive under Auto (uncropped), and choosing
           a fixed shape here re-crops them from the originals kept on each
           Img — so the decision is reversible, including back to Auto. */}
-      {imgs.length > 0 && (
-        <div className="flex items-center gap-2">
-          <span className="shrink-0 text-xs font-semibold text-muted">Photo shape</span>
-          <div className="flex gap-1.5">
-            {RATIOS.map((r, i) => (
-              <button
-                key={r.label}
-                type="button"
-                onClick={() => changeShape(i)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-colors ${
-                  i === ratioIdx
-                    ? "bg-accent text-accent-ink"
-                    : "bg-surface text-muted hover:text-foreground"
-                }`}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+            {imgs.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 text-xs font-semibold text-muted">
+                  Photo shape
+                </span>
+                <div className="flex gap-1.5">
+                  {RATIOS.map((r, i) => (
+                    <button
+                      key={r.label}
+                      type="button"
+                      onClick={() => changeShape(i)}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-colors ${
+                        i === ratioIdx
+                          ? "bg-accent text-accent-ink"
+                          : "bg-surface text-muted hover:text-foreground"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-      {fileError && <p className="text-xs text-danger">{fileError}</p>}
+            {fileError && <p className="text-xs text-danger">{fileError}</p>}
 
-      {/* Caption — the line that sits beside your @name in the feed.
+            {/* Caption — the line that sits beside your @name in the feed.
           Labelled explicitly: two boxes differing only by placeholder text
           gave no way to tell what either one was for, or why one allowed
           280 characters and the other 1000. */}
-      <div className="relative">
-        <label htmlFor="post-caption" className="mb-1.5 flex items-baseline gap-2">
-          <span className="text-xs font-bold text-foreground">Caption</span>
-          <span className="text-[11px] text-faint">Shows next to your name</span>
-        </label>
-        <textarea
-          id="post-caption"
-          ref={captionRef}
-          value={caption}
-          onChange={(e) => { setCaption(e.target.value.slice(0, 280)); setCaptionCursor(e.target.selectionStart ?? 0); setActiveField("caption"); }}
-          onSelect={(e) => setCaptionCursor((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
-          onFocus={() => setActiveField("caption")}
-          onBlur={() => setTimeout(resetPicker, 150)}
-          rows={2}
-          placeholder="Write a caption…"
-          className="input resize-none"
-        />
-        {activeField === "caption" && <SuggestionDropdown suggestions={pickerSuggestions} onSelect={applyPickerSelection} />}
-        {/* No echo box under the field. It restated the text you were looking
+            <div className="relative">
+              <label
+                htmlFor="post-caption"
+                className="mb-1.5 flex items-baseline gap-2"
+              >
+                <span className="text-xs font-bold text-foreground">
+                  Caption
+                </span>
+                <span className="text-[11px] text-faint">
+                  Shows next to your name
+                </span>
+              </label>
+              <textarea
+                id="post-caption"
+                ref={captionRef}
+                value={caption}
+                onChange={(e) => {
+                  setCaption(e.target.value.slice(0, 280));
+                  setCaptionCursor(e.target.selectionStart ?? 0);
+                  setActiveField("caption");
+                }}
+                onSelect={(e) =>
+                  setCaptionCursor(
+                    (e.target as HTMLTextAreaElement).selectionStart ?? 0
+                  )
+                }
+                onFocus={() => setActiveField("caption")}
+                onBlur={() => setTimeout(resetPicker, 150)}
+                rows={2}
+                placeholder="Write a caption…"
+                className="input resize-none"
+              />
+              {activeField === "caption" && (
+                <SuggestionDropdown
+                  suggestions={pickerSuggestions}
+                  onSelect={applyPickerSelection}
+                />
+              )}
+              {/* No echo box under the field. It restated the text you were looking
             at while you typed it, and the Preview page now shows the styled
             version properly, in place. */}
-        <p className="mt-0.5 text-right text-xs text-faint">{caption.length}/280</p>
-      </div>
+              <p className="mt-0.5 text-right text-xs text-faint">
+                {caption.length}/280
+              </p>
 
-      {/* Body — the paragraph under the caption. Marked optional because it
+              {/* Appends rather than replaces, and respects the 280 cap so a full
+            caption cannot be silently truncated by tapping a chip. */}
+              <TopicSuggestions
+                caption={caption}
+                onPick={(tag) => {
+                  setCaption((prev) => {
+                    const next =
+                      prev.trimEnd() + (prev.trim() ? " " : "") + "#" + tag;
+                    return next.length > 280 ? prev : next;
+                  });
+                }}
+              />
+            </div>
+
+            {/* Body — the paragraph under the caption. Marked optional because it
           is: a post is postable with only a photo, or only a caption. */}
-      <div className="relative">
-        <label htmlFor="post-body" className="mb-1.5 flex items-baseline gap-2">
-          <span className="text-xs font-bold text-foreground">Say more</span>
-          <span className="text-[11px] text-faint">Optional · appears below the caption</span>
-        </label>
-        <textarea
-          id="post-body"
-          ref={bodyRef}
-          value={body}
-          onChange={(e) => { setBody(e.target.value.slice(0, 1000)); setBodyCursor(e.target.selectionStart ?? 0); setActiveField("body"); }}
-          onSelect={(e) => setBodyCursor((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
-          onFocus={() => setActiveField("body")}
-          onBlur={() => setTimeout(resetPicker, 150)}
-          rows={3}
-          placeholder="Add context, a story, your take…"
-          className="input resize-none"
-        />
-        {activeField === "body" && <SuggestionDropdown suggestions={pickerSuggestions} onSelect={applyPickerSelection} />}
-        <p className="mt-0.5 text-right text-xs text-faint">{body.length}/1000</p>
-      </div>
+            <div className="relative">
+              <label
+                htmlFor="post-body"
+                className="mb-1.5 flex items-baseline gap-2"
+              >
+                <span className="text-xs font-bold text-foreground">
+                  Say more
+                </span>
+                <span className="text-[11px] text-faint">
+                  Optional · appears below the caption
+                </span>
+              </label>
+              <textarea
+                id="post-body"
+                ref={bodyRef}
+                value={body}
+                onChange={(e) => {
+                  setBody(e.target.value.slice(0, 1000));
+                  setBodyCursor(e.target.selectionStart ?? 0);
+                  setActiveField("body");
+                }}
+                onSelect={(e) =>
+                  setBodyCursor(
+                    (e.target as HTMLTextAreaElement).selectionStart ?? 0
+                  )
+                }
+                onFocus={() => setActiveField("body")}
+                onBlur={() => setTimeout(resetPicker, 150)}
+                rows={3}
+                placeholder="Add context, a story, your take…"
+                className="input resize-none"
+              />
+              {activeField === "body" && (
+                <SuggestionDropdown
+                  suggestions={pickerSuggestions}
+                  onSelect={applyPickerSelection}
+                />
+              )}
+              <p className="mt-0.5 text-right text-xs text-faint">
+                {body.length}/1000
+              </p>
+            </div>
 
-      {/* Parsed tags preview */}
-      {(hashtags.length > 0 || mentions.length > 0) && (
-        <div className="flex flex-wrap gap-1.5 rounded-xl bg-surface px-3 py-2">
-          {hashtags.map((t) => (
-            <span key={t} className="rounded-full bg-hashtag/15 px-2 py-0.5 text-xs font-semibold text-hashtag">
-              #{t}
-            </span>
-          ))}
-          {mentions.map((m) => (
-            <span key={m} className="rounded-full bg-verified/15 px-2 py-0.5 text-xs font-semibold text-verified">
-              @{m}
-            </span>
-          ))}
-        </div>
-      )}
+            {/* Parsed tags preview */}
+            {(hashtags.length > 0 || mentions.length > 0) && (
+              <div className="flex flex-wrap gap-1.5 rounded-xl bg-surface px-3 py-2">
+                {hashtags.map((t) => (
+                  <span
+                    key={t}
+                    className="rounded-full bg-hashtag/15 px-2 py-0.5 text-xs font-semibold text-hashtag"
+                  >
+                    #{t}
+                  </span>
+                ))}
+                {mentions.map((m) => (
+                  <span
+                    key={m}
+                    className="rounded-full bg-verified/15 px-2 py-0.5 text-xs font-semibold text-verified"
+                  >
+                    @{m}
+                  </span>
+                ))}
+              </div>
+            )}
 
-      <p className="text-xs text-faint">Use # to add hashtags · @ to mention someone</p>
-      </>
-      )}
+            <p className="text-xs text-faint">
+              Use # to add hashtags · @ to mention someone
+            </p>
+          </>
+        )}
 
-      {/* Mounted outside both pages: the picker is opened programmatically,
+        {/* Mounted outside both pages: the picker is opened programmatically,
           and a cropper unmounted mid-crop would drop the image it is
           cropping. */}
-      <input
-        ref={fileRef}
-        type="file"
-        accept={ALLOWED_TYPES.join(",")}
-        multiple
-        className="hidden"
-        onChange={onFileChange}
-      />
-
-      {crop && (
-        <ImageCropper
-          src={crop.origSrc}
-          aspect={currentRatio.value ?? 1}
-          label={`Crop · ${currentRatio.label}`}
-          onCancel={onCropCancel}
-          onDone={onCropDone}
+        <input
+          ref={fileRef}
+          type="file"
+          accept={ALLOWED_TYPES.join(",")}
+          multiple
+          className="hidden"
+          onChange={onFileChange}
         />
-      )}
 
-      {/* ═══ Page 2 · Preview + extras ════════════════════════ */}
-      {step === 1 && (
-        <PostPreview
-          author={author}
-          imageUrls={imgs.map((i) => i.url)}
-          aspect={postAspect}
-          caption={caption}
-          body={body}
-          track={track}
-          pollOptions={pollOptions}
-        />
-      )}
+        {crop && (
+          <ImageCropper
+            src={crop.origSrc}
+            aspect={currentRatio.value ?? 1}
+            label={`Crop · ${currentRatio.label}`}
+            onCancel={onCropCancel}
+            onDone={onCropDone}
+          />
+        )}
 
-      {/* ── Attachments ─────────────────────────────────────────
+        {/* ═══ Page 2 · Preview + extras ════════════════════════ */}
+        {step === 1 && (
+          <PostPreview
+            author={author}
+            imageUrls={imgs.map((i) => i.url)}
+            aspect={postAspect}
+            caption={caption}
+            body={body}
+            track={track}
+            pollOptions={pollOptions}
+          />
+        )}
+
+        {/* ── Attachments ─────────────────────────────────────────
           On the compose page, because they are things you add to the post,
           not things you check on the way out.
 
@@ -587,171 +771,194 @@ export function PostComposer({ userId, author }: { userId: string; author: Previ
           and three of them wrapped into an untidy row; as full-width rows
           they read as a menu of what a post can carry, and each one has
           somewhere to show what you picked. */}
-      {step === 0 && (
-      <>
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface">
-        {track ? (
-          <div className="border-b border-border p-3">
-            <TrackChip track={track} onRemove={() => setTrack(null)} />
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setTrackPickerOpen(true)}
-            className="flex w-full items-center gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-white/[0.03]"
-          >
-            <Music size={16} className="shrink-0 text-muted" />
-            <span className="flex-1 text-sm font-semibold">Music</span>
-            <span className="text-xs text-faint">Add a song</span>
-            <ChevronRight size={15} className="shrink-0 text-faint" />
-          </button>
-        )}
-
-        {pollOptions === null ? (
-          <button
-            type="button"
-            onClick={() => setPollOptions(["", ""])}
-            className="flex w-full items-center gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-white/[0.03]"
-          >
-            <BarChart2 size={16} className="shrink-0 text-muted" />
-            <span className="flex-1 text-sm font-semibold">Poll</span>
-            <span className="text-xs text-faint">Ask something</span>
-            <ChevronRight size={15} className="shrink-0 text-faint" />
-          </button>
-        ) : (
-        <div className="flex flex-col gap-2 border-b border-border p-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-widest text-faint">Poll</p>
-            <button
-              type="button"
-              onClick={() => setPollOptions(null)}
-              aria-label="Remove poll"
-              className="flex h-6 w-6 items-center justify-center rounded-full text-muted hover:text-foreground"
-            >
-              <X size={14} />
-            </button>
-          </div>
-          {pollOptions.map((opt, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input
-                value={opt}
-                onChange={(e) =>
-                  setPollOptions((prev) => prev!.map((o, j) => (j === i ? e.target.value.slice(0, 60) : o)))
-                }
-                placeholder={`Option ${i + 1}`}
-                className="input h-10 flex-1 text-sm"
-              />
-              {pollOptions.length > 2 && (
+        {step === 0 && (
+          <>
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+              {track ? (
+                <div className="border-b border-border p-3">
+                  <TrackChip track={track} onRemove={() => setTrack(null)} />
+                </div>
+              ) : (
                 <button
                   type="button"
-                  onClick={() => setPollOptions((prev) => prev!.filter((_, j) => j !== i))}
-                  aria-label={`Remove option ${i + 1}`}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:text-foreground"
+                  onClick={() => setTrackPickerOpen(true)}
+                  className="flex w-full items-center gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-white/[0.03]"
                 >
-                  <X size={14} />
+                  <Music size={16} className="shrink-0 text-muted" />
+                  <span className="flex-1 text-sm font-semibold">Music</span>
+                  <span className="text-xs text-faint">Add a song</span>
+                  <ChevronRight size={15} className="shrink-0 text-faint" />
                 </button>
               )}
+
+              {pollOptions === null ? (
+                <button
+                  type="button"
+                  onClick={() => setPollOptions(["", ""])}
+                  className="flex w-full items-center gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-white/[0.03]"
+                >
+                  <BarChart2 size={16} className="shrink-0 text-muted" />
+                  <span className="flex-1 text-sm font-semibold">Poll</span>
+                  <span className="text-xs text-faint">Ask something</span>
+                  <ChevronRight size={15} className="shrink-0 text-faint" />
+                </button>
+              ) : (
+                <div className="flex flex-col gap-2 border-b border-border p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-widest text-faint">
+                      Poll
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setPollOptions(null)}
+                      aria-label="Remove poll"
+                      className="flex h-6 w-6 items-center justify-center rounded-full text-muted hover:text-foreground"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  {pollOptions.map((opt, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        value={opt}
+                        onChange={(e) =>
+                          setPollOptions((prev) =>
+                            prev!.map((o, j) =>
+                              j === i ? e.target.value.slice(0, 60) : o
+                            )
+                          )
+                        }
+                        placeholder={`Option ${i + 1}`}
+                        className="input h-10 flex-1 text-sm"
+                      />
+                      {pollOptions.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPollOptions((prev) =>
+                              prev!.filter((_, j) => j !== i)
+                            )
+                          }
+                          aria-label={`Remove option ${i + 1}`}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:text-foreground"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {pollOptions.length < 4 && (
+                    <button
+                      type="button"
+                      onClick={() => setPollOptions((prev) => [...prev!, ""])}
+                      className="self-start rounded-pill border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:text-foreground"
+                    >
+                      + Add option
+                    </button>
+                  )}
+                  <p className="text-[11px] text-faint">
+                    Your caption is the question. 2–4 options.
+                  </p>
+                </div>
+              )}
+
+              {scheduleAt === null ? (
+                <button
+                  type="button"
+                  onClick={() => setSchedulePickerOpen(true)}
+                  className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-white/[0.03]"
+                >
+                  <Clock size={16} className="shrink-0 text-muted" />
+                  <span className="flex-1 text-sm font-semibold">Schedule</span>
+                  <span className="text-xs text-faint">Post later</span>
+                  <ChevronRight size={15} className="shrink-0 text-faint" />
+                </button>
+              ) : (
+                <div className="flex items-center gap-3 px-3.5 py-3">
+                  <CalendarClock size={16} className="shrink-0 text-accent" />
+                  <button
+                    type="button"
+                    onClick={() => setSchedulePickerOpen(true)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <span className="block text-sm font-semibold">
+                      Scheduled
+                    </span>
+                    <span className="block truncate text-xs text-muted">
+                      {formatSchedule(scheduleAt)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScheduleAt(null)}
+                    aria-label="Cancel schedule"
+                    className="shrink-0 text-muted hover:text-foreground"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              )}
             </div>
-          ))}
-          {pollOptions.length < 4 && (
-            <button
-              type="button"
-              onClick={() => setPollOptions((prev) => [...prev!, ""])}
-              className="self-start rounded-pill border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:text-foreground"
-            >
-              + Add option
-            </button>
-          )}
-          <p className="text-[11px] text-faint">Your caption is the question. 2–4 options.</p>
-        </div>
-        )}
 
-        {scheduleAt === null ? (
-          <button
-            type="button"
-            onClick={() => setSchedulePickerOpen(true)}
-            className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-white/[0.03]"
-          >
-            <Clock size={16} className="shrink-0 text-muted" />
-            <span className="flex-1 text-sm font-semibold">Schedule</span>
-            <span className="text-xs text-faint">Post later</span>
-            <ChevronRight size={15} className="shrink-0 text-faint" />
-          </button>
-        ) : (
-          <div className="flex items-center gap-3 px-3.5 py-3">
-            <CalendarClock size={16} className="shrink-0 text-accent" />
-            <button
-              type="button"
-              onClick={() => setSchedulePickerOpen(true)}
-              className="min-w-0 flex-1 text-left"
-            >
-              <span className="block text-sm font-semibold">Scheduled</span>
-              <span className="block truncate text-xs text-muted">{formatSchedule(scheduleAt)}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setScheduleAt(null)}
-              aria-label="Cancel schedule"
-              className="shrink-0 text-muted hover:text-foreground"
-            >
-              <X size={15} />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* "Scheduled" alone, next to a Schedule row, read as a status rather
+            {/* "Scheduled" alone, next to a Schedule row, read as a status rather
           than a link to the list. */}
-      <Link href="/create/scheduled" className="self-end text-xs font-semibold text-muted hover:text-foreground">
-        View scheduled
-      </Link>
+            <Link
+              href="/create/scheduled"
+              className="self-end text-xs font-semibold text-muted hover:text-foreground"
+            >
+              View scheduled
+            </Link>
 
-      <TrackPicker open={trackPickerOpen} onClose={() => setTrackPickerOpen(false)} onSelect={setTrack} />
-      <SchedulePicker
-        open={schedulePickerOpen}
-        value={scheduleAt}
-        onClose={() => setSchedulePickerOpen(false)}
-        onConfirm={setScheduleAt}
-      />
-      </>
-      )}
+            <TrackPicker
+              open={trackPickerOpen}
+              onClose={() => setTrackPickerOpen(false)}
+              onSelect={setTrack}
+            />
+            <SchedulePicker
+              open={schedulePickerOpen}
+              value={scheduleAt}
+              onClose={() => setSchedulePickerOpen(false)}
+              onConfirm={setScheduleAt}
+            />
+          </>
+        )}
 
-      {/* ── Step navigation ─────────────────────────────────────
+        {/* ── Step navigation ─────────────────────────────────────
           One button per page. Going back is the header arrow's job, so
           nothing down here competes with it. */}
-      {step === 0 ? (
-        <div className="flex items-center gap-2">
-          {/* Preview is a step; Post is the commit. They differ by fill, not
+        {step === 0 ? (
+          <div className="flex items-center gap-2">
+            {/* Preview is a step; Post is the commit. They differ by fill, not
               only by wording — two accent buttons side by side would give
               navigating and publishing the same visual weight, which is the
               wrong signal on the one action that cannot be undone. */}
-          <button
-            type="button"
-            onClick={() => setStep(1)}
-            disabled={!canPost}
-            className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface text-sm font-bold text-foreground transition-colors hover:border-white/25 disabled:opacity-40"
-          >
-            Preview <ChevronRight size={17} />
-          </button>
-          {postButton("flex-1")}
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          {/* Second way back, next to the thing you are deciding about. The
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              disabled={!canPost}
+              className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface text-sm font-bold text-foreground transition-colors hover:border-white/25 disabled:opacity-40"
+            >
+              Preview <ChevronRight size={17} />
+            </button>
+            {postButton("flex-1")}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            {/* Second way back, next to the thing you are deciding about. The
               header arrow is easy to miss when your attention is on the
               preview and the Post button at the other end of the screen. */}
-          <button
-            type="button"
-            onClick={() => setStep(0)}
-            aria-label="Back to editing"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border text-muted transition-colors hover:border-white/25 hover:text-foreground"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          {postButton("flex-1")}
-        </div>
-      )}
-    </div>
+            <button
+              type="button"
+              onClick={() => setStep(0)}
+              aria-label="Back to editing"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border text-muted transition-colors hover:border-white/25 hover:text-foreground"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            {postButton("flex-1")}
+          </div>
+        )}
+      </div>
     </>
   );
 }
