@@ -3,7 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Star, MessageCircle, Send, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2 } from "lucide-react";
+import {
+  Star,
+  MessageCircle,
+  Send,
+  Bookmark,
+  Volume2,
+  VolumeX,
+  Play,
+  Pause,
+  ChevronLeft,
+  MoreHorizontal,
+  Trash2,
+  BookmarkCheck,
+  Loader2,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
@@ -53,10 +67,29 @@ export function ReelsFeed({
   const router = useRouter();
   const supabase = createClient();
   const [reels, setReels] = useState<Reel[]>(initialReels);
+  /**
+   * A sheet is up over the active reel.
+   *
+   * The sheets are owned by ReelCard but the swipe lives out here, so the
+   * stage had no idea one was open and stayed fully gesture-live underneath
+   * it. The sheet's own backdrop covers the stage, but relying on that
+   * alone leaves the feed one stray touch — a gesture begun as the sheet
+   * opens, a sheet that does not cover edge to edge — from scrolling away
+   * behind whatever is being read.
+   */
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   // Audible by default; ReelCard falls back to muted if the browser blocks
   // unmuted autoplay (no user gesture yet, e.g. a direct page load).
   const [muted, setMuted] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
+
+  // Only the active card reports, so a card that stops being active can no
+  // longer clear the flag it set. Without this the stage could be left
+  // permanently unswipeable by a sheet that is no longer on screen.
+  useEffect(() => {
+    setSheetOpen(false);
+  }, [activeIdx]);
   const swipeTouchStartY = useRef(0);
   /** Live finger offset in px, null when no finger is down. Doubles as the
    *  "is dragging" flag, which is what decides whether the transform
@@ -73,28 +106,39 @@ export function ReelsFeed({
     if (activeIdx < reels.length - 2) return;
     fetchingMore.current = true;
     const oldest = reels[reels.length - 1]?.created_at;
-    if (!oldest) { fetchingMore.current = false; return; }
+    if (!oldest) {
+      fetchingMore.current = false;
+      return;
+    }
     supabase
       .from("shots")
-      .select("id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, profiles(display_name, avatar_hue, username, avatar_url)")
+      .select(
+        "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, profiles(display_name, avatar_hue, username, avatar_url)"
+      )
       .lt("created_at", oldest)
       .order("created_at", { ascending: false })
       .limit(10)
       .then(({ data }) => {
         const fresh = (data ?? []).map((s: any) => ({
           ...s,
-          profiles: Array.isArray(s.profiles) ? s.profiles[0] ?? null : s.profiles,
+          profiles: Array.isArray(s.profiles)
+            ? s.profiles[0] ?? null
+            : s.profiles,
         })) as Reel[];
         if (fresh.length < 10) setNoMore(true);
         if (fresh.length > 0) {
-          setReels((prev) => [...prev, ...fresh.filter((f) => !prev.some((p) => p.id === f.id))]);
+          setReels((prev) => [
+            ...prev,
+            ...fresh.filter((f) => !prev.some((p) => p.id === f.id)),
+          ]);
         }
         fetchingMore.current = false;
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIdx, reels.length, noMore]);
 
   function onSwipeTouchStart(e: React.TouchEvent) {
+    if (sheetOpen) return;
     swipeTouchStartY.current = e.touches[0].clientY;
     swipeStartedAt.current = Date.now();
     setDrag(0);
@@ -108,7 +152,7 @@ export function ReelsFeed({
    * no indication a swipe was even being registered.
    */
   function onSwipeTouchMove(e: React.TouchEvent) {
-    if (drag === null) return;
+    if (sheetOpen || drag === null) return;
     let dy = e.touches[0].clientY - swipeTouchStartY.current;
 
     // Resist at the ends so pulling past the last reel feels like a boundary
@@ -121,6 +165,7 @@ export function ReelsFeed({
   }
 
   function onSwipeTouchEnd() {
+    if (sheetOpen) return;
     const dy = drag ?? 0;
     setDrag(null);
 
@@ -157,15 +202,20 @@ export function ReelsFeed({
       {reels.map((reel, i) => (
         <div
           key={reel.id}
-          className={`absolute inset-0 will-change-transform ${i === activeIdx ? "" : "pointer-events-none"}`}
+          className={`absolute inset-0 will-change-transform ${
+            i === activeIdx ? "" : "pointer-events-none"
+          }`}
           style={{
-            transform: `translateY(calc(${i - activeIdx} * 100% + ${drag ?? 0}px))`,
+            transform: `translateY(calc(${i - activeIdx} * 100% + ${
+              drag ?? 0
+            }px))`,
             // No transition while a finger is down — the reel has to track it
             // exactly. On release the settle is shorter than the old 0.4s,
             // which read as sluggish once the drag itself became live.
-            transition: drag === null
-              ? "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)"
-              : "none",
+            transition:
+              drag === null
+                ? "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)"
+                : "none",
           }}
         >
           <ReelCard
@@ -176,6 +226,8 @@ export function ReelsFeed({
             onAutoplayBlocked={() => setMuted(true)}
             isActive={i === activeIdx}
             onBack={() => router.back()}
+            // Only the active reel can raise a sheet, so only it reports.
+            onSheetChange={i === activeIdx ? setSheetOpen : undefined}
             // Buffer the current reel + its immediate neighbours so swiping to
             // the next one is instant; keep the rest at metadata only.
             preload={Math.abs(i - activeIdx) <= 1 ? "auto" : "metadata"}
@@ -194,6 +246,7 @@ function ReelCard({
   onAutoplayBlocked,
   isActive,
   onBack,
+  onSheetChange,
   preload = "metadata",
 }: {
   reel: Reel;
@@ -203,6 +256,7 @@ function ReelCard({
   onAutoplayBlocked: () => void;
   isActive: boolean;
   onBack: () => void;
+  onSheetChange?: (open: boolean) => void;
   preload?: "auto" | "metadata" | "none";
 }) {
   const supabase = createClient();
@@ -229,6 +283,7 @@ function ReelCard({
   const [commentCount, setCommentCount] = useState(reel.comment_count ?? 0);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const sheetOpen = commentsOpen || shareOpen;
 
   const [saved, setSaved] = useState(false);
   const [savePending, setSavePending] = useState(false);
@@ -237,7 +292,9 @@ function ReelCard({
   const isOwner = !!currentUserId && currentUserId === reel.user_id;
   const [ownerMenuOpen, setOwnerMenuOpen] = useState(false);
   const [inShowcase, setInShowcase] = useState(false);
-  const [ownerAction, setOwnerAction] = useState<"delete" | "showcase" | null>(null);
+  const [ownerAction, setOwnerAction] = useState<"delete" | "showcase" | null>(
+    null
+  );
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleted, setDeleted] = useState(false);
 
@@ -247,22 +304,50 @@ function ReelCard({
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTap = useRef(0);
 
+  // Tell the stage, so its swipe stops while something is being read on top
+  // of this reel.
+  useEffect(() => {
+    onSheetChange?.(sheetOpen);
+  }, [sheetOpen, onSheetChange]);
+
+  // Leaving a reel while its sheet is up would strand the stage as blocked.
+  useEffect(() => {
+    if (!isActive && sheetOpen) {
+      setCommentsOpen(false);
+      setShareOpen(false);
+    }
+  }, [isActive, sheetOpen]);
+
   // Autoplay the active reel; pause all others.
   // isActive is driven by the parent's JS-controlled index — no IntersectionObserver needed.
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
+
+    // Hold, do not rewind: the sheet closes back onto the same moment. A
+    // reel talking away underneath the comments you are reading is the
+    // other half of "do not interact with the shot behind".
+    if (isActive && sheetOpen) {
+      el.pause();
+      setPlaying(false);
+      return;
+    }
+
     if (isActive) {
-      el.play().then(() => setPlaying(true)).catch(() => {
-        // Unmuted autoplay is blocked before the first user gesture (direct
-        // page load) — fall back to muted so the reel still starts, and sync
-        // the global toggle so the speaker icon tells the truth.
-        if (!el.muted) {
-          onAutoplayBlocked();
-          el.muted = true;
-          el.play().then(() => setPlaying(true)).catch(() => {});
-        }
-      });
+      el.play()
+        .then(() => setPlaying(true))
+        .catch(() => {
+          // Unmuted autoplay is blocked before the first user gesture (direct
+          // page load) — fall back to muted so the reel still starts, and sync
+          // the global toggle so the speaker icon tells the truth.
+          if (!el.muted) {
+            onAutoplayBlocked();
+            el.muted = true;
+            el.play()
+              .then(() => setPlaying(true))
+              .catch(() => {});
+          }
+        });
     } else {
       el.pause();
       el.currentTime = 0; // rewind so it restarts clean when revisited
@@ -272,8 +357,8 @@ function ReelCard({
       if (iconTimer.current) clearTimeout(iconTimer.current);
       setIconShown(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, sheetOpen]);
 
   // Load hype + saved state for the current user.
   useEffect(() => {
@@ -288,7 +373,11 @@ function ReelCard({
           .eq("target_type", "shot")
           .eq("target_id", reel.id)
           .maybeSingle(),
-        supabase.from("shots").select("hype_count, comment_count, in_showcase").eq("id", reel.id).maybeSingle(),
+        supabase
+          .from("shots")
+          .select("hype_count, comment_count, in_showcase")
+          .eq("id", reel.id)
+          .maybeSingle(),
         supabase
           .from("saved_shots")
           .select("id")
@@ -355,8 +444,14 @@ function ReelCard({
     // supabase-js resolves with { error } instead of throwing, so the previous
     // try/catch never fired and a failed save left the icon stuck flipped.
     const { error } = prev
-      ? await supabase.from("saved_shots").delete().eq("user_id", currentUserId).eq("shot_id", reel.id)
-      : await supabase.from("saved_shots").insert({ user_id: currentUserId, shot_id: reel.id });
+      ? await supabase
+          .from("saved_shots")
+          .delete()
+          .eq("user_id", currentUserId)
+          .eq("shot_id", reel.id)
+      : await supabase
+          .from("saved_shots")
+          .insert({ user_id: currentUserId, shot_id: reel.id });
     setSavePending(false);
 
     // A unique-violation means the Shot is already saved, which is the
@@ -366,7 +461,9 @@ function ReelCard({
     // appeared never to work.
     if (error && !/duplicate|unique/i.test(error.message)) {
       setSaved(prev);
-      showToast(prev ? "Couldn't unsave that Shot." : "Couldn't save that Shot.");
+      showToast(
+        prev ? "Couldn't unsave that Shot." : "Couldn't save that Shot."
+      );
     }
   }
 
@@ -438,7 +535,9 @@ function ReelCard({
     const el = videoRef.current;
     if (!el) return;
     if (el.paused) {
-      el.play().then(() => setPlaying(true)).catch(() => {});
+      el.play()
+        .then(() => setPlaying(true))
+        .catch(() => {});
     } else {
       el.pause();
       setPlaying(false);
@@ -467,7 +566,11 @@ function ReelCard({
    */
   function primeFrame(el: HTMLVideoElement) {
     if (reel.poster_url || el.currentTime > 0) return;
-    try { el.currentTime = 0.05; } catch { /* seeking not ready yet */ }
+    try {
+      el.currentTime = 0.05;
+    } catch {
+      /* seeking not ready yet */
+    }
   }
 
   // Replay the burst without un-hyping (already hyped).
@@ -521,8 +624,14 @@ function ReelCard({
           if (v.duration) setProgress(v.currentTime / v.duration);
         }}
         onWaiting={() => setBuffering(true)}
-        onPlaying={() => { setBuffering(false); setFrameReady(true); }}
-        onCanPlay={() => { setBuffering(false); setFrameReady(true); }}
+        onPlaying={() => {
+          setBuffering(false);
+          setFrameReady(true);
+        }}
+        onCanPlay={() => {
+          setBuffering(false);
+          setFrameReady(true);
+        }}
       />
 
       {/* Placeholder for the gap before any frame exists. A tinted shimmer
@@ -564,7 +673,11 @@ function ReelCard({
           }`}
         >
           <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm">
-            {playing ? <Pause size={28} className="fill-white" /> : <Play size={30} className="ml-1 fill-white" />}
+            {playing ? (
+              <Pause size={28} className="fill-white" />
+            ) : (
+              <Play size={30} className="ml-1 fill-white" />
+            )}
           </span>
         </div>
       )}
@@ -606,7 +719,9 @@ function ReelCard({
           <span className="relative">
             <Star
               size={32}
-              className={`${hypeBurst ? "animate-hype-burst" : ""} ${hyped ? "text-hype" : "text-white"}`}
+              className={`${hypeBurst ? "animate-hype-burst" : ""} ${
+                hyped ? "text-hype" : "text-white"
+              }`}
               fill={hyped ? "currentColor" : "none"}
             />
             {showParticles && <HypeParticles size={10} />}
@@ -625,7 +740,11 @@ function ReelCard({
         </RailButton>
 
         <RailButton label="Save" onClick={toggleSave} disabled={savePending}>
-          <Bookmark size={30} className={saved ? "text-accent" : "text-white"} fill={saved ? "currentColor" : "none"} />
+          <Bookmark
+            size={30}
+            className={saved ? "text-accent" : "text-white"}
+            fill={saved ? "currentColor" : "none"}
+          />
         </RailButton>
 
         {isOwner && (
@@ -637,14 +756,27 @@ function ReelCard({
 
       {/* Author + caption */}
       <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col gap-2 p-4 pr-16">
-        <Link href={handle ? `/u/${handle}` : "#"} className="flex items-center gap-2.5">
-          <Avatar name={name} hue={hue} size={38} src={reel.profiles?.avatar_url ?? undefined} className="ring-2 ring-white/70" />
+        <Link
+          href={handle ? `/u/${handle}` : "#"}
+          className="flex items-center gap-2.5"
+        >
+          <Avatar
+            name={name}
+            hue={hue}
+            size={38}
+            src={reel.profiles?.avatar_url ?? undefined}
+            className="ring-2 ring-white/70"
+          />
           <span className="text-sm font-bold text-white drop-shadow">
             {handle ? `@${handle}` : name}
           </span>
         </Link>
         {reel.caption && (
-          <ExpandableText clampClass="line-clamp-2" className="text-sm text-white/90 drop-shadow" moreClassName="text-white/80">
+          <ExpandableText
+            clampClass="line-clamp-2"
+            className="text-sm text-white/90 drop-shadow"
+            moreClassName="text-white/80"
+          >
             {reel.caption}
           </ExpandableText>
         )}
@@ -654,7 +786,10 @@ function ReelCard({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[3px] bg-white/15">
         <div
           className="h-full bg-accent"
-          style={{ width: `${Math.round(progress * 100)}%`, transition: "width 0.15s linear" }}
+          style={{
+            width: `${Math.round(progress * 100)}%`,
+            transition: "width 0.15s linear",
+          }}
         />
       </div>
 
@@ -668,7 +803,10 @@ function ReelCard({
       {/* Owner actions menu — same pattern as ShowViewer */}
       {ownerMenuOpen && (
         <>
-          <div className="absolute inset-0 z-30" onClick={() => setOwnerMenuOpen(false)} />
+          <div
+            className="absolute inset-0 z-30"
+            onClick={() => setOwnerMenuOpen(false)}
+          />
           <div className="absolute inset-x-4 bottom-8 z-40 overflow-hidden rounded-2xl bg-elevated/95 ring-1 ring-border backdrop-blur-xl">
             <button
               type="button"
@@ -676,15 +814,21 @@ function ReelCard({
               onClick={toggleShotShowcase}
               className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5 disabled:opacity-50"
             >
-              {ownerAction === "showcase"
-                ? <Loader2 size={20} className="animate-spin text-accent" />
-                : inShowcase
-                  ? <BookmarkCheck size={20} className="text-accent" />
-                  : <Bookmark size={20} className="text-foreground" />}
+              {ownerAction === "showcase" ? (
+                <Loader2 size={20} className="animate-spin text-accent" />
+              ) : inShowcase ? (
+                <BookmarkCheck size={20} className="text-accent" />
+              ) : (
+                <Bookmark size={20} className="text-foreground" />
+              )}
               <div>
-                <p className="text-sm font-semibold">{inShowcase ? "Remove from Showcase" : "Add to Showcase"}</p>
+                <p className="text-sm font-semibold">
+                  {inShowcase ? "Remove from Showcase" : "Add to Showcase"}
+                </p>
                 <p className="text-xs text-muted">
-                  {inShowcase ? "Remove from your profile highlights" : "Pin to your profile highlights"}
+                  {inShowcase
+                    ? "Remove from your profile highlights"
+                    : "Pin to your profile highlights"}
                 </p>
               </div>
             </button>
@@ -697,10 +841,16 @@ function ReelCard({
               onClick={() => setConfirmDelete(true)}
               className="flex w-full items-center gap-3 px-5 py-4 text-left text-danger transition-colors hover:bg-danger/10 disabled:opacity-50"
             >
-              {ownerAction === "delete" ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
+              {ownerAction === "delete" ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <Trash2 size={20} />
+              )}
               <div>
                 <p className="text-sm font-semibold">Delete Shot</p>
-                <p className="text-xs opacity-70">Removes this Shot permanently</p>
+                <p className="text-xs opacity-70">
+                  Removes this Shot permanently
+                </p>
               </div>
             </button>
 
@@ -772,7 +922,9 @@ function RailButton({
       className="flex flex-col items-center gap-1 transition-transform active:scale-90 disabled:opacity-60"
     >
       {children}
-      <span className="text-xs font-semibold tabular-nums text-white drop-shadow">{label}</span>
+      <span className="text-xs font-semibold tabular-nums text-white drop-shadow">
+        {label}
+      </span>
     </button>
   );
 }
