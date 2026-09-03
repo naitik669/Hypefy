@@ -59,6 +59,23 @@ const RATIOS = [
   { label: "16:9", value: 16 / 9, cssRatio: "aspect-video" },
 ] as const;
 
+/**
+ * A rectangle in the option's real proportion, bounded to 24px.
+ *
+ * The picker used to be five text chips reading "1:1", "3:4", "16:9" — which
+ * names a shape rather than showing one, and asks the reader to translate.
+ * Drawing the shape means the control can be understood at a glance and
+ * without knowing what the notation means.
+ */
+function shapeBox(value: number | null): React.CSSProperties {
+  // Auto has no fixed shape; a square stands in and the dashed border says so.
+  const r = value ?? 1;
+  const max = 24;
+  return r >= 1
+    ? { width: max, height: Math.max(6, Math.round(max / r)) }
+    : { width: Math.max(6, Math.round(max * r)), height: max };
+}
+
 /** Matches the CHECK constraint on posts.aspect_ratio (0035). A panorama or
  *  a very tall screenshot would otherwise be rejected by the insert, or
  *  wreck the feed layout if it were not. */
@@ -567,25 +584,44 @@ export function PostComposer({
           a fixed shape here re-crops them from the originals kept on each
           Img — so the decision is reversible, including back to Auto. */}
             {imgs.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="shrink-0 text-xs font-semibold text-muted">
+              <div>
+                <p className="mb-2 text-xs font-semibold text-muted">
                   Photo shape
-                </span>
-                <div className="flex gap-1.5">
-                  {RATIOS.map((r, i) => (
-                    <button
-                      key={r.label}
-                      type="button"
-                      onClick={() => changeShape(i)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-colors ${
-                        i === ratioIdx
-                          ? "bg-accent text-accent-ink"
-                          : "bg-surface text-muted hover:text-foreground"
-                      }`}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
+                </p>
+                <div className="flex gap-2">
+                  {RATIOS.map((r, i) => {
+                    const on = i === ratioIdx;
+                    return (
+                      <button
+                        key={r.label}
+                        type="button"
+                        onClick={() => changeShape(i)}
+                        aria-pressed={on}
+                        aria-label={`Photo shape ${r.label}`}
+                        className={`flex flex-1 flex-col items-center justify-end gap-2 rounded-xl border py-2.5 transition-colors ${
+                          on
+                            ? "border-accent bg-accent/10"
+                            : "border-border bg-surface hover:border-white/20"
+                        }`}
+                      >
+                        <span className="flex h-6 items-center">
+                          <span
+                            style={shapeBox(r.value)}
+                            className={`block rounded-[3px] border-2 ${
+                              on ? "border-accent" : "border-muted"
+                            } ${r.value === null ? "border-dashed" : ""}`}
+                          />
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold ${
+                            on ? "text-accent" : "text-faint"
+                          }`}
+                        >
+                          {r.label}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
