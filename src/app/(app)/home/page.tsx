@@ -239,7 +239,7 @@ export default async function HomePage() {
   // only for the top 30, purely to set the icon state — so the ranker had no
   // idea which posts the viewer had already seen and kept showing them first.
   const candidateIds = [...byId.keys()];
-  const [hypesRes, savedRes, commentedRes] = await Promise.all(
+  const [hypesRes, savedRes, commentedRes, viewedRes] = await Promise.all(
     candidateIds.length > 0
       ? [
           supabase
@@ -258,10 +258,19 @@ export default async function HomePage() {
             .select("post_id")
             .eq("user_id", user.id)
             .in("post_id", candidateIds),
+          // Impressions, from post_views. This is the signal the feed never
+          // had: it could tell that you hyped something but not that you had
+          // already scrolled past it twice.
+          supabase
+            .from("post_views")
+            .select("post_id")
+            .eq("viewer_id", user.id)
+            .in("post_id", candidateIds),
         ]
-      : [{ data: [] }, { data: [] }, { data: [] }]
+      : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
   );
 
+  const viewedIds = new Set((viewedRes.data ?? []).map((v: any) => v.post_id));
   const hypedIds = new Set((hypesRes.data ?? []).map((h: any) => h.target_id));
   const savedIds = new Set((savedRes.data ?? []).map((s: any) => s.post_id));
   const commentedIds = new Set(
@@ -270,9 +279,10 @@ export default async function HomePage() {
 
   // Rank by blended score; recency breaks ties. Then diversify authors.
   const now = Date.now();
-  // Changes every few minutes, so a pull-to-refresh reshuffles posts that
-  // scored close together instead of replaying a byte-identical list.
-  const seed = refreshSeed(now);
+  // Drawn fresh per render, so a pull-to-refresh genuinely reshuffles posts
+  // that scored close together. It used to be a three-minute wall-clock
+  // bucket, which made two refreshes inside that window byte-identical.
+  const seed = refreshSeed();
   const ranked = [...byId.values()]
     .map((p: any) => ({
       ...p,
@@ -285,7 +295,8 @@ export default async function HomePage() {
           now,
           authorAff[p.user_id] ?? 0,
           tagAffinityFor(p, tagAff, followedTags),
-          hypedIds.has(p.id) || savedIds.has(p.id) || commentedIds.has(p.id)
+          hypedIds.has(p.id) || savedIds.has(p.id) || commentedIds.has(p.id),
+          viewedIds.has(p.id)
         ) + refreshJitter(p.id, seed),
     }))
     .sort((a: any, b: any) =>

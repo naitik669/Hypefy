@@ -16,7 +16,12 @@
  * (0 when none); both are capped so they enrich rather than dominate.
  */
 export function feedScore(
-  p: { created_at: string; hype_count?: number; comment_count?: number; save_count?: number },
+  p: {
+    created_at: string;
+    hype_count?: number;
+    comment_count?: number;
+    save_count?: number;
+  },
   isOwn: boolean,
   isFollowed: boolean,
   interestMatch: boolean,
@@ -33,13 +38,27 @@ export function feedScore(
    * down.
    */
   interacted = false,
+  /**
+   * Already scrolled past this one, from post_views.
+   *
+   * Distinct from `interacted`: hyping something is a strong statement about
+   * it, merely having it on screen is a weak one. Weaker penalty to match —
+   * enough to sink a post you have already been shown beneath ones you have
+   * not, without burying a followed friend you happened to glance at.
+   *
+   * They do not stack. Interacting implies seeing, and applying both would
+   * push anything you engaged with off the feed entirely.
+   */
+  seen = false
 ): number {
   const hours = (now - new Date(p.created_at).getTime()) / 3_600_000;
   const recency = Math.max(0, 48 - hours) * 2;
   const social = isFollowed ? 44 : isOwn ? 28 : 0;
   const engagement = Math.min(
-    (p.hype_count ?? 0) * 3 + (p.comment_count ?? 0) * 2 + (p.save_count ?? 0) * 2,
-    60,
+    (p.hype_count ?? 0) * 3 +
+      (p.comment_count ?? 0) * 2 +
+      (p.save_count ?? 0) * 2,
+    60
   );
   const interest = interestMatch ? 18 : 0;
   const authorBoost = Math.min(Math.max(authorAffinity, 0) * 1.5, 30);
@@ -47,8 +66,16 @@ export function feedScore(
   // Sized against the scale above: enough to sink a post below fresh
   // unseen ones, not enough to bury a followed friend's new post under a
   // stranger's.
-  const seenPenalty = interacted ? 55 : 0;
-  return recency + social + engagement + interest + authorBoost + tagBoost - seenPenalty;
+  const seenPenalty = interacted ? 55 : seen ? 25 : 0;
+  return (
+    recency +
+    social +
+    engagement +
+    interest +
+    authorBoost +
+    tagBoost -
+    seenPenalty
+  );
 }
 
 /**
@@ -62,17 +89,33 @@ export function feedScore(
  * The amplitude is small on purpose: it breaks ties, it does not outrank
  * recency or a followed author.
  */
-export function refreshJitter(id: string, seed: number, amplitude = 12): number {
+export function refreshJitter(
+  id: string,
+  seed: number,
+  amplitude = 20
+): number {
   let h = seed >>> 0;
   for (let i = 0; i < id.length; i++) {
-    h = (Math.imul(h ^ id.charCodeAt(i), 0x01000193) >>> 0);
+    h = Math.imul(h ^ id.charCodeAt(i), 0x01000193) >>> 0;
   }
   return ((h % 1000) / 1000) * amplitude;
 }
 
-/** Refresh bucket — changes every few minutes so a pull-to-refresh reorders. */
-export function refreshSeed(now: number, minutes = 3): number {
-  return Math.floor(now / (minutes * 60_000));
+/**
+ * A fresh seed for one render.
+ *
+ * This used to be a wall-clock bucket — Math.floor(now / 3 minutes) — which
+ * meant every refresh inside the same three minutes produced the identical
+ * seed, the identical jitter and therefore the identical feed. Pulling to
+ * refresh and seeing the same post at the top was not a coincidence; it was
+ * guaranteed.
+ *
+ * Random per call is safe here because the seed is drawn ONCE per render and
+ * then applied to every post. The thing to avoid is randomness inside the
+ * comparison itself, which would reorder mid-sort and break reconciliation.
+ */
+export function refreshSeed(): number {
+  return (Math.random() * 0xffffffff) >>> 0;
 }
 
 /**
@@ -83,7 +126,7 @@ export function refreshSeed(now: number, minutes = 3): number {
 export function tagAffinityFor(
   p: { hashtags?: string[] | null },
   tagWeights: Record<string, number>,
-  followedTags: Set<string> = new Set(),
+  followedTags: Set<string> = new Set()
 ): number {
   let sum = 0;
   for (const t of postTags(p)) {
@@ -111,5 +154,7 @@ export function diversify<T extends { user_id: string }>(ranked: T[]): T[] {
 
 /** Lowercased hashtag set from a post, for interest matching. */
 export function postTags(p: { hashtags?: string[] | null }): string[] {
-  return ((p.hashtags ?? []) as string[]).map((t) => t.replace(/^#/, "").toLowerCase());
+  return ((p.hashtags ?? []) as string[]).map((t) =>
+    t.replace(/^#/, "").toLowerCase()
+  );
 }
