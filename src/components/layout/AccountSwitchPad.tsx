@@ -203,11 +203,16 @@ export function AccountSwitchPad({
         <>
           {/* Portalled for the same reason as the switch overlay: the nav
               carries backdrop-blur, which makes it the containing block for
-              fixed children, so this dimmed the tab bar and nothing else. */}
+              fixed children, so this dimmed the tab bar and nothing else.
+
+              z-25 puts it UNDER the nav (z-30). The tiles live inside the
+              nav, and the nav is its own stacking context, so their z-50 is
+              capped at 30 against the root — a portalled veil at z-40 sat
+              on top of them and blurred the very accounts being chosen. */}
           {typeof document !== "undefined" &&
             createPortal(
               <div
-                className="animate-switch-veil fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]"
+                className="animate-switch-veil fixed inset-0 z-[25] bg-black/55 backdrop-blur-[2px]"
                 aria-hidden
                 onPointerDown={detached ? close : undefined}
               />,
