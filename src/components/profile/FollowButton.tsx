@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type FollowState = "none" | "requested" | "following";
 
@@ -23,8 +24,9 @@ export function FollowButton({
   className?: string;
 }) {
   const supabase = createClient();
+  const toast = useToast();
   const [state, setState] = useState<FollowState>(
-    initialFollowing ? "following" : initialRequested ? "requested" : "none",
+    initialFollowing ? "following" : initialRequested ? "requested" : "none"
   );
   const [pending, setPending] = useState(false);
 
@@ -37,18 +39,34 @@ export function FollowButton({
     // row + its notification, and gate private accounts behind a request.
     if (prev === "none") {
       setState("following"); // optimistic; corrected from the RPC's return
-      const { data, error } = await supabase.rpc("follow_user", { p_target: targetUserId });
-      if (error) setState(prev);
-      else setState(data === "requested" ? "requested" : "following");
+      const { data, error } = await supabase.rpc("follow_user", {
+        p_target: targetUserId,
+      });
+      // A follow that silently reverts is the one failure that quietly
+      // produces an empty feed later, so it has to be said out loud.
+      if (error) {
+        setState(prev);
+        toast("Couldn't follow. Try again.", "error");
+      } else setState(data === "requested" ? "requested" : "following");
     } else {
       setState("none"); // covers both unfollow and cancel-request
-      const { error } = await supabase.rpc("unfollow_user", { p_target: targetUserId });
-      if (error) setState(prev);
+      const { error } = await supabase.rpc("unfollow_user", {
+        p_target: targetUserId,
+      });
+      if (error) {
+        setState(prev);
+        toast("Couldn't update that. Try again.", "error");
+      }
     }
     setPending(false);
   }
 
-  const label = state === "following" ? "Following" : state === "requested" ? "Requested" : "Follow";
+  const label =
+    state === "following"
+      ? "Following"
+      : state === "requested"
+      ? "Requested"
+      : "Follow";
   const filled = state === "none";
 
   return (

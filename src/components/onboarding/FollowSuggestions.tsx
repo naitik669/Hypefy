@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/ui/ToastProvider";
 import { Avatar } from "@/components/ui/Avatar";
 
 type Person = {
@@ -26,6 +27,7 @@ export function FollowSuggestions({
   people: Person[];
 }) {
   const supabase = createClient();
+  const toast = useToast();
   const router = useRouter();
   const [followed, setFollowed] = useState<Set<string>>(new Set());
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -45,10 +47,22 @@ export function FollowSuggestions({
 
     if (isFollowed) {
       const { error } = await supabase.rpc("unfollow_user", { p_target: id });
-      if (error) setFollowed((prev) => new Set(prev).add(id));
+      if (error) {
+        setFollowed((prev) => new Set(prev).add(id));
+        toast("Couldn't update that. Try again.", "error");
+      }
     } else {
       const { error } = await supabase.rpc("follow_user", { p_target: id });
-      if (error) setFollowed((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      // Of every follow in the app this one matters most: it is the only
+      // thing seeding a brand new account's feed.
+      if (error) {
+        setFollowed((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        toast("Couldn't follow. Try again.", "error");
+      }
     }
     setPendingId(null);
   }
@@ -96,14 +110,27 @@ export function FollowSuggestions({
               <div
                 key={p.id}
                 className={`flex items-center gap-3 rounded-2xl border px-3 py-3 transition-colors ${
-                  isFollowed ? "border-accent/30 bg-accent/[0.05]" : "border-border bg-surface"
+                  isFollowed
+                    ? "border-accent/30 bg-accent/[0.05]"
+                    : "border-border bg-surface"
                 }`}
               >
-                <Avatar name={name} hue={p.avatar_hue ?? 280} size={46} src={p.avatar_url ?? undefined} />
+                <Avatar
+                  name={name}
+                  hue={p.avatar_hue ?? 280}
+                  size={46}
+                  src={p.avatar_url ?? undefined}
+                />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{name}</p>
-                  {p.username && <p className="truncate text-xs text-muted">@{p.username}</p>}
-                  {p.bio && <p className="mt-0.5 truncate text-xs text-faint">{p.bio}</p>}
+                  {p.username && (
+                    <p className="truncate text-xs text-muted">@{p.username}</p>
+                  )}
+                  {p.bio && (
+                    <p className="mt-0.5 truncate text-xs text-faint">
+                      {p.bio}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -118,7 +145,9 @@ export function FollowSuggestions({
                   {pendingId === p.id ? (
                     <Loader2 size={13} className="animate-spin" />
                   ) : isFollowed ? (
-                    <><Check size={13} /> Following</>
+                    <>
+                      <Check size={13} /> Following
+                    </>
                   ) : (
                     "Follow"
                   )}

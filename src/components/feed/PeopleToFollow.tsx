@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Loader2, UserPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/ui/ToastProvider";
 import { Avatar } from "@/components/ui/Avatar";
 import { haptics } from "@/lib/haptics";
 
@@ -33,6 +34,7 @@ export function PeopleToFollow({
   sub?: string;
 }) {
   const supabase = createClient();
+  const toast = useToast();
   const [people, setPeople] = useState<Person[] | null>(null);
   const [followed, setFollowed] = useState<Set<string>>(new Set());
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -41,7 +43,9 @@ export function PeopleToFollow({
     let active = true;
     (async () => {
       // Prefer the suggestion RPC; fall back to recent completed profiles.
-      const { data: suggested } = await supabase.rpc("get_suggested_people", { p_limit: 12 });
+      const { data: suggested } = await supabase.rpc("get_suggested_people", {
+        p_limit: 12,
+      });
       let list = (suggested ?? []) as Person[];
       if (list.length === 0) {
         const { data } = await supabase
@@ -56,8 +60,10 @@ export function PeopleToFollow({
       const exclude = new Set([currentUserId, ...followingIds]);
       if (active) setPeople(list.filter((p) => !exclude.has(p.id)));
     })();
-    return () => { active = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function toggle(p: Person) {
@@ -68,16 +74,27 @@ export function PeopleToFollow({
     haptics.select();
     setFollowed((prev) => {
       const next = new Set(prev);
-      if (isFollowed) next.delete(id); else next.add(id);
+      if (isFollowed) next.delete(id);
+      else next.add(id);
       return next;
     });
 
     if (isFollowed) {
       const { error } = await supabase.rpc("unfollow_user", { p_target: id });
-      if (error) setFollowed((prev) => new Set(prev).add(id));
+      if (error) {
+        setFollowed((prev) => new Set(prev).add(id));
+        toast("Couldn't update that. Try again.", "error");
+      }
     } else {
       const { error } = await supabase.rpc("follow_user", { p_target: id });
-      if (error) setFollowed((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      if (error) {
+        setFollowed((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        toast("Couldn't follow. Try again.", "error");
+      }
     }
     setPendingId(null);
   }
@@ -103,7 +120,9 @@ export function PeopleToFollow({
     return (
       <div className="px-6 py-14 text-center">
         <p className="text-sm font-semibold">No suggestions right now</p>
-        <p className="mt-1 text-xs text-muted">Check back soon, the community is growing.</p>
+        <p className="mt-1 text-xs text-muted">
+          Check back soon, the community is growing.
+        </p>
       </div>
     );
   }
@@ -126,26 +145,52 @@ export function PeopleToFollow({
             <div
               key={p.id}
               className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition-colors ${
-                isF ? "border-accent/30 bg-accent/[0.05]" : "border-border bg-surface"
+                isF
+                  ? "border-accent/30 bg-accent/[0.05]"
+                  : "border-border bg-surface"
               }`}
             >
               <Link href={href}>
-                <Avatar name={name} hue={p.avatar_hue ?? 280} size={44} src={p.avatar_url ?? undefined} />
+                <Avatar
+                  name={name}
+                  hue={p.avatar_hue ?? 280}
+                  size={44}
+                  src={p.avatar_url ?? undefined}
+                />
               </Link>
               <div className="min-w-0 flex-1">
-                <Link href={href} className="block truncate text-sm font-semibold hover:underline">{name}</Link>
-                {p.username && <p className="truncate text-xs text-muted">@{p.username}</p>}
-                {p.bio && <p className="mt-0.5 truncate text-xs text-faint">{p.bio}</p>}
+                <Link
+                  href={href}
+                  className="block truncate text-sm font-semibold hover:underline"
+                >
+                  {name}
+                </Link>
+                {p.username && (
+                  <p className="truncate text-xs text-muted">@{p.username}</p>
+                )}
+                {p.bio && (
+                  <p className="mt-0.5 truncate text-xs text-faint">{p.bio}</p>
+                )}
               </div>
               <button
                 type="button"
                 onClick={() => toggle(p)}
                 disabled={pendingId === p.id}
                 className={`flex h-9 min-w-[84px] items-center justify-center gap-1 rounded-xl text-xs font-bold transition-transform active:scale-95 disabled:opacity-60 ${
-                  isF ? "border border-border bg-elevated text-foreground" : "bg-accent text-accent-ink"
+                  isF
+                    ? "border border-border bg-elevated text-foreground"
+                    : "bg-accent text-accent-ink"
                 }`}
               >
-                {pendingId === p.id ? <Loader2 size={13} className="animate-spin" /> : isF ? <><Check size={13} /> Following</> : "Follow"}
+                {pendingId === p.id ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : isF ? (
+                  <>
+                    <Check size={13} /> Following
+                  </>
+                ) : (
+                  "Follow"
+                )}
               </button>
             </div>
           );
