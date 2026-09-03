@@ -153,6 +153,7 @@ export default async function PublicProfilePage({
         avatarUrl={profile.avatar_url}
         bannerId={bannerId}
         bannerUrl={profile.banner_url}
+        accentId={(profile as { accent_id?: string | null }).accent_id}
         hasActiveShow={!!entryShowId}
         entryShowId={entryShowId}
         userId={profile.id}

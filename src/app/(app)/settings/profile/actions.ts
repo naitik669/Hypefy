@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { sanitizeInterests } from "@/lib/profile";
+import { ACCENTS, DEFAULT_ACCENT_ID } from "@/lib/profile-accent";
 
 export type UpdateProfileInput = {
   username: string;
@@ -10,6 +11,7 @@ export type UpdateProfileInput = {
   bio: string;
   profileTags: string[];
   interests?: string[];
+  accentId?: string | null;
   avatarHue: number;
   avatarUrl?: string | null;
   bannerId?: string | null;
@@ -41,6 +43,11 @@ export async function updateProfile(
       bio: input.bio.trim() || null,
       profile_tags: input.profileTags,
       interests: sanitizeInterests(input.interests ?? []),
+      // Fall back rather than reject: a stale client sending a retired
+      // accent should still save the rest of the edit.
+      accent_id: ACCENTS.some((a) => a.id === input.accentId)
+        ? (input.accentId as string)
+        : DEFAULT_ACCENT_ID,
       avatar_hue: input.avatarHue,
       avatar_url: input.avatarUrl ?? null,
       banner_id: input.bannerId ?? null,

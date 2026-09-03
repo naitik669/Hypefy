@@ -31,6 +31,7 @@ export default async function EditProfilePage() {
           bannerUrl: profile?.bannerUrl ?? null,
           profileTags: profile?.profileTags ?? [],
           interests: profile?.interests ?? [],
+          accentId: profile?.accentId ?? null,
         }}
       />
     </>

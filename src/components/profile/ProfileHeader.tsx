@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
+import { accentVars } from "@/lib/profile-accent";
 import { BannerEditMenu } from "@/components/profile/BannerEditMenu";
 import { FollowStats } from "@/components/profile/FollowStats";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
@@ -39,6 +40,7 @@ export function ProfileHeader({
   anthem = null,
   note = null,
   noteEditable = false,
+  accentId,
 }: {
   name: string;
   username: string | null;
@@ -61,9 +63,14 @@ export function ProfileHeader({
   anthem?: unknown;
   note?: ProfileNote;
   noteEditable?: boolean;
+  /** Profile owner's accent. Tints THIS subtree only. */
+  accentId?: string | null;
 }) {
   return (
-    <>
+    // Redefining the two accent variables here re-tints every bg-accent /
+    // text-accent below it and nothing else — the bottom nav and feed are not
+    // descendants, so the viewer's own chrome stays Hypefy lime.
+    <div style={accentVars(accentId)}>
       {/* Relative wrapper, not the banner itself: ProfileBanner carries the
           caller's margins, and the pencil has to sit inside those. */}
       <div className="relative mx-2 mt-2">
@@ -93,6 +100,7 @@ export function ProfileHeader({
               hasActiveShow={hasActiveShow}
               showId={entryShowId}
               card={{
+                accentId,
                 userId,
                 name,
                 username,
@@ -150,6 +158,6 @@ export function ProfileHeader({
 
         {actions && <div className="mt-3 flex gap-2">{actions}</div>}
       </div>
-    </>
+    </div>
   );
 }

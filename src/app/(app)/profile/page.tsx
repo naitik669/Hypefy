@@ -71,6 +71,7 @@ export default async function ProfilePage() {
         avatarUrl={profile?.avatarUrl}
         bannerId={bannerId}
         bannerUrl={profile?.bannerUrl}
+        accentId={profile?.accentId}
         hasActiveShow={!!entryShowId}
         entryShowId={entryShowId}
         userId={user.id}

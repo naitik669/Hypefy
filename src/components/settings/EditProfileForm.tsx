@@ -10,6 +10,7 @@ import { BannerPicker } from "@/components/profile/BannerPicker";
 import { ImageCropper } from "@/components/post/ImageCropper";
 import { PROFILE_TAGS, DEFAULT_BANNER_ID } from "@/lib/profile";
 import { InterestPills } from "@/components/profile/InterestPills";
+import { AccentPicker } from "@/components/profile/AccentPicker";
 import { updateProfile } from "@/app/(app)/settings/profile/actions";
 
 const HUES = [280, 200, 150, 30, 330, 95, 250, 10];
@@ -30,6 +31,7 @@ export function EditProfileForm({
     bannerUrl: string | null;
     profileTags: string[];
     interests: string[];
+    accentId: string | null;
   };
 }) {
   const supabase = createClient();
@@ -46,6 +48,7 @@ export function EditProfileForm({
   const [bannerUrl, setBannerUrl] = useState<string | null>(initial.bannerUrl);
   const [tags, setTags] = useState<string[]>(initial.profileTags);
   const [interests, setInterests] = useState<string[]>(initial.interests);
+  const [accentId, setAccentId] = useState<string | null>(initial.accentId);
 
   const [uStatus, setUStatus] = useState<UsernameStatus>("idle");
   const [uploading, setUploading] = useState(false);
@@ -163,6 +166,7 @@ export function EditProfileForm({
         bio,
         profileTags: tags,
         interests,
+        accentId,
         avatarHue,
         avatarUrl,
         bannerId,
@@ -386,6 +390,13 @@ export function EditProfileForm({
       {/* Interests steer the FEED; the tags above describe the PERSON.
           Adjacent because they look alike, labelled apart because they do
           different jobs. */}
+      <Field label="Accent">
+        <p className="mb-2 -mt-0.5 text-xs text-muted">
+          Colours your profile and card for everyone who visits.
+        </p>
+        <AccentPicker value={accentId} onChange={setAccentId} />
+      </Field>
+
       <Field label="Interests">
         <p className="mb-2 -mt-0.5 text-xs text-muted">
           Topics you want more of. These shape your feed.

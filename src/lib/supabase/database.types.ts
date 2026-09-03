@@ -1243,6 +1243,7 @@ export type Database = {
           bio: string | null
           card_layout: string
           card_theme: string
+          accent_id: string
           created_at: string
           current_vibe: string | null
           display_name: string | null
@@ -1272,6 +1273,7 @@ export type Database = {
           bio?: string | null
           card_layout?: string
           card_theme?: string
+          accent_id?: string
           created_at?: string
           current_vibe?: string | null
           display_name?: string | null
@@ -1301,6 +1303,7 @@ export type Database = {
           bio?: string | null
           card_layout?: string
           card_theme?: string
+          accent_id?: string
           created_at?: string
           current_vibe?: string | null
           display_name?: string | null

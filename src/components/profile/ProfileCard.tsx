@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Link2, QrCode, Pencil, Download, Share2, Image as ImageIcon } from "lucide-react";
+import { accentVars } from "@/lib/profile-accent";
+import {
+  X,
+  Link2,
+  QrCode,
+  Pencil,
+  Download,
+  Share2,
+  Image as ImageIcon,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { AvatarImg } from "@/components/ui/AvatarImg";
@@ -25,6 +34,8 @@ import { ProfileCardEditor } from "@/components/profile/ProfileCardEditor";
 import { ProfileCardQr } from "@/components/profile/ProfileCardQr";
 
 export type ProfileCardData = {
+  /** Owner's accent. The card portals to body, so it re-applies it itself. */
+  accentId?: string | null;
   userId: string;
   name: string;
   username: string | null;
@@ -87,7 +98,10 @@ export function ProfileCard({
 
     setLinks((linkRes.data as ProfileLink[] | null) ?? []);
 
-    const row = profRes.data as { card_layout?: string; card_theme?: string } | null;
+    const row = profRes.data as {
+      card_layout?: string;
+      card_theme?: string;
+    } | null;
     if (isCardLayout(row?.card_layout)) setLayout(row.card_layout);
     if (row?.card_theme) setTheme(row.card_theme);
     setLoading(false);
@@ -104,6 +118,10 @@ export function ProfileCard({
 
   return createPortal(
     <div
+      // Re-applied here on purpose. This card portals to document.body, so
+      // it escapes the tinted wrapper in ProfileHeader entirely and would
+      // otherwise render in brand lime while the profile behind it does not.
+      style={accentVars(data.accentId)}
       className="fixed inset-0 z-[200] flex flex-col bg-black/90 backdrop-blur-xl"
       role="dialog"
       aria-modal="true"
@@ -170,12 +188,24 @@ export function ProfileCard({
 
           {pane === "card" && (
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              <Action icon={QrCode} label="QR code" onClick={() => setPane("qr")} />
+              <Action
+                icon={QrCode}
+                label="QR code"
+                onClick={() => setPane("qr")}
+              />
               {data.avatarUrl && (
-                <Action icon={ImageIcon} label="View photo" onClick={() => setPhotoOpen(true)} />
+                <Action
+                  icon={ImageIcon}
+                  label="View photo"
+                  onClick={() => setPhotoOpen(true)}
+                />
               )}
               {data.isOwn && (
-                <Action icon={Pencil} label="Edit card" onClick={() => setPane("edit")} />
+                <Action
+                  icon={Pencil}
+                  label="Edit card"
+                  onClick={() => setPane("edit")}
+                />
               )}
               <ShareAction url={url} name={data.name} />
             </div>
@@ -187,7 +217,7 @@ export function ProfileCard({
         <ZoomViewer src={data.avatarUrl} onClose={() => setPhotoOpen(false)} />
       )}
     </div>,
-    document.body,
+    document.body
   );
 }
 
@@ -237,7 +267,11 @@ function ShareAction({ url, name }: { url: string; name: string }) {
   }
 
   return (
-    <Action icon={copied ? Link2 : Share2} label={copied ? "Copied" : "Share"} onClick={share} />
+    <Action
+      icon={copied ? Link2 : Share2}
+      label={copied ? "Copied" : "Share"}
+      onClick={share}
+    />
   );
 }
 
@@ -273,7 +307,11 @@ function CardFace({
           className="block h-44 w-full"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={data.avatarUrl} alt="" className="h-full w-full object-cover" />
+          <img
+            src={data.avatarUrl}
+            alt=""
+            className="h-full w-full object-cover"
+          />
         </button>
       )}
 
@@ -283,7 +321,11 @@ function CardFace({
         }`}
       >
         {!photoLed && (
-          <div className={`flex w-full gap-3 ${centred ? "flex-col items-center" : "items-center"}`}>
+          <div
+            className={`flex w-full gap-3 ${
+              centred ? "flex-col items-center" : "items-center"
+            }`}
+          >
             <AvatarImg
               url={data.avatarUrl}
               name={data.name}
@@ -297,11 +339,17 @@ function CardFace({
         {photoLed && <Identity data={data} centred={false} />}
 
         {data.bio && (
-          <p className="text-sm leading-relaxed text-foreground/80">{data.bio}</p>
+          <p className="text-sm leading-relaxed text-foreground/80">
+            {data.bio}
+          </p>
         )}
 
         {data.tags.length > 0 && (
-          <div className={`flex flex-wrap gap-1.5 ${centred ? "justify-center" : ""}`}>
+          <div
+            className={`flex flex-wrap gap-1.5 ${
+              centred ? "justify-center" : ""
+            }`}
+          >
             {data.tags.map((t) => (
               <span
                 key={t}
@@ -313,7 +361,9 @@ function CardFace({
           </div>
         )}
 
-        <div className={`flex gap-4 text-xs ${centred ? "justify-center" : ""}`}>
+        <div
+          className={`flex gap-4 text-xs ${centred ? "justify-center" : ""}`}
+        >
           <Stat n={data.stats.posts} label="Posts" />
           <Stat n={data.stats.followers} label="Followers" />
           <Stat n={data.stats.following} label="Following" />
@@ -333,7 +383,9 @@ function CardFace({
                   rel="noopener noreferrer nofollow ugc"
                   className="flex w-full flex-col items-center rounded-xl border border-white/15 bg-black/30 px-4 py-2.5 text-center transition active:scale-[0.99] hover:bg-black/45"
                 >
-                  <span className="text-sm font-bold text-foreground">{l.label}</span>
+                  <span className="text-sm font-bold text-foreground">
+                    {l.label}
+                  </span>
                   <span className="mt-0.5 truncate text-[10px] text-foreground/50">
                     {prettyUrl(href)}
                   </span>
@@ -347,12 +399,24 @@ function CardFace({
   );
 }
 
-function Identity({ data, centred }: { data: ProfileCardData; centred: boolean }) {
+function Identity({
+  data,
+  centred,
+}: {
+  data: ProfileCardData;
+  centred: boolean;
+}) {
   return (
     <div className={`min-w-0 ${centred ? "text-center" : "text-left"}`}>
-      <div className={`flex items-center gap-1 ${centred ? "justify-center" : ""}`}>
-        <h2 className="truncate text-lg font-extrabold tracking-tight">{data.name}</h2>
-        {data.verified && <VerifiedStar className="h-[15px] w-[15px] shrink-0" />}
+      <div
+        className={`flex items-center gap-1 ${centred ? "justify-center" : ""}`}
+      >
+        <h2 className="truncate text-lg font-extrabold tracking-tight">
+          {data.name}
+        </h2>
+        {data.verified && (
+          <VerifiedStar className="h-[15px] w-[15px] shrink-0" />
+        )}
       </div>
       {data.username && (
         <p className="text-sm text-foreground/60">@{data.username}</p>
@@ -364,7 +428,8 @@ function Identity({ data, centred }: { data: ProfileCardData; centred: boolean }
 function Stat({ n, label }: { n: number; label: string }) {
   return (
     <span className="text-foreground/70">
-      <b className="font-extrabold text-foreground">{n.toLocaleString()}</b> {label}
+      <b className="font-extrabold text-foreground">{n.toLocaleString()}</b>{" "}
+      {label}
     </span>
   );
 }

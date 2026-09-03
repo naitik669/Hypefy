@@ -24,6 +24,8 @@ export type Profile = {
   bannerUrl: string | null;
   anthem: unknown;
   interests: string[];
+  /** Profile-surface accent; see ./profile-accent.ts. */
+  accentId: string | null;
   profileTags: string[];
   profileCompleted: boolean;
   isVerified: boolean;
@@ -149,6 +151,7 @@ function mapProfile(row: any): Profile {
     bannerUrl: row.banner_url,
     anthem: row.anthem ?? null,
     interests: row.interests ?? [],
+    accentId: (row as { accent_id?: string | null }).accent_id ?? null,
     profileTags: row.profile_tags ?? [],
     profileCompleted: row.profile_completed ?? false,
     isVerified: row.is_verified ?? false,
