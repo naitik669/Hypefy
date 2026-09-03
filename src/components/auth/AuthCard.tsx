@@ -217,8 +217,14 @@ export function AuthCard({ mode }: { mode: Mode }) {
             if (prevSession) await saveSessionAsAccount(prevSession);
             await saveSessionAsAccount(data.session);
           }
-          router.push("/setup-profile");
-          router.refresh();
+
+          // Hard navigation. router.push issues an RSC request that can
+          // still carry the outgoing session, and /setup-profile redirects
+          // to /signin when getUser() comes back null — so a brand new
+          // account was thrown back to the sign-in form it had just left,
+          // with the account created and its profile never built.
+          window.location.href = "/setup-profile";
+          return;
         } else {
           // No session yet (email confirmation pending) — restore whoever
           // was signed in so they aren't logged out while waiting.

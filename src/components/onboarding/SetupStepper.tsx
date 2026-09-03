@@ -1,16 +1,48 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { ArrowRight, ArrowLeft, Check, Loader2, Upload, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  Loader2,
+  Upload,
+  Sparkles,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ProfilePreviewCard } from "@/components/onboarding/ProfilePreviewCard";
 import { saveProfile } from "@/app/setup-profile/actions";
 import { PROFILE_TAGS } from "@/lib/profile";
+import { APP_ORIGIN } from "@/lib/profile-card";
+import { haptics } from "@/lib/haptics";
 
-const TOTAL_STEPS = 6; // 5 input steps + completion
 const HUES = [280, 200, 150, 30, 330, 95, 250, 10, 180, 45];
 const MAX_TAGS = 3;
+
+/**
+ * The username step promises a URL, so it has to be the real one. It reads
+ * from APP_ORIGIN — the same constant the profile card and share sheet use —
+ * rather than a literal, which is how it came to advertise "hypefy.chat/@"
+ * after the domain split: wrong host (that is the marketing site now) and
+ * wrong path (profiles resolve at /u/).
+ */
+const PROFILE_URL_PREFIX = `${APP_ORIGIN.replace(/^https?:\/\//, "")}/u/`;
+
+/**
+ * Steps in order. `optional` drives the Skip affordance: three of these can
+ * be filled in later from Settings, and a flow that hides that reads as five
+ * mandatory forms standing between someone and the app.
+ */
+const STEPS = [
+  { key: "name", label: "Name", optional: false },
+  { key: "username", label: "Username", optional: false },
+  { key: "avatar", label: "Photo", optional: true },
+  { key: "bio", label: "Bio", optional: true },
+  { key: "tags", label: "Tags", optional: true },
+] as const;
+
+const TOTAL_STEPS = STEPS.length + 1; // input steps + completion
 
 type FormState = {
   displayName: string;
@@ -94,23 +126,28 @@ export function SetupStepper({
       case 0:
         return form.displayName.trim().length >= 2;
       case 1:
-        return /^[a-z0-9_.]{3,20}$/.test(form.username) && uStatus === "available";
+        return (
+          /^[a-z0-9_.]{3,20}$/.test(form.username) && uStatus === "available"
+        );
       default:
         return true;
     }
   }
 
   function next() {
+    haptics.tap();
     setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
     setError(null);
   }
   function back() {
+    haptics.tap();
     setStep((s) => Math.max(s - 1, 0));
     setError(null);
   }
 
   function finish() {
     setError(null);
+    haptics.success();
     startTransition(async () => {
       const res = await saveProfile({
         displayName: form.displayName,
@@ -126,53 +163,89 @@ export function SetupStepper({
 
   const isLast = step === TOTAL_STEPS - 1;
   const isSecondLast = step === TOTAL_STEPS - 2;
+  const current = STEPS[step];
 
   return (
     <div className="flex min-h-dvh flex-col">
-      {/* Progress */}
+      {/* Brand + progress. The wordmark is here because this is the first
+          screen of a new account and the only one with no navigation — the
+          rest of the app frames itself, this did not. */}
       {!isLast && (
-        <div className="sticky top-0 z-10 bg-background/90 px-6 pb-3 pt-5 backdrop-blur-xl">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-faint">
-              Step {step + 1} of {TOTAL_STEPS - 1}
+        <header className="sticky top-0 z-10 bg-background/90 px-6 pt-5 pb-3 backdrop-blur-xl">
+          <div className="mb-3 flex items-baseline justify-between">
+            <span className="text-[15px] font-extrabold tracking-tight text-foreground/70">
+              Hypefy<span className="text-accent">.</span>
+            </span>
+            <span className="text-xs font-semibold tracking-wider text-faint uppercase">
+              {current?.label} · {step + 1} of {STEPS.length}
             </span>
           </div>
+
           <div className="flex gap-1.5">
-            {Array.from({ length: TOTAL_STEPS - 1 }).map((_, i) => (
-              <div key={i} className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
+            {STEPS.map((s, i) => (
+              <div
+                key={s.key}
+                className="h-1.5 flex-1 overflow-hidden rounded-full bg-border"
+              >
+                {/* Done fills; the step you are ON reads as in progress. The
+                    old bar filled it completely, taking credit for work that
+                    had not happened yet. */}
                 <div
-                  className="h-full rounded-full bg-accent transition-all duration-500 ease-out"
-                  style={{ width: i <= step ? "100%" : "0%" }}
+                  className={`h-full rounded-full transition-all duration-500 ease-out ${
+                    i < step ? "bg-accent" : "bg-accent/40"
+                  }`}
+                  style={{
+                    width: i < step ? "100%" : i === step ? "45%" : "0%",
+                  }}
                 />
               </div>
             ))}
           </div>
-        </div>
+        </header>
       )}
 
-      {/* Content */}
-      <div className="flex flex-1 flex-col px-6 pb-40 pt-6">
-        {step === 0 && <StepName value={form.displayName} onChange={(v) => set("displayName", v)} />}
-        {step === 1 && <StepUsername value={form.username} status={uStatus} onChange={onUsernameChange} />}
-        {step === 2 && (
-          <StepAvatar
-            displayName={form.displayName}
-            avatarHue={form.avatarHue}
-            avatarUrl={form.avatarUrl}
-            uploading={uploading}
-            onUpload={uploadAvatar}
-            onColor={(h) => set("avatarHue", h)}
-            onRemove={() => set("avatarUrl", null)}
-          />
-        )}
-        {step === 3 && <StepBio value={form.bio} onChange={(v) => set("bio", v)} />}
-        {step === 4 && <StepTags selected={form.tags} onChange={(v) => set("tags", v)} />}
-        {step === 5 && <StepComplete form={form} />}
+      {/* Content. Keyed on step so each panel animates in rather than
+          swapping instantly, which made the flow feel like a form. */}
+      <div className="flex flex-1 flex-col px-6 pt-6 pb-40">
+        <div key={step} className="animate-rise">
+          {step === 0 && (
+            <StepName
+              value={form.displayName}
+              onChange={(v) => set("displayName", v)}
+            />
+          )}
+          {step === 1 && (
+            <StepUsername
+              value={form.username}
+              status={uStatus}
+              onChange={onUsernameChange}
+            />
+          )}
+          {step === 2 && (
+            <StepAvatar
+              displayName={form.displayName}
+              avatarHue={form.avatarHue}
+              avatarUrl={form.avatarUrl}
+              uploading={uploading}
+              onUpload={uploadAvatar}
+              onColor={(h) => set("avatarHue", h)}
+              onRemove={() => set("avatarUrl", null)}
+            />
+          )}
+          {step === 3 && (
+            <StepBio value={form.bio} onChange={(v) => set("bio", v)} />
+          )}
+          {step === 4 && (
+            <StepTags selected={form.tags} onChange={(v) => set("tags", v)} />
+          )}
+          {step === 5 && <StepComplete form={form} />}
+        </div>
 
         {/* Live preview (steps 0–4) */}
         {!isLast && (
           <div className="mt-8">
-            <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-faint">
+            <p className="mb-2.5 flex items-center gap-1.5 text-xs font-semibold tracking-wider text-faint uppercase">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
               Live preview
             </p>
             <ProfilePreviewCard
@@ -189,7 +262,7 @@ export function SetupStepper({
       </div>
 
       {/* CTA */}
-      <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[480px] bg-gradient-to-t from-background via-background to-transparent px-6 pb-8 pt-6">
+      <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[480px] bg-gradient-to-t from-background via-background to-transparent px-6 pt-6 pb-8">
         {error && (
           <p className="mb-2 rounded-xl bg-danger/10 px-3 py-2 text-center text-xs text-danger">
             {error}
@@ -200,6 +273,7 @@ export function SetupStepper({
             <button
               type="button"
               onClick={back}
+              aria-label="Back"
               className="flex h-14 w-14 shrink-0 items-center justify-center rounded-pill border border-border text-muted transition-colors hover:text-foreground"
             >
               <ArrowLeft size={20} />
@@ -230,6 +304,18 @@ export function SetupStepper({
             )}
           </button>
         </div>
+
+        {/* Skip only where it is honest. Name and username are required, so
+            offering to skip them would be a dead control. */}
+        {!isLast && current?.optional && (
+          <button
+            type="button"
+            onClick={next}
+            className="mx-auto mt-3 block text-xs font-semibold text-faint transition-colors hover:text-muted"
+          >
+            Skip — you can add this later
+          </button>
+        )}
       </div>
     </div>
   );
@@ -237,10 +323,19 @@ export function SetupStepper({
 
 /* ─── Steps ──────────────────────────────────────────────────── */
 
-function StepName({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function StepName({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <div>
-      <StepHeader title="What should people call you?" sub="This is how your name shows up across Hypefy." />
+      <StepHeader
+        title="What should people call you?"
+        sub="This is how your name shows up across Hypefy."
+      />
       <input
         autoFocus
         value={value}
@@ -265,23 +360,43 @@ function StepUsername({
 }) {
   return (
     <div>
-      <StepHeader title="Claim your username" sub="Pick a unique name people can find you with." />
+      <StepHeader
+        title="Claim your username"
+        sub="This is your link. Pick something people can find you with."
+      />
       <div className="mt-5 flex h-12 items-center gap-1 rounded-xl border border-border bg-surface px-3 focus-within:border-white/25">
-        <span className="shrink-0 text-sm text-faint">hypefy.chat/@</span>
+        <span className="shrink-0 text-sm text-faint">
+          {PROFILE_URL_PREFIX}
+        </span>
         <input
           autoFocus
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="username"
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
           className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-faint"
         />
-        {status === "checking" && <Loader2 size={16} className="shrink-0 animate-spin text-muted" />}
-        {status === "available" && <Check size={16} className="shrink-0 text-accent" />}
+        {status === "checking" && (
+          <Loader2 size={16} className="shrink-0 animate-spin text-muted" />
+        )}
+        {status === "available" && (
+          <Check size={16} className="shrink-0 text-accent" />
+        )}
       </div>
-      {status === "taken" && <p className="mt-1.5 text-xs text-danger">That username is taken.</p>}
-      {status === "available" && <p className="mt-1.5 text-xs text-accent">Nice, that one's free.</p>}
+      {status === "taken" && (
+        <p className="mt-1.5 text-xs text-danger">That username is taken.</p>
+      )}
+      {status === "available" && (
+        <p className="mt-1.5 text-xs text-accent">
+          Nice, that one&apos;s free.
+        </p>
+      )}
       {status === "invalid" && value.length > 0 && (
-        <p className="mt-1.5 text-xs text-muted">3–20 characters: a–z, 0–9, dot, underscore.</p>
+        <p className="mt-1.5 text-xs text-muted">
+          3–20 characters: a–z, 0–9, dot, underscore.
+        </p>
       )}
     </div>
   );
@@ -307,7 +422,10 @@ function StepAvatar({
   const fileRef = useRef<HTMLInputElement>(null);
   return (
     <div>
-      <StepHeader title="Add your profile picture" sub="Upload a photo, or roll with a color and your initial." />
+      <StepHeader
+        title="Add your profile picture"
+        sub="Upload a photo, or roll with a colour and your initial."
+      />
 
       <div className="mt-5 flex items-center gap-4">
         <div className="relative">
@@ -359,8 +477,8 @@ function StepAvatar({
 
       {!avatarUrl && (
         <>
-          <p className="mb-2.5 mt-6 text-xs font-semibold uppercase tracking-wider text-faint">
-            Or pick a color
+          <p className="mt-6 mb-2.5 text-xs font-semibold tracking-wider text-faint uppercase">
+            Or pick a colour
           </p>
           <div className="flex flex-wrap gap-2.5">
             {HUES.map((h) => (
@@ -371,10 +489,12 @@ function StepAvatar({
                 className="h-11 w-11 rounded-2xl transition-transform active:scale-95"
                 style={{
                   background: `linear-gradient(140deg, hsl(${h} 75% 52%), hsl(${(h + 50) % 360} 70% 38%))`,
-                  outline: avatarHue === h ? "3px solid var(--color-accent)" : "none",
+                  outline:
+                    avatarHue === h ? "3px solid var(--color-accent)" : "none",
                   outlineOffset: "2px",
                 }}
-                aria-label={`Color ${h}`}
+                aria-label={`Colour ${h}`}
+                aria-pressed={avatarHue === h}
               />
             ))}
           </div>
@@ -384,10 +504,19 @@ function StepAvatar({
   );
 }
 
-function StepBio({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function StepBio({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <div>
-      <StepHeader title="Say a little about yourself" sub="A short line that tells people what you're about." />
+      <StepHeader
+        title="Say a little about yourself"
+        sub="A short line that tells people what you're about."
+      />
       <textarea
         autoFocus
         value={value}
@@ -401,8 +530,16 @@ function StepBio({ value, onChange }: { value: string; onChange: (v: string) => 
   );
 }
 
-function StepTags({ selected, onChange }: { selected: string[]; onChange: (v: string[]) => void }) {
+function StepTags({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const full = selected.length >= MAX_TAGS;
   function toggle(tag: string) {
+    haptics.select();
     onChange(
       selected.includes(tag)
         ? selected.filter((t) => t !== tag)
@@ -411,19 +548,28 @@ function StepTags({ selected, onChange }: { selected: string[]; onChange: (v: st
   }
   return (
     <div>
-      <StepHeader title="What do you do?" sub={`Pick up to ${MAX_TAGS} tags that describe you.`} />
+      <StepHeader
+        title="What do you do?"
+        sub={`Pick up to ${MAX_TAGS} tags that describe you.`}
+      />
       <div className="mt-5 flex flex-wrap gap-2">
         {PROFILE_TAGS.map((tag) => {
           const on = selected.includes(tag);
+          // At the cap, unpicked tags dim rather than stay bright — a tap
+          // that is silently ignored reads as a broken button.
+          const muted = full && !on;
           return (
             <button
               key={tag}
               type="button"
               onClick={() => toggle(tag)}
-              className={`rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
+              aria-pressed={on}
+              className={`rounded-xl border px-4 py-2 text-sm font-medium transition-all ${
                 on
                   ? "border-accent bg-accent text-accent-ink"
-                  : "border-border text-muted hover:text-foreground"
+                  : muted
+                    ? "border-border/60 text-faint"
+                    : "border-border text-muted hover:text-foreground"
               }`}
             >
               {tag}
@@ -431,7 +577,11 @@ function StepTags({ selected, onChange }: { selected: string[]; onChange: (v: st
           );
         })}
       </div>
-      {selected.length > 0 && <p className="mt-3 text-xs text-muted">{selected.join(" · ")}</p>}
+      <p className="mt-3 text-xs text-muted">
+        {selected.length > 0
+          ? selected.join(" · ")
+          : `Nothing picked yet — ${MAX_TAGS} max.`}
+      </p>
     </div>
   );
 }
@@ -443,8 +593,12 @@ function StepComplete({ form }: { form: FormState }) {
         <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/15 text-accent">
           <Sparkles size={30} />
         </span>
-        <h1 className="mt-4 text-3xl font-extrabold tracking-tight">You&apos;re in.</h1>
-        <p className="mt-1.5 text-sm text-muted">Your profile is ready. Start the hype.</p>
+        <h1 className="mt-4 text-3xl font-extrabold tracking-tight">
+          You&apos;re in<span className="text-accent">.</span>
+        </h1>
+        <p className="mt-1.5 text-sm text-muted">
+          Your profile is ready. Start the hype.
+        </p>
       </div>
       <ProfilePreviewCard
         displayName={form.displayName}
@@ -454,6 +608,10 @@ function StepComplete({ form }: { form: FormState }) {
         avatarUrl={form.avatarUrl}
         avatarHue={form.avatarHue}
       />
+      <p className="mt-4 text-center text-xs text-faint">
+        {PROFILE_URL_PREFIX}
+        {form.username}
+      </p>
     </div>
   );
 }
@@ -461,7 +619,9 @@ function StepComplete({ form }: { form: FormState }) {
 function StepHeader({ title, sub }: { title: string; sub: string }) {
   return (
     <div>
-      <h1 className="text-[1.7rem] font-extrabold leading-tight tracking-tight">{title}</h1>
+      <h1 className="text-[1.7rem] leading-tight font-extrabold tracking-tight">
+        {title}
+      </h1>
       <p className="mt-1.5 text-sm text-muted">{sub}</p>
     </div>
   );
