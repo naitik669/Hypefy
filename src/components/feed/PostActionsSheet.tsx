@@ -8,6 +8,7 @@ import { ReportSheet } from "@/components/ui/ReportSheet";
 import { FloatingMenu, MenuItem, MenuDivider } from "@/components/ui/FloatingMenu";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
+import { scheduleUndoable } from "@/lib/undoable";
 
 /**
  * Post ··· menu — anchored popover at the card's top-right (FloatingMenu
@@ -124,17 +125,35 @@ export function PostActionsSheet({
     router.refresh();
   }
 
-  async function deletePost() {
-    const { error } = await supabase.from("posts").delete().eq("id", postId);
-    if (error) {
-      toast("Couldn't delete post", "error");
-      return;
-    }
+  function deletePost() {
+    // The post leaves the screen now and the row is deleted in five seconds.
+    // It cannot be done the other way round: posts are hard-deleted, so once
+    // the DELETE has run there is nothing left to restore and an Undo button
+    // would be a lie.
     setConfirmDelete(false);
     onDelete?.();
     onClose();
-    router.refresh();
-    toast("Post deleted");
+
+    const cancel = scheduleUndoable(async () => {
+      const { error } = await supabase.from("posts").delete().eq("id", postId);
+      if (error) {
+        toast("Couldn't delete post", "error");
+        // Bring it back rather than leaving a post that looks deleted and
+        // is still there for everyone else.
+        router.refresh();
+        return;
+      }
+      router.refresh();
+    });
+
+    toast("Post deleted", "plain", {
+      label: "Undo",
+      onClick: () => {
+        cancel();
+        // The card removed itself optimistically; this is what puts it back.
+        router.refresh();
+      },
+    });
   }
 
   return (
@@ -201,7 +220,7 @@ export function PostActionsSheet({
         onConfirm={deletePost}
         icon={Trash2}
         title="Delete this post"
-        body="It disappears from every feed, along with its hypes and comments. There's no undo."
+        body="It disappears from every feed, along with its hypes and comments. You get a few seconds to undo."
         confirmLabel="Delete post"
       />
 

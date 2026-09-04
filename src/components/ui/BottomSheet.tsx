@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useFocusTrap } from "@/lib/useFocusTrap";
@@ -11,6 +11,9 @@ import { useOverlayBackButton } from "@/lib/overlay-stack";
  * This avoids stacking context issues — the sheet always overlays
  * everything regardless of where in the component tree it lives.
  */
+/** How far down the sheet must be dragged before letting go dismisses it. */
+const DISMISS_PX = 110;
+
 export function BottomSheet({
   open,
   onClose,
@@ -80,6 +83,69 @@ export function BottomSheet({
     };
   }, [open]);
 
+  /**
+   * Drag the sheet down to dismiss it.
+   *
+   * Only from the top of its scroll. The sheet body scrolls, and a downward
+   * drag partway through a long thread means "scroll up" — pulling the whole
+   * sheet off screen instead would make it impossible to read anything
+   * below the first screenful. So the gesture is only claimed once there is
+   * nowhere left to scroll, which is also the moment the drag would
+   * otherwise do nothing.
+   *
+   * Downward only: dragging up is the scroll's business, always.
+   */
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [drag, setDrag] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const dragFrom = useRef<number | null>(null);
+
+  function onDragStart(e: React.TouchEvent) {
+    if (e.touches.length !== 1) return;
+    // Read the scroll position at TOUCHSTART, not during the move. By the
+    // time a finger has travelled the sheet may have scrolled to the top on
+    // its own, and the gesture would convert to a dismiss mid-scroll.
+    if ((scrollRef.current?.scrollTop ?? 0) > 0) {
+      dragFrom.current = null;
+      return;
+    }
+    dragFrom.current = e.touches[0].clientY;
+  }
+
+  function onDragMove(e: React.TouchEvent) {
+    if (dragFrom.current === null || e.touches.length !== 1) return;
+    const dy = e.touches[0].clientY - dragFrom.current;
+    if (dy <= 0) {
+      // Pulled back up past the start — hand the gesture back to the scroll.
+      if (drag !== 0) setDrag(0);
+      return;
+    }
+    if (!dragging) setDragging(true);
+    setDrag(dy);
+  }
+
+  function onDragEnd() {
+    dragFrom.current = null;
+    setDragging(false);
+    // A short tug springs back; past the threshold, or thrown, it closes.
+    if (drag > DISMISS_PX) {
+      onClose();
+      // Left where it is rather than reset: the sheet is unmounting, and
+      // snapping it home first would show it fly back up as it disappears.
+      return;
+    }
+    setDrag(0);
+  }
+
+  // Reset between openings, so a sheet never reopens already half dragged off.
+  useEffect(() => {
+    if (!open) {
+      setDrag(0);
+      setDragging(false);
+      dragFrom.current = null;
+    }
+  }, [open]);
+
   // Escape closes the sheet, matching CenterModal/FloatingMenu behavior.
   useEffect(() => {
     if (!open) return;
@@ -116,11 +182,22 @@ export function BottomSheet({
       onPointerUp={(e) => e.stopPropagation()}
     >
       <div
-        ref={trapRef}
+        ref={(el) => {
+          trapRef.current = el;
+          scrollRef.current = el;
+        }}
         role="dialog"
         aria-modal="true"
         className="animate-rise w-full max-w-[480px] max-h-[85dvh] overflow-y-auto rounded-t-3xl border-t border-border bg-elevated pb-[calc(env(safe-area-inset-bottom)+12px)]"
         onClick={(e) => e.stopPropagation()}
+        onTouchStart={onDragStart}
+        onTouchMove={onDragMove}
+        onTouchEnd={onDragEnd}
+        onTouchCancel={onDragEnd}
+        style={{
+          transform: drag ? `translateY(${drag}px)` : undefined,
+          transition: dragging ? "none" : "transform 240ms cubic-bezier(0.16,1,0.3,1)",
+        }}
       >
         {/* Header */}
         <div className="sticky top-0 z-10 bg-elevated/95 px-5 pb-2 pt-3 backdrop-blur-sm">

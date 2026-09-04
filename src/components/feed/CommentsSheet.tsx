@@ -34,6 +34,7 @@ import {
   SuggestionDropdown,
 } from "@/components/ui/MentionHashtagPicker";
 import { useToast } from "@/components/ui/ToastProvider";
+import { scheduleUndoable } from "@/lib/undoable";
 
 /**
  * Comments.
@@ -283,23 +284,41 @@ export function CommentsSheet({
   );
 
   const remove = useCallback(
-    async (id: string) => {
-      // .select() is load-bearing: without it the update runs return=minimal,
-      // and an update matching NO rows is not an error — so an RLS refusal
-      // arrived as success, the comment left the list, and came back on
-      // reopen. Asking for the row makes "did anything change" answerable.
-      const { data, error } = await supabase
-        .from("comments")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", id)
-        .select("id");
+    (id: string) => {
+      // Snapshot first: the comment and anything hanging off it leave the
+      // list immediately, and putting them back has to be exact — including
+      // where in the order they were.
+      let restore: Node[] = [];
+      setItems((prev) => {
+        restore = prev;
+        return prev.filter((n) => n.id !== id && n.parent_id !== id);
+      });
 
-      if (error || !data || data.length === 0) {
-        showToast(error?.message ?? "Couldn't delete that comment.");
-        return;
-      }
-      // Drop the comment and anything hanging off it.
-      setItems((prev) => prev.filter((n) => n.id !== id && n.parent_id !== id));
+      const cancel = scheduleUndoable(async () => {
+        // .select() is load-bearing: without it the update runs
+        // return=minimal, and an update matching NO rows is not an error —
+        // so an RLS refusal arrived as success, the comment left the list,
+        // and came back on reopen. Asking for the row makes "did anything
+        // change" answerable.
+        const { data, error } = await supabase
+          .from("comments")
+          .update({ deleted_at: new Date().toISOString() })
+          .eq("id", id)
+          .select("id");
+
+        if (error || !data || data.length === 0) {
+          showToast(error?.message ?? "Couldn't delete that comment.");
+          setItems(restore);
+        }
+      });
+
+      showToast("Comment deleted", "plain", {
+        label: "Undo",
+        onClick: () => {
+          cancel();
+          setItems(restore);
+        },
+      });
     },
     [supabase, showToast]
   );

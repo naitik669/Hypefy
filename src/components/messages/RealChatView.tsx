@@ -20,6 +20,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CaptureGuard } from "@/components/native/CaptureGuard";
 import { useKeyboardInset } from "@/lib/useKeyboardInset";
 import { useToast } from "@/components/ui/ToastProvider";
+import { scheduleUndoable } from "@/lib/undoable";
 import { presenceLabel } from "@/lib/presence";
 import { haptics } from "@/lib/haptics";
 import { PresenceDot } from "@/components/presence/PresenceDot";
@@ -1078,10 +1079,33 @@ export function RealChatView({
     setUploading(false);
   }
 
-  async function unsend(m: ChatMsg) {
-    setMessages((p) => p.map((x) => (x.id === m.id ? { ...x, is_unsent: true, body: null } : x)));
-    const { error } = await supabase.rpc("unsend_message", { p_message_id: m.id });
-    if (error) showToast("Couldn't unsend");
+  function unsend(m: ChatMsg) {
+    // Deferred rather than reversed, and here that is not a preference:
+    // unsend_message overwrites the body with null. After it runs the text
+    // is gone from the server, and the only copy left is the one in this
+    // browser — which is exactly what the undo puts back.
+    setMessages((p) =>
+      p.map((x) => (x.id === m.id ? { ...x, is_unsent: true, body: null } : x))
+    );
+
+    const cancel = scheduleUndoable(async () => {
+      const { error } = await supabase.rpc("unsend_message", {
+        p_message_id: m.id,
+      });
+      if (error) {
+        showToast("Couldn't unsend");
+        setMessages((p) => p.map((x) => (x.id === m.id ? m : x)));
+      }
+    });
+
+    showToast("Unsent", "plain", {
+      label: "Undo",
+      onClick: () => {
+        cancel();
+        // Restores the original row wholesale — body, metadata and all.
+        setMessages((p) => p.map((x) => (x.id === m.id ? m : x)));
+      },
+    });
   }
 
   function startEdit(m: ChatMsg) {

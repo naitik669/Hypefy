@@ -151,7 +151,7 @@ export function FeedCard({
    *   tap            → nothing (kept for the desktop click path)
    *   double-tap     → Hype
    *   swipe sideways → next / previous image
-   *   hold           → peek: the photo lifts, and drops when you let go
+   *   hold           → peek: the photo lifts and STAYS, until tapped away
    *   pinch          → the photo lifts clear of the card and grows past its
    *                    borders; zoom and pan, springing back on release
    *
@@ -311,7 +311,7 @@ export function FeedCard({
     }
     if (gestureConsumed.current) {
       gestureConsumed.current = false;
-      setPeekSrc(null); // releasing is how a peek is dismissed
+      // Deliberately does NOT close the peek: it stays until tapped.
       return;
     }
 

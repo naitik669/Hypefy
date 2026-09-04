@@ -29,6 +29,7 @@ import { haptics } from "@/lib/haptics";
 import { useToast } from "@/components/ui/ToastProvider";
 import { hypeResult } from "@/lib/supabase/typed";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { scheduleUndoable } from "@/lib/undoable";
 
 type ReelProfile = {
   display_name: string | null;
@@ -572,33 +573,43 @@ function ReelCard({
     }
   }
 
-  async function deleteShot() {
-    setOwnerAction("delete");
-
-    // Ask for the rows back. A delete filtered out by RLS succeeds with zero
-    // rows and no error, so without this the UI would report "Shot deleted"
-    // for a Shot that is still there.
-    const { data, error } = await supabase
-      .from("shots")
-      .delete()
-      .eq("id", reel.id)
-      .select("id");
-    setOwnerAction(null);
-
-    if (error || !data?.length) {
-      setOwnerMenuOpen(false);
-      showToast("Couldn't delete that Shot.");
-      return;
-    }
-
-    // Best-effort storage cleanup. The row is already gone, so a failure
-    // here orphans bytes rather than breaking anything the user sees —
-    // never block or roll back the delete on it.
-    void removeShotObjects();
-
+  function deleteShot() {
+    // Deferred, not reversed. A Shot is a hard-deleted row plus two objects
+    // in storage; once either is gone there is nothing to restore, so the
+    // only honest undo is one that stops it happening.
     setOwnerMenuOpen(false);
     setDeleted(true);
-    setTimeout(onBack, 700);
+
+    const cancel = scheduleUndoable(async () => {
+      // Ask for the rows back. A delete filtered out by RLS succeeds with
+      // zero rows and no error, so without this the UI would report "Shot
+      // deleted" for a Shot that is still there.
+      const { data, error } = await supabase
+        .from("shots")
+        .delete()
+        .eq("id", reel.id)
+        .select("id");
+
+      if (error || !data?.length) {
+        setDeleted(false);
+        showToast(error?.message ?? "Couldn't delete that Shot.");
+        return;
+      }
+
+      // Best-effort storage cleanup. The row is already gone, so a failure
+      // here orphans bytes rather than breaking anything the user sees —
+      // never block or roll back the delete on it.
+      void removeShotObjects();
+      onBack();
+    });
+
+    showToast("Shot deleted", "plain", {
+      label: "Undo",
+      onClick: () => {
+        cancel();
+        setDeleted(false);
+      },
+    });
   }
 
   /**
@@ -992,7 +1003,7 @@ function ReelCard({
         onConfirm={deleteShot}
         icon={Trash2}
         title="Delete this Shot"
-        body="It disappears from Shots and your profile, along with its hypes and comments. There's no undo."
+        body="It disappears from Shots and your profile, along with its hypes and comments. You get a few seconds to undo."
         confirmLabel="Delete Shot"
       />
 
