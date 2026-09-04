@@ -21,6 +21,7 @@ import { RichPostText } from "@/components/ui/RichPostText";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { FeedImpression } from "@/components/feed/FeedImpression";
 import { PostPeek } from "@/components/feed/PostPeek";
+import { PinchLayer } from "@/components/feed/PinchLayer";
 import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
 import { EditPostSheet } from "@/components/feed/EditPostSheet";
@@ -151,7 +152,8 @@ export function FeedCard({
    *   double-tap     → Hype
    *   swipe sideways → next / previous image
    *   hold           → peek: the photo lifts, and drops when you let go
-   *   pinch          → zoom and pan in place, springing back on release
+   *   pinch          → the photo lifts clear of the card and grows past its
+   *                    borders; zoom and pan, springing back on release
    *
    * Hold and pinch are deliberately different answers. Holding asks "what is
    * that?" and wants the whole picture for a second; pinching asks "what is
@@ -173,6 +175,18 @@ export function FeedCard({
   /** Live pinch transform. Identity when idle, so nothing is composited. */
   const [pinch, setPinch] = useState({ scale: 1, x: 0, y: 0 });
   const [pinching, setPinching] = useState(false);
+  /**
+   * Where the photo was on screen when the pinch began, so the lifted copy
+   * can start exactly on top of it. Null means no pinch is in flight.
+   */
+  const [pinchRect, setPinchRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const galleryRef = useRef<HTMLDivElement | null>(null);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinchFrom = useRef<{
     dist: number;
     midX: number;
@@ -198,7 +212,21 @@ export function FeedCard({
     clearHold();
     setPeekSrc(null);
     gestureConsumed.current = true;
+    if (settleTimer.current) {
+      clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+    }
+    const box = galleryRef.current?.getBoundingClientRect();
+    if (box) {
+      setPinchRect({
+        left: box.left,
+        top: box.top,
+        width: box.width,
+        height: box.height,
+      });
+    }
     pinchFrom.current = twoFingerState(t);
+    setPinch({ scale: 1, x: 0, y: 0 });
     setPinching(true);
   }
 
@@ -210,7 +238,21 @@ export function FeedCard({
     // leaving it parked at 3× would mean every scroll past it starts in a
     // state nobody chose, and there is no obvious way back to normal.
     setPinch({ scale: 1, x: 0, y: 0 });
+    // Held one beat past the spring so the lifted copy is not yanked away
+    // mid-animation — dropping it on release makes the photo snap rather
+    // than settle.
+    settleTimer.current = setTimeout(() => {
+      settleTimer.current = null;
+      setPinchRect(null);
+    }, 260);
   }
+
+  useEffect(
+    () => () => {
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+    },
+    []
+  );
 
   function onGalleryTouchStart(e: React.TouchEvent) {
     galleryIsTouchEvent.current = true;
@@ -578,6 +620,7 @@ export function FeedCard({
       {/* Image gallery -- swipe/scroll between images; double-tap to Hype */}
       {images.length > 0 && (
         <div
+          ref={galleryRef}
           className="group relative mx-4 overflow-hidden rounded-2xl"
           onTouchStart={onGalleryTouchStart}
           onTouchMove={onGalleryTouchMove}
@@ -595,24 +638,6 @@ export function FeedCard({
             userSelect: "none",
           }}
         >
-          {/* Zoom layer. Separate from the slide below it because the two
-              transforms are independent — composing pinch scale into the
-              same transform as the -100%-per-image slide makes the pan
-              distance depend on which image you are on. */}
-          <div
-            style={{
-              transform:
-                pinch.scale === 1 && pinch.x === 0 && pinch.y === 0
-                  ? undefined
-                  : `translate3d(${pinch.x}px, ${pinch.y}px, 0) scale(${pinch.scale})`,
-              // Track the fingers exactly while they are down; spring back
-              // under its own power once they leave.
-              transition: pinching
-                ? "none"
-                : "transform 240ms cubic-bezier(0.16,1,0.3,1)",
-              willChange: pinching ? "transform" : undefined,
-            }}
-          >
           {/* Transform-based slide — no native scroll so velocity cannot skip frames */}
           <div
             className="flex transition-transform duration-300 ease-out will-change-transform"
@@ -638,7 +663,6 @@ export function FeedCard({
                 />
               </div>
             ))}
-          </div>
           </div>
 
           {/* Double-tap burst (centred over the gallery) */}
@@ -862,6 +886,21 @@ export function FeedCard({
 
       {/* Held, not opened — it lives only as long as the finger is down. */}
       {peekSrc && <PostPeek src={peekSrc} onClose={() => setPeekSrc(null)} />}
+
+      {/* Pinched. Lifted out of the card because it cannot grow past it in
+          place: the feed virtualises with content-visibility, which paints
+          with containment, so a card clips its own contents whatever the
+          gallery asks for. */}
+      {pinchRect && images[imgIdx] && (
+        <PinchLayer
+          src={images[imgIdx]}
+          rect={pinchRect}
+          scale={pinch.scale}
+          x={pinch.x}
+          y={pinch.y}
+          settling={!pinching}
+        />
+      )}
 
       {zoomOpen && images[imgIdx] && (
         <ZoomViewer src={images[imgIdx]} onClose={() => setZoomOpen(false)} />
