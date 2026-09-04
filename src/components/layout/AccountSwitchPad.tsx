@@ -347,15 +347,38 @@ export function AccountSwitchPad({
                 >
                   {/* Label sits to the LEFT, and only for the row under the
                       thumb — labelling every row at once is a wall of text
-                      over the feed. */}
-                  <span
-                    className={`pointer-events-none absolute right-[calc(100%+10px)] max-w-[42vw] truncate rounded-lg bg-background/90 px-2.5 py-1 text-[13px] font-bold whitespace-nowrap text-foreground shadow-lg ring-1 ring-border/70 transition-all duration-200 ${
-                      active
-                        ? "translate-x-0 opacity-100"
-                        : "translate-x-2 opacity-0"
-                    }`}
-                  >
-                    {truncateName(name)}
+                      over the feed.
+
+                      It slides out from BEHIND the tile, right to left. The
+                      hiding is done by clipping rather than opacity: this
+                      wrapper's right edge lines up exactly with the tile's
+                      left edge, so a label parked underneath is invisible
+                      without ever being transparent, and the name reads as
+                      coming out from behind the photo instead of fading in
+                      beside it.
+
+                      Padding on three sides gives the shadow and ring room to
+                      land: overflow clips at the PADDING box, so only the
+                      un-padded right edge actually cuts. The padding costs
+                      nothing positionally — the right edge is pinned by
+                      right-full and the box simply grows leftward, while the
+                      symmetric vertical padding leaves it centred. */}
+                  <span className="pointer-events-none absolute right-full overflow-hidden py-2 pl-3">
+                    <span
+                      className="block max-w-[42vw] truncate rounded-lg bg-background/90 px-2.5 py-1 text-[13px] font-bold whitespace-nowrap text-foreground shadow-lg ring-1 ring-border/70"
+                      style={{
+                        // Parked: its own width plus the gap, which puts it
+                        // wholly past the clip edge and under the tile.
+                        transform: active
+                          ? "translate3d(0,0,0)"
+                          : "translate3d(calc(100% + 10px), 0, 0)",
+                        marginRight: 10,
+                        transition:
+                          "transform 260ms cubic-bezier(0.16,1,0.3,1)",
+                      }}
+                    >
+                      {truncateName(name)}
+                    </span>
                   </span>
 
                   <div
