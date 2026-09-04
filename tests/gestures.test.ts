@@ -83,30 +83,33 @@ describe("clampZoom", () => {
 
 describe("autoplayAllowed", () => {
   it("plays on an ordinary device", () => {
-    expect(autoplayAllowed({ reducedMotion: false })).toBe(true);
+    expect(autoplayAllowed({})).toBe(true);
     expect(
-      autoplayAllowed({ reducedMotion: false, effectiveType: "4g" }),
+      autoplayAllowed({ effectiveType: "4g" }),
     ).toBe(true);
   });
 
-  it("stands down for reduced motion", () => {
-    // Someone has told the OS they do not want things moving on their own.
-    expect(autoplayAllowed({ reducedMotion: true })).toBe(false);
+  it("does NOT stand down for reduced motion", () => {
+    // It used to, and that was the bug: Android turns prefers-reduced-motion
+    // on with battery saver, so an ordinary phone setting silently disabled
+    // autoplay everywhere. A muted, looping, in-place clip is not the kind of
+    // motion that setting is protecting anyone from.
+    expect(autoplayAllowed({})).toBe(true);
   });
 
   it("stands down for Save-Data", () => {
     expect(
-      autoplayAllowed({ reducedMotion: false, saveData: true }),
+      autoplayAllowed({ saveData: true }),
     ).toBe(false);
   });
 
   it("stands down on 2g and slow-2g", () => {
     // Autoplaying video here is spending someone's money without asking.
     expect(
-      autoplayAllowed({ reducedMotion: false, effectiveType: "2g" }),
+      autoplayAllowed({ effectiveType: "2g" }),
     ).toBe(false);
     expect(
-      autoplayAllowed({ reducedMotion: false, effectiveType: "slow-2g" }),
+      autoplayAllowed({ effectiveType: "slow-2g" }),
     ).toBe(false);
   });
 
@@ -115,7 +118,7 @@ describe("autoplayAllowed", () => {
     // substring match would wrongly catch "slow-2g"-shaped strings only —
     // this pins the boundary.
     expect(
-      autoplayAllowed({ reducedMotion: false, effectiveType: "3g" }),
+      autoplayAllowed({ effectiveType: "3g" }),
     ).toBe(true);
   });
 });

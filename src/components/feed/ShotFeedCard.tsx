@@ -25,12 +25,18 @@ import type { ShotCard } from "@/lib/feed-mix";
  *    a feed does not fetch three videos.
  *  - **Muted, always.** Sound belongs to the Shots tab, where you chose to be.
  *    A feed that starts talking is a feed people close.
- *  - **It stands down** for prefers-reduced-motion and for a browser
- *    reporting Save-Data or a 2g-class connection. Both are someone telling
- *    us not to do this.
- *  - **The poster stays underneath.** If autoplay is refused — and browsers
- *    refuse it for reasons we never see — the card is still a picture of the
- *    Shot rather than a black rectangle.
+ *  - **It stands down** only for Save-Data and 2g-class connections. Those are
+ *    about someone's money. prefers-reduced-motion USED to block it too and
+ *    that was wrong: Android turns that flag on with battery saver, so a very
+ *    ordinary phone setting silently disabled the whole feature.
+ *  - **It retries.** A refused play() is not final — browsers and WebViews
+ *    gate autoplay behind a first interaction, so the next intersection and
+ *    the first touch anywhere both try again.
+ *  - **The poster is the video's own `poster`**, not a separate image layered
+ *    under it. A paused video showing its poster frame looks identical to a
+ *    playing one that has stopped; an image standing in for a video that
+ *    failed to start looks like the feature working, which is exactly how a
+ *    silent failure hides.
  *
  * Still no FeedImpression: post_views.post_id has a hard foreign key to
  * posts(id), so logging a shot there fails every time. And no hype/save
@@ -49,11 +55,9 @@ const PLAY_RATIO = 0.6;
  * reproduces by hand.
  */
 export function autoplayAllowed(env: {
-  reducedMotion: boolean;
   saveData?: boolean;
   effectiveType?: string;
 }): boolean {
-  if (env.reducedMotion) return false;
   if (env.saveData) return false;
   // "2g" and "slow-2g". Video on either is a way of spending someone's
   // money without asking.
@@ -69,8 +73,6 @@ function autoplayUnwelcome(): boolean {
     }
   ).connection;
   return !autoplayAllowed({
-    reducedMotion:
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false,
     saveData: conn?.saveData,
     effectiveType: conn?.effectiveType,
   });
@@ -89,10 +91,27 @@ export function ShotFeedCard({ shot }: { shot: ShotCard }) {
   const [armed, setArmed] = useState(false);
   const [playing, setPlaying] = useState(false);
 
+  /** True while the card is the one on screen, so retries know to bother. */
+  const inViewRef = useRef(false);
+
   useEffect(() => {
     const el = wrapRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
     if (autoplayUnwelcome()) return;
+
+    function attempt() {
+      const v = videoRef.current;
+      if (!v || !inViewRef.current) return;
+      // React sets `muted` as a DOM property but does not always reflect it
+      // as an attribute, and autoplay policies read the attribute. Setting it
+      // both ways is the difference between playing and being refused.
+      v.muted = true;
+      v.setAttribute("muted", "");
+      void v
+        .play()
+        .then(() => setPlaying(true))
+        .catch(() => setPlaying(false));
+    }
 
     const io = new IntersectionObserver(
       (entries) => {
@@ -107,14 +126,14 @@ export function ShotFeedCard({ shot }: { shot: ShotCard }) {
         if (!v) return;
 
         if (entry.intersectionRatio >= PLAY_RATIO) {
-          v.muted = true; // belt and braces: unmuted play is refused
-          void v
-            .play()
-            .then(() => setPlaying(true))
-            .catch(() => setPlaying(false));
-        } else if (!v.paused) {
-          v.pause();
-          setPlaying(false);
+          inViewRef.current = true;
+          attempt();
+        } else {
+          inViewRef.current = false;
+          if (!v.paused) {
+            v.pause();
+            setPlaying(false);
+          }
         }
       },
       // Two thresholds: one to arm, one to play.
@@ -122,8 +141,19 @@ export function ShotFeedCard({ shot }: { shot: ShotCard }) {
     );
 
     io.observe(el);
+
+    // Autoplay is commonly gated behind a first interaction — notably in the
+    // Android WebView the native shell runs in, where nothing plays on its own
+    // until the user has touched the page once. One retry on the first touch
+    // costs nothing and is the difference between working and not.
+    const unlock = () => attempt();
+    document.addEventListener("pointerdown", unlock, { once: true, passive: true });
+    document.addEventListener("touchstart", unlock, { once: true, passive: true });
+
     return () => {
       io.disconnect();
+      document.removeEventListener("pointerdown", unlock);
+      document.removeEventListener("touchstart", unlock);
       const v = videoRef.current;
       if (v && !v.paused) v.pause();
     };
@@ -177,20 +207,14 @@ export function ShotFeedCard({ shot }: { shot: ShotCard }) {
            uses for its gallery, so the two sit together. */
         className="relative mx-4 block aspect-[4/5] overflow-hidden rounded-2xl bg-black"
       >
-        {/* The poster sits UNDER the video, not instead of it. Browsers refuse
-            autoplay for reasons we never find out about; when that happens
-            this is what the reader sees, and it is still the Shot. */}
-        {shot.poster_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={shot.poster_url}
-            alt={shot.caption ?? "Shot"}
-            loading="lazy"
-            decoding="async"
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        )}
+        {/* One element, not a video hidden behind an image.
 
+            This used to fade the video in only once `playing` was true, with
+            the poster as a separate <img> underneath — which meant a video
+            that never started looked exactly like one that had, and the whole
+            feature could be broken without leaving a trace on screen. The
+            video's own `poster` covers the not-yet-playing case, so what you
+            see is always the real element. */}
         <video
           ref={videoRef}
           src={shot.media_url}
@@ -198,11 +222,16 @@ export function ShotFeedCard({ shot }: { shot: ShotCard }) {
           muted
           loop
           playsInline
+          // Deliberately NO autoPlay attribute. React sets `muted` as a DOM
+          // property and does not emit it as an attribute, so server-rendered
+          // markup would carry `autoplay` WITHOUT `muted` — which every
+          // autoplay policy reads as "wants to make noise" and refuses. The
+          // effect below sets the muted attribute first and then plays, which
+          // is the only ordering that reliably works.
+          //
           // Nothing is fetched until the card has been near the viewport.
           preload={armed ? "metadata" : "none"}
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
-            playing ? "opacity-100" : "opacity-0"
-          }`}
+          className="absolute inset-0 h-full w-full object-cover"
         />
 
         {/* Scrim so the glyphs and counts stay legible on a bright frame */}
