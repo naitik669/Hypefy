@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp } from "lucide-react";
+import Link from "next/link";
+import { ArrowUp, Compass, PlusCircle } from "lucide-react";
 import { haptics } from "@/lib/haptics";
 
 /**
@@ -10,7 +11,7 @@ import { haptics } from "@/lib/haptics";
  * draw themselves) the first time it scrolls into view; tapping the badge
  * replays it, and Back to top does what it says.
  */
-export function CaughtUp() {
+export function CaughtUp({ count = 0 }: { count?: number }) {
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
   const [seen, setSeen] = useState(false);
@@ -63,7 +64,37 @@ export function CaughtUp() {
 
       <div className={seen ? "animate-row-in" : "opacity-0"} style={{ animationDelay: "250ms" }}>
         <p className="text-sm font-bold">You&apos;re all caught up</p>
-        <p className="mt-0.5 text-xs text-muted">New posts land here as your circle gets loud.</p>
+        {/* Says what was actually covered rather than just stopping. The feed
+            is deliberately allowed to run out — so the end has to read as an
+            achievement with somewhere to go, not as the app running dry. */}
+        <p className="mt-0.5 text-xs text-muted">
+          {count > 0
+            ? `That's all ${count} ${count === 1 ? "post" : "posts"} — nothing left unread.`
+            : "New posts land here as your circle gets loud."}
+        </p>
+      </div>
+
+      {/* Two real destinations. Discover has things this feed did not show
+          you, and composing is the only way the feed gets longer for
+          everyone else. */}
+      <div
+        className={`mt-2 flex items-center gap-2 ${seen ? "animate-row-in" : "opacity-0"}`}
+        style={{ animationDelay: "400ms" }}
+      >
+        <Link
+          href="/discover"
+          onClick={() => haptics.tap()}
+          className="flex items-center gap-1.5 rounded-pill bg-accent px-4 py-2 text-xs font-bold text-accent-ink transition-transform active:scale-95"
+        >
+          <Compass size={14} /> Discover more
+        </Link>
+        <Link
+          href="/create/post"
+          onClick={() => haptics.tap()}
+          className="flex items-center gap-1.5 rounded-pill border border-border px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-white/25 hover:text-foreground"
+        >
+          <PlusCircle size={14} /> Post
+        </Link>
       </div>
 
       <button
@@ -76,10 +107,10 @@ export function CaughtUp() {
           // feed, not just the top of the stale one.
           router.refresh();
         }}
-        className={`mt-1 flex items-center gap-1.5 rounded-xl border border-border px-3.5 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-white/25 hover:text-foreground ${
+        className={`mt-1 flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-faint transition-colors hover:text-foreground ${
           seen ? "animate-row-in" : "opacity-0"
         }`}
-        style={{ animationDelay: "400ms" }}
+        style={{ animationDelay: "520ms" }}
       >
         <ArrowUp size={13} /> Back to top
       </button>

@@ -337,7 +337,7 @@ export function FeedList({
       )}
 
       {!noHypersPicked && tab !== "foryou" && activeDone && activePosts.length > 10 && (
-        <CaughtUp />
+        <CaughtUp count={activePosts.length} />
       )}
 
       {/* End of the For You road — once the posts run out, close the feed
@@ -354,7 +354,7 @@ export function FeedList({
               variant="compact"
             />
           ) : (
-            <CaughtUp />
+            <CaughtUp count={posts.length} />
           )}
           <PeopleToFollow currentUserId={currentUserId} followingIds={followingIds} />
         </div>
