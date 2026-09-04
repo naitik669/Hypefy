@@ -144,11 +144,20 @@ export function FeedList({
       (min, p) => (p.created_at < min ? p.created_at : min),
       current[0]?.created_at ?? new Date().toISOString(),
     );
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("posts").select(POST_SELECT)
       .lt("created_at", oldest)
       .order("created_at", { ascending: false })
       .limit(PAGE_SIZE);
+
+    // A failed page is not the end of the feed.
+    //
+    // `error` was not destructured here, so on failure `data` was null, the
+    // length check below read 0 < PAGE_SIZE, and fyDone latched true — the
+    // feed showed "You're all caught up" permanently, until a full reload.
+    // The reader's interpretation of that is "this app has nothing", which is
+    // a much worse thing to believe than "that didn't load".
+    if (error) return;
 
     // Only the two filters that are correctness rather than preference:
     // don't show the same post twice, and don't show blocked authors.
@@ -212,7 +221,10 @@ export function FeedList({
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
     }
-    const { data } = await query;
+    const { data, error } = await query;
+    // Same reasoning as the For You tail: a failed page must not latch `done`
+    // and turn a network blip into a permanent end-of-feed.
+    if (error) return;
     const fresh = normalize(data).filter((p) => !current.some((x) => x.id === p.id) && !blockedSet.has(p.user_id));
     const nowDone = (data?.length ?? 0) < PAGE_SIZE;
     const withState = fresh.length ? await withUserState(fresh) : fresh;

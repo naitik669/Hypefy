@@ -2090,6 +2090,8 @@ export type Database = {
       }
       touch_last_seen: { Args: never; Returns: undefined }
       unfollow_user: { Args: { p_target: string }; Returns: undefined }
+      blocked_either_way: { Args: Record<PropertyKey, never>; Returns: string[] }
+      unread_dm_count: { Args: Record<PropertyKey, never>; Returns: number }
       unsend_message: { Args: { p_message_id: string }; Returns: undefined }
       update_conversation: {
         Args: {

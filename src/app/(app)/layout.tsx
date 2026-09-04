@@ -44,48 +44,26 @@ export default async function AppLayout({
     redirect("/setup-profile");
   }
 
-  // Initial unread DM count for BottomNav badge. Avoid querying `conversations`
-  // directly (RLS behaves differently in layout vs page context); use
-  // conversation_members + messages only — both are member-gated by RLS.
-  const { data: myMembers } = await supabase
-    .from("conversation_members")
-    .select("conversation_id, last_read_at, muted_at")
-    .eq("user_id", user!.id)
-    .is("blocked_at", null);
-
-  let initialUnreadMsgs = 0;
-  if (myMembers?.length) {
-    const convIds = myMembers.map((m: any) => m.conversation_id as string);
-    const { data: latestMsgs } = await supabase
-      .from("messages")
-      .select("conversation_id, sender_id, created_at")
-      .in("conversation_id", convIds)
-      .order("created_at", { ascending: false });
-
-    // Map: conversation_id → {sender_id, created_at} of the LATEST message
-    const latestByConv = new Map<
-      string,
-      { sender_id: string; created_at: string }
-    >();
-    for (const m of latestMsgs ?? []) {
-      const msg = m as {
-        conversation_id: string;
-        sender_id: string;
-        created_at: string;
-      };
-      if (!latestByConv.has(msg.conversation_id))
-        latestByConv.set(msg.conversation_id, msg);
-    }
-
-    initialUnreadMsgs = (myMembers ?? []).filter((mem: any) => {
-      if (mem.muted_at) return false;
-      const latest = latestByConv.get(mem.conversation_id);
-      if (!latest) return false;
-      if (latest.sender_id === user!.id) return false;
-      if (!mem.last_read_at) return true;
-      return new Date(latest.created_at) > new Date(mem.last_read_at);
-    }).length;
-  }
+  // Initial unread DM count for the BottomNav badge — one aggregate, computed
+  // in the database.
+  //
+  // This used to fetch conversation_members with no limit, then EVERY message
+  // across all of those conversations with no limit, and reduce them in JS —
+  // in the shared signed-in layout, so on every server render of every page,
+  // to produce one integer.
+  //
+  // The cost was the smaller half of the problem. The sort was globally
+  // descending across all conversations, so once the row cap was reached one
+  // chatty thread filled the entire window and every other conversation's
+  // latest message was truncated away. The badge did not just get slow: it
+  // silently under-counted, and got worse the more the app was used.
+  //
+  // unread_dm_count() (0046) keeps the exact rule the JS applied — look only
+  // at the LATEST message per conversation, skip muted, skip conversations
+  // where you spoke last — verified to return the same number for every
+  // existing user before it replaced this.
+  const { data: unreadCount } = await supabase.rpc("unread_dm_count");
+  const initialUnreadMsgs = (unreadCount as number | null) ?? 0;
 
   return (
     <ToastProvider>

@@ -42,7 +42,18 @@ export default async function HomePage() {
 
   // Follow graph first: the followed-posts query depends on it.
   const [{ data: followRows }, blockedIds] = await Promise.all([
-    supabase.from("follows").select("following_id").eq("follower_id", user.id),
+    // Capped, like favorites and close_friends below, and for a harder reason
+    // than volume: every one of these ids is spread into `.in("user_id", …)`
+    // further down, which PostgREST renders as a comma-separated value in a
+    // GET URL. Past a few thousand follows that URL exceeds proxy limits and
+    // home returns 414 — breaking the app specifically for the people who use
+    // it most. The global candidate window still surfaces anyone beyond this
+    // cut; they just lose the guaranteed-inclusion slot.
+    supabase
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", user.id)
+      .limit(2000),
     getBlockedIds(supabase),
   ]);
   const followingIds = new Set(
