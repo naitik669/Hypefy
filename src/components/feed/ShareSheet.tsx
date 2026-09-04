@@ -16,7 +16,21 @@ type Friend = {
    *  Friend[] hid it from the renderer and everyone showed as a gradient
    *  initial instead of their actual photo. */
   avatar_url: string | null;
+  /** Closeness bucket — see `rank` below. 4 means "not a connection". */
+  tier?: number;
 };
+
+/**
+ * Below this many real connections, the list is topped up with people you
+ * have merely interacted with. Above it, it is connections only.
+ *
+ * Worth knowing what this does at current scale: every account today has
+ * fewer than this, so the top-up still applies to everybody and the list does
+ * not actually get shorter. What changes now is the ORDER, and the divider
+ * that makes the boundary visible — which is the honest fix while the whole
+ * app is small enough that most people have brushed against most others.
+ */
+const THIN_CONNECTIONS = 8;
 
 export function ShareSheet({
   open,
@@ -64,9 +78,10 @@ export function ShareSheet({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
 
-      const [followingRes, followerRes, notifRes] = await Promise.all([
+      const [followingRes, followerRes, hyperRes, notifRes] = await Promise.all([
         supabase.from("follows").select("following_id").eq("follower_id", user.id).limit(100),
         supabase.from("follows").select("follower_id").eq("following_id", user.id).limit(100),
+        supabase.from("close_friends").select("friend_id").eq("user_id", user.id).limit(100),
         supabase.from("notifications")
           .select("actor_id")
           .eq("user_id", user.id)
@@ -75,10 +90,38 @@ export function ShareSheet({
           .limit(50),
       ]);
 
-      const allIds = new Set<string>();
-      followingRes.data?.forEach((r: any) => allIds.add(r.following_id));
-      followerRes.data?.forEach((r: any) => allIds.add(r.follower_id));
-      notifRes.data?.forEach((r: any) => r.actor_id && allIds.add(r.actor_id));
+      const following = new Set<string>((followingRes.data ?? []).map((r: any) => r.following_id));
+      const followers = new Set<string>((followerRes.data ?? []).map((r: any) => r.follower_id));
+      const hypers = new Set<string>((hyperRes.data ?? []).map((r: any) => r.friend_id));
+
+      /**
+       * Closeness, best first. Sharing is an act aimed at someone specific,
+       * so the order of this list is the entire feature — a flat alphabet of
+       * everyone you have ever brushed against is the same as no list.
+       */
+      const rank = (id: string): number => {
+        if (hypers.has(id)) return 0;                              // a Hyper
+        if (following.has(id) && followers.has(id)) return 1;      // mutual
+        if (following.has(id)) return 2;                           // you follow
+        if (followers.has(id)) return 3;                           // follows you
+        return 4;                                                  // acquaintance
+      };
+
+      const connections = new Set<string>([...following, ...followers, ...hypers]);
+      connections.delete(user.id);
+
+      // Notification actors are anyone who ever hyped or commented on your
+      // work — a stranger who tapped a star once ranks alongside people you
+      // talk to. In an app this size that quietly meant "everybody", which is
+      // what made the share list look unfiltered. They are a TOP-UP now, used
+      // only when you barely have connections yet, so a new account still has
+      // somewhere to send things.
+      const allIds = new Set(connections);
+      if (connections.size < THIN_CONNECTIONS) {
+        for (const r of notifRes.data ?? []) {
+          if (r.actor_id) allIds.add(r.actor_id as string);
+        }
+      }
       allIds.delete(user.id);
 
       if (allIds.size === 0) { setFriends([]); setLoading(false); return; }
@@ -90,7 +133,11 @@ export function ShareSheet({
         .eq("profile_completed", true)
         .limit(80);
 
-      setFriends((profiles ?? []) as Friend[]);
+      const sorted = ((profiles ?? []) as Friend[])
+        .map((f) => ({ ...f, tier: rank(f.id) }))
+        .sort((a, b) => (a.tier ?? 4) - (b.tier ?? 4));
+
+      setFriends(sorted);
       setLoading(false);
     }
     load();
@@ -367,12 +414,22 @@ export function ShareSheet({
               : "Nobody by that name."}
           </p>
         ) : (
-          filtered.map((f) => {
+          filtered.map((f, i) => {
             const name = f.display_name ?? f.username ?? "User";
             const selected = sent.has(f.id);
+            // Where the people you actually know end and the people who once
+            // hyped a post begin. Without this the two are indistinguishable,
+            // which is what made the list read as "everyone".
+            const startsAcquaintances =
+              (f.tier ?? 4) >= 4 && (filtered[i - 1]?.tier ?? 4) < 4;
             return (
+              <div key={f.id}>
+                {startsAcquaintances && (
+                  <p className="px-1 pt-3 pb-1 text-[11px] font-bold tracking-widest text-faint uppercase">
+                    You&rsquo;ve interacted with
+                  </p>
+                )}
               <button
-                key={f.id}
                 type="button"
                 onClick={() => toggleSend(f.id)}
                 className={`flex items-center gap-3 rounded-xl px-1 py-2.5 transition-colors ${
@@ -396,6 +453,7 @@ export function ShareSheet({
                   ✓
                 </span>
               </button>
+              </div>
             );
           })
         )}

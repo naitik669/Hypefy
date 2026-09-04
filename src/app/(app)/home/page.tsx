@@ -97,16 +97,31 @@ export default async function HomePage() {
       .gt("expires_at", nowIso)
       .order("created_at", { ascending: true })
       .limit(50),
-    // Active Shows from OTHERS â€” newest first
-    supabase
-      .from("shows")
-      .select(
-        "id, user_id, profiles!shows_user_id_fkey(display_name, avatar_hue, avatar_url, username)"
-      )
-      .gt("expires_at", nowIso)
-      .neq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50),
+    // Active Shows from PEOPLE YOU FOLLOW — newest first.
+    //
+    // This used to be every active Show in the app: .neq(user_id, me) and
+    // nothing else. A Show is the most personal thing here — ephemeral, and
+    // posted to whoever is around — and the ring was filling with strangers
+    // nobody had any relationship with.
+    //
+    // Follows only, deliberately, rather than a wider "anyone you have
+    // touched" net. The ring is the one surface where the answer to "why am I
+    // seeing this?" has to be a single sentence, and "you follow them" is it.
+    // Follow nobody and the ring is just your own bubble, which is honest.
+    //
+    // Skipped entirely when you follow nobody: an empty .in() list is not a
+    // query worth sending, and PostgREST renders it awkwardly.
+    followingIds.size > 0
+      ? supabase
+          .from("shows")
+          .select(
+            "id, user_id, profiles!shows_user_id_fkey(display_name, avatar_hue, avatar_url, username)"
+          )
+          .gt("expires_at", nowIso)
+          .in("user_id", [...followingIds])
+          .order("created_at", { ascending: false })
+          .limit(50)
+      : Promise.resolve({ data: [] as any[] }),
     // Recent reposts by people I follow: their reposted posts join the feed
     followingIds.size > 0
       ? supabase

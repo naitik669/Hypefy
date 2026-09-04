@@ -79,9 +79,38 @@ export function GroupInfoSheet({
     let active = true;
     setSearching(true);
     const t = setTimeout(async () => {
+      // Scoped to people you actually know, matching ForwardSheet.
+      //
+      // This searched every account in the app, so adding a member to a
+      // private group meant picking from a directory of total strangers —
+      // the same class of problem as the Shows ring pulling in people you
+      // have no relationship with.
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || !active) return;
+
+      const [followingRes, followerRes] = await Promise.all([
+        supabase.from("follows").select("following_id").eq("follower_id", user.id).limit(200),
+        supabase.from("follows").select("follower_id").eq("following_id", user.id).limit(200),
+      ]);
+      if (!active) return;
+
+      const known = new Set<string>();
+      (followingRes.data ?? []).forEach((r: any) => known.add(r.following_id));
+      (followerRes.data ?? []).forEach((r: any) => known.add(r.follower_id));
+      known.delete(user.id);
+
+      if (known.size === 0) {
+        setResults([]);
+        setSearching(false);
+        return;
+      }
+
       const { data } = await supabase
         .from("profiles")
         .select("id, display_name, username, avatar_hue, avatar_url")
+        .in("id", [...known])
         .or(`username.ilike.%${term}%,display_name.ilike.%${term}%`)
         .limit(15);
       if (!active) return;
