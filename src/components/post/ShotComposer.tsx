@@ -6,6 +6,7 @@ import { Video, X, Loader2, Send, Link2, Check, ChevronRight, ChevronLeft } from
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
+import { ShotCoverPicker } from "@/components/post/ShotCoverPicker";
 
 const MAX_SIZE_MB = 60;
 const ALLOWED_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/ogg"];
@@ -25,11 +26,17 @@ export type ShotAuthor = {
 const STEPS = [{ label: "New Shot" }, { label: "Preview" }] as const;
 
 /**
- * Grab a poster frame from the video (~0.5s in, past any black lead-in)
- * as a JPEG blob. Returns null when the browser can't decode/seek —
- * the Shot still posts, just without a thumbnail.
+ * Grab a poster frame from the video as a JPEG blob.
+ *
+ * `at` is the chosen cover time; without one it falls back to ~0.5s, past any
+ * black lead-in. The fallback is what every Shot used to get, and it is why
+ * the picker exists — half a second into a phone recording is very often a
+ * hand reaching for the screen.
+ *
+ * Returns null when the browser can't decode or seek. The Shot still posts,
+ * just without a thumbnail.
  */
-function capturePoster(src: string): Promise<Blob | null> {
+function capturePoster(src: string, at?: number | null): Promise<Blob | null> {
   return new Promise((resolve) => {
     const video = document.createElement("video");
     video.muted = true;
@@ -39,7 +46,14 @@ function capturePoster(src: string): Promise<Blob | null> {
     const bail = setTimeout(() => resolve(null), 8000);
     video.onerror = () => { clearTimeout(bail); resolve(null); };
     video.onloadedmetadata = () => {
-      video.currentTime = Math.min(0.5, Math.max(0, video.duration - 0.1));
+      const fallback = Math.min(0.5, Math.max(0, video.duration - 0.1));
+      // Clamped: a cover time from a picker that read a different duration
+      // than this element reports would otherwise seek past the end and never
+      // fire onseeked, hanging until the bail timeout.
+      video.currentTime =
+        at != null && Number.isFinite(at)
+          ? Math.min(Math.max(at, 0), Math.max(0, video.duration - 0.05))
+          : fallback;
     };
     video.onseeked = () => {
       clearTimeout(bail);
@@ -68,6 +82,8 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
   const [caption, setCaption] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
   const [postError, setPostError] = useState<string | null>(null);
+  /** Chosen cover frame, in seconds. Null until the picker reports one. */
+  const [coverTime, setCoverTime] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
   const [postedId, setPostedId] = useState<string | null>(null);
@@ -89,6 +105,8 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
     }
     setFile(f);
     setPreview(URL.createObjectURL(f));
+    // A new clip invalidates the old choice.
+    setCoverTime(null);
   }
 
   function removeFile() {
@@ -129,7 +147,7 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
       // post itself.
       let posterUrl: string | null = null;
       if (preview) {
-        const posterBlob = await capturePoster(preview);
+        const posterBlob = await capturePoster(preview, coverTime);
         if (posterBlob) {
           const posterPath = `${userId}/${Date.now()}-poster.jpg`;
           const { error: posterErr } = await supabase.storage
@@ -278,6 +296,17 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
             </div>
             <input ref={fileRef} type="file" accept={ALLOWED_TYPES.join(",")} className="hidden" onChange={onFileChange} />
             {fileError && <p className="text-xs text-danger">{fileError}</p>}
+
+            {/* Sits with the clip, before the caption: the cover is a property
+                of the video, and choosing it while the video is the thing on
+                screen is the moment it makes sense. */}
+            {preview && (
+              <ShotCoverPicker
+                src={preview}
+                value={coverTime}
+                onChange={setCoverTime}
+              />
+            )}
 
             <textarea
               value={caption}
