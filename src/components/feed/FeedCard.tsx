@@ -123,13 +123,81 @@ export function FeedCard({
   const [imgIdx, setImgIdx] = useState(0);
   // JS-controlled swipe: one image per gesture, no native scroll momentum
   const galleryTouchStartX = useRef(0);
+  const galleryTouchStartY = useRef(0);
   const galleryIsTouchEvent = useRef(false);
 
-  function onGalleryTouchStart(e: React.TouchEvent) {
-    galleryTouchStartX.current = e.touches[0].clientX;
-    galleryIsTouchEvent.current = true;
+  /**
+   * Hold or pinch the photo to open it full screen.
+   *
+   * This replaces a corner button. The button was always visible, sat on top
+   * of the photo it was there to reveal, and had to be hit exactly; holding
+   * and pinching are what people already try on an image, and neither costs
+   * any pixels.
+   *
+   * Four gestures now share this element — tap, double-tap to Hype, swipe
+   * between images, and hold/pinch to expand — so the guards below are the
+   * whole design. A hold must not also register as a tap, and a swipe must
+   * cancel a hold that has not fired yet.
+   */
+  const HOLD_MS = 350;
+  /** Movement that means "swiping", not "holding". */
+  const HOLD_SLOP_PX = 10;
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The expand already happened; the release that follows is not a tap. */
+  const gestureConsumed = useRef(false);
+
+  function clearHold() {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
   }
+
+  function expandImage() {
+    clearHold();
+    gestureConsumed.current = true;
+    haptics.select();
+    setZoomOpen(true);
+  }
+
+  function onGalleryTouchStart(e: React.TouchEvent) {
+    galleryIsTouchEvent.current = true;
+    gestureConsumed.current = false;
+    clearHold();
+
+    // Two fingers down is already a pinch — go straight to the viewer, which
+    // is where pinching actually zooms. Waiting for the fingers to move first
+    // would swallow the opening of the gesture.
+    if (e.touches.length > 1) {
+      expandImage();
+      return;
+    }
+
+    galleryTouchStartX.current = e.touches[0].clientX;
+    galleryTouchStartY.current = e.touches[0].clientY;
+    holdTimer.current = setTimeout(expandImage, HOLD_MS);
+  }
+
+  function onGalleryTouchMove(e: React.TouchEvent) {
+    if (gestureConsumed.current) return;
+    if (e.touches.length > 1) {
+      expandImage();
+      return;
+    }
+    const dx = Math.abs(e.touches[0].clientX - galleryTouchStartX.current);
+    const dy = Math.abs(e.touches[0].clientY - galleryTouchStartY.current);
+    // Either axis: sideways is a swipe between images, vertical is the feed
+    // scrolling past. Neither should still be arming an expand.
+    if (dx > HOLD_SLOP_PX || dy > HOLD_SLOP_PX) clearHold();
+  }
+
   function onGalleryTouchEnd(e: React.TouchEvent) {
+    clearHold();
+    if (gestureConsumed.current) {
+      gestureConsumed.current = false;
+      return;
+    }
+
     const dx = galleryTouchStartX.current - e.changedTouches[0].clientX;
     if (Math.abs(dx) >= 30) {
       // Swipe detected — advance exactly ONE image regardless of velocity
@@ -140,10 +208,19 @@ export function FeedCard({
       handleImageTap(); // small move = tap
     }
   }
+  function onGalleryTouchCancel() {
+    clearHold();
+    gestureConsumed.current = false;
+  }
   function onGalleryClick() {
     // On touch devices onTouchEnd already handled the tap; skip click synthesis.
     if (galleryIsTouchEvent.current) return;
     handleImageTap(); // desktop mouse click
+  }
+  function onGalleryContextMenu(e: React.MouseEvent) {
+    // A long press on an image raises the WebView's own save/copy callout,
+    // which would land on top of the viewer we just opened.
+    e.preventDefault();
   }
   const showToast = useToast();
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -424,10 +501,22 @@ export function FeedCard({
       {/* Image gallery -- swipe/scroll between images; double-tap to Hype */}
       {images.length > 0 && (
         <div
-          className="relative mx-4 overflow-hidden rounded-2xl"
+          className="group relative mx-4 overflow-hidden rounded-2xl"
           onTouchStart={onGalleryTouchStart}
+          onTouchMove={onGalleryTouchMove}
           onTouchEnd={onGalleryTouchEnd}
+          onTouchCancel={onGalleryTouchCancel}
+          onContextMenu={onGalleryContextMenu}
           onClick={onGalleryClick}
+          // pan-y keeps the feed scrolling under the photo while taking the
+          // browser's own pinch-to-zoom off the table, so two fingers here
+          // mean our gesture rather than zooming the whole page.
+          style={{
+            touchAction: "pan-y",
+            WebkitTouchCallout: "none",
+            WebkitUserSelect: "none",
+            userSelect: "none",
+          }}
         >
           {/* Transform-based slide — no native scroll so velocity cannot skip frames */}
           <div
@@ -504,7 +593,10 @@ export function FeedCard({
             </>
           )}
 
-          {/* Expand â†’ full-screen pinch-to-zoom viewer */}
+          {/* The expand button used to sit here. Hold or pinch the photo
+              instead — see onGalleryTouchStart. Kept for pointer devices,
+              which have neither gesture, but only while hovering, so it no
+              longer covers the corner of every photo on a phone. */}
           <button
             type="button"
             onClick={(e) => {
@@ -512,7 +604,7 @@ export function FeedCard({
               setZoomOpen(true);
             }}
             aria-label="View full image"
-            className="absolute bottom-2.5 right-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+            className="absolute bottom-2.5 right-2.5 z-10 hidden h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-black/70 focus-visible:opacity-100 [@media(hover:hover)]:flex"
           >
             <Maximize2 size={15} />
           </button>

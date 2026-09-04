@@ -57,6 +57,26 @@ export type Reel = {
  * Uses JS-controlled swipe so each gesture advances exactly ONE reel —
  * native scroll momentum cannot skip multiple shots.
  */
+/** Smallest and largest a pinched reel may get. */
+export const PINCH_MIN = 1;
+export const PINCH_MAX = 4;
+
+/**
+ * Where a pinch has got to, from the gap between the fingers.
+ *
+ * Floored at 1 rather than allowed below it: a reel is object-cover, so
+ * shrinking it past the screen exposes bars where the video used to be,
+ * which reads as something broken rather than as zooming out.
+ */
+export function clampPinch(
+  startScale: number,
+  startDist: number,
+  dist: number
+): number {
+  const ratio = dist / Math.max(1, startDist);
+  return Math.max(PINCH_MIN, Math.min(PINCH_MAX, startScale * ratio));
+}
+
 export function ReelsFeed({
   reels: initialReels,
   currentUserId,
@@ -139,6 +159,10 @@ export function ReelsFeed({
 
   function onSwipeTouchStart(e: React.TouchEvent) {
     if (sheetOpen) return;
+    // Two fingers is a pinch on the reel. The reel tells us via onSheetChange,
+    // but that is a state update and this handler runs in the same event that
+    // triggered it — so the flag is still false here. Count the fingers.
+    if (e.touches.length !== 1) return;
     swipeTouchStartY.current = e.touches[0].clientY;
     swipeStartedAt.current = Date.now();
     setDrag(0);
@@ -153,6 +177,12 @@ export function ReelsFeed({
    */
   function onSwipeTouchMove(e: React.TouchEvent) {
     if (sheetOpen || drag === null) return;
+    // A second finger landing mid-swipe turns the gesture into a pinch.
+    // Abandon the drag rather than letting the reel slide while it scales.
+    if (e.touches.length !== 1) {
+      setDrag(null);
+      return;
+    }
     let dy = e.touches[0].clientY - swipeTouchStartY.current;
 
     // Resist at the ends so pulling past the last reel feels like a boundary
@@ -285,6 +315,81 @@ function ReelCard({
   const [shareOpen, setShareOpen] = useState(false);
   const sheetOpen = commentsOpen || shareOpen;
 
+  /**
+   * Pinch to zoom the reel.
+   *
+   * Scaled in place rather than opening a viewer, because a Shot is a moving
+   * picture — pulling it out into a still would be a different thing from
+   * looking closer at this one. It springs back on release: this is a look,
+   * not a mode you have to get out of.
+   *
+   * The video pauses for the duration and resumes afterwards, which is the
+   * whole point of pinching a video: you are trying to see one frame, and it
+   * keeps moving out from under you otherwise.
+   */
+  const [pinchScale, setPinchScale] = useState(1);
+  const [pinching, setPinching] = useState(false);
+  const pinchStart = useRef<{ dist: number; scale: number } | null>(null);
+  /** Sheets and pinch both mean "the stage must not swipe, and audio stops". */
+  const gestureLock = sheetOpen || pinching;
+
+  function fingerGap(t: React.TouchList) {
+    return Math.hypot(
+      t[0].clientX - t[1].clientX,
+      t[0].clientY - t[1].clientY
+    );
+  }
+
+  /**
+   * Whether the reel was running when the pinch began.
+   *
+   * Resume is deliberately not driven by the autoplay effect: that effect
+   * plays whenever the reel is active and unblocked, so routing pinch
+   * through it would restart a reel the viewer had tapped to pause. What
+   * happens after a pinch has to be whatever was happening before it.
+   */
+  const playingBeforePinch = useRef(false);
+
+  function onReelTouchStart(e: React.TouchEvent) {
+    if (e.touches.length !== 2) return;
+    pinchStart.current = { dist: fingerGap(e.touches), scale: pinchScale };
+    setPinching(true);
+    haptics.select();
+
+    const el = videoRef.current;
+    if (el) {
+      playingBeforePinch.current = !el.paused;
+      el.pause();
+      setPlaying(false);
+    }
+  }
+
+  function onReelTouchMove(e: React.TouchEvent) {
+    if (e.touches.length !== 2 || !pinchStart.current) return;
+    setPinchScale(
+      clampPinch(
+        pinchStart.current.scale,
+        pinchStart.current.dist,
+        fingerGap(e.touches)
+      )
+    );
+  }
+
+  function onReelTouchEnd(e: React.TouchEvent) {
+    if (e.touches.length >= 2) return;
+    if (!pinchStart.current) return;
+    pinchStart.current = null;
+    setPinching(false);
+    setPinchScale(1);
+
+    const el = videoRef.current;
+    if (el && playingBeforePinch.current && isActive && !sheetOpen) {
+      el.play()
+        .then(() => setPlaying(true))
+        .catch(() => {});
+    }
+  }
+
   const [saved, setSaved] = useState(false);
   const [savePending, setSavePending] = useState(false);
 
@@ -307,8 +412,8 @@ function ReelCard({
   // Tell the stage, so its swipe stops while something is being read on top
   // of this reel.
   useEffect(() => {
-    onSheetChange?.(sheetOpen);
-  }, [sheetOpen, onSheetChange]);
+    onSheetChange?.(gestureLock);
+  }, [gestureLock, onSheetChange]);
 
   // Leaving a reel while its sheet is up would strand the stage as blocked.
   useEffect(() => {
@@ -606,12 +711,24 @@ function ReelCard({
   }
 
   return (
-    <section className="relative h-full w-full">
+    <section
+      className="relative h-full w-full"
+      onTouchStart={onReelTouchStart}
+      onTouchMove={onReelTouchMove}
+      onTouchEnd={onReelTouchEnd}
+      onTouchCancel={onReelTouchEnd}
+    >
       <video
         ref={videoRef}
         src={reel.media_url}
         poster={reel.poster_url ?? undefined}
         className="absolute inset-0 h-full w-full bg-black object-cover"
+        style={{
+          transform: pinchScale === 1 ? undefined : `scale(${pinchScale})`,
+          // Snap back under its own power once the fingers leave, but track
+          // them exactly while they are down.
+          transition: pinching ? "none" : "transform 220ms ease-out",
+        }}
         loop
         muted={muted}
         playsInline

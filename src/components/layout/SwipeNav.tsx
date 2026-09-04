@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { haptics } from "@/lib/haptics";
+import { overlayCount } from "@/lib/overlay-stack";
 
 /**
  * Swipe sideways to move between the bottom-nav tabs.
@@ -74,6 +75,20 @@ export function inHorizontalScroller(start: EventTarget | null): boolean {
   return false;
 }
 
+/**
+ * Should this touch be released to whatever is under it?
+ *
+ * Split out from the handler so the rule is testable without a real gesture:
+ * the DOM half needs a document, the overlay half is just a count.
+ */
+export function gestureBlocked(
+  openOverlays: number,
+  target: EventTarget | null
+): boolean {
+  if (openOverlays > 0) return true;
+  return inHorizontalScroller(target);
+}
+
 export function SwipeNav({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -105,12 +120,28 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     const t = e.touches[0];
     start.current = { x: t.clientX, y: t.clientY, t: Date.now() };
     axis.current = null;
-    ignore.current = inHorizontalScroller(e.target);
+    // A sheet on top of the page means the page is not what is being
+    // touched. Sheets portal to <body>, so they escape this element in the
+    // DOM — but React routes events through the COMPONENT tree, and the
+    // comments sheet is rendered by a feed card that lives inside here. So
+    // every touch inside an open sheet still arrived, and dragging sideways
+    // while reading comments changed tab out from under it.
+    ignore.current = gestureBlocked(overlayCount(), e.target);
     setSettling(false);
   }
 
   function onTouchMove(e: React.TouchEvent) {
     if (ignore.current || e.touches.length !== 1) return;
+    // A sheet can open mid-drag — a long-press menu, say. Abandon the gesture
+    // rather than sliding the page under whatever just appeared.
+    if (overlayCount() > 0) {
+      ignore.current = true;
+      if (dx) {
+        setSettling(true);
+        setDx(0);
+      }
+      return;
+    }
     const t = e.touches[0];
     const ddx = t.clientX - start.current.x;
     const ddy = t.clientY - start.current.y;

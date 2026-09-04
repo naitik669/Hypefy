@@ -166,11 +166,25 @@ export function CommentsSheet({
   }
 
   async function deleteComment(id: string) {
-    // Soft-delete: set deleted_at
-    const { error } = await supabase.from("comments").update({ deleted_at: new Date().toISOString() }).eq("id", id);
-    if (error) {
-      // Previously silent — the comment vanished locally but survived a reload.
-      showToast("Couldn't delete that comment.");
+    // Soft-delete: set deleted_at.
+    //
+    // .select() is load-bearing, not decoration. Without it the update runs
+    // with return=minimal, and an update that matches NO rows is not an
+    // error — so an RLS refusal came back as success, the comment vanished
+    // from the tree, and it was back on the next open. Asking for the row
+    // makes "did anything actually change" answerable.
+    //
+    // Until 0044 the answer was always no: the SELECT policy read
+    // `deleted_at is null`, so stamping the row hid it from its own author
+    // and Postgres rejected the write. Nothing had ever been deleted.
+    const { data, error } = await supabase
+      .from("comments")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("id");
+
+    if (error || !data || data.length === 0) {
+      showToast(error?.message ?? "Couldn't delete that comment.");
       return;
     }
     // Remove from tree immediately
@@ -211,7 +225,9 @@ export function CommentsSheet({
     if (error || !data) {
       // Previously silent: the composer just cleared and the comment was
       // never posted, which is indistinguishable from it having worked.
-      showToast("Couldn’t post that comment.");
+      // Postgres names the cause — a rate limit reads very differently from
+      // a dead session — so say which rather than one catch-all sentence.
+      showToast(error?.message ?? "Couldn’t post that comment.");
       return;
     }
 
@@ -268,7 +284,13 @@ export function CommentsSheet({
           });
     setPosting(false);
     if (error || !data) {
-      showToast("Couldn’t post that GIF.");
+      // The generic copy hid every cause behind one sentence, so a GIF that
+      // would not post was undiagnosable — rate limit, auth, and a bad target
+      // id all read identically. Postgres already says which; pass it on.
+      showToast(error?.message ?? "Couldn’t post that GIF.");
+      // Losing the picker on failure meant re-opening and re-finding the GIF
+      // to try again, which is what turned one failure into "again and again".
+      setGifPickerOpen(true);
       return;
     }
 
@@ -316,7 +338,7 @@ export function CommentsSheet({
               onHype={hypeComment}
               onReply={startReply}
               onReport={reportComment}
-              onDelete={deleteComment}
+
               onToggleReplies={toggleReplies}
               onLongPress={(c, threadId, x, y) => setActionC({ c, threadId, x, y })}
             />
@@ -449,14 +471,13 @@ export function CommentsSheet({
 
 /* --- Single comment + thread ---------------------------------------------- */
 function CommentItem({
-  comment, currentUserId, onHype, onReply, onReport, onDelete, onToggleReplies, onLongPress,
+  comment, currentUserId, onHype, onReply, onReport, onToggleReplies, onLongPress,
 }: {
   comment: Comment;
   currentUserId: string;
   onHype: (c: Comment) => void;
   onReply: (id: string, username: string) => void;
   onReport: (id: string) => void;
-  onDelete: (id: string) => void;
   onToggleReplies: (id: string) => void;
   onLongPress: (c: Comment, threadId: string, x: number, y: number) => void;
 }) {
@@ -541,12 +562,10 @@ function CommentItem({
                 {comment.reported ? "Reported" : "Report"}
               </button>
             )}
-            {isOwnComment && (
-              <button type="button" onClick={() => onDelete(comment.id)}
-                className="flex items-center gap-0.5 text-xs font-medium text-danger">
-                <Trash2 size={11} /> Delete
-              </button>
-            )}
+            {/* Delete deliberately lives only in the long-press menu. A
+                destructive action sitting one stray tap away from Reply, on
+                every comment you own, is the wrong default — and it was the
+                only action here duplicated from that menu. */}
           </div>
 
           {/* Show/hide replies toggle */}
