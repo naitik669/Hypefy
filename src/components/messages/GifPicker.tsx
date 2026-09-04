@@ -7,8 +7,11 @@ export interface GifResult {
   id: string;
   /** downsized_medium URL — sent as the message body */
   gifUrl: string;
-  /** fixed_height_small URL — fast-loading grid thumbnail */
+  /** Small WebP rendition — the grid thumbnail. */
   previewUrl: string;
+  /** Intrinsic size of previewUrl, so the grid can hold the space for it. */
+  width?: number;
+  height?: number;
   title: string;
 }
 
@@ -161,7 +164,10 @@ export function GifPicker({ onSelect }: Props) {
       } finally {
         if (reqGen.current === gen) setLoading(false);
       }
-    }, 380);
+      // Shorter than it was: the old results now stay on screen while this
+      // runs, so a spare request costs a lot less than the wait did. Still
+      // long enough that a typed word is one search, not six.
+    }, 240);
   }
 
   // ── Handle category tab click ─────────────────────────────────────────────
@@ -257,8 +263,12 @@ export function GifPicker({ onSelect }: Props) {
               Vercel Environment Variables, then redeploy.
             </p>
           </div>
-        ) : loading ? (
-          /* Skeleton grid — 3 columns, varying heights to mimic real masonry */
+        ) : loading && gifs.length === 0 ? (
+          /* Skeleton grid — 3 columns, varying heights to mimic real masonry.
+             Only when there is nothing to show yet. While REFINING a search
+             the old results stay put and dim (see the grid below): blanking
+             to a skeleton on every keystroke made the picker strobe, which
+             is what made searching feel broken rather than slow. */
           <div className="columns-3 gap-1 space-y-1">
             {[72, 52, 88, 60, 96, 52, 80, 64, 72, 88, 56, 68].map((h, i) => (
               <div
@@ -292,7 +302,10 @@ export function GifPicker({ onSelect }: Props) {
           </div>
         ) : (
           /* CSS columns = natural masonry, no JS needed */
-          <div className="columns-3 gap-1 space-y-1">
+          <div
+            className="columns-3 gap-1 space-y-1 transition-opacity duration-150"
+            style={{ opacity: loading ? 0.45 : 1 }}
+          >
             {gifs.map((gif) => (
               <div key={gif.id} className="relative break-inside-avoid">
                 <button
@@ -301,7 +314,23 @@ export function GifPicker({ onSelect }: Props) {
                   className="block w-full overflow-hidden rounded-lg transition-opacity active:opacity-60"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={gif.previewUrl} alt={gif.title} className="w-full rounded-lg" loading="lazy" />
+                  <img
+                    src={gif.previewUrl}
+                    alt={gif.title}
+                    className="w-full rounded-lg bg-surface"
+                    loading="lazy"
+                    decoding="async"
+                    // The masonry re-flowed on every arrival without these —
+                    // two dozen column-height recalculations, which is what
+                    // the "lag" was. aspectRatio holds the slot from the
+                    // first paint; the tinted background makes the slot read
+                    // as loading rather than as a hole.
+                    style={
+                      gif.width && gif.height
+                        ? { aspectRatio: `${gif.width} / ${gif.height}` }
+                        : undefined
+                    }
+                  />
                 </button>
 
                 {/* Heart / fave button — always visible, top-right of each GIF */}

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { gestureBlocked } from "@/components/layout/SwipeNav";
 import { clampPinch, PINCH_MAX } from "@/components/shots/ReelsFeed";
+import { clampZoom, ZOOM_MAX, ZOOM_MIN } from "@/components/feed/FeedCard";
 
 /**
  * The rules that decide whether a touch belongs to the page or to something
@@ -47,5 +48,34 @@ describe("clampPinch", () => {
     // Two touches reported at the same point would divide by zero and put
     // NaN into a transform, which silently blanks the video.
     expect(Number.isFinite(clampPinch(1, 0, 120))).toBe(true);
+  });
+});
+
+describe("clampZoom", () => {
+  it("passes an ordinary pinch straight through", () => {
+    expect(clampZoom(1.8)).toBe(1.8);
+  });
+
+  it("never shrinks the photo inside its own frame", () => {
+    // Below 1 the card would show a gap around the image, which reads as a
+    // rendering fault rather than as zooming out.
+    expect(clampZoom(0.3)).toBe(ZOOM_MIN);
+  });
+
+  it("caps the zoom", () => {
+    expect(clampZoom(99)).toBe(ZOOM_MAX);
+  });
+
+  it("refuses NaN and Infinity rather than blanking the image", () => {
+    // Two touches reported at the same point divide by zero; NaN in a
+    // transform silently renders nothing at all.
+    //
+    // Both non-finite cases land on "no zoom" rather than Infinity landing
+    // on maximum zoom. They can only arise from a zero starting gap, which
+    // means the gesture was never measurable — snapping to 4x on garbage
+    // input would be a violent answer to a question nobody asked.
+    expect(clampZoom(NaN)).toBe(ZOOM_MIN);
+    expect(clampZoom(Infinity)).toBe(ZOOM_MIN);
+    expect(clampZoom(0 / 0)).toBe(ZOOM_MIN);
   });
 });

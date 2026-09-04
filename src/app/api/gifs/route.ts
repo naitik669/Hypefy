@@ -9,6 +9,14 @@ import { guardApi } from "@/lib/api-guard";
  * Server-side proxy for Giphy so the API key is never exposed in the browser.
  * Uses GIPHY_API_KEY (no NEXT_PUBLIC_ prefix — server-only).
  */
+/** One rendition of a GIF as Giphy returns it. */
+type GiphyImage = {
+  url?: string;
+  webp?: string;
+  width?: string;
+  height?: string;
+};
+
 export async function GET(req: NextRequest) {
   const blocked = await guardApi("gifs");
   if (blocked) return blocked;
@@ -36,15 +44,22 @@ export async function GET(req: NextRequest) {
     // Shape the response — only send what the picker needs
     const gifs = ((json.data ?? []) as Record<string, unknown>[])
       .map((r) => {
-        const imgs = (r.images ?? {}) as Record<string, { url?: string }>;
+        const imgs = (r.images ?? {}) as Record<string, GiphyImage>;
+        const preview =
+          imgs.fixed_height_small ?? imgs.preview_gif ?? imgs.downsized_medium;
         return {
           id: String(r.id ?? ""),
           gifUrl: imgs.downsized_medium?.url ?? imgs.original?.url ?? "",
-          previewUrl:
-            imgs.fixed_height_small?.url ??
-            imgs.preview_gif?.url ??
-            imgs.downsized_medium?.url ??
-            "",
+          // WebP first: the same frame at a fraction of the bytes. The grid
+          // shows two dozen of these at once, and animated GIF is the single
+          // heaviest way to deliver every one of them.
+          previewUrl: preview?.webp ?? preview?.url ?? "",
+          // Sent so the grid can reserve the space before the image lands.
+          // Without them every arrival re-flowed the masonry, which is what
+          // the lag actually was — not download time, but the column heights
+          // being recomputed two dozen times.
+          width: Number(preview?.width) || 0,
+          height: Number(preview?.height) || 0,
           title: String(r.title ?? ""),
         };
       })

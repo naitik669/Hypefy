@@ -96,6 +96,24 @@ export function BottomSheet({
     <div
       className="fixed inset-0 z-[200] flex items-end justify-center bg-black/70 backdrop-blur-[6px]"
       onClick={onClose}
+      /*
+       * Stop the gesture here.
+       *
+       * This portals to <body>, so in the DOM it is outside everything. But
+       * React dispatches events through the COMPONENT tree, and this sheet is
+       * rendered by a feed card or a reel — so every touch inside it was also
+       * delivered to their handlers. Two fingers in the comments pinched the
+       * Shot underneath; a sideways drag changed tab. Blocking each offender
+       * in turn is endless, because the leak is structural: anything that
+       * renders a sheet inherits it. One stop at the portal root closes all
+       * of them, including the ones nobody has written yet.
+       */
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerMove={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
     >
       <div
         ref={trapRef}

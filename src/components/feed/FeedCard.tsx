@@ -20,6 +20,7 @@ import { ExpandableText } from "@/components/ui/ExpandableText";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { FeedImpression } from "@/components/feed/FeedImpression";
+import { PostPeek } from "@/components/feed/PostPeek";
 import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
 import { EditPostSheet } from "@/components/feed/EditPostSheet";
@@ -90,6 +91,23 @@ function getImages(post: FeedPost): string[] {
   return [...new Set(urls)];
 }
 
+/** How far a feed photo may be pinched. */
+export const ZOOM_MIN = 1;
+export const ZOOM_MAX = 4;
+
+/**
+ * Pinch ratio, clamped.
+ *
+ * Floored at 1 rather than allowed below: shrinking the photo inside its own
+ * frame leaves a gap in the card, which reads as a rendering fault rather
+ * than as zooming out. Guarded against a zero starting gap, which would put
+ * NaN into a transform and blank the image.
+ */
+export function clampZoom(ratio: number): number {
+  if (!Number.isFinite(ratio)) return ZOOM_MIN;
+  return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, ratio));
+}
+
 export function FeedCard({
   post,
   currentUserId,
@@ -127,24 +145,39 @@ export function FeedCard({
   const galleryIsTouchEvent = useRef(false);
 
   /**
-   * Hold or pinch the photo to open it full screen.
+   * Five gestures share this one element, so the guards below ARE the design:
    *
-   * This replaces a corner button. The button was always visible, sat on top
-   * of the photo it was there to reveal, and had to be hit exactly; holding
-   * and pinching are what people already try on an image, and neither costs
-   * any pixels.
+   *   tap            → nothing (kept for the desktop click path)
+   *   double-tap     → Hype
+   *   swipe sideways → next / previous image
+   *   hold           → peek: the photo lifts, and drops when you let go
+   *   pinch          → zoom and pan in place, springing back on release
    *
-   * Four gestures now share this element — tap, double-tap to Hype, swipe
-   * between images, and hold/pinch to expand — so the guards below are the
-   * whole design. A hold must not also register as a tap, and a swipe must
-   * cancel a hold that has not fired yet.
+   * Hold and pinch are deliberately different answers. Holding asks "what is
+   * that?" and wants the whole picture for a second; pinching asks "what is
+   * in the corner of it?" and wants to steer. Sending both to the same
+   * full-screen viewer, as this did, answered neither well.
+   *
+   * The corner expand button is gone from touch as a result — it was always
+   * visible, sat on top of the photo it existed to reveal, and had to be hit
+   * exactly.
    */
   const HOLD_MS = 350;
   /** Movement that means "swiping", not "holding". */
   const HOLD_SLOP_PX = 10;
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** The expand already happened; the release that follows is not a tap. */
+  /** A hold or pinch happened; the release that follows is not a tap. */
   const gestureConsumed = useRef(false);
+  const [peekSrc, setPeekSrc] = useState<string | null>(null);
+
+  /** Live pinch transform. Identity when idle, so nothing is composited. */
+  const [pinch, setPinch] = useState({ scale: 1, x: 0, y: 0 });
+  const [pinching, setPinching] = useState(false);
+  const pinchFrom = useRef<{
+    dist: number;
+    midX: number;
+    midY: number;
+  } | null>(null);
 
   function clearHold() {
     if (holdTimer.current) {
@@ -153,11 +186,30 @@ export function FeedCard({
     }
   }
 
-  function expandImage() {
+  function twoFingerState(t: React.TouchList) {
+    return {
+      dist: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY),
+      midX: (t[0].clientX + t[1].clientX) / 2,
+      midY: (t[0].clientY + t[1].clientY) / 2,
+    };
+  }
+
+  function beginPinch(t: React.TouchList) {
     clearHold();
+    setPeekSrc(null);
     gestureConsumed.current = true;
-    haptics.select();
-    setZoomOpen(true);
+    pinchFrom.current = twoFingerState(t);
+    setPinching(true);
+  }
+
+  function endPinch() {
+    if (!pinchFrom.current) return;
+    pinchFrom.current = null;
+    setPinching(false);
+    // Springs back rather than staying zoomed. The photo lives in a feed —
+    // leaving it parked at 3× would mean every scroll past it starts in a
+    // state nobody chose, and there is no obvious way back to normal.
+    setPinch({ scale: 1, x: 0, y: 0 });
   }
 
   function onGalleryTouchStart(e: React.TouchEvent) {
@@ -165,36 +217,59 @@ export function FeedCard({
     gestureConsumed.current = false;
     clearHold();
 
-    // Two fingers down is already a pinch — go straight to the viewer, which
-    // is where pinching actually zooms. Waiting for the fingers to move first
-    // would swallow the opening of the gesture.
     if (e.touches.length > 1) {
-      expandImage();
+      beginPinch(e.touches);
       return;
     }
 
     galleryTouchStartX.current = e.touches[0].clientX;
     galleryTouchStartY.current = e.touches[0].clientY;
-    holdTimer.current = setTimeout(expandImage, HOLD_MS);
+    holdTimer.current = setTimeout(() => {
+      holdTimer.current = null;
+      gestureConsumed.current = true;
+      haptics.select();
+      setPeekSrc(images[imgIdx] ?? null);
+    }, HOLD_MS);
   }
 
   function onGalleryTouchMove(e: React.TouchEvent) {
-    if (gestureConsumed.current) return;
     if (e.touches.length > 1) {
-      expandImage();
+      // A second finger can land after the first — start the pinch from
+      // wherever they are now, not from the single-finger origin.
+      if (!pinchFrom.current) beginPinch(e.touches);
+      else {
+        const now = twoFingerState(e.touches);
+        const from = pinchFrom.current;
+        setPinch({
+          scale: clampZoom(now.dist / Math.max(1, from.dist)),
+          // Pan follows the midpoint, which is what makes it steerable
+          // rather than just growing from the centre.
+          x: now.midX - from.midX,
+          y: now.midY - from.midY,
+        });
+      }
       return;
     }
+
+    if (gestureConsumed.current) return;
     const dx = Math.abs(e.touches[0].clientX - galleryTouchStartX.current);
     const dy = Math.abs(e.touches[0].clientY - galleryTouchStartY.current);
     // Either axis: sideways is a swipe between images, vertical is the feed
-    // scrolling past. Neither should still be arming an expand.
+    // scrolling past. Neither should still be arming a hold.
     if (dx > HOLD_SLOP_PX || dy > HOLD_SLOP_PX) clearHold();
   }
 
   function onGalleryTouchEnd(e: React.TouchEvent) {
     clearHold();
+    // Lifting one finger of two ends the pinch; the remaining finger must not
+    // then be read as a swipe from wherever it happens to be.
+    if (pinchFrom.current) {
+      endPinch();
+      return;
+    }
     if (gestureConsumed.current) {
       gestureConsumed.current = false;
+      setPeekSrc(null); // releasing is how a peek is dismissed
       return;
     }
 
@@ -210,7 +285,9 @@ export function FeedCard({
   }
   function onGalleryTouchCancel() {
     clearHold();
+    endPinch();
     gestureConsumed.current = false;
+    setPeekSrc(null);
   }
   function onGalleryClick() {
     // On touch devices onTouchEnd already handled the tap; skip click synthesis.
@@ -518,6 +595,24 @@ export function FeedCard({
             userSelect: "none",
           }}
         >
+          {/* Zoom layer. Separate from the slide below it because the two
+              transforms are independent — composing pinch scale into the
+              same transform as the -100%-per-image slide makes the pan
+              distance depend on which image you are on. */}
+          <div
+            style={{
+              transform:
+                pinch.scale === 1 && pinch.x === 0 && pinch.y === 0
+                  ? undefined
+                  : `translate3d(${pinch.x}px, ${pinch.y}px, 0) scale(${pinch.scale})`,
+              // Track the fingers exactly while they are down; spring back
+              // under its own power once they leave.
+              transition: pinching
+                ? "none"
+                : "transform 240ms cubic-bezier(0.16,1,0.3,1)",
+              willChange: pinching ? "transform" : undefined,
+            }}
+          >
           {/* Transform-based slide — no native scroll so velocity cannot skip frames */}
           <div
             className="flex transition-transform duration-300 ease-out will-change-transform"
@@ -543,6 +638,7 @@ export function FeedCard({
                 />
               </div>
             ))}
+          </div>
           </div>
 
           {/* Double-tap burst (centred over the gallery) */}
@@ -763,6 +859,9 @@ export function FeedCard({
         imageUrls={images.length > 0 ? images : undefined}
         initialImageIdx={imgIdx}
       />
+
+      {/* Held, not opened — it lives only as long as the finger is down. */}
+      {peekSrc && <PostPeek src={peekSrc} onClose={() => setPeekSrc(null)} />}
 
       {zoomOpen && images[imgIdx] && (
         <ZoomViewer src={images[imgIdx]} onClose={() => setZoomOpen(false)} />
