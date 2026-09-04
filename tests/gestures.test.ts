@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { gestureBlocked } from "@/components/layout/SwipeNav";
 import { clampPinch, PINCH_MAX } from "@/components/shots/ReelsFeed";
 import { clampZoom, ZOOM_MAX, ZOOM_MIN } from "@/components/feed/FeedCard";
+import { autoplayAllowed } from "@/components/feed/ShotFeedCard";
 
 /**
  * The rules that decide whether a touch belongs to the page or to something
@@ -77,5 +78,44 @@ describe("clampZoom", () => {
     expect(clampZoom(NaN)).toBe(ZOOM_MIN);
     expect(clampZoom(Infinity)).toBe(ZOOM_MIN);
     expect(clampZoom(0 / 0)).toBe(ZOOM_MIN);
+  });
+});
+
+describe("autoplayAllowed", () => {
+  it("plays on an ordinary device", () => {
+    expect(autoplayAllowed({ reducedMotion: false })).toBe(true);
+    expect(
+      autoplayAllowed({ reducedMotion: false, effectiveType: "4g" }),
+    ).toBe(true);
+  });
+
+  it("stands down for reduced motion", () => {
+    // Someone has told the OS they do not want things moving on their own.
+    expect(autoplayAllowed({ reducedMotion: true })).toBe(false);
+  });
+
+  it("stands down for Save-Data", () => {
+    expect(
+      autoplayAllowed({ reducedMotion: false, saveData: true }),
+    ).toBe(false);
+  });
+
+  it("stands down on 2g and slow-2g", () => {
+    // Autoplaying video here is spending someone's money without asking.
+    expect(
+      autoplayAllowed({ reducedMotion: false, effectiveType: "2g" }),
+    ).toBe(false);
+    expect(
+      autoplayAllowed({ reducedMotion: false, effectiveType: "slow-2g" }),
+    ).toBe(false);
+  });
+
+  it("does not mistake 3g for 2g", () => {
+    // A suffix match on "2g" alone would catch nothing here, but a loose
+    // substring match would wrongly catch "slow-2g"-shaped strings only —
+    // this pins the boundary.
+    expect(
+      autoplayAllowed({ reducedMotion: false, effectiveType: "3g" }),
+    ).toBe(true);
   });
 });
