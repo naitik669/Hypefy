@@ -15,7 +15,9 @@ import {
   tagAffinityFor,
   refreshJitter,
   refreshSeed,
+  shotFeedScore,
 } from "@/lib/feed-rank";
+import { placeShots } from "@/lib/feed-mix";
 import { getBlockedIds } from "@/lib/blocked";
 import { jsonRecord } from "@/lib/supabase/typed";
 
@@ -58,6 +60,7 @@ export default async function HomePage() {
     { data: followedReposts },
     { data: affinityData },
     { data: followedTagRows },
+    { data: shotRows },
   ] = await Promise.all([
     // Posts from people I follow (+ my own): guaranteed present even when
     // the global firehose has scrolled past them.
@@ -123,6 +126,16 @@ export default async function HomePage() {
       .select("tag")
       .eq("user_id", user.id)
       .limit(200),
+    // Shots, to mix into the feed. Joins the existing wave rather than adding
+    // a round trip. A small window: the feed shows at most three, and which
+    // three re-rolls on refresh.
+    supabase
+      .from("shots")
+      .select(
+        "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, save_count, profiles(display_name, username, avatar_hue, avatar_url)"
+      )
+      .order("created_at", { ascending: false })
+      .limit(30),
   ]);
 
   // People lists behind the Favourite / Hypers feed tabs — fetched lightly
@@ -307,6 +320,38 @@ export default async function HomePage() {
     .slice(0, 30);
   const posts = diversify(ranked);
 
+  // Shots, mixed in.
+  //
+  // Scored on the post scale (shotFeedScore) so "which shots are worth
+  // showing" is answered consistently with the posts around them — but NOT
+  // merged into the same sort. With a handful of shots against a few dozen
+  // posts a score merge has no stable behaviour: fresh shots sweep the top,
+  // then a day later fall past the cut and vanish entirely. placeShots
+  // decides how many and where; the score only decides which.
+  //
+  // Same refresh seed as the posts, so pulling to refresh re-rolls the
+  // selection instead of showing the same three every time.
+  const shotCandidates = ((shotRows ?? []) as any[])
+    .map((s) => ({
+      ...s,
+      profiles: Array.isArray(s.profiles) ? s.profiles[0] ?? null : s.profiles,
+    }))
+    .filter((s) => !blockedIds.has(s.user_id))
+    .map((s) => ({
+      ...s,
+      _score:
+        shotFeedScore(
+          s,
+          s.user_id === user.id,
+          followingIds.has(s.user_id),
+          now,
+          authorAff[s.user_id] ?? 0
+        ) + refreshJitter(s.id, seed),
+    }))
+    .sort((a, b) => b._score - a._score);
+
+  const placedShots = placeShots(posts, shotCandidates);
+
   const currentUserForRow = myProfile
     ? {
         name: myProfile.display_name ?? myProfile.username ?? "You",
@@ -382,6 +427,7 @@ export default async function HomePage() {
             initialHyped: hypedIds.has(post.id),
             initialSaved: savedIds.has(post.id),
           }))}
+          initialShots={placedShots}
           currentUserId={user.id}
           followingIds={[...followingIds]}
           favoriteIds={favoriteIds}

@@ -152,6 +152,119 @@ export function diversify<T extends { user_id: string }>(ranked: T[]): T[] {
   return out;
 }
 
+/**
+ * A Shot's score on the POST scale, so the two can be compared at all.
+ *
+ * Deliberately a delegation rather than its own formula. `shotScore` in
+ * shots/page.tsx tops out around 114 on a tiered recency curve while
+ * `feedScore` tops out near 263 — sorting numbers from those two scales in one
+ * list is meaningless. That function stays where it is, ranking shots against
+ * shots, where the scale does not matter.
+ *
+ * A Shot carries no hashtags, so it can never earn the interest or tag-affinity
+ * terms and is structurally ~33 points short of an otherwise identical post.
+ * That is correct and left uncompensated: placement is decided by quota (see
+ * feed-mix.ts), so the shortfall changes the ORDER shots are chosen in, never
+ * whether they appear.
+ *
+ * `seen` is not exposed because there is no shot_views table — there is no
+ * impression signal for Shots to read.
+ */
+export function shotFeedScore(
+  s: {
+    created_at: string;
+    hype_count?: number | null;
+    comment_count?: number | null;
+    save_count?: number | null;
+  },
+  isOwn: boolean,
+  isFollowed: boolean,
+  now: number,
+  authorAffinity = 0,
+  interacted = false
+): number {
+  return feedScore(
+    {
+      created_at: s.created_at,
+      hype_count: s.hype_count ?? 0,
+      comment_count: s.comment_count ?? 0,
+      save_count: s.save_count ?? 0,
+    },
+    isOwn,
+    isFollowed,
+    false,
+    now,
+    authorAffinity,
+    0,
+    interacted,
+    false
+  );
+}
+
+/**
+ * Rank a batch fetched by the client, with only what the client actually has.
+ *
+ * The home feed's first 30 posts are ranked on the server with affinity data
+ * from get_affinity; everything after that was appended in pure
+ * reverse-chronological order, so the feed silently changed character partway
+ * down. This closes that cliff.
+ *
+ * It is deliberately a weaker ranking, not a pretend-equal one: affinity is a
+ * server-only RPC and interests are not shipped to the client, so both terms
+ * are passed as zero. What remains — recency, whether you follow the author,
+ * engagement, and the seen penalty — is most of the signal and all of the
+ * ordering that matters at this corpus size.
+ *
+ * `interacted` is likewise left false: the client learns hype/save state in a
+ * separate round trip AFTER this runs, and delaying the sort to wait for it
+ * would trade a visible pause for a marginal reordering.
+ */
+export function rankBatch<
+  T extends {
+    id: string;
+    user_id: string;
+    created_at: string;
+    hype_count?: number | null;
+    comment_count?: number | null;
+    save_count?: number | null;
+  },
+>(
+  batch: T[],
+  ctx: {
+    currentUserId: string;
+    following: Set<string>;
+    seen: Set<string>;
+    now?: number;
+  }
+): T[] {
+  const now = ctx.now ?? Date.now();
+  const scored = batch.map((p) => ({
+    p,
+    score: feedScore(
+      {
+        // Coerced because the database columns are nullable while feedScore
+        // takes plain numbers. A null count is zero engagement, not unknown.
+        created_at: p.created_at,
+        hype_count: p.hype_count ?? 0,
+        comment_count: p.comment_count ?? 0,
+        save_count: p.save_count ?? 0,
+      },
+      p.user_id === ctx.currentUserId,
+      ctx.following.has(p.user_id),
+      false,
+      now,
+      0,
+      0,
+      false,
+      ctx.seen.has(p.id)
+    ),
+  }));
+  scored.sort(
+    (a, b) => b.score - a.score || (a.p.created_at < b.p.created_at ? 1 : -1)
+  );
+  return diversify(scored.map((s) => s.p));
+}
+
 /** Lowercased hashtag set from a post, for interest matching. */
 export function postTags(p: { hashtags?: string[] | null }): string[] {
   return ((p.hashtags ?? []) as string[]).map((t) =>

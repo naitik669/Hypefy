@@ -57,31 +57,46 @@ export function ShowsRowSkeleton() {
   );
 }
 
-/** A single feed post card skeleton. */
+/**
+ * A single feed post card skeleton.
+ *
+ * Every measurement here is copied from FeedCard rather than chosen, because
+ * the only job of a skeleton is to put the real thing's furniture in the real
+ * thing's place. It previously did not: a CIRCLE where the avatar is a
+ * squircle, a full-bleed square where the media is inset by mx-4 and rounded,
+ * border-border/60 against the card's /50, and a gap-4 action row against
+ * gap-5. Everything jumped sideways the moment content arrived.
+ *
+ * If FeedCard's layout changes, this has to change with it — a skeleton that
+ * has drifted is worse than none, because it animates confidently in the
+ * wrong place.
+ */
 export function FeedCardSkeleton() {
   return (
-    <div className="border-b border-border/60 pb-3">
-      {/* Author row */}
+    <div className="border-b border-border/50 pb-3">
+      {/* Author row — FeedCard: flex items-center gap-3 px-4 py-3 */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <SkeletonCircle size={40} />
+        {/* Avatar is a squircle (rounded-[30%]), not a circle. */}
+        <Skeleton rounded="rounded-[30%]" className="h-10 w-10 shrink-0" />
         <div className="flex flex-1 flex-col gap-1.5">
           <SkeletonLine width={120} height={11} />
           <SkeletonLine width={72} height={9} />
         </div>
         <SkeletonCircle size={24} />
       </div>
-      {/* Media */}
-      <Skeleton rounded="rounded-none" className="aspect-square w-full" />
-      {/* Actions */}
-      <div className="flex items-center gap-4 px-4 pt-3">
+      {/* Media — FeedCard: mx-4 rounded-2xl, aspect from the post itself.
+          Square is the same fallback the card uses when aspect_ratio is null. */}
+      <Skeleton rounded="rounded-2xl" className="mx-4 aspect-square" />
+      {/* Actions — FeedCard: gap-5, and the save icon pinned right. */}
+      <div className="flex items-center gap-5 px-4 pt-3">
         <SkeletonCircle size={24} />
         <SkeletonCircle size={24} />
         <SkeletonCircle size={24} />
         <div className="flex-1" />
         <SkeletonCircle size={24} />
       </div>
-      {/* Caption */}
-      <div className="flex flex-col gap-1.5 px-4 pt-3">
+      {/* Caption — FeedCard: px-4 pt-2, clamped to two lines. */}
+      <div className="flex flex-col gap-1.5 px-4 pt-2">
         <SkeletonLine width="80%" height={10} />
         <SkeletonLine width="55%" height={10} />
       </div>

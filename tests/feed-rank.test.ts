@@ -6,6 +6,7 @@ import {
   tagAffinityFor,
   refreshJitter,
   refreshSeed,
+  rankBatch,
 } from "@/lib/feed-rank";
 
 const now = Date.UTC(2026, 5, 28, 12, 0, 0);
@@ -258,5 +259,89 @@ describe("refresh variety", () => {
     // Randomness per render is fine; randomness per comparison is not.
     const seed = refreshSeed();
     expect(refreshJitter("post-1", seed)).toBe(refreshJitter("post-1", seed));
+  });
+});
+
+describe("rankBatch — the client-side tail", () => {
+  const now = Date.parse("2026-09-04T12:00:00Z");
+  const post = (
+    id: string,
+    user_id: string,
+    hoursAgo: number,
+    hype_count = 0,
+  ) => ({
+    id,
+    user_id,
+    created_at: new Date(now - hoursAgo * 3_600_000).toISOString(),
+    hype_count,
+    comment_count: 0,
+    save_count: 0,
+  });
+
+  const ctx = (over: Partial<Parameters<typeof rankBatch>[1]> = {}) => ({
+    currentUserId: "me",
+    following: new Set<string>(),
+    seen: new Set<string>(),
+    now,
+    ...over,
+  });
+
+  it("puts a followed author above a stranger, all else equal", () => {
+    // The whole reason the tail was worth ranking: reverse-chronological
+    // ignores who you actually follow.
+    const out = rankBatch([post("a", "stranger", 1), post("b", "friend", 1)], {
+      ...ctx({ following: new Set(["friend"]) }),
+    });
+    expect(out.map((p) => p.id)).toEqual(["b", "a"]);
+  });
+
+  it("pushes already-seen posts down", () => {
+    const out = rankBatch([post("seen", "x", 1), post("new", "y", 1)], {
+      ...ctx({ seen: new Set(["seen"]) }),
+    });
+    expect(out[0].id).toBe("new");
+  });
+
+  it("prefers recent over old when nothing else separates them", () => {
+    const out = rankBatch([post("old", "x", 40), post("fresh", "y", 1)], ctx());
+    expect(out[0].id).toBe("fresh");
+  });
+
+  it("lets engagement outweigh a few hours of age", () => {
+    const out = rankBatch(
+      [post("quiet", "x", 0), post("loud", "y", 6, 20)],
+      ctx(),
+    );
+    expect(out[0].id).toBe("loud");
+  });
+
+  it("does not put the same author in consecutive slots", () => {
+    // diversify's promise has to survive the tail too, or one prolific
+    // poster owns everything below post 30.
+    const out = rankBatch(
+      [
+        post("a1", "spammer", 1),
+        post("a2", "spammer", 2),
+        post("a3", "spammer", 3),
+        post("b1", "other", 9),
+      ],
+      ctx(),
+    );
+    const authors = out.map((p) => p.user_id);
+    expect(authors[0]).toBe("spammer");
+    expect(authors[1]).toBe("other");
+  });
+
+  it("handles null counts as zero rather than breaking the sort", () => {
+    const withNulls = [
+      { ...post("n", "x", 1), hype_count: null, comment_count: null, save_count: null },
+      post("m", "y", 1, 5),
+    ];
+    const out = rankBatch(withNulls, ctx());
+    expect(out.map((p) => p.id)).toEqual(["m", "n"]);
+  });
+
+  it("returns an empty batch untouched", () => {
+    expect(rankBatch([], ctx())).toEqual([]);
   });
 });

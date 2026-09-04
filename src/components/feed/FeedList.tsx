@@ -11,6 +11,9 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { CaughtUp } from "@/components/feed/CaughtUp";
 import { useFeedTab, type FeedTab } from "@/components/layout/FeedTabDropdown";
 import { loadSeen, saveSeen } from "@/lib/feed-seen";
+import { rankBatch } from "@/lib/feed-rank";
+import { spliceShots, type PlacedShot, type ShotCard } from "@/lib/feed-mix";
+import { ShotFeedCard } from "@/components/feed/ShotFeedCard";
 
 const PAGE_SIZE = 20;
 const POST_SELECT =
@@ -44,6 +47,7 @@ const EMPTY_IDS_STATE: IdsListState = { posts: [], done: false, init: false };
  */
 export function FeedList({
   initialPosts,
+  initialShots = [],
   currentUserId,
   followingIds = [],
   favoriteIds = [],
@@ -52,6 +56,8 @@ export function FeedList({
   blockedIds = [],
 }: {
   initialPosts: FeedPost[];
+  /** Shots already scored and slotted by the server (For You only). */
+  initialShots?: PlacedShot<ShotCard>[];
   currentUserId: string;
   followingIds?: string[];
   favoriteIds?: string[];
@@ -63,13 +69,17 @@ export function FeedList({
   const tab = useFeedTab();
   // Authors the viewer has blocked — pagination batches skip them too.
   const blockedSet = new Set(blockedIds);
+  // Authors the viewer follows — the tail ranker needs this to award the
+  // social bonus, exactly as the server does for the first page.
+  const followingSet = new Set(followingIds);
   // Hyper status resolved once per page (avoids a close_friends query per card).
   const hyperSet = new Set(hyperIds);
   const mutualHyperSet = new Set(mutualHyperIds);
 
   // For You — seeded by the server.
   const [posts, setPosts] = useState<FeedPost[]>(initialPosts);
-  const [fyDone, setFyDone] = useState(initialPosts.length < 10);
+  const [shots, setShots] = useState<PlacedShot<ShotCard>[]>(initialShots);
+  const [fyDone, setFyDone] = useState(initialPosts.length < PAGE_SIZE);
 
   // Following / Favourite / Hypers — each lazily loaded client-side.
   const [idsState, setIdsState] = useState<Record<IdsTab, IdsListState>>({
@@ -102,7 +112,12 @@ export function FeedList({
   // server query but the visible list stayed frozen on the first load.
   useEffect(() => {
     setPosts(initialPosts);
-    setFyDone(initialPosts.length < 10);
+    // Shots need the identical treatment for the identical reason. Without
+    // this line they would be seeded once and then freeze, while the posts
+    // around them refreshed — the same bug the comment above describes, and
+    // more confusing here because the stale cards would be video.
+    setShots(initialShots);
+    setFyDone(initialPosts.length < PAGE_SIZE);
     // Mark the ranked page as seen so the chronological tail won't resurface it.
     seenRef.current = loadSeen();
     initialPosts.forEach((p) => seenRef.current.add(p.id));
@@ -135,16 +150,39 @@ export function FeedList({
       .order("created_at", { ascending: false })
       .limit(PAGE_SIZE);
 
+    // Only the two filters that are correctness rather than preference:
+    // don't show the same post twice, and don't show blocked authors.
+    //
+    // The seen ring is deliberately NOT filtered here any more. It used to be,
+    // and it made the tail return nothing: the re-sync effect above adds all
+    // 30 ranked ids to the ring before the reader has scrolled at all, so the
+    // whole first page was already "seen" and every one of these rows was
+    // dropped — after the limit had been spent on them. Seen posts are already
+    // pushed down by feedScore's -25; filtering them again is double jeopardy,
+    // and on a corpus this size it empties the feed.
     const fresh = normalize(data).filter(
-      (p) => !current.some((x) => x.id === p.id) && !seenRef.current.has(p.id) && !blockedSet.has(p.user_id),
+      (p) => !current.some((x) => x.id === p.id) && !blockedSet.has(p.user_id),
     );
     if ((data?.length ?? 0) < PAGE_SIZE) setFyDone(true);
-    fresh.forEach((p) => seenRef.current.add(p.id));
-    saveSeen(seenRef.current);
+
     if (fresh.length) {
-      const withState = await withUserState(fresh);
+      // Rank the tail. Without this the feed changed character at post 30 —
+      // ranked above, raw reverse-chronological below.
+      //
+      // Scored against the ring as it stands BEFORE this batch joins it.
+      // Adding them first would mark every one of them seen and apply the
+      // same -25 to all, which is no ordering at all.
+      const ranked = rankBatch(fresh, {
+        currentUserId,
+        following: followingSet,
+        seen: new Set(seenRef.current),
+      });
+      const withState = await withUserState(ranked);
       setPosts((prev) => [...prev, ...withState]);
     }
+
+    fresh.forEach((p) => seenRef.current.add(p.id));
+    saveSeen(seenRef.current);
   }
 
   async function loadMoreIdsTab(t: IdsTab) {
@@ -250,21 +288,37 @@ export function FeedList({
           <EmptyIdsTab tab={tab} />
         )
       ) : (
-        activePosts.map((post, i) => (
-          <Reveal
-            key={`${tab}-${post.id}`}
-            delay={Math.min(i, 4) * 55}
-            // content-visibility virtualizes: off-screen cards skip layout+paint
-            className="[content-visibility:auto] [contain-intrinsic-size:auto_480px]"
-          >
-            <FeedCard
-              post={post}
-              currentUserId={currentUserId}
-              initialIsHyper={hyperSet.has(post.user_id)}
-              initialIsMutualHyper={mutualHyperSet.has(post.user_id)}
-            />
-          </Reveal>
-        ))
+        // Shots are spliced in at RENDER only, and only on For You. `posts`
+        // stays a plain FeedPost[] so every post-keyed path in this file —
+        // withUserState's .in() lookups, the seen ring, the `oldest` cursor,
+        // initialHyped/initialSaved — keeps working on post ids alone.
+        spliceShots(activePosts, tab === "foryou" ? shots : []).map((item, i) =>
+          item.kind === "shot" ? (
+            <Reveal
+              key={`shot-${item.shot.id}`}
+              delay={Math.min(i, 4) * 55}
+              // Taller than a post card, so it needs its own placeholder size —
+              // reusing 480px makes the scroll anchor jump as it resolves.
+              className="[content-visibility:auto] [contain-intrinsic-size:auto_560px]"
+            >
+              <ShotFeedCard shot={item.shot} />
+            </Reveal>
+          ) : (
+            <Reveal
+              key={`${tab}-${item.post.id}`}
+              delay={Math.min(i, 4) * 55}
+              // content-visibility virtualizes: off-screen cards skip layout+paint
+              className="[content-visibility:auto] [contain-intrinsic-size:auto_480px]"
+            >
+              <FeedCard
+                post={item.post}
+                currentUserId={currentUserId}
+                initialIsHyper={hyperSet.has(item.post.user_id)}
+                initialIsMutualHyper={mutualHyperSet.has(item.post.user_id)}
+              />
+            </Reveal>
+          )
+        )
       )}
 
       {/* Sentinel + loading shimmer */}
