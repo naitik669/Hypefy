@@ -17,6 +17,8 @@ import {
   Trash2,
   BookmarkCheck,
   Loader2,
+  Flag,
+  Ban,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
@@ -29,6 +31,7 @@ import { haptics } from "@/lib/haptics";
 import { useToast } from "@/components/ui/ToastProvider";
 import { hypeResult } from "@/lib/supabase/typed";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ReportSheet } from "@/components/ui/ReportSheet";
 import { scheduleUndoable } from "@/lib/undoable";
 
 type ReelProfile = {
@@ -396,7 +399,26 @@ function ReelCard({
 
   // Owner controls
   const isOwner = !!currentUserId && currentUserId === reel.user_id;
+  const cardRouter = useRouter();
   const [ownerMenuOpen, setOwnerMenuOpen] = useState(false);
+  const [viewerMenuOpen, setViewerMenuOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+
+  async function blockAuthor() {
+    setConfirmBlock(false);
+    const { error } = await supabase.rpc("block_user", {
+      p_blocked: reel.user_id,
+    });
+    if (error) {
+      showToast(error.message ?? "Couldn't block, try again");
+      return;
+    }
+    haptics.success();
+    showToast("Blocked");
+    // Their Shots should not still be on screen after blocking them.
+    cardRouter.refresh();
+  }
   const [inShowcase, setInShowcase] = useState(false);
   const [ownerAction, setOwnerAction] = useState<"delete" | "showcase" | null>(
     null
@@ -875,11 +897,19 @@ function ReelCard({
           />
         </RailButton>
 
-        {isOwner && (
-          <RailButton label="More" onClick={() => setOwnerMenuOpen(true)}>
-            <MoreHorizontal size={30} className="text-white" />
-          </RailButton>
-        )}
+        {/* Was `{isOwner && …}`, so a viewer watching someone else's Shot had
+            no menu at all — no report, no block, no way out. Shots are the
+            most viral surface here and were the only one with no safety
+            valve. Owners get their own actions; everyone else gets the ones
+            that matter to them. */}
+        <RailButton
+          label="More"
+          onClick={() =>
+            isOwner ? setOwnerMenuOpen(true) : setViewerMenuOpen(true)
+          }
+        >
+          <MoreHorizontal size={30} className="text-white" />
+        </RailButton>
       </div>
 
       {/* Author + caption */}
@@ -926,6 +956,86 @@ function ReelCard({
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/80">
           <p className="text-sm font-semibold text-white/80">Shot deleted</p>
         </div>
+      )}
+
+      {/* Viewer actions — report the Shot, or block its author. */}
+      {viewerMenuOpen && (
+        <>
+          <div
+            className="absolute inset-0 z-30"
+            onClick={() => setViewerMenuOpen(false)}
+          />
+          <div className="absolute inset-x-4 bottom-8 z-40 overflow-hidden rounded-2xl bg-elevated/95 ring-1 ring-border backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={() => {
+                setViewerMenuOpen(false);
+                setReportOpen(true);
+              }}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
+            >
+              <Flag size={20} className="text-foreground" />
+              <div>
+                <p className="text-sm font-semibold">Report Shot</p>
+                <p className="text-xs text-muted">
+                  Tell us what&rsquo;s wrong with this
+                </p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
+            <button
+              type="button"
+              onClick={() => {
+                setViewerMenuOpen(false);
+                setConfirmBlock(true);
+              }}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left text-danger transition-colors hover:bg-danger/10"
+            >
+              <Ban size={20} />
+              <div>
+                <p className="text-sm font-semibold">
+                  Block {handle ? `@${handle}` : name}
+                </p>
+                <p className="text-xs opacity-70">
+                  You stop seeing each other
+                </p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
+            <button
+              type="button"
+              onClick={() => setViewerMenuOpen(false)}
+              className="flex w-full items-center justify-center px-5 py-4 text-sm font-semibold text-muted transition-colors hover:bg-white/5"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+
+      <ConfirmDialog
+        open={confirmBlock}
+        onClose={() => setConfirmBlock(false)}
+        onConfirm={blockAuthor}
+        icon={Ban}
+        title={`Block ${handle ? `@${handle}` : name}`}
+        body="Their Shots and posts disappear from your feeds, and yours from theirs. They aren't told."
+        confirmLabel="Block"
+      />
+
+      {currentUserId && reportOpen && (
+        <ReportSheet
+          open
+          onClose={() => setReportOpen(false)}
+          targetType="shot"
+          targetId={reel.id}
+          currentUserId={currentUserId}
+          onReported={() => showToast("Thanks — we'll take a look.")}
+        />
       )}
 
       {/* Owner actions menu — same pattern as ShowViewer */}

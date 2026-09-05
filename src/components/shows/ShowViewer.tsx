@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   X, Send, Star, ChevronLeft, ChevronRight, ExternalLink,
-  MoreHorizontal, Trash2, Bookmark, BookmarkCheck, Loader2, FileText, Eye,
+  MoreHorizontal, Trash2, Bookmark, BookmarkCheck, Loader2, FileText, Eye, Flag, Ban,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { parseTrack, ensurePreviewPlaying, pausePreview, stopPreview } from "@/lib/music";
 import { useToast } from "@/components/ui/ToastProvider";
 import { hypeResult } from "@/lib/supabase/typed";
+import { ReportSheet } from "@/components/ui/ReportSheet";
 
 type ShowProfile = { display_name: string | null; avatar_hue: number | null; username: string | null; avatar_url?: string | null } | null;
 
@@ -136,6 +137,26 @@ function ShowScreen({
   const progressRef = useRef(0);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [viewerMenuOpen, setViewerMenuOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+
+  async function blockAuthor() {
+    setConfirmBlock(false);
+    const { error } = await supabase.rpc("block_user", {
+      p_blocked: show.user_id,
+    });
+    if (error) {
+      showToast(error.message ?? "Couldn't block, try again");
+      setPaused(false);
+      return;
+    }
+    showToast("Blocked");
+    // Leave the Show rather than sitting inside content from someone you
+    // just blocked.
+    onClose();
+    router.refresh();
+  }
   const [viewersOpen, setViewersOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionPending, setActionPending] = useState<"delete" | "showcase" | null>(null);
@@ -394,16 +415,24 @@ function ShowScreen({
           <span className="text-xs text-white/55">{timeAgo(show.created_at)}</span>
         </div>
 
-        {isOwner && (
-          <button
-            type="button"
-            aria-label="Show options"
-            onClick={(e) => { e.stopPropagation(); setMenuOpen(true); setPaused(true); }}
-            className="pointer-events-auto flex h-8 w-8 items-center justify-center text-white"
-          >
-            <MoreHorizontal size={22} />
-          </button>
-        )}
+        {/* Was owner-only, so someone watching a stranger's Show had no menu
+            at all and no way to report it. A Show is ephemeral, which makes
+            it the easiest thing here to misuse and the hardest to moderate
+            after the fact — it should not have been the one surface with no
+            way to raise a hand. */}
+        <button
+          type="button"
+          aria-label={isOwner ? "Show options" : "Report or block"}
+          onClick={(e) => {
+            e.stopPropagation();
+            setPaused(true);
+            if (isOwner) setMenuOpen(true);
+            else setViewerMenuOpen(true);
+          }}
+          className="pointer-events-auto flex h-8 w-8 items-center justify-center text-white"
+        >
+          <MoreHorizontal size={22} />
+        </button>
 
         <button
           type="button"
@@ -622,6 +651,73 @@ function ShowScreen({
             </button>
           </div>
         </div>
+      )}
+
+      {/* ── Viewer actions: report the Show, or block whoever posted it ── */}
+      {viewerMenuOpen && (
+        <>
+          <div
+            className="absolute inset-0 z-40"
+            onClick={() => { setViewerMenuOpen(false); setPaused(false); }}
+          />
+          <div className="absolute inset-x-4 bottom-8 z-50 overflow-hidden rounded-2xl bg-elevated/95 ring-1 ring-border backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setViewerMenuOpen(false); setReportOpen(true); }}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
+            >
+              <Flag size={20} className="text-foreground" />
+              <div>
+                <p className="text-sm font-semibold">Report Show</p>
+                <p className="text-xs text-muted">Tell us what&rsquo;s wrong with this</p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setViewerMenuOpen(false); setConfirmBlock(true); }}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left text-danger transition-colors hover:bg-danger/10"
+            >
+              <Ban size={20} />
+              <div>
+                <p className="text-sm font-semibold">Block {name}</p>
+                <p className="text-xs opacity-70">You stop seeing each other</p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setViewerMenuOpen(false); setPaused(false); }}
+              className="flex w-full items-center justify-center px-5 py-4 text-sm font-semibold text-muted transition-colors hover:bg-white/5"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+
+      <ConfirmDialog
+        open={confirmBlock}
+        onClose={() => { setConfirmBlock(false); setPaused(false); }}
+        onConfirm={blockAuthor}
+        icon={Ban}
+        title={`Block ${name}`}
+        body="Their Shows and posts disappear from your feeds, and yours from theirs. They aren't told."
+        confirmLabel="Block"
+      />
+
+      {currentUserId && reportOpen && (
+        <ReportSheet
+          open
+          onClose={() => { setReportOpen(false); setPaused(false); }}
+          targetType="show"
+          targetId={show.id}
+          currentUserId={currentUserId}
+        />
       )}
 
       {/* ── Owner actions menu ── */}
