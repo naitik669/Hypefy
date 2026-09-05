@@ -1124,6 +1124,35 @@ export type Database = {
           },
         ]
       }
+      post_views: {
+        Row: {
+          created_at: string
+          post_id: string
+          viewed_on: string
+          viewer_id: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: string
+          viewed_on?: string
+          viewer_id: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: string
+          viewed_on?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_views_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           aspect_ratio: number | null
@@ -1235,6 +1264,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          accent_id: string
           anthem: Json | null
           avatar_hue: number | null
           avatar_url: string | null
@@ -1243,9 +1273,9 @@ export type Database = {
           bio: string | null
           card_layout: string
           card_theme: string
-          accent_id: string
           created_at: string
           current_vibe: string | null
+          date_of_birth: string | null
           display_name: string | null
           dm_privacy: string
           hide_read_receipts: boolean
@@ -1265,6 +1295,7 @@ export type Database = {
           username: string | null
         }
         Insert: {
+          accent_id?: string
           anthem?: Json | null
           avatar_hue?: number | null
           avatar_url?: string | null
@@ -1273,9 +1304,9 @@ export type Database = {
           bio?: string | null
           card_layout?: string
           card_theme?: string
-          accent_id?: string
           created_at?: string
           current_vibe?: string | null
+          date_of_birth?: string | null
           display_name?: string | null
           dm_privacy?: string
           hide_read_receipts?: boolean
@@ -1295,6 +1326,7 @@ export type Database = {
           username?: string | null
         }
         Update: {
+          accent_id?: string
           anthem?: Json | null
           avatar_hue?: number | null
           avatar_url?: string | null
@@ -1303,9 +1335,9 @@ export type Database = {
           bio?: string | null
           card_layout?: string
           card_theme?: string
-          accent_id?: string
           created_at?: string
           current_vibe?: string | null
+          date_of_birth?: string | null
           display_name?: string | null
           dm_privacy?: string
           hide_read_receipts?: boolean
@@ -1333,6 +1365,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      push_devices: {
+        Row: {
+          created_at: string
+          platform: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          platform: string
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          platform?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       push_subscriptions: {
         Row: {
@@ -1597,6 +1653,7 @@ export type Database = {
           caption: string | null
           comment_count: number
           created_at: string
+          hashtags: string[]
           hype_count: number
           id: string
           in_showcase: boolean
@@ -1605,13 +1662,13 @@ export type Database = {
           save_count: number
           share_count: number
           track: Json | null
-          hashtags: string[]
           user_id: string
         }
         Insert: {
           caption?: string | null
           comment_count?: number
           created_at?: string
+          hashtags?: string[]
           hype_count?: number
           id?: string
           in_showcase?: boolean
@@ -1620,13 +1677,13 @@ export type Database = {
           save_count?: number
           share_count?: number
           track?: Json | null
-          hashtags?: string[]
           user_id: string
         }
         Update: {
           caption?: string | null
           comment_count?: number
           created_at?: string
+          hashtags?: string[]
           hype_count?: number
           id?: string
           in_showcase?: boolean
@@ -1635,7 +1692,6 @@ export type Database = {
           save_count?: number
           share_count?: number
           track?: Json | null
-          hashtags?: string[]
           user_id?: string
         }
         Relationships: [
@@ -1644,35 +1700,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      post_views: {
-        Row: {
-          created_at: string
-          post_id: string
-          viewed_on: string
-          viewer_id: string
-        }
-        Insert: {
-          created_at?: string
-          post_id: string
-          viewed_on?: string
-          viewer_id: string
-        }
-        Update: {
-          created_at?: string
-          post_id?: string
-          viewed_on?: string
-          viewer_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "post_views_post_id_fkey"
-            columns: ["post_id"]
-            isOneToOne: false
-            referencedRelation: "posts"
             referencedColumns: ["id"]
           },
         ]
@@ -1803,6 +1830,30 @@ export type Database = {
         }
         Relationships: []
       }
+      waitlist: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          source: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          source?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          source?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1813,6 +1864,7 @@ export type Database = {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: undefined
       }
+      age_ok: { Args: never; Returns: boolean }
       api_rate_limit: { Args: { p_action: string }; Returns: undefined }
       approve_follow_request: {
         Args: { p_requester: string }
@@ -1827,6 +1879,7 @@ export type Database = {
         Returns: undefined
       }
       block_user: { Args: { p_blocked: string }; Returns: undefined }
+      blocked_either_way: { Args: never; Returns: string[] }
       capture_creator_daily_stats: { Args: never; Returns: undefined }
       claim_oneshot: { Args: { p_message_id: string }; Returns: string }
       claim_referral: { Args: { p_ref_username: string }; Returns: boolean }
@@ -1851,11 +1904,7 @@ export type Database = {
             Returns: string
           }
       create_group: {
-        // p_title is `text` with no default, so the generator infers it as
-        // required + non-null. The function body explicitly handles a NULL
-        // title (meaning "auto-name from members"), so it is nullable.
-        // Re-apply this patch after every regenerate_typescript_types.
-        Args: { p_member_ids: string[]; p_title: string | null }
+        Args: { p_member_ids: string[]; p_title: string }
         Returns: string
       }
       create_shot_comment: {
@@ -2021,6 +2070,7 @@ export type Database = {
         Args: { p_after: string; p_conversation_id: string }
         Returns: undefined
       }
+      set_date_of_birth: { Args: { p_dob: string }; Returns: undefined }
       set_lock_pin: {
         Args: { p_pin: string; p_scope: string }
         Returns: undefined
@@ -2090,8 +2140,7 @@ export type Database = {
       }
       touch_last_seen: { Args: never; Returns: undefined }
       unfollow_user: { Args: { p_target: string }; Returns: undefined }
-      blocked_either_way: { Args: Record<PropertyKey, never>; Returns: string[] }
-      unread_dm_count: { Args: Record<PropertyKey, never>; Returns: number }
+      unread_dm_count: { Args: never; Returns: number }
       unsend_message: { Args: { p_message_id: string }; Returns: undefined }
       update_conversation: {
         Args: {
@@ -2123,12 +2172,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2152,11 +2201,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2177,11 +2226,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2202,11 +2251,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2219,11 +2268,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

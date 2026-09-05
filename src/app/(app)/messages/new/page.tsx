@@ -6,11 +6,13 @@ import { Search, Check, Loader2, Users , X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type Person = { id: string; display_name: string | null; username: string | null; avatar_hue: number | null; avatar_url: string | null };
 
 export default function NewChatPage() {
   const router = useRouter();
+  const toast = useToast();
   const supabase = createClient();
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,12 +74,19 @@ export default function NewChatPage() {
       if (ids.length === 1) {
         const { data: convId, error } = await supabase.rpc("get_or_create_dm", { p_other: ids[0] });
         if (!error && convId) { router.push(`/messages/${convId}`); return; }
+        // Was silent: a blocked user or a dropped connection left the button
+        // spinning back to idle with no conversation and no explanation.
+        toast(error?.message ?? "Couldn't open that chat.", "error");
       } else {
         const { data: convId, error } = await supabase.rpc("create_group", {
-          p_title: groupName.trim() || null,
+          // An untitled group is valid — the RPC names it from its members.
+          // The generated types mark every argument without a default as
+          // non-null, which `text` is not.
+          p_title: (groupName.trim() || null) as string,
           p_member_ids: ids,
         });
         if (!error && convId) { router.push(`/messages/${convId}`); return; }
+        toast(error?.message ?? "Couldn't create that group.", "error");
       }
     } finally {
       setCreating(false);

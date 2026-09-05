@@ -41,6 +41,16 @@ export default async function AppLayout({
   }
 
   const profile = await getProfile(supabase);
+
+  // No date of birth on file means we never actually asked — the Google button
+  // on the sign-in page ran no age check at all, and the signup path could lose
+  // the answer across the OAuth redirect. Ask before anything else, including
+  // profile setup, so an under-13 account never gets as far as having a
+  // username. 15 of the 17 accounts that predate migration 0053 land here.
+  if (!profile?.dateOfBirth) {
+    redirect("/age-check");
+  }
+
   if (!profile?.profileCompleted) {
     redirect("/setup-profile");
   }

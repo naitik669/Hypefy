@@ -31,12 +31,15 @@ export function PostAuthTasks() {
       // entry alone; it expires on its own.
       if (!session || cancelled) return;
 
-      // Record the age gate for accounts created through Google, matching
-      // what signUp() writes for email. Never overwrite an existing value.
-      if (pending.dob && !session.user.user_metadata?.date_of_birth) {
-        await supabase.auth.updateUser({
-          data: { date_of_birth: pending.dob, age_confirmed: true },
-        });
+      // Record the age gate for accounts created through Google.
+      //
+      // This now writes the profiles column via set_date_of_birth (0053), not
+      // user_metadata: metadata is client-writable, so it was never evidence of
+      // anything. The RPC is write-once and rejects under-13 server-side, so a
+      // failure here is not a hole — the /age-check gate asks again on the next
+      // render, which is exactly what should happen if this step is lost.
+      if (pending.dob) {
+        await supabase.rpc("set_date_of_birth", { p_dob: pending.dob });
       }
 
       if (pending.addAccount) {

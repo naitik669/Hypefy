@@ -72,6 +72,10 @@ export async function updateSession(request: NextRequest) {
     "/messages",
     "/profile",
     "/setup-profile",
+    // The one-time date-of-birth prompt. Signed-in only, like setup-profile:
+    // the (app) layout redirects here, and an anonymous visitor has no profile
+    // to record it against.
+    "/age-check",
     "/create",
     "/notifications",
     "/search",

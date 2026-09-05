@@ -29,6 +29,9 @@ export type Profile = {
   profileTags: string[];
   profileCompleted: boolean;
   isVerified: boolean;
+  isAdmin: boolean;
+  /** Recorded server-side; null means we never asked. See migration 0053. */
+  dateOfBirth: string | null;
 };
 
 export type Banner = { id: string; label: string; gradient: string };
@@ -155,6 +158,8 @@ function mapProfile(row: any): Profile {
     profileTags: row.profile_tags ?? [],
     profileCompleted: row.profile_completed ?? false,
     isVerified: row.is_verified ?? false,
+    isAdmin: row.is_admin ?? false,
+    dateOfBirth: row.date_of_birth ?? null,
   };
 }
 
