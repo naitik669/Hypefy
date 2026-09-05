@@ -30,6 +30,8 @@ export function useCamera({
   const [facing, setFacing] = useState<FacingMode>(facingDefault);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Real dimensions of the stream we were given, once metadata lands. */
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
 
   const start = useCallback(
     async (mode: FacingMode) => {
@@ -41,6 +43,7 @@ export function useCamera({
       }
       setReady(false);
       setError(null);
+      setSize(null);
 
       if (!navigator.mediaDevices?.getUserMedia) {
         setError("Camera not supported on this device.");
@@ -51,6 +54,14 @@ export function useCamera({
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: mode },
+            // aspectRatio is the constraint that actually governs SHAPE, and
+            // it was missing. Width and height ideals alone are a weak hint:
+            // a device that cannot do exactly 1080x1920 is free to hand back
+            // its nearest mode, and plenty hand back landscape. That is not a
+            // cosmetic problem, because MediaRecorder records this stream
+            // verbatim — a landscape stream produces a landscape Shot that
+            // the whole app then displays in a 9:16 frame.
+            aspectRatio: { ideal: portrait ? 9 / 16 : 4 / 3 },
             // Ideals, not exact: a device that cannot do 1080x1920 should
             // hand back its closest match rather than throwing.
             width: { ideal: portrait ? 1080 : 1280 },
@@ -61,7 +72,14 @@ export function useCamera({
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => setReady(true);
+          videoRef.current.onloadedmetadata = () => {
+            setReady(true);
+            // Report what we actually got, not what we asked for. The caller
+            // needs it to frame the viewfinder honestly when a device ignores
+            // the request.
+            const v = videoRef.current;
+            if (v?.videoWidth) setSize({ w: v.videoWidth, h: v.videoHeight });
+          };
         }
       } catch (err) {
         // NotAllowedError is a refusal; anything else is usually hardware
@@ -136,5 +154,11 @@ export function useCamera({
     capturePhoto,
     /** Front camera is shown mirrored so it behaves like a mirror. */
     mirrored: facing === "user",
+    size,
+    /**
+     * The device gave us a landscape stream despite being asked for portrait.
+     * Worth knowing rather than silently cropping 75% of the width away.
+     */
+    isLandscape: size ? size.w > size.h : false,
   };
 }

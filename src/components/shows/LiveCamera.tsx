@@ -41,8 +41,14 @@ export function LiveCamera({
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: mode },
-          width: { ideal: 1280 },
-          height: { ideal: 960 },
+          // Portrait, not the old 4:3 landscape. A Show is displayed
+          // full-screen portrait by ShowViewer, so capturing landscape meant
+          // the viewer cropped most of the frame away afterwards — and the
+          // preview here cropped a different amount, so what you framed was
+          // not what got posted.
+          aspectRatio: { ideal: 9 / 16 },
+          width: { ideal: 1080 },
+          height: { ideal: 1920 },
         },
         audio: false,
       });
@@ -95,14 +101,20 @@ export function LiveCamera({
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-black">
-      {/* Live preview — mirror front camera in CSS so it feels like a mirror */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className={`h-full w-full object-cover ${facing === "user" ? "[transform:scaleX(-1)]" : ""}`}
-      />
+      {/* Live preview — mirror front camera in CSS so it feels like a mirror.
+          Letterboxed to 9:16 for the same reason as the Shot viewfinder: a
+          phone screen is ~20:9 and no camera is, so covering it edge to edge
+          crops the width and shows you a tighter frame than you are about to
+          capture. */}
+      <div className="flex h-full w-full items-center justify-center">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`aspect-[9/16] max-h-full w-full object-cover ${facing === "user" ? "[transform:scaleX(-1)]" : ""}`}
+        />
+      </div>
 
       {/* Error overlay */}
       {error && (

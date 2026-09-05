@@ -114,17 +114,36 @@ export function CreateScreen({ userId }: { userId: string }) {
 
   return (
     <div className="fixed inset-0 z-[200] flex flex-col bg-black">
-      {/* Viewfinder, full-bleed behind every control. */}
+      {/*
+        Viewfinder, framed at the shape it will actually be recorded in.
+
+        It used to be full-bleed with object-cover, and that is why it looked
+        zoomed in. A phone screen is about 20:9; no camera is. Covering a
+        screen that tall with even a perfect 9:16 stream throws away ~18-20%
+        of the WIDTH — and if the device hands back landscape, which plenty do
+        in a WebView, it throws away about 75%. Measured, on a 390x844 screen:
+        1080x1920 leaves 82% of the width, 1280x720 leaves 26%.
+
+        The framing was also dishonest. MediaRecorder captures the stream
+        verbatim, so the crop was never applied to the recording — you framed
+        a shot against a picture that was not what you were about to save.
+
+        Letterboxed to 9:16 instead: the whole frame is visible, it matches
+        what gets stored, and the black bands are where the chrome already
+        sits.
+      */}
       {wantsCamera ? (
-        <video
-          ref={cam.videoRef}
-          autoPlay
-          playsInline
-          muted
-          className={`absolute inset-0 h-full w-full object-cover ${
-            cam.mirrored ? "[transform:scaleX(-1)]" : ""
-          }`}
-        />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <video
+            ref={cam.videoRef}
+            autoPlay
+            playsInline
+            muted
+            className={`aspect-[9/16] max-h-full w-full object-cover ${
+              cam.mirrored ? "[transform:scaleX(-1)]" : ""
+            }`}
+          />
+        </div>
       ) : (
         <div className="absolute inset-0 bg-gradient-to-b from-elevated to-black" />
       )}
