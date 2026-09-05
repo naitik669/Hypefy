@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, CheckCheck, Loader2, Trash2 } from "lucide-react";
+import { Bell, CheckCheck, Loader2, Trash2, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -408,15 +408,26 @@ export default function NotificationsPage() {
         title="Activity"
         showBack
         right={
-          newGroups.length > 0 ? (
-            <button
-              type="button"
-              onClick={readAll}
-              className="flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-xs font-bold text-accent transition-colors hover:bg-accent/10"
+          <>
+            {newGroups.length > 0 && (
+              <button
+                type="button"
+                onClick={readAll}
+                className="flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-xs font-bold text-accent transition-colors hover:bg-accent/10"
+              >
+                <CheckCheck size={15} /> Read all
+              </button>
+            )}
+            {/* Follow requests outlive their notifications — clearing one used
+                to strand the request with nowhere left to answer it. */}
+            <Link
+              href="/requests"
+              aria-label="Follow requests"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground"
             >
-              <CheckCheck size={15} /> Read all
-            </button>
-          ) : undefined
+              <UserPlus size={18} />
+            </Link>
+          </>
         }
       />
 

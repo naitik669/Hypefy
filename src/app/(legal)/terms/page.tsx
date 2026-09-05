@@ -51,7 +51,7 @@ export default function TermsPage() {
       <ul>
         <li>Provide accurate information and keep it current.</li>
         <li>Keep your login credentials confidential; you are responsible for all activity under your account.</li>
-        <li>Tell us promptly at [support@hypefy.chat] if you suspect unauthorized use of your account.</li>
+        <li>Tell us promptly at support@hypefy.chat if you suspect unauthorized use of your account.</li>
         <li>Do not create an account for anyone else or transfer your account without our consent.</li>
       </ul>
 
@@ -225,7 +225,7 @@ export default function TermsPage() {
       <h2>16. Contact</h2>
       <p>
         Questions about these Terms? Reach us at{" "}
-        <a href="mailto:[support@hypefy.chat]" className="text-accent">[support@hypefy.chat]</a>.
+        <a href="mailto:support@hypefy.chat" className="text-accent">support@hypefy.chat</a>.
       </p>
     </>
   );
