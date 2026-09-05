@@ -114,6 +114,7 @@ export function FeedCard({
   currentUserId,
   initialIsHyper,
   initialIsMutualHyper,
+  focusCommentId = null,
 }: {
   post: FeedPost;
   currentUserId: string;
@@ -121,6 +122,12 @@ export function FeedCard({
    *  Undefined for standalone cards (post page, profile viewer), which self-fetch. */
   initialIsHyper?: boolean;
   initialIsMutualHyper?: boolean;
+  /**
+   * Open comments on mount, landing on this one. Passed only by /p/[postId]
+   * from ?comment= in the URL, so a "replied to your comment" notification
+   * has somewhere to point — a comment was not a place before this.
+   */
+  focusCommentId?: string | null;
 }) {
   const supabase = createClient();
   const images = getImages(post);
@@ -342,7 +349,12 @@ export function FeedCard({
     e.preventDefault();
   }
   const showToast = useToast();
-  const [commentsOpen, setCommentsOpen] = useState(false);
+  // A ?comment= link opens the sheet itself — landing on the post with the
+  // comments closed is the same dead end the notification already had.
+  const [commentsOpen, setCommentsOpen] = useState(!!focusCommentId);
+  // Spent once. Reopening comments by hand later should not drag you back to
+  // whichever comment the notification was about.
+  const [focusId, setFocusId] = useState(focusCommentId);
   const [commentCount, setCommentCount] = useState(post.comment_count);
   const [shareOpen, setShareOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -869,11 +881,15 @@ export function FeedCard({
       {/* Sheets */}
       <CommentsSheet
         open={commentsOpen}
-        onClose={() => setCommentsOpen(false)}
+        onClose={() => {
+          setCommentsOpen(false);
+          setFocusId(null);
+        }}
         postId={post.id}
         postOwnerId={post.user_id}
         currentUserId={uid}
         onCountChange={(n) => setCommentCount(n)}
+        focusCommentId={focusId}
       />
 
       <ShareSheet

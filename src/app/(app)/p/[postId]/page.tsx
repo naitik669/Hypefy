@@ -62,10 +62,17 @@ export async function generateMetadata({
 
 export default async function PostDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ postId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { postId } = await params;
+  // ?comment=<id> opens the thread on that comment. Notifications about a
+  // comment used to have nowhere to land: a comment is not a route, so
+  // notifHref sent them to the post with the sheet closed.
+  const commentParam = (await searchParams).comment;
+  const focusCommentId = typeof commentParam === "string" ? commentParam : null;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const uid = user?.id ?? "";
@@ -143,7 +150,7 @@ export default async function PostDetailPage({
     <>
       <PageHeader title="Post" showBack />
       <ViewPing postId={postId} />
-      <FeedCard post={post} currentUserId={uid} />
+      <FeedCard post={post} currentUserId={uid} focusCommentId={focusCommentId} />
 
       {moreFrom.length > 0 && (
         <ThumbSection title={username ? `More from @${username}` : "More from this person"} items={moreFrom} />

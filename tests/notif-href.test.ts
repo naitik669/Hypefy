@@ -41,12 +41,13 @@ describe("notifHref — every combination that exists in production", () => {
     expect(notifHref(n({ type: "hype_shot", target_type: "show" }))).toBe("/shows/t1");
   });
 
-  it("hyped-your-comment goes to the post carrying it", () => {
-    // A comment is not a destination, so these returned "#". The parent is
-    // resolved alongside the thumbnails.
+  it("hyped-your-comment goes to the comment, not just the post", () => {
+    // A comment is not a route, so these returned "#". The parent is resolved
+    // alongside the thumbnails, and ?comment= makes the post page open the
+    // thread on the right row rather than leaving you to find it.
     expect(
       notifHref(n({ type: "hype_comment", target_type: "comment", parent: { kind: "post", id: "p9" } })),
-    ).toBe("/p/p9");
+    ).toBe("/p/p9?comment=t1");
     expect(
       notifHref(n({ type: "hype_comment", target_type: "comment", parent: { kind: "shot", id: "s9" } })),
     ).toBe("/shots/s9");

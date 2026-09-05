@@ -36,6 +36,11 @@ import {
 import { useToast } from "@/components/ui/ToastProvider";
 import { scheduleUndoable } from "@/lib/undoable";
 
+/** Comments per round trip. Was unbounded. */
+const PAGE = 100;
+/** How far a ?comment= deep link will page forward before giving up. */
+const FOCUS_MAX_PAGES = 10;
+
 /**
  * Comments.
  *
@@ -148,6 +153,7 @@ export function CommentsSheet({
   currentUserId,
   onCountChange,
   targetType = "post",
+  focusCommentId = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -157,12 +163,23 @@ export function CommentsSheet({
   onCountChange?: (count: number) => void;
   /** Whether comments belong to a post (default) or a shot/reel. */
   targetType?: "post" | "shot";
+  /**
+   * A specific comment to land on, from ?comment= in the URL. A "replied to
+   * your comment" notification had nowhere to point before this — a comment
+   * was not a place.
+   */
+  focusCommentId?: string | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const showToast = useToast();
 
   const [items, setItems] = useState<Node[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [more, setMore] = useState(false);
+  const [total, setTotal] = useState<number | null>(null);
+  /** created_at of the newest row loaded — the keyset cursor. */
+  const cursor = useRef<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo] = useState<{
     id: string;
@@ -180,22 +197,30 @@ export function CommentsSheet({
   const threads = useMemo(() => threadOf(items), [items]);
 
   /* --- Load ------------------------------------------------------------- */
-  useEffect(() => {
-    if (!open) return;
-    let live = true;
-    setLoading(true);
-
-    (async () => {
-      const { data } = await supabase
+  /**
+   * One page of comments, oldest first.
+   *
+   * The old query was unbounded — every comment on a post, in one round trip,
+   * into a drag-to-dismiss sheet. Paging forward from oldest is the ordering
+   * that makes threading survive it: a reply is always newer than the comment
+   * it answers, so by the time a reply arrives its whole ancestor chain is
+   * already loaded and rootOf can resolve it.
+   */
+  const fetchPage = useCallback(
+    async (after: string | null): Promise<Node[] | null> => {
+      let q = supabase
         .from("comments")
         .select(
           "id, user_id, body, created_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url)"
         )
         .eq(targetType === "shot" ? "shot_id" : "post_id", postId)
         .is("deleted_at", null)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true })
+        .limit(PAGE);
+      if (after) q = q.gt("created_at", after);
 
-      if (!live) return;
+      const { data, error } = await q;
+      if (error) return null;
       const rows = data ?? [];
 
       // Which of these the viewer has already hyped. Kept as a second query
@@ -213,34 +238,94 @@ export function CommentsSheet({
             "target_id",
             rows.map((c: { id: string }) => c.id)
           );
-        if (!live) return;
         hyped = new Set(
           (hypeRows ?? []).map((h: { target_id: string }) => h.target_id)
         );
       }
 
-      setItems(
-        rows.map((c: Record<string, unknown>) => ({
-          id: c.id as string,
-          user_id: c.user_id as string,
-          body: c.body as string,
-          created_at: c.created_at as string,
-          parent_id: (c.parent_id as string | null) ?? null,
-          hyped: hyped.has(c.id as string),
-          hypeCount: (c.hype_count as number) ?? 0,
-          reported: false,
-          profiles: Array.isArray(c.profiles)
-            ? ((c.profiles[0] as Profile) ?? null)
-            : ((c.profiles as Profile) ?? null),
-        }))
-      );
+      return rows.map((c: Record<string, unknown>) => ({
+        id: c.id as string,
+        user_id: c.user_id as string,
+        body: c.body as string,
+        created_at: c.created_at as string,
+        parent_id: (c.parent_id as string | null) ?? null,
+        hyped: hyped.has(c.id as string),
+        hypeCount: (c.hype_count as number) ?? 0,
+        reported: false,
+        profiles: Array.isArray(c.profiles)
+          ? ((c.profiles[0] as Profile) ?? null)
+          : ((c.profiles as Profile) ?? null),
+      }));
+    },
+    [supabase, targetType, postId, currentUserId]
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    setLoading(true);
+    setItems([]);
+    setMore(false);
+    cursor.current = null;
+
+    (async () => {
+      // The real total, so the header and the parent's badge stay honest now
+      // that the list is only a page of it.
+      void supabase
+        .from("comments")
+        .select("id", { count: "exact", head: true })
+        .eq(targetType === "shot" ? "shot_id" : "post_id", postId)
+        .is("deleted_at", null)
+        .then(({ count }) => {
+          if (live) setTotal(count ?? null);
+        });
+
+      const collected: Node[] = [];
+      // Keep paging while a deep link is asking for a comment we haven't
+      // reached yet. Capped, because "keep fetching until you find it" on a
+      // thread that no longer contains it is an unbounded loop.
+      for (let page = 0; page < (focusCommentId ? FOCUS_MAX_PAGES : 1); page++) {
+        const rows = await fetchPage(cursor.current);
+        if (!live) return;
+        if (!rows) break;
+        collected.push(...rows);
+        cursor.current = rows[rows.length - 1]?.created_at ?? cursor.current;
+        if (rows.length < PAGE) break;
+        setMore(true);
+        if (!focusCommentId || collected.some((c) => c.id === focusCommentId)) break;
+      }
+
+      if (!live) return;
+      setItems(collected);
+      setMore(collected.length > 0 && collected.length % PAGE === 0);
       setLoading(false);
     })();
 
     return () => {
       live = false;
     };
-  }, [open, postId, targetType, currentUserId, supabase]);
+  }, [open, postId, targetType, focusCommentId, fetchPage, supabase]);
+
+  // A linked reply sits inside a collapsed thread, so open it — otherwise the
+  // deep link lands on a "3 replies" button with the reply still hidden.
+  useEffect(() => {
+    if (!focusCommentId) return;
+    const thread = threads.find((t) =>
+      t.replies.some((r) => r.id === focusCommentId)
+    );
+    if (thread) setExpanded((prev) => new Set(prev).add(thread.root.id));
+  }, [focusCommentId, threads]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    const rows = await fetchPage(cursor.current);
+    setLoadingMore(false);
+    if (!rows) return;
+    cursor.current = rows[rows.length - 1]?.created_at ?? cursor.current;
+    setItems((prev) => [...prev, ...rows]);
+    if (rows.length < PAGE) setMore(false);
+  }, [fetchPage, loadingMore]);
 
   useEffect(() => {
     if (!open) {
@@ -249,11 +334,13 @@ export function CommentsSheet({
     }
   }, [open]);
 
-  // Keep the parent's badge honest — replies count too.
+  // Keep the parent's badge honest — replies count too. Reports the real
+  // total rather than what happens to be loaded, or opening a long thread
+  // would make the badge shrink.
   useEffect(() => {
-    if (open) onCountChange?.(items.length);
+    if (open) onCountChange?.(total ?? items.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length, open]);
+  }, [items.length, total, open]);
 
   /* --- Mutations -------------------------------------------------------- */
   /** Replace one node, leaving every other object identity untouched. */
@@ -426,7 +513,7 @@ export function CommentsSheet({
       <BottomSheet
         open={open}
         onClose={onClose}
-        title={`Comments · ${items.length}`}
+        title={`Comments · ${total ?? items.length}`}
       >
         {loading ? (
           <div className="flex items-center justify-center py-10">
@@ -451,8 +538,21 @@ export function CommentsSheet({
                 onToggleReplies={toggleReplies}
                 onLongPress={longPress}
                 onZoom={zoom}
+                focusId={focusCommentId}
               />
             ))}
+
+            {more && (
+              <button
+                type="button"
+                onClick={() => void loadMore()}
+                disabled={loadingMore}
+                className="mx-auto flex h-9 items-center gap-2 rounded-pill border border-border px-4 text-xs font-bold text-muted transition-colors hover:text-foreground disabled:opacity-60"
+              >
+                {loadingMore && <Loader2 size={14} className="animate-spin" />}
+                Load more comments
+              </button>
+            )}
           </div>
         )}
 
@@ -720,6 +820,7 @@ const Thread = memo(function Thread({
   open,
   currentUserId,
   onToggleReplies,
+  focusId,
   ...handlers
 }: {
   root: Node;
@@ -727,6 +828,7 @@ const Thread = memo(function Thread({
   open: boolean;
   currentUserId: string;
   onToggleReplies: (id: string) => void;
+  focusId?: string | null;
 } & RowHandlers) {
   return (
     <div>
@@ -734,6 +836,7 @@ const Thread = memo(function Thread({
         node={root}
         threadId={root.id}
         currentUserId={currentUserId}
+        focused={focusId === root.id}
         {...handlers}
       />
 
@@ -762,6 +865,7 @@ const Thread = memo(function Thread({
               threadId={root.id}
               compact
               currentUserId={currentUserId}
+              focused={focusId === r.id}
               {...handlers}
             />
           ))}
@@ -780,6 +884,7 @@ const Row = memo(function Row({
   threadId,
   compact = false,
   currentUserId,
+  focused = false,
   onHype,
   onReply,
   onReport,
@@ -790,6 +895,8 @@ const Row = memo(function Row({
   threadId: string;
   compact?: boolean;
   currentUserId: string;
+  /** This is the comment the URL asked for. */
+  focused?: boolean;
 } & RowHandlers) {
   const name = node.profiles?.display_name ?? node.profiles?.username ?? "User";
   const username = node.profiles?.username;
@@ -799,6 +906,18 @@ const Row = memo(function Row({
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const point = useRef({ x: 0, y: 0 });
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  // Arriving from a notification, put the comment on screen. Without this the
+  // deep link would open the right sheet and leave you to find the row.
+  useEffect(() => {
+    if (!focused) return;
+    const id = setTimeout(
+      () => rowRef.current?.scrollIntoView({ block: "center", behavior: "smooth" }),
+      120
+    );
+    return () => clearTimeout(id);
+  }, [focused]);
 
   const cancel = () => {
     if (timer.current) {
@@ -809,7 +928,12 @@ const Row = memo(function Row({
   useEffect(() => cancel, []);
 
   return (
-    <div className="flex gap-3">
+    <div
+      ref={rowRef}
+      className={`flex gap-3 ${
+        focused ? "-mx-2 rounded-xl bg-accent/[0.09] px-2 py-2 ring-1 ring-accent/30" : ""
+      }`}
+    >
       <button
         type="button"
         aria-label={`View ${name}'s photo`}

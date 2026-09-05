@@ -118,7 +118,11 @@ export function notifHref(n: Notif): string {
   if (n.target_type === "show" && n.target_id) return `/shows/${n.target_id}`;
   if (n.target_type === "conversation" && n.target_id) return `/messages/${n.target_id}`;
   if (n.target_type === "comment" && n.parent)
-    return n.parent.kind === "post" ? `/p/${n.parent.id}` : `/shots/${n.parent.id}`;
+    return n.parent.kind === "post"
+      ? // Land on the comment itself, not just the post it is on. The post
+        // page opens the thread and scrolls to it.
+        `/p/${n.parent.id}?comment=${n.target_id}`
+      : `/shots/${n.parent.id}`;
   return "#";
 }
 

@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { Grid3x3, Zap, Bookmark, PlusCircle, Copy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
-import { PostViewerModal } from "@/components/profile/PostViewerModal";
+import { type FeedPost } from "@/components/feed/FeedCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
 
@@ -39,7 +38,6 @@ export function PublicProfileTabs({
   const [shots, setShots] = useState<any[]>([]);
   const [saved, setSaved] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(false);
-  const [viewerIdx, setViewerIdx] = useState<number | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -144,14 +142,16 @@ export function PublicProfileTabs({
                 postGrid.ts for why the wrapper exists. */}
               <div className={GRID_WRAP}>
                 <div className={GRID}>
-                  {activePosts.map((p, i) => {
+                  {activePosts.map((p) => {
                     const thumb = getThumb(p);
                     const multi = ((p as any).image_urls?.length ?? 0) > 1;
                     return (
-                      <button
+                      // Was a button opening PostViewerModal — a second feed
+                      // screen with its own chrome, doing the job /p/[postId]
+                      // already does, with no URL and nothing to come back to.
+                      <Link
                         key={p.id}
-                        type="button"
-                        onClick={() => setViewerIdx(i)}
+                        href={`/p/${p.id}`}
                         className="relative h-full overflow-hidden rounded-xl bg-surface"
                       >
                         {thumb ? (
@@ -172,21 +172,11 @@ export function PublicProfileTabs({
                             <Copy size={11} strokeWidth={2.5} />
                           </span>
                         )}
-                      </button>
+                      </Link>
                     );
                   })}
                 </div>
               </div>
-
-              {/* Post viewer modal */}
-              {viewerIdx !== null && (
-                <PostViewerModal
-                  posts={activePosts}
-                  startIdx={viewerIdx}
-                  currentUserId={currentUserId ?? ""}
-                  onClose={() => setViewerIdx(null)}
-                />
-              )}
             </>
           )
         ) : tab === "Shots" ? (
