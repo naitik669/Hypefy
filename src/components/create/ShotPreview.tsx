@@ -8,6 +8,7 @@ import { extractHashtags } from "@/lib/content-utils";
 import {
   ALLOWED_SHOT_TYPES,
   MAX_SHOT_MB,
+  MAX_SHOW_MB,
   capturePoster,
 } from "@/lib/video-poster";
 import {
@@ -54,14 +55,19 @@ export function ShotPreview({
   const url = useMemo(() => URL.createObjectURL(file), [file]);
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
 
-  const tooBig = file.size > MAX_SHOT_MB * 1024 * 1024;
+  // Shows go to a bucket half the size of Shots. Using the Shot limit for both
+  // meant a 40MB Show passed this check and was rejected on upload — reported
+  // as "check your connection", because the catch below can't tell a 413 from
+  // a dropped socket.
+  const maxMb = mode === "show" ? MAX_SHOW_MB : MAX_SHOT_MB;
+  const tooBig = file.size > maxMb * 1024 * 1024;
   const badType = isVideo && !ALLOWED_SHOT_TYPES.includes(file.type);
 
   async function publish() {
     if (busy) return;
 
     if (tooBig) {
-      toast(`That clip is over ${MAX_SHOT_MB}MB. Try a shorter one.`);
+      toast(`That clip is over ${maxMb}MB. Try a shorter one.`);
       return;
     }
     if (badType) {
@@ -177,7 +183,7 @@ export function ShotPreview({
         {(tooBig || badType) && (
           <p className="rounded-lg bg-danger/15 px-3 py-2 text-xs text-danger">
             {tooBig
-              ? `That clip is ${(file.size / 1024 / 1024).toFixed(0)}MB — the limit is ${MAX_SHOT_MB}MB.`
+              ? `That clip is ${(file.size / 1024 / 1024).toFixed(0)}MB — the limit is ${maxMb}MB.`
               : "That video format isn't supported."}
           </p>
         )}

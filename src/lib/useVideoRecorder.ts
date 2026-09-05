@@ -73,7 +73,19 @@ export function useVideoRecorder({
     }
 
     chunksRef.current = [];
-    const rec = new MediaRecorder(stream, { mimeType: mime });
+    // Bitrate, not just codec.
+    //
+    // This was omitted, so MediaRecorder used the browser default — 8-12 Mbps
+    // on a modern Android. A 60s Shot came out around 75 MB against a 50 MB
+    // bucket: rejected AFTER the user had waited through the whole upload, and
+    // no client-side cap could have rescued it because the file was already
+    // that size. 2.5 Mbps at 720p is visually indistinguishable on a phone and
+    // puts the same 60s at roughly 20 MB.
+    const rec = new MediaRecorder(stream, {
+      mimeType: mime,
+      videoBitsPerSecond: 2_500_000,
+      audioBitsPerSecond: 128_000,
+    });
     recorderRef.current = rec;
 
     rec.ondataavailable = (e) => {

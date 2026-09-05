@@ -13,12 +13,28 @@
  */
 export const MAX_SHOT_MB = 50;
 
-/** Mirrors the bucket's allowed MIME list. */
+/**
+ * The show-media bucket is half the size of shot-media, and this file is used
+ * by both paths.
+ *
+ * ShotPreview applied MAX_SHOT_MB to Shows as well, so a 40 MB Show passed
+ * client validation and was then rejected by a 25 MB bucket — the same drift
+ * the comment above describes, repeated one level down.
+ */
+export const MAX_SHOW_MB = 25;
+
+/**
+ * Mirrors the bucket's allowed MIME list.
+ *
+ * video/ogg was in here and is NOT in the bucket, so an ogg clip passed the
+ * client and was rejected server-side. Nothing in the app produces ogg —
+ * useVideoRecorder only ever emits webm or mp4 — so the entry went rather than
+ * the bucket widening.
+ */
 export const ALLOWED_SHOT_TYPES = [
   "video/mp4",
   "video/webm",
   "video/quicktime",
-  "video/ogg",
 ];
 
 const POSTER_WIDTH = 720;

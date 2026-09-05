@@ -8,8 +8,14 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
 import { ShotCoverPicker } from "@/components/post/ShotCoverPicker";
 
-const MAX_SIZE_MB = 60;
-const ALLOWED_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/ogg"];
+// Shared with the camera-first creator rather than restated. This file said 60
+// against a 50 MB bucket, and video-poster.ts already carried a comment about
+// that exact drift — it just never reached this copy, because the two Shot
+// paths each kept their own number.
+import { MAX_SHOT_MB, ALLOWED_SHOT_TYPES } from "@/lib/video-poster";
+
+const MAX_SIZE_MB = MAX_SHOT_MB;
+const ALLOWED_TYPES = ALLOWED_SHOT_TYPES;
 const POSTER_WIDTH = 720;
 
 /** Author chip for the preview — the Shot is drawn as the reel feed draws it,
