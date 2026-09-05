@@ -13,7 +13,6 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { VoiceRecorder } from "@/components/messages/VoiceRecorder";
 import { VoiceMessage } from "@/components/messages/VoiceMessage";
 import { GifPicker } from "@/components/messages/GifPicker";
-import { GroupInfoSheet } from "@/components/messages/GroupInfoSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { FloatingMenu, MenuItem, MenuDivider } from "@/components/ui/FloatingMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -223,7 +222,6 @@ export function RealChatView({
   const [forwardMsg, setForwardMsg] = useState<ChatMsg | null>(null);
   // Message id whose reaction list ("who reacted with what") is open
   const [reactionSheet, setReactionSheet] = useState<string | null>(null);
-  const [groupInfoOpen, setGroupInfoOpen] = useState(false);
   const [reportGroupOpen, setReportGroupOpen] = useState(false);
   // Other DM party's presence (last_seen_at), kept live via realtime + a ticker.
   const [otherLastSeen, setOtherLastSeen] = useState<string | null>(other.lastSeenAt ?? null);
@@ -1180,7 +1178,7 @@ export function RealChatView({
           <ChevronLeft size={24} />
         </button>
         {isGroup ? (
-          <button type="button" onClick={() => setGroupInfoOpen(true)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+          <Link href={`/messages/${conversationId}/info`} className="flex min-w-0 flex-1 items-center gap-3 text-left">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[30%]"
               style={{ background: "linear-gradient(140deg, hsl(210 70% 52%), hsl(260 65% 42%))" }}>
               <Users size={18} className="text-white/95" />
@@ -1189,9 +1187,9 @@ export function RealChatView({
               <p className="truncate text-sm font-semibold">{group!.title}</p>
               <p className="truncate text-xs text-muted">{group!.memberCount} members</p>
             </div>
-          </button>
+          </Link>
         ) : (
-          <Link href={other.username ? `/u/${other.username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
+          <Link href={`/messages/${conversationId}/info`} className="flex min-w-0 flex-1 items-center gap-3">
             <div className="relative shrink-0">
               <Avatar name={other.name} hue={other.hue} size={36} src={other.avatarUrl ?? undefined} />
               <PresenceDot lastSeenAt={otherLastSeen} size="sm" />
@@ -1239,7 +1237,7 @@ export function RealChatView({
               <MenuItem icon={UserCircle} label="View profile" onClick={() => { setHeaderMenu(false); router.push(`/u/${other.username}`); }} />
             )}
             {isGroup && (
-              <MenuItem icon={Users} label="Group info" onClick={() => { setHeaderMenu(false); setGroupInfoOpen(true); }} />
+              <MenuItem icon={Users} label="Group info" onClick={() => { setHeaderMenu(false); router.push(`/messages/${conversationId}/info`); }} />
             )}
             <MenuItem
               icon={BellOff}
@@ -1958,17 +1956,6 @@ export function RealChatView({
           </>
         );
       })()}
-
-      {/* Group info / management */}
-      {groupInfoOpen && isGroup && group?.members && (
-        <GroupInfoSheet
-          conversationId={conversationId}
-          title={group.title}
-          members={group.members}
-          myRole={group.myRole ?? "member"}
-          onClose={() => setGroupInfoOpen(false)}
-        />
-      )}
 
       {/* Reaction details — who reacted with what */}
       {reactionSheet && (() => {
