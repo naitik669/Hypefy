@@ -247,7 +247,10 @@ export default async function DiscoverPage() {
 
   return (
     <>
-      <PageHeader title="Discover" />
+      {/* showBack because Discover is somewhere you navigate TO — from the
+          compass on Home — not a tab you can simply be on. It was the only
+          PageHeader in the app without it. */}
+      <PageHeader title="Discover" showBack />
       <PullToRefresh>
         <div className="px-4 py-3">
           <SearchBar placeholder="Search people, posts, #tags" href="/search" />

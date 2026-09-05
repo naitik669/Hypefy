@@ -11,7 +11,19 @@ import { createClient } from "@/lib/supabase/client";
 import { isAuthCallbackUrl, completeNativeSignIn } from "@/lib/native-auth";
 
 /** Tab roots — back from here should leave the app, not unwind history. */
-const ROOT_ROUTES = ["/home", "/discover", "/messages", "/shots", "/profile"];
+/**
+ * Routes where back should quit rather than unwind.
+ *
+ * These are exactly the bottom-nav tabs — the places you can be without
+ * having navigated forward to get there.
+ *
+ * /discover used to be in this list and is not a tab. You reach it by tapping
+ * the compass on Home, which is a forward navigation, and hardware back then
+ * closed the app instead of returning. It is also the only PageHeader in the
+ * codebase without a back arrow, so there was no in-app way out either: the
+ * bottom nav was the sole exit from a screen you had deliberately opened.
+ */
+const ROOT_ROUTES = ["/home", "/messages", "/shots", "/profile"];
 
 /**
  * The native behaviours a WebView does not get for free.

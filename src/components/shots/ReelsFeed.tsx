@@ -33,6 +33,7 @@ import { hypeResult } from "@/lib/supabase/typed";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { scheduleUndoable } from "@/lib/undoable";
+import { safeBack } from "@/lib/safe-back";
 
 type ReelProfile = {
   display_name: string | null;
@@ -217,7 +218,7 @@ export function ReelsFeed({
       setActiveIdx((i) => Math.min(i + 1, reels.length - 1));
     } else if (activeIdx === 0) {
       // Pulling down on the first reel leaves Shots.
-      router.back();
+      safeBack(router);
     } else {
       setActiveIdx((i) => i - 1);
     }
@@ -259,7 +260,7 @@ export function ReelsFeed({
             onToggleMute={() => setMuted((m) => !m)}
             onAutoplayBlocked={() => setMuted(true)}
             isActive={i === activeIdx}
-            onBack={() => router.back()}
+            onBack={() => safeBack(router)}
             // Only the active reel can raise a sheet, so only it reports.
             onSheetChange={i === activeIdx ? setSheetOpen : undefined}
             // Buffer the current reel + its immediate neighbours so swiping to

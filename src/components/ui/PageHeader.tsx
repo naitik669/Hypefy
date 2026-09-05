@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { safeBack } from "@/lib/safe-back";
 import { ChevronLeft } from "lucide-react";
 
 /** Sticky page header: optional back button, title, optional right slot. */
@@ -25,7 +26,7 @@ export function PageHeader({
       {showBack ? (
         <button
           type="button"
-          onClick={() => (onBack ? onBack() : router.back())}
+          onClick={() => (onBack ? onBack() : safeBack(router))}
           aria-label="Back"
           className="flex h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5"
         >

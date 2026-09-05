@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { safeBack } from "@/lib/safe-back";
 import {
   X, Images, Type, Send, Loader2, User,
   LayoutGrid, ChevronLeft, ChevronRight, ExternalLink, Music,
@@ -323,7 +324,7 @@ export default function AddShowPage() {
       {state === "camera" && (
         <>
           <div className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-4 pb-2 pt-14">
-            <button type="button" aria-label="Close" onClick={() => router.back()}
+            <button type="button" aria-label="Close" onClick={() => safeBack(router)}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm">
               <X size={20} />
             </button>

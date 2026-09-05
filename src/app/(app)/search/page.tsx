@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { safeBack } from "@/lib/safe-back";
 import { ChevronLeft, SearchX, Loader2, Hash, Clock, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -265,7 +266,7 @@ export default function SearchPage() {
       <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border/60 bg-background/80 px-2 backdrop-blur-xl">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => safeBack(router)}
           aria-label="Back"
           className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5"
         >

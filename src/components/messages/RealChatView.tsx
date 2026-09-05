@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { safeBack } from "@/lib/safe-back";
 import { ChevronLeft, Send, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Share, Eye, EyeOff, FileText, Download, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
@@ -1174,7 +1175,7 @@ export function RealChatView({
     <div className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
       {/* Header */}
       <header className="flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-2 border-b border-border/60 bg-background/90 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-        <button type="button" onClick={() => router.back()} aria-label="Back"
+        <button type="button" onClick={() => safeBack(router, "/messages")} aria-label="Back"
           className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5">
           <ChevronLeft size={24} />
         </button>

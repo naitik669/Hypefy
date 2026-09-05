@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { safeBack } from "@/lib/safe-back";
 import {
   X,
   RefreshCw,
@@ -52,7 +53,7 @@ export function CreateScreen({ userId }: { userId: string }) {
   const [captured, setCaptured] = useState<File | null>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
-  const close = () => router.back();
+  const close = () => safeBack(router);
   useOverlayBackButton(true, close);
 
   // Only Shot and Show want a viewfinder. Post is text and gallery, and Live

@@ -14,6 +14,7 @@ import { parseTrack, ensurePreviewPlaying, pausePreview, stopPreview } from "@/l
 import { useToast } from "@/components/ui/ToastProvider";
 import { hypeResult } from "@/lib/supabase/typed";
 import { ReportSheet } from "@/components/ui/ReportSheet";
+import { safeBack } from "@/lib/safe-back";
 
 type ShowProfile = { display_name: string | null; avatar_hue: number | null; username: string | null; avatar_url?: string | null } | null;
 
@@ -75,7 +76,7 @@ export function ShowViewer({
 
   function goNext() {
     if (idx < shows.length - 1) setIdx((i) => i + 1);
-    else router.back();
+    else safeBack(router);
   }
   function goPrev() {
     if (idx > 0) setIdx((i) => i - 1);
@@ -99,7 +100,7 @@ export function ShowViewer({
         }
         onNext={goNext}
         onPrev={goPrev}
-        onClose={() => router.back()}
+        onClose={() => safeBack(router)}
       />
     </div>
   );

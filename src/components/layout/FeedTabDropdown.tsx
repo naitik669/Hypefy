@@ -2,15 +2,28 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { FloatingMenu } from "@/components/ui/FloatingMenu";
 import { haptics } from "@/lib/haptics";
 
 export type FeedTab = "foryou" | "following" | "favourite" | "hypers";
 
+/**
+ * The tabs you can switch to.
+ *
+ * "favourite" was missing from this list while being fully implemented
+ * everywhere else — the FeedTab type below, FeedList's query, and its own
+ * "No Favourites yet" empty state. And because useFeedTab validates the URL
+ * param against THIS array, even typing ?feed=favourite fell back to For You.
+ *
+ * So the feature was complete and reachable from nowhere. Zero of seventeen
+ * accounts have ever marked a favourite, which is not a verdict on the idea:
+ * there was no screen in the app that showed the result.
+ */
 const OPTIONS: { value: FeedTab; label: string }[] = [
   { value: "foryou", label: "For You" },
   { value: "following", label: "Following" },
+  { value: "favourite", label: "Favourites" },
   { value: "hypers", label: "Hypers" },
 ];
 
@@ -48,8 +61,29 @@ export function FeedTabDropdown() {
         className="flex items-center gap-1 rounded-full px-1.5 py-1 transition-colors active:scale-95"
       >
         <span className="text-xl font-extrabold tracking-tight">
-          Hypefy<span className="text-accent">.</span>
+          {active === "foryou" ? (
+            <>
+              Hypefy<span className="text-accent">.</span>
+            </>
+          ) : (
+            OPTIONS.find((o) => o.value === active)?.label
+          )}
         </span>
+        {/* The chevron this component's own docstring has always claimed and
+            never rendered. Without it the wordmark looked like a title, so
+            nothing anywhere in the app suggested the feed had tabs — which is
+            the likeliest reason Hypers sits at one user out of seventeen.
+
+            The label also becomes the active tab's name once you leave For
+            You, so the header answers "which feed am I looking at?" instead
+            of showing the same word on all four. */}
+        <ChevronDown
+          size={16}
+          className={`shrink-0 text-muted transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+          aria-hidden
+        />
       </button>
 
       <FloatingMenu
