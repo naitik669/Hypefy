@@ -282,7 +282,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
             />
           ) : (
             <>
-              <CollectionsStrip userId={userId} savedPosts={saved} />
+              <CollectionsStrip userId={userId} />
               <div className={GRID_WRAP}>
                 <div className={GRID}>
                   {saved.map((p) => (

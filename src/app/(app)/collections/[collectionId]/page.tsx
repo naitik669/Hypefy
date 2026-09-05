@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Folder } from "lucide-react";
 import { CollectionActions } from "@/components/profile/CollectionActions";
+import { CollectionPicker } from "@/components/profile/CollectionPicker";
 
 /**
  * One collection, on a route.
@@ -68,10 +69,13 @@ export default async function CollectionPage({
         title={collection.name as string}
         showBack
         right={
-          <CollectionActions
-            collectionId={collection.id as string}
-            name={collection.name as string}
-          />
+          <div className="flex items-center gap-1">
+            <CollectionPicker collectionId={collection.id as string} userId={user.id} />
+            <CollectionActions
+              collectionId={collection.id as string}
+              name={collection.name as string}
+            />
+          </div>
         }
       />
 
@@ -79,9 +83,7 @@ export default async function CollectionPage({
         <EmptyState
           icon={Folder}
           title="Nothing in here yet"
-          text="Add saved posts to this collection to keep them together."
-          ctaLabel="Go to Saved"
-          ctaHref="/saved"
+          text="Tap Add to file saved posts in here."
           variant="compact"
         />
       ) : (
