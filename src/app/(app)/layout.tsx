@@ -11,6 +11,7 @@ import { SwipeNav } from "@/components/layout/SwipeNav";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PresenceHeartbeat } from "@/components/presence/PresenceHeartbeat";
 import { InAppNotifier } from "@/components/messages/InAppNotifier";
+import { AppLockGate } from "@/components/settings/AppLockGate";
 
 /**
  * Shell for the signed-in app: a mobile-first centered column with a
@@ -71,6 +72,7 @@ export default async function AppLayout({
         <GroupCallProvider userId={user!.id}>
           <UploadProvider>
             <NativeShell />
+            <AppLockGate />
             <PresenceHeartbeat />
             <InAppNotifier currentUserId={user!.id} />
             <InstallPrompt />

@@ -10,12 +10,14 @@ export function PrivacySettings({
   initialIsPrivate,
   initialDmPrivacy,
   initialShowActivity,
+  initialHideReadReceipts,
   initialTwoStep,
 }: {
   userId: string;
   initialIsPrivate: boolean;
   initialDmPrivacy: "everyone" | "following";
   initialShowActivity: boolean;
+  initialHideReadReceipts: boolean;
   initialTwoStep: boolean;
 }) {
   const supabase = createClient();
@@ -23,10 +25,11 @@ export function PrivacySettings({
   const [isPrivate, setIsPrivate] = useState(initialIsPrivate);
   const [dmPrivacy, setDmPrivacy] = useState(initialDmPrivacy);
   const [showActivity, setShowActivity] = useState(initialShowActivity);
+  const [hideReceipts, setHideReceipts] = useState(initialHideReadReceipts);
   const [twoStep, setTwoStep] = useState(initialTwoStep);
   const [saving, setSaving] = useState(false);
 
-  async function save(patch: { is_private?: boolean; dm_privacy?: string; show_activity?: boolean; two_step_enabled?: boolean }) {
+  async function save(patch: { is_private?: boolean; dm_privacy?: string; show_activity?: boolean; hide_read_receipts?: boolean; two_step_enabled?: boolean }) {
     setSaving(true);
     const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
     setSaving(false);
@@ -43,6 +46,11 @@ export function PrivacySettings({
   async function toggleActivity(next: boolean) {
     setShowActivity(next);
     if (!(await save({ show_activity: next }))) setShowActivity(!next);
+  }
+
+  async function toggleReceipts(next: boolean) {
+    setHideReceipts(next);
+    if (!(await save({ hide_read_receipts: next }))) setHideReceipts(!next);
   }
 
   async function toggleTwoStep(next: boolean) {
@@ -73,6 +81,18 @@ export function PrivacySettings({
             sub="Let others see when you're online and your last active time"
             checked={showActivity}
             onChange={toggleActivity}
+            disabled={saving}
+          />
+        </div>
+        <div className="mt-2">
+          {/* Migration 0032 added this column and then nothing ever read or
+              wrote it. RealChatView reads it now: with this on, your reading
+              never turns their ticks to "seen". */}
+          <SettingToggle
+            label="Hide read receipts"
+            sub="Don't let people see when you've read their messages"
+            checked={hideReceipts}
+            onChange={toggleReceipts}
             disabled={saving}
           />
         </div>

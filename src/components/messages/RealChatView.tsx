@@ -81,7 +81,7 @@ function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null 
 }
 
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
-type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null; lastSeenAt?: string | null; showActivity?: boolean };
+type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null; lastSeenAt?: string | null; showActivity?: boolean; hideReadReceipts?: boolean };
 type GroupMember = { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null; role: string };
 type GroupMeta = { title: string; memberCount: number; avatarUrl?: string | null; members?: GroupMember[]; myRole?: string };
 
@@ -398,7 +398,11 @@ export function RealChatView({
     if (m._status === "failed") return "failed";
     if (m._status === "pending") return "pending";
     // In group chats we don't track individual read receipts — just show "sent"
-    if (!isGroup && otherLastReadAt && m.created_at <= otherLastReadAt) return "seen";
+    // "Hide read receipts" (migration 0032) shipped as a column nothing read
+    // or wrote. This is the read half: if they turned it on, their reading
+    // never shows here.
+    if (!isGroup && !other.hideReadReceipts && otherLastReadAt && m.created_at <= otherLastReadAt)
+      return "seen";
     return "sent";
   }
 

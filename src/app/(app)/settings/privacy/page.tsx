@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PrivacySettings } from "@/components/settings/PrivacySettings";
 import { BlockedList } from "@/components/settings/BlockedList";
+import { AppLockSettings } from "@/components/settings/AppLockSettings";
 
 export default async function PrivacySettingsPage() {
   const supabase = await createClient();
@@ -11,7 +12,7 @@ export default async function PrivacySettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_private, dm_privacy, show_activity, two_step_enabled")
+    .select("is_private, dm_privacy, show_activity, hide_read_receipts, two_step_enabled")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -24,8 +25,14 @@ export default async function PrivacySettingsPage() {
           initialIsPrivate={!!(profile as any)?.is_private}
           initialDmPrivacy={((profile as any)?.dm_privacy ?? "everyone") as "everyone" | "following"}
           initialShowActivity={(profile as any)?.show_activity ?? true}
+          initialHideReadReceipts={!!(profile as any)?.hide_read_receipts}
           initialTwoStep={!!(profile as any)?.two_step_enabled}
         />
+
+        {/* App lock — migration 0031 shipped the whole backend and no UI. */}
+        <div className="mt-8">
+          <AppLockSettings />
+        </div>
 
         {/* Blocked accounts */}
         <section className="mt-8">

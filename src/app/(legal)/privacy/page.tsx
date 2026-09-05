@@ -151,7 +151,8 @@ export default function PrivacyPage() {
       <h2>10. Cookies and local storage</h2>
       <p>
         We use essential cookies and local storage to keep you signed in, remember
-        preferences (such as drafts), and secure the Service. These are necessary
+        preferences (such as your feed tab and whether music is muted), and secure
+        the Service. These are necessary
         for the Service to function; we do not use advertising or cross-site
         tracking cookies.
       </p>
