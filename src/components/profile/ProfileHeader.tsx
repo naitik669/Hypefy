@@ -115,8 +115,7 @@ export function ProfileHeader({
             />
           </div>
           <FollowStats
-            userId={userId}
-            currentUserId={currentUserId}
+            username={username}
             posts={stats.posts}
             followers={stats.followers}
             following={stats.following}
