@@ -169,7 +169,7 @@ export default async function PublicProfilePage({
         actions={
           isOwn ? (
             <>
-              <Link href="/setup-profile" className="flex h-10 flex-1 items-center justify-center rounded-xl border border-border bg-elevated text-sm font-semibold transition-colors hover:bg-elevated/70">
+              <Link href="/settings/profile" className="flex h-10 flex-1 items-center justify-center rounded-xl border border-border bg-elevated text-sm font-semibold transition-colors hover:bg-elevated/70">
                 Edit profile
               </Link>
               <SignOutButton />

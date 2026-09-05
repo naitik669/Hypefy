@@ -3,12 +3,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, MessageCircle, Users, Check, Ban, Loader2, BellOff, Bell, Pin, PinOff, Trash2 } from "lucide-react";
+import { Search, MessageCircle, Users, Check, Ban, Loader2, BellOff, Bell, Pin, PinOff, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PresenceDot } from "@/components/presence/PresenceDot";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export type InboxRow = {
   id: string;
@@ -146,6 +148,11 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
   const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
+  const showToast = useToast();
+  /** Conversation awaiting a block confirmation. */
+  const [confirmBlockId, setConfirmBlockId] = useState<string | null>(null);
+  /** Conversation awaiting a delete/leave confirmation. */
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   // Long-press action menu (pin / mute / delete) for a conversation row.
   const [menuRow, setMenuRow] = useState<InboxRow | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
@@ -165,30 +172,71 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
     if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
   }
 
-  async function togglePin(r: InboxRow) {
+  /**
+   * Pin and mute.
+   *
+   * Both discarded their result entirely — no error captured, then
+   * router.refresh() re-rendered from the server, so a failure looked exactly
+   * like a dead button: the state visibly snapped back with no explanation.
+   *
+   * .select() is not decoration here. These are RLS-scoped updates, and a
+   * policy mismatch returns ZERO ROWS AND NO ERROR — which reads as success.
+   * Asking for the row back is the only way to tell "it worked" from "it was
+   * refused". The same guard is used for comment deletion for the same reason.
+   */
+  async function setMembership(
+    r: InboxRow,
+    patch: { pinned_at?: string | null; muted_at?: string | null },
+    okMessage: string,
+    failMessage: string,
+  ) {
     setActionBusy(true);
-    await supabase.from("conversation_members")
-      .update({ pinned_at: r.pinned ? null : new Date().toISOString() })
-      .eq("conversation_id", r.id).eq("user_id", currentUserId);
+    const { data, error } = await supabase
+      .from("conversation_members")
+      .update(patch)
+      .eq("conversation_id", r.id)
+      .eq("user_id", currentUserId)
+      .select("conversation_id");
     setActionBusy(false);
     setMenuRow(null);
+
+    if (error || !data || data.length === 0) {
+      showToast(error?.message ?? failMessage);
+      return;
+    }
+    showToast(okMessage);
     router.refresh();
   }
-  async function toggleMute(r: InboxRow) {
-    setActionBusy(true);
-    await supabase.from("conversation_members")
-      .update({ muted_at: r.muted ? null : new Date().toISOString() })
-      .eq("conversation_id", r.id).eq("user_id", currentUserId);
-    setActionBusy(false);
-    setMenuRow(null);
-    router.refresh();
+
+  function togglePin(r: InboxRow) {
+    return setMembership(
+      r,
+      { pinned_at: r.pinned ? null : new Date().toISOString() },
+      r.pinned ? "Unpinned" : "Pinned to top",
+      "Couldn't update that chat.",
+    );
   }
-  async function deleteChat(r: InboxRow) {
+  function toggleMute(r: InboxRow) {
+    return setMembership(
+      r,
+      { muted_at: r.muted ? null : new Date().toISOString() },
+      r.muted ? "Unmuted" : "Muted",
+      "Couldn't update that chat.",
+    );
+  }
+  async function deleteChat(id: string, isGroup: boolean) {
     setActionBusy(true);
-    const { error } = await supabase.rpc("leave_conversation", { p_conversation_id: r.id });
+    const { error } = await supabase.rpc("leave_conversation", { p_conversation_id: id });
     setActionBusy(false);
     setMenuRow(null);
-    if (!error) { setRemovedIds((p) => new Set(p).add(r.id)); router.refresh(); }
+    setConfirmDeleteId(null);
+    if (error) {
+      showToast(error.message ?? "Couldn't remove that chat.");
+      return;
+    }
+    setRemovedIds((p) => new Set(p).add(id));
+    showToast(isGroup ? "Left group" : "Chat removed");
+    router.refresh();
   }
 
   // Seed readIds from sessionStorage so navigating to a thread and back doesn't
@@ -258,13 +306,47 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
     setBusyId(id);
     const { error } = await supabase.rpc("approve_message_request", { p_conversation_id: id });
     setBusyId(null);
-    if (!error) setApprovedIds((p) => new Set(p).add(id));
+    if (error) {
+      showToast(error.message ?? "Couldn't approve that request.");
+      return;
+    }
+    setApprovedIds((p) => new Set(p).add(id));
   }
+
+  /**
+   * Say no without punishing anyone.
+   *
+   * There was no way to decline: the only alternative to Approve was Block —
+   * permanent, unconfirmed, and sitting right beside it. So the honest choice
+   * for "I don't want this" was to do nothing, which is why five conversations
+   * are sitting unanswered, two of them over a month old.
+   *
+   * leave_conversation already has exactly the right semantics: it deletes
+   * your membership row, so the thread leaves your inbox and the other person
+   * is neither blocked nor told.
+   */
+  async function declineRequest(id: string) {
+    setBusyId(id);
+    const { error } = await supabase.rpc("leave_conversation", { p_conversation_id: id });
+    setBusyId(null);
+    if (error) {
+      showToast(error.message ?? "Couldn't decline that request.");
+      return;
+    }
+    setRemovedIds((p) => new Set(p).add(id));
+    showToast("Request declined");
+  }
+
   async function blockRequest(id: string) {
     setBusyId(id);
     const { error } = await supabase.rpc("block_message_request", { p_conversation_id: id });
     setBusyId(null);
-    if (!error) setRemovedIds((p) => new Set(p).add(id));
+    if (error) {
+      showToast(error.message ?? "Couldn't block that account.");
+      return;
+    }
+    setRemovedIds((p) => new Set(p).add(id));
+    showToast("Blocked");
   }
 
   const unreadCount = rows.filter((r) => isUnread(r) && !isPendingRequest(r) && !removedIds.has(r.id)).length;
@@ -417,13 +499,26 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
             >
               {busyId === r.id ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Approve
             </button>
+            {/* Decline is the middle ground that did not exist. It gets equal
+                billing with Approve; Block is demoted to an icon and gated by
+                a confirm, because it is permanent and was previously one
+                mistap away from the button next to it. */}
             <button
               type="button"
-              onClick={() => blockRequest(r.id)}
+              onClick={() => declineRequest(r.id)}
               disabled={busyId === r.id}
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface text-sm font-semibold text-red-400 transition-colors hover:bg-white/5 disabled:opacity-60"
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface text-sm font-semibold text-muted transition-colors hover:bg-white/5 disabled:opacity-60"
             >
-              <Ban size={15} /> Block
+              <X size={15} /> Decline
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmBlockId(r.id)}
+              disabled={busyId === r.id}
+              aria-label="Block this account"
+              className="flex h-9 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-red-400 transition-colors hover:bg-white/5 disabled:opacity-60"
+            >
+              <Ban size={15} />
             </button>
           </div>
         )}
@@ -552,7 +647,11 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
               {menuRow.muted ? <Bell size={18} className="text-muted" /> : <BellOff size={18} className="text-muted" />}
               {menuRow.muted ? "Unmute" : "Mute"}
             </button>
-            <button type="button" disabled={actionBusy} onClick={() => deleteChat(menuRow)}
+            {/* Confirmed now. The identical action inside the thread has
+                always had a dialog; reaching it by holding a row for 420ms
+                did not — so an accidental hold plus one mistap silently
+                removed a group you were in. */}
+            <button type="button" disabled={actionBusy} onClick={() => { const r = menuRow; setMenuRow(null); setConfirmDeleteId(r.id); }}
               className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-red-400 hover:bg-white/5 disabled:opacity-60">
               {actionBusy ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
               {menuRow.isGroup ? "Leave group" : "Delete chat"}
@@ -560,6 +659,40 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
           </div>
         </BottomSheet>
       )}
+
+      {/* Same copy as the in-thread confirmation, so the two doors to this
+          action say the same thing. */}
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={() => {
+          const row = rows.find((r) => r.id === confirmDeleteId);
+          if (confirmDeleteId) void deleteChat(confirmDeleteId, !!row?.isGroup);
+        }}
+        icon={Trash2}
+        title={
+          rows.find((r) => r.id === confirmDeleteId)?.isGroup
+            ? "Leave this group"
+            : "Delete this chat"
+        }
+        body="The conversation disappears from your inbox. The other person keeps their copy."
+        confirmLabel={
+          rows.find((r) => r.id === confirmDeleteId)?.isGroup ? "Leave" : "Delete"
+        }
+      />
+
+      <ConfirmDialog
+        open={confirmBlockId !== null}
+        onClose={() => setConfirmBlockId(null)}
+        onConfirm={() => {
+          if (confirmBlockId) void blockRequest(confirmBlockId);
+          setConfirmBlockId(null);
+        }}
+        icon={Ban}
+        title="Block this account"
+        body="They can't message or call you, and you stop seeing each other. Declining instead just removes the request."
+        confirmLabel="Block"
+      />
     </>
   );
 }

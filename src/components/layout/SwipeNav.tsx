@@ -55,9 +55,14 @@ export function swipeOutcome(g: {
 }
 
 function tabIndex(pathname: string): number {
-  // Exact matches only. /messages/[thread] has its own swipe-to-reply, and
-  // sub-routes are somewhere you navigated *into* — sliding out of them
-  // sideways would be the wrong mental model.
+  // Exact matches only. A sub-route is somewhere you navigated INTO, so
+  // sliding out of it sideways is the wrong mental model — you would expect
+  // back, not a tab change.
+  //
+  // An earlier version of this comment claimed /messages/[thread] had its own
+  // swipe-to-reply and that this was avoiding a clash. It does not; there are
+  // no touch handlers in RealChatView at all. The exclusion is right, the
+  // stated reason was not.
   return (TABS as readonly string[]).indexOf(pathname);
 }
 

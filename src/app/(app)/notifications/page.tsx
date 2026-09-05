@@ -13,7 +13,7 @@ import { FollowButton } from "@/components/profile/FollowButton";
 import { haptics } from "@/lib/haptics";
 import { useToast } from "@/components/ui/ToastProvider";
 
-type Notif = {
+export type Notif = {
   id: string;
   type: string;
   target_type: string | null;
@@ -29,6 +29,14 @@ type Notif = {
     avatar_url: string | null;
   } | null;
   thumb?: { url: string; isVideo: boolean } | null;
+  /**
+   * Where a comment actually lives, resolved alongside the thumbnails.
+   *
+   * A hype_comment notification's target_id is the COMMENT, and a comment is
+   * not a place you can navigate to — so these rows had nowhere to point and
+   * returned "#". Carrying the parent lets them land on the post or Shot.
+   */
+  parent?: { kind: "post" | "shot"; id: string } | null;
 };
 
 /** One or more notifications collapsed into a single row (same type + target). */
@@ -55,7 +63,10 @@ const TYPE_MAP: Record<Filter, string[]> = {
   All: [],
   Hypes: ["hype_post", "hype_shot", "hype_comment", "repost"],
   Comments: ["comment_post", "comment_shot", "comment_reply"],
-  Follows: ["follow"],
+  // follow_request and follow_accepted were missing, so filtering to Follows
+  // hid the only rows in the whole feed that need a decision from you — a
+  // pending request exists nowhere else in the app.
+  Follows: ["follow", "follow_request", "follow_accepted"],
   Mentions: ["mention_post"],
 };
 
@@ -71,16 +82,43 @@ function timeAgo(iso: string) {
   return `${Math.floor(s / 86400)}d`;
 }
 
-function notifHref(n: Notif): string {
+/**
+ * Where tapping a notification should take you.
+ *
+ * Every row renders as a full-width Link with hover styling, so a "#" is not
+ * a no-op the reader can detect — it looks tappable and simply does nothing.
+ * Three types were landing there, and two more were landing somewhere
+ * unhelpful:
+ *
+ *  - hype_comment targets a COMMENT, which is not a destination. Resolved to
+ *    its post or Shot in withThumbs.
+ *  - hype_shot on a Show had no branch at all, despite the thumbnail already
+ *    being fetched for it.
+ *  - Call notifications went to the generic /calls list while holding the
+ *    conversation id they should have opened.
+ *  - "reacted to your status" went to the REACTOR's profile rather than to
+ *    your own, where the status they reacted to actually is.
+ */
+export function notifHref(n: Notif): string {
+  // Your own status is on your own profile, not on theirs.
+  if (n.type === "note_reaction") return "/profile";
+
   if (
-    n.type === "follow" || n.type === "referral_joined" || n.type === "note_reaction" ||
+    n.type === "follow" || n.type === "referral_joined" ||
     n.type === "follow_request" || n.type === "follow_accepted"
   )
     return n.actor?.username ? `/u/${n.actor.username}` : "#";
-  if (n.type === "incoming_call" || n.type === "missed_call") return "/calls";
+
+  // The conversation is the point of a call notification; the log is not.
+  if (n.type === "incoming_call" || n.type === "missed_call")
+    return n.target_id ? `/messages/${n.target_id}` : "/calls";
+
   if (n.target_type === "post" && n.target_id) return `/p/${n.target_id}`;
   if (n.target_type === "shot" && n.target_id) return `/shots/${n.target_id}`;
+  if (n.target_type === "show" && n.target_id) return `/shows/${n.target_id}`;
   if (n.target_type === "conversation" && n.target_id) return `/messages/${n.target_id}`;
+  if (n.target_type === "comment" && n.parent)
+    return n.parent.kind === "post" ? `/p/${n.parent.id}` : `/shots/${n.parent.id}`;
   return "#";
 }
 
@@ -163,16 +201,31 @@ export default function NotificationsPage() {
     const postIds = list.filter((n) => n.target_type === "post" && n.target_id).map((n) => n.target_id!);
     const shotIds = list.filter((n) => n.target_type === "shot" && n.target_id).map((n) => n.target_id!);
     const showIds = list.filter((n) => n.target_type === "show" && n.target_id).map((n) => n.target_id!);
+    // A comment is not somewhere you can go, so these rows need their parent
+    // resolved before they can link anywhere at all.
+    const commentIds = list.filter((n) => n.target_type === "comment" && n.target_id).map((n) => n.target_id!);
 
-    const [postsRes, shotsRes, showsRes] = await Promise.all([
+    const [postsRes, shotsRes, showsRes, commentsRes] = await Promise.all([
       postIds.length ? supabase.from("posts").select("id, image_url, image_urls").in("id", postIds) : Promise.resolve({ data: [] as any[] }),
       shotIds.length ? supabase.from("shots").select("id, media_url").in("id", shotIds) : Promise.resolve({ data: [] as any[] }),
       showIds.length ? supabase.from("shows").select("id, media_url").in("id", showIds) : Promise.resolve({ data: [] as any[] }),
+      commentIds.length ? supabase.from("comments").select("id, post_id, shot_id").in("id", commentIds) : Promise.resolve({ data: [] as any[] }),
     ]);
 
     const postMap = new Map((postsRes.data ?? []).map((p: any) => [p.id, p.image_urls?.[0] ?? p.image_url ?? null]));
     const shotMap = new Map((shotsRes.data ?? []).map((s: any) => [s.id, s.media_url ?? null]));
     const showMap = new Map((showsRes.data ?? []).map((s: any) => [s.id, s.media_url ?? null]));
+    const parentMap = new Map<string, { kind: "post" | "shot"; id: string }>(
+      (commentsRes.data ?? [])
+        .map((c: any) =>
+          c.post_id
+            ? [c.id, { kind: "post" as const, id: c.post_id }]
+            : c.shot_id
+              ? [c.id, { kind: "shot" as const, id: c.shot_id }]
+              : null,
+        )
+        .filter(Boolean) as [string, { kind: "post" | "shot"; id: string }][],
+    );
 
     return list.map((n) => {
       if (n.target_type === "post" && n.target_id && postMap.get(n.target_id)) {
@@ -183,6 +236,9 @@ export default function NotificationsPage() {
       }
       if (n.target_type === "show" && n.target_id && showMap.get(n.target_id)) {
         return { ...n, thumb: { url: showMap.get(n.target_id)!, isVideo: false } };
+      }
+      if (n.target_type === "comment" && n.target_id) {
+        return { ...n, parent: parentMap.get(n.target_id) ?? null };
       }
       return n;
     });
