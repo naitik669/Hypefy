@@ -58,7 +58,7 @@ export function FeedTabDropdown() {
         onClick={() => setOpen((v) => !v)}
         aria-label="Switch feed"
         aria-expanded={open}
-        className="flex items-center gap-1 rounded-full px-1.5 py-1 transition-colors active:scale-95"
+        className="relative flex items-center rounded-full px-1.5 py-1 transition-colors active:scale-95"
       >
         <span className="text-xl font-extrabold tracking-tight">
           {active === "foryou" ? (
@@ -69,18 +69,19 @@ export function FeedTabDropdown() {
             OPTIONS.find((o) => o.value === active)?.label
           )}
         </span>
-        {/* The chevron this component's own docstring has always claimed and
-            never rendered. Without it the wordmark looked like a title, so
-            nothing anywhere in the app suggested the feed had tabs — which is
-            the likeliest reason Hypers sits at one user out of seventeen.
+        {/* Absolutely positioned, so it is out of the flow entirely and the
+            wordmark is what gets centred by the top bar. In the flow it took
+            its own width plus a gap, which pushed "Hypefy." left of centre by
+            about half that — the reason the title never looked quite straight.
 
-            The label also becomes the active tab's name once you leave For
-            You, so the header answers "which feed am I looking at?" instead
-            of showing the same word on all four. */}
+            Hidden until the menu is open, at the cost of the discoverability
+            it was added for: the label still changes to the active tab's name
+            once you leave For You, so the header answers "which feed am I
+            looking at?" even when the chevron is not showing. */}
         <ChevronDown
           size={16}
-          className={`shrink-0 text-muted transition-transform duration-200 ${
-            open ? "rotate-180" : ""
+          className={`pointer-events-none absolute left-full top-1/2 ml-0.5 -translate-y-1/2 text-muted transition-all duration-200 ${
+            open ? "rotate-180 opacity-100" : "opacity-0"
           }`}
           aria-hidden
         />
