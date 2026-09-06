@@ -17,7 +17,7 @@ export default async function ThreadPage({
   const [{ data: members }, { data: conv }] = await Promise.all([
     supabase
       .from("conversation_members")
-      .select("user_id, role, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, hide_read_receipts)")
+      .select("user_id, role, last_read_at, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, hide_read_receipts)")
       .eq("conversation_id", threadId),
     supabase.from("conversations").select("type, title, avatar_url").eq("id", threadId).maybeSingle(),
   ]);
@@ -93,17 +93,22 @@ export default async function ThreadPage({
     ? await supabase.from("message_reactions").select("message_id, user_id, emoji").in("message_id", msgIds)
     : { data: [] as any[] };
 
-  // Other user's last_read_at — drives "Seen" double-tick on my messages
-  const otherUserId = op?.id ?? null;
-  const { data: otherMemberRow } = otherUserId
-    ? await supabase
-        .from("conversation_members")
-        .select("last_read_at")
-        .eq("conversation_id", threadId)
-        .eq("user_id", otherUserId)
-        .maybeSingle()
-    : { data: null };
-  const initialOtherLastReadAt: string | null = (otherMemberRow as any)?.last_read_at ?? null;
+  // Everyone else's read state — drives the "Seen" double-tick.
+  //
+  // Was a single scalar for the first other participant, fetched in its own
+  // extra round trip. That is why groups never showed a read receipt: there is
+  // no "the other person" in a group. The membership query above already has
+  // every row, so this costs nothing and covers both shapes.
+  const readers = members
+    .filter((m: any) => m.user_id !== user.id)
+    .map((m: any) => {
+      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+      return {
+        userId: m.user_id as string,
+        lastReadAt: (m.last_read_at as string | null) ?? null,
+        hideReadReceipts: (p?.hide_read_receipts as boolean) ?? false,
+      };
+    });
 
   return (
     <RealChatView
@@ -123,7 +128,7 @@ export default async function ThreadPage({
       members={membersMap}
       initialMessages={messages}
       initialReactions={(reactRows ?? []) as any}
-      initialOtherLastReadAt={initialOtherLastReadAt}
+      initialReaders={readers}
     />
   );
 }

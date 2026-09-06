@@ -2198,6 +2198,7 @@ export type Database = {
         Returns: undefined
       }
       leave_group_call: { Args: { p_call_id: string }; Returns: undefined }
+      mark_call_busy: { Args: { p_call_id: string }; Returns: undefined }
       mark_call_missed: { Args: { p_call_id: string }; Returns: undefined }
       mark_conversation_read: {
         Args: { p_conversation_id: string }

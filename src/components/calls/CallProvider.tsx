@@ -233,6 +233,11 @@ export function CallProvider({ userId, children }: { userId: string; children: R
               if (ringTimer.current) { clearTimeout(ringTimer.current); ringTimer.current = null; }
               setCall((c) => (c && c.status === "outgoing" ? { ...c, status: "connected" } : c));
             } else if (st === "declined" || st === "missed" || st === "ended" || st === "busy") {
+              // Say which it was. All four used to close the call screen
+              // identically, so "they're on another call" was indistinguishable
+              // from "they hung up on you".
+              if (st === "busy") setError("They're on another call.");
+              else if (st === "declined") setError("Call declined.");
               cleanup(); setCall(null);
             }
           })
@@ -332,7 +337,15 @@ export function CallProvider({ userId, children }: { userId: string; children: R
 
   // â”€â”€ app-wide incoming-call listener â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const ringIncoming = useCallback(async (info: { id: string; conversationId: string; callerId: string; type: CallType }) => {
-    if (callRef.current) return; // busy  --  ignore for MVP
+    // Already on a call. This used to just `return`, without touching the
+    // database — so the callee saw nothing and the caller rang out the full
+    // 30s and read it as "no answer". 'busy' has always been in the status
+    // CHECK and the caller's handler already tears the call down on it;
+    // nothing wrote it. Now something does.
+    if (callRef.current) {
+      await supabase.rpc("mark_call_busy", { p_call_id: info.id });
+      return;
+    }
     const { data: p } = await supabase
       .from("profiles").select("display_name, username, avatar_hue, avatar_url").eq("id", info.callerId).maybeSingle();
     beginIncoming({

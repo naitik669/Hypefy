@@ -58,9 +58,38 @@ export type ChatMsg = {
   metadata?: { oneshot_opened?: boolean; oneshot_opened_at?: string } | null;
   /** Client-only: set on optimistic messages before server confirms */
   _status?: "pending" | "failed";
+  /** Client-only: the OneShot's private storage path, kept so a failed send
+   *  can be retried without re-uploading. Never comes back from the server. */
+  _storagePath?: string;
 };
 
 type MsgStatus = "pending" | "sent" | "seen" | "failed";
+
+/**
+ * One other participant's read state. A list rather than a scalar because a
+ * group has no "the other person" — which is exactly why group read receipts
+ * never appeared.
+ */
+export type Reader = {
+  userId: string;
+  lastReadAt: string | null;
+  hideReadReceipts: boolean;
+};
+
+/**
+ * Has everyone who could have read this message read it?
+ *
+ * Anyone with "Hide read receipts" on is left OUT of the test rather than
+ * counted as unread — otherwise one member's privacy setting would
+ * permanently withhold the tick from everyone else in the group. When they
+ * are the only other participant there is nobody left to count, so the
+ * message correctly never reads as seen.
+ */
+export function everyoneHasRead(readers: Reader[], createdAt: string): boolean {
+  const counted = readers.filter((r) => !r.hideReadReceipts);
+  if (counted.length === 0) return false;
+  return counted.every((r) => !!r.lastReadAt && createdAt <= r.lastReadAt);
+}
 
 /** Short human snippet for quoting a message — never a raw URL. */
 function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null }): string {
@@ -179,7 +208,7 @@ export function RealChatView({
   members,
   initialMessages,
   initialReactions = [],
-  initialOtherLastReadAt = null,
+  initialReaders = [],
 }: {
   conversationId: string;
   currentUserId: string;
@@ -188,7 +217,7 @@ export function RealChatView({
   members?: Record<string, { name: string; hue: number }>;
   initialMessages: ChatMsg[];
   initialReactions?: ReactionRow[];
-  initialOtherLastReadAt?: string | null;
+  initialReaders?: Reader[];
 }) {
   const isGroup = !!group;
   const senderName = (id: string) => (id === currentUserId ? "You" : members?.[id]?.name ?? other.name);
@@ -196,7 +225,7 @@ export function RealChatView({
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMsg[]>(initialMessages);
   const [reactions, setReactions] = useState<ReactionRow[]>(initialReactions);
-  const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(initialOtherLastReadAt);
+  const [readers, setReaders] = useState<Reader[]>(initialReaders);
   const [text, setText] = useState("");
   const [dmCursor, setDmCursor] = useState(0);
   const { suggestions: pickerSuggestions, reset: resetPicker } = useMentionHashtag(text, dmCursor);
@@ -397,12 +426,19 @@ export function RealChatView({
   function getMsgStatus(m: ChatMsg): MsgStatus {
     if (m._status === "failed") return "failed";
     if (m._status === "pending") return "pending";
-    // In group chats we don't track individual read receipts — just show "sent"
-    // "Hide read receipts" (migration 0032) shipped as a column nothing read
-    // or wrote. This is the read half: if they turned it on, their reading
-    // never shows here.
-    if (!isGroup && !other.hideReadReceipts && otherLastReadAt && m.created_at <= otherLastReadAt)
-      return "seen";
+    // "Seen" means everyone who could have read it, has.
+    //
+    // This was gated on !isGroup, so a group message could only ever say
+    // "sent" — and the realtime handler behind it stored ONE scalar for the
+    // whole conversation, so in a group any single member's read would have
+    // clobbered it anyway. Per-member state fixes both.
+    //
+    // Anyone with "Hide read receipts" on (migration 0032) is left out of the
+    // test rather than counted as unread: otherwise one person's privacy
+    // setting would permanently withhold the tick from everybody else. If they
+    // are the only other participant there is nobody left to count, and the
+    // message correctly never reads as seen.
+    if (everyoneHasRead(readers, m.created_at)) return "seen";
     return "sent";
   }
 
@@ -684,9 +720,13 @@ export function RealChatView({
     return () => { supabase.removeChannel(ch); };
   }, [conversationId, supabase]);
 
-  // Realtime: other user's read receipt -- drives "Seen" double-tick
+  // Realtime: everyone else's read receipts -- drives the "Seen" double-tick.
+  //
+  // The old version early-returned unless other.id was set, which is empty in
+  // a group, and then wrote whichever member's row arrived into a single
+  // shared value. Now each member is tracked separately, so three people
+  // reading at different times can't overwrite each other.
   useEffect(() => {
-    if (!other.id) return;
     const ch = supabase
       .channel(`read:${conversationId}`)
       .on(
@@ -695,15 +735,25 @@ export function RealChatView({
           filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
           const row = payload.new as { user_id: string; last_read_at: string | null };
-          // Only update when it's the other person who read
-          if (row.user_id !== currentUserId) {
-            setOtherLastReadAt(row.last_read_at ?? null);
-          }
+          if (row.user_id === currentUserId) return;
+          setReaders((prev) => {
+            const i = prev.findIndex((r) => r.userId === row.user_id);
+            // A member who joined after this page loaded still counts.
+            if (i === -1) {
+              return [
+                ...prev,
+                { userId: row.user_id, lastReadAt: row.last_read_at ?? null, hideReadReceipts: false },
+              ];
+            }
+            const next = [...prev];
+            next[i] = { ...next[i], lastReadAt: row.last_read_at ?? null };
+            return next;
+          });
         },
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [conversationId, currentUserId, other.id, supabase]);
+  }, [conversationId, currentUserId, supabase]);
 
   // Realtime: typing indicators (ephemeral broadcast, no DB writes)
   useEffect(() => {
@@ -862,12 +912,31 @@ export function RealChatView({
     setSending(false);
   }
 
-  /** Re-send a message that previously failed (tap the failed bubble). */
+  /**
+   * Re-send a message that previously failed (tap the failed bubble).
+   *
+   * This used to bail on anything that wasn't text, and the retry affordance
+   * was gated the same way — so a photo, video, document, GIF or voice note
+   * that failed showed a red tick with nothing to do about it. The file had
+   * already uploaded successfully in every one of those cases; only the RPC
+   * had failed, which is the easiest thing in the world to retry.
+   *
+   * Nothing is re-uploaded: the body already holds the public URL (or the
+   * JSON wrapper for documents and voice notes), and a OneShot's private
+   * storage path is carried on the optimistic message for exactly this.
+   */
   async function retrySend(failed: ChatMsg) {
-    if (failed.kind !== "text" || !failed.body) return;
+    // A OneShot has no body by design — the image is private.
+    if (!failed.body && failed.kind !== "oneshot") return;
     setMessages((p) => p.map((m) => (m.id === failed.id ? { ...m, _status: "pending" as const } : m)));
     const { data, error } = await supabase.rpc("send_message", {
-      p_conversation_id: conversationId, p_body: failed.body ?? undefined, p_kind: "text", p_post_id: undefined, p_reply_to_id: failed.reply_to_id ?? undefined,
+      p_conversation_id: conversationId,
+      p_body: failed.body ?? undefined,
+      p_kind: failed.kind,
+      p_post_id: failed.post_id ?? undefined,
+      p_shot_id: failed.shot_id ?? undefined,
+      p_reply_to_id: failed.reply_to_id ?? undefined,
+      p_storage_path: failed._storagePath ?? undefined,
     });
     if (error || !data) {
       setMessages((p) => p.map((m) => (m.id === failed.id ? { ...m, _status: "failed" as const } : m)));
@@ -910,7 +979,22 @@ export function RealChatView({
     const replyId = replyTo?.id ?? null;
     setReplyTo(null);
 
-    const { error } = await supabase.rpc("send_message", {
+    // Voice was the only send path with no optimistic message at all. On a
+    // failure it showed a toast and dropped the recording — which was
+    // unrecoverable, since the blob is gone once the recorder resets, while
+    // the uploaded file stayed orphaned in the bucket. Now it behaves like
+    // every other kind: a bubble you can tap to retry, pointing at the audio
+    // that is already uploaded.
+    const tempId = `temp-${Date.now()}`;
+    const optimistic: ChatMsg = {
+      id: tempId, body, sender_id: currentUserId, kind: "voice",
+      post_id: null, reply_to_id: replyId, is_unsent: false,
+      created_at: new Date().toISOString(), _status: "pending",
+    };
+    setMessages((p) => [...p, optimistic]);
+    setVoiceMode(false);
+
+    const { data, error } = await supabase.rpc("send_message", {
       p_conversation_id: conversationId,
       p_body: body ?? undefined,
       p_kind: "voice",
@@ -918,8 +1002,17 @@ export function RealChatView({
       p_reply_to_id: replyId ?? undefined,
     });
 
-    if (error) showToast("Couldn't send voice note.");
-    setVoiceMode(false);
+    if (error || !data) {
+      setMessages((p) => p.map((m) => (m.id === tempId ? { ...m, _status: "failed" as const } : m)));
+      showToast("Couldn't send voice note. Tap it to retry.");
+      return;
+    }
+    const real = data as ChatMsg;
+    setMessages((p) =>
+      p.some((m) => m.id === real.id)
+        ? p.filter((m) => m.id !== tempId)
+        : p.map((m) => (m.id === tempId ? { ...m, ...real, _status: undefined } : m)),
+    );
   }
 
   /** Send a GIF (selected from the picker) as a message. */
@@ -1060,6 +1153,9 @@ export function RealChatView({
       id: tempId, body: outgoingBody, sender_id: currentUserId, kind,
       post_id: null, reply_to_id: replyId, is_unsent: false,
       created_at: new Date().toISOString(), _status: "pending",
+      // Kept so a failed OneShot can be retried against the file already in
+      // the private bucket, rather than being stranded there.
+      _storagePath: isOneShot ? path : undefined,
     };
     setMessages((p) => [...p, optimistic]);
     if (attachment.preview) URL.revokeObjectURL(attachment.preview);
@@ -1619,8 +1715,10 @@ export function RealChatView({
                         </div>
                       )}
 
-                      {/* Tap-to-retry for failed text sends */}
-                      {mine && m._status === "failed" && m.kind === "text" && (
+                      {/* Tap-to-retry. Was gated on kind === "text", so every
+                          failed photo, video, document, GIF and voice note
+                          rendered a dead red tick. */}
+                      {mine && m._status === "failed" && (
                         <button
                           type="button"
                           onClick={() => retrySend(m)}

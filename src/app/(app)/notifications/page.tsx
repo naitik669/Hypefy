@@ -292,8 +292,21 @@ export default function NotificationsPage() {
     setLoading(false);
     void loadFollowState(withT, user.id);
 
-    // Mark all as read (RPC fires the UPDATE that clears the TopBar badge)
-    await supabase.rpc("mark_notifications_read");
+    // Mark as read — but only what was actually fetched.
+    //
+    // This used to call mark_notifications_read(), which takes no arguments
+    // and clears EVERY notification on the account, including everything past
+    // this page's limit that was never fetched, never rendered and never seen.
+    // Open Activity once with 300 unread and 250 of them were silently marked
+    // read; pull-to-refresh did it again.
+    //
+    // Scoped to the loaded ids, the badge still clears for what you have in
+    // front of you, and anything below the fold survives until you page down
+    // to it.
+    const unreadIds = mapped.filter((n) => !n.is_read).map((n) => n.id);
+    if (unreadIds.length > 0) {
+      await supabase.from("notifications").update({ is_read: true }).in("id", unreadIds);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
@@ -360,12 +373,19 @@ export default function NotificationsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMore, loading, loadingMore, notifs]);
 
-  /** The server-side mark already ran when the page opened (load() calls
-   *  mark_notifications_read), so this is purely the visual half: it drops the
-   *  New section and the unread stripes without a reload. */
-  function readAll() {
+  /**
+   * "Read all" now genuinely means all.
+   *
+   * It used to be purely cosmetic, because opening the page had already marked
+   * every notification on the account server-side. Now that the implicit mark
+   * is scoped to what you actually loaded, this button is the explicit way to
+   * clear the rest — which is what its label always claimed.
+   */
+  async function readAll() {
     haptics.tap();
     setNotifs((prev) => prev.map((n) => (n.is_read ? n : { ...n, is_read: true })));
+    const { error } = await supabase.rpc("mark_notifications_read");
+    if (error) showToast("Couldn't mark everything read.");
   }
 
   const allowed = TYPE_MAP[filter];
