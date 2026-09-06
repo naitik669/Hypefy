@@ -2,21 +2,23 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Video, X, Loader2, Send, Link2, Check, ChevronRight, ChevronLeft } from "lucide-react";
+import { Video, X, Loader2, Send, Link2, Check, ChevronRight, ChevronLeft, Music } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
 import { ShotCoverPicker } from "@/components/post/ShotCoverPicker";
+import { TrackPicker } from "@/components/music/TrackPicker";
+import { extractHashtags } from "@/lib/content-utils";
+import type { Track } from "@/lib/music";
 
 // Shared with the camera-first creator rather than restated. This file said 60
 // against a 50 MB bucket, and video-poster.ts already carried a comment about
 // that exact drift — it just never reached this copy, because the two Shot
 // paths each kept their own number.
-import { MAX_SHOT_MB, ALLOWED_SHOT_TYPES } from "@/lib/video-poster";
+import { MAX_SHOT_MB, ALLOWED_SHOT_TYPES, capturePoster } from "@/lib/video-poster";
 
 const MAX_SIZE_MB = MAX_SHOT_MB;
 const ALLOWED_TYPES = ALLOWED_SHOT_TYPES;
-const POSTER_WIDTH = 720;
 
 /** Author chip for the preview — the Shot is drawn as the reel feed draws it,
  *  which means it needs the same identity the feed puts over the video. */
@@ -31,49 +33,6 @@ export type ShotAuthor = {
  *  assistive tech — the visible indicator is bars, same as the post composer. */
 const STEPS = [{ label: "New Shot" }, { label: "Preview" }] as const;
 
-/**
- * Grab a poster frame from the video as a JPEG blob.
- *
- * `at` is the chosen cover time; without one it falls back to ~0.5s, past any
- * black lead-in. The fallback is what every Shot used to get, and it is why
- * the picker exists — half a second into a phone recording is very often a
- * hand reaching for the screen.
- *
- * Returns null when the browser can't decode or seek. The Shot still posts,
- * just without a thumbnail.
- */
-function capturePoster(src: string, at?: number | null): Promise<Blob | null> {
-  return new Promise((resolve) => {
-    const video = document.createElement("video");
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "auto";
-    video.src = src;
-    const bail = setTimeout(() => resolve(null), 8000);
-    video.onerror = () => { clearTimeout(bail); resolve(null); };
-    video.onloadedmetadata = () => {
-      const fallback = Math.min(0.5, Math.max(0, video.duration - 0.1));
-      // Clamped: a cover time from a picker that read a different duration
-      // than this element reports would otherwise seek past the end and never
-      // fire onseeked, hanging until the bail timeout.
-      video.currentTime =
-        at != null && Number.isFinite(at)
-          ? Math.min(Math.max(at, 0), Math.max(0, video.duration - 0.05))
-          : fallback;
-    };
-    video.onseeked = () => {
-      clearTimeout(bail);
-      const scale = Math.min(1, POSTER_WIDTH / (video.videoWidth || POSTER_WIDTH));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round((video.videoWidth || POSTER_WIDTH) * scale);
-      canvas.height = Math.round((video.videoHeight || POSTER_WIDTH) * scale);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { resolve(null); return; }
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.82);
-    };
-  });
-}
 
 /**
  * Shot composer — Shots are short VIDEO reels (permanent, vertical feed).
@@ -90,6 +49,8 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
   const [postError, setPostError] = useState<string | null>(null);
   /** Chosen cover frame, in seconds. Null until the picker reports one. */
   const [coverTime, setCoverTime] = useState<number | null>(null);
+  const [track, setTrack] = useState<Track | null>(null);
+  const [trackOpen, setTrackOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
   const [postedId, setPostedId] = useState<string | null>(null);
@@ -165,9 +126,22 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
         }
       }
 
+      // Parity with the camera-first path, which has extracted these since it
+      // shipped. Typing "#hiking" here produced a Shot with an empty hashtags
+      // array, so it appeared in no tag search and counted toward no trending
+      // tag — the caption looked right and the indexing silently did not
+      // happen. Same for the track, which the picker below now sets.
+      const text = caption.trim();
       const { data: shot, error: insertErr } = await supabase
         .from("shots")
-        .insert({ user_id: userId, media_url: pub.publicUrl, caption: caption.trim() || null, poster_url: posterUrl })
+        .insert({
+          user_id: userId,
+          media_url: pub.publicUrl,
+          caption: text || null,
+          poster_url: posterUrl,
+          track: track ?? null,
+          hashtags: extractHashtags(text),
+        })
         .select("id")
         .single();
 
@@ -314,6 +288,32 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
               />
             )}
 
+            {/* Sound. The camera-first path has had this from the start; here
+                a Shot could only ever be silent, so the two routes to the same
+                content type produced different things. */}
+            <button
+              type="button"
+              onClick={() => setTrackOpen(true)}
+              className="flex h-12 items-center gap-2.5 rounded-xl border border-border bg-surface px-3.5 text-left transition-colors hover:border-white/25"
+            >
+              <Music size={18} className={track ? "text-accent" : "text-muted"} />
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                {track ? track.title : "Add sound"}
+              </span>
+              {track && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Remove sound"
+                  onClick={(e) => { e.stopPropagation(); setTrack(null); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setTrack(null); } }}
+                  className="shrink-0 rounded-full p-1 text-muted hover:text-foreground"
+                >
+                  <X size={15} />
+                </span>
+              )}
+            </button>
+
             <textarea
               value={caption}
               onChange={(e) => setCaption(e.target.value.slice(0, 150))}
@@ -398,6 +398,17 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
           </div>
         )}
       </div>
+
+      {trackOpen && (
+        <TrackPicker
+          open={trackOpen}
+          onClose={() => setTrackOpen(false)}
+          onSelect={(t) => {
+            setTrack(t);
+            setTrackOpen(false);
+          }}
+        />
+      )}
     </>
   );
 }

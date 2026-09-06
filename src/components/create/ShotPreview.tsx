@@ -11,6 +11,7 @@ import {
   MAX_SHOW_MB,
   capturePoster,
 } from "@/lib/video-poster";
+import { ShotCoverPicker } from "@/components/post/ShotCoverPicker";
 import {
   SuggestionDropdown,
   applySuggestion,
@@ -45,6 +46,8 @@ export function ShotPreview({
   const [caption, setCaption] = useState("");
   const [cursor, setCursor] = useState(0);
   const [busy, setBusy] = useState(false);
+  /** Chosen cover frame, in seconds. Only Shots have a poster. */
+  const [coverTime, setCoverTime] = useState<number | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const { suggestions, reset } = useMentionHashtag(caption, cursor);
@@ -96,7 +99,7 @@ export function ShotPreview({
     // failure here must not block publishing.
     let posterUrl: string | null = null;
     if (isVideo && mode === "shot") {
-      const poster = await capturePoster(url);
+      const poster = await capturePoster(url, coverTime);
       if (poster) {
         const posterPath = `${userId}/${Date.now()}-poster.jpg`;
         const { error: pErr } = await supabase.storage
@@ -186,6 +189,14 @@ export function ShotPreview({
               ? `That clip is ${(file.size / 1024 / 1024).toFixed(0)}MB — the limit is ${maxMb}MB.`
               : "That video format isn't supported."}
           </p>
+        )}
+
+        {/* Cover frame. The other Shot composer has had this since it shipped;
+            here every Shot got whatever was ~0.5s in, which on a phone
+            recording is very often a hand reaching for the screen. Shots only:
+            a Show has no poster. */}
+        {isVideo && mode === "shot" && !tooBig && !badType && (
+          <ShotCoverPicker src={url} value={coverTime} onChange={setCoverTime} />
         )}
 
         <div className="relative">

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/ToastProvider";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 type BlockedRow = {
   id: string;
@@ -22,6 +23,7 @@ export function BlockedList({ currentUserId }: { currentUserId: string }) {
   const toast = useToast();
   const [rows, setRows] = useState<BlockedRow[] | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [confirmRow, setConfirmRow] = useState<BlockedRow | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -51,6 +53,7 @@ export function BlockedList({ currentUserId }: { currentUserId: string }) {
   }, [currentUserId]);
 
   async function unblock(row: BlockedRow) {
+    setConfirmRow(null);
     if (pendingId) return;
     setPendingId(row.id);
     const { error } = await supabase.from("blocked_users").delete().eq("id", row.id);
@@ -98,7 +101,7 @@ export function BlockedList({ currentUserId }: { currentUserId: string }) {
           </div>
           <button
             type="button"
-            onClick={() => unblock(r)}
+            onClick={() => setConfirmRow(r)}
             disabled={pendingId === r.id}
             className="flex h-9 min-w-[88px] items-center justify-center rounded-xl border border-border text-xs font-bold text-foreground transition-colors hover:bg-white/5 disabled:opacity-50"
           >
@@ -106,6 +109,22 @@ export function BlockedList({ currentUserId }: { currentUserId: string }) {
           </button>
         </div>
       ))}
+
+      {/* Unblocking is quiet on the other side and immediately lets them reach
+          you again. Blocking someone is confirmed when you do it; lifting it
+          was one tap with no way back except finding and blocking them again. */}
+      <ConfirmDialog
+        open={confirmRow !== null}
+        onClose={() => setConfirmRow(null)}
+        onConfirm={() => {
+          if (confirmRow) void unblock(confirmRow);
+        }}
+        icon={Ban}
+        danger={false}
+        title={`Unblock ${confirmRow?.username ? "@" + confirmRow.username : confirmRow?.name ?? "this account"}`}
+        body="They'll be able to find you, message you and see your posts again. They aren't told either way."
+        confirmLabel="Unblock"
+      />
     </div>
   );
 }

@@ -42,11 +42,19 @@ const POSTER_WIDTH = 720;
 /**
  * Grab a still from a video for use as its poster.
  *
- * Seeks to 0.5s rather than 0 — the first frame of a phone recording is
- * very often black. Resolves null on any failure, and bails after 8s so a
- * video the browser cannot decode never hangs the publish flow.
+ * `at` is a chosen cover time in seconds. Without one it falls back to ~0.5s
+ * rather than 0, because the first frame of a phone recording is very often
+ * black — and half a second in is very often a hand reaching for the screen,
+ * which is why the cover picker exists.
+ *
+ * The parameter was the one thing keeping ShotComposer on a private copy of
+ * this function: the two Shot paths had two poster implementations, and only
+ * one of them could honour a chosen frame.
+ *
+ * Resolves null on any failure, and bails after 8s so a video the browser
+ * cannot decode never hangs the publish flow.
  */
-export function capturePoster(src: string): Promise<Blob | null> {
+export function capturePoster(src: string, at?: number | null): Promise<Blob | null> {
   return new Promise((resolve) => {
     const video = document.createElement("video");
     video.muted = true;
@@ -61,7 +69,14 @@ export function capturePoster(src: string): Promise<Blob | null> {
       resolve(null);
     };
     video.onloadedmetadata = () => {
-      video.currentTime = Math.min(0.5, Math.max(0, video.duration - 0.1));
+      const fallback = Math.min(0.5, Math.max(0, video.duration - 0.1));
+      // Clamped: a cover time from a picker that measured a different duration
+      // than this element reports would otherwise seek past the end, and
+      // onseeked would never fire — hanging until the bail timeout.
+      video.currentTime =
+        at != null && Number.isFinite(at)
+          ? Math.min(Math.max(at, 0), Math.max(0, video.duration - 0.05))
+          : fallback;
     };
     video.onseeked = () => {
       clearTimeout(bail);

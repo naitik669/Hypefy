@@ -12,6 +12,7 @@ import { LiveCamera } from "@/components/shows/LiveCamera";
 import { Avatar } from "@/components/ui/Avatar";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import type { Track } from "@/lib/music";
+import { MAX_SHOW_MB, ALLOWED_SHOT_TYPES } from "@/lib/video-poster";
 
 type State = "camera" | "pick-post" | "pick-image" | "preview";
 
@@ -161,7 +162,27 @@ export default function AddShowPage() {
       let linkedPostId: string | null = null;
 
       if (capturedFile) {
-        // Own camera / gallery show
+        // Own camera / gallery show.
+        //
+        // This path had NO size or MIME check of any kind — accept="image/*,
+        // video/*" was the only filter, and the show-media bucket's own limits
+        // are narrower than that. So an over-size clip or an unsupported format
+        // uploaded, failed at the bucket, and surfaced the raw Supabase error
+        // (a MIME string) to the user. Same constants the other Show path uses.
+        if (capturedFile.size > MAX_SHOW_MB * 1024 * 1024) {
+          setError(
+            `That's ${(capturedFile.size / 1024 / 1024).toFixed(0)}MB — Shows can be up to ${MAX_SHOW_MB}MB.`,
+          );
+          return;
+        }
+        if (
+          capturedFile.type.startsWith("video/") &&
+          !ALLOWED_SHOT_TYPES.includes(capturedFile.type)
+        ) {
+          setError("That video format isn't supported. Try MP4, WebM or MOV.");
+          return;
+        }
+
         const ext = capturedFile.name.split(".").pop() ?? "jpg";
         const path = `${user.id}/${Date.now()}.${ext}`;
         const { error: uploadErr } = await supabase.storage
