@@ -12,6 +12,7 @@ import {
   UserPlus,
   CalendarClock,
   HelpCircle,
+  ShieldAlert,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -47,11 +48,12 @@ export default async function SettingsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: prof }, { count: joined }] = user
     ? await Promise.all([
-        supabase.from("profiles").select("username").eq("id", user.id).maybeSingle(),
+        supabase.from("profiles").select("username, is_admin").eq("id", user.id).maybeSingle(),
         supabase.from("profiles").select("id", { count: "exact", head: true }).eq("referred_by", user.id),
       ])
     : [{ data: null }, { count: 0 }];
   const username = (prof?.username as string | null) ?? null;
+  const isAdmin = !!(prof as { is_admin?: boolean } | null)?.is_admin;
 
   return (
     <>
@@ -145,6 +147,32 @@ export default async function SettingsPage() {
             <ChevronRight size={18} className="shrink-0 text-faint" />
           </Link>
         </section>
+
+        {/* Moderation. The queue existed and was linked from nowhere — the only
+            way in was typing the URL. The page's own notFound() gate is still
+            the real check; this link is convenience, not security. */}
+        {isAdmin && (
+          <section>
+            <p className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">
+              Moderation
+            </p>
+            <Link
+              href="/admin/reports"
+              className="flex items-center gap-3 rounded-2xl px-2 py-4 transition-colors hover:bg-white/[0.03]"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface text-foreground">
+                <ShieldAlert size={20} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Reports queue</p>
+                <p className="truncate text-xs text-muted">
+                  Review reports, remove content, suspend accounts
+                </p>
+              </div>
+              <ChevronRight size={18} className="shrink-0 text-faint" />
+            </Link>
+          </section>
+        )}
 
         {/* Sign out */}
         <SignOutButton />

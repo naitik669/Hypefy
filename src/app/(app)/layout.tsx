@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profile";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -12,6 +13,7 @@ import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PresenceHeartbeat } from "@/components/presence/PresenceHeartbeat";
 import { InAppNotifier } from "@/components/messages/InAppNotifier";
 import { AppLockGate } from "@/components/settings/AppLockGate";
+import { SuspendedScreen } from "@/components/moderation/SuspendedScreen";
 
 /**
  * Shell for the signed-in app: a mobile-first centered column with a
@@ -53,6 +55,32 @@ export default async function AppLayout({
 
   if (!profile?.profileCompleted) {
     redirect("/setup-profile");
+  }
+
+  // Suspension. The database triggers (0057) are what actually stop a suspended
+  // account writing anything; this is the screen that says why, because
+  // otherwise every action fails with an error and nothing explains it.
+  //
+  // suspended_until in the past means it has elapsed — the triggers already
+  // treat it that way, and this has to agree or the two would disagree about
+  // who is suspended.
+  const suspendedNow =
+    !!profile.suspendedAt &&
+    (!profile.suspendedUntil || new Date(profile.suspendedUntil) > new Date());
+
+  if (suspendedNow) {
+    const pathname = (await headers()).get("x-pathname") ?? "";
+    // The routes a suspended person must keep: how to appeal, what the rules
+    // are, and how to export or delete their account.
+    const allowed = ["/help", "/settings/account", "/guidelines"];
+    if (!allowed.some((p) => pathname.startsWith(p))) {
+      return (
+        <SuspendedScreen
+          reason={profile.suspensionReason}
+          until={profile.suspendedUntil}
+        />
+      );
+    }
   }
 
   // Initial unread DM count for the BottomNav badge — one aggregate, computed

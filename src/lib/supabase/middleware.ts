@@ -6,6 +6,11 @@ import { NextResponse, type NextRequest } from "next/server";
  * sync. Called from the root proxy (Next 16's renamed middleware).
  */
 export async function updateSession(request: NextRequest) {
+  // Server components cannot read the pathname, and the suspension gate in the
+  // (app) layout has to let a few routes through — support, guidelines,
+  // account settings — or a suspended user has no way to appeal or leave.
+  // Carrying it on a request header is the standard way to hand it down.
+  request.headers.set("x-pathname", request.nextUrl.pathname);
   let supabaseResponse = NextResponse.next({ request });
 
   // Missing Supabase env used to short-circuit auth entirely, which meant a

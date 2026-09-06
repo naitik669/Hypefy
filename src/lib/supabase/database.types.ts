@@ -254,6 +254,9 @@ export type Database = {
           id: string
           parent_id: string | null
           post_id: string | null
+          removal_reason: string | null
+          removed_at: string | null
+          removed_by: string | null
           shot_id: string | null
           updated_at: string
           user_id: string
@@ -266,6 +269,9 @@ export type Database = {
           id?: string
           parent_id?: string | null
           post_id?: string | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           shot_id?: string | null
           updated_at?: string
           user_id: string
@@ -278,6 +284,9 @@ export type Database = {
           id?: string
           parent_id?: string | null
           post_id?: string | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           shot_id?: string | null
           updated_at?: string
           user_id?: string
@@ -295,6 +304,13 @@ export type Database = {
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -795,6 +811,9 @@ export type Database = {
           kind: string
           metadata: Json
           post_id: string | null
+          removal_reason: string | null
+          removed_at: string | null
+          removed_by: string | null
           reply_to_id: string | null
           sender_id: string
           shot_id: string | null
@@ -810,6 +829,9 @@ export type Database = {
           kind?: string
           metadata?: Json
           post_id?: string | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           reply_to_id?: string | null
           sender_id: string
           shot_id?: string | null
@@ -825,6 +847,9 @@ export type Database = {
           kind?: string
           metadata?: Json
           post_id?: string | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           reply_to_id?: string | null
           sender_id?: string
           shot_id?: string | null
@@ -846,6 +871,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "messages_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "messages_reply_to_id_fkey"
             columns: ["reply_to_id"]
             isOneToOne: false
@@ -864,6 +896,57 @@ export type Database = {
             columns: ["shot_id"]
             isOneToOne: false
             referencedRelation: "shots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      moderation_actions: {
+        Row: {
+          action: string
+          actor_id: string
+          created_at: string
+          id: string
+          reason: string | null
+          report_id: string | null
+          target_id: string
+          target_type: string
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          report_id?: string | null
+          target_id: string
+          target_type: string
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          report_id?: string | null
+          target_id?: string
+          target_type?: string
+          target_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderation_actions_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1167,6 +1250,9 @@ export type Database = {
           image_urls: string[]
           mentions: string[]
           poll: Json | null
+          removal_reason: string | null
+          removed_at: string | null
+          removed_by: string | null
           repost_count: number
           save_count: number
           share_count: number
@@ -1188,6 +1274,9 @@ export type Database = {
           image_urls?: string[]
           mentions?: string[]
           poll?: Json | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           repost_count?: number
           save_count?: number
           share_count?: number
@@ -1209,6 +1298,9 @@ export type Database = {
           image_urls?: string[]
           mentions?: string[]
           poll?: Json | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           repost_count?: number
           save_count?: number
           share_count?: number
@@ -1218,6 +1310,13 @@ export type Database = {
           view_count?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "posts_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "posts_user_id_fkey"
             columns: ["user_id"]
@@ -1290,6 +1389,10 @@ export type Database = {
           profile_tags: string[]
           referred_by: string | null
           show_activity: boolean
+          suspended_at: string | null
+          suspended_by: string | null
+          suspended_until: string | null
+          suspension_reason: string | null
           two_step_enabled: boolean
           updated_at: string
           username: string | null
@@ -1321,6 +1424,10 @@ export type Database = {
           profile_tags?: string[]
           referred_by?: string | null
           show_activity?: boolean
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspended_until?: string | null
+          suspension_reason?: string | null
           two_step_enabled?: boolean
           updated_at?: string
           username?: string | null
@@ -1352,6 +1459,10 @@ export type Database = {
           profile_tags?: string[]
           referred_by?: string | null
           show_activity?: boolean
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspended_until?: string | null
+          suspension_reason?: string | null
           two_step_enabled?: boolean
           updated_at?: string
           username?: string | null
@@ -1360,6 +1471,13 @@ export type Database = {
           {
             foreignKeyName: "profiles_referred_by_fkey"
             columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_suspended_by_fkey"
+            columns: ["suspended_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1659,6 +1777,9 @@ export type Database = {
           in_showcase: boolean
           media_url: string
           poster_url: string | null
+          removal_reason: string | null
+          removed_at: string | null
+          removed_by: string | null
           save_count: number
           share_count: number
           track: Json | null
@@ -1674,6 +1795,9 @@ export type Database = {
           in_showcase?: boolean
           media_url: string
           poster_url?: string | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           save_count?: number
           share_count?: number
           track?: Json | null
@@ -1689,12 +1813,22 @@ export type Database = {
           in_showcase?: boolean
           media_url?: string
           poster_url?: string | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           save_count?: number
           share_count?: number
           track?: Json | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "shots_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "shots_user_id_fkey"
             columns: ["user_id"]
@@ -1747,6 +1881,9 @@ export type Database = {
           is_showcase: boolean | null
           linked_post_id: string | null
           media_url: string
+          removal_reason: string | null
+          removed_at: string | null
+          removed_by: string | null
           track: Json | null
           user_id: string
         }
@@ -1759,6 +1896,9 @@ export type Database = {
           is_showcase?: boolean | null
           linked_post_id?: string | null
           media_url: string
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           track?: Json | null
           user_id: string
         }
@@ -1771,6 +1911,9 @@ export type Database = {
           is_showcase?: boolean | null
           linked_post_id?: string | null
           media_url?: string
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           track?: Json | null
           user_id?: string
         }
@@ -1780,6 +1923,13 @@ export type Database = {
             columns: ["linked_post_id"]
             isOneToOne: false
             referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shows_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -1864,6 +2014,28 @@ export type Database = {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: undefined
       }
+      admin_remove_content: {
+        Args: {
+          p_reason?: string
+          p_report_id?: string
+          p_target_id: string
+          p_target_type: string
+        }
+        Returns: undefined
+      }
+      admin_resolve_report: {
+        Args: { p_id: string; p_status: string; p_table: string }
+        Returns: undefined
+      }
+      admin_restore_content: {
+        Args: { p_target_id: string; p_target_type: string }
+        Returns: undefined
+      }
+      admin_suspend_user: {
+        Args: { p_days?: number; p_reason?: string; p_user_id: string }
+        Returns: undefined
+      }
+      admin_unsuspend_user: { Args: { p_user_id: string }; Returns: undefined }
       age_ok: { Args: never; Returns: boolean }
       api_rate_limit: { Args: { p_action: string }; Returns: undefined }
       approve_follow_request: {
@@ -2019,6 +2191,7 @@ export type Database = {
       increment_post_view: { Args: { p_post_id: string }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       is_conv_member: { Args: { conv: string }; Returns: boolean }
+      is_suspended: { Args: { p_user?: string }; Returns: boolean }
       join_group_call: { Args: { p_call_id: string }; Returns: undefined }
       leave_conversation: {
         Args: { p_conversation_id: string }

@@ -30,6 +30,9 @@ export type Profile = {
   profileCompleted: boolean;
   isVerified: boolean;
   isAdmin: boolean;
+  suspendedAt: string | null;
+  suspendedUntil: string | null;
+  suspensionReason: string | null;
   /** Recorded server-side; null means we never asked. See migration 0053. */
   dateOfBirth: string | null;
 };
@@ -159,6 +162,9 @@ function mapProfile(row: any): Profile {
     profileCompleted: row.profile_completed ?? false,
     isVerified: row.is_verified ?? false,
     isAdmin: row.is_admin ?? false,
+    suspendedAt: row.suspended_at ?? null,
+    suspendedUntil: row.suspended_until ?? null,
+    suspensionReason: row.suspension_reason ?? null,
     dateOfBirth: row.date_of_birth ?? null,
   };
 }
