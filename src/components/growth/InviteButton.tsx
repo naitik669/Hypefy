@@ -11,7 +11,12 @@ const SITE = "https://app.hypefy.chat";
  *  Carries ?ref=<username> so signups from it credit the inviter. */
 async function shareProfile(username: string | null) {
   haptics.tap();
-  const url = username ? `${SITE}/u/${username}?ref=${encodeURIComponent(username)}` : SITE;
+  // No username means no ?ref, which means the invite is uncredited — while
+  // the row above it is still counting "friends joined from your link". Send
+  // people to pick a handle first rather than quietly losing the referral.
+  const url = username
+    ? `${SITE}/u/${username}?ref=${encodeURIComponent(username)}`
+    : `${SITE}/setup-profile`;
   const text = "Come find me on Hypefy, where your personality lives.";
   try {
     if (navigator.share) {
@@ -41,19 +46,31 @@ export function InviteIconButton({ username }: { username: string | null }) {
       }}
       className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-elevated text-foreground transition-colors hover:bg-elevated/70 active:scale-[0.99]"
     >
-      {copied ? <Check size={18} className="text-accent" /> : <Plane size={18} weight="bold" />}
+      {copied ? (
+        <Check size={18} className="text-accent" />
+      ) : (
+        <Plane size={18} weight="bold" />
+      )}
     </button>
   );
 }
 
 /** Full-width row for the settings hub, styled like its nav links. */
-export function InviteRow({ username, joined = 0 }: { username: string | null; joined?: number }) {
+export function InviteRow({
+  username,
+  joined = 0,
+}: {
+  username: string | null;
+  joined?: number;
+}) {
   const [copied, setCopied] = useState(false);
   const sub = copied
     ? "Link copied ✓"
     : joined > 0
-      ? `${joined} ${joined === 1 ? "friend" : "friends"} joined from your link 🎉`
-      : "Share your profile link";
+    ? `${joined} ${
+        joined === 1 ? "friend" : "friends"
+      } joined from your link 🎉`
+    : "Share your profile link";
   return (
     <button
       type="button"

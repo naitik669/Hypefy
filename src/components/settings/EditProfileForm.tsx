@@ -111,6 +111,25 @@ export function EditProfileForm({
     });
   }
 
+  /**
+   * The storage path inside `bucket` that a public URL points at, or null.
+   *
+   * Public URLs are .../object/public/<bucket>/<path>, so the path is whatever
+   * follows the bucket name. Returns null for anything that isn't one of ours
+   * — an externally hosted avatar must never be treated as a file we may
+   * delete.
+   */
+  function ownedPath(url: string | null, bucket: string): string | null {
+    if (!url) return null;
+    const marker = `/object/public/${bucket}/`;
+    const at = url.indexOf(marker);
+    if (at === -1) return null;
+    const path = url.slice(at + marker.length).split("?")[0];
+    // Only files under this user's own folder, which is also all the storage
+    // policy would allow us to remove.
+    return path.startsWith(`${userId}/`) ? path : null;
+  }
+
   // Crop done → upload the cropped square/wide JPEG to the right bucket.
   async function onCropDone(blob: Blob) {
     if (!cropper) return;
@@ -118,6 +137,8 @@ export function EditProfileForm({
     URL.revokeObjectURL(cropper.src);
     setCropper(null);
     const bucket = kind === "banner" ? "banners" : "avatars";
+    // The one being replaced, captured before the new URL overwrites it.
+    const previous = ownedPath(kind === "banner" ? bannerUrl : avatarUrl, bucket);
     const path = `${userId}/${kind}-${Date.now()}.jpg`;
     kind === "banner" ? setBannerUploading(true) : setUploading(true);
     const { error: upErr } = await supabase.storage
@@ -133,6 +154,14 @@ export function EditProfileForm({
       const { data } = supabase.storage.from(bucket).getPublicUrl(path);
       if (kind === "banner") setBannerUrl(data.publicUrl);
       else setAvatarUrl(data.publicUrl);
+
+      // Every crop uploaded to a new timestamped path and nothing ever removed
+      // the old one, so changing an avatar three times left three files in the
+      // bucket for good. Only after the replacement is safely up, and only for
+      // a file we put there ourselves.
+      if (previous && previous !== path) {
+        await supabase.storage.from(bucket).remove([previous]);
+      }
     }
     kind === "banner" ? setBannerUploading(false) : setUploading(false);
   }
