@@ -53,6 +53,15 @@ export function NavHoldMenu({
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   /** Pointer was taken away mid-gesture; the stack stays up and is tapped. */
   const [detached, setDetached] = useState(false);
+  /**
+   * Which side the labels unfurl towards.
+   *
+   * Measured from the trigger rather than hardcoded: this component hangs off
+   * the leftmost tab today, but a menu on a right-hand tab needs the mirror
+   * image, and a label that opens into the nearest screen edge is clipped to
+   * nothing.
+   */
+  const [labelSide, setLabelSide] = useState<"left" | "right">("right");
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startY = useRef(0);
@@ -133,6 +142,12 @@ export function NavHoldMenu({
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;
       didHold.current = true;
+      const box = triggerRef.current?.getBoundingClientRect();
+      if (box) {
+        setLabelSide(
+          box.left + box.width / 2 < window.innerWidth / 2 ? "right" : "left",
+        );
+      }
       setOpen(true);
       setActiveIdx(null);
       haptics.select();
@@ -232,7 +247,9 @@ export function NavHoldMenu({
                         }
                       : undefined
                   }
-                  className="relative flex items-center justify-end"
+                  className={`relative flex items-center ${
+                    labelSide === "right" ? "justify-start" : "justify-end"
+                  }`}
                   style={{
                     // Stagger outwards from the thumb, so the stack unfurls
                     // away from the finger rather than at it.
@@ -241,21 +258,37 @@ export function NavHoldMenu({
                     }ms backwards`,
                   }}
                 >
-                  {/* Label slides out from behind the tile, right to left, and
-                      only for the row under the thumb. Clipped rather than
-                      faded: this wrapper's right edge meets the tile's left
-                      edge, so a parked label is invisible without ever being
-                      transparent. Padding on three sides gives the shadow room
-                      — overflow clips at the padding box, so only the
-                      un-padded right edge cuts. */}
-                  <span className="pointer-events-none absolute right-full overflow-hidden py-2 pl-3">
+                  {/* Label slides out from behind the tile, away from the
+                      screen edge, and only for the row under the thumb.
+
+                      Which side is not a style choice. This menu hangs off the
+                      LEFTMOST tab, so a label sliding left — the direction
+                      AccountSwitchPad uses, because it hangs off the RIGHTMOST
+                      tab — runs straight into the edge of the screen and gets
+                      clipped to nothing. The side is picked from where the
+                      trigger actually sits (see labelSide).
+
+                      Clipped rather than faded: the wrapper's inner edge meets
+                      the tile's, so a parked label is invisible without ever
+                      being transparent. Padding on three sides gives the shadow
+                      room — overflow clips at the padding box, so only the
+                      un-padded inner edge cuts. */}
+                  <span
+                    className={`pointer-events-none absolute overflow-hidden py-2 ${
+                      labelSide === "right" ? "left-full pr-3" : "right-full pl-3"
+                    }`}
+                  >
                     <span
-                      className="block max-w-[42vw] truncate whitespace-nowrap rounded-lg bg-background/90 px-2.5 py-1 text-[13px] font-bold text-foreground shadow-lg ring-1 ring-border/70"
+                      className="block max-w-[42vw] truncate whitespace-nowrap rounded-lg bg-elevated px-2.5 py-1 text-[13px] font-bold text-foreground shadow-lg ring-1 ring-border"
                       style={{
+                        // Parked: its own width plus the gap, which puts it
+                        // wholly past the clip edge and under the tile.
                         transform: active
                           ? "translate3d(0,0,0)"
-                          : "translate3d(calc(100% + 10px), 0, 0)",
-                        marginRight: 10,
+                          : labelSide === "right"
+                            ? "translate3d(calc(-100% - 10px), 0, 0)"
+                            : "translate3d(calc(100% + 10px), 0, 0)",
+                        [labelSide === "right" ? "marginLeft" : "marginRight"]: 10,
                         transition: "transform 260ms cubic-bezier(0.16,1,0.3,1)",
                       }}
                     >
@@ -265,7 +298,11 @@ export function NavHoldMenu({
 
                   <div
                     className={`transition-transform duration-200 ease-out ${
-                      active ? "-translate-x-2.5 scale-110" : "scale-100"
+                      active
+                        ? labelSide === "right"
+                          ? "translate-x-2.5 scale-110"
+                          : "-translate-x-2.5 scale-110"
+                        : "scale-100"
                     }`}
                   >
                     <span
