@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Star, MessageCircle, Bookmark, MoreHorizontal, Maximize2, Repeat2, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Star,
+  MessageCircle,
+  Bookmark,
+  MoreHorizontal,
+  Maximize2,
+  Repeat2,
+} from "lucide-react";
 import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
@@ -203,7 +210,10 @@ export function FeedCard({
 
   function twoFingerState(t: React.TouchList) {
     return {
-      dist: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY),
+      dist: Math.hypot(
+        t[0].clientX - t[1].clientX,
+        t[0].clientY - t[1].clientY
+      ),
       midX: (t[0].clientX + t[1].clientX) / 2,
       midY: (t[0].clientY + t[1].clientY) / 2,
     };
@@ -698,37 +708,14 @@ export function FeedCard({
             </div>
           )}
 
-          {/* Left/right arrows -- desktop-friendly nav, mirrors the swipe gesture */}
-          {images.length > 1 && (
-            <>
-              {imgIdx > 0 && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setImgIdx((i) => Math.max(i - 1, 0));
-                  }}
-                  aria-label="Previous image"
-                  className="absolute left-2.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-              )}
-              {imgIdx < images.length - 1 && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setImgIdx((i) => Math.min(i + 1, images.length - 1));
-                  }}
-                  aria-label="Next image"
-                  className="absolute right-2.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
-                >
-                  <ChevronRight size={18} />
-                </button>
-              )}
-            </>
-          )}
+          {/* The left/right arrows used to sit here, and the "2/5" counter in
+              the top-right corner with them. Both were chrome parked on top of
+              the photograph — two dark pills over the middle of the image and
+              one over its corner, on every gallery post, permanently. Swiping
+              is how anyone actually moves through these, and the dots below
+              already say where you are and how many there are; tapping a dot
+              still jumps straight to that image, so nothing was lost with a
+              pointer either. */}
 
           {/* The expand button used to sit here. Hold or pinch the photo
               instead — see onGalleryTouchStart. Kept for pointer devices,
@@ -746,28 +733,23 @@ export function FeedCard({
             <Maximize2 size={15} />
           </button>
 
-          {/* Multi-image dots + counter */}
+          {/* Multi-image position dots */}
           {images.length > 1 && (
-            <>
-              <span className="absolute right-2.5 top-2.5 rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
-                {imgIdx + 1}/{images.length}
-              </span>
-              <div className="absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5">
-                {images.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setImgIdx(i);
-                    }}
-                    className={`h-1.5 rounded-full transition-all ${
-                      i === imgIdx ? "w-4 bg-white" : "w-1.5 bg-white/50"
-                    }`}
-                  />
-                ))}
-              </div>
-            </>
+            <div className="absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5">
+              {images.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImgIdx(i);
+                  }}
+                  className={`h-1.5 rounded-full transition-all ${
+                    i === imgIdx ? "w-4 bg-white" : "w-1.5 bg-white/50"
+                  }`}
+                />
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -788,7 +770,11 @@ export function FeedCard({
                 size={23}
                 strokeWidth={2.2}
                 className={`${
-                  hypeBurst ? "animate-hype-burst" : hypeBreak ? "animate-hype-crack" : ""
+                  hypeBurst
+                    ? "animate-hype-burst"
+                    : hypeBreak
+                    ? "animate-hype-crack"
+                    : ""
                 } transition-colors ${hyped ? "text-hype" : "text-foreground"}`}
                 fill={hyped ? "currentColor" : "none"}
               />
