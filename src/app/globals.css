@@ -930,8 +930,10 @@ body {
     animation: none;
   }
   /* switch-rise is applied as an inline style (each row carries its own
-     stagger delay), so it cannot be switched off by class alone. */
-  [role="listbox"][aria-label="Switch account"] > * {
+     stagger delay), so it cannot be switched off by class alone. Every
+     hold menu uses it — the account switcher, the two nav stacks and the
+     create fan — so the selector matches the role, not one label. */
+  [role="listbox"] > * {
     animation: none !important;
   }
 }

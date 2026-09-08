@@ -10,7 +10,16 @@ import { createClient } from "@/lib/supabase/client";
 import { haptics } from "@/lib/haptics";
 import { NavHoldMenu, type HoldAction } from "@/components/layout/NavHoldMenu";
 import { ChatHoldMenu } from "@/components/layout/ChatHoldMenu";
-import { Search, Settings, Bookmark, Bell } from "lucide-react";
+import {
+  Search,
+  Settings,
+  Bookmark,
+  Bell,
+  ImagePlus,
+  Video,
+  Sparkles,
+  Radio,
+} from "lucide-react";
 
 /**
  * Shortcuts behind a hold on Home.
@@ -28,6 +37,31 @@ const HOME_SHORTCUTS: HoldAction[] = [
   // right-swipe from the feed, so it was the one entry with two other ways in.
   // Settings had none — it was buried behind the profile tab.
   { icon: Settings, label: "Settings", href: "/settings" },
+];
+
+/**
+ * What (+) can make, fanned across the top of the button.
+ *
+ * Left to right, not nearest-thumb-first: an arc has no near end, and these
+ * read in the order the create screen already lists them, so the two places
+ * you choose a mode agree with each other.
+ *
+ * Each carries its own gradient. Four identical outlined squares would make
+ * you read four labels to pick one, and unlike Search and Settings these are
+ * not peers — going live is not the same size of decision as writing a post,
+ * and the colours say so before the caption does. Live is red for the reason
+ * every camera light in history is red.
+ */
+const CREATE_SHORTCUTS: HoldAction[] = [
+  {
+    icon: ImagePlus,
+    label: "Post",
+    href: "/create?mode=post",
+    tint: [212, 258],
+  },
+  { icon: Video, label: "Shot", href: "/create?mode=shot", tint: [284, 322] },
+  { icon: Sparkles, label: "Show", href: "/create?mode=show", tint: [38, 62] },
+  { icon: Radio, label: "Live", href: "/create?mode=live", tint: [352, 18] },
 ];
 
 export function BottomNav({
@@ -148,20 +182,29 @@ export function BottomNav({
           </Link>
         </ChatHoldMenu>
 
-        {/* center create */}
-        <button
-          type="button"
-          aria-label="Create"
-          onClick={() => {
-            haptics.tap();
-            router.push("/create");
-          }}
-          className="flex h-11 w-[68px] -translate-y-1.5 items-center justify-center rounded-[20px] bg-accent text-accent-ink shadow-md transition-transform duration-200 will-change-transform hover:brightness-105 active:scale-90"
+        {/* center create. Tap opens the camera on Shot as it always has;
+            holding fans out the four things it can make, so choosing Live or
+            a text Post no longer means loading the camera first and switching
+            away from it. */}
+        <NavHoldMenu
+          actions={CREATE_SHORTCUTS}
+          label="What to create"
+          layout="arc"
         >
-          <span className="flex items-center justify-center">
-            <Plus size={26} weight="bold" aria-hidden />
-          </span>
-        </button>
+          <button
+            type="button"
+            aria-label="Create"
+            onClick={() => {
+              haptics.tap();
+              router.push("/create");
+            }}
+            className="flex h-11 w-[68px] -translate-y-1.5 items-center justify-center rounded-[20px] bg-accent text-accent-ink shadow-md transition-transform duration-200 will-change-transform hover:brightness-105 active:scale-90"
+          >
+            <span className="flex items-center justify-center">
+              <Plus size={26} weight="bold" aria-hidden />
+            </span>
+          </button>
+        </NavHoldMenu>
 
         <NavItem
           href="/shots"

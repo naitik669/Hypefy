@@ -28,6 +28,15 @@ export type HoldAction = {
   avatar?: { name: string; hue: number; src?: string | null };
   /** Unread messages waiting in this thread. 0 or absent draws nothing. */
   unread?: number;
+  /**
+   * [from, to] hues for a filled, gradient tile instead of an outlined one.
+   *
+   * The create fan uses it: four outlined squares would make you read four
+   * labels to pick, and these four things are not peers of each other the way
+   * Search and Settings are — a Live stream and a text post deserve to look
+   * as different as they are.
+   */
+  tint?: [number, number];
 };
 
 /**
@@ -54,10 +63,23 @@ export type HoldAction = {
 export function NavHoldMenu({
   actions,
   label,
+  layout = "stack",
   onArm,
   children,
 }: {
   actions: HoldAction[];
+  /**
+   * How the options are laid out around the trigger.
+   *
+   * "stack" climbs straight up from a tab on the edge of the bar. "arc" fans
+   * across the top of the trigger and is for the CENTRE button, which is the
+   * one place with room on both sides — a column there would rise out of the
+   * middle of the screen and cover the thing you are creating from. The
+   * mechanics below are shared on purpose: the hold, the pointer capture, the
+   * detach fallback and the commit were all hard-won once, and a second
+   * component would have re-earned the same bugs.
+   */
+  layout?: "stack" | "arc";
   /** Names the stack for assistive tech, e.g. "Home shortcuts". */
   label: string;
   /**
@@ -93,10 +115,36 @@ export function NavHoldMenu({
   const stackRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLDivElement | null>(null);
 
-  // Bottom-of-column is nearest the thumb, so the visual order is the
-  // reverse of the caller's priority order. Everything below — hit-testing,
-  // the stagger, commit — indexes into THIS list, so they cannot disagree.
-  const ordered = [...actions].reverse();
+  // Bottom-of-column is nearest the thumb, so a stack's visual order is the
+  // reverse of the caller's priority order. An arc has no near end — every
+  // tile is one flick away — so it reads left to right instead. Everything
+  // below (hit-testing, the stagger, commit) indexes into THIS list, so they
+  // cannot disagree.
+  const ordered = layout === "arc" ? actions : [...actions].reverse();
+
+  /**
+   * Where each arc tile sits, relative to the trigger's centre.
+   *
+   * An ellipse rather than a circle, lifted clear of the bar: on a true circle
+   * the outermost tiles sit barely above the trigger and collide with the nav,
+   * and stretching it sideways is also what gives the fan its shape. Angles
+   * run right to left in screen terms because CSS y grows downward.
+   */
+  function arcPos(i: number, n: number) {
+    const RX = 112;
+    const RY = 116;
+    /** Half a tile, so left/top can centre it without a transform. */
+    const HALF = 27;
+    const LIFT = 22;
+    const FROM = -152;
+    const TO = -28;
+    const t = n === 1 ? 0.5 : i / (n - 1);
+    const a = ((FROM + (TO - FROM) * t) * Math.PI) / 180;
+    return {
+      x: Math.cos(a) * RX - HALF,
+      y: Math.sin(a) * RY - LIFT - HALF,
+    };
+  }
 
   const close = useCallback(() => {
     setOpen(false);
@@ -134,10 +182,35 @@ export function NavHoldMenu({
    * re-invoked on every render, and this list re-renders on every move), the
    * DOM is the thing being pointed at, so asking it directly cannot drift.
    */
-  function rowAt(y: number): number | null {
+  function rowAt(x: number, y: number): number | null {
     const stack = stackRef.current;
     if (!stack) return null;
     const els = stack.querySelectorAll<HTMLElement>('[role="option"]');
+
+    if (layout === "arc") {
+      // Nearest centre wins, not containment. Tiles on an arc have gaps
+      // between them, and a thumb travelling from one to the next crosses
+      // those gaps — deselecting mid-slide makes the fan feel broken. The
+      // radius is generous for the same reason: the tile you are heading for
+      // should light up before you are on top of it.
+      const REACH = 74;
+      let best: number | null = null;
+      let bestD = REACH;
+      for (let i = 0; i < els.length; i++) {
+        const r = els[i].getBoundingClientRect();
+        const dx = x - (r.left + r.width / 2);
+        const dy = y - (r.top + r.height / 2);
+        const d = Math.hypot(dx, dy);
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      }
+      return best;
+    }
+
+    // A stack is a column: the thumb arcs sideways as it reaches up, so
+    // demanding X containment breaks the top of the tallest reaches.
     for (let i = 0; i < els.length; i++) {
       const r = els[i].getBoundingClientRect();
       if (y >= r.top && y <= r.bottom) return i;
@@ -195,7 +268,7 @@ export function NavHoldMenu({
       if (moved) clearHold();
       return;
     }
-    const hit = rowAt(e.clientY);
+    const hit = rowAt(e.clientX, e.clientY);
     if (hit !== activeIdx) {
       setActiveIdx(hit);
       if (hit !== null) haptics.select();
@@ -246,7 +319,14 @@ export function NavHoldMenu({
 
           <div
             ref={stackRef}
-            className="absolute bottom-[calc(100%+14px)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3"
+            className={
+              layout === "arc"
+                ? // A zero-size anchor at the trigger's centre; every tile is
+                  // placed from there, so the fan is symmetric about the
+                  // button no matter how wide the bar is.
+                  "absolute left-1/2 top-1/2 z-50 h-0 w-0"
+                : "absolute bottom-[calc(100%+14px)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3"
+            }
             role="listbox"
             aria-label={label}
           >
@@ -274,16 +354,42 @@ export function NavHoldMenu({
                         }
                       : undefined
                   }
-                  className={`relative flex items-center ${
-                    labelSide === "right" ? "justify-start" : "justify-end"
-                  }`}
-                  style={{
-                    // Stagger outwards from the thumb, so the stack unfurls
-                    // away from the finger rather than at it.
-                    animation: `switch-rise 260ms cubic-bezier(0.16,1,0.3,1) ${
-                      (actions.length - 1 - i) * 38
-                    }ms backwards`,
-                  }}
+                  className={
+                    layout === "arc"
+                      ? "absolute"
+                      : `relative flex items-center ${
+                          labelSide === "right"
+                            ? "justify-start"
+                            : "justify-end"
+                        }`
+                  }
+                  style={
+                    layout === "arc"
+                      ? {
+                          left: arcPos(i, ordered.length).x,
+                          top: arcPos(i, ordered.length).y,
+                          // Centred by offsetting left/top, NOT by a
+                          // translate: switch-rise animates `transform`, and a
+                          // transform in an animation replaces the element's
+                          // own outright. Centring there put every tile half a
+                          // tile down and to the right for the length of the
+                          // animation — and permanently, on any surface that
+                          // pauses animations (a hidden tab does exactly
+                          // that). Offsets cannot be overridden by a keyframe.
+                          // Outwards from the middle of the fan, so it opens
+                          // like a hand rather than sweeping in one direction.
+                          animation: `switch-rise 300ms cubic-bezier(0.16,1,0.3,1) ${
+                            Math.abs(i - (ordered.length - 1) / 2) * 42
+                          }ms backwards`,
+                        }
+                      : {
+                          // Stagger outwards from the thumb, so the stack
+                          // unfurls away from the finger rather than at it.
+                          animation: `switch-rise 260ms cubic-bezier(0.16,1,0.3,1) ${
+                            (actions.length - 1 - i) * 38
+                          }ms backwards`,
+                        }
+                  }
                 >
                   {/* Label slides out from behind the tile, away from the
                       screen edge, and only for the row under the thumb.
@@ -300,49 +406,68 @@ export function NavHoldMenu({
                       being transparent. Padding on three sides gives the shadow
                       room — overflow clips at the padding box, so only the
                       un-padded inner edge cuts. */}
-                  <span
-                    className={`pointer-events-none absolute overflow-hidden py-2 ${
-                      labelSide === "right"
-                        ? "left-full pr-3"
-                        : "right-full pl-3"
-                    }`}
-                  >
+                  {layout === "stack" && (
                     <span
-                      className="block max-w-[42vw] truncate whitespace-nowrap rounded-lg bg-elevated px-2.5 py-1 text-[13px] font-bold text-foreground shadow-lg ring-1 ring-border"
-                      style={{
-                        // Parked: its own width plus the gap, which puts it
-                        // wholly past the clip edge and under the tile.
-                        transform: active
-                          ? "translate3d(0,0,0)"
-                          : labelSide === "right"
-                          ? "translate3d(calc(-100% - 10px), 0, 0)"
-                          : "translate3d(calc(100% + 10px), 0, 0)",
-                        [labelSide === "right"
-                          ? "marginLeft"
-                          : "marginRight"]: 10,
-                        transition:
-                          "transform 260ms cubic-bezier(0.16,1,0.3,1)",
-                      }}
+                      className={`pointer-events-none absolute overflow-hidden py-2 ${
+                        labelSide === "right"
+                          ? "left-full pr-3"
+                          : "right-full pl-3"
+                      }`}
                     >
-                      {action.label}
+                      <span
+                        className="block max-w-[42vw] truncate whitespace-nowrap rounded-lg bg-elevated px-2.5 py-1 text-[13px] font-bold text-foreground shadow-lg ring-1 ring-border"
+                        style={{
+                          // Parked: its own width plus the gap, which puts it
+                          // wholly past the clip edge and under the tile.
+                          transform: active
+                            ? "translate3d(0,0,0)"
+                            : labelSide === "right"
+                            ? "translate3d(calc(-100% - 10px), 0, 0)"
+                            : "translate3d(calc(100% + 10px), 0, 0)",
+                          [labelSide === "right"
+                            ? "marginLeft"
+                            : "marginRight"]: 10,
+                          transition:
+                            "transform 260ms cubic-bezier(0.16,1,0.3,1)",
+                        }}
+                      >
+                        {action.label}
+                      </span>
                     </span>
-                  </span>
+                  )}
 
                   <div
                     className={`transition-transform duration-200 ease-out ${
                       active
-                        ? labelSide === "right"
+                        ? layout === "arc"
+                          ? "scale-[1.18]"
+                          : labelSide === "right"
                           ? "translate-x-2.5 scale-110"
                           : "-translate-x-2.5 scale-110"
                         : "scale-100"
                     }`}
                   >
                     <span
-                      className={`relative flex h-12 w-12 items-center justify-center overflow-visible rounded-[16px] border-2 transition-colors duration-200 ${
-                        active
+                      className={`relative flex items-center justify-center overflow-visible border-2 transition-[background-color,border-color,box-shadow,color] duration-200 ${
+                        layout === "arc"
+                          ? "h-[54px] w-[54px] rounded-[19px]"
+                          : "h-12 w-12 rounded-[16px]"
+                      } ${
+                        action.tint
+                          ? active
+                            ? "border-white text-white shadow-[0_0_0_4px_rgba(255,255,255,0.16),0_12px_30px_rgba(0,0,0,0.55)]"
+                            : "border-white/15 text-white"
+                          : active
                           ? "border-accent bg-accent/15 text-accent"
                           : "border-border bg-surface/95 text-foreground"
                       }`}
+                      style={
+                        action.tint
+                          ? {
+                              background: `linear-gradient(140deg, hsl(${action.tint[0]} 82% 56%), hsl(${action.tint[1]} 72% 40%))`,
+                            }
+                          : undefined
+                      }
                     >
                       {action.avatar ? (
                         <Avatar
@@ -353,7 +478,11 @@ export function NavHoldMenu({
                           className="rounded-[12px]"
                         />
                       ) : Icon ? (
-                        <Icon size={21} aria-hidden />
+                        <Icon
+                          size={layout === "arc" ? 23 : 21}
+                          strokeWidth={layout === "arc" ? 2.3 : 2}
+                          aria-hidden
+                        />
                       ) : null}
                       {!!action.unread && (
                         // A bare dot said "something happened" and stopped
@@ -371,6 +500,35 @@ export function NavHoldMenu({
                 </div>
               );
             })}
+
+            {layout === "arc" && (
+              // One caption for the whole fan instead of a label per tile.
+              // Four labels around an arc collide with each other and with the
+              // tiles; one line above the fan, where your eye already is, says
+              // the same thing without the clutter — and it is the only text
+              // on screen, so it cannot be misread.
+              <span
+                aria-hidden
+                // A fixed-width centring track, so the pill inside can shrink
+                // to its own text. Centring the pill itself with a translate
+                // is not available here — switch-rise owns `transform` on
+                // this subtree, and a scale on the pill would fight it.
+                className="pointer-events-none absolute flex justify-center"
+                style={{ left: 0, top: -198, marginLeft: -90, width: 180 }}
+              >
+                <span
+                  className="whitespace-nowrap rounded-full bg-elevated px-3 py-1.5 text-[13px] font-bold text-foreground shadow-lg ring-1 ring-border"
+                  style={{
+                    opacity: activeIdx === null ? 0 : 1,
+                    transform: `scale(${activeIdx === null ? 0.92 : 1})`,
+                    transition:
+                      "opacity 160ms ease-out, transform 220ms cubic-bezier(0.16,1,0.3,1)",
+                  }}
+                >
+                  {activeIdx === null ? "\u00a0" : ordered[activeIdx].label}
+                </span>
+              </span>
+            )}
           </div>
         </>
       )}

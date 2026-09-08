@@ -44,9 +44,21 @@ const DURATIONS = [15, 30, 60];
  * uses — because the camera stream must survive switching modes, and a route
  * change would tear it down and re-prompt for permission.
  */
-export function CreateScreen({ userId }: { userId: string }) {
+export function CreateScreen({
+  userId,
+  initialMode = "shot",
+}: {
+  userId: string;
+  /**
+   * Which mode to land in. Shot is the default because it is what the camera
+   * is already pointed at; holding (+) picks a different one, and arriving on
+   * the wrong tab and having to switch would undo the whole point of the
+   * shortcut.
+   */
+  initialMode?: CreateMode;
+}) {
   const router = useRouter();
-  const [mode, setMode] = useState<CreateMode>("shot");
+  const [mode, setMode] = useState<CreateMode>(initialMode);
   const [maxSeconds, setMaxSeconds] = useState(DURATIONS[0]);
   const [track, setTrack] = useState<Track | null>(null);
   const [trackOpen, setTrackOpen] = useState(false);
