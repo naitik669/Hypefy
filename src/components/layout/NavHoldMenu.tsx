@@ -195,13 +195,20 @@ export function NavHoldMenu({
 
       {open && (
         <>
-          {/* Veil, portalled so it covers the app rather than the nav bar it
-              is rendered inside. Only interactive once detached — during a
-              live drag the pointer is captured and never reaches it. */}
+          {/* Portalled because the nav carries backdrop-blur, which makes it
+              the containing block for fixed children — rendered in place this
+              dimmed the tab bar and nothing else.
+
+              z-25 puts it UNDER the nav (z-30). The tiles live inside the nav,
+              and the nav is its own stacking context, so their z-50 is capped
+              at 30 against the root: a veil at z-40 sits ON TOP of them and
+              blurs the very options being chosen. AccountSwitchPad documents
+              this exact trap and I walked into it anyway — hence the identical
+              value here rather than a fresh guess. */}
           {typeof document !== "undefined" &&
             createPortal(
               <div
-                className="animate-fade-in fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
+                className="animate-switch-veil fixed inset-0 z-[25] bg-black/55 backdrop-blur-[2px]"
                 aria-hidden
                 onPointerDown={detached ? close : undefined}
               />,

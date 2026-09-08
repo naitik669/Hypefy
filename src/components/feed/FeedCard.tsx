@@ -905,8 +905,33 @@ export function FeedCard({
         initialImageIdx={imgIdx}
       />
 
-      {/* Held, not opened — it lives only as long as the finger is down. */}
-      {peekSrc && <PostPeek src={peekSrc} onClose={() => setPeekSrc(null)} />}
+      {/* Opened by a hold and it stays. Given the card's own author, caption
+          and actions so it is a post you can act on, not just a bigger photo
+          you have to dismiss before you can do anything about it. */}
+      {peekSrc && (
+        <PostPeek
+          src={peekSrc}
+          author={{
+            id: post.user_id,
+            name,
+            username: username ?? null,
+            avatarUrl: profile?.avatar_url ?? null,
+            hue,
+            verified: !!profile?.is_verified,
+          }}
+          caption={post.caption ?? null}
+          currentUserId={uid}
+          hyped={hyped}
+          hypeCount={hypeCount}
+          commentCount={commentCount}
+          saved={saved}
+          onHype={toggleHype}
+          onComment={() => setCommentsOpen(true)}
+          onShare={() => setShareOpen(true)}
+          onSave={toggleSave}
+          onClose={() => setPeekSrc(null)}
+        />
+      )}
 
       {/* Pinched. Lifted out of the card because it cannot grow past it in
           place: the feed virtualises with content-visibility, which paints
