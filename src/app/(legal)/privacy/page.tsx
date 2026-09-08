@@ -6,16 +6,11 @@ export default function PrivacyPage() {
       <h1>Privacy Policy</h1>
       <p className="text-xs text-faint">Last updated: July 27, 2026</p>
 
-      <p className="rounded-xl border border-border bg-surface p-3 text-xs text-muted">
-        Placeholders shown in [brackets] must be completed with your registered
-        legal details before public launch, and this policy should be reviewed by
-        a qualified privacy professional. It is drafted for an operator based in
-        India (Digital Personal Data Protection Act, 2023) and to a global standard
-        aligned with the GDPR.
-      </p>
-
       <p>
-        This Privacy Policy explains how [Legal Entity Name] (&quot;Hypefy,&quot;
+        This Privacy Policy explains how Hypefy Platform Private Limited (CIN
+        U62011UP2026PTC250914), a company incorporated in India with its
+        registered office at House No. 420, Sambhal Road, Taharpur, Moradabad,
+        Uttar Pradesh 244001 (&quot;Hypefy,&quot;
         &quot;we,&quot; &quot;us&quot;) collects, uses, shares, and protects your
         personal data when you use the Hypefy applications and services (the
         &quot;Service&quot;), and the choices and rights you have. We act as the
@@ -175,9 +170,12 @@ export default function PrivacyPage() {
       <h2>13. Contact and Grievance Officer</h2>
       <p>Privacy questions or data requests:</p>
       <ul>
-        <li>General: <a href="mailto:[privacy@hypefy.chat]" className="text-accent">[privacy@hypefy.chat]</a></li>
-        <li>Grievance Officer: [Grievance Officer Name], <a href="mailto:[grievance@hypefy.chat]" className="text-accent">[grievance@hypefy.chat]</a></li>
-        <li>Address: [Registered Address]</li>
+        <li>General: <a href="mailto:privacy@hypefy.chat" className="text-accent">privacy@hypefy.chat</a></li>
+        <li>Grievance Officer: [Grievance Officer Name], <a href="mailto:grievance@hypefy.chat" className="text-accent">grievance@hypefy.chat</a></li>
+        <li>
+          Address: Hypefy Platform Private Limited, House No. 420, Sambhal Road,
+          Taharpur, Moradabad, Uttar Pradesh 244001, India
+        </li>
       </ul>
     </>
   );

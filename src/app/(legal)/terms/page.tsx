@@ -6,17 +6,26 @@ export default function TermsPage() {
       <h1>Terms of Service</h1>
       <p className="text-xs text-faint">Last updated: July 27, 2026</p>
 
+      {/* One placeholder is left: the Grievance Officer's name, in section 12.
+          It is a statutory disclosure under the IT Rules 2021, so this banner
+          stays visible until it is filled — and then this whole block should
+          go, because a note addressed to the operator does not belong on a
+          published legal page. */}
       <p className="rounded-xl border border-border bg-surface p-3 text-xs text-muted">
-        Placeholders shown in [brackets] must be completed with your registered
-        legal details before public launch, and these Terms should be reviewed by
-        a qualified lawyer in your jurisdiction. They are drafted for an operator
-        based in India and to a global standard of practice.
+        Our Grievance Officer is being appointed; their name will be published
+        here shortly. In the meantime, grievances reach us at{" "}
+        <a href="mailto:grievance@hypefy.chat" className="text-accent">
+          grievance@hypefy.chat
+        </a>{" "}
+        and are handled to the timelines in section 12.
       </p>
 
       <p>
         These Terms of Service (the &quot;Terms&quot;) are a binding agreement
-        between you and [Legal Entity Name], a company incorporated in India with
-        its registered office at [Registered Address] (&quot;Hypefy,&quot;
+        between you and Hypefy Platform Private Limited (CIN
+        U62011UP2026PTC250914), a company incorporated in India with its
+        registered office at House No. 420, Sambhal Road, Taharpur, Moradabad,
+        Uttar Pradesh 244001, India (&quot;Hypefy,&quot;
         &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), governing your access
         to and use of the Hypefy mobile and web applications and related services
         (together, the &quot;Service&quot;). By creating an account or using the
@@ -124,7 +133,7 @@ export default function TermsPage() {
         <li>Respect copyright in the content you post. Do not upload media you do not have the right to share.</li>
         <li>
           If you believe content on Hypefy infringes your copyright, send a notice
-          to <a href="mailto:[legal@hypefy.chat]" className="text-accent">[legal@hypefy.chat]</a>{" "}
+          to <a href="mailto:legal@hypefy.chat" className="text-accent">legal@hypefy.chat</a>{" "}
           identifying the work concerned, the infringing URL, your contact details,
           and a good-faith statement that the use is not authorized. We remove
           infringing content promptly and may terminate repeat infringers.
@@ -187,9 +196,12 @@ export default function TermsPage() {
         Protection Act, 2023, our Grievance Officer is:
       </p>
       <ul>
-        <li>Name: [Grievance Officer Name]</li>
-        <li>Email: <a href="mailto:[grievance@hypefy.chat]" className="text-accent">[grievance@hypefy.chat]</a></li>
-        <li>Address: [Registered Address]</li>
+        <li>Name: to be appointed (see the note at the top of this page)</li>
+        <li>Email: <a href="mailto:grievance@hypefy.chat" className="text-accent">grievance@hypefy.chat</a></li>
+        <li>
+          Address: Hypefy Platform Private Limited, House No. 420, Sambhal Road,
+          Taharpur, Moradabad, Uttar Pradesh 244001, India
+        </li>
       </ul>
       <p>
         We acknowledge grievances within 24 hours and aim to resolve them within 15
@@ -200,7 +212,8 @@ export default function TermsPage() {
       <h2>13. Governing law and dispute resolution</h2>
       <p>
         These Terms are governed by the laws of India, without regard to conflict
-        of law principles. Subject to applicable law, the courts at [City], India
+        of law principles. Subject to applicable law, the courts at Moradabad,
+        Uttar Pradesh, India
         will have exclusive jurisdiction over disputes arising from these Terms or
         the Service. Where permitted, we may first seek to resolve disputes through
         good-faith negotiation.
