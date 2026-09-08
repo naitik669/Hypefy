@@ -1,0 +1,26 @@
+-- Regression fix for 0055.
+--
+-- 0055 put public.is_admin() into the SELECT policies for posts, shots, shows,
+-- comments and messages, so a moderator can still see content they have taken
+-- down. But `anon` has never had EXECUTE on it, and a policy is evaluated as
+-- the CALLING role -- so every anonymous read of those tables failed with
+-- "permission denied for function is_admin".
+--
+-- The important part: that is an ERROR, not a filtered-to-zero-rows result. A
+-- policy that hides rows degrades quietly; a policy that raises takes the
+-- whole query down. So this broke every logged-out surface at once -- shared
+-- post links (/p/[id]), public profiles (/u/[username]), Shot deep links, and
+-- any server render that happens before a session is attached.
+--
+-- Verified after applying, as anon: posts 31, shots 5, shows 17, comments 40.
+--
+-- Granting EXECUTE to anon discloses nothing. The body is
+--   coalesce((select is_admin from profiles where id = auth.uid()), false)
+-- and auth.uid() is null for anon, so it returns false and the branch it
+-- guards is never taken.
+--
+-- Still denied to anon, deliberately: is_conv_member(), used by the
+-- conversations/messages policies. Nothing reads DMs anonymously, so it never
+-- runs in an anon context -- but it is the same shape, and worth knowing about
+-- before anything public is ever built on those tables.
+grant execute on function public.is_admin() to anon;
