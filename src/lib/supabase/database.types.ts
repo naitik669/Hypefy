@@ -2216,6 +2216,7 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: undefined
       }
+      log_security_alert: { Args: { p_body: string }; Returns: undefined }
       mark_notifications_read: { Args: never; Returns: undefined }
       mfa_recovery_codes_remaining: { Args: never; Returns: number }
       publish_due_scheduled_posts: { Args: never; Returns: number }
