@@ -9,6 +9,7 @@ import { AccountSwitchPad } from "@/components/layout/AccountSwitchPad";
 import { createClient } from "@/lib/supabase/client";
 import { haptics } from "@/lib/haptics";
 import { NavHoldMenu, type HoldAction } from "@/components/layout/NavHoldMenu";
+import { ChatHoldMenu } from "@/components/layout/ChatHoldMenu";
 import { Search, Settings, Bookmark, Bell } from "lucide-react";
 
 /**
@@ -28,7 +29,6 @@ const HOME_SHORTCUTS: HoldAction[] = [
   // Settings had none — it was buried behind the profile tab.
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
-
 
 export function BottomNav({
   avatarUrl,
@@ -105,16 +105,19 @@ export function BottomNav({
           />
         </NavHoldMenu>
 
-        {/* Messages with live unread badge */}
-        <Link
-          href="/messages"
-          aria-label="Messages"
-          onClick={() => haptics.tap()}
-          className={`relative flex h-12 w-12 flex-col items-center justify-center gap-1 transition-[color,transform] duration-200 active:scale-90 ${
-            messagesActive ? "text-foreground" : "text-faint hover:text-muted"
-          }`}
-        >
-          {/* A speech bubble, not a paper plane: the plane reads as "send",
+        {/* Messages with live unread badge. Holding raises the last few
+            conversations — the third tab to use the gesture, so the whole nav
+            bar now answers a hold with "where do you actually want to go". */}
+        <ChatHoldMenu currentUserId={currentUserId}>
+          <Link
+            href="/messages"
+            aria-label="Messages"
+            onClick={() => haptics.tap()}
+            className={`relative flex h-12 w-12 flex-col items-center justify-center gap-1 transition-[color,transform] duration-200 active:scale-90 ${
+              messagesActive ? "text-foreground" : "text-faint hover:text-muted"
+            }`}
+          >
+            {/* A speech bubble, not a paper plane: the plane reads as "send",
               which is one action inside a thread rather than the inbox itself.
               Plain Chat rather than a dotted variant — dots inside the bubble
               compete with the count sitting on its corner.
@@ -122,27 +125,28 @@ export function BottomNav({
               The badge is positioned against this span, not the whole tab, so
               it lands on the bubble's corner instead of floating in the
               padding above it. */}
-          <span className="relative flex items-center justify-center">
-            <Chat
-              size={26}
-              weight={messagesActive ? "fill" : "regular"}
-              className={`transition-transform duration-300 ${
-                messagesActive ? "-translate-y-0.5 scale-105" : ""
-              }`}
-            />
-            {unreadMsgs > 0 && !messagesActive && (
-              // Red, not accent: a count you have not read is an alert, and
-              // the accent green is the same colour as the active-tab dot
-              // right below it. The background-coloured ring cuts the bubble's
-              // stroke away behind the badge so the two shapes stay readable
-              // where they overlap.
-              <span className="absolute -right-2 -top-1.5 flex h-[18px] min-w-[18px] animate-react-pop items-center justify-center rounded-full bg-danger px-1 text-[10px] font-black leading-none text-white ring-[3px] ring-background">
-                {unreadMsgs > 9 ? "9+" : unreadMsgs}
-              </span>
-            )}
-          </span>
-          <NavDot active={messagesActive} />
-        </Link>
+            <span className="relative flex items-center justify-center">
+              <Chat
+                size={26}
+                weight={messagesActive ? "fill" : "regular"}
+                className={`transition-transform duration-300 ${
+                  messagesActive ? "-translate-y-0.5 scale-105" : ""
+                }`}
+              />
+              {unreadMsgs > 0 && !messagesActive && (
+                // Red, not accent: a count you have not read is an alert, and
+                // the accent green is the same colour as the active-tab dot
+                // right below it. The background-coloured ring cuts the bubble's
+                // stroke away behind the badge so the two shapes stay readable
+                // where they overlap.
+                <span className="absolute -right-2 -top-1.5 flex h-[18px] min-w-[18px] animate-react-pop items-center justify-center rounded-full bg-danger px-1 text-[10px] font-black leading-none text-white ring-[3px] ring-background">
+                  {unreadMsgs > 9 ? "9+" : unreadMsgs}
+                </span>
+              )}
+            </span>
+            <NavDot active={messagesActive} />
+          </Link>
+        </ChatHoldMenu>
 
         {/* center create */}
         <button

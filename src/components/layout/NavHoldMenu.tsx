@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
+import { Avatar } from "@/components/ui/Avatar";
 import { haptics } from "@/lib/haptics";
 
 /** Hold before the stack appears. Matches AccountSwitchPad. */
@@ -12,9 +13,21 @@ const HOLD_MS = 320;
 const CANCEL_SLOP_PX = 10;
 
 export type HoldAction = {
-  icon: LucideIcon;
+  /** Ignored when `avatar` is set. One of the two is required. */
+  icon?: LucideIcon;
   label: string;
   href: string;
+  /**
+   * Renders a person in the tile instead of a glyph.
+   *
+   * The chat shortcuts are people, and a row of identical speech bubbles
+   * would make you read four labels to tell them apart — the whole point of
+   * the gesture is that you can pick without reading. A face is recognisable
+   * at 48px in a way a name is not.
+   */
+  avatar?: { name: string; hue: number; src?: string | null };
+  /** Draws the unread pip on the tile. */
+  unread?: boolean;
 };
 
 /**
@@ -41,11 +54,20 @@ export type HoldAction = {
 export function NavHoldMenu({
   actions,
   label,
+  onArm,
   children,
 }: {
   actions: HoldAction[];
   /** Names the stack for assistive tech, e.g. "Home shortcuts". */
   label: string;
+  /**
+   * Fired the instant the tab is touched, before the hold completes.
+   *
+   * Gives a caller whose actions need fetching the HOLD_MS window to get
+   * them, so the stack is populated by the time it appears — without every
+   * session paying for a query it may never open.
+   */
+  onArm?: () => void;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -134,6 +156,7 @@ export function NavHoldMenu({
   function onPointerDown(e: React.PointerEvent) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     didHold.current = false;
+    onArm?.();
     startY.current = e.clientY;
     startX.current = e.clientX;
     const pid = e.pointerId;
@@ -141,11 +164,15 @@ export function NavHoldMenu({
     clearHold();
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;
+      // Nothing to raise — let the press behave like a plain tap rather than
+      // flashing up an empty panel. The chat stack loads asynchronously, so
+      // this is a real state, not a defensive nicety.
+      if (actions.length === 0) return;
       didHold.current = true;
       const box = triggerRef.current?.getBoundingClientRect();
       if (box) {
         setLabelSide(
-          box.left + box.width / 2 < window.innerWidth / 2 ? "right" : "left",
+          box.left + box.width / 2 < window.innerWidth / 2 ? "right" : "left"
         );
       }
       setOpen(true);
@@ -214,7 +241,7 @@ export function NavHoldMenu({
                 aria-hidden
                 onPointerDown={detached ? close : undefined}
               />,
-              document.body,
+              document.body
             )}
 
           <div
@@ -275,7 +302,9 @@ export function NavHoldMenu({
                       un-padded inner edge cuts. */}
                   <span
                     className={`pointer-events-none absolute overflow-hidden py-2 ${
-                      labelSide === "right" ? "left-full pr-3" : "right-full pl-3"
+                      labelSide === "right"
+                        ? "left-full pr-3"
+                        : "right-full pl-3"
                     }`}
                   >
                     <span
@@ -286,10 +315,13 @@ export function NavHoldMenu({
                         transform: active
                           ? "translate3d(0,0,0)"
                           : labelSide === "right"
-                            ? "translate3d(calc(-100% - 10px), 0, 0)"
-                            : "translate3d(calc(100% + 10px), 0, 0)",
-                        [labelSide === "right" ? "marginLeft" : "marginRight"]: 10,
-                        transition: "transform 260ms cubic-bezier(0.16,1,0.3,1)",
+                          ? "translate3d(calc(-100% - 10px), 0, 0)"
+                          : "translate3d(calc(100% + 10px), 0, 0)",
+                        [labelSide === "right"
+                          ? "marginLeft"
+                          : "marginRight"]: 10,
+                        transition:
+                          "transform 260ms cubic-bezier(0.16,1,0.3,1)",
                       }}
                     >
                       {action.label}
@@ -306,13 +338,26 @@ export function NavHoldMenu({
                     }`}
                   >
                     <span
-                      className={`flex h-12 w-12 items-center justify-center rounded-[16px] border-2 transition-colors duration-200 ${
+                      className={`relative flex h-12 w-12 items-center justify-center overflow-visible rounded-[16px] border-2 transition-colors duration-200 ${
                         active
                           ? "border-accent bg-accent/15 text-accent"
                           : "border-border bg-surface/95 text-foreground"
                       }`}
                     >
-                      <Icon size={21} aria-hidden />
+                      {action.avatar ? (
+                        <Avatar
+                          name={action.avatar.name}
+                          hue={action.avatar.hue}
+                          src={action.avatar.src ?? undefined}
+                          size={38}
+                          className="rounded-[12px]"
+                        />
+                      ) : Icon ? (
+                        <Icon size={21} aria-hidden />
+                      ) : null}
+                      {action.unread && (
+                        <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-danger ring-2 ring-surface" />
+                      )}
                     </span>
                   </div>
                 </div>
