@@ -2,17 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  Star,
-  MessageCircle,
-  Send,
-  Bookmark,
-  MoreHorizontal,
-  Maximize2,
-  Repeat2,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { Star, MessageCircle, Bookmark, MoreHorizontal, Maximize2, Repeat2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ZoomViewer } from "@/components/ui/ZoomViewer";
@@ -825,7 +816,7 @@ export function FeedCard({
             aria-label="Share"
             className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 active:scale-90"
           >
-            <Send size={21} strokeWidth={2.2} />
+            <Plane size={21} weight="bold" />
             {((post as any).share_count ?? 0) > 0 &&
               formatCount((post as any).share_count)}
           </button>

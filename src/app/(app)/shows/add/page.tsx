@@ -3,10 +3,8 @@
 import { useRef, useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import {
-  X, Images, Type, Send, Loader2, User,
-  LayoutGrid, ChevronLeft, ChevronRight, ExternalLink, Music,
-} from "lucide-react";
+import { X, Images, Type, Loader2, User, LayoutGrid, ChevronLeft, ChevronRight, ExternalLink, Music } from "lucide-react";
+import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { LiveCamera } from "@/components/shows/LiveCamera";
 import { Avatar } from "@/components/ui/Avatar";
@@ -521,7 +519,7 @@ export default function AddShowPage() {
             <div className="flex-1" />
             <button type="button" onClick={share} disabled={pending} aria-label="Share to your Show"
               className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-ink shadow-lg transition-transform active:scale-95 disabled:opacity-60">
-              {pending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+              {pending ? <Loader2 size={20} className="animate-spin" /> : <Plane size={20} weight="fill" />}
             </button>
           </div>
         </>

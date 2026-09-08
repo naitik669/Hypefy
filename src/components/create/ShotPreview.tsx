@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Send, Music } from "lucide-react";
+import { ArrowLeft, Music } from "lucide-react";
+import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { extractHashtags } from "@/lib/content-utils";
@@ -248,7 +249,7 @@ export function ShotPreview({
             className="flex items-center gap-2 rounded-pill bg-accent px-6 py-3 text-sm font-bold text-accent-ink transition active:scale-95 disabled:opacity-50"
           >
             {busy ? "Posting…" : mode === "show" ? "Add to Show" : "Post Shot"}
-            {!busy && <Send size={15} />}
+            {!busy && <Plane size={15} weight="fill" />}
           </button>
         </div>
       </div>

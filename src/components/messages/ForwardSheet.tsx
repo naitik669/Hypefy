@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Check, Loader2, Share } from "lucide-react";
+import { Search, Check, Loader2 } from "lucide-react";
+import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
@@ -133,7 +134,7 @@ export function ForwardSheet({
             <Loader2 size={22} className="animate-spin text-faint" />
           </div>
         ) : visible.length === 0 ? (
-          <EmptyState icon={Share} title="No one to forward to" text="Follow people to message them." variant="compact" />
+          <EmptyState icon={Plane} title="No one to forward to" text="Follow people to message them." variant="compact" />
         ) : (
           visible.map((f) => {
             const name = f.display_name ?? f.username ?? "User";

@@ -2,10 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  X, Send, Star, ChevronLeft, ChevronRight, ExternalLink,
-  MoreHorizontal, Trash2, Bookmark, BookmarkCheck, Loader2, FileText, Eye, Flag, Ban,
-} from "lucide-react";
+import { X, Star, ChevronLeft, ChevronRight, ExternalLink, MoreHorizontal, Trash2, Bookmark, BookmarkCheck, Loader2, FileText, Eye, Flag, Ban } from "lucide-react";
+import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ShowViewersSheet } from "@/components/shows/ShowViewersSheet";
@@ -648,7 +646,7 @@ function ShowScreen({
               onClick={(e) => { e.stopPropagation(); sendReply(); }}
               className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink transition-transform active:scale-90 disabled:opacity-40"
             >
-              {sendingReply ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+              {sendingReply ? <Loader2 size={18} className="animate-spin" /> : <Plane size={18} weight="fill" />}
             </button>
           </div>
         </div>

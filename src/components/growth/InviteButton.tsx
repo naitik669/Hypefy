@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Share2, Check, UserPlus, ChevronRight } from "lucide-react";
+import { Check, UserPlus, ChevronRight } from "lucide-react";
+import { Plane } from "@/components/ui/Plane";
 import { haptics } from "@/lib/haptics";
 
 const SITE = "https://app.hypefy.chat";
@@ -40,7 +41,7 @@ export function InviteIconButton({ username }: { username: string | null }) {
       }}
       className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-elevated text-foreground transition-colors hover:bg-elevated/70 active:scale-[0.99]"
     >
-      {copied ? <Check size={18} className="text-accent" /> : <Share2 size={18} />}
+      {copied ? <Check size={18} className="text-accent" /> : <Plane size={18} weight="bold" />}
     </button>
   );
 }

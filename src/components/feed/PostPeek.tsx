@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Heart, MessageCircle, Send, Bookmark } from "lucide-react";
+import { Star, MessageCircle, Bookmark } from "lucide-react";
+import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { Avatar } from "@/components/ui/Avatar";
@@ -216,13 +217,16 @@ export function PostPeek({
               label={hyped ? "Remove hype" : "Hype"}
               count={hypeCount}
               active={hyped}
+              activeClass="text-hype"
               onClick={() => {
                 onHype();
               }}
             >
-              <Heart
+              <Star
                 size={22}
-                className={hyped ? "fill-accent text-accent" : ""}
+                strokeWidth={2.2}
+                className={hyped ? "text-hype" : ""}
+                fill={hyped ? "currentColor" : "none"}
               />
             </PeekAction>
 
@@ -244,7 +248,7 @@ export function PostPeek({
                 onShare();
               }}
             >
-              <Send size={21} />
+              <Plane size={21} weight="bold" />
             </PeekAction>
 
             <div className="flex-1" />
@@ -277,12 +281,15 @@ function PeekAction({
   label,
   count,
   active = false,
+  activeClass = "text-accent",
   onClick,
   children,
 }: {
   label: string;
   count?: number;
   active?: boolean;
+  /** Hype is yellow, saving is green — the count has to follow its own icon. */
+  activeClass?: string;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -292,7 +299,7 @@ function PeekAction({
       aria-label={label}
       onClick={onClick}
       className={`flex h-10 items-center gap-1.5 rounded-full px-2 transition-colors active:scale-95 ${
-        active ? "text-accent" : "text-foreground hover:bg-white/5"
+        active ? activeClass : "text-foreground hover:bg-white/5"
       }`}
     >
       {children}

@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Star, MessageCircle, Send, Play, Compass, Bell } from "lucide-react";
+import { ArrowRight, Star, MessageCircle, Play, Compass, Bell } from "lucide-react";
+import { Plane } from "@/components/ui/Plane";
 import { Avatar } from "@/components/ui/Avatar";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 
@@ -336,7 +337,7 @@ function MockProfile() {
             Edit profile
           </div>
           <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted">
-            <Send size={15} />
+            <Plane size={15} />
           </div>
         </div>
       </div>
@@ -411,7 +412,7 @@ function WelcomeVisual() {
               <span className="text-[11px] font-bold">2.4k</span>
             </span>
             <MessageCircle size={15} className="text-muted" />
-            <Send size={14} className="text-muted" />
+            <Plane size={14} className="text-muted" />
           </div>
         </div>
       </div>
@@ -554,7 +555,7 @@ function BgPost({ post }: { post: BgPostData }) {
         <Star size={13} className="fill-hype text-hype" />
         <span className="text-[10px] font-bold">{post.hypes}</span>
         <MessageCircle size={12} className="text-muted" />
-        <Send size={11} className="text-muted" />
+        <Plane size={11} className="text-muted" />
       </div>
     </div>
   );
@@ -601,7 +602,7 @@ function MockPostCard() {
           <span className="text-[15px] font-bold">2.4k</span>
         </span>
         <MessageCircle size={23} className="text-muted" />
-        <Send size={22} className="text-muted" />
+        <Plane size={22} className="text-muted" />
       </div>
     </div>
   );
@@ -683,7 +684,7 @@ function ReelCard({ data, w, h, active = false }: { data: ReelData; w: number; h
           <span className="text-[10px] font-semibold">{data.hypes}</span>
         </span>
         <MessageCircle size={big ? 22 : 18} />
-        <Send size={big ? 20 : 16} />
+        <Plane size={big ? 20 : 16} />
       </div>
 
       {/* Author + caption */}

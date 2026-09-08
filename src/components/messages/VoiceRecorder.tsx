@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Pause, Play, Send, Trash2, Loader2 } from "lucide-react";
+import { Pause, Play, Trash2, Loader2 } from "lucide-react";
+import { Plane } from "@/components/ui/Plane";
 
 type Status = "idle" | "recording" | "paused" | "sending";
 
@@ -270,7 +271,7 @@ export function VoiceRecorder({ onSend, onCancel, onStatusChange }: Props) {
       >
         {isSending
           ? <Loader2 size={18} className="animate-spin" />
-          : <Send size={18} />
+          : <Plane size={18} weight="fill" />
         }
       </button>
     </div>

@@ -9,17 +9,8 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import {
-  Star,
-  Send,
-  Loader2,
-  Flag,
-  Check,
-  ChevronDown,
-  Trash2,
-  CornerUpLeft,
-  Copy,
-} from "lucide-react";
+import { Star, Loader2, Flag, Check, ChevronDown, Trash2, CornerUpLeft, Copy } from "lucide-react";
+import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
@@ -797,7 +788,7 @@ function Composer({
           {posting ? (
             <Loader2 size={16} className="animate-spin" />
           ) : (
-            <Send size={16} />
+            <Plane size={16} weight="fill" />
           )}
         </button>
       </div>

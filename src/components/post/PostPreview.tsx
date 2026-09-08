@@ -1,6 +1,7 @@
 "use client";
 
-import { Star, MessageCircle, Send, Bookmark, ImageIcon } from "lucide-react";
+import { Star, MessageCircle, Bookmark, ImageIcon } from "lucide-react";
+import { Plane } from "@/components/ui/Plane";
 import { Avatar } from "@/components/ui/Avatar";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { TrackChip } from "@/components/music/TrackChip";
@@ -88,7 +89,7 @@ export function PostPreview({
           <div aria-hidden className="flex items-center gap-3 px-3 pt-2.5 text-faint">
             <Star size={16} />
             <MessageCircle size={16} />
-            <Send size={16} />
+            <Plane size={16} weight="bold" />
             <span className="flex-1" />
             <Bookmark size={16} />
           </div>

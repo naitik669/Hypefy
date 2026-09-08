@@ -26,8 +26,8 @@ export type HoldAction = {
    * at 48px in a way a name is not.
    */
   avatar?: { name: string; hue: number; src?: string | null };
-  /** Draws the unread pip on the tile. */
-  unread?: boolean;
+  /** Unread messages waiting in this thread. 0 or absent draws nothing. */
+  unread?: number;
 };
 
 /**
@@ -355,8 +355,16 @@ export function NavHoldMenu({
                       ) : Icon ? (
                         <Icon size={21} aria-hidden />
                       ) : null}
-                      {action.unread && (
-                        <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-danger ring-2 ring-surface" />
+                      {!!action.unread && (
+                        // A bare dot said "something happened" and stopped
+                        // there, which is the one thing you already knew.
+                        // Capped at 5+ because past five the exact number
+                        // stops changing what you do about it — and a
+                        // three-digit count would not fit the corner of a
+                        // 48px tile anyway.
+                        <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-black leading-none text-accent-ink ring-2 ring-background">
+                          {action.unread > 5 ? "5+" : action.unread}
+                        </span>
                       )}
                     </span>
                   </div>

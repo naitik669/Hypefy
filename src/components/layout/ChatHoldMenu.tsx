@@ -114,7 +114,7 @@ export function ChatHoldMenu({
       // Round two. The member reads only need ids, which round one already
       // settled, so the top-up for missed pins rides alongside them rather
       // than adding a third trip.
-      const [missingRes, peersRes, mineRes] = await Promise.all([
+      const [missingRes, peersRes, mineRes, summaryRes] = await Promise.all([
         missingIds.length > 0
           ? supabase
               .from("conversations")
@@ -130,9 +130,14 @@ export function ChatHoldMenu({
           .neq("user_id", currentUserId),
         supabase
           .from("conversation_members")
-          .select("conversation_id, last_read_at, request_accepted, blocked_at")
+          .select("conversation_id, request_accepted, blocked_at")
           .in("conversation_id", ordered)
           .eq("user_id", currentUserId),
+        // The inbox's own aggregate, so the tile badges agree with the row
+        // counts you would see one tap further in. Comparing last_read_at to
+        // last_message_at was cheaper but could only ever answer yes/no, and
+        // said "unread" for a thread whose last message was your own.
+        supabase.rpc("get_inbox_summary", { p_conversation_ids: ordered }),
       ]);
 
       ((missingRes.data ?? []) as Conv[]).forEach((c) => byId.set(c.id, c));
@@ -160,24 +165,22 @@ export function ChatHoldMenu({
       });
 
       const hidden = new Set<string>();
-      const readAt = new Map<string, string | null>();
       (mineRes.data ?? []).forEach((m) => {
         // A blocked thread or a request you have not accepted is not something
         // to surface one thumb-slide from the inbox.
         if (m.blocked_at || m.request_accepted === false)
           hidden.add(m.conversation_id);
-        readAt.set(m.conversation_id, m.last_read_at);
       });
 
-      // Unread by timestamp rather than by counting messages: the pip only has
-      // to say "something happened here", and this needs no extra query.
-      // It can read as unread for a thread whose last message is your own,
-      // which is a far cheaper mistake than a query per conversation.
-      const isUnread = (id: string, lastAt: string | null) => {
-        if (!lastAt) return false;
-        const seen = readAt.get(id);
-        return !seen || new Date(lastAt) > new Date(seen);
-      };
+      const unreadByConv = new Map<string, number>();
+      (
+        (summaryRes.data ?? []) as {
+          conversation_id: string;
+          unread_count: number | null;
+        }[]
+      ).forEach((r) =>
+        unreadByConv.set(r.conversation_id, r.unread_count ?? 0)
+      );
 
       const next: HoldAction[] = [];
       for (const id of ordered) {
@@ -204,7 +207,7 @@ export function ChatHoldMenu({
                 hue: members[0].hue,
                 src: members[0].src,
               },
-          unread: isUnread(c.id, c.last_message_at),
+          unread: unreadByConv.get(c.id) ?? 0,
         });
         if (next.length === MAX_RECENTS) break;
       }

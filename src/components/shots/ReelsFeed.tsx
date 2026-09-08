@@ -3,23 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Star,
-  MessageCircle,
-  Send,
-  Bookmark,
-  Volume2,
-  VolumeX,
-  Play,
-  Pause,
-  ChevronLeft,
-  MoreHorizontal,
-  Trash2,
-  BookmarkCheck,
-  Loader2,
-  Flag,
-  Ban,
-} from "lucide-react";
+import { Star, MessageCircle, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban } from "lucide-react";
+import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
@@ -900,7 +885,7 @@ function ReelCard({
         </RailButton>
 
         <RailButton label="Share" onClick={() => setShareOpen(true)}>
-          <Send size={29} className="text-white" />
+          <Plane size={29} weight="bold" className="text-white" />
         </RailButton>
 
         <RailButton label="Save" onClick={toggleSave} disabled={savePending}>
