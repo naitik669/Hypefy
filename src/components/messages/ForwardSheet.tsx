@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type Friend = {
   id: string;
@@ -37,6 +38,7 @@ export function ForwardSheet({
   msg: ForwardableMsg | null;
 }) {
   const supabase = createClient();
+  const toast = useToast();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
@@ -77,7 +79,15 @@ export function ForwardSheet({
     if (!msg || busy || sentTo.has(friend.id)) return;
     setBusy(friend.id);
     const { data: convId, error: convErr } = await supabase.rpc("get_or_create_dm", { p_other: friend.id });
-    if (convErr || !convId) { setBusy(null); return; }
+    if (convErr || !convId) {
+      setBusy(null);
+      // Both failure paths here used to just clear the spinner: the row went
+      // back to how it looked before, so a block or a dropped connection was
+      // indistinguishable from not having tapped at all — and the obvious
+      // response is to tap again, which fails the same silent way.
+      toast(convErr?.message ?? "Couldn't open a chat with them.", "error");
+      return;
+    }
     const body =
       msg.kind === "text" && msg.body ? `↪️ Forwarded: ${msg.body}` : msg.body;
     const { error } = await supabase.rpc("send_message", {
@@ -89,7 +99,11 @@ export function ForwardSheet({
       p_shot_id: msg.shot_id ?? undefined,
     });
     setBusy(null);
-    if (!error) setSentTo((s) => new Set(s).add(friend.id));
+    if (error) {
+      toast(error.message, "error");
+      return;
+    }
+    setSentTo((s) => new Set(s).add(friend.id));
   }
 
   const q = query.trim().toLowerCase();

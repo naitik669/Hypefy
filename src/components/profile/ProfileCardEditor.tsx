@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, GripVertical, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/ui/ToastProvider";
+import { scheduleUndoable } from "@/lib/undoable";
 import {
   CARD_LAYOUTS,
   CARD_THEMES,
@@ -41,6 +43,7 @@ export function ProfileCardEditor({
   onDone: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
+  const toast = useToast();
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
@@ -97,16 +100,30 @@ export function ProfileCardEditor({
     setUrl("");
   }
 
-  async function removeLink(id: string) {
+  function removeLink(id: string) {
     const before = links;
-    // Optimistic: the row is gone from view immediately, restored if the
-    // delete fails.
+    // The row leaves the list at once and the DELETE is held for a few
+    // seconds. It used to fire immediately, and a link is a URL you pasted
+    // from somewhere else — getting it back means going and finding it again.
+    // Deferring rather than reversing, because a DELETE cannot be undone once
+    // it has run; this is the same shape posts, comments and Shots use.
     onChange({ links: links.filter((l) => l.id !== id) });
-    const { error: err } = await supabase.from("profile_links").delete().eq("id", id);
-    if (err) {
-      onChange({ links: before });
-      setError("Could not remove that link.");
-    }
+
+    const cancel = scheduleUndoable(async () => {
+      const { error: err } = await supabase.from("profile_links").delete().eq("id", id);
+      if (err) {
+        onChange({ links: before });
+        setError("Could not remove that link.");
+      }
+    });
+
+    toast("Link removed", "plain", {
+      label: "Undo",
+      onClick: () => {
+        cancel();
+        onChange({ links: before });
+      },
+    });
   }
 
   async function saveLook(next: { layout?: CardLayout; theme?: string }) {

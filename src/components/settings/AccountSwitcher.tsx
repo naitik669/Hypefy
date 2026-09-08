@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check, Plus, X, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   getSavedAccounts,
   upsertSavedAccount,
@@ -17,6 +18,7 @@ export function AccountSwitcher() {
   const [accounts, setAccounts] = useState<SavedAccount[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [switching, setSwitching] = useState<string | null>(null);
+  const [confirmForget, setConfirmForget] = useState<SavedAccount | null>(null);
 
   // On mount: save current session into localStorage so it shows in the list
   useEffect(() => {
@@ -66,6 +68,7 @@ export function AccountSwitcher() {
   }
 
   function forget(userId: string) {
+    setConfirmForget(null);
     removeSavedAccount(userId);
     setAccounts(getSavedAccounts());
   }
@@ -122,7 +125,7 @@ export function AccountSwitcher() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => forget(account.userId)}
+                  onClick={() => setConfirmForget(account)}
                   aria-label="Remove account"
                   className="flex h-7 w-7 items-center justify-center rounded-full text-faint transition-colors hover:bg-danger/10 hover:text-danger"
                 >
@@ -143,6 +146,21 @@ export function AccountSwitcher() {
         <Plus size={18} />
         Add account
       </Link>
+
+      {/* The × sits a few pixels from "Switch" and used to fire on the first
+          tap. Getting the account back means signing in with the password
+          again, which is the whole thing this list exists to avoid. */}
+      <ConfirmDialog
+        open={confirmForget !== null}
+        onClose={() => setConfirmForget(null)}
+        onConfirm={() => {
+          if (confirmForget) forget(confirmForget.userId);
+        }}
+        icon={X}
+        title={`Forget ${confirmForget?.displayName ?? (confirmForget?.username ? "@" + confirmForget.username : "this account")}?`}
+        body="It goes from this device's quick-switch list. The account itself is untouched — you'll just need the password to add it back."
+        confirmLabel="Forget"
+      />
     </div>
   );
 }
