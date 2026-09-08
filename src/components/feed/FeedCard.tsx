@@ -26,6 +26,7 @@ import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
 import { EditPostSheet } from "@/components/feed/EditPostSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
+import { HypeBreak } from "@/components/feed/HypeBreak";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { HyperStar } from "@/components/ui/HyperStar";
 import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
@@ -141,6 +142,8 @@ export function FeedCard({
   const [hypePending, setHypePending] = useState(false);
   const [hypeBurst, setHypeBurst] = useState(false);
   const [showParticles, setShowParticles] = useState(false);
+  /** Un-hyping: the star snaps in two and the halves fall. */
+  const [hypeBreak, setHypeBreak] = useState(false);
   const [saveBurst, setSaveBurst] = useState(false);
 
   const [saved, setSaved] = useState(post.initialSaved ?? false);
@@ -490,6 +493,12 @@ export function FeedCard({
       setShowParticles(true);
       setTimeout(() => setHypeBurst(false), 380);
       setTimeout(() => setShowParticles(false), 640);
+    } else {
+      // Taking it back used to be silent, which made the destructive half of
+      // the toggle the one with no feedback.
+      haptics.tap();
+      setHypeBreak(true);
+      setTimeout(() => setHypeBreak(false), 520);
     }
     try {
       const { data, error } = await supabase.rpc("toggle_hype", {
@@ -788,11 +797,12 @@ export function FeedCard({
                 size={23}
                 strokeWidth={2.2}
                 className={`${
-                  hypeBurst ? "animate-hype-burst" : ""
+                  hypeBurst ? "animate-hype-burst" : hypeBreak ? "animate-hype-crack" : ""
                 } transition-colors ${hyped ? "text-hype" : "text-foreground"}`}
                 fill={hyped ? "currentColor" : "none"}
               />
               {showParticles && <HypeParticles size={9} />}
+              {hypeBreak && <HypeBreak size={23} />}
             </span>
             <span className={hyped ? "text-hype" : "text-foreground"}>
               {formatCount(hypeCount)}

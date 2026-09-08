@@ -592,6 +592,38 @@ body {
   animation: hype-particle 0.6s ease-out forwards;
 }
 
+/* Taking a hype back: the star splits down the middle and the halves drop.
+   Mirrored keyframes rather than one shared with a flipped sign, because the
+   two pieces should not fall identically -- a perfectly symmetric break reads
+   as a wipe, a slightly uneven one reads as something snapping. */
+@keyframes hype-break-left {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  30% { transform: translate(-3px, -2px) rotate(-8deg); opacity: 1; }
+  100% { transform: translate(-9px, 13px) rotate(-38deg); opacity: 0; }
+}
+@keyframes hype-break-right {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  30% { transform: translate(3px, -1px) rotate(6deg); opacity: 1; }
+  100% { transform: translate(10px, 15px) rotate(31deg); opacity: 0; }
+}
+.animate-hype-break-left {
+  animation: hype-break-left 0.5s cubic-bezier(0.36, 0, 0.66, -0.2) forwards;
+}
+.animate-hype-break-right {
+  animation: hype-break-right 0.5s cubic-bezier(0.36, 0, 0.66, -0.2) forwards;
+}
+
+/* The icon itself flinches as the halves leave, so the break looks like it
+   happened TO the star rather than beside it. */
+@keyframes hype-crack {
+  0% { transform: scale(1); }
+  35% { transform: scale(0.82) rotate(-4deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.animate-hype-crack {
+  animation: hype-crack 0.4s ease-out;
+}
+
 /* Slow rotation for the dashed HypefyMark (loaders / empty states) */
 @keyframes spin-slow {
   to {
@@ -828,6 +860,9 @@ body {
   .animate-twinkle,
   .animate-hype-pop,
   .animate-hype-particle,
+  .animate-hype-break-left,
+  .animate-hype-break-right,
+  .animate-hype-crack,
   .animate-spin-slow,
   .animate-mascot-float,
   .animate-mascot-blink,

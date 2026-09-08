@@ -25,6 +25,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
+import { HypeBreak } from "@/components/feed/HypeBreak";
 import { formatCount } from "@/lib/format";
 import { ExpandableText } from "@/components/ui/ExpandableText";
 import { haptics } from "@/lib/haptics";
@@ -430,6 +431,9 @@ function ReelCard({
   // Double-tap-to-Hype (animations mirror the feed: 380ms burst + 640ms particles)
   const [hypeBurst, setHypeBurst] = useState(false);
   const [showParticles, setShowParticles] = useState(false);
+  // Un-hyping had no feedback at all, so the destructive half of the toggle was
+  // the silent one. The star snaps in two on the way back down.
+  const [hypeBreak, setHypeBreak] = useState(false);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTap = useRef(0);
 
@@ -543,6 +547,10 @@ function ReelCard({
       setShowParticles(true);
       setTimeout(() => setHypeBurst(false), 380);
       setTimeout(() => setShowParticles(false), 640);
+    } else {
+      haptics.tap();
+      setHypeBreak(true);
+      setTimeout(() => setHypeBreak(false), 520);
     }
     try {
       const { data, error } = await supabase.rpc("toggle_hype", {
@@ -870,12 +878,17 @@ function ReelCard({
           <span className="relative">
             <Star
               size={32}
-              className={`${hypeBurst ? "animate-hype-burst" : ""} ${
-                hyped ? "text-hype" : "text-white"
-              }`}
+              className={`${
+                hypeBurst
+                  ? "animate-hype-burst"
+                  : hypeBreak
+                    ? "animate-hype-crack"
+                    : ""
+              } ${hyped ? "text-hype" : "text-white"}`}
               fill={hyped ? "currentColor" : "none"}
             />
             {showParticles && <HypeParticles size={10} />}
+            {hypeBreak && <HypeBreak size={32} />}
           </span>
         </RailButton>
 
