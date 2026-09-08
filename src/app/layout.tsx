@@ -7,7 +7,6 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { PostAuthTasks } from "@/components/auth/PostAuthTasks";
 import { SavedAccountSync } from "@/components/auth/SavedAccountSync";
-import { AppSplash } from "@/components/layout/AppSplash";
 
 /**
  * Kept to things the app actually does. A splash is the first thing a new
@@ -109,32 +108,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        {/* Must precede the splash markup so the attribute is set before it
-            would ever be painted. */}
-        <script dangerouslySetInnerHTML={{ __html: SPLASH_BOOT }} />
-
-        {/* Server-rendered into the first HTML, which is the whole point: it
-            paints before hydration and before the (app) layout's auth and
-            profile queries resolve. Mounted inside that layout it could only
-            have appeared after all of them, which is not a splash.
-
-            AppSplash never re-renders this — it flips data-splash on <html>
-            and CSS does the rest, so there is no DOM removal and no
-            hydration mismatch. */}
-        <div id="hypefy-splash" aria-hidden>
-          <span className="text-[2.6rem] leading-none font-extrabold tracking-[-0.04em]">
-            Hypefy<span className="text-accent">.</span>
-          </span>
-          <div className="absolute bottom-16 px-10">
-            <p className="text-center text-[11px] font-bold tracking-[0.2em] text-faint uppercase">
-              Did you know
-            </p>
-            <p className="mt-2 max-w-[280px] text-center text-sm leading-relaxed text-muted">
-              {SPLASH_FACTS[Math.floor(Math.random() * SPLASH_FACTS.length)]}
-            </p>
-          </div>
-        </div>
-        <AppSplash />
+        {/* The opening splash is removed for now, at request. Everything it
+            needed is still here and unreferenced — SPLASH_BOOT, SPLASH_FACTS,
+            AppSplash and the #hypefy-splash rules in globals.css — so putting
+            it back is re-adding two lines rather than rebuilding it. */}
         {/* Page views + custom events. Renders nothing and no-ops off
             Vercel, so local dev and the Android build are unaffected.
             The native shell loads app.hypefy.chat, so app traffic is measured

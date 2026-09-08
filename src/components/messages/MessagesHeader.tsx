@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, PenSquare, Plus, Check, Loader2, Phone } from "lucide-react";
+import { ChevronDown, Plus, Check, Loader2, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { getSavedAccounts, upsertSavedAccount, removeSavedAccount, type SavedAccount } from "@/lib/saved-accounts";
@@ -91,12 +91,15 @@ export function MessagesHeader({
           <Phone size={21} />
         </Link>
 
+        {/* A filled accent "+" rather than an outline pencil. Starting a chat
+            is the one thing you come here to DO, and it now reads as the
+            primary action instead of one more grey glyph beside the phone. */}
         <Link
           href="/messages/new"
           aria-label="New message"
-          className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5"
+          className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-ink transition-transform active:scale-90"
         >
-          <PenSquare size={22} />
+          <Plus size={20} strokeWidth={2.5} />
         </Link>
       </div>
 

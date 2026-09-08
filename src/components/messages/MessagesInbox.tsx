@@ -528,14 +528,10 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
 
   return (
     <>
-      {/* Large title. The sticky bar above stays the compact account switcher,
-          so this scrolls away the way a large title is supposed to. */}
-      <div className="flex items-baseline justify-between px-4 pb-1 pt-3">
-        <h1 className="text-[28px] font-extrabold leading-none tracking-tight">Messages</h1>
-        {unreadCount > 0 && (
-          <span className="text-xs font-bold text-accent">{unreadCount} unread</span>
-        )}
-      </div>
+      {/* The large "Messages" title used to sit here, under a sticky bar that
+          already says @username. Two headers stacked on one screen, and the
+          big one pushed the actual conversations below the fold. The unread
+          count went with it — the bottom nav badges it, so nothing is lost. */}
 
       {/* Search */}
       <div className="px-4 pt-3">

@@ -634,6 +634,11 @@ export function FeedCard({
         <div
           ref={galleryRef}
           className="group relative mx-4 overflow-hidden rounded-2xl"
+          // Tells SwipeNav this element owns its sideways drags. It is
+          // overflow-hidden with a JS transform, so nothing about its computed
+          // style identifies it as a carousel — without this, swiping between
+          // a post's photos was read as a tab swipe and landed you in Messages.
+          data-hswipe=""
           onTouchStart={onGalleryTouchStart}
           onTouchMove={onGalleryTouchMove}
           onTouchEnd={onGalleryTouchEnd}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Compass, Search } from "lucide-react";
+import { Compass } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { FeedTabDropdown } from "@/components/layout/FeedTabDropdown";
@@ -21,8 +21,11 @@ export async function TopBar() {
 
   return (
     <header className="sticky top-0 z-20 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between border-b border-border/60 bg-background/80 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-      {/* Both flanks are the same width so the feed switcher stays centred
-          now that the left side carries two icons rather than one. */}
+      {/* Search briefly sat here beside the compass. Two icons crowded the
+          wordmark and read as bolted on, so it moved to a hold on the Home tab
+          alongside Discover, Activity and Saved — and swiping right from the
+          feed now reaches Discover too. Both flanks stay the same width so the
+          feed switcher is centred on the bar. */}
       <div className="flex w-20 items-center">
         <Link
           href="/discover"
@@ -30,17 +33,6 @@ export async function TopBar() {
           className="flex h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5"
         >
           <Compass size={22} strokeWidth={2.2} />
-        </Link>
-        {/* Search had no icon anywhere in the app: it lived two taps deep,
-            behind the compass, on one screen. It is not a nav destination —
-            it is the thing people reach for — so it sits here instead of
-            costing a bottom-nav slot. */}
-        <Link
-          href="/search"
-          aria-label="Search"
-          className="flex h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5"
-        >
-          <Search size={21} strokeWidth={2.2} />
         </Link>
       </div>
 

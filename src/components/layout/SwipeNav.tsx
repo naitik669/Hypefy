@@ -11,8 +11,13 @@ import { overlayCount } from "@/lib/overlay-stack";
  * Order matches the nav bar left to right. The centre "+" is missing on
  * purpose: it is an action, not a place, and swiping into a fullscreen camera
  * you did not ask for would be alarming.
+ *
+ * /discover is the exception — it has no tab, but it sits to the LEFT of home
+ * so that swiping right from the feed reaches it. Home was the left end of the
+ * list, so that gesture did nothing at all, and Discover was reachable only
+ * through the compass in the top bar.
  */
-const TABS = ["/home", "/messages", "/shots", "/profile"] as const;
+const TABS = ["/discover", "/home", "/messages", "/shots", "/profile"] as const;
 
 /** Fraction of the screen the finger must cross to commit to the next tab. */
 const COMMIT_RATIO = 0.28;
@@ -66,10 +71,23 @@ function tabIndex(pathname: string): number {
   return (TABS as readonly string[]).indexOf(pathname);
 }
 
-/** Does this touch belong to something that scrolls sideways already? */
+/**
+ * Marks an element whose own sideways drags must never become navigation.
+ *
+ * Needed because the check below can only see NATIVE scrollers, and the post
+ * gallery is not one: it is `overflow-hidden` with a JS-driven transform, so
+ * it has no overflowX and no scrollWidth to notice. Swiping between a post's
+ * photos was therefore read as a tab swipe, and you landed in Messages.
+ */
+export const HSWIPE_ATTR = "data-hswipe";
+
+/** Does this touch belong to something that handles sideways drags itself? */
 export function inHorizontalScroller(start: EventTarget | null): boolean {
   let el = start instanceof Element ? start : null;
   while (el && el !== document.body) {
+    // Explicit opt-out first: a JS carousel says so, since nothing about its
+    // computed style gives it away.
+    if (el.hasAttribute(HSWIPE_ATTR)) return true;
     const style = getComputedStyle(el);
     const scrolls =
       (style.overflowX === "auto" || style.overflowX === "scroll") &&
