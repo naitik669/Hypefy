@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { readSessionId, deviceLabel } from "@/lib/login-alert";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profile";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -103,6 +104,26 @@ export default async function AppLayout({
   // existing user before it replaced this.
   const { data: unreadCount } = await supabase.rpc("unread_dm_count");
   const initialUnreadMsgs = (unreadCount as number | null) ?? 0;
+
+  // First sighting of this session id raises a "new sign-in" alert; every
+  // render after that is a no-op on an indexed primary key.
+  //
+  // Deliberately NOT a trigger on auth.sessions, which is the obvious place
+  // and the wrong one: it would run inside GoTrue's own transaction, so a
+  // fault in it — including the webhook that fires on every notification
+  // insert — would break signing in, for everybody. The cost of doing it here
+  // is that a session which authenticates and never loads a page raises no
+  // alert, which is the moment it also cannot do anything.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const sessionId = readSessionId(session?.access_token);
+  if (sessionId) {
+    await supabase.rpc("record_login_session", {
+      p_session_id: sessionId,
+      p_label: deviceLabel((await headers()).get("user-agent")),
+    });
+  }
 
   return (
     <ToastProvider>

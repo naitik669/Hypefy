@@ -29,6 +29,13 @@ function pushCopy(type: string, actor: string, body: string | null) {
     // chat someone locked specifically to hide that contact.
     case type === "locked_dm":
       return { title: "Hypefy", body: "New message" };
+    // Has no actor, so the default branch below would render ": New sign-in"
+    // — the empty name, the stray colon and all.
+    case type === "security_alert":
+      return {
+        title: "🔒 Hypefy security",
+        body: body ?? "New sign-in to your account",
+      };
     case type.startsWith("hype_"):
       return { title: `⭐ ${actor}`, body: body ?? "hyped your post" };
     case type === "repost":
@@ -45,6 +52,9 @@ function pushCopy(type: string, actor: string, body: string | null) {
 }
 
 function pushUrl(n: { type: string; target_type: string | null; target_id: string | null }, actorUsername: string | null) {
+  // Straight to where you can act on it — turn 2FA on, or sign the other
+  // devices out.
+  if (n.type === "security_alert") return "/settings/security";
   if (n.type === "follow") return actorUsername ? `/u/${actorUsername}` : "/notifications";
   if (n.target_type === "post" && n.target_id) return `/p/${n.target_id}`;
   if (n.target_type === "shot" && n.target_id) return `/shots/${n.target_id}`;

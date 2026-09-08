@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, CheckCheck, Loader2, Trash2, UserPlus } from "lucide-react";
+import { Bell, CheckCheck, Loader2, Trash2, UserPlus, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -72,7 +72,15 @@ const TYPE_MAP: Record<Filter, string[]> = {
 
 /** Types where bundling several rows into one loses information the user needs
  *  to act on individually — never collapse these. */
-const NEVER_GROUP = new Set(["incoming_call", "new_message", "dm_post_shared", "follow_request"]);
+const NEVER_GROUP = new Set([
+  "incoming_call",
+  "new_message",
+  "dm_post_shared",
+  "follow_request",
+  // Every sign-in is its own event. Collapsing two into "1 other" hides the
+  // one you didn't make, which is the entire point of the alert.
+  "security_alert",
+]);
 
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -100,6 +108,10 @@ function timeAgo(iso: string) {
  *    your own, where the status they reacted to actually is.
  */
 export function notifHref(n: Notif): string {
+  // A security alert has no actor and no target — it is about the account
+  // itself, so it opens the page where you can act on it.
+  if (n.type === "security_alert") return "/settings/security";
+
   // Your own status is on your own profile, not on theirs.
   if (n.type === "note_reaction") return "/profile";
 
@@ -608,7 +620,14 @@ function NotifRow({ group: g, index = 0, following = false, onClear, onResolveRe
         }}
       >
         <div className="relative shrink-0">
-          {showCluster ? (
+          {g.type === "security_alert" ? (
+            // No actor: nobody did this to you, it happened to your account.
+            // A face here would be a stranger's initial next to "New sign-in",
+            // which reads as an accusation of the wrong person.
+            <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-danger/15 text-danger">
+              <ShieldAlert size={22} />
+            </span>
+          ) : showCluster ? (
             <div className="relative h-11 w-11">
               {g.actors.slice(0, 3).map((a, i) => (
                 <Avatar
@@ -636,8 +655,16 @@ function NotifRow({ group: g, index = 0, following = false, onClear, onResolveRe
           )}
         </div>
         <p className="min-w-0 flex-1 text-sm leading-snug">
-          <span className="font-semibold">{actorName}</span>{" "}
-          <span className="text-muted">{g.body}</span>{" "}
+          {g.type !== "security_alert" && (
+            <>
+              <span className="font-semibold">{actorName}</span>{" "}
+            </>
+          )}
+          <span
+            className={g.type === "security_alert" ? "font-semibold" : "text-muted"}
+          >
+            {g.body}
+          </span>{" "}
           <span className="text-xs text-faint">{timeAgo(g.latestAt)}</span>
         </p>
         {/* Follow back, without leaving the list. Only where there is nothing

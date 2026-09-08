@@ -75,4 +75,22 @@ describe("notifHref — every combination that exists in production", () => {
   it("a comment whose parent could not be resolved does not pretend", () => {
     expect(notifHref(n({ type: "hype_comment", target_type: "comment", parent: null }))).toBe("#");
   });
+
+  it("a security alert opens the security settings", () => {
+    // It has no actor and no target, so without its own branch it falls all
+    // the way through to "#" — a full-width row that looks tappable and isn't,
+    // for the one notification you most want to act on.
+    expect(
+      notifHref(
+        n({
+          type: "security_alert",
+          target_type: null,
+          target_id: null,
+          actor_id: null,
+          actor: null,
+          body: "New sign-in from Chrome on Windows",
+        }),
+      ),
+    ).toBe("/settings/security");
+  });
 });
