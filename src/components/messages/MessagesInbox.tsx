@@ -121,9 +121,12 @@ function preview(r: InboxRow) {
   const verb = r.lastKind ? KIND_VERB[r.lastKind] : undefined;
 
   if (verb) {
-    // Media/share kinds read as a sentence: "You sent a photo" / "Aman sent a GIF"
-    if (r.lastMine) return `You ${verb}`;
-    if (r.isGroup && r.lastSenderName) return `${r.lastSenderName} ${verb}`;
+    // "You: sent a photo" / "Dev: sent a voice note", matching the reference.
+    // The colon is doing work: it separates WHO from WHAT, so the eye can
+    // find the sender without reading the whole line, and it keeps media
+    // previews in the same shape as text ones ("Dev: see you at 8").
+    if (r.lastMine) return `You: ${verb}`;
+    if (r.isGroup && r.lastSenderName) return `${r.lastSenderName}: ${verb}`;
     return cap(verb);
   }
 
@@ -456,7 +459,16 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
           className={`flex items-center gap-3 transition-colors hover:bg-white/[0.03] ${pending ? "" : "px-4 py-3"}`}
         >
           <div className="relative shrink-0">
-            {r.isGroup ? <GroupAvatar /> : <Avatar name={r.name} hue={r.hue} size={52} src={r.avatarUrl ?? undefined} />}
+            {r.isGroup ? <GroupAvatar /> : <Avatar
+                name={r.name}
+                hue={r.hue}
+                size={52}
+                src={r.avatarUrl ?? undefined}
+                /* Rounded square, per the reference. A column of circles and a
+                   column of squircles read as different products; the rest of
+                   the app (nav avatar, create button) is already squircled. */
+                className="rounded-2xl"
+              />}
             {!r.isGroup && <PresenceDot lastSeenAt={r.lastSeenAt} size="md" />}
           </div>
           <div className="min-w-0 flex-1">
@@ -604,28 +616,19 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
             </>
           )}
 
-          {/* Unread section — only shown in "All" tab when there are unread rows */}
-          {unreadRows.length > 0 && (
-            <>
-              <p className="px-4 pb-1 pt-2 text-[11px] font-bold uppercase tracking-widest text-faint">
-                Unread
-              </p>
-              {unreadRows.map((r) => <RowItem key={r.id} r={r} />)}
-              <div className="mx-4 my-1 h-px bg-border/50" />
-            </>
-          )}
-
-          {/* Read / all-other conversations */}
-          {otherRows.length > 0 && (
-            <>
-              {unreadRows.length > 0 && (
-                <p className="px-4 pb-1 pt-2 text-[11px] font-bold uppercase tracking-widest text-faint">
-                  Earlier
-                </p>
-              )}
-              {otherRows.map((r) => <RowItem key={r.id} r={r} />)}
-            </>
-          )}
+          {/* Everything else, flat.
+              The reference has PINNED and then one uncategorised list, so the
+              "Unread" and "Earlier" headings are gone. The ORDER they produced
+              is kept — unread first, then the rest — because that is what puts
+              the conversations you care about at the top; only the two labels
+              went. Unread rows are still obvious from the bold text and the
+              count pill, which is how the reference distinguishes them too. */}
+          {unreadRows.map((r) => (
+            <RowItem key={r.id} r={r} />
+          ))}
+          {otherRows.map((r) => (
+            <RowItem key={r.id} r={r} />
+          ))}
         </div>
       )}
 

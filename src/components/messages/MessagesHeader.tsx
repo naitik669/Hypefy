@@ -68,38 +68,49 @@ export function MessagesHeader({
   const others = accounts.filter((a) => a.userId !== currentUserId);
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-border/60 bg-background/80 px-3 backdrop-blur-xl">
+    <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-xl">
+      {/* "Messages" as a large title, per the reference.
+          The chevron is the one addition: the account switcher was asked for
+          before the reference arrived, and the reference has no place for it,
+          so it hangs off the title rather than being dropped. Tap the word to
+          switch accounts; if that is unwanted, this button becomes an <h1>. */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex min-w-0 items-center gap-1.5"
+        className="flex min-w-0 items-center gap-1"
         aria-haspopup="menu"
         aria-expanded={open}
+        title={username ? `Signed in as @${username}` : name}
       >
-        <span className="truncate text-[17px] font-extrabold tracking-tight">{username ? `@${username}` : name}</span>
-        <ChevronDown size={20} className={`shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`} />
+        <h1 className="truncate text-[28px] font-extrabold leading-none tracking-tight">
+          Messages
+        </h1>
+        <ChevronDown
+          size={20}
+          className={`shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </button>
 
-      <div className="flex shrink-0 items-center">
+      <div className="flex shrink-0 items-center gap-1.5">
         {/* Call log was previously reachable only by tapping a call
             notification — invisible once that notification was cleared. */}
         <Link
           href="/calls"
           aria-label="Call history"
-          className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5"
         >
           <Phone size={21} />
         </Link>
 
-        {/* A filled accent "+" rather than an outline pencil. Starting a chat
-            is the one thing you come here to DO, and it now reads as the
-            primary action instead of one more grey glyph beside the phone. */}
+        {/* Squircle, not a circle: it is the same shape language as the
+            create button in the bottom nav, so the app's two "make something
+            new" affordances read as the same control. */}
         <Link
           href="/messages/new"
           aria-label="New message"
-          className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-ink transition-transform active:scale-90"
+          className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-accent text-accent-ink shadow-md transition-transform active:scale-90"
         >
-          <Plus size={20} strokeWidth={2.5} />
+          <Plus size={22} strokeWidth={2.75} />
         </Link>
       </div>
 
@@ -108,7 +119,7 @@ export function MessagesHeader({
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div
             style={{ transformOrigin: "top left" }}
-            className="animate-menu-pop absolute left-3 top-[52px] z-40 w-72 overflow-hidden rounded-2xl border border-border bg-elevated py-1 shadow-2xl"
+            className="animate-menu-pop absolute left-4 top-[60px] z-40 w-72 overflow-hidden rounded-2xl border border-border bg-elevated py-1 shadow-2xl"
           >
             <p className="px-4 pb-1 pt-2 text-[11px] font-bold uppercase tracking-widest text-faint">Switch account</p>
 
