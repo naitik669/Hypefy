@@ -39,6 +39,13 @@ const OPEN_PATHS = [
   // resetting a password on a device that has no gate cookie. The page is
   // useless without a valid recovery session, so it opens nothing else.
   "/reset-password",
+
+  // Same reasoning for the second-factor challenge: a session can be sent
+  // here from any device, and one without a gate cookie would meet the wall
+  // instead of the code field. The page is useless without a live session, so
+  // it opens nothing else either.
+  "/verify-2fa",
+  "/api/mfa/recover",
   "/api/push",
   "/api/oneshot/reap",
 

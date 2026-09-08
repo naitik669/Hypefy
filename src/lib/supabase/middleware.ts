@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { needsSecondFactor } from "@/lib/mfa-gate";
 
 /**
  * Refreshes the Supabase auth session on every request and keeps cookies in
@@ -22,7 +23,7 @@ export async function updateSession(request: NextRequest) {
   ) {
     if (process.env.NODE_ENV === "production") {
       throw new Error(
-        "Supabase env vars are missing. Refusing to serve requests without auth.",
+        "Supabase env vars are missing. Refusing to serve requests without auth."
       );
     }
     return supabaseResponse;
@@ -50,20 +51,21 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
+            request.cookies.set(name, value)
           );
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
+            supabaseResponse.cookies.set(name, value, options)
           );
         },
       },
-    },
+    }
   );
 
   // IMPORTANT: do not run code between createServerClient and getUser().
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
 
   // Gate the in-app routes. Unauthenticated users are sent to the landing.
@@ -88,7 +90,8 @@ export async function updateSession(request: NextRequest) {
   ];
   const { pathname } = request.nextUrl;
   const isProtected =
-    protectedPrefixes.some((p) => pathname.startsWith(p)) || pathname === "/shots";
+    protectedPrefixes.some((p) => pathname.startsWith(p)) ||
+    pathname === "/shots";
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
@@ -99,6 +102,61 @@ export async function updateSession(request: NextRequest) {
       redirectResponse.cookies.set(c.name, c.value);
     });
     return redirectResponse;
+  }
+
+  // ── Second factor ──────────────────────────────────────────────────
+  //
+  // The thing that makes two-factor real. The old "two-step" flag was read by
+  // one browser `if`, so Google sign-in, the account switcher, a direct GoTrue
+  // password grant and even a failed code-send all walked past it. None of
+  // those need a line of their own here: every one of them produces an AAL1
+  // session, and this fires on the first protected navigation that session
+  // makes.
+  //
+  // Kill switch, because the failure mode is locking real people out of their
+  // own accounts and a deploy is slower than an env var.
+  if (user && isProtected) {
+    // The factors come from the getUser() RESPONSE above — a live call to
+    // GoTrue, so it is authoritative.
+    //
+    // NOT mfa.getAuthenticatorAssuranceLevel(): its no-argument path reads
+    // user.factors out of the STORED COOKIE. Stale cookie data would make this
+    // gate silently pass, and a fail-open staleness bug is the worst possible
+    // shape for an auth check.
+    //
+    // getSession() only supplies the token to read `aal` off; getUser() has
+    // already validated that same token, which is what makes reading it safe.
+    //
+    // Fetched only when a factor actually exists. Almost nobody has one, and
+    // there is no reason to make every request of every other account pay for
+    // a lookup whose answer cannot matter to them.
+    const hasFactor = (user.factors ?? []).some((f) => f.status === "verified");
+    const accessToken = hasFactor
+      ? (await supabase.auth.getSession()).data.session?.access_token
+      : undefined;
+
+    if (
+      needsSecondFactor({
+        hasUser: true,
+        userError: !!userError,
+        factors: user.factors,
+        accessToken,
+        isProtected,
+        enforce: process.env.MFA_ENFORCE !== "0",
+      })
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/verify-2fa";
+      url.search = "";
+      const redirectResponse = NextResponse.redirect(url);
+      // Same cookie carry-over as the signed-out gate. Without it a token
+      // refreshed during this request is dropped, and the user is signed out
+      // on their way to the screen that exists to sign them in.
+      supabaseResponse.cookies.getAll().forEach((c) => {
+        redirectResponse.cookies.set(c.name, c.value);
+      });
+      return redirectResponse;
+    }
   }
 
   return supabaseResponse;
