@@ -11,14 +11,12 @@ export function PrivacySettings({
   initialDmPrivacy,
   initialShowActivity,
   initialHideReadReceipts,
-  initialTwoStep,
 }: {
   userId: string;
   initialIsPrivate: boolean;
   initialDmPrivacy: "everyone" | "following";
   initialShowActivity: boolean;
   initialHideReadReceipts: boolean;
-  initialTwoStep: boolean;
 }) {
   const supabase = createClient();
   const toast = useToast();
@@ -26,13 +24,31 @@ export function PrivacySettings({
   const [dmPrivacy, setDmPrivacy] = useState(initialDmPrivacy);
   const [showActivity, setShowActivity] = useState(initialShowActivity);
   const [hideReceipts, setHideReceipts] = useState(initialHideReadReceipts);
-  const [twoStep, setTwoStep] = useState(initialTwoStep);
-  const [saving, setSaving] = useState(false);
+  /**
+   * Which single control is mid-save — not a panel-wide flag.
+   *
+   * One shared boolean disabled all five while any one of them was in flight,
+   * so toggling "Private account" froze the read-receipt switch for the length
+   * of a round trip. Nothing about these settings makes them mutually
+   * exclusive.
+   */
+  const [pending, setPending] = useState<string | null>(null);
 
-  async function save(patch: { is_private?: boolean; dm_privacy?: string; show_activity?: boolean; hide_read_receipts?: boolean; two_step_enabled?: boolean }) {
-    setSaving(true);
-    const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
-    setSaving(false);
+  async function save(
+    key: string,
+    patch: {
+      is_private?: boolean;
+      dm_privacy?: string;
+      show_activity?: boolean;
+      hide_read_receipts?: boolean;
+    }
+  ) {
+    setPending(key);
+    const { error } = await supabase
+      .from("profiles")
+      .update(patch)
+      .eq("id", userId);
+    setPending(null);
     if (error) toast("Couldn't save, try again", "error");
     else toast("Saved", "success");
     return !error;
@@ -40,40 +56,39 @@ export function PrivacySettings({
 
   async function togglePrivate(next: boolean) {
     setIsPrivate(next);
-    if (!(await save({ is_private: next }))) setIsPrivate(!next);
+    if (!(await save("private", { is_private: next }))) setIsPrivate(!next);
   }
 
   async function toggleActivity(next: boolean) {
     setShowActivity(next);
-    if (!(await save({ show_activity: next }))) setShowActivity(!next);
+    if (!(await save("activity", { show_activity: next })))
+      setShowActivity(!next);
   }
 
   async function toggleReceipts(next: boolean) {
     setHideReceipts(next);
-    if (!(await save({ hide_read_receipts: next }))) setHideReceipts(!next);
-  }
-
-  async function toggleTwoStep(next: boolean) {
-    setTwoStep(next);
-    if (!(await save({ two_step_enabled: next }))) setTwoStep(!next);
+    if (!(await save("receipts", { hide_read_receipts: next })))
+      setHideReceipts(!next);
   }
 
   async function setDm(next: "everyone" | "following") {
     const prev = dmPrivacy;
     setDmPrivacy(next);
-    if (!(await save({ dm_privacy: next }))) setDmPrivacy(prev);
+    if (!(await save("dm", { dm_privacy: next }))) setDmPrivacy(prev);
   }
 
   return (
     <div className="flex flex-col gap-6">
       <section>
-        <p className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">Account</p>
+        <p className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">
+          Account
+        </p>
         <SettingToggle
           label="Private account"
           sub="Only your followers can see your posts and Shots"
           checked={isPrivate}
           onChange={togglePrivate}
-          disabled={saving}
+          disabled={pending === "private"}
         />
         <div className="mt-2">
           <SettingToggle
@@ -81,7 +96,7 @@ export function PrivacySettings({
             sub="Let others see when you're online and your last active time"
             checked={showActivity}
             onChange={toggleActivity}
-            disabled={saving}
+            disabled={pending === "activity"}
           />
         </div>
         <div className="mt-2">
@@ -93,36 +108,39 @@ export function PrivacySettings({
             sub="Don't let people see when you've read their messages"
             checked={hideReceipts}
             onChange={toggleReceipts}
-            disabled={saving}
+            disabled={pending === "receipts"}
           />
         </div>
       </section>
 
       <section>
-        <p className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">Security</p>
-        <SettingToggle
-          label="Two-step verification"
-          sub="Require an emailed 6-digit code at sign-in, on top of your password"
-          checked={twoStep}
-          onChange={toggleTwoStep}
-          disabled={saving}
-        />
-      </section>
-
-      <section>
-        <p className="mb-2 px-1 text-xs font-bold uppercase tracking-widest text-faint">Who can message you</p>
+        <p className="mb-2 px-1 text-xs font-bold uppercase tracking-widest text-faint">
+          Who can message you
+        </p>
         <div className="flex flex-col gap-2">
-          {([
-            { value: "everyone", label: "Everyone", sub: "Strangers land in Requests until you approve" },
-            { value: "following", label: "People you follow", sub: "Only accounts you follow can start a chat" },
-          ] as const).map((opt) => (
+          {(
+            [
+              {
+                value: "everyone",
+                label: "Everyone",
+                sub: "Strangers land in Requests until you approve",
+              },
+              {
+                value: "following",
+                label: "People you follow",
+                sub: "Only accounts you follow can start a chat",
+              },
+            ] as const
+          ).map((opt) => (
             <button
               key={opt.value}
               type="button"
-              disabled={saving}
+              disabled={pending === "dm"}
               onClick={() => setDm(opt.value)}
               className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors disabled:opacity-50 ${
-                dmPrivacy === opt.value ? "border-accent/40 bg-accent/[0.06]" : "border-border bg-surface"
+                dmPrivacy === opt.value
+                  ? "border-accent/40 bg-accent/[0.06]"
+                  : "border-border bg-surface"
               }`}
             >
               <div className="min-w-0 flex-1">
