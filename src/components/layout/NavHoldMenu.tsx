@@ -59,7 +59,7 @@ export function NavHoldMenu({
   const startX = useRef(0);
   /** Set once the hold completes, so the trailing click is swallowed. */
   const didHold = useRef(false);
-  const rowEls = useRef<(HTMLElement | null)[]>([]);
+  const stackRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLDivElement | null>(null);
 
   // Bottom-of-column is nearest the thumb, so the visual order is the
@@ -92,107 +92,94 @@ export function NavHoldMenu({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, close]);
 
-  /** Which row is under this Y position, or null. */
+  /**
+   * Which row is under this Y position, or null.
+   *
+   * Reads the rendered rows straight out of the stack rather than an array
+   * kept in sync by ref callbacks. The ref version silently held nothing —
+   * every hit-test missed, so sliding highlighted nothing and releasing
+   * committed nothing, which is exactly what "can't choose options" looked
+   * like. Whatever the cause (inline ref callbacks are re-created and
+   * re-invoked on every render, and this list re-renders on every move), the
+   * DOM is the thing being pointed at, so asking it directly cannot drift.
+   */
   function rowAt(y: number): number | null {
-    for (let i = 0; i < rowEls.current.length; i++) {
-      const el = rowEls.current[i];
-      if (!el) continue;
-      const r = el.getBoundingClientRect();
+    const stack = stackRef.current;
+    if (!stack) return null;
+    const els = stack.querySelectorAll<HTMLElement>('[role="option"]');
+    for (let i = 0; i < els.length; i++) {
+      const r = els[i].getBoundingClientRect();
       if (y >= r.top && y <= r.bottom) return i;
     }
     return null;
   }
 
+  /** Close, and act on the row the thumb was resting on. null just closes. */
+  function commit(idx: number | null) {
+    close();
+    if (idx === null) return;
+    haptics.tap();
+    router.push(ordered[idx].href);
+  }
+
   function onPointerDown(e: React.PointerEvent) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    didHold.current = false;
     startY.current = e.clientY;
     startX.current = e.clientX;
-    didHold.current = false;
-    const target = e.currentTarget as HTMLElement;
     const pid = e.pointerId;
 
+    clearHold();
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;
       didHold.current = true;
-      haptics.select();
       setOpen(true);
       setActiveIdx(null);
-      // Without capture the stack goes dead the moment the thumb slides off
-      // the tab, which is instantly.
+      haptics.select();
+      // Keep receiving moves after the thumb leaves the small tab.
       try {
-        target.setPointerCapture(pid);
+        triggerRef.current?.setPointerCapture(pid);
       } catch {
-        /* capture is best-effort; the detached path still works */
+        /* capture unsupported — the gesture still works over the tab */
       }
     }, HOLD_MS);
   }
 
   function onPointerMove(e: React.PointerEvent) {
     if (!open) {
-      // Still deciding: a real drag means the user is scrolling, not pressing.
       const moved =
         Math.abs(e.clientY - startY.current) > CANCEL_SLOP_PX ||
         Math.abs(e.clientX - startX.current) > CANCEL_SLOP_PX;
       if (moved) clearHold();
       return;
     }
-    const idx = rowAt(e.clientY);
-    setActiveIdx((prev) => {
-      if (prev !== idx && idx !== null) haptics.tap();
-      return idx;
-    });
+    const hit = rowAt(e.clientY);
+    if (hit !== activeIdx) {
+      setActiveIdx(hit);
+      if (hit !== null) haptics.select();
+    }
   }
 
   function onPointerUp(e: React.PointerEvent) {
     clearHold();
-    if (!open) return;
-
-    const idx = rowAt(e.clientY);
-    if (idx !== null) {
-      haptics.tap();
-      close();
-      router.push(ordered[idx].href);
-      return;
+    try {
+      triggerRef.current?.releasePointerCapture(e.pointerId);
+    } catch {
+      /* never captured */
     }
-    // Lifted somewhere that is not a row. If the finger never left the tab,
-    // treat the stack as parked so it can be tapped; otherwise dismiss.
-    const onTrigger = triggerRef.current
-      ?.getBoundingClientRect()
-      ?? null;
-    const stillOnTab =
-      onTrigger !== null &&
-      e.clientY >= onTrigger.top &&
-      e.clientY <= onTrigger.bottom;
-    if (stillOnTab) setDetached(true);
-    else close();
-  }
+    if (!open) return;
+    // The pointer was already taken away — the stack is being tapped now,
+    // so a stray release must not commit or dismiss it.
+    if (detached) return;
 
-  function onPointerCancel() {
-    clearHold();
-    // The gesture was taken from us (a system sheet, a call). Leave the stack
-    // up and tappable rather than vanishing mid-reach.
-    if (open) setDetached(true);
+    // Commits on the row the MOVE handler last landed on, not a fresh
+    // hit-test of the release coordinates. After a capture those can be
+    // stale or outside every row, which is how a deliberate pick ended up
+    // committing nothing.
+    commit(activeIdx);
   }
-
   return (
-    <div
-      ref={triggerRef}
-      className="relative"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-      // A completed hold must not also fire the link underneath.
-      onClickCapture={(e) => {
-        if (didHold.current) {
-          e.preventDefault();
-          e.stopPropagation();
-          didHold.current = false;
-        }
-      }}
-    >
-      {children}
-
+    <div className="relative flex items-center justify-center">
       {open && (
         <>
           {/* Portalled because the nav carries backdrop-blur, which makes it
@@ -216,6 +203,7 @@ export function NavHoldMenu({
             )}
 
           <div
+            ref={stackRef}
             className="absolute bottom-[calc(100%+14px)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3"
             role="listbox"
             aria-label={label}
@@ -231,9 +219,6 @@ export function NavHoldMenu({
               return (
                 <div
                   key={action.href}
-                  ref={(el) => {
-                    rowEls.current[i] = el;
-                  }}
                   role="option"
                   aria-selected={active}
                   onPointerEnter={detached ? () => setActiveIdx(i) : undefined}
@@ -299,6 +284,53 @@ export function NavHoldMenu({
           </div>
         </>
       )}
+
+      <div
+        ref={triggerRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={() => {
+          clearHold();
+          // Deliberately does NOT close. Some WebViews cancel the pointer even
+          // with touch-action: none, and dropping the stack here is what makes
+          // it flash up and vanish. Fall back to tap-to-choose.
+          if (open) {
+            setDetached(true);
+            setActiveIdx(null);
+          }
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+        onDragStart={(e) => e.preventDefault()}
+        onClickCapture={(e) => {
+          // The hold ends in a click. Let it through only for a real tap.
+          if (didHold.current) {
+            e.preventDefault();
+            e.stopPropagation();
+            didHold.current = false;
+          }
+        }}
+        // The single most important line here, and the one this component
+        // shipped without. touch-action is read at TOUCHSTART, so it cannot be
+        // switched on once the hold completes — by then the browser has
+        // reserved the gesture for panning and cancels the pointer the moment
+        // the thumb moves. That is why releasing did not close the menu (no
+        // pointerup ever arrived) and why sliding could not pick anything (no
+        // pointermove either). It has to be "none" from the first contact.
+        // A long-press on a link or image also raises the WebView's own
+        // callout, which cancels the pointer too; hence the rest.
+        style={{
+          touchAction: "none",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+        }}
+        className={`relative z-50 transition-transform duration-200 ${
+          open ? "scale-95" : ""
+        }`}
+      >
+        {children}
+      </div>
     </div>
   );
 }

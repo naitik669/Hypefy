@@ -9,7 +9,7 @@ import { AccountSwitchPad } from "@/components/layout/AccountSwitchPad";
 import { createClient } from "@/lib/supabase/client";
 import { haptics } from "@/lib/haptics";
 import { NavHoldMenu, type HoldAction } from "@/components/layout/NavHoldMenu";
-import { Search, Compass, Bookmark, Bell } from "lucide-react";
+import { Search, Settings, Bookmark, Bell } from "lucide-react";
 
 /**
  * Shortcuts behind a hold on Home.
@@ -21,9 +21,12 @@ import { Search, Compass, Bookmark, Bell } from "lucide-react";
  */
 const HOME_SHORTCUTS: HoldAction[] = [
   { icon: Search, label: "Search", href: "/search" },
-  { icon: Compass, label: "Discover", href: "/discover" },
   { icon: Bell, label: "Activity", href: "/notifications" },
   { icon: Bookmark, label: "Saved", href: "/saved" },
+  // Discover was here and came out: it has the compass in the top bar AND a
+  // right-swipe from the feed, so it was the one entry with two other ways in.
+  // Settings had none — it was buried behind the profile tab.
+  { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
 
