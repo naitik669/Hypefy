@@ -12,7 +12,15 @@ import {
   RotateCw,
 } from "lucide-react";
 
-const OUT = 1080; // exported width
+/**
+ * Default exported width.
+ *
+ * 1080 is generous for a square avatar and short for a banner: the strip is
+ * displayed across the full column, which on a 3x phone is about 1400 device
+ * pixels, so the banner was the one crop being upscaled on exactly the
+ * screens with the most pixels to show it on. Callers that need more pass it.
+ */
+const OUT_DEFAULT = 1080;
 
 /**
  * Image editor + cropper. Pan (drag), zoom (pinch / wheel / slider), rotate in
@@ -27,12 +35,15 @@ const OUT = 1080; // exported width
 export function ImageCropper({
   src,
   aspect = 1,
+  out = OUT_DEFAULT,
   label = "Edit",
   onCancel,
   onDone,
 }: {
   src: string;
   aspect?: number;
+  /** Exported width in pixels; height follows `aspect`. */
+  out?: number;
   label?: string;
   onCancel: () => void;
   onDone: (blob: Blob, url: string) => void;
@@ -206,8 +217,8 @@ export function ImageCropper({
     const sx = Math.max(0, Math.min(nat.w - sW, -imgLeft / dispScale));
     const sy = Math.max(0, Math.min(nat.h - sH, -imgTop / dispScale));
 
-    const outW = OUT;
-    const outH = Math.round(OUT / aspect);
+    const outW = out;
+    const outH = Math.round(out / aspect);
     const canvas = document.createElement("canvas");
     canvas.width = outW;
     canvas.height = outH;

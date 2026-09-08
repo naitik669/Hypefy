@@ -189,7 +189,7 @@ export function EditProfileForm({
         <ProfileBanner
           bannerId={bannerId}
           bannerUrl={bannerUrl}
-          className="h-24"
+          className=""
         />
         <div className="flex items-center gap-3 px-3 pb-3">
           <button

@@ -77,7 +77,7 @@ export function ProfileHeader({
         <ProfileBanner
           bannerId={bannerId}
           bannerUrl={bannerUrl}
-          className="h-36 rounded-card"
+          className="rounded-card"
         />
         {currentUserId === userId && <BannerEditMenu userId={userId} />}
       </div>

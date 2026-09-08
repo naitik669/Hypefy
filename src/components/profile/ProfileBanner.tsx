@@ -1,6 +1,16 @@
 import { bannerGradient } from "@/lib/profile";
 
-/** Renders a custom uploaded banner image if present, else a preset gradient. */
+/**
+ * Renders a custom uploaded banner image if present, else a preset gradient.
+ *
+ * The box is 3:1 — the ratio the cropper frames at — and never a fixed
+ * height. It used to be h-36, which is a different SHAPE at every screen
+ * width: the app column is capped at 480px, so a banner was 3.2:1 on a
+ * desktop and 2.5:1 on a 375px phone, and object-cover quietly ate a
+ * different slice of the same image on each. You framed one picture and got
+ * two crops. Locking the ratio means the phone shows exactly what the
+ * cropper showed, just smaller.
+ */
 export function ProfileBanner({
   bannerId,
   bannerUrl,
@@ -14,7 +24,7 @@ export function ProfileBanner({
     <div
       // block auto-width, not w-full: callers add mx-* margins, and margins
       // don't shrink a 100%-width box — w-full made the banner overflow right.
-      className={`relative overflow-hidden ${className}`}
+      className={`relative aspect-[3/1] overflow-hidden ${className}`}
       style={bannerUrl ? undefined : { background: bannerGradient(bannerId) }}
     >
       {bannerUrl ? (

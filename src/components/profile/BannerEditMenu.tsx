@@ -166,6 +166,10 @@ export function BannerEditMenu({ userId }: { userId: string }) {
           // A banner is a wide strip and an avatar is a square; cropping both
           // to the shape they will actually be shown in is the whole point.
           aspect={kind === "banner" ? 3 : 1}
+          // A banner spans the whole column, so it needs the pixels a phone's
+          // 3x screen will ask of it. An avatar never renders above ~200 CSS
+          // px, where 1080 is already more than enough.
+          out={kind === "banner" ? 1440 : 1080}
           label={kind === "banner" ? "Frame your banner" : "Frame your photo"}
           onCancel={() => {
             URL.revokeObjectURL(cropSrc);
