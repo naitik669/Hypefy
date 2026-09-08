@@ -1392,9 +1392,7 @@ export type Database = {
           suspended_at: string | null
           suspended_by: string | null
           suspended_until: string | null
-          suspension_reason: string | null
-          two_step_enabled: boolean
-          updated_at: string
+          suspension_reason: string | null          updated_at: string
           username: string | null
         }
         Insert: {
@@ -1427,9 +1425,7 @@ export type Database = {
           suspended_at?: string | null
           suspended_by?: string | null
           suspended_until?: string | null
-          suspension_reason?: string | null
-          two_step_enabled?: boolean
-          updated_at?: string
+          suspension_reason?: string | null          updated_at?: string
           username?: string | null
         }
         Update: {
@@ -1462,9 +1458,7 @@ export type Database = {
           suspended_at?: string | null
           suspended_by?: string | null
           suspended_until?: string | null
-          suspension_reason?: string | null
-          two_step_enabled?: boolean
-          updated_at?: string
+          suspension_reason?: string | null          updated_at?: string
           username?: string | null
         }
         Relationships: [

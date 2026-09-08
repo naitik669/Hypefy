@@ -123,31 +123,15 @@ export function AuthCard({ mode }: { mode: Mode }) {
         });
         if (error) throw error;
 
-        // Opt-in 2-step verification: if this account requires an email code,
-        // drop the password session and gate behind a one-time code. (Skipped
-        // when adding a second account to the switcher.)
-        if (!addMode && data.user) {
-          const { data: prof } = await supabase
-            .from("profiles")
-            .select("two_step_enabled")
-            .eq("id", data.user.id)
-            .maybeSingle();
-          if ((prof as any)?.two_step_enabled) {
-            // Send the code BEFORE dropping the password session. If the
-            // send fails after a signOut the account is unreachable: no
-            // session, no code, and a verify screen that can never be
-            // satisfied. Failing here still leaves them signed in.
-            const { error: otpError } = await supabase.auth.signInWithOtp({
-              email,
-              options: { shouldCreateUser: false },
-            });
-            if (otpError) throw otpError;
-
-            await supabase.auth.signOut();
-            router.push(`/verify-2step?email=${encodeURIComponent(email)}`);
-            return;
-          }
-        }
+        // The old opt-in "two-step" gate used to live here: read a boolean,
+        // email a code, sign out, redirect. It is gone, and not because
+        // two-factor went away — because a check in this handler was never a
+        // check at all. Google sign-in, the account switcher, ?add=1, a curl
+        // password grant and even a failed code-send all reached /home without
+        // passing it.
+        //
+        // The real one is in the middleware, which sees every route this
+        // session will ever ask for, and it needs nothing from this file.
 
         if (addMode) {
           if (prevSession) await saveSessionAsAccount(prevSession);

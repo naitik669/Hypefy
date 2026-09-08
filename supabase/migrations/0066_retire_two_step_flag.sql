@@ -1,0 +1,23 @@
+-- ─────────────────────────────────────────────────────────────────────
+-- Retire profiles.two_step_enabled.
+--
+-- Migration 0003 was one line: a boolean column. Nothing server-side ever
+-- read it. Its only reader was a single `if` in the sign-in handler, which
+-- Google OAuth, the account switcher, /signin?add=1, a curl password grant
+-- and even a failed code-send all walked straight past. A user who switched
+-- it on got the feeling of two-factor and none of it.
+--
+-- Real two-factor is TOTP through GoTrue now (0063 for the recovery codes),
+-- enforced in the middleware against the aal claim in the token — a place a
+-- client cannot argue with. Nothing in the app has read or written this
+-- column since that landed.
+--
+-- Checked before dropping: 0 of 18 accounts had it set, so nobody loses a
+-- protection they believed they had. Had any account held it true, this
+-- would have wanted a notice rather than a silent DROP.
+-- ─────────────────────────────────────────────────────────────────────
+
+-- The column-level grant from 0050 goes with it. Dropping the column removes
+-- the grant automatically; this is here so a reader of 0050's allowlist can
+-- see where the entry went.
+alter table public.profiles drop column if exists two_step_enabled;
