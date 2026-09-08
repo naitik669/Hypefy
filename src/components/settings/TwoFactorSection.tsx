@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { RecoveryCodes } from "@/components/settings/RecoveryCodes";
 import { removeSavedAccount } from "@/lib/saved-accounts";
+import { useStepUp } from "@/components/auth/StepUpDialog";
 
 /**
  * Fixed, so cleanup is deterministic. Supabase rejects a duplicate friendly
@@ -49,6 +50,7 @@ export function TwoFactorSection({
   const supabase = createClient();
   const router = useRouter();
   const toast = useToast();
+  const { requireStepUp, stepUpDialog } = useStepUp();
 
   const [stage, setStage] = useState<Stage>("loading");
   const [factorId, setFactorId] = useState<string | null>(null);
@@ -72,7 +74,7 @@ export function TwoFactorSection({
       return;
     }
     const verified = (data?.all ?? []).find(
-      (f) => f.factor_type === "totp" && f.status === "verified",
+      (f) => f.factor_type === "totp" && f.status === "verified"
     );
     if (verified) {
       setFactorId(verified.id);
@@ -136,7 +138,7 @@ export function TwoFactorSection({
       setError(
         attempts >= 2
           ? "Still wrong. If your phone's clock is set manually, switch it to automatic — TOTP codes are time-based."
-          : "That code didn't match. Codes change every 30 seconds.",
+          : "That code didn't match. Codes change every 30 seconds."
       );
       return;
     }
@@ -153,16 +155,27 @@ export function TwoFactorSection({
     setSecret(null);
     setCode("");
     setRemaining(0);
+    await supabase.rpc("log_security_alert", {
+      p_body: "Two-factor authentication was turned on",
+    });
     toast("Two-factor is on", "success");
     router.refresh();
     setTimeout(
-      () => codesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
-      120,
+      () =>
+        codesRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        }),
+      120
     );
   }
 
   async function disable() {
     if (!factorId) return;
+    // A FRESH challenge, cache bypassed. An already-unlocked browser left on a
+    // desk must not be able to switch the second factor off — that is the
+    // exact scenario it exists for.
+    if (!(await requireStepUp({ maxAge: 0 }))) return;
     setBusy(true);
     const { error: err } = await supabase.auth.mfa.unenroll({ factorId });
     if (err) {
@@ -171,6 +184,9 @@ export function TwoFactorSection({
       return;
     }
     await supabase.rpc("clear_mfa_recovery_codes");
+    await supabase.rpc("log_security_alert", {
+      p_body: "Two-factor authentication was turned off",
+    });
     setBusy(false);
     setFactorId(null);
     setRemaining(null);
@@ -199,7 +215,9 @@ export function TwoFactorSection({
           <AlertTriangle size={18} />
         </span>
         <div>
-          <p className="text-sm font-semibold">Two-factor isn&apos;t available</p>
+          <p className="text-sm font-semibold">
+            Two-factor isn&apos;t available
+          </p>
           <p className="mt-0.5 text-xs text-muted">
             This deployment can&apos;t perform account recovery, so turning
             two-factor on would risk locking you out for good.
@@ -211,6 +229,7 @@ export function TwoFactorSection({
 
   return (
     <div className="flex flex-col gap-3">
+      {stepUpDialog}
       <div className="flex items-start gap-3 rounded-2xl border border-border bg-elevated p-4">
         <span
           className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] ${
@@ -361,9 +380,9 @@ export function TwoFactorSection({
                 <AlertTriangle size={16} />
               </span>
               <p className="text-xs leading-snug">
-                <span className="font-bold">No recovery codes.</span> If you lose
-                your authenticator you will not be able to get back in. Generate
-                a set now.
+                <span className="font-bold">No recovery codes.</span> If you
+                lose your authenticator you will not be able to get back in.
+                Generate a set now.
               </p>
             </div>
           )}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useStepUp } from "@/components/auth/StepUpDialog";
 
 /**
  * Danger zone: permanent account deletion. Requires typing the username
@@ -12,6 +13,7 @@ import { createClient } from "@/lib/supabase/client";
 export function DeleteAccount({ username }: { username: string | null }) {
   const supabase = createClient();
   const router = useRouter();
+  const { requireStepUp, stepUpDialog } = useStepUp();
   const confirmWord = username ?? "delete";
 
   const [open, setOpen] = useState(false);
@@ -23,6 +25,10 @@ export function DeleteAccount({ username }: { username: string | null }) {
 
   async function destroy() {
     if (!armed || busy) return;
+    // Typing the username guards against a mis-tap. This guards against
+    // someone else holding an unlocked phone — a different problem, and the
+    // one where "irreversible" actually bites.
+    if (!(await requireStepUp({ maxAge: 0 }))) return;
     setBusy(true);
     setError(null);
     const res = await fetch("/api/account/delete", { method: "POST" });
@@ -34,18 +40,24 @@ export function DeleteAccount({ username }: { username: string | null }) {
     }
     await supabase.auth.signOut();
     // Clear saved multi-account entries for this user too
-    try { localStorage.removeItem("hypefy_accounts"); } catch {}
+    try {
+      localStorage.removeItem("hypefy_accounts");
+    } catch {}
     router.push("/");
   }
 
   return (
     <section className="rounded-2xl border border-danger/30 bg-danger/[0.04] p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-danger">Danger zone</p>
+      {stepUpDialog}
+      <p className="text-xs font-semibold uppercase tracking-wide text-danger">
+        Danger zone
+      </p>
 
       {!open ? (
         <>
           <p className="mt-2 text-xs text-muted">
-            Permanently delete your account, posts, Shots, messages, and followers. This cannot be undone.
+            Permanently delete your account, posts, Shots, messages, and
+            followers. This cannot be undone.
           </p>
           <button
             type="button"
@@ -58,7 +70,9 @@ export function DeleteAccount({ username }: { username: string | null }) {
       ) : (
         <div className="mt-3 flex flex-col gap-2">
           <p className="text-xs text-muted">
-            Type <span className="font-bold text-foreground">{confirmWord}</span> to confirm. Everything is wiped, no recovery.
+            Type{" "}
+            <span className="font-bold text-foreground">{confirmWord}</span> to
+            confirm. Everything is wiped, no recovery.
           </p>
           <input
             value={typed}
@@ -71,7 +85,11 @@ export function DeleteAccount({ username }: { username: string | null }) {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => { setOpen(false); setTyped(""); setError(null); }}
+              onClick={() => {
+                setOpen(false);
+                setTyped("");
+                setError(null);
+              }}
               className="flex-1 rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-white/5"
             >
               Cancel
@@ -82,7 +100,11 @@ export function DeleteAccount({ username }: { username: string | null }) {
               disabled={!armed || busy}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-danger py-2.5 text-sm font-bold text-white disabled:opacity-40"
             >
-              {busy ? <Loader2 size={15} className="animate-spin" /> : "Delete forever"}
+              {busy ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : (
+                "Delete forever"
+              )}
             </button>
           </div>
         </div>

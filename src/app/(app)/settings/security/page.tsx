@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TwoFactorSection } from "@/components/settings/TwoFactorSection";
+import { SessionsCard } from "@/components/settings/SessionsCard";
 
 /**
  * Security, which used to be one toggle at the bottom of Privacy.
@@ -31,6 +32,7 @@ export default async function SecuritySettingsPage() {
           userId={user.id}
           recoveryConfigured={recoveryConfigured}
         />
+        <SessionsCard />
       </div>
     </>
   );
