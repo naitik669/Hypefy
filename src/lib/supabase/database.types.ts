@@ -2170,6 +2170,16 @@ export type Database = {
           username: string
         }[]
       }
+      get_topic_cards: {
+        Args: { p_limit?: number }
+        Returns: {
+          cover_url: string
+          last_at: string
+          post_count: number
+          recent_count: number
+          tag: string
+        }[]
+      }
       get_trending_tags: {
         Args: { p_limit?: number }
         Returns: {
@@ -2227,6 +2237,24 @@ export type Database = {
       report_message: {
         Args: { p_details?: string; p_message_id: string; p_reason: string }
         Returns: undefined
+      }
+      search_people: {
+        Args: { p_limit?: number; p_q: string }
+        Returns: {
+          avatar_hue: number
+          avatar_url: string
+          bio: string
+          display_name: string
+          followers: number
+          id: string
+          is_verified: boolean
+          score: number
+          username: string
+        }[]
+      }
+      search_posts: {
+        Args: { p_limit?: number; p_q: string }
+        Returns: Database["public"]["Tables"]["posts"]["Row"][]
       }
       send_message: {
         Args: {

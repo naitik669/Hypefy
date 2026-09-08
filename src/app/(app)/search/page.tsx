@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, SearchX, Loader2, Hash, Clock, X } from "lucide-react";
+import { ChevronLeft, SearchX, Hash } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { SearchBar } from "@/components/ui/SearchBar";
@@ -13,6 +13,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
 import { ListRowSkeleton } from "@/components/skeletons/Skeletons";
+import { SearchDiscovery } from "@/components/search/SearchDiscovery";
 import Link from "next/link";
 
 type Profile = {
@@ -22,6 +23,9 @@ type Profile = {
   avatar_hue: number | null;
   avatar_url: string | null;
   bio: string | null;
+  /** From search_people's ranking — shown as the one line that explains order. */
+  followers?: number | null;
+  is_verified?: boolean | null;
 };
 
 const RECENT_KEY = "hypefy_recent_searches";
@@ -63,9 +67,6 @@ export default function SearchPage() {
   const [isPending, startTransition] = useTransition();
   const [recent, setRecent] = useState<string[]>([]);
   const blockedRef = useRef<Set<string>>(new Set());
-  const [trendingTags, setTrendingTags] = useState<
-    { tag: string; count: number }[]
-  >([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Resolve current user (for FeedCard hype/save attribution) + seed from ?q=
@@ -93,14 +94,6 @@ export default function SearchPage() {
       }
     });
     setRecent(loadRecent());
-    supabase.rpc("get_trending_tags", { p_limit: 10 }).then(({ data }) => {
-      setTrendingTags(
-        ((data ?? []) as any[]).map((t) => ({
-          tag: t.tag,
-          count: t.recent ?? 0,
-        }))
-      );
-    });
     if (query) {
       if (query.startsWith("#")) setTab("Tags");
       runSearch(query);
@@ -210,36 +203,23 @@ export default function SearchPage() {
     if (!term) return;
 
     startTransition(async () => {
-      // People (skip when explicitly searching a hashtag)
+      // Both sides are ranked in SQL now (0062). They used to be
+      // `ilike '%term%'` ordered by all-time hype, which had no notion of a
+      // better match and made the top result for any live topic the oldest
+      // popular post about it. The term also used to be interpolated into
+      // PostgREST's `or=` filter, where a comma is syntax — so searching
+      // "hey, you" did not return poor results, it returned wrong ones.
       const peopleRes = isTag
         ? { data: [] as Profile[] }
-        : await supabase
-            .from("profiles")
-            .select("id, display_name, username, avatar_hue, avatar_url, bio")
-            .eq("profile_completed", true)
-            .or(`username.ilike.%${term}%,display_name.ilike.%${term}%`)
-            .limit(20);
+        : await supabase.rpc("search_people", { p_q: trimmed, p_limit: 20 });
 
-      // Posts â€” by hashtag (array contains) or by text
       const postsRes = isUser
         ? { data: [] as any[] }
-        : isTag
-        ? await supabase
-            .from("posts")
-            .select(
-              "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)"
-            )
-            .contains("hashtags", [term])
-            .order("hype_count", { ascending: false })
-            .limit(20)
         : await supabase
-            .from("posts")
+            .rpc("search_posts", { p_q: trimmed, p_limit: 24 })
             .select(
               "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)"
-            )
-            .or(`caption.ilike.%${term}%,body.ilike.%${term}%`)
-            .order("hype_count", { ascending: false })
-            .limit(20);
+            );
 
       setPeople(
         (peopleRes.data ?? []).filter(
@@ -276,10 +256,16 @@ export default function SearchPage() {
           <SearchBar
             placeholder="Search people, posts, #tags"
             autoFocus
-            defaultValue={query}
+            value={query}
             onChange={(q) => {
               setQuery(q);
               if (debounceRef.current) clearTimeout(debounceRef.current);
+              // Emptying the box should show the browse screen at once, not
+              // after a debounce spent waiting for a search nobody asked for.
+              if (q.trim() === "") {
+                runSearch("");
+                return;
+              }
               debounceRef.current = setTimeout(
                 () => runSearch(q),
                 SEARCH_DEBOUNCE_MS
@@ -320,74 +306,13 @@ export default function SearchPage() {
       )}
 
       {!isPending && !searched && (
-        <div className="px-4 py-4">
-          {recent.length === 0 && trendingTags.length === 0 && (
-            <p className="py-6 text-center text-sm text-faint">
-              Search people or posts
-            </p>
-          )}
-
-          {recent.length > 0 && (
-            <div className="mb-6">
-              <div className="mb-1 flex items-center justify-between">
-                <h2 className="text-xs font-bold uppercase tracking-widest text-faint">
-                  Recent
-                </h2>
-                <button
-                  type="button"
-                  onClick={clearAllRecent}
-                  className="text-xs font-semibold text-muted transition-colors hover:text-foreground"
-                >
-                  Clear all
-                </button>
-              </div>
-              <div className="flex flex-col">
-                {recent.map((term) => (
-                  <div key={term} className="flex items-center gap-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => searchFromChip(term)}
-                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                    >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-muted">
-                        <Clock size={16} />
-                      </span>
-                      <span className="truncate text-sm">{term}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeRecentTerm(term)}
-                      aria-label={`Remove "${term}" from recent searches`}
-                      className="shrink-0 p-1.5 text-faint transition-colors hover:text-foreground"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {trendingTags.length > 0 && (
-            <div>
-              <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-faint">
-                Trending
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {trendingTags.map((t) => (
-                  <button
-                    key={t.tag}
-                    type="button"
-                    onClick={() => searchFromChip(`#${t.tag}`)}
-                    className="rounded-pill border border-border bg-surface px-3.5 py-2 text-sm font-semibold text-hashtag transition-transform active:scale-95"
-                  >
-                    #{t.tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchDiscovery
+          currentUserId={userId}
+          recent={recent}
+          onSearch={searchFromChip}
+          onRemoveRecent={removeRecentTerm}
+          onClearRecent={clearAllRecent}
+        />
       )}
 
       {!isPending && hasResults && (
@@ -472,7 +397,18 @@ export default function SearchPage() {
                     <p className="truncate text-sm font-semibold">
                       {u.display_name ?? u.username}
                     </p>
-                    <p className="truncate text-xs text-muted">@{u.username}</p>
+                    {/* Handle plus followers, because the ranker weighs both
+                        and a list whose order you cannot account for reads as
+                        no order at all. */}
+                    <p className="truncate text-xs text-muted">
+                      @{u.username}
+                      {typeof u.followers === "number" && u.followers > 0 && (
+                        <>
+                          {" · "}
+                          {u.followers} follower{u.followers === 1 ? "" : "s"}
+                        </>
+                      )}
+                    </p>
                   </div>
                 </Link>
               ))}
