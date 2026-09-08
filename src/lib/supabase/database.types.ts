@@ -2059,6 +2059,7 @@ export type Database = {
         Args: { p_current_pin: string; p_scope: string }
         Returns: undefined
       }
+      clear_mfa_recovery_codes: { Args: never; Returns: undefined }
       clear_note: { Args: never; Returns: undefined }
       clear_note_reaction: { Args: { p_owner: string }; Returns: undefined }
       create_comment:
@@ -2097,6 +2098,7 @@ export type Database = {
       }
       end_call: { Args: { p_call_id: string }; Returns: undefined }
       follow_user: { Args: { p_target: string }; Returns: string }
+      generate_mfa_recovery_codes: { Args: never; Returns: string[] }
       get_affinity: { Args: { p_lookback_days?: number }; Returns: Json }
       get_creator_timeseries: {
         Args: { p_days?: number }
@@ -2215,6 +2217,7 @@ export type Database = {
         Returns: undefined
       }
       mark_notifications_read: { Args: never; Returns: undefined }
+      mfa_recovery_codes_remaining: { Args: never; Returns: number }
       publish_due_scheduled_posts: { Args: never; Returns: number }
       purge_expired_messages: { Args: never; Returns: undefined }
       quick_reply_call: {
@@ -2230,6 +2233,10 @@ export type Database = {
         Returns: undefined
       }
       reap_oneshots: { Args: never; Returns: undefined }
+      record_login_session: {
+        Args: { p_label?: string; p_session_id: string }
+        Returns: undefined
+      }
       remove_conversation_member: {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: undefined
@@ -2298,6 +2305,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_notif_pref: {
+        Args: { p_key: string; p_on: boolean }
+        Returns: Json
+      }
       set_verified: {
         Args: { p_user_id: string; p_value: boolean }
         Returns: undefined
@@ -2354,6 +2365,10 @@ export type Database = {
       }
       verify_lock_pin: {
         Args: { p_pin: string; p_scope: string }
+        Returns: boolean
+      }
+      verify_mfa_recovery_code: {
+        Args: { p_code: string }
         Returns: boolean
       }
     }
