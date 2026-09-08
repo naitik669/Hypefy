@@ -3,23 +3,22 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { House, Chat, Lightning, Plus } from "@phosphor-icons/react";
+import {
+  House,
+  Chat,
+  Lightning,
+  Plus,
+  ImageSquare,
+  Cards,
+  Broadcast,
+} from "@phosphor-icons/react";
 import { Avatar } from "@/components/ui/Avatar";
 import { AccountSwitchPad } from "@/components/layout/AccountSwitchPad";
 import { createClient } from "@/lib/supabase/client";
 import { haptics } from "@/lib/haptics";
 import { NavHoldMenu, type HoldAction } from "@/components/layout/NavHoldMenu";
 import { ChatHoldMenu } from "@/components/layout/ChatHoldMenu";
-import {
-  Search,
-  Settings,
-  Bookmark,
-  Bell,
-  ImagePlus,
-  Video,
-  Sparkles,
-  Radio,
-} from "lucide-react";
+import { Search, Settings, Bookmark, Bell } from "lucide-react";
 
 /**
  * Shortcuts behind a hold on Home.
@@ -40,28 +39,48 @@ const HOME_SHORTCUTS: HoldAction[] = [
 ];
 
 /**
+ * Solid glyphs, fixed at the weight the fan needs.
+ *
+ * Phosphor's, not lucide's: at 54px a hairline outline floats inside the
+ * tile, and these four want the presence of a filled shape. Shot is the tab
+ * bar's own Lightning — the fan and the tab it eventually lands on should not
+ * disagree about what a Shot looks like — and Live is Broadcast, which draws
+ * the signal leaving the device rather than a radio set.
+ *
+ * Post is ONE framed photo and Show is a STACK of cards, deliberately: a Show
+ * is a run of moments that expires, a Post is a single thing that stays. Two
+ * stacked-rectangle glyphs side by side would have said nothing about which
+ * was which.
+ */
+const PostIcon = (p: { size?: number; className?: string }) => (
+  <ImageSquare {...p} weight="fill" />
+);
+const ShotIcon = (p: { size?: number; className?: string }) => (
+  <Lightning {...p} weight="fill" />
+);
+const ShowIcon = (p: { size?: number; className?: string }) => (
+  <Cards {...p} weight="fill" />
+);
+const LiveIcon = (p: { size?: number; className?: string }) => (
+  <Broadcast {...p} weight="bold" />
+);
+
+/**
  * What (+) can make, fanned across the top of the button.
  *
  * Left to right, not nearest-thumb-first: an arc has no near end, and these
  * read in the order the create screen already lists them, so the two places
  * you choose a mode agree with each other.
  *
- * Each carries its own gradient. Four identical outlined squares would make
- * you read four labels to pick one, and unlike Search and Settings these are
- * not peers — going live is not the same size of decision as writing a post,
- * and the colours say so before the caption does. Live is red for the reason
- * every camera light in history is red.
+ * No colour at rest. Only the tile under your thumb takes the accent — the
+ * same lime as the button you are still holding — and only Live goes red,
+ * because it is the one option other people see the instant you let go.
  */
 const CREATE_SHORTCUTS: HoldAction[] = [
-  {
-    icon: ImagePlus,
-    label: "Post",
-    href: "/create?mode=post",
-    tint: [212, 258],
-  },
-  { icon: Video, label: "Shot", href: "/create?mode=shot", tint: [284, 322] },
-  { icon: Sparkles, label: "Show", href: "/create?mode=show", tint: [38, 62] },
-  { icon: Radio, label: "Live", href: "/create?mode=live", tint: [352, 18] },
+  { icon: PostIcon, label: "Post", href: "/create?mode=post" },
+  { icon: ShotIcon, label: "Shot", href: "/create?mode=shot" },
+  { icon: ShowIcon, label: "Show", href: "/create?mode=show" },
+  { icon: LiveIcon, label: "Live", href: "/create?mode=live", tone: "danger" },
 ];
 
 export function BottomNav({

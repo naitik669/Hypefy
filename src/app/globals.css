@@ -913,6 +913,18 @@ body {
     transform: translateY(0) scale(1);
   }
 }
+/* Each tile of the create fan starts folded into the (+) and travels out
+   along its own radius. --dx/--dy are that radius, negated, set per tile. */
+@keyframes arc-fan {
+  from {
+    opacity: 0;
+    transform: translate(var(--dx, 0), var(--dy, 0)) scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+}
 @keyframes switch-veil {
   from {
     opacity: 0;

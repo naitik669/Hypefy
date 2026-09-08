@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { haptics } from "@/lib/haptics";
 
@@ -12,9 +11,17 @@ const HOLD_MS = 320;
 /** Movement that cancels the hold — treat it as a scroll, not a press. */
 const CANCEL_SLOP_PX = 10;
 
+/**
+ * Any icon that takes a size and a class — lucide's, Phosphor's, or one of
+ * ours. Typed structurally rather than as LucideIcon so a menu can use
+ * whichever family reads best at its size, which is how the create fan came
+ * to use Phosphor's while the stacks stay on lucide's.
+ */
+type IconType = React.ComponentType<{ size?: number; className?: string }>;
+
 export type HoldAction = {
   /** Ignored when `avatar` is set. One of the two is required. */
-  icon?: LucideIcon;
+  icon?: IconType;
   label: string;
   href: string;
   /**
@@ -29,14 +36,21 @@ export type HoldAction = {
   /** Unread messages waiting in this thread. 0 or absent draws nothing. */
   unread?: number;
   /**
-   * [from, to] hues for a filled, gradient tile instead of an outlined one.
+   * Colour of this option WHEN IT IS UNDER THE THUMB. Nothing is tinted at
+   * rest.
    *
-   * The create fan uses it: four outlined squares would make you read four
-   * labels to pick, and these four things are not peers of each other the way
-   * Search and Settings are — a Live stream and a text post deserve to look
-   * as different as they are.
+   * The fan first shipped with a different gradient on every tile, which is
+   * four competing colours to say one thing — and the thing they were saying,
+   * "these are four different features", the icons and the caption already
+   * said. Resting tiles are the app's own dark material now, and the accent
+   * appears on exactly one tile at a time: the one you are choosing, in the
+   * same lime as the button still under your thumb.
+   *
+   * "danger" is for Live alone. A broadcast is the one thing here that other
+   * people see the instant you tap it, and red is what every camera in
+   * history has used to say "you are on".
    */
-  tint?: [number, number];
+  tone?: "accent" | "danger";
 };
 
 /**
@@ -365,7 +379,7 @@ export function NavHoldMenu({
                   }
                   style={
                     layout === "arc"
-                      ? {
+                      ? ({
                           left: arcPos(i, ordered.length).x,
                           top: arcPos(i, ordered.length).y,
                           // Centred by offsetting left/top, NOT by a
@@ -376,19 +390,30 @@ export function NavHoldMenu({
                           // animation — and permanently, on any surface that
                           // pauses animations (a hidden tab does exactly
                           // that). Offsets cannot be overridden by a keyframe.
-                          // Outwards from the middle of the fan, so it opens
-                          // like a hand rather than sweeping in one direction.
-                          animation: `switch-rise 300ms cubic-bezier(0.16,1,0.3,1) ${
-                            Math.abs(i - (ordered.length - 1) / 2) * 42
+                          // Each tile flies out of the (+) along its own
+                          // radius, so the fan opens FROM the thing you are
+                          // holding. switch-rise nudged everything 14px
+                          // upward instead, which is the same motion whatever
+                          // the layout — fine for a column, and the reason
+                          // this arc felt like four squares appearing rather
+                          // than one control unfolding.
+                          //
+                          // The offsets are handed to the keyframes as custom
+                          // properties because each tile travels a different
+                          // way; the keyframe itself stays one rule.
+                          ["--dx"]: `${-arcPos(i, ordered.length).x - 27}px`,
+                          ["--dy"]: `${-arcPos(i, ordered.length).y - 27}px`,
+                          animation: `arc-fan 340ms cubic-bezier(0.2,1.12,0.4,1) ${
+                            Math.abs(i - (ordered.length - 1) / 2) * 40
                           }ms backwards`,
-                        }
-                      : {
+                        } as React.CSSProperties)
+                      : ({
                           // Stagger outwards from the thumb, so the stack
                           // unfurls away from the finger rather than at it.
                           animation: `switch-rise 260ms cubic-bezier(0.16,1,0.3,1) ${
                             (actions.length - 1 - i) * 38
                           }ms backwards`,
-                        }
+                        } as React.CSSProperties)
                   }
                 >
                   {/* Label slides out from behind the tile, away from the
@@ -450,24 +475,21 @@ export function NavHoldMenu({
                     <span
                       className={`relative flex items-center justify-center overflow-visible border-2 transition-[background-color,border-color,box-shadow,color] duration-200 ${
                         layout === "arc"
-                          ? "h-[54px] w-[54px] rounded-[19px]"
+                          ? "h-[54px] w-[54px] rounded-[18px]"
                           : "h-12 w-12 rounded-[16px]"
                       } ${
-                        action.tint
-                          ? active
-                            ? "border-white text-white shadow-[0_0_0_4px_rgba(255,255,255,0.16),0_12px_30px_rgba(0,0,0,0.55)]"
-                            : "border-white/15 text-white"
-                          : active
-                          ? "border-accent bg-accent/15 text-accent"
-                          : "border-border bg-surface/95 text-foreground"
+                        !active
+                          ? "border-border bg-elevated text-foreground"
+                          : action.tone === "danger"
+                          ? "border-danger bg-danger text-white shadow-[0_10px_26px_-6px_rgba(239,68,68,0.65)]"
+                          : layout === "arc"
+                          ? // Solid, not a wash: on the arc the chosen tile
+                            // should match the (+) still under the thumb,
+                            // so the gesture reads as the button moving to
+                            // where you pointed it.
+                            "border-accent bg-accent text-accent-ink shadow-[0_10px_26px_-6px_rgba(190,242,100,0.55)]"
+                          : "border-accent bg-accent/15 text-accent"
                       }`}
-                      style={
-                        action.tint
-                          ? {
-                              background: `linear-gradient(140deg, hsl(${action.tint[0]} 82% 56%), hsl(${action.tint[1]} 72% 40%))`,
-                            }
-                          : undefined
-                      }
                     >
                       {action.avatar ? (
                         <Avatar
@@ -478,12 +500,15 @@ export function NavHoldMenu({
                           className="rounded-[12px]"
                         />
                       ) : Icon ? (
-                        <Icon
-                          size={layout === "arc" ? 23 : 21}
-                          strokeWidth={layout === "arc" ? 2.3 : 2}
-                          aria-hidden
-                        />
+                        <Icon size={layout === "arc" ? 24 : 21} />
                       ) : null}
+                      {action.tone === "danger" && !active && (
+                        // At rest the fan is monochrome, so this dot is the
+                        // only thing distinguishing the option that other
+                        // people see the moment you release. Small on purpose:
+                        // a warning, not a decoration.
+                        <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-danger" />
+                      )}
                       {!!action.unread && (
                         // A bare dot said "something happened" and stopped
                         // there, which is the one thing you already knew.
