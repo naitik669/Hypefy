@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/TopBar";
@@ -96,7 +97,9 @@ export default async function HomePage() {
     supabase
       .from("profiles")
       .select(
-        "display_name, username, avatar_hue, avatar_url, interests, profile_tags"
+        // date_of_birth is here only to decide whether ads may be
+        // personalised. It never reaches the browser — only the boolean does.
+        "display_name, username, avatar_hue, avatar_url, interests, profile_tags, date_of_birth"
       )
       .eq("id", user.id)
       .maybeSingle(),
@@ -378,6 +381,23 @@ export default async function HomePage() {
 
   const placedShots = placeShots(posts, shotCandidates);
 
+  // ── Ads ────────────────────────────────────────────────────────────────
+  //
+  // Both inputs are resolved here, on the server, and only the conclusions
+  // cross to the client. The age one matters: a browser clock is adjustable,
+  // and this decides whether a reader who may be fourteen gets a personalised
+  // ad. A null date of birth — every OAuth account that never passed
+  // /age-check — is a no, not a maybe.
+  const dob = (myProfile as any)?.date_of_birth as string | null | undefined;
+  const eighteen = new Date();
+  eighteen.setFullYear(eighteen.getFullYear() - 18);
+  const adPersonalised = !!dob && new Date(dob) <= eighteen;
+
+  // Country comes from the edge. An absent header is left null and read as
+  // "consent required" downstream, so a misconfigured deploy serves nothing
+  // rather than serving into the EEA.
+  const adCountry = (await headers()).get("x-vercel-ip-country");
+
   const currentUserForRow = myProfile
     ? {
         name: myProfile.display_name ?? myProfile.username ?? "You",
@@ -460,6 +480,8 @@ export default async function HomePage() {
           hyperIds={hyperIds}
           mutualHyperIds={mutualHyperIds}
           blockedIds={[...blockedIds]}
+          adCountry={adCountry}
+          adPersonalised={adPersonalised}
         />
       </PullToRefresh>
     </>

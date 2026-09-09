@@ -130,3 +130,39 @@ export function personalised(isAdult: boolean): boolean {
 
 /** How many ads one browsing session may show, however far it scrolls. */
 export const AD_SESSION_BUDGET = 8;
+
+const BUDGET_KEY = "hypefy_ads_shown";
+
+/**
+ * Ads already shown this session, from sessionStorage.
+ *
+ * Session rather than local storage on purpose: the cap is about not wearing
+ * out one sitting, and a reader who comes back tomorrow is a new sitting.
+ * Follows loadSeen/saveSeen in feed-seen.ts — same idiom, different lifetime.
+ */
+export function adsShown(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    return Number(sessionStorage.getItem(BUDGET_KEY)) || 0;
+  } catch {
+    // Private mode, or storage blocked. Reporting zero means the cap stops
+    // biting, which is the right way round: a reader who cannot be counted
+    // should not be cut off from a feed that has already reserved the slots.
+    return 0;
+  }
+}
+
+/** Spend one. Called on IMPRESSION, never on placement. */
+export function noteAdShown() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(BUDGET_KEY, String(adsShown() + 1));
+  } catch {
+    /* non-fatal */
+  }
+}
+
+/** How many more this session may place. Never negative. */
+export function adBudgetLeft(): number {
+  return Math.max(0, AD_SESSION_BUDGET - adsShown());
+}

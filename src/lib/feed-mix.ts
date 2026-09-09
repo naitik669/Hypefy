@@ -33,16 +33,20 @@ export type ShotCard = {
 /** A shot plus the index it should occupy in the merged list. */
 export type PlacedShot<S> = S & { slot: number };
 
-/**
- * `A` defaults to `never` so that every existing `FeedItem<P, S>` keeps
- * exactly the type it had before ads existed: the ad arm collapses to an
- * uninhabited member, so `item.kind === "shot" ? … : …` still narrows the
- * false branch to a post. Nothing downstream had to change to make room.
- */
-export type FeedItem<P, S, A = never> =
+export type FeedItem<P, S> =
   | { kind: "post"; post: P }
-  | { kind: "shot"; shot: S }
-  | { kind: "ad"; ad: A };
+  | { kind: "shot"; shot: S };
+
+/**
+ * The same list with ad slots in it.
+ *
+ * A separate name rather than a third arm defaulted to `never` on FeedItem —
+ * that was the first attempt and it does not work: TypeScript keeps an arm
+ * whose payload is `never`, so `item.kind === "shot" ? … : item.post` stopped
+ * narrowing and every existing consumer broke. Two types cost one extra line
+ * and leave the shots-only path exactly as it was.
+ */
+export type FeedItemOrAd<P, S, A> = FeedItem<P, S> | { kind: "ad"; ad: A };
 
 export type PlaceOpts = {
   /** First slot a shot may occupy. */
@@ -233,7 +237,7 @@ export function spliceFeed<
   P,
   S extends { slot: number },
   A extends { slot: number },
->(posts: P[], shots: readonly S[], ads: readonly A[]): FeedItem<P, S, A>[] {
+>(posts: P[], shots: readonly S[], ads: readonly A[]): FeedItemOrAd<P, S, A>[] {
   const bySlot = <T extends { slot: number }>(items: readonly T[]) => {
     const map = new Map<number, T[]>();
     for (const item of items) {
@@ -247,7 +251,7 @@ export function spliceFeed<
   const shotSlots = bySlot(shots);
   const adSlots = bySlot(ads);
 
-  const out: FeedItem<P, S, A>[] = [];
+  const out: FeedItemOrAd<P, S, A>[] = [];
   posts.forEach((post, i) => {
     for (const shot of shotSlots.get(i) ?? []) out.push({ kind: "shot", shot });
     for (const ad of adSlots.get(i) ?? []) out.push({ kind: "ad", ad });

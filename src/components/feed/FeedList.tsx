@@ -12,8 +12,23 @@ import { CaughtUp } from "@/components/feed/CaughtUp";
 import { useFeedTab, type FeedTab } from "@/components/layout/FeedTabDropdown";
 import { loadSeen, saveSeen } from "@/lib/feed-seen";
 import { rankBatch } from "@/lib/feed-rank";
-import { spliceShots, type PlacedShot, type ShotCard } from "@/lib/feed-mix";
+import {
+  spliceFeed,
+  placeAds,
+  AD_DEFAULTS,
+  type PlacedShot,
+  type PlacedAd,
+  type ShotCard,
+} from "@/lib/feed-mix";
 import { ShotFeedCard } from "@/components/feed/ShotFeedCard";
+import { AdFeedCard } from "@/components/feed/AdFeedCard";
+import {
+  adFill,
+  adBudgetLeft,
+  noteAdShown,
+  type AdFill,
+} from "@/lib/ads";
+import { isNative } from "@/lib/native";
 
 const PAGE_SIZE = 20;
 const POST_SELECT =
@@ -54,6 +69,8 @@ export function FeedList({
   hyperIds = [],
   mutualHyperIds = [],
   blockedIds = [],
+  adCountry = null,
+  adPersonalised = false,
 }: {
   initialPosts: FeedPost[];
   /** Shots already scored and slotted by the server (For You only). */
@@ -64,6 +81,10 @@ export function FeedList({
   hyperIds?: string[];
   mutualHyperIds?: string[];
   blockedIds?: string[];
+  /** The reader's country, resolved on the server. Null means unknown. */
+  adCountry?: string | null;
+  /** Confirmed 18+. Computed server-side from date_of_birth; null is a no. */
+  adPersonalised?: boolean;
 }) {
   const supabase = createClient();
   const tab = useFeedTab();
@@ -80,6 +101,20 @@ export function FeedList({
   const [posts, setPosts] = useState<FeedPost[]>(initialPosts);
   const [shots, setShots] = useState<PlacedShot<ShotCard>[]>(initialShots);
   const [fyDone, setFyDone] = useState(initialPosts.length < PAGE_SIZE);
+
+  // Ads. Placed entirely client-side, after mount, and never server-rendered:
+  // isNative() answers false during SSR because Capacitor is absent there, so
+  // a server-rendered slot would ship an ad tag into the Play Store app and
+  // then have to take it back out. The gate has to run where it can tell.
+  const [ads, setAds] = useState<PlacedAd[]>([]);
+  const [fill, setFill] = useState<AdFill>("off");
+  // Where the next ad may start, and how many have been minted. Append-only:
+  // recomputing placement from scratch on every page would move an ad the
+  // reader has already scrolled past, which remounts the unit — a second
+  // request, a double-counted impression, and a jump above the scroll.
+  const adCursor = useRef({ nextSlot: 0, count: 0 });
+  // Bumped on refresh so the new slots get new ids and new units.
+  const adEpoch = useRef(0);
 
   // Following / Favourite / Hypers — each lazily loaded client-side.
   const [idsState, setIdsState] = useState<Record<IdsTab, IdsListState>>({
@@ -118,12 +153,55 @@ export function FeedList({
     // more confusing here because the stale cards would be video.
     setShots(initialShots);
     setFyDone(initialPosts.length < PAGE_SIZE);
+    // A refresh is a genuinely new page view, so the ad slots start over:
+    // new positions, new ids, new units. Carrying the old ones across would
+    // leave a unit that has already been requested sitting next to posts it
+    // was never placed against.
+    setAds([]);
+    adCursor.current = { nextSlot: 0, count: 0 };
+    adEpoch.current += 1;
     // Mark the ranked page as seen so the chronological tail won't resurface it.
     seenRef.current = loadSeen();
     initialPosts.forEach((p) => seenRef.current.add(p.id));
     saveSeen(seenRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPosts]);
+
+  // What may fill a slot for this reader. Resolved after mount because
+  // isNative() is only truthful in a browser.
+  useEffect(() => {
+    setFill(adFill({ country: adCountry, native: isNative() }));
+  }, [adCountry]);
+
+  // Place ads as the feed grows.
+  //
+  // Unlike shots — which arrive as a server prop and are therefore stuck on
+  // page one — an ad carries no server data, so it can be placed against
+  // whatever is currently loaded. Appends only, never renumbers.
+  useEffect(() => {
+    if (tab !== "foryou" || fill === "off") return;
+    const budget = adBudgetLeft();
+    if (budget <= 0) return;
+
+    setAds((prev) => {
+      const fresh = placeAds(
+        posts.length,
+        shots.map((shot) => shot.slot),
+        {
+          startAfter: adCursor.current.nextSlot,
+          startIndex: adCursor.current.count,
+          idPrefix: `ad-${adEpoch.current}-`,
+          max: Math.min(AD_DEFAULTS.max, budget),
+        }
+      );
+      if (fresh.length === 0) return prev;
+      adCursor.current = {
+        nextSlot: fresh[fresh.length - 1].slot + AD_DEFAULTS.every,
+        count: adCursor.current.count + fresh.length,
+      };
+      return [...prev, ...fresh];
+    });
+  }, [posts.length, shots, tab, fill]);
 
   /** Attach the current user's hype/save state to a freshly fetched batch. */
   async function withUserState(fresh: FeedPost[]): Promise<FeedPost[]> {
@@ -304,8 +382,27 @@ export function FeedList({
         // stays a plain FeedPost[] so every post-keyed path in this file —
         // withUserState's .in() lookups, the seen ring, the `oldest` cursor,
         // initialHyped/initialSaved — keeps working on post ids alone.
-        spliceShots(activePosts, tab === "foryou" ? shots : []).map((item, i) =>
-          item.kind === "shot" ? (
+        spliceFeed(
+          activePosts,
+          tab === "foryou" ? shots : [],
+          tab === "foryou" ? ads : []
+        ).map((item, i) =>
+          item.kind === "ad" ? (
+            // No content-visibility here, unlike its neighbours. It skips
+            // layout for off-screen subtrees, and an AdSense creative is an
+            // iframe that measures and resizes itself after load — the two
+            // race exactly at the viewport boundary, which is the worst
+            // possible moment for a shift. There are at most two of these on
+            // a page, so the virtualisation was never worth anything.
+            <Reveal key={item.ad.id} delay={Math.min(i, 4) * 55}>
+              <AdFeedCard
+                ad={item.ad}
+                fill={fill}
+                personalised={adPersonalised}
+                onSeen={noteAdShown}
+              />
+            </Reveal>
+          ) : item.kind === "shot" ? (
             <Reveal
               key={`shot-${item.shot.id}`}
               delay={Math.min(i, 4) * 55}
