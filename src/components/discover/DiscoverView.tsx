@@ -292,7 +292,7 @@ export function DiscoverView({
         {cat === "Shots" &&
           (trendingShots.length > 0 ? (
             <Section title="Shots">
-              <div className="grid grid-cols-2 gap-2.5 px-4 sm:grid-cols-3">
+              <div className="grid grid-cols-3 gap-3 px-4">
                 {trendingShots.map((s) => (
                   <ShotTile key={s.id} shot={s} />
                 ))}
@@ -398,7 +398,10 @@ function Section({
  */
 function Grid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="columns-2 gap-2 px-3 sm:columns-3 [&>*]:mb-2">
+    // gap-3 / mb-3 rather than 2: at two columns the tiles were very nearly
+    // touching, which reads as one continuous surface rather than as separate
+    // posts.
+    <div className="columns-2 gap-3 px-3 sm:columns-3 [&>*]:mb-3">
       {children}
     </div>
   );
@@ -454,6 +457,9 @@ function PostTile({
     // this buys the context back without spending a navigation on it.
     <GridPeek
       currentUserId={currentUserId}
+      // break-inside lives on the wrapper now, because the wrapper is what
+      // the column layout actually places.
+      className="break-inside-avoid"
       post={{
         id: post.id,
         user_id: post.user_id,
@@ -483,7 +489,7 @@ function PostTile({
         // falls back to a square. Clamped to 9:16..16:9 so one extreme
         // panorama cannot own the screen.
         style={{ aspectRatio: String(tileRatio(post.aspect_ratio)) }}
-        className="group relative block break-inside-avoid overflow-hidden rounded-2xl bg-surface"
+        className="group relative block overflow-hidden rounded-2xl bg-surface"
       >
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element

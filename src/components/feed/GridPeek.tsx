@@ -39,10 +39,22 @@ export type PeekablePost = {
 export function GridPeek({
   post,
   currentUserId,
+  className = "",
   children,
 }: {
   post: PeekablePost;
   currentUserId?: string;
+  /**
+   * Applied to the wrapper, which IS the layout item.
+   *
+   * This started as `display: contents` so the tile stayed the grid item
+   * directly — and that silently broke Discover. Its masonry spaces items
+   * with `[&>*]:mb-2`, a rule about DIRECT CHILDREN, and a display:contents
+   * element generates no box for a margin to apply to. The gaps went to zero
+   * and nothing errored. A real element, styled by the caller, cannot fail
+   * that way.
+   */
+  className?: string;
   /** The tile itself — usually a Link. */
   children: React.ReactNode;
 }) {
@@ -184,7 +196,7 @@ export function GridPeek({
           }
         }}
         style={{ touchAction: "pan-y", WebkitTouchCallout: "none" }}
-        className="contents"
+        className={className}
       >
         {children}
       </div>

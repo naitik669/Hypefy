@@ -29,7 +29,10 @@ export function PostResultsGrid({
   currentUserId?: string;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-1 px-1">
+    // Discover's grid, at three columns. Same gap, same rounding, same
+    // gradient scrim — the only difference is the density, which is what a
+    // list of results wants and a browse surface does not.
+    <div className="grid grid-cols-3 gap-3 px-4">
       {posts.map((p) => {
         const img = firstImage(p);
         const profile = p.profiles;
@@ -59,7 +62,7 @@ export function PostResultsGrid({
           >
             <Link
               href={`/p/${p.id}`}
-              className="group relative block aspect-square overflow-hidden bg-surface"
+              className="group relative block aspect-square overflow-hidden rounded-2xl bg-surface"
             >
               {img ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -87,7 +90,7 @@ export function PostResultsGrid({
               )}
 
               {(p.hype_count ?? 0) > 0 || (p.comment_count ?? 0) > 0 ? (
-                <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2.5 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1 pt-5 text-[10px] font-bold text-white">
+                <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2.5 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-5 text-[10px] font-bold text-white">
                   {(p.hype_count ?? 0) > 0 && (
                     <span className="flex items-center gap-0.5">
                       <Star size={10} className="fill-white" />
