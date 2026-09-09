@@ -2254,6 +2254,10 @@ export type Database = {
           username: string
         }[]
       }
+      search_suggestions: {
+        Args: { p_limit?: number; p_q: string }
+        Returns: { kind: string; score: number; term: string }[]
+      }
       search_posts: {
         Args: { p_limit?: number; p_q: string }
         Returns: Database["public"]["Tables"]["posts"]["Row"][]

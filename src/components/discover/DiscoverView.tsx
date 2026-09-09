@@ -6,10 +6,14 @@ import { Zap, MessageCircle, Play, Compass, Hash, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { UserSuggestionCard } from "@/components/discover/UserSuggestionCard";
+import { GridPeek } from "@/components/feed/GridPeek";
 import { formatCount } from "@/lib/format";
 
 type Post = {
   id: string;
+  // Both of these were already in the page's select and simply absent from
+  // this type; the peek needs an author to show and a target to hype.
+  user_id: string;
   caption: string | null;
   body: string | null;
   image_url: string | null;
@@ -22,6 +26,7 @@ type Post = {
     display_name: string | null;
     username: string | null;
     avatar_hue: number | null;
+    avatar_url: string | null;
   } | null;
 };
 type Shot = {
@@ -62,6 +67,7 @@ function postImage(p: Post): string | null {
 }
 
 export function DiscoverView({
+  currentUserId,
   trendingPosts,
   freshPosts,
   trendingShots,
@@ -182,7 +188,11 @@ export function DiscoverView({
               <Section eyebrow="Right now" title="Blowing up 🔥">
                 <Grid>
                   {trendingPosts.map((p) => (
-                    <PostTile key={p.id} post={p} />
+                    <PostTile
+                      key={p.id}
+                      post={p}
+                      currentUserId={currentUserId}
+                    />
                   ))}
                 </Grid>
               </Section>
@@ -192,7 +202,7 @@ export function DiscoverView({
                 <div className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto px-4">
                   {interestPosts.map((p) => (
                     <div key={p.id} className="w-32 shrink-0 snap-start">
-                      <PostTile post={p} />
+                      <PostTile post={p} currentUserId={currentUserId} />
                     </div>
                   ))}
                 </div>
@@ -221,7 +231,7 @@ export function DiscoverView({
                 <div className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto px-4">
                   {catPosts.map((p) => (
                     <div key={p.id} className="w-32 shrink-0 snap-start">
-                      <PostTile post={p} />
+                      <PostTile post={p} currentUserId={currentUserId} />
                     </div>
                   ))}
                 </div>
@@ -231,7 +241,11 @@ export function DiscoverView({
               <Section eyebrow="Just posted" title="Fresh">
                 <Grid>
                   {fresh.map((p) => (
-                    <PostTile key={p.id} post={p} />
+                    <PostTile
+                      key={p.id}
+                      post={p}
+                      currentUserId={currentUserId}
+                    />
                   ))}
                 </Grid>
                 {!noMore && (
@@ -259,7 +273,7 @@ export function DiscoverView({
           <Section title="Blowing up 🔥">
             <Grid>
               {trendingPosts.map((p) => (
-                <PostTile key={p.id} post={p} />
+                <PostTile key={p.id} post={p} currentUserId={currentUserId} />
               ))}
             </Grid>
           </Section>
@@ -269,7 +283,7 @@ export function DiscoverView({
           <Section title="All posts">
             <Grid>
               {allPosts.map((p) => (
-                <PostTile key={p.id} post={p} />
+                <PostTile key={p.id} post={p} currentUserId={currentUserId} />
               ))}
             </Grid>
           </Section>
@@ -425,48 +439,82 @@ function tileRatio(ratio: number | null | undefined): number {
   return Math.min(16 / 9, Math.max(9 / 16, ratio));
 }
 
-function PostTile({ post }: { post: Post }) {
+function PostTile({
+  post,
+  currentUserId,
+}: {
+  post: Post;
+  currentUserId?: string;
+}) {
   const img = postImage(post);
   const hue = post.profiles?.avatar_hue ?? 280;
   return (
-    <Link
-      href={`/p/${post.id}`}
-      // The post's own shape, not a forced square. aspect_ratio is
-      // width/height and is set on every post since 0035; anything older
-      // falls back to a square. Clamped to 9:16..16:9 so one extreme
-      // panorama cannot own the screen.
-      style={{ aspectRatio: String(tileRatio(post.aspect_ratio)) }}
-      className="group relative block break-inside-avoid overflow-hidden rounded-2xl bg-surface"
+    // Hold to lift the whole post out of the grid. A grid trades context for
+    // density — twelve posts on screen and no idea who made any of them — and
+    // this buys the context back without spending a navigation on it.
+    <GridPeek
+      currentUserId={currentUserId}
+      post={{
+        id: post.id,
+        user_id: post.user_id,
+        caption: post.caption ?? post.body ?? null,
+        image: img,
+        hype_count: post.hype_count,
+        comment_count: post.comment_count,
+        author: post.profiles
+          ? {
+              id: post.user_id,
+              name:
+                post.profiles.display_name ??
+                post.profiles.username ??
+                "Someone",
+              username: post.profiles.username ?? null,
+              avatarUrl: post.profiles.avatar_url ?? null,
+              hue,
+              verified: false,
+            }
+          : null,
+      }}
     >
-      {img ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={img}
-          alt={post.caption ?? "Post"}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        <div
-          className="flex h-full w-full items-end p-3"
-          style={{
-            background: `linear-gradient(140deg, hsl(${hue} 55% 22%), #141414)`,
-          }}
-        >
-          <p className="line-clamp-4 text-xs font-medium text-white/90">
-            {post.caption ?? post.body ?? ""}
-          </p>
+      <Link
+        href={`/p/${post.id}`}
+        // The post's own shape, not a forced square. aspect_ratio is
+        // width/height and is set on every post since 0035; anything older
+        // falls back to a square. Clamped to 9:16..16:9 so one extreme
+        // panorama cannot own the screen.
+        style={{ aspectRatio: String(tileRatio(post.aspect_ratio)) }}
+        className="group relative block break-inside-avoid overflow-hidden rounded-2xl bg-surface"
+      >
+        {img ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={img}
+            alt={post.caption ?? "Post"}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div
+            className="flex h-full w-full items-end p-3"
+            style={{
+              background: `linear-gradient(140deg, hsl(${hue} 55% 22%), #141414)`,
+            }}
+          >
+            <p className="line-clamp-4 text-xs font-medium text-white/90">
+              {post.caption ?? post.body ?? ""}
+            </p>
+          </div>
+        )}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent p-2.5 pt-6">
+          <Stat
+            icon={<Zap size={12} className="fill-accent text-accent" />}
+            value={post.hype_count}
+          />
+          <Stat icon={<MessageCircle size={12} />} value={post.comment_count} />
         </div>
-      )}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent p-2.5 pt-6">
-        <Stat
-          icon={<Zap size={12} className="fill-accent text-accent" />}
-          value={post.hype_count}
-        />
-        <Stat icon={<MessageCircle size={12} />} value={post.comment_count} />
-      </div>
-    </Link>
+      </Link>
+    </GridPeek>
   );
 }
 

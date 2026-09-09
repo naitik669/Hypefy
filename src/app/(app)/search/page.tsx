@@ -11,7 +11,8 @@ import { FilterPills } from "@/components/ui/FilterPills";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Avatar } from "@/components/ui/Avatar";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
-import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
+import { type FeedPost } from "@/components/feed/FeedCard";
+import { PostResultsGrid } from "@/components/search/PostResultsGrid";
 import { ListRowSkeleton } from "@/components/skeletons/Skeletons";
 import { SearchDiscovery } from "@/components/search/SearchDiscovery";
 import Link from "next/link";
@@ -66,6 +67,10 @@ export default function SearchPage() {
   const [followedTags, setFollowedTags] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [recent, setRecent] = useState<string[]>([]);
+  /** "Did you mean …" candidates for the term that was actually typed. */
+  const [suggestions, setSuggestions] = useState<
+    { term: string; kind: string }[]
+  >([]);
   const blockedRef = useRef<Set<string>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -193,6 +198,7 @@ export default function SearchPage() {
       setPeople([]);
       setPosts([]);
       setTags([]);
+      setSuggestions([]);
       setSearched(false);
       return;
     }
@@ -221,6 +227,20 @@ export default function SearchPage() {
               "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)"
             );
 
+      // Asked for on every search, shown only when the results are thin —
+      // see the row below. Cheap, and doing it here means the answer is ready
+      // at the same moment the disappointment is.
+      supabase
+        .rpc("search_suggestions", { p_q: trimmed, p_limit: 3 })
+        .then(({ data }) =>
+          setSuggestions(
+            ((data ?? []) as { term: string; kind: string }[]).map((r) => ({
+              term: r.term,
+              kind: r.kind,
+            }))
+          )
+        );
+
       setPeople(
         (peopleRes.data ?? []).filter(
           (p: Profile) => !blockedRef.current.has(p.id)
@@ -238,7 +258,8 @@ export default function SearchPage() {
   const showPeople = tab === "Top" || tab === "People";
   const showPosts = tab === "Top" || tab === "Posts";
   const showTags = tab === "Top" || tab === "Tags";
-  const hasResults = people.length > 0 || posts.length > 0 || tags.length > 0;
+  const resultCount = people.length + posts.length + tags.length;
+  const hasResults = resultCount > 0;
 
   return (
     <>
@@ -295,6 +316,33 @@ export default function SearchPage() {
             <ListRowSkeleton key={i} avatarSize={46} />
           ))}
         </div>
+      )}
+
+      {/* Did you mean …
+          Shown when the results are thin, which is when a typo is the likely
+          explanation — not on every search, because correcting someone who
+          found what they wanted is just noise. The suggestion RUNS the search
+          rather than only filling the box: being told the right spelling and
+          then having to press enter yourself is a hint, not a fix. */}
+      {!isPending && searched && suggestions.length > 0 && resultCount < 3 && (
+        <p className="px-4 pt-3 text-sm text-muted">
+          Did you mean{" "}
+          {suggestions.map((s, i) => (
+            <span key={s.term}>
+              {i > 0 && <span className="text-faint"> · </span>}
+              <button
+                type="button"
+                onClick={() =>
+                  searchFromChip(s.kind === "tag" ? `#${s.term}` : s.term)
+                }
+                className="font-bold text-accent underline underline-offset-2"
+              >
+                {s.kind === "tag" ? `#${s.term}` : s.term}
+              </button>
+            </span>
+          ))}
+          ?
+        </p>
       )}
 
       {!isPending && searched && !hasResults && (
@@ -421,11 +469,7 @@ export default function SearchPage() {
               <h2 className="px-4 pb-2 pt-4 text-xs font-bold uppercase tracking-widest text-faint">
                 Posts
               </h2>
-              <div className="flex flex-col">
-                {posts.map((p) => (
-                  <FeedCard key={p.id} post={p} currentUserId={userId} />
-                ))}
-              </div>
+              <PostResultsGrid posts={posts} currentUserId={userId} />
             </>
           )}
         </div>
