@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { AD_CLIENT, AD_LAYOUT_KEY, AD_SLOT_FEED } from "@/lib/ads";
+import { AD_CLIENT, AD_LAYOUT_KEY, AD_SLOT_FEED, adTest } from "@/lib/ads";
 import { loadAdSense } from "@/lib/adsense";
 
 /**
@@ -100,6 +100,10 @@ export const AdSenseUnit = memo(function AdSenseUnit({
       // Non-personalised for anyone we cannot confirm is an adult. The app's
       // only age threshold is 13, so this is most readers.
       {...(personalised ? {} : { "data-tag-for-under-age-of-consent": "true" })}
+      // Test creatives: served, rendered and measured like the real thing,
+      // but never counted or paid. The only safe way to run this path outside
+      // Production.
+      {...(adTest() ? { "data-adtest": "on" } : {})}
     />
   );
 });

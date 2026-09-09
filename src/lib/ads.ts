@@ -128,6 +128,22 @@ export function personalised(isAdult: boolean): boolean {
   return isAdult === true;
 }
 
+/**
+ * Ask Google for test creatives instead of real ones.
+ *
+ * This is AdSense's own switch (data-adtest="on"), not a mock of ours: the
+ * script loads, the unit is requested and filled, and the whole path runs
+ * exactly as it will in production — but the impression is not counted and
+ * not paid, so it cannot generate invalid traffic. It still needs a real
+ * publisher id; there is no way to exercise the served path without one.
+ *
+ * This is what makes it safe to run `adsense` mode outside Production, and
+ * the only thing that does.
+ */
+export function adTest(): boolean {
+  return process.env.NEXT_PUBLIC_ADS_TEST === "1";
+}
+
 /** How many ads one browsing session may show, however far it scrolls. */
 export const AD_SESSION_BUDGET = 8;
 
