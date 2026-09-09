@@ -325,7 +325,10 @@ function PostThumb({ post }: { post: PostRow }) {
 
   return (
     <Link
-      href={`/p/${post.id}`}
+      // ?from=profile turns the post page into the rest of this profile in
+      // order, instead of two shelves of recommendations. See the comment on
+      // fromProfile in p/[postId]/page.tsx.
+      href={`/p/${post.id}?from=profile`}
       className="relative block h-full overflow-hidden rounded-xl bg-surface"
     >
       {cover ? (
