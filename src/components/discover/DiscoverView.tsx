@@ -486,8 +486,10 @@ function ShotTile({ shot }: { shot: Shot }) {
           className="h-full w-full object-cover"
         />
       ) : (
+        // #t=0.1 forces a decoded frame; preload="metadata" alone is not
+        // obliged to produce one and Safari does not.
         <video
-          src={shot.media_url}
+          src={`${shot.media_url}#t=0.1`}
           muted
           playsInline
           preload="metadata"

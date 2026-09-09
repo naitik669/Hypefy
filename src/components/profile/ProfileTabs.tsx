@@ -253,8 +253,13 @@ export function ProfileTabs({ userId }: { userId: string }) {
                     href={`/shots/${s.id}`}
                     className="relative block aspect-[3/4] overflow-hidden rounded-xl bg-surface"
                   >
+                    {/* #t=0.1, not a bare src: preload="metadata" is only
+                        obliged to fetch duration and dimensions, and Safari
+                        decodes no frame at all — a black tile with a play
+                        badge on it. A media fragment makes the browser seek
+                        there, which forces one. */}
                     <video
-                      src={s.media_url}
+                      src={`${s.media_url}#t=0.1`}
                       className="h-full w-full object-cover"
                       muted
                       playsInline

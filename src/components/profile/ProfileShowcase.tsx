@@ -54,7 +54,8 @@ export function ProfileShowcase({ userId }: { userId: string }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={it.poster_url} alt={it.caption ?? ""} loading="lazy" className="h-full w-full object-cover" />
             ) : (
-              <video src={it.media_url} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+              // #t=0.1 forces a decoded frame — see ProfileTabs.
+              <video src={`${it.media_url}#t=0.1`} muted playsInline preload="metadata" className="h-full w-full object-cover" />
             )}
             <span className="absolute right-1.5 top-1.5 text-white drop-shadow">
               <Play size={12} className="fill-white" />

@@ -60,6 +60,13 @@ export function capturePoster(src: string, at?: number | null): Promise<Blob | n
     video.muted = true;
     video.playsInline = true;
     video.preload = "auto";
+    // Set BEFORE src, and required for any source that is not a local blob:
+    // drawing a cross-origin video onto a canvas taints it, and the toBlob
+    // below then throws a SecurityError. Publishing captures from a local
+    // object URL where this is moot, but anything re-capturing from storage
+    // (a backfill for the Shots that predate posters) needs it, and Supabase
+    // Storage does send the CORS headers that make it work.
+    video.crossOrigin = "anonymous";
     video.src = src;
 
     const bail = setTimeout(() => resolve(null), 8000);

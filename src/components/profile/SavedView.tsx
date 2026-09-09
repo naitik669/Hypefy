@@ -9,7 +9,18 @@ import { EmptyState } from "@/components/ui/EmptyState";
 export type SavedItem = {
   id: string;
   kind: "post" | "shot";
+  /** A real image only. A Shot with no poster has none — see `video`. */
   thumb: string | null;
+  /**
+   * The Shot's own media, used as the thumbnail when it has no poster.
+   *
+   * Kept separate from `thumb` because it is not interchangeable with one.
+   * Both save paths used to fall back to `poster_url ?? media_url` and hand
+   * the result to an <img>, so a Shot without a poster rendered as a BROKEN
+   * IMAGE with a play badge sitting on top of it — which is exactly what a
+   * generic video placeholder looks like, and why this went unnoticed.
+   */
+  video: string | null;
   caption: string | null;
   savedAt: string;
 };
@@ -56,7 +67,7 @@ export function SavedView({
   const sentinel = useRef<HTMLDivElement>(null);
 
   const one = <T,>(v: T | T[] | null): T | null =>
-    Array.isArray(v) ? (v[0] ?? null) : v;
+    Array.isArray(v) ? v[0] ?? null : v;
 
   const loadMore = useCallback(async () => {
     if (busy.current) return;
@@ -80,15 +91,22 @@ export function SavedView({
       // permanently short list.
       if (!error) {
         const fresh = (data ?? []).flatMap((r: Record<string, unknown>) => {
-          const p = one(r.posts as Record<string, unknown> | Record<string, unknown>[] | null);
+          const p = one(
+            r.posts as
+              | Record<string, unknown>
+              | Record<string, unknown>[]
+              | null
+          );
           if (!p) return [];
           return [
             {
               id: p.id as string,
               kind: "post" as const,
               thumb:
-                ((p.image_urls as string[] | null)?.[0] ??
-                  (p.image_url as string | null)) ?? null,
+                (p.image_urls as string[] | null)?.[0] ??
+                (p.image_url as string | null) ??
+                null,
+              video: null,
               caption: (p.caption as string) ?? null,
               savedAt: r.created_at as string,
             },
@@ -110,13 +128,19 @@ export function SavedView({
         .limit(pageSize);
       if (!error) {
         const fresh = (data ?? []).flatMap((r: Record<string, unknown>) => {
-          const s = one(r.shots as Record<string, unknown> | Record<string, unknown>[] | null);
+          const s = one(
+            r.shots as
+              | Record<string, unknown>
+              | Record<string, unknown>[]
+              | null
+          );
           if (!s) return [];
           return [
             {
               id: s.id as string,
               kind: "shot" as const,
-              thumb: ((s.poster_url as string) ?? (s.media_url as string)) ?? null,
+              thumb: (s.poster_url as string) ?? null,
+              video: (s.media_url as string) ?? null,
               caption: (s.caption as string) ?? null,
               savedAt: r.created_at as string,
             },
@@ -148,10 +172,15 @@ export function SavedView({
     tab === "posts"
       ? posts
       : tab === "shots"
-        ? shots
-        : [...posts, ...shots].sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1));
+      ? shots
+      : [...posts, ...shots].sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1));
 
-  const done = tab === "posts" ? postsDone : tab === "shots" ? shotsDone : postsDone && shotsDone;
+  const done =
+    tab === "posts"
+      ? postsDone
+      : tab === "shots"
+      ? shotsDone
+      : postsDone && shotsDone;
 
   return (
     <div className="flex flex-col">
@@ -182,7 +211,9 @@ export function SavedView({
                     </span>
                   )}
                 </span>
-                <span className="mt-1 block truncate text-xs font-semibold">{c.name}</span>
+                <span className="mt-1 block truncate text-xs font-semibold">
+                  {c.name}
+                </span>
                 <span className="block text-[11px] text-faint">{c.count}</span>
               </Link>
             ))}
@@ -235,6 +266,18 @@ export function SavedView({
                   alt={i.caption ?? ""}
                   loading="lazy"
                   decoding="async"
+                  className="h-full w-full object-cover"
+                />
+              ) : i.video ? (
+                // #t=0.1 is the whole trick: preload="metadata" fetches the
+                // duration and dimensions but is not obliged to decode a
+                // frame, and Safari in particular paints nothing. A media
+                // fragment makes the browser seek there, which forces one.
+                <video
+                  src={`${i.video}#t=0.1`}
+                  muted
+                  playsInline
+                  preload="metadata"
                   className="h-full w-full object-cover"
                 />
               ) : (
