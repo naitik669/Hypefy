@@ -34,6 +34,26 @@ const OPEN_PATHS = [
   "/api/gate",
   "/auth/callback",
 
+  // The front door.
+  //
+  // The wall used to stand here, and standing here it made the whole site
+  // look like it did not exist: a visitor — or a reviewer, or a crawler —
+  // arrived, met a code field, and left. Nothing behind it was reachable
+  // even though most of it was public.
+  //
+  // "Invite only" is about who can JOIN, not about who may look. So the wall
+  // moved to /signin and /signup, which is where joining actually happens,
+  // and these three became the public face. Nobody gets an account who
+  // could not before.
+  //
+  // Note that this must be the same for everyone. Letting a crawler through
+  // a wall that humans still meet is cloaking — a policy violation with a
+  // site-level penalty — and it would not even work, since a review is a
+  // person opening the URL in a browser.
+  "/",
+  "/onboarding",
+  "/explore",
+
   // Account recovery has to survive the wall. The callback forwards here
   // after spending the recovery code, so gating it would strand anyone
   // resetting a password on a device that has no gate cookie. The page is

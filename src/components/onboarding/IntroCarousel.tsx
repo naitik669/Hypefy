@@ -182,6 +182,17 @@ export function IntroCarousel() {
             Already have an account? <span className="font-semibold text-foreground">Sign in</span>
           </Link>
         )}
+
+        {/* The way out of the carousel that is not a form.
+            Without it the front door leads only to sign-up, which leaves
+            anyone who has not decided yet — and anything reading the site
+            from outside — with nowhere to go but away. */}
+        <Link
+          href="/explore"
+          className="mt-3 block text-center text-sm font-medium text-muted transition-colors active:text-foreground"
+        >
+          Or <span className="font-semibold text-foreground">look around first</span>
+        </Link>
       </div>
     </div>
   );

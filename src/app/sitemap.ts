@@ -62,6 +62,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const fixed: MetadataRoute.Sitemap = [
     { url: BASE, lastModified: now, changeFrequency: "daily", priority: 1 },
+    // The one page that links to everything else. Highest priority after
+    // the root for exactly that reason.
+    { url: `${BASE}/explore`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${BASE}/onboarding`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${BASE}/privacy`, lastModified: now, changeFrequency: "monthly", priority: 0.3 },
     { url: `${BASE}/terms`, lastModified: now, changeFrequency: "monthly", priority: 0.3 },
