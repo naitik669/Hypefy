@@ -63,6 +63,37 @@ export const AD_LAYOUT_KEY = process.env.NEXT_PUBLIC_ADSENSE_FEED_LAYOUT_KEY ?? 
  */
 export const AD_RESERVED_PX = 320;
 
+/**
+ * The only origins allowed to request a real ad.
+ *
+ * Everywhere else — localhost, a Vercel preview, a branch deploy, a tunnel —
+ * gets the house card, whatever the configuration says.
+ *
+ * This exists because the safeguard it replaces did not hold. The intended
+ * protection was NEXT_PUBLIC_ADS_TEST, which sets data-adtest="on" so a
+ * creative is served but never counted. Serving it locally once, the ad
+ * request that actually went to Google carried no adtest parameter, and in a
+ * zero-width preview window there was no way to establish why. An unexplained
+ * gap in the one control standing between a development machine and real,
+ * billable impressions is not a control.
+ *
+ * So the guard is now the origin, which cannot silently fail to be true: a
+ * request either comes from the live site or it does not. NEXT_PUBLIC_ADS_TEST
+ * stays as a second layer for the live site, not as the only one.
+ */
+const SERVING_HOSTS = new Set([
+  "app.hypefy.chat",
+  "hypefy.chat",
+  "www.hypefy.chat",
+]);
+
+function canServeHere(): boolean {
+  // Server-side render: never mount an ad anyway, so the answer is moot. The
+  // browser decides, after mount, which is also where isNative() is truthful.
+  if (typeof window === "undefined") return false;
+  return SERVING_HOSTS.has(window.location.hostname);
+}
+
 /** Regions with no lawful path to serving until a CMP exists. */
 const CONSENT_REQUIRED = new Set([
   "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR",
@@ -135,6 +166,9 @@ export function adFill(ctx: AdContext): AdFill {
   if (mode === "house") return "house";
   if (ctx.native) return "house";
   if (needsConsent(ctx.country)) return "house";
+  // Last, and the one that does not depend on anything being configured
+  // correctly: only the live site talks to Google.
+  if (!canServeHere()) return "house";
   return "adsense";
 }
 

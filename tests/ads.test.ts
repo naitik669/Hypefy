@@ -36,8 +36,22 @@ const BLANK = {
   NEXT_PUBLIC_ADSENSE_FEED_LAYOUT_KEY: undefined,
 };
 
+/**
+ * jsdom serves from "localhost", which the origin guard treats as a
+ * development machine — correctly. Any test about what a real reader gets has
+ * to say where they are.
+ */
+function servingFrom(hostname: string) {
+  Object.defineProperty(window, "location", {
+    value: { hostname },
+    writable: true,
+    configurable: true,
+  });
+}
+
 beforeEach(() => {
   process.env = { ...ENV };
+  servingFrom("app.hypefy.chat");
 });
 afterEach(() => {
   process.env = { ...ENV };
@@ -136,6 +150,12 @@ describe("adFill", () => {
     expect(adFill({ country: "IN", native: false })).toBe("adsense");
   });
 
+  it("does not reach adsense from a developer's machine", async () => {
+    const { adFill } = await load(CONFIGURED);
+    servingFrom("localhost");
+    expect(adFill({ country: "IN", native: false })).toBe("house");
+  });
+
   it("stays off entirely when nothing is configured, native or not", async () => {
     const { adFill } = await load(BLANK);
     expect(adFill({ country: "IN", native: false })).toBe("off");
@@ -194,5 +214,41 @@ describe("the publisher id", () => {
     });
     expect(AD_CLIENT).toBe("");
     expect(adMode()).toBe("off");
+  });
+});
+
+describe("the origin guard", () => {
+  const at = servingFrom;
+
+  it("serves only from the live site", async () => {
+    const { adFill } = await load(CONFIGURED);
+    for (const host of ["app.hypefy.chat", "hypefy.chat", "www.hypefy.chat"]) {
+      at(host);
+      expect(adFill({ country: "IN", native: false })).toBe("adsense");
+    }
+  });
+
+  it("never serves from a development or preview origin", async () => {
+    // The reason this guard exists: NEXT_PUBLIC_ADS_TEST is a flag that can
+    // silently fail to take effect, and when it does the request that reaches
+    // Google is a real, billable one from a developer's machine. An origin
+    // cannot silently be the wrong one.
+    const { adFill } = await load(CONFIGURED);
+    for (const host of [
+      "localhost",
+      "127.0.0.1",
+      "hypefy-git-main-x.vercel.app",
+      "evil-hypefy.chat",
+      "app.hypefy.chat.attacker.test",
+    ]) {
+      at(host);
+      expect(adFill({ country: "IN", native: false })).toBe("house");
+    }
+  });
+
+  it("still fills the card rather than leaving a hole", async () => {
+    const { adsEnabled } = await load(CONFIGURED);
+    at("localhost");
+    expect(adsEnabled({ country: "IN", native: false })).toBe(true);
   });
 });

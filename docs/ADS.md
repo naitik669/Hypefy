@@ -128,11 +128,20 @@ NEXT_PUBLIC_ADSENSE_FEED_LAYOUT_KEY=<the layout key>
 NEXT_PUBLIC_ADS_TEST=1
 ```
 
-**`NEXT_PUBLIC_ADS_TEST=1` is not optional outside Production.** It sets
-`data-adtest="on"`, so creatives are requested, served and rendered for real
-but never counted or paid. Without it, every page you or the E2E suite loads
-is a real impression from your own machine — invalid traffic, and the fastest
-way to lose the account.
+**Real ads only ever load on `app.hypefy.chat`, `hypefy.chat` and
+`www.hypefy.chat`.** Every other origin — localhost, a Vercel preview, a branch
+deploy, a tunnel — gets the house card whatever the configuration says. See
+`SERVING_HOSTS` in `src/lib/ads.ts`.
+
+That guard exists because the flag below did not hold. Serving locally once
+with `NEXT_PUBLIC_ADS_TEST=1`, the request that actually reached Google carried
+no `adtest` parameter — so it was a real request, not a test one. It went
+unfilled and nothing was counted, but an unexplained gap in the one control
+between a developer's machine and billable impressions is not a control.
+
+`NEXT_PUBLIC_ADS_TEST=1` is still worth setting; it is now a second layer
+rather than the only one. It sets `data-adtest="on"`, which asks Google for
+creatives that are served and rendered for real but never counted or paid.
 
 Restart the dev server. **Next reads `.env.local` only at boot**; editing it
 under a running server silently does nothing.
@@ -146,7 +155,8 @@ instruction. The layout key is optional; see step 4.
 
 ## Step 6 — Verify
 
-With `NEXT_PUBLIC_ADS_TEST=1`:
+**Serving can only be verified on the live site**, by the origin guard above.
+Locally you are verifying placement and the house card, which is most of it.
 
 1. Sign in and scroll the For You feed.
 2. An ad card should appear around the 5th post, never adjacent to a Shot,
