@@ -102,16 +102,26 @@ export function ProfileStatusBubble({
   if (!note && !editable) return null;
 
   const bubbleBody = note ? (
-    <span className="flex items-center gap-1.5">
-      <span className="line-clamp-2 min-w-0">{note.text}</span>
-      {track && <Music size={12} className="shrink-0 text-accent" aria-hidden />}
+    <span className="flex items-center gap-1">
+      <span className="line-clamp-1 min-w-0">{note.text}</span>
+      {track && <Music size={10} className="shrink-0 text-accent" aria-hidden />}
     </span>
   ) : (
     <span className="text-faint">add a status…</span>
   );
 
+  // Sized for the corner of an avatar, not for a chat.
+  //
+  // max-w-[220px] never did anything: this is absolutely positioned inside
+  // the avatar wrapper, so its containing block is 88px wide and the text
+  // wrapped to two lines and clipped anyway. What it actually was, measured,
+  // is an 88x50 slab with a heavy shadow sitting on top of an 88px avatar —
+  // more furniture than the status it carries.
+  //
+  // Smaller type, tighter padding and one line: a 24h status is a glance, and
+  // the full text is one tap away in the editor or the reaction sheet.
   const bubbleClasses =
-    "animate-bubble-float pointer-events-auto max-w-[220px] rounded-[18px] rounded-bl-md border bg-elevated px-3 py-1.5 text-[13px] font-semibold leading-snug shadow-[0_10px_28px_rgba(0,0,0,0.4)] " +
+    "animate-bubble-float pointer-events-auto rounded-[13px] rounded-bl-sm border bg-elevated px-2.5 py-1 text-[11px] font-semibold leading-snug shadow-[0_6px_18px_rgba(0,0,0,0.35)] " +
     (note ? "border-white/[0.09]" : "border-dashed border-border text-muted");
 
   function onBubbleClick() {
@@ -120,7 +130,7 @@ export function ProfileStatusBubble({
   }
 
   return (
-    <div className="pointer-events-none absolute bottom-full left-0 z-10 mb-2">
+    <div className="pointer-events-none absolute bottom-full left-0 z-10 mb-1.5">
       <div className="relative">
         {/* Reaction picker (others' profiles) — floats above the bubble */}
         {pickerOpen && canReact && (
@@ -154,19 +164,19 @@ export function ProfileStatusBubble({
         )}
 
         {/* Thought-bubble tail — two dots stepping down toward the avatar */}
-        <span className="pointer-events-none absolute -bottom-2 left-3 h-2.5 w-2.5 rounded-full border border-white/[0.09] bg-elevated" />
-        <span className="pointer-events-none absolute -bottom-4 left-1.5 h-1.5 w-1.5 rounded-full border border-white/[0.09] bg-elevated" />
+        <span className="pointer-events-none absolute -bottom-1.5 left-2.5 h-2 w-2 rounded-full border border-white/[0.09] bg-elevated" />
+        <span className="pointer-events-none absolute -bottom-3 left-1 h-1 w-1 rounded-full border border-white/[0.09] bg-elevated" />
 
         {/* My reaction badge (others' profiles) */}
         {!editable && myReaction && (
-          <span className="pointer-events-none absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-xs shadow">
+          <span className="pointer-events-none absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-[10px] shadow">
             {myReaction}
           </span>
         )}
 
         {/* Reactions received (own profile) */}
         {editable && cluster.count > 0 && (
-          <span className="pointer-events-none absolute -right-2 -top-2 flex items-center gap-0.5 rounded-full border border-border bg-background px-1.5 py-0.5 text-[11px] font-semibold shadow">
+          <span className="pointer-events-none absolute -right-1.5 -top-1.5 flex items-center gap-0.5 rounded-full border border-border bg-background px-1.5 py-0.5 text-[10px] font-semibold shadow">
             <span>{cluster.emojis.join("")}</span>
             {cluster.count > 1 && <span className="text-muted">{cluster.count}</span>}
           </span>
