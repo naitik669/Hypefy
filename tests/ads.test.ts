@@ -150,3 +150,34 @@ describe("personalised", () => {
     expect(personalised(false)).toBe(false);
   });
 });
+
+describe("the publisher id", () => {
+  it("takes the form AdSense shows on screen", async () => {
+    // The interface says "pub-8956774728473034"; data-ad-client needs
+    // "ca-pub-8956774728473034". Copying what is on screen would otherwise
+    // give a unit that loads, requests and never fills, with no error to
+    // explain it.
+    const { AD_CLIENT } = await load({
+      ...CONFIGURED,
+      NEXT_PUBLIC_ADSENSE_CLIENT: "pub-8956774728473034",
+    });
+    expect(AD_CLIENT).toBe("ca-pub-8956774728473034");
+  });
+
+  it("leaves an already-prefixed id alone", async () => {
+    const { AD_CLIENT } = await load({
+      ...CONFIGURED,
+      NEXT_PUBLIC_ADSENSE_CLIENT: "ca-pub-8956774728473034",
+    });
+    expect(AD_CLIENT).toBe("ca-pub-8956774728473034");
+  });
+
+  it("trims, and treats blank as absent", async () => {
+    const { AD_CLIENT, adMode } = await load({
+      ...CONFIGURED,
+      NEXT_PUBLIC_ADSENSE_CLIENT: "   ",
+    });
+    expect(AD_CLIENT).toBe("");
+    expect(adMode()).toBe("off");
+  });
+});

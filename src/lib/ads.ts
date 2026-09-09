@@ -29,7 +29,24 @@
 /** What should actually fill a slot. */
 export type AdFill = "off" | "house" | "adsense";
 
-export const AD_CLIENT = process.env.NEXT_PUBLIC_ADSENSE_CLIENT ?? "";
+/**
+ * The publisher id, in the form the tag wants.
+ *
+ * AdSense's own interface shows it as "pub-8956774728473034", but
+ * data-ad-client has to read "ca-pub-8956774728473034". Copying what is on
+ * screen therefore produces a unit that loads, requests, and never fills —
+ * with no error anywhere, because an unrecognised client is indistinguishable
+ * from having nothing to serve. Accepting both spellings costs one line.
+ */
+function normaliseClient(raw: string): string {
+  const v = raw.trim();
+  if (!v) return "";
+  return v.startsWith("ca-") ? v : `ca-${v}`;
+}
+
+export const AD_CLIENT = normaliseClient(
+  process.env.NEXT_PUBLIC_ADSENSE_CLIENT ?? ""
+);
 export const AD_SLOT_FEED = process.env.NEXT_PUBLIC_ADSENSE_FEED_SLOT ?? "";
 export const AD_LAYOUT_KEY = process.env.NEXT_PUBLIC_ADSENSE_FEED_LAYOUT_KEY ?? "";
 
