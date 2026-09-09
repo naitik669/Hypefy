@@ -90,6 +90,25 @@ export const metadata: Metadata = {
     description: "Where your personality lives.",
     images: ["/og-default.png"],
   },
+  other: {
+    /**
+     * AdSense site verification.
+     *
+     * The meta tag rather than the <script> Google hands you, which is the
+     * Auto ads tag and does three things we specifically do not want. It
+     * would inject anchor bars and full-screen vignettes over the feed the
+     * moment Auto ads is switched on, undoing the card we built to sit
+     * inside it. It would load inside the Android WebView, which is the
+     * AdSense policy line the whole gate in src/lib/ads.ts exists to stay
+     * behind. And it would set cookies for every EEA visitor, who have no
+     * consent flow to say yes with.
+     *
+     * This proves ownership and does nothing else: no script, no cookies,
+     * no request. The actual ad script is still loaded by AdSenseUnit, once,
+     * and only for a reader the gate allows.
+     */
+    "google-adsense-account": "ca-pub-8956774728473034",
+  },
 };
 
 export const viewport: Viewport = {
