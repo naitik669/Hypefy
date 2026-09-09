@@ -1,10 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Play, VolumeX } from "lucide-react";
+import { Play, VolumeX, Volume2, Star, MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
+import { Plane } from "@/components/ui/Plane";
+import { CommentsSheet } from "@/components/feed/CommentsSheet";
+import { ShareSheet } from "@/components/feed/ShareSheet";
+import { HypeBreak } from "@/components/feed/HypeBreak";
+import { HypeParticles } from "@/components/feed/HypeParticles";
+import { createClient } from "@/lib/supabase/client";
+import { hypeResult } from "@/lib/supabase/typed";
 import { formatCount } from "@/lib/format";
+import { haptics } from "@/lib/haptics";
+import {
+  isMuted,
+  setMuted,
+  subscribe,
+  claimAudio,
+  releaseAudio,
+  ownsAudio,
+} from "@/lib/shot-audio";
 import type { ShotCard } from "@/lib/feed-mix";
 
 /**
@@ -38,10 +54,20 @@ import type { ShotCard } from "@/lib/feed-mix";
  *    failed to start looks like the feature working, which is exactly how a
  *    silent failure hides.
  *
+ *  - **Sound is attempted, not assumed.** A Shot is made with sound and the
+ *    feed should carry it, but a video that is not muted has its play()
+ *    REFUSED until the page has been interacted with. So it asks for sound,
+ *    and on refusal falls back to muted and shows the unmute control rather
+ *    than simply not playing. Only one card is ever audible — see
+ *    lib/shot-audio.
+ *
  * Still no FeedImpression: post_views.post_id has a hard foreign key to
- * posts(id), so logging a shot there fails every time. And no hype/save
- * buttons — the counts are static text, the real controls are one tap away,
- * which is what keeps this card out of FeedList's post-keyed batch queries.
+ * posts(id), so logging a shot there fails every time.
+ *
+ * Hype, comment and share live here now. They cost one extra query per shot
+ * card for the viewer's own hype state, which FeedList's batch cannot supply
+ * because it is keyed on post ids — a handful of shots per feed, fetched only
+ * once a card is near the viewport.
  */
 
 /** How much of the card must be visible before it plays. */
@@ -78,12 +104,32 @@ function autoplayUnwelcome(): boolean {
   });
 }
 
-export function ShotFeedCard({ shot }: { shot: ShotCard }) {
+export function ShotFeedCard({
+  shot,
+  currentUserId,
+}: {
+  shot: ShotCard;
+  currentUserId?: string;
+}) {
+  const supabase = createClient();
   const name =
     shot.profiles?.display_name ?? shot.profiles?.username ?? "Someone";
   const username = shot.profiles?.username;
-  const hypes = shot.hype_count ?? 0;
-  const comments = shot.comment_count ?? 0;
+
+  const [hyped, setHyped] = useState(false);
+  const [hypeCount, setHypeCount] = useState(shot.hype_count ?? 0);
+  const [hypePending, setHypePending] = useState(false);
+  const [hypeBurst, setHypeBurst] = useState(false);
+  const [showParticles, setShowParticles] = useState(false);
+  const [hypeBreak, setHypeBreak] = useState(false);
+  const [commentCount, setCommentCount] = useState(shot.comment_count ?? 0);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+
+  /** Mirrors the shared preference so this card re-renders when it changes. */
+  const [muted, setMutedState] = useState(true);
+  /** Sound was asked for and the browser said no — until a gesture. */
+  const [soundBlocked, setSoundBlocked] = useState(false);
 
   const wrapRef = useRef<HTMLAnchorElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -94,24 +140,121 @@ export function ShotFeedCard({ shot }: { shot: ShotCard }) {
   /** True while the card is the one on screen, so retries know to bother. */
   const inViewRef = useRef(false);
 
+  // The mute preference and the audio owner both live outside React, because
+  // they are shared by every card on the page. This mirrors them in.
+  useEffect(() => {
+    const sync = () => setMutedState(isMuted() || !ownsAudio(shot.id));
+    sync();
+    return subscribe(sync);
+  }, [shot.id]);
+
+  // Whether the viewer has already hyped this. Deferred until the card is
+  // near the viewport so a feed of ten shots is not ten queries up front.
+  useEffect(() => {
+    if (!armed || !currentUserId) return;
+    let live = true;
+    supabase
+      .from("hypes")
+      .select("target_id")
+      .eq("user_id", currentUserId)
+      .eq("target_type", "shot")
+      .eq("target_id", shot.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (live) setHyped(!!data);
+      });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [armed, currentUserId, shot.id]);
+
+  async function toggleHype() {
+    if (hypePending || !currentUserId) return;
+    const prev = hyped;
+    const prevCount = hypeCount;
+    setHypePending(true);
+    setHyped(!prev);
+    setHypeCount((c) => c + (prev ? -1 : 1));
+    if (!prev) {
+      haptics.success();
+      setHypeBurst(true);
+      setShowParticles(true);
+      setTimeout(() => setHypeBurst(false), 380);
+      setTimeout(() => setShowParticles(false), 640);
+    } else {
+      haptics.tap();
+      setHypeBreak(true);
+      setTimeout(() => setHypeBreak(false), 520);
+    }
+    try {
+      const { data, error } = await supabase.rpc("toggle_hype", {
+        p_target_type: "shot",
+        p_target_id: shot.id,
+        p_owner_id: shot.user_id,
+      });
+      if (error) throw error;
+      const res = hypeResult(data);
+      if (res) {
+        setHyped(res.hyped);
+        setHypeCount(res.hype_count);
+      }
+    } catch {
+      setHyped(prev);
+      setHypeCount(prevCount);
+    } finally {
+      setHypePending(false);
+    }
+  }
+
+  /**
+   * Play, asking for sound first.
+   *
+   * The order matters and is the whole trick. An unmuted play() is refused
+   * outright until the page has a user gesture, and a refusal means NOTHING
+   * plays — so trying sound first and falling back to muted is the only way
+   * to get both "audible when allowed" and "always plays".
+   */
+  const attemptPlay = useCallback(async () => {
+    const v = videoRef.current;
+    if (!v || !inViewRef.current) return;
+
+    const wantSound = !isMuted() && ownsAudio(shot.id);
+
+    if (wantSound) {
+      v.muted = false;
+      v.removeAttribute("muted");
+      try {
+        await v.play();
+        setSoundBlocked(false);
+        setPlaying(true);
+        return;
+      } catch {
+        // Refused for being audible. Fall through and play silently rather
+        // than leaving a dead frame on screen.
+        setSoundBlocked(true);
+      }
+    }
+
+    // React sets `muted` as a DOM property but does not always reflect it as
+    // an attribute, and autoplay policies read the attribute. Setting it both
+    // ways is the difference between playing and being refused.
+    v.muted = true;
+    v.setAttribute("muted", "");
+    try {
+      await v.play();
+      setPlaying(true);
+    } catch {
+      setPlaying(false);
+    }
+  }, [shot.id]);
+
   useEffect(() => {
     const el = wrapRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
     if (autoplayUnwelcome()) return;
 
-    function attempt() {
-      const v = videoRef.current;
-      if (!v || !inViewRef.current) return;
-      // React sets `muted` as a DOM property but does not always reflect it
-      // as an attribute, and autoplay policies read the attribute. Setting it
-      // both ways is the difference between playing and being refused.
-      v.muted = true;
-      v.setAttribute("muted", "");
-      void v
-        .play()
-        .then(() => setPlaying(true))
-        .catch(() => setPlaying(false));
-    }
+    const attempt = () => void attemptPlay();
 
     const io = new IntersectionObserver(
       (entries) => {
@@ -127,9 +270,12 @@ export function ShotFeedCard({ shot }: { shot: ShotCard }) {
 
         if (entry.intersectionRatio >= PLAY_RATIO) {
           inViewRef.current = true;
+          // The card you are looking at is the one that should be heard.
+          claimAudio(shot.id);
           attempt();
         } else {
           inViewRef.current = false;
+          releaseAudio(shot.id);
           if (!v.paused) {
             v.pause();
             setPlaying(false);
@@ -147,17 +293,64 @@ export function ShotFeedCard({ shot }: { shot: ShotCard }) {
     // until the user has touched the page once. One retry on the first touch
     // costs nothing and is the difference between working and not.
     const unlock = () => attempt();
-    document.addEventListener("pointerdown", unlock, { once: true, passive: true });
-    document.addEventListener("touchstart", unlock, { once: true, passive: true });
+    document.addEventListener("pointerdown", unlock, {
+      once: true,
+      passive: true,
+    });
+    document.addEventListener("touchstart", unlock, {
+      once: true,
+      passive: true,
+    });
 
     return () => {
       io.disconnect();
       document.removeEventListener("pointerdown", unlock);
       document.removeEventListener("touchstart", unlock);
+      releaseAudio(shot.id);
       const v = videoRef.current;
       if (v && !v.paused) v.pause();
     };
-  }, []);
+  }, [attemptPlay, shot.id]);
+
+  // Re-apply the mute state to the element whenever the shared preference or
+  // the audio owner changes, without restarting playback.
+  //
+  // No early return on `v.muted` already matching: React's muted={muted} prop
+  // has by this point set the PROPERTY, so a check like that always matches
+  // and would skip the two things this effect is actually for — keeping the
+  // attribute in sync, and finding out whether the unmute was allowed.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const wantSound = !muted;
+
+    v.muted = !wantSound;
+    // The attribute, separately: autoplay policy reads the attribute rather
+    // than the property, so the next play() depends on it being right.
+    if (wantSound) v.removeAttribute("muted");
+    else v.setAttribute("muted", "");
+
+    if (!wantSound) {
+      setSoundBlocked(false);
+      return;
+    }
+
+    // Turning sound ON mid-playback can be refused, and the browser's way of
+    // refusing is to pause or re-mute — leaving the button saying "Mute" over
+    // a silent video. Re-asserting through play() is how we find out, and if
+    // it is refused we put the shared preference back rather than showing a
+    // state the element does not have.
+    if (v.paused) return;
+    void v.play().then(
+      () => setSoundBlocked(false),
+      () => {
+        v.muted = true;
+        v.setAttribute("muted", "");
+        setSoundBlocked(true);
+        setMuted(true);
+      }
+    );
+  }, [muted]);
 
   // A backgrounded tab keeps firing nothing, so the observer never tells us to
   // stop. Without this a shot carries on decoding while the phone is locked.
@@ -219,7 +412,11 @@ export function ShotFeedCard({ shot }: { shot: ShotCard }) {
           ref={videoRef}
           src={shot.media_url}
           poster={shot.poster_url ?? undefined}
-          muted
+          // Bound to state, NOT hardcoded. React re-applies its props on
+          // every render, so a literal `muted` here would quietly re-mute the
+          // element the next time anything in this card re-rendered — the
+          // toggle would appear to work and the sound would not come back.
+          muted={muted}
           loop
           playsInline
           // Deliberately NO autoPlay attribute. React sets `muted` as a DOM
@@ -247,25 +444,128 @@ export function ShotFeedCard({ shot }: { shot: ShotCard }) {
           </span>
         )}
 
-        {/* Says why it is silent, and that sound exists elsewhere. */}
-        {playing && (
-          <span className="pointer-events-none absolute top-3 right-3 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm">
-            <VolumeX size={14} />
-          </span>
-        )}
+        {/* Sound, and the fact that you can have it.
+            This used to be a VolumeX glyph with no handler — a statement that
+            the feed is silent, offering nothing to do about it.
 
-        {(hypes > 0 || comments > 0) && (
-          <span className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-3 text-[11px] font-semibold text-white/90">
-            {hypes > 0 && <span>{formatCount(hypes)} hypes</span>}
-            {comments > 0 && <span>{formatCount(comments)} comments</span>}
+            preventDefault as well as stopPropagation: the button sits inside
+            the Link that opens the Shots viewer, and without both, muting
+            navigates away from the thing you were watching. */}
+        <button
+          type="button"
+          aria-label={muted ? "Unmute" : "Mute"}
+          aria-pressed={!muted}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            haptics.tap();
+            // Claim the sound as well as unmuting: tapping unmute on THIS
+            // card means you want to hear THIS one, even if another card
+            // last claimed it.
+            if (muted) claimAudio(shot.id);
+            setMuted(!muted);
+          }}
+          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-transform active:scale-90"
+        >
+          {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+        </button>
+
+        {/* Only when the browser actually refused. A permanent "tap for
+            sound" hint on a card that is already audible would be noise. */}
+        {soundBlocked && muted && (
+          <span className="pointer-events-none absolute right-3 top-14 rounded-full bg-black/50 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
+            Tap for sound
           </span>
         )}
       </Link>
 
+      {/* The same actions in the same order as a post card, so a Shot is
+          something you can respond to where you find it rather than a
+          trailer for the Shots tab. */}
+      <div className="flex items-center gap-1 px-3 pt-2">
+        <button
+          type="button"
+          onClick={toggleHype}
+          disabled={hypePending || !currentUserId}
+          aria-pressed={hyped}
+          aria-label={hyped ? "Remove hype" : "Hype"}
+          className={`flex h-10 items-center gap-1.5 rounded-full px-2 transition-colors active:scale-95 disabled:opacity-50 ${
+            hyped ? "text-hype" : "text-foreground hover:bg-white/5"
+          }`}
+        >
+          <span className="relative">
+            <Star
+              size={22}
+              strokeWidth={2.2}
+              className={
+                hypeBurst
+                  ? "animate-hype-burst"
+                  : hypeBreak
+                  ? "animate-hype-crack"
+                  : ""
+              }
+              fill={hyped ? "currentColor" : "none"}
+            />
+            {showParticles && <HypeParticles size={9} />}
+            {hypeBreak && <HypeBreak size={22} />}
+          </span>
+          {hypeCount > 0 && (
+            <span className="text-xs font-semibold tabular-nums">
+              {formatCount(hypeCount)}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCommentsOpen(true)}
+          disabled={!currentUserId}
+          aria-label="Comments"
+          className="flex h-10 items-center gap-1.5 rounded-full px-2 text-foreground transition-colors hover:bg-white/5 active:scale-95 disabled:opacity-50"
+        >
+          <MessageCircle size={22} strokeWidth={2.2} />
+          {commentCount > 0 && (
+            <span className="text-xs font-semibold tabular-nums">
+              {formatCount(commentCount)}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShareOpen(true)}
+          disabled={!currentUserId}
+          aria-label="Share"
+          className="flex h-10 items-center justify-center rounded-full px-2 text-foreground transition-colors hover:bg-white/5 active:scale-95 disabled:opacity-50"
+        >
+          <Plane size={21} weight="bold" />
+        </button>
+      </div>
+
       {shot.caption && (
-        <p className="line-clamp-2 px-4 pt-2 text-sm leading-snug text-foreground/85">
+        <p className="line-clamp-2 px-4 pt-1 text-sm leading-snug text-foreground/85">
           {shot.caption}
         </p>
+      )}
+
+      {currentUserId && (
+        <>
+          <CommentsSheet
+            open={commentsOpen}
+            onClose={() => setCommentsOpen(false)}
+            targetType="shot"
+            postId={shot.id}
+            postOwnerId={shot.user_id}
+            currentUserId={currentUserId}
+            onCountChange={setCommentCount}
+          />
+          <ShareSheet
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            targetType="shot"
+            postId={shot.id}
+          />
+        </>
       )}
     </article>
   );

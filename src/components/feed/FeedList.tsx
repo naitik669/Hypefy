@@ -313,7 +313,7 @@ export function FeedList({
               // reusing 480px makes the scroll anchor jump as it resolves.
               className="[content-visibility:auto] [contain-intrinsic-size:auto_560px]"
             >
-              <ShotFeedCard shot={item.shot} />
+              <ShotFeedCard shot={item.shot} currentUserId={currentUserId} />
             </Reveal>
           ) : (
             <Reveal
