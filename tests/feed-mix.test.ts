@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { placeShots, spliceShots, PLACE_DEFAULTS } from "@/lib/feed-mix";
+import {
+  placeShots,
+  spliceShots,
+  placeAds,
+  spliceFeed,
+  PLACE_DEFAULTS,
+  AD_DEFAULTS,
+} from "@/lib/feed-mix";
 
 const posts = (n: number, author = (i: number) => `u${i}`) =>
   Array.from({ length: n }, (_, i) => ({ id: `p${i}`, user_id: author(i) }));
@@ -100,5 +107,136 @@ describe("spliceShots", () => {
     for (let i = 1; i < out.length; i++) {
       expect(out[i].kind === "shot" && out[i - 1].kind === "shot").toBe(false);
     }
+  });
+});
+
+/**
+ * Ads are a second quota pass over the same index space as shots, so most of
+ * what can go wrong is a collision between the two passes rather than anything
+ * either one does alone. These cover the collision.
+ */
+describe("placeAds", () => {
+  const shotSlots = (n: number) =>
+    placeShots(posts(40), shots(n)).map((s) => s.slot);
+
+  it("never puts an ad within `gap` of a shot, at any feed size", () => {
+    // The exhaustive form on purpose: 5/8 against 3/6 collides at 11 and 19,
+    // and which sizes expose that is not obvious by eye.
+    for (let n = 0; n <= 40; n++) {
+      for (let k = 0; k <= 3; k++) {
+        const reserved = placeShots(posts(n), shots(k)).map((s) => s.slot);
+        for (const ad of placeAds(n, reserved)) {
+          for (const shot of reserved) {
+            expect(Math.abs(ad.slot - shot)).toBeGreaterThanOrEqual(
+              AD_DEFAULTS.gap
+            );
+          }
+        }
+      }
+    }
+  });
+
+  it("never slots an ad at or past the end", () => {
+    // The last card sits above "You're all caught up", where an ad reads as
+    // Hypefy signing off rather than as an advert.
+    for (let n = 0; n <= 40; n++) {
+      for (const ad of placeAds(n, [])) expect(ad.slot).toBeLessThan(n);
+    }
+  });
+
+  it("never puts an ad in the opening run of the feed", () => {
+    expect(
+      placeAds(40, []).every((a) => a.slot >= AD_DEFAULTS.firstSlot)
+    ).toBe(true);
+  });
+
+  it("keeps ads at least `every` apart", () => {
+    const slots = placeAds(40, []).map((a) => a.slot);
+    for (let i = 1; i < slots.length; i++) {
+      expect(slots[i] - slots[i - 1]).toBeGreaterThanOrEqual(AD_DEFAULTS.every);
+    }
+  });
+
+  it("places nothing on a thin feed", () => {
+    expect(placeAds(AD_DEFAULTS.minPosts - 1, [])).toEqual([]);
+    expect(placeAds(0, [])).toEqual([]);
+  });
+
+  it("respects the max", () => {
+    expect(placeAds(400, [])).toHaveLength(AD_DEFAULTS.max);
+  });
+
+  it("appends beyond startAfter without renumbering", () => {
+    // Pagination: an ad the reader has already scrolled past must not move,
+    // because moving it remounts the unit — a second request, a double-counted
+    // impression, and a jump above the scroll position.
+    const first = placeAds(20, []);
+    const next = placeAds(40, [], {
+      startAfter: first[first.length - 1].slot + AD_DEFAULTS.every,
+      startIndex: first.length,
+    });
+    expect(next[0].slot).toBeGreaterThan(first[first.length - 1].slot);
+    expect(next[0].index).toBe(first.length);
+    expect(next.map((a) => a.id)).not.toContain(first[0].id);
+  });
+
+  it("gives up rather than drifting when shots saturate the region", () => {
+    // Every slot blocked from firstSlot onwards: the ad has nowhere legal to
+    // go, and walking it forward until it finds one would land it wherever,
+    // not where the spacing rules say.
+    const wall = Array.from({ length: 40 }, (_, i) => i);
+    expect(placeAds(40, wall)).toEqual([]);
+  });
+
+  it("still places when there are no shots at all", () => {
+    expect(placeAds(40, shotSlots(0)).length).toBeGreaterThan(0);
+  });
+});
+
+describe("spliceFeed", () => {
+  it("loses no posts, whatever is spliced in", () => {
+    const p = posts(30);
+    const placed = placeShots(p, shots(3));
+    const ads = placeAds(p.length, placed.map((s) => s.slot));
+    const out = spliceFeed(p, placed, ads);
+    expect(out.filter((i) => i.kind === "post")).toHaveLength(30);
+    expect(out.filter((i) => i.kind === "shot")).toHaveLength(placed.length);
+    expect(out.filter((i) => i.kind === "ad")).toHaveLength(ads.length);
+  });
+
+  it("never yields two non-posts in a row", () => {
+    // The whole point of the gap. Two interruptions back to back is the thing
+    // a reader notices, whichever two they are.
+    for (let n = 0; n <= 40; n++) {
+      const p = posts(n);
+      const placed = placeShots(p, shots(3));
+      const ads = placeAds(n, placed.map((s) => s.slot));
+      const out = spliceFeed(p, placed, ads);
+      for (let i = 1; i < out.length; i++) {
+        expect(out[i].kind !== "post" && out[i - 1].kind !== "post").toBe(false);
+      }
+    }
+  });
+
+  it("puts the shot before the ad when both land on one index", () => {
+    // Should not happen via placeAds, but the order has to be stated rather
+    // than fall out of Map insertion.
+    const out = spliceFeed(posts(5), [{ id: "s0", slot: 2 }], [
+      { id: "a0", slot: 2 },
+    ]);
+    expect(out.map((i) => i.kind)).toEqual([
+      "post",
+      "post",
+      "shot",
+      "ad",
+      "post",
+      "post",
+      "post",
+    ]);
+  });
+
+  it("drops an over-slotted ad rather than parking it at the bottom", () => {
+    const out = spliceFeed(posts(2), [], [{ id: "a0", slot: 99 }]);
+    expect(out.every((i) => i.kind === "post")).toBe(true);
   });
 });
