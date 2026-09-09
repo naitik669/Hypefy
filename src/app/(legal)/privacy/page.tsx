@@ -4,7 +4,7 @@ export default function PrivacyPage() {
   return (
     <>
       <h1>Privacy Policy</h1>
-      <p className="text-xs text-faint">Last updated: July 27, 2026</p>
+      <p className="text-xs text-faint">Last updated: September 9, 2026</p>
 
       <p>
         This Privacy Policy explains how Hypefy Platform Private Limited (CIN
@@ -74,8 +74,11 @@ export default function PrivacyPage() {
       <h2>3. What we do not do</h2>
       <ul>
         <li>We do not sell your personal data.</li>
-        <li>We do not show third-party ads or share your data with ad networks.</li>
         <li>We do not track you across unrelated websites.</li>
+        <li>
+          We do not give advertisers your email address, your messages, or any
+          other information that identifies you.
+        </li>
       </ul>
 
       <h2>4. Who we share data with (processors)</h2>
@@ -89,6 +92,10 @@ export default function PrivacyPage() {
         <li><strong>Sentry</strong> — error monitoring and diagnostics.</li>
         <li><strong>GIPHY</strong> — GIF search (your search query is proxied through our server).</li>
         <li><strong>Apple (iTunes Search API)</strong> — song search; previews and artwork are served directly by Apple.</li>
+        <li>
+          <strong>Google (AdSense)</strong> — advertising in the feed, where it
+          is shown. See section 11.
+        </li>
       </ul>
       <p>
         We may also disclose data where required by law, to respond to valid legal
@@ -147,12 +154,47 @@ export default function PrivacyPage() {
       <p>
         We use essential cookies and local storage to keep you signed in, remember
         preferences (such as your feed tab and whether music is muted), and secure
-        the Service. These are necessary
-        for the Service to function; we do not use advertising or cross-site
-        tracking cookies.
+        the Service. These are necessary for the Service to function.
+      </p>
+      <p>
+        Where ads are shown, Google may also set cookies or read device
+        identifiers to measure them and to limit how often you see the same
+        one. Section 11 explains where this applies and where it does not.
       </p>
 
-      <h2>11. Security and breach notification</h2>
+      <h2 id="ads">11. Advertising</h2>
+      <p>
+        Some Hypefy feeds include ads, shown between posts and marked
+        &quot;Sponsored&quot;. They are served by Google AdSense. Where an ad
+        appears, Google receives your IP address, your device and browser type,
+        and the page it was shown on, and may set cookies to measure it and to
+        limit repeats. Google does not receive your email address, your
+        username, your messages, or anything else that identifies your Hypefy
+        account.
+      </p>
+      <p>
+        Ads are not shown everywhere. They are not shown in the Hypefy Android
+        app, and they are not shown to people in the European Economic Area,
+        the United Kingdom or Switzerland, because we do not yet operate a
+        consent management platform of the kind those rules require. Where ads
+        do not run, the slot carries a Hypefy notice instead and no third-party
+        script loads at all.
+      </p>
+      <p>
+        Ads are personalised only where we can confirm you are 18 or over from
+        a date of birth you have given us. Everyone else — including anyone who
+        has never given us one — sees non-personalised ads, which are chosen
+        from the page rather than from anything about you.
+      </p>
+      <p>
+        You can review and change Google&apos;s ad settings at{" "}
+        <a href="https://myadcenter.google.com" className="text-accent" rel="noopener noreferrer" target="_blank">
+          myadcenter.google.com
+        </a>
+        . Blocking ads does not affect your access to Hypefy.
+      </p>
+
+      <h2>12. Security and breach notification</h2>
       <p>
         We use reasonable technical and organizational measures — including
         encryption in transit, hashed passwords, and access controls — to protect
@@ -161,13 +203,13 @@ export default function PrivacyPage() {
         required by applicable law.
       </p>
 
-      <h2>12. Changes to this policy</h2>
+      <h2>13. Changes to this policy</h2>
       <p>
         We may update this policy from time to time. We will announce material
         changes in-app or by other reasonable means and update the date above.
       </p>
 
-      <h2>13. Contact and Grievance Officer</h2>
+      <h2>14. Contact and Grievance Officer</h2>
       <p>Privacy questions or data requests:</p>
       <ul>
         <li>General: <a href="mailto:privacy@hypefy.chat" className="text-accent">privacy@hypefy.chat</a></li>

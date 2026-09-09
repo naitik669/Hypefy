@@ -65,11 +65,17 @@ const OPEN_PATHS = [
  * which is what these deep links were designed for before the gate
  * existed.
  *
- * `/p/` and `/shots/` stay walled for now. They were public by the same
- * design, so reopening them is a one-line change here whenever you want
- * post and shot share links working again.
+ * `/p/` and `/shots/` are open for the same reason, and now for a second
+ * one: AdSense reviews a site by crawling it, and serves contextual ads by
+ * reading the page an ad sits on. With only `/u/` reachable, Google's view of
+ * Hypefy is a handful of profiles — which is both a likely rejection and,
+ * after approval, poor ad context on every page it cannot see.
+ *
+ * Both pages already handle an anonymous visitor: neither redirects, and the
+ * (app) layout renders a bare shell with a Join banner. So this reopens share
+ * links as well, which is what they were built for.
  */
-const OPEN_PREFIXES = ["/_next/", "/icons/", "/onboarding/", "/u/"];
+const OPEN_PREFIXES = ["/_next/", "/icons/", "/onboarding/", "/u/", "/p/", "/shots/"];
 
 const OPEN_FILES = [
   "/favicon.ico",
