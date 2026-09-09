@@ -211,8 +211,21 @@ export function ProfileStatusBubble({
   //
   // Smaller type, tighter padding and one line: a 24h status is a glance, and
   // the full text is one tap away in the editor or the reaction sheet.
+  /**
+   * A squircle, not a pill.
+   *
+   * This app rounds at roughly a third of the shorter side, everywhere: the
+   * 88px avatar uses 26, the 72px Showcase cover uses 24, the 48px nav tiles
+   * use 16. The bubble was rounded-[13px] on a 25px-tall box — half its
+   * height, which is a stadium, and the one shape in the app that does not
+   * belong to it.
+   *
+   * Taller (py-1.5) and less round (10px on ~30px) puts it back on the same
+   * ratio as everything else. The bottom-left corner stays tight, because
+   * that is where the tail leaves and a full curve there would detach it.
+   */
   const bubbleClasses =
-    "pointer-events-auto max-w-[46vw] rounded-[13px] rounded-bl-sm border bg-elevated px-2.5 py-1 text-[11px] font-semibold leading-snug shadow-[0_6px_18px_rgba(0,0,0,0.35)] " +
+    "pointer-events-auto max-w-[46vw] rounded-[10px] rounded-bl-[3px] border bg-elevated px-3 py-1.5 text-[11px] font-semibold leading-snug shadow-[0_8px_22px_rgba(0,0,0,0.45)] " +
     (phase === "in" ? "animate-bubble-in " : "animate-bubble-out ") +
     (note ? "border-white/[0.09]" : "border-dashed border-border text-muted");
 
@@ -231,14 +244,17 @@ export function ProfileStatusBubble({
     // lived at the top-LEFT. Sizing to content lets it overflow the wrapper,
     // and the max-w then keeps it on screen.
     // Overlapping the avatar's top-right corner rather than sitting clear
-    // of it: -ml-6 pulls it 24px back over the picture and -mb-4 drops it
-    // 16px down, so the bubble reads as being in FRONT of the person rather
-    // than parked beside them. z-10 is what puts it there — the avatar is a
-    // sibling that comes after it in the DOM, so without it the picture wins.
+    // of it: -ml-6 pulls it 24px back over the picture, so the bubble reads as
+    // being in FRONT of the person rather than parked beside them. z-10 is
+    // what puts it there — the avatar is a sibling that comes after it in the
+    // DOM, so without it the picture wins.
+    //
+    // Only -mb-1.5 of drop: the overlap should come from the SIDE, over the
+    // empty corner, not from sinking the bubble down the picture's face.
     //
     // 24px and not more: the avatar is 88px and the initial sits dead centre,
     // so this eats the empty corner without touching the face.
-    <div className="pointer-events-none absolute bottom-full left-full z-10 -mb-4 -ml-6 w-max">
+    <div className="pointer-events-none absolute bottom-full left-full z-10 -mb-1.5 -ml-6 w-max">
       <div className="relative">
         {/* Reaction picker (others' profiles) — floats below, because there is
             nothing above it up here. */}
@@ -278,18 +294,34 @@ export function ProfileStatusBubble({
                 bubbleClasses +
                 " text-left transition-transform active:scale-[0.98]"
               }
+              // Last in, first out — the dots lead the thought in and outlive it.
+              style={{ animationDelay: phase === "in" ? "180ms" : "0ms" }}
             >
               {bubbleBody}
             </button>
           ) : (
-            <div className={bubbleClasses}>{bubbleBody}</div>
+            <div
+              className={bubbleClasses}
+              style={{ animationDelay: phase === "in" ? "180ms" : "0ms" }}
+            >
+              {bubbleBody}
+            </div>
           ))}
 
-        {/* The tail stays put through the whole cycle — it is the thing that
-            says a thought is coming back. It steps down-LEFT: the bubble sits in
-            the top-right corner and the avatar is at the bottom-left, so a
-            tail trailing right would point at the edge of the screen rather
-            than at the person whose thought it is. */}
+        {/* The tail builds the thought and then lets it go.
+
+            Small dot, big dot, bubble on the way in; the reverse on the way
+            out. Staggering them is what makes it read as thinking rather than
+            as three things fading in at once — and the delays are inline
+            because the ORDER has to reverse between the two directions, which
+            a single class cannot express.
+
+            They never vanish completely: dot-pop-out settles at 35% rather
+            than 0, because the resting dots are what say a thought is coming
+            back, and they are the tap target that summons it early.
+
+            Down-LEFT, because the bubble sits at the avatar's top-right and
+            the person it belongs to is below-left of it. */}
         <button
           type="button"
           aria-label="Show status"
@@ -299,14 +331,16 @@ export function ProfileStatusBubble({
           className="pointer-events-auto absolute -bottom-4 left-0 h-6 w-8"
         >
           <span
-            className={`absolute bottom-2.5 left-2.5 h-2 w-2 rounded-full border border-white/[0.09] bg-elevated transition-opacity duration-300 ${
-              phase === "in" ? "opacity-100" : "opacity-70"
+            className={`absolute bottom-2.5 left-2.5 h-2 w-2 rounded-full border border-white/[0.09] bg-elevated ${
+              phase === "in" ? "animate-dot-in" : "animate-dot-out"
             }`}
+            style={{ animationDelay: phase === "in" ? "80ms" : "60ms" }}
           />
           <span
-            className={`absolute bottom-1 left-1 h-1 w-1 rounded-full border border-white/[0.09] bg-elevated transition-opacity duration-300 ${
-              phase === "in" ? "opacity-100" : "opacity-50"
+            className={`absolute bottom-1 left-1 h-1 w-1 rounded-full border border-white/[0.09] bg-elevated ${
+              phase === "in" ? "animate-dot-in" : "animate-dot-out"
             }`}
+            style={{ animationDelay: phase === "in" ? "0ms" : "140ms" }}
           />
         </button>
 

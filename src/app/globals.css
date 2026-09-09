@@ -291,6 +291,41 @@ body {
   animation: bubble-pop-out 260ms ease-in both;
 }
 
+/* The two tail dots, which build the thought before the bubble arrives.
+
+   A thought bubble reads as a sequence — small dot, bigger dot, then the
+   thing itself — and the stagger is what makes it read as thinking rather
+   than as three elements fading in together. The delays are set inline per
+   dot so the order can reverse on the way out. */
+@keyframes dot-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes dot-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    /* Not to zero: a faint resting dot is what says a thought is coming
+       back, and it is the tap target that summons it early. */
+    opacity: 0.35;
+    transform: scale(0.75);
+  }
+}
+.animate-dot-in {
+  animation: dot-pop-in 260ms cubic-bezier(0.18, 1.4, 0.4, 1) both;
+}
+.animate-dot-out {
+  animation: dot-pop-out 220ms ease-in both;
+}
+
 /* Dice tumble on roll */
 @keyframes dice-spin {
   0% {
@@ -899,6 +934,8 @@ body {
   .animate-twinkle,
   .animate-hype-pop,
   .animate-hype-particle,
+  .animate-dot-in,
+  .animate-dot-out,
   .animate-bubble-in,
   .animate-bubble-out,
   .animate-hype-break-left,
