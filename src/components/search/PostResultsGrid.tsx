@@ -29,10 +29,16 @@ export function PostResultsGrid({
   currentUserId?: string;
 }) {
   return (
-    // Discover's grid, at three columns. Same gap, same rounding, same
-    // gradient scrim — the only difference is the density, which is what a
-    // list of results wants and a browse surface does not.
-    <div className="grid grid-cols-3 gap-3 px-4">
+    // Discover's tile — same 16px rounding, same gradient scrim — at three
+    // columns.
+    //
+    // Tighter gutters than Discover's, though, and that is the point rather
+    // than an oversight: at three columns the page margin costs twice what
+    // the gutter does, so trimming px-4/gap-3 to px-2/gap-2 buys about 16%
+    // more picture per tile without dropping a column. A browse surface can
+    // afford to frame a photo; a list of results is answering "which of these
+    // is the one I meant", and that is answered by seeing more of them.
+    <div className="grid grid-cols-3 gap-2 px-2">
       {posts.map((p) => {
         const img = firstImage(p);
         const profile = p.profiles;
