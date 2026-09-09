@@ -212,7 +212,7 @@ export function ProfileStatusBubble({
   // Smaller type, tighter padding and one line: a 24h status is a glance, and
   // the full text is one tap away in the editor or the reaction sheet.
   const bubbleClasses =
-    "pointer-events-auto max-w-[190px] rounded-[13px] rounded-bl-sm border bg-elevated px-2.5 py-1 text-[11px] font-semibold leading-snug shadow-[0_6px_18px_rgba(0,0,0,0.35)] " +
+    "pointer-events-auto max-w-[46vw] rounded-[13px] rounded-bl-sm border bg-elevated px-2.5 py-1 text-[11px] font-semibold leading-snug shadow-[0_6px_18px_rgba(0,0,0,0.35)] " +
     (phase === "in" ? "animate-bubble-in " : "animate-bubble-out ") +
     (note ? "border-white/[0.09]" : "border-dashed border-border text-muted");
 
@@ -222,19 +222,20 @@ export function ProfileStatusBubble({
   }
 
   return (
-    // Top-right of the profile, over the banner. It used to hang off the
-    // avatar's top-left corner, where it competed with the avatar for the same
-    // few pixels and pushed into the banner anyway. The corner is empty space
-    // that the layout was already giving away.
+    // Off the avatar's top-RIGHT corner: bottom-full puts it above the
+    // avatar, left-full puts it past the right edge.
     //
-    // items-end so the bubble and its tail both grow leftward from the right
-    // edge rather than pushing off-screen as the text gets longer.
-    <div className="pointer-events-none absolute right-3 top-3 z-10 flex flex-col items-end">
+    // w-max is doing real work here. This is positioned inside the avatar's
+    // 88px wrapper, so without it the bubble is capped at 88px and wraps —
+    // which is exactly what the old max-w-[220px] failed to prevent when it
+    // lived at the top-LEFT. Sizing to content lets it overflow the wrapper,
+    // and the max-w then keeps it on screen.
+    <div className="pointer-events-none absolute bottom-full left-full z-10 -mb-1 ml-1 w-max">
       <div className="relative">
         {/* Reaction picker (others' profiles) — floats below, because there is
             nothing above it up here. */}
         {pickerOpen && canReact && (
-          <div className="pointer-events-auto absolute right-0 top-full z-10 mt-1.5 flex gap-0.5 rounded-full border border-border bg-background/95 px-1.5 py-1 shadow-lg backdrop-blur">
+          <div className="pointer-events-auto absolute bottom-full left-0 z-10 mb-1.5 flex gap-0.5 rounded-full border border-border bg-background/95 px-1.5 py-1 shadow-lg backdrop-blur">
             {QUICK_EMOJIS.map((e) => (
               <button
                 key={e}
