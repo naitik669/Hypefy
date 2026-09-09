@@ -183,24 +183,28 @@ export function FeedList({
     const budget = adBudgetLeft();
     if (budget <= 0) return;
 
-    setAds((prev) => {
-      const fresh = placeAds(
-        posts.length,
-        shots.map((shot) => shot.slot),
-        {
-          startAfter: adCursor.current.nextSlot,
-          startIndex: adCursor.current.count,
-          idPrefix: `ad-${adEpoch.current}-`,
-          max: Math.min(AD_DEFAULTS.max, budget),
-        }
-      );
-      if (fresh.length === 0) return prev;
-      adCursor.current = {
-        nextSlot: fresh[fresh.length - 1].slot + AD_DEFAULTS.every,
-        count: adCursor.current.count + fresh.length,
-      };
-      return [...prev, ...fresh];
-    });
+    // Placed out here, and the cursor advanced out here, because React may
+    // call a state updater more than once for a single update. An updater that
+    // reads and writes adCursor would then see its own first pass and produce
+    // a different answer the second time — which for ads means slots that move
+    // between renders.
+    const fresh = placeAds(
+      posts.length,
+      shots.map((shot) => shot.slot),
+      {
+        startAfter: adCursor.current.nextSlot,
+        startIndex: adCursor.current.count,
+        idPrefix: `ad-${adEpoch.current}-`,
+        max: Math.min(AD_DEFAULTS.max, budget),
+      }
+    );
+    if (fresh.length === 0) return;
+
+    adCursor.current = {
+      nextSlot: fresh[fresh.length - 1].slot + AD_DEFAULTS.every,
+      count: adCursor.current.count + fresh.length,
+    };
+    setAds((prev) => [...prev, ...fresh]);
   }, [posts.length, shots, tab, fill]);
 
   /** Attach the current user's hype/save state to a freshly fetched batch. */
