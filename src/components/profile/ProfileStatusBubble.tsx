@@ -230,7 +230,15 @@ export function ProfileStatusBubble({
     // which is exactly what the old max-w-[220px] failed to prevent when it
     // lived at the top-LEFT. Sizing to content lets it overflow the wrapper,
     // and the max-w then keeps it on screen.
-    <div className="pointer-events-none absolute bottom-full left-full z-10 -mb-1 ml-1 w-max">
+    // Overlapping the avatar's top-right corner rather than sitting clear
+    // of it: -ml-6 pulls it 24px back over the picture and -mb-4 drops it
+    // 16px down, so the bubble reads as being in FRONT of the person rather
+    // than parked beside them. z-10 is what puts it there — the avatar is a
+    // sibling that comes after it in the DOM, so without it the picture wins.
+    //
+    // 24px and not more: the avatar is 88px and the initial sits dead centre,
+    // so this eats the empty corner without touching the face.
+    <div className="pointer-events-none absolute bottom-full left-full z-10 -mb-4 -ml-6 w-max">
       <div className="relative">
         {/* Reaction picker (others' profiles) — floats below, because there is
             nothing above it up here. */}
