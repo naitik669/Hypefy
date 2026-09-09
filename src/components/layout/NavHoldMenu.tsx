@@ -478,16 +478,19 @@ export function NavHoldMenu({
                           ? "h-[54px] w-[54px] rounded-[18px]"
                           : "h-12 w-12 rounded-[16px]"
                       } ${
+                        // The same treatment on both layouts: outlined at
+                        // rest, and a stroke plus a wash when chosen.
+                        //
+                        // The arc used to fill solid — a whole lime or red
+                        // tile under your thumb. It was loud in a way the
+                        // Home stack never is, and with four of them fanned
+                        // out the screen turned into a block of colour. The
+                        // stroke is enough to say "this one", and it leaves
+                        // the icon legible instead of knocking it out.
                         !active
-                          ? "border-border bg-elevated text-foreground"
+                          ? "border-border bg-surface/95 text-foreground"
                           : action.tone === "danger"
-                          ? "border-danger bg-danger text-white shadow-[0_10px_26px_-6px_rgba(239,68,68,0.65)]"
-                          : layout === "arc"
-                          ? // Solid, not a wash: on the arc the chosen tile
-                            // should match the (+) still under the thumb,
-                            // so the gesture reads as the button moving to
-                            // where you pointed it.
-                            "border-accent bg-accent text-accent-ink shadow-[0_10px_26px_-6px_rgba(190,242,100,0.55)]"
+                          ? "border-danger bg-danger/15 text-danger"
                           : "border-accent bg-accent/15 text-accent"
                       }`}
                     >
@@ -502,11 +505,11 @@ export function NavHoldMenu({
                       ) : Icon ? (
                         <Icon size={layout === "arc" ? 24 : 21} />
                       ) : null}
-                      {action.tone === "danger" && !active && (
-                        // At rest the fan is monochrome, so this dot is the
-                        // only thing distinguishing the option that other
-                        // people see the moment you release. Small on purpose:
-                        // a warning, not a decoration.
+                      {action.tone === "danger" && (
+                        // Live is the one option other people see the moment
+                        // you let go, so it carries a mark at rest as well as
+                        // when chosen — it stays visible either way now that
+                        // selection is a stroke rather than a fill.
                         <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-danger" />
                       )}
                       {!!action.unread && (

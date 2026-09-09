@@ -171,7 +171,10 @@ export default function PrivacyPage() {
       <p>Privacy questions or data requests:</p>
       <ul>
         <li>General: <a href="mailto:privacy@hypefy.chat" className="text-accent">privacy@hypefy.chat</a></li>
-        <li>Grievance Officer: [Grievance Officer Name], <a href="mailto:grievance@hypefy.chat" className="text-accent">grievance@hypefy.chat</a></li>
+        <li>
+          Grievance Officer: Mohd Aman, Hypefy Platform Private Limited,{" "}
+          <a href="mailto:grievance@hypefy.chat" className="text-accent">grievance@hypefy.chat</a>
+        </li>
         <li>
           Address: Hypefy Platform Private Limited, House No. 420, Sambhal Road,
           Taharpur, Moradabad, Uttar Pradesh 244001, India

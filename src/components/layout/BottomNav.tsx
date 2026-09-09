@@ -9,7 +9,7 @@ import {
   Lightning,
   Plus,
   ImageSquare,
-  Cards,
+  FilmSlate,
   Broadcast,
 } from "@phosphor-icons/react";
 import { Avatar } from "@/components/ui/Avatar";
@@ -47,10 +47,10 @@ const HOME_SHORTCUTS: HoldAction[] = [
  * disagree about what a Shot looks like — and Live is Broadcast, which draws
  * the signal leaving the device rather than a radio set.
  *
- * Post is ONE framed photo and Show is a STACK of cards, deliberately: a Show
- * is a run of moments that expires, a Post is a single thing that stays. Two
- * stacked-rectangle glyphs side by side would have said nothing about which
- * was which.
+ * Post is one framed photo; Show is a clapperboard, the same film language the
+ * Help glossary uses for it. A stack of cards was the first attempt and said
+ * "a collection" rather than "a moment you record" — and it read too close to
+ * the Post glyph beside it.
  */
 const PostIcon = (p: { size?: number; className?: string }) => (
   <ImageSquare {...p} weight="fill" />
@@ -59,7 +59,7 @@ const ShotIcon = (p: { size?: number; className?: string }) => (
   <Lightning {...p} weight="fill" />
 );
 const ShowIcon = (p: { size?: number; className?: string }) => (
-  <Cards {...p} weight="fill" />
+  <FilmSlate {...p} weight="fill" />
 );
 const LiveIcon = (p: { size?: number; className?: string }) => (
   <Broadcast {...p} weight="bold" />

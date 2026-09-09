@@ -12,6 +12,7 @@ import {
   ProfileStatusBubble,
   type ProfileNote,
 } from "@/components/profile/ProfileStatusBubble";
+import { STATUS_ENABLED } from "@/lib/status-feature";
 
 /**
  * Profile hero — banner, the squircle avatar overlapping its bottom-left
@@ -86,13 +87,15 @@ export function ProfileHeader({
         {/* Avatar + stats */}
         <div className="flex items-end gap-4">
           <div className="relative -mt-11 inline-block rounded-[26px] shadow-[0_8px_20px_rgba(0,0,0,0.45)]">
-            <ProfileStatusBubble
-              note={note}
-              editable={noteEditable}
-              me={{ name, hue, avatarUrl: avatarUrl ?? null }}
-              ownerId={userId}
-              viewerId={currentUserId}
-            />
+            {STATUS_ENABLED && (
+              <ProfileStatusBubble
+                note={note}
+                editable={noteEditable}
+                me={{ name, hue, avatarUrl: avatarUrl ?? null }}
+                ownerId={userId}
+                viewerId={currentUserId}
+              />
+            )}
             <ProfileAvatar
               name={name}
               hue={hue}

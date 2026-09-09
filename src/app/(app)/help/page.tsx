@@ -2,13 +2,12 @@ import Link from "next/link";
 import {
   Bookmark,
   Clapperboard,
-  Film,
   Heart,
   ImageIcon,
   Lock,
   Mail,
-  MessageSquareDashed,
   Star,
+  Users,
   Zap,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -16,7 +15,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 /**
  * The glossary.
  *
- * Hypefy invents its own words — Hype, Hyper, Favourite, Shot, Show, Note —
+ * Hypefy invents its own words — Hype, Hyper, Favourite, Shot, Show —
  * and defined none of them anywhere. FeatureHint is rendered in exactly one
  * place, explaining Shows, so every other term had to be guessed from context.
  * This is also the app's only real support contact; the one that existed was
@@ -41,7 +40,9 @@ const CONTENT: Entry[] = [
     what: "A photo and your thoughts. Posts stay up until you delete them, and they're what fills the Home feed.",
   },
   {
-    icon: Film,
+    // The bolt, because that is what the tab bar shows. A glossary that
+    // draws a term differently from the app is a second thing to learn.
+    icon: Zap,
     term: "Shot",
     what: "A short video reel. Shots get their own tab, and they play full-screen one after another.",
     href: "/shots",
@@ -54,21 +55,20 @@ const CONTENT: Entry[] = [
     href: "/shows",
     hrefLabel: "Your Shows",
   },
-  {
-    icon: MessageSquareDashed,
-    term: "Note",
-    what: "A line of text on your profile that clears itself after a day. Nobody is notified; people see it when they visit you.",
-  },
 ];
 
 const ACTIONS: Entry[] = [
   {
-    icon: Zap,
+    // Moved off the bolt when Shot took it, and a star is what you actually
+    // tap in the feed — the bolt only ever appeared on Discover's counters.
+    icon: Star,
     term: "Hype",
     what: "The applause. Hyping a post or a Shot tells the person you liked it, and pushes more like it into your feed.",
   },
   {
-    icon: Star,
+    // Not a star any more: Hype took it, and two identical glyphs two rows
+    // apart in a glossary defeat the point of the glossary.
+    icon: Users,
     term: "Hyper",
     what: "One of your closest people. Their posts come first in the Hypers feed. Your list is private — nobody is told they're on it.",
     href: "/hypers",
@@ -100,7 +100,9 @@ const ACTIONS: Entry[] = [
 function Section({ title, entries }: { title: string; entries: Entry[] }) {
   return (
     <section>
-      <h2 className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">{title}</h2>
+      <h2 className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">
+        {title}
+      </h2>
       <div className="flex flex-col divide-y divide-border/50">
         {entries.map(({ icon: Icon, term, what, href, hrefLabel }) => (
           <div key={term} className="flex gap-3 py-4">
@@ -109,7 +111,9 @@ function Section({ title, entries }: { title: string; entries: Entry[] }) {
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold">{term}</p>
-              <p className="mt-0.5 text-[13px] leading-relaxed text-muted">{what}</p>
+              <p className="mt-0.5 text-[13px] leading-relaxed text-muted">
+                {what}
+              </p>
               {href && hrefLabel && (
                 <Link
                   href={href}
@@ -145,20 +149,21 @@ export default function HelpPage() {
           </h2>
           <ul className="flex flex-col gap-2 py-2 text-[13px] leading-relaxed text-muted">
             <li>
-              <strong className="text-foreground">Hold a photo</strong> to blow it up without
-              leaving the feed. Pinch it to zoom and pan; let go and it springs back.
+              <strong className="text-foreground">Hold a photo</strong> to blow
+              it up without leaving the feed. Pinch it to zoom and pan; let go
+              and it springs back.
             </li>
             <li>
-              <strong className="text-foreground">Hold a comment</strong> for reply, copy and
-              delete.
+              <strong className="text-foreground">Hold a comment</strong> for
+              reply, copy and delete.
             </li>
             <li>
-              <strong className="text-foreground">Hold an avatar</strong> to open someone&apos;s
-              profile card, with their QR code.
+              <strong className="text-foreground">Hold an avatar</strong> to
+              open someone&apos;s profile card, with their QR code.
             </li>
             <li>
-              <strong className="text-foreground">Swipe a sheet down</strong> to close it —
-              comments, sharing, and the rest.
+              <strong className="text-foreground">Swipe a sheet down</strong> to
+              close it — comments, sharing, and the rest.
             </li>
           </ul>
         </section>
@@ -180,8 +185,9 @@ export default function HelpPage() {
             </div>
           </a>
           <p className="mt-3 px-1 text-[11px] text-faint">
-            To report a post, a Shot or a person, use the ··· menu on the thing itself — reports
-            reach us faster that way, and the other person is never told it came from you.
+            To report a post, a Shot or a person, use the ··· menu on the thing
+            itself — reports reach us faster that way, and the other person is
+            never told it came from you.
           </p>
         </section>
 

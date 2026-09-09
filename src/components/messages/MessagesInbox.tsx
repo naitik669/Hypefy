@@ -3,8 +3,22 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, MessageCircle, Users, Check, Ban, Loader2, BellOff, Bell, Pin, PinOff, Trash2, X } from "lucide-react";
+import {
+  Search,
+  MessageCircle,
+  Users,
+  Check,
+  Ban,
+  Loader2,
+  BellOff,
+  Bell,
+  Pin,
+  PinOff,
+  Trash2,
+  X,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { STATUS_ENABLED } from "@/lib/status-feature";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -49,7 +63,9 @@ function highlightSnippet(body: string, query: string) {
   return (
     <>
       {pre}
-      <mark className="rounded bg-accent/25 px-0.5 text-foreground">{match}</mark>
+      <mark className="rounded bg-accent/25 px-0.5 text-foreground">
+        {match}
+      </mark>
       {post}
     </>
   );
@@ -59,7 +75,10 @@ function GroupAvatar() {
   return (
     <div
       className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[30%]"
-      style={{ background: "linear-gradient(140deg, hsl(210 70% 52%), hsl(260 65% 42%))" }}
+      style={{
+        background:
+          "linear-gradient(140deg, hsl(210 70% 52%), hsl(260 65% 42%))",
+      }}
     >
       <Users size={24} className="text-white/95" />
     </div>
@@ -106,9 +125,18 @@ function preview(r: InboxRow) {
   // 1. Fresh reaction beats the last message
   if (r.lastReaction) {
     const { emoji, mine, onMine } = r.lastReaction;
-    const target = onMine ? (mine ? "their message" : "your message") : "a message";
-    const verb = emoji === "⭐" ? `hyped ${target}` : `reacted ${emoji} to ${target}`;
-    return mine ? `You ${emoji === "⭐" ? "hyped a message" : `reacted ${emoji} to a message`}` : cap(verb);
+    const target = onMine
+      ? mine
+        ? "their message"
+        : "your message"
+      : "a message";
+    const verb =
+      emoji === "⭐" ? `hyped ${target}` : `reacted ${emoji} to ${target}`;
+    return mine
+      ? `You ${
+          emoji === "⭐" ? "hyped a message" : `reacted ${emoji} to a message`
+        }`
+      : cap(verb);
   }
 
   if (!r.lastAt) return r.isGroup ? "New group" : "Say hi 👋";
@@ -138,13 +166,23 @@ function preview(r: InboxRow) {
   return (r.lastMine ? "You: " : "") + body;
 }
 
-export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRow[]; currentUserId: string; children?: React.ReactNode }) {
+export function MessagesInbox({
+  rows,
+  currentUserId,
+  children,
+}: {
+  rows: InboxRow[];
+  currentUserId: string;
+  children?: React.ReactNode;
+}) {
   const supabase = createClient();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
   // conversation_id → a matching message body, for content search (2b).
-  const [contentMatches, setContentMatches] = useState<Map<string, string>>(new Map());
+  const [contentMatches, setContentMatches] = useState<Map<string, string>>(
+    new Map()
+  );
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Conversations the user has opened — optimistically clear their unread state.
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
@@ -166,13 +204,20 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
     if (r.isRequest) return; // requests have their own actions
     suppressClick.current = true;
     setMenuRow(r);
-    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
+    if (typeof navigator !== "undefined" && navigator.vibrate)
+      navigator.vibrate(8);
   }
   function onPressStart(r: InboxRow) {
-    pressTimer.current = setTimeout(() => { pressTimer.current = null; openMenu(r); }, 420);
+    pressTimer.current = setTimeout(() => {
+      pressTimer.current = null;
+      openMenu(r);
+    }, 420);
   }
   function onPressEnd() {
-    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
   }
 
   /**
@@ -191,7 +236,7 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
     r: InboxRow,
     patch: { pinned_at?: string | null; muted_at?: string | null },
     okMessage: string,
-    failMessage: string,
+    failMessage: string
   ) {
     setActionBusy(true);
     const { data, error } = await supabase
@@ -216,7 +261,7 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
       r,
       { pinned_at: r.pinned ? null : new Date().toISOString() },
       r.pinned ? "Unpinned" : "Pinned to top",
-      "Couldn't update that chat.",
+      "Couldn't update that chat."
     );
   }
   function toggleMute(r: InboxRow) {
@@ -224,12 +269,14 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
       r,
       { muted_at: r.muted ? null : new Date().toISOString() },
       r.muted ? "Unmuted" : "Muted",
-      "Couldn't update that chat.",
+      "Couldn't update that chat."
     );
   }
   async function deleteChat(id: string, isGroup: boolean) {
     setActionBusy(true);
-    const { error } = await supabase.rpc("leave_conversation", { p_conversation_id: id });
+    const { error } = await supabase.rpc("leave_conversation", {
+      p_conversation_id: id,
+    });
     setActionBusy(false);
     setMenuRow(null);
     setConfirmDeleteId(null);
@@ -246,10 +293,14 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
   // re-show the unread badge for conversations we already opened this session.
   useEffect(() => {
     try {
-      const stored = JSON.parse(sessionStorage.getItem("hypefy:inbox:read") ?? "[]") as string[];
+      const stored = JSON.parse(
+        sessionStorage.getItem("hypefy:inbox:read") ?? "[]"
+      ) as string[];
       if (stored.length) setReadIds(new Set(stored));
-    } catch { /* ignore */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Realtime: keep the inbox live without a manual refresh.
@@ -261,39 +312,77 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
     };
     const channel = supabase
       .channel(`inbox-realtime:${currentUserId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-        const m = payload.new as { sender_id?: string; conversation_id?: string };
-        if (m.sender_id === currentUserId) return;
-        // New incoming message: revoke the "already read" flag so the unread badge reappears.
-        if (m.conversation_id) {
-          setReadIds((prev) => {
-            if (!prev.has(m.conversation_id!)) return prev;
-            const next = new Set(prev);
-            next.delete(m.conversation_id!);
-            try { sessionStorage.setItem("hypefy:inbox:read", JSON.stringify([...next])); } catch { /* ignore */ }
-            return next;
-          });
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages" },
+        (payload) => {
+          const m = payload.new as {
+            sender_id?: string;
+            conversation_id?: string;
+          };
+          if (m.sender_id === currentUserId) return;
+          // New incoming message: revoke the "already read" flag so the unread badge reappears.
+          if (m.conversation_id) {
+            setReadIds((prev) => {
+              if (!prev.has(m.conversation_id!)) return prev;
+              const next = new Set(prev);
+              next.delete(m.conversation_id!);
+              try {
+                sessionStorage.setItem(
+                  "hypefy:inbox:read",
+                  JSON.stringify([...next])
+                );
+              } catch {
+                /* ignore */
+              }
+              return next;
+            });
+          }
+          refresh();
         }
-        refresh();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, refresh)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations" }, refresh)
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "message_reactions" },
+        refresh
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "conversations" },
+        refresh
+      )
       // When my last_read_at updates (i.e. I opened the thread on another device / tab),
       // mark that conversation as read locally so the badge clears immediately.
-      .on("postgres_changes", {
-        event: "UPDATE", schema: "public", table: "conversation_members",
-        filter: `user_id=eq.${currentUserId}`,
-      }, (payload) => {
-        const m = payload.new as { conversation_id?: string; last_read_at?: string };
-        if (m.conversation_id && m.last_read_at) {
-          setReadIds((prev) => {
-            const next = new Set(prev).add(m.conversation_id!);
-            try { sessionStorage.setItem("hypefy:inbox:read", JSON.stringify([...next])); } catch { /* ignore */ }
-            return next;
-          });
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "conversation_members",
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        (payload) => {
+          const m = payload.new as {
+            conversation_id?: string;
+            last_read_at?: string;
+          };
+          if (m.conversation_id && m.last_read_at) {
+            setReadIds((prev) => {
+              const next = new Set(prev).add(m.conversation_id!);
+              try {
+                sessionStorage.setItem(
+                  "hypefy:inbox:read",
+                  JSON.stringify([...next])
+                );
+              } catch {
+                /* ignore */
+              }
+              return next;
+            });
+          }
+          refresh();
         }
-        refresh();
-      })
+      )
       .subscribe();
     return () => {
       if (timer) clearTimeout(timer);
@@ -303,11 +392,14 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
 
   // Muted conversations never surface as unread (no badge, no Unread section)
   const isUnread = (r: InboxRow) => r.unread && !r.muted && !readIds.has(r.id);
-  const isPendingRequest = (r: InboxRow) => r.isRequest && !approvedIds.has(r.id) && !removedIds.has(r.id);
+  const isPendingRequest = (r: InboxRow) =>
+    r.isRequest && !approvedIds.has(r.id) && !removedIds.has(r.id);
 
   async function approveRequest(id: string) {
     setBusyId(id);
-    const { error } = await supabase.rpc("approve_message_request", { p_conversation_id: id });
+    const { error } = await supabase.rpc("approve_message_request", {
+      p_conversation_id: id,
+    });
     setBusyId(null);
     if (error) {
       showToast(error.message ?? "Couldn't approve that request.");
@@ -330,7 +422,9 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
    */
   async function declineRequest(id: string) {
     setBusyId(id);
-    const { error } = await supabase.rpc("leave_conversation", { p_conversation_id: id });
+    const { error } = await supabase.rpc("leave_conversation", {
+      p_conversation_id: id,
+    });
     setBusyId(null);
     if (error) {
       showToast(error.message ?? "Couldn't decline that request.");
@@ -342,7 +436,9 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
 
   async function blockRequest(id: string) {
     setBusyId(id);
-    const { error } = await supabase.rpc("block_message_request", { p_conversation_id: id });
+    const { error } = await supabase.rpc("block_message_request", {
+      p_conversation_id: id,
+    });
     setBusyId(null);
     if (error) {
       showToast(error.message ?? "Couldn't block that account.");
@@ -352,7 +448,9 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
     showToast("Blocked");
   }
 
-  const unreadCount = rows.filter((r) => isUnread(r) && !isPendingRequest(r) && !removedIds.has(r.id)).length;
+  const unreadCount = rows.filter(
+    (r) => isUnread(r) && !isPendingRequest(r) && !removedIds.has(r.id)
+  ).length;
   const requestCount = rows.filter((r) => isPendingRequest(r)).length;
 
   // Content search: match recent message bodies for the typed query, keeping
@@ -360,7 +458,10 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
   useEffect(() => {
     const query = q.trim();
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (query.length < 2) { setContentMatches(new Map()); return; }
+    if (query.length < 2) {
+      setContentMatches(new Map());
+      return;
+    }
     searchTimer.current = setTimeout(async () => {
       const ids = rows.map((r) => r.id);
       if (ids.length === 0) return;
@@ -374,28 +475,33 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
         .limit(100);
       const map = new Map<string, string>();
       (data ?? []).forEach((m: any) => {
-        if (m.body && !map.has(m.conversation_id)) map.set(m.conversation_id, m.body);
+        if (m.body && !map.has(m.conversation_id))
+          map.set(m.conversation_id, m.body);
       });
       setContentMatches(map);
     }, 300);
-    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, rows]);
 
   const filtered = useMemo(() => {
     let list =
       tab === "unread"
-        ? rows.filter((r) => isUnread(r) && !isPendingRequest(r) && !removedIds.has(r.id))
+        ? rows.filter(
+            (r) => isUnread(r) && !isPendingRequest(r) && !removedIds.has(r.id)
+          )
         : tab === "requests"
-          ? rows.filter((r) => isPendingRequest(r))
-          : rows.filter((r) => !isPendingRequest(r) && !removedIds.has(r.id));
+        ? rows.filter((r) => isPendingRequest(r))
+        : rows.filter((r) => !isPendingRequest(r) && !removedIds.has(r.id));
     const query = q.trim().toLowerCase();
     if (query) {
       list = list.filter(
         (r) =>
           r.name.toLowerCase().includes(query) ||
           (r.username ?? "").toLowerCase().includes(query) ||
-          contentMatches.has(r.id),
+          contentMatches.has(r.id)
       );
     }
     return list;
@@ -404,8 +510,12 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
 
   // Split "All" tab into Pinned + Unread + rest
   const pinnedRows = tab === "all" ? filtered.filter((r) => r.pinned) : [];
-  const unreadRows = tab === "all" ? filtered.filter((r) => isUnread(r) && !r.pinned) : [];
-  const otherRows  = tab === "all" ? filtered.filter((r) => !isUnread(r) && !r.pinned) : filtered;
+  const unreadRows =
+    tab === "all" ? filtered.filter((r) => isUnread(r) && !r.pinned) : [];
+  const otherRows =
+    tab === "all"
+      ? filtered.filter((r) => !isUnread(r) && !r.pinned)
+      : filtered;
 
   if (rows.length === 0) {
     return (
@@ -420,8 +530,8 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
   }
 
   const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: "all",      label: "All",      count: 0 },
-    { key: "unread",   label: "Unread",   count: unreadCount },
+    { key: "all", label: "All", count: 0 },
+    { key: "unread", label: "Unread", count: unreadCount },
     { key: "requests", label: "Requests", count: requestCount },
   ];
 
@@ -440,14 +550,30 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
     const matchBody = query && !nameHit ? contentMatches.get(r.id) : undefined;
 
     return (
-      <div key={r.id} className={`[content-visibility:auto] [contain-intrinsic-size:auto_76px] ${pending ? "px-4 py-3" : ""}`}>
+      <div
+        key={r.id}
+        className={`[content-visibility:auto] [contain-intrinsic-size:auto_76px] ${
+          pending ? "px-4 py-3" : ""
+        }`}
+      >
         <Link
           href={`/messages/${r.id}`}
           onClick={(e) => {
-            if (suppressClick.current) { e.preventDefault(); suppressClick.current = false; return; }
+            if (suppressClick.current) {
+              e.preventDefault();
+              suppressClick.current = false;
+              return;
+            }
             setReadIds((prev) => {
               const next = new Set(prev).add(r.id);
-              try { sessionStorage.setItem("hypefy:inbox:read", JSON.stringify([...next])); } catch { /* ignore */ }
+              try {
+                sessionStorage.setItem(
+                  "hypefy:inbox:read",
+                  JSON.stringify([...next])
+                );
+              } catch {
+                /* ignore */
+              }
               return next;
             });
           }}
@@ -455,11 +581,19 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
           onPointerUp={onPressEnd}
           onPointerLeave={onPressEnd}
           onPointerMove={onPressEnd}
-          onContextMenu={(e) => { e.preventDefault(); openMenu(r); }}
-          className={`flex items-center gap-3 transition-colors hover:bg-white/[0.03] ${pending ? "" : "px-4 py-3"}`}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            openMenu(r);
+          }}
+          className={`flex items-center gap-3 transition-colors hover:bg-white/[0.03] ${
+            pending ? "" : "px-4 py-3"
+          }`}
         >
           <div className="relative shrink-0">
-            {r.isGroup ? <GroupAvatar /> : <Avatar
+            {r.isGroup ? (
+              <GroupAvatar />
+            ) : (
+              <Avatar
                 name={r.name}
                 hue={r.hue}
                 size={52}
@@ -468,16 +602,25 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
                    column of squircles read as different products; the rest of
                    the app (nav avatar, create button) is already squircled. */
                 className="rounded-2xl"
-              />}
+              />
+            )}
             {!r.isGroup && <PresenceDot lastSeenAt={r.lastSeenAt} size="md" />}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
-              <p className={`min-w-0 truncate text-sm ${unread ? "font-bold text-foreground" : "font-semibold"}`}>
+              <p
+                className={`min-w-0 truncate text-sm ${
+                  unread ? "font-bold text-foreground" : "font-semibold"
+                }`}
+              >
                 {r.name}
-                {r.isGroup && <span className="ml-1.5 text-xs font-normal text-faint">· {r.memberCount}</span>}
+                {r.isGroup && (
+                  <span className="ml-1.5 text-xs font-normal text-faint">
+                    · {r.memberCount}
+                  </span>
+                )}
               </p>
-              {!r.isGroup && r.note && (
+              {STATUS_ENABLED && !r.isGroup && r.note && (
                 <span
                   title={r.note}
                   className="inline-block max-w-[120px] shrink-0 truncate rounded-full rounded-bl-sm border border-white/[0.08] bg-surface px-1.5 py-0.5 text-[11px] font-medium leading-tight text-muted"
@@ -486,17 +629,27 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
                 </span>
               )}
             </div>
-            <p className={`truncate text-sm ${unread ? "font-semibold text-foreground" : "text-muted"}`}>
+            <p
+              className={`truncate text-sm ${
+                unread ? "font-semibold text-foreground" : "text-muted"
+              }`}
+            >
               {matchBody ? highlightSnippet(matchBody, query) : preview(r)}
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             <span className="flex items-center gap-1.5">
-              {r.pinned && <Pin size={12} className="rotate-45 fill-faint text-faint" />}
+              {r.pinned && (
+                <Pin size={12} className="rotate-45 fill-faint text-faint" />
+              )}
               {r.muted && <BellOff size={12} className="text-faint" />}
-              {r.lastAt && <span className="text-xs text-faint">{timeAgo(r.lastAt)}</span>}
+              {r.lastAt && (
+                <span className="text-xs text-faint">{timeAgo(r.lastAt)}</span>
+              )}
             </span>
-            {effectiveCount > 0 && !pending && <UnreadBadge count={effectiveCount} />}
+            {effectiveCount > 0 && !pending && (
+              <UnreadBadge count={effectiveCount} />
+            )}
           </div>
         </Link>
 
@@ -509,7 +662,12 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
               disabled={busyId === r.id}
               className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.98] disabled:opacity-60"
             >
-              {busyId === r.id ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Approve
+              {busyId === r.id ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : (
+                <Check size={15} />
+              )}{" "}
+              Approve
             </button>
             {/* Decline is the middle ground that did not exist. It gets equal
                 billing with Approve; Block is demoted to an icon and gated by
@@ -566,14 +724,18 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
             type="button"
             onClick={() => setTab(t.key)}
             className={`flex shrink-0 items-center gap-1.5 rounded-pill px-4 py-1.5 text-sm font-semibold transition-colors ${
-              tab === t.key ? "bg-accent text-accent-ink" : "bg-surface text-muted"
+              tab === t.key
+                ? "bg-accent text-accent-ink"
+                : "bg-surface text-muted"
             }`}
           >
             {t.label}
             {t.count > 0 && (
               <span
                 className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
-                  tab === t.key ? "bg-accent-ink/15 text-accent-ink" : "bg-accent text-accent-ink"
+                  tab === t.key
+                    ? "bg-accent-ink/15 text-accent-ink"
+                    : "bg-accent text-accent-ink"
                 }`}
               >
                 {t.count}
@@ -589,8 +751,8 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
           {tab === "requests"
             ? "No requests, your door is clear."
             : tab === "unread"
-              ? "All caught up. Zero noise. 🎉"
-              : "Nobody by that name."}
+            ? "All caught up. Zero noise. 🎉"
+            : "Nobody by that name."}
         </p>
       ) : (
         <div className="flex flex-col pt-1">
@@ -599,8 +761,9 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
             <div className="mx-4 mb-2 mt-2 rounded-2xl border border-border bg-surface px-4 py-3">
               <p className="text-sm font-semibold">Message requests</p>
               <p className="mt-0.5 text-xs leading-snug text-muted">
-                People you don&apos;t follow land here first. They can&apos;t see when you&apos;ve
-                read it until you approve, blocking is silent.
+                People you don&apos;t follow land here first. They can&apos;t
+                see when you&apos;ve read it until you approve, blocking is
+                silent.
               </p>
             </div>
           )}
@@ -611,7 +774,9 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
               <p className="flex items-center gap-1 px-4 pb-1 pt-2 text-[11px] font-bold uppercase tracking-widest text-faint">
                 <Pin size={11} className="rotate-45 fill-faint" /> Pinned
               </p>
-              {pinnedRows.map((r) => <RowItem key={r.id} r={r} />)}
+              {pinnedRows.map((r) => (
+                <RowItem key={r.id} r={r} />
+              ))}
               <div className="mx-4 my-1 h-px bg-border/50" />
             </>
           )}
@@ -636,23 +801,51 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
       {menuRow && (
         <BottomSheet open onClose={() => setMenuRow(null)} title={menuRow.name}>
           <div className="flex flex-col pb-3">
-            <button type="button" disabled={actionBusy} onClick={() => togglePin(menuRow)}
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/5 disabled:opacity-60">
-              {menuRow.pinned ? <PinOff size={18} className="text-muted" /> : <Pin size={18} className="text-muted" />}
+            <button
+              type="button"
+              disabled={actionBusy}
+              onClick={() => togglePin(menuRow)}
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/5 disabled:opacity-60"
+            >
+              {menuRow.pinned ? (
+                <PinOff size={18} className="text-muted" />
+              ) : (
+                <Pin size={18} className="text-muted" />
+              )}
               {menuRow.pinned ? "Unpin" : "Pin to top"}
             </button>
-            <button type="button" disabled={actionBusy} onClick={() => toggleMute(menuRow)}
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/5 disabled:opacity-60">
-              {menuRow.muted ? <Bell size={18} className="text-muted" /> : <BellOff size={18} className="text-muted" />}
+            <button
+              type="button"
+              disabled={actionBusy}
+              onClick={() => toggleMute(menuRow)}
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/5 disabled:opacity-60"
+            >
+              {menuRow.muted ? (
+                <Bell size={18} className="text-muted" />
+              ) : (
+                <BellOff size={18} className="text-muted" />
+              )}
               {menuRow.muted ? "Unmute" : "Mute"}
             </button>
             {/* Confirmed now. The identical action inside the thread has
                 always had a dialog; reaching it by holding a row for 420ms
                 did not — so an accidental hold plus one mistap silently
                 removed a group you were in. */}
-            <button type="button" disabled={actionBusy} onClick={() => { const r = menuRow; setMenuRow(null); setConfirmDeleteId(r.id); }}
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-red-400 hover:bg-white/5 disabled:opacity-60">
-              {actionBusy ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+            <button
+              type="button"
+              disabled={actionBusy}
+              onClick={() => {
+                const r = menuRow;
+                setMenuRow(null);
+                setConfirmDeleteId(r.id);
+              }}
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-red-400 hover:bg-white/5 disabled:opacity-60"
+            >
+              {actionBusy ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Trash2 size={18} />
+              )}
               {menuRow.isGroup ? "Leave group" : "Delete chat"}
             </button>
           </div>
@@ -676,7 +869,9 @@ export function MessagesInbox({ rows, currentUserId, children }: { rows: InboxRo
         }
         body="The conversation disappears from your inbox. The other person keeps their copy."
         confirmLabel={
-          rows.find((r) => r.id === confirmDeleteId)?.isGroup ? "Leave" : "Delete"
+          rows.find((r) => r.id === confirmDeleteId)?.isGroup
+            ? "Leave"
+            : "Delete"
         }
       />
 

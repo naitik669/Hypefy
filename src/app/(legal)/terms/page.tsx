@@ -6,20 +6,6 @@ export default function TermsPage() {
       <h1>Terms of Service</h1>
       <p className="text-xs text-faint">Last updated: July 27, 2026</p>
 
-      {/* One placeholder is left: the Grievance Officer's name, in section 12.
-          It is a statutory disclosure under the IT Rules 2021, so this banner
-          stays visible until it is filled — and then this whole block should
-          go, because a note addressed to the operator does not belong on a
-          published legal page. */}
-      <p className="rounded-xl border border-border bg-surface p-3 text-xs text-muted">
-        Our Grievance Officer is being appointed; their name will be published
-        here shortly. In the meantime, grievances reach us at{" "}
-        <a href="mailto:grievance@hypefy.chat" className="text-accent">
-          grievance@hypefy.chat
-        </a>{" "}
-        and are handled to the timelines in section 12.
-      </p>
-
       <p>
         These Terms of Service (the &quot;Terms&quot;) are a binding agreement
         between you and Hypefy Platform Private Limited (CIN
@@ -196,13 +182,20 @@ export default function TermsPage() {
         Protection Act, 2023, our Grievance Officer is:
       </p>
       <ul>
-        <li>Name: to be appointed (see the note at the top of this page)</li>
+        <li>Name: Mohd Aman</li>
+        <li>Designation: Grievance Officer</li>
+        <li>Company: Hypefy Platform Private Limited</li>
         <li>Email: <a href="mailto:grievance@hypefy.chat" className="text-accent">grievance@hypefy.chat</a></li>
         <li>
           Address: Hypefy Platform Private Limited, House No. 420, Sambhal Road,
           Taharpur, Moradabad, Uttar Pradesh 244001, India
         </li>
       </ul>
+      <p>
+        Users may contact the Grievance Officer regarding complaints about
+        Hypefy&apos;s services, user content, account issues, privacy, or any
+        other grievance.
+      </p>
       <p>
         We acknowledge grievances within 24 hours and aim to resolve them within 15
         days of receipt. Complaints about content that is non-consensual, sexual,
