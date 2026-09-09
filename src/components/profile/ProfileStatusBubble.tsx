@@ -220,12 +220,15 @@ export function ProfileStatusBubble({
    * height, which is a stadium, and the one shape in the app that does not
    * belong to it.
    *
-   * Taller (py-1.5) and less round (10px on ~30px) puts it back on the same
-   * ratio as everything else. The bottom-left corner stays tight, because
-   * that is where the tail leaves and a full curve there would detach it.
+   * Taller (py-1.5) and less round (12px) puts it back on the same ratio as
+   * everything else.
+   *
+   * The bottom-left corner is SQUARE. That is not a rounding oversight: it is
+   * the flat base the tail grows out of, which is how a chat bubble is built.
+   * A curve there and the nub reads as a separate blob parked underneath.
    */
   const bubbleClasses =
-    "pointer-events-auto max-w-[46vw] rounded-[10px] rounded-bl-[3px] border bg-elevated px-3 py-1.5 text-[11px] font-semibold leading-snug shadow-[0_8px_22px_rgba(0,0,0,0.45)] " +
+    "pointer-events-auto max-w-[46vw] rounded-[12px] rounded-bl-none border bg-elevated px-3 py-1.5 text-[11px] font-semibold leading-snug shadow-[0_8px_22px_rgba(0,0,0,0.45)] " +
     (phase === "in" ? "animate-bubble-in " : "animate-bubble-out ") +
     (note ? "border-white/[0.09]" : "border-dashed border-border text-muted");
 
@@ -292,55 +295,50 @@ export function ProfileStatusBubble({
               }
               className={
                 bubbleClasses +
-                " text-left transition-transform active:scale-[0.98]"
+                " relative text-left transition-transform active:scale-[0.98]"
               }
-              // Last in, first out — the dots lead the thought in and outlive it.
-              style={{ animationDelay: phase === "in" ? "180ms" : "0ms" }}
+              // The tail leads in by a beat and outlives the bubble on the way
+              // out, so the shape that persists is the one that arrives first.
+              style={{ animationDelay: phase === "in" ? "110ms" : "0ms" }}
             >
               {bubbleBody}
             </button>
           ) : (
             <div
-              className={bubbleClasses}
-              style={{ animationDelay: phase === "in" ? "180ms" : "0ms" }}
+              className={bubbleClasses + " relative"}
+              style={{ animationDelay: phase === "in" ? "110ms" : "0ms" }}
             >
               {bubbleBody}
             </div>
           ))}
 
-        {/* The tail builds the thought and then lets it go.
+        {/* The tail: one nub, rotated, with its outer corner rounded.
 
-            Small dot, big dot, bubble on the way in; the reverse on the way
-            out. Staggering them is what makes it read as thinking rather than
-            as three things fading in at once — and the delays are inline
-            because the ORDER has to reverse between the two directions, which
-            a single class cannot express.
+            It replaces the two thought-dots. Those said "someone is thinking";
+            this says "someone said something", which is what a status actually
+            is — and it keeps the sharp point off a profile otherwise made
+            entirely of squircles.
 
-            They never vanish completely: dot-pop-out settles at 35% rather
-            than 0, because the resting dots are what say a thought is coming
-            back, and they are the tap target that summons it early.
+            It sits BEHIND the bubble (the bubble is relative, this is not) so
+            only its outer half is ever visible; the inner half and its two
+            inner borders are covered. That is what stops it reading as a
+            separate blob parked under the corner.
 
-            Down-LEFT, because the bubble sits at the avatar's top-right and
-            the person it belongs to is below-left of it. */}
+            It is also the only thing left on screen while the bubble is away,
+            which makes it do two jobs: it says a status exists, and it is the
+            tap target that summons one early. So it never scales to nothing —
+            dot-pop-out settles at 35%. */}
         <button
           type="button"
           aria-label="Show status"
           onClick={() => setSummoned(true)}
-          // A generous target around two very small dots: they are 8px and
-          // 4px, and the padding is what makes them hittable with a thumb.
-          className="pointer-events-auto absolute -bottom-4 left-0 h-6 w-8"
+          // A thumb-sized target around a 14px shape.
+          className="pointer-events-auto absolute -bottom-3 left-0 h-6 w-7"
         >
           <span
-            className={`absolute bottom-2.5 left-2.5 h-2 w-2 rounded-full border border-white/[0.09] bg-elevated ${
+            className={`absolute bottom-1 left-0.5 h-3.5 w-3.5 rotate-[38deg] rounded-[4px] rounded-tr-none border border-white/[0.09] bg-elevated ${
               phase === "in" ? "animate-dot-in" : "animate-dot-out"
             }`}
-            style={{ animationDelay: phase === "in" ? "80ms" : "60ms" }}
-          />
-          <span
-            className={`absolute bottom-1 left-1 h-1 w-1 rounded-full border border-white/[0.09] bg-elevated ${
-              phase === "in" ? "animate-dot-in" : "animate-dot-out"
-            }`}
-            style={{ animationDelay: phase === "in" ? "0ms" : "140ms" }}
           />
         </button>
 
