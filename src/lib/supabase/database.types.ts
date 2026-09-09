@@ -1865,6 +1865,93 @@ export type Database = {
           },
         ]
       }
+      showcase_items: {
+        Row: {
+          caption: string | null
+          created_at: string
+          id: string
+          kind: string
+          media_url: string | null
+          position: number
+          poster_url: string | null
+          removal_reason: string | null
+          removed_at: string | null
+          removed_by: string | null
+          shot_id: string | null
+          show_id: string | null
+          showcase_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          media_url?: string | null
+          position?: number
+          poster_url?: string | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          shot_id?: string | null
+          show_id?: string | null
+          showcase_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          media_url?: string | null
+          position?: number
+          poster_url?: string | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          shot_id?: string | null
+          show_id?: string | null
+          showcase_id?: string
+        }
+        Relationships: []
+      }
+      showcases: {
+        Row: {
+          cover_url: string | null
+          created_at: string
+          id: string
+          position: number
+          removal_reason: string | null
+          removed_at: string | null
+          removed_by: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          position?: number
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          position?: number
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       shows: {
         Row: {
           caption: string | null
@@ -2047,6 +2134,7 @@ export type Database = {
       block_user: { Args: { p_blocked: string }; Returns: undefined }
       blocked_either_way: { Args: never; Returns: string[] }
       capture_creator_daily_stats: { Args: never; Returns: undefined }
+      can_see_profile: { Args: { p_user: string }; Returns: boolean }
       claim_oneshot: { Args: { p_message_id: string }; Returns: string }
       claim_referral: { Args: { p_ref_username: string }; Returns: boolean }
       clear_lock_pin: {
