@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getProfile, hueFromId } from "@/lib/profile";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
-import { ProfileShowcase } from "@/components/profile/ProfileShowcase";
+import { ShowcaseRail } from "@/components/showcase/ShowcaseRail";
 import { StreakBadges } from "@/components/profile/StreakBadges";
 import { InviteIconButton } from "@/components/growth/InviteButton";
 
@@ -124,7 +124,7 @@ export default async function ProfilePage() {
       </div>
 
       {/* Pinned Shots/Shows highlights */}
-      <ProfileShowcase userId={user.id} />
+      <ShowcaseRail userId={user.id} isOwn />
 
       {/* Tabs: Posts | Shots | Saved */}
       <ProfileTabs userId={user.id} />

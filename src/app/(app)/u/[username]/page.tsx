@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { JoinBanner } from "@/components/growth/JoinBanner";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { PublicProfileTabs } from "@/components/profile/PublicProfileTabs";
-import { ProfileShowcase } from "@/components/profile/ProfileShowcase";
+import { ShowcaseRail } from "@/components/showcase/ShowcaseRail";
 import { StreakBadges } from "@/components/profile/StreakBadges";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { MessageButton } from "@/components/profile/MessageButton";
@@ -208,7 +208,9 @@ export default async function PublicProfilePage({
       )}
 
       {/* Pinned highlights (hidden for locked private accounts) */}
-      {!isLocked && <ProfileShowcase userId={profile.id} />}
+      {!isLocked && (
+        <ShowcaseRail userId={profile.id} isOwn={isOwn} />
+      )}
 
       {/* Tabs: Posts | Shots (no Saved for others) — locked for private accounts */}
       {isLocked ? (
