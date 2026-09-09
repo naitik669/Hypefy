@@ -80,19 +80,19 @@ export function ProfileHeader({
           className="rounded-card"
         />
         {currentUserId === userId && <BannerEditMenu userId={userId} />}
+        <ProfileStatusBubble
+          note={note}
+          editable={noteEditable}
+          me={{ name, hue, avatarUrl: avatarUrl ?? null }}
+          ownerId={userId}
+          viewerId={currentUserId}
+        />
       </div>
 
       <div className="px-4">
         {/* Avatar + stats */}
         <div className="flex items-end gap-4">
           <div className="relative -mt-11 inline-block rounded-[26px] shadow-[0_8px_20px_rgba(0,0,0,0.45)]">
-            <ProfileStatusBubble
-              note={note}
-              editable={noteEditable}
-              me={{ name, hue, avatarUrl: avatarUrl ?? null }}
-              ownerId={userId}
-              viewerId={currentUserId}
-            />
             <ProfileAvatar
               name={name}
               hue={hue}
