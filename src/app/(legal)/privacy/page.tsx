@@ -96,6 +96,11 @@ export default function PrivacyPage() {
           <strong>Google (AdSense)</strong> — advertising in the feed, where it
           is shown. See section 11.
         </li>
+        <li>
+          <strong>Google Analytics</strong> — how the app is used: which
+          screens are opened and in what order. It receives no name, username,
+          email address or message content.
+        </li>
       </ul>
       <p>
         We may also disclose data where required by law, to respond to valid legal
@@ -160,6 +165,13 @@ export default function PrivacyPage() {
         Where ads are shown, Google may also set cookies or read device
         identifiers to measure them and to limit how often you see the same
         one. Section 11 explains where this applies and where it does not.
+      </p>
+      <p>
+        Google Analytics sets cookies to recognise a returning visit and to
+        count a session. It is subject to the same regional limit as ads: it
+        does not run for people in the European Economic Area, the United
+        Kingdom or Switzerland, because we do not yet operate a consent
+        management platform of the kind those rules require.
       </p>
 
       <h2 id="ads">11. Advertising</h2>

@@ -5,6 +5,8 @@ import { ReferralTracker } from "@/components/growth/ReferralTracker";
 import { ClientErrorReporter } from "@/components/pwa/ClientErrorReporter";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
+import { headers } from "next/headers";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { PostAuthTasks } from "@/components/auth/PostAuthTasks";
 import { SavedAccountSync } from "@/components/auth/SavedAccountSync";
 
@@ -119,11 +121,16 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Resolved here rather than in the browser: a reader's country decides
+  // whether analytics may run at all, and the edge knows it while the page
+  // does not. An absent header stays null and is read as "consent required".
+  const country = (await headers()).get("x-vercel-ip-country");
+
   return (
     <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
@@ -136,6 +143,10 @@ export default function RootLayout({
             The native shell loads app.hypefy.chat, so app traffic is measured
             here too rather than needing a separate mobile SDK. */}
         <Analytics />
+        {/* Google Analytics 4. Separate from Vercel's above, which is
+            server-side and cookieless and measures delivery rather than
+            behaviour — neither replaces the other. */}
+        <GoogleAnalytics country={country} />
         <RegisterSW />
         <ReferralTracker />
         <ClientErrorReporter />
