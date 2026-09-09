@@ -92,9 +92,18 @@ export function adMode(): AdFill {
   // A half-configured "adsense" is a misconfiguration, not an instruction:
   // pushing to an <ins> with no client id produces a console error and an
   // empty box, so fall back rather than trying.
-  if (m === "adsense" && AD_CLIENT && AD_SLOT_FEED && AD_LAYOUT_KEY) {
-    return "adsense";
-  }
+  //
+  // The layout key is deliberately NOT required. It only exists on an
+  // In-feed unit, and an In-feed unit is the one thing AdSense will not
+  // always let you create — its builder wants to scan a live feed for a
+  // style, and this feed is behind a login, so it reports finding none.
+  // Waiting on that would block the whole feature on a styling wizard.
+  //
+  // A Display unit works here because the card already IS the native
+  // styling: the chrome, the label, the reserved height and the fallback
+  // are ours, and all the layout key ever contributed was fonts and
+  // colours inside a box we frame anyway.
+  if (m === "adsense" && AD_CLIENT && AD_SLOT_FEED) return "adsense";
   return "off";
 }
 

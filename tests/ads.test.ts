@@ -56,12 +56,27 @@ describe("adMode", () => {
     expect(adMode()).toBe("off");
   });
 
-  it("is off when one id of the three is missing", async () => {
+  it("is off without a client or a slot", async () => {
+    for (const missing of [
+      "NEXT_PUBLIC_ADSENSE_CLIENT",
+      "NEXT_PUBLIC_ADSENSE_FEED_SLOT",
+    ]) {
+      const { adMode } = await load({ ...CONFIGURED, [missing]: undefined });
+      expect(adMode()).toBe("off");
+    }
+  });
+
+  it("runs without a layout key", async () => {
+    // The key only exists on an In-feed unit, and AdSense will not always let
+    // you create one — its style builder wants to scan a live feed, and this
+    // feed is behind a login. Requiring the key would block the feature on a
+    // styling wizard. A Display unit fills the same card, which supplies all
+    // the styling the key would have.
     const { adMode } = await load({
       ...CONFIGURED,
       NEXT_PUBLIC_ADSENSE_FEED_LAYOUT_KEY: undefined,
     });
-    expect(adMode()).toBe("off");
+    expect(adMode()).toBe("adsense");
   });
 
   it("takes house mode with no ids at all", async () => {

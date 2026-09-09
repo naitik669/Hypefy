@@ -24,34 +24,35 @@ Tests: `tests/feed-mix.test.ts`, `tests/ads.test.ts`, `tests/adsense.test.ts`.
 
 ---
 
-## Step 1 — Take the invite wall down
+## Step 1 — The front door — DONE
 
-**This is the blocker, and it is not a code change.** AdSense reviews a site by
-visiting it. `app.hypefy.chat/` currently serves "Invite only", so a reviewer
-sees a form and declines for "site unavailable" or "no content" — the open
-deep links never come into it.
+The wall used to stand at `/`, which made the whole site look like it did not
+exist: a reviewer arrived, met a code field, and left.
 
-1. Vercel → the project → Settings → Environment Variables → Production.
-2. Delete `APP_INVITE_CODE`. (`INVITE_COOKIE_SECRET` can stay; it does nothing
-   on its own.)
-3. Redeploy.
-4. Confirm `https://app.hypefy.chat/` no longer shows the code field.
+It now stands at `/signin` and `/signup` instead, so joining still needs a
+code while `/`, `/onboarding` and `/explore` are public. `APP_INVITE_CODE`
+stays set — it guards a different door, not the whole building. See
+`OPEN_PATHS` in `src/lib/invite-gate.ts`.
 
-`isGateDisabled()` in `src/lib/invite-gate.ts` returns true when that variable
-is unset, and every request then passes straight through.
-
-**Putting the wall back after approval does not work.** AdSense re-crawls
-continuously, and a site that becomes a login wall has ads disabled for it with
-"site down or unavailable". Treat this step as one-way for as long as ads run.
+Note that this had to be the same for everyone. Letting a crawler past a wall
+humans still meet is cloaking, which carries a site-level penalty — and it
+would not work anyway, since a review is a person opening the URL in a browser.
 
 ## Step 2 — Let Google find the content
 
-Already done in code — `src/app/robots.ts` and `src/app/sitemap.ts`. After
-step 1:
+Done in code, in **both** repos — `robots.ts` and `sitemap.ts` in each. The
+app's sitemap lists real content; the landing site's is nearly a formality, and
+the two are joined by the Explore link in the landing nav, which is how a
+crawler travels between them.
 
-1. Google Search Console → add `app.hypefy.chat` as a property.
-2. Verify it (the DNS or HTML-tag method; Vercel makes the DNS one easy).
-3. Sitemaps → submit `sitemap.xml`.
+`/explore` is the piece that makes any of it reachable. Public profiles, posts
+and shots were always openable by link, but nothing led to them, so the front
+door opened onto a sign-up form.
+
+1. Google Search Console → add `hypefy.chat` as a property (and
+   `app.hypefy.chat` separately if you want its numbers).
+2. Verify it.
+3. Sitemaps → submit `sitemap.xml` for each.
 
 The sitemap lists public profiles, posts and shots. It is read as `anon`, so
 private profiles, suspended accounts and removed posts are excluded by RLS
@@ -63,11 +64,21 @@ after more posts exist is normal, not a sign anything is broken.
 
 ## Step 3 — Apply to AdSense
 
-1. Sign up at adsense.google.com and add `app.hypefy.chat` as a site.
-2. Paste the verification snippet where AdSense asks — or skip it, because
-   `AdSenseUnit` already loads the same script from your publisher id once a
-   unit renders.
-3. Wait. Days to weeks. The account shows *Getting ready* until it is *Ready*.
+**The site is `hypefy.chat`, not `app.hypefy.chat`.** AdSense verifies a site
+and covers the subdomains under it, so proving the root domain is what lets ads
+run on the app. It will not accept the subdomain on its own.
+
+1. adsense.google.com → Sites → `hypefy.chat`.
+2. Verification method: **meta tag**, not the code snippet. The tag is already
+   served by the landing site's `layout.tsx`; the snippet is the Auto ads tag
+   and is deliberately absent.
+3. Request review. Days to weeks; the account reads *Getting ready* until
+   *Ready*.
+
+**`hypefy.chat` is the domain being judged**, and it is a one-page waitlist
+site. That is the weakest part of this whole plan. The Explore links give the
+crawler a route into real content, but a thin-content decline is the likely
+outcome of a first attempt, and the fix is real pages on the landing site.
 
 Publisher id: `pub-8956774728473034` → the tag needs `ca-pub-8956774728473034`,
 but `src/lib/ads.ts` accepts either spelling, so paste whichever you have.
@@ -76,12 +87,25 @@ but `src/lib/ads.ts` accepts either spelling, so paste whichever you have.
 — anchor bars, side rails, full-screen vignettes. It would layer its own
 placements on top of the feed card and undo the whole point of this work.
 
-## Step 4 — Create the in-feed unit
+## Step 4 — Create the ad unit
 
-AdSense → Ads → By ad unit → **In-feed**. Not Display, not In-article, not
-Auto: In-feed is the only one that produces a layout key.
+**A Display unit is enough.** AdSense → Ads → By ad unit → **Display**. Copy
+the `data-ad-slot`. That is the whole step.
 
-Use the manual layout builder and match the card:
+An In-feed unit is slightly better and entirely optional. Its builder wants to
+scan a live page and copy the style of a real feed, and it answers
+*"We couldn't find any feed page on this site"* when it cannot — which it
+cannot here, because the feed is behind a login. The way past that is the
+**manual** tab in the unit builder ("Build your own" rather than "Let Google
+suggest a style"), not a different URL.
+
+It is optional because the card already is the native styling: the chrome, the
+"Sponsored" label, the reserved height and the house fallback are all ours. All
+a layout key ever contributed was fonts and colours inside a box we frame
+anyway. Set `NEXT_PUBLIC_ADSENSE_FEED_LAYOUT_KEY` if you have one and the slot
+renders as In-feed; leave it empty and the same slot renders as Display.
+
+If you do build one manually, match the card:
 
 - Image **above** the text
 - Roughly 1.91:1 image
@@ -116,8 +140,9 @@ under a running server silently does nothing.
 In Vercel, set the same four in **Production only**, and leave
 `NEXT_PUBLIC_ADS_TEST` unset there.
 
-All three ids are required together. Missing one and `adMode()` returns `off`
-— a half-configured deploy is a mistake, not an instruction.
+The client and the slot are required together — missing either and `adMode()`
+returns `off`, because a half-configured deploy is a mistake rather than an
+instruction. The layout key is optional; see step 4.
 
 ## Step 6 — Verify
 
@@ -157,9 +182,6 @@ that never passed `/age-check` — gets non-personalised ads via
 
 ## Still open
 
-- **`ads.txt`.** Google reads it from the root domain, and `hypefy.chat` is a
-  separate project from this repo. Without it you get unauthorised-inventory
-  warnings and suppressed bidding.
 - **Android revenue.** Nothing until an AdMob Native Advanced bridge exists: a
   Kotlin plugin that loads a `NativeAd`, passes the creative fields into the
   WebView, and registers impressions and clicks natively. The card is already

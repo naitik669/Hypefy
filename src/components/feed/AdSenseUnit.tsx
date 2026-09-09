@@ -93,10 +93,16 @@ export const AdSenseUnit = memo(function AdSenseUnit({
       ref={ref}
       className="adsbygoogle block h-full w-full"
       style={{ display: "block" }}
-      data-ad-format="fluid"
-      data-ad-layout-key={AD_LAYOUT_KEY}
       data-ad-client={AD_CLIENT}
       data-ad-slot={AD_SLOT_FEED}
+      // In-feed when there is a layout key, Display when there is not.
+      //
+      // "fluid" without a layout key is not a smaller version of in-feed —
+      // it is a unit with no shape at all, which collapses. So the two go
+      // together or neither does.
+      {...(AD_LAYOUT_KEY
+        ? { "data-ad-format": "fluid", "data-ad-layout-key": AD_LAYOUT_KEY }
+        : { "data-ad-format": "auto", "data-full-width-responsive": "true" })}
       // Non-personalised for anyone we cannot confirm is an adult. The app's
       // only age threshold is 13, so this is most readers.
       {...(personalised ? {} : { "data-tag-for-under-age-of-consent": "true" })}
