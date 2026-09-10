@@ -37,9 +37,24 @@ afterEach(() => {
 });
 
 describe("gaEnabled", () => {
-  it("is off with no measurement id", async () => {
+  it("uses Hypefy's own id when the environment sets none — or sets it empty", async () => {
+    for (const v of [undefined, ""]) {
+      const { GA_ID, gaEnabled } = await load({ ...ON, NEXT_PUBLIC_GA_ID: v });
+      expect(GA_ID).toBe("G-EQD7SK0DGZ");
+      expect(gaEnabled({ analytics: true })).toBe(true);
+    }
+  });
+
+  it("still sends nothing off the live domains with the built-in id", async () => {
+    // The id being in the code is only safe because of this.
     const { gaEnabled } = await load({ ...ON, NEXT_PUBLIC_GA_ID: undefined });
+    servingFrom("localhost");
     expect(gaEnabled({ analytics: true })).toBe(false);
+  });
+
+  it("lets the environment override the id", async () => {
+    const { GA_ID } = await load({ ...ON, NEXT_PUBLIC_GA_ID: "G-OTHER" });
+    expect(GA_ID).toBe("G-OTHER");
   });
 
   it("measures a reader on the live site who has analytics consent", async () => {
