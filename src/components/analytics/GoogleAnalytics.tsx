@@ -1,8 +1,17 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { GA_ID, gaDebug, gaEnabled } from "@/lib/analytics";
+import {
+  consentRevision,
+  currentConsent,
+  subscribeConsent,
+  toGoogleConsent,
+} from "@/lib/consent";
+
+type Gtag = (...args: unknown[]) => void;
+const gtagOf = () => (window as typeof window & { gtag?: Gtag }).gtag;
 
 /**
  * Google Analytics 4.
@@ -39,10 +48,24 @@ export function GoogleAnalytics({ country }: { country: string | null }) {
   const pathname = usePathname();
   const loaded = useRef(false);
 
-  // Load once.
+  // Re-render whenever the reader changes their cookie choice, so accepting
+  // starts measurement at once and refusing stops it at once.
+  const revision = useSyncExternalStore(subscribeConsent, consentRevision, () => 0);
+
+  // Tell an already-loaded gtag about a changed choice. Consent Mode reads
+  // this as an update: analytics_storage denied stops cookies being set and
+  // read from here on.
+  useEffect(() => {
+    if (!loaded.current) return;
+    gtagOf()?.("consent", "update", toGoogleConsent(currentConsent(country)));
+  }, [revision, country]);
+
+  // Load once — but only once there is consent, which may be right away
+  // (a region where the default is on) or only after the banner is answered.
   useEffect(() => {
     if (loaded.current) return;
-    if (!gaEnabled({ country })) return;
+    const consent = currentConsent(country);
+    if (!gaEnabled({ analytics: consent.analytics })) return;
     loaded.current = true;
 
     const w = window as typeof window & {
@@ -61,6 +84,10 @@ export function GoogleAnalytics({ country }: { country: string | null }) {
     }
     w.gtag = gtag as unknown as (...args: unknown[]) => void;
 
+    // Consent first, before config: Consent Mode v2 wants the state known
+    // before the first hit, and a tag configured first would send one under
+    // no consent at all.
+    w.gtag("consent", "default", toGoogleConsent(consent));
     w.gtag("js", new Date());
     w.gtag("config", GA_ID, {
       // See the note above — views are sent from the effect below.
@@ -77,13 +104,15 @@ export function GoogleAnalytics({ country }: { country: string | null }) {
     // reporting. The queued dataLayer calls simply never drain.
     el.onerror = () => {};
     document.head.appendChild(el);
-  }, [country]);
+  }, [country, revision]);
 
   // One page view per URL, including the first.
   useEffect(() => {
     if (!loaded.current) return;
     const w = window as typeof window & { gtag?: (...a: unknown[]) => void };
     if (!w.gtag) return;
+    // A reader who withdrew consent after the script loaded is not measured.
+    if (!currentConsent(country).analytics) return;
 
     // page_location and page_title only. page_path is a Universal Analytics
     // parameter: GA4 drops it, and a hit sent with it arrives carrying an
@@ -94,7 +123,7 @@ export function GoogleAnalytics({ country }: { country: string | null }) {
       page_location: window.location.href,
       page_title: document.title,
     });
-  }, [pathname]);
+  }, [pathname, revision, country]);
 
   // Back and forward, restored from the browser's cache.
   //
@@ -105,7 +134,7 @@ export function GoogleAnalytics({ country }: { country: string | null }) {
   // one signal that distinguishes a restore from a fresh load.
   useEffect(() => {
     const onShow = (e: PageTransitionEvent) => {
-      if (!e.persisted || !loaded.current) return;
+      if (!e.persisted || !loaded.current || !currentConsent(country).analytics) return;
       const w = window as typeof window & { gtag?: (...a: unknown[]) => void };
       w.gtag?.("event", "page_view", {
         page_location: window.location.href,
@@ -114,7 +143,7 @@ export function GoogleAnalytics({ country }: { country: string | null }) {
     };
     window.addEventListener("pageshow", onShow);
     return () => window.removeEventListener("pageshow", onShow);
-  }, []);
+  }, [country]);
 
   return null;
 }

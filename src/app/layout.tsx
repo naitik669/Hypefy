@@ -7,6 +7,7 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { headers } from "next/headers";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
+import { ConsentBanner } from "@/components/consent/ConsentBanner";
 import { PostAuthTasks } from "@/components/auth/PostAuthTasks";
 import { SavedAccountSync } from "@/components/auth/SavedAccountSync";
 
@@ -147,6 +148,9 @@ export default async function RootLayout({
             server-side and cookieless and measures delivery rather than
             behaviour — neither replaces the other. */}
         <GoogleAnalytics country={country} />
+        {/* Every page, the Android app included: Analytics runs there too,
+            and a reader there is owed the same choice. */}
+        <ConsentBanner country={country} />
         <RegisterSW />
         <ReferralTracker />
         <ClientErrorReporter />

@@ -76,6 +76,8 @@ const OPEN_PATHS = [
   "/privacy",
   "/terms",
   "/guidelines",
+  // The cookie banner links here before anyone has signed in — it has to open.
+  "/cookies",
 ];
 
 /**

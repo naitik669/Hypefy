@@ -9,6 +9,7 @@ import {
   type PlacedAd,
 } from "@/lib/feed-mix";
 import { adBudgetLeft, adFill, type AdFill } from "@/lib/ads";
+import { consentRevision, currentConsent, subscribeConsent } from "@/lib/consent";
 import { isNative } from "@/lib/native";
 
 const NO_ADS: PlacedAd[] = [];
@@ -27,9 +28,17 @@ const never = () => () => {};
  * does not render the page once with the wrong answer before correcting it.
  */
 export function useAdFill(country: string | null): AdFill {
+  // Subscribed to consent changes, so answering the cookie banner switches
+  // the slots over at once rather than on the next page load.
+  useSyncExternalStore(subscribeConsent, consentRevision, () => 0);
   return useSyncExternalStore(
     never,
-    () => adFill({ country, native: isNative() }),
+    () =>
+      adFill({
+        country,
+        native: isNative(),
+        adsConsent: currentConsent(country).ads,
+      }),
     () => "off"
   );
 }

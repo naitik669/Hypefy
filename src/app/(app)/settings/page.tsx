@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CookiePreferencesButton } from "@/components/consent/ConsentBanner";
 import {
   UserCircle,
   Shield,
@@ -176,6 +177,10 @@ export default async function SettingsPage() {
 
         <SignOutButton />
 
+        {/* Where a cookie choice is changed after the first time. The banner
+            only asks once; this is the "any time" the banner promises. */}
+        <CookiePreferencesButton className="mx-auto block rounded-pill border border-border px-4 py-2 text-xs font-semibold text-muted transition-colors hover:text-foreground" />
+
         <p className="text-center text-[11px] text-faint">
           <Link href="/terms" className="underline hover:text-muted">
             Terms of Service
@@ -187,6 +192,10 @@ export default async function SettingsPage() {
           <span className="mx-2">·</span>
           <Link href="/guidelines" className="underline hover:text-muted">
             Community Guidelines
+          </Link>
+          <span className="mx-2">·</span>
+          <Link href="/cookies" className="underline hover:text-muted">
+            Cookie Policy
           </Link>
         </p>
       </div>

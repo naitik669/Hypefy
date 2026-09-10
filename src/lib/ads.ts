@@ -161,6 +161,13 @@ export type AdContext = {
    * component: that is where the region and the age both come from.
    */
   native: boolean;
+  /**
+   * The reader's advertising consent — their cookie-banner choice, or their
+   * region's default before they have made one (lib/consent.ts). Required,
+   * not defaulted: a caller that forgot to pass it must not quietly count as
+   * a yes.
+   */
+  adsConsent: boolean;
 };
 
 /**
@@ -175,7 +182,17 @@ export function adFill(ctx: AdContext): AdFill {
   if (mode === "off") return "off";
   if (mode === "house") return "house";
   if (ctx.native) return "house";
+  // The EEA, the UK and Switzerland stay on the house card even with our own
+  // banner accepted. Google requires ads there to run behind a Google-
+  // certified consent platform speaking IAB TCF, and a first-party banner is
+  // not one. Serving there needs AdSense's own EU consent message switched on
+  // in the AdSense dashboard — see docs/ADS.md.
   if (needsConsent(ctx.country)) return "house";
+  // Everywhere else the reader's choice decides. Refusing advertising cookies
+  // means no Google ad at all rather than a non-personalised one: those still
+  // set cookies for frequency capping and fraud checks, so they are not what
+  // "no" means.
+  if (!ctx.adsConsent) return "house";
   // Last, and the one that does not depend on anything being configured
   // correctly: only the live site talks to Google.
   if (!canServeHere()) return "house";

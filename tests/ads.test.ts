@@ -136,43 +136,43 @@ describe("adFill", () => {
     // tag here is a tag inside the app — which is AdMob's territory, not
     // AdSense's. This is the single most expensive thing to get wrong.
     const { adFill } = await load(CONFIGURED);
-    expect(adFill({ country: "IN", native: true })).toBe("house");
+    expect(adFill({ country: "IN", native: true, adsConsent: true })).toBe("house");
   });
 
   it("never returns adsense for a reader who needs a CMP", async () => {
     const { adFill } = await load(CONFIGURED);
-    expect(adFill({ country: "DE", native: false })).toBe("house");
-    expect(adFill({ country: null, native: false })).toBe("house");
+    expect(adFill({ country: "DE", native: false, adsConsent: true })).toBe("house");
+    expect(adFill({ country: null, native: false, adsConsent: true })).toBe("house");
   });
 
   it("serves adsense to a configured, non-native, non-EEA reader", async () => {
     const { adFill } = await load(CONFIGURED);
-    expect(adFill({ country: "IN", native: false })).toBe("adsense");
+    expect(adFill({ country: "IN", native: false, adsConsent: true })).toBe("adsense");
   });
 
   it("does not reach adsense from a developer's machine", async () => {
     const { adFill } = await load(CONFIGURED);
     servingFrom("localhost");
-    expect(adFill({ country: "IN", native: false })).toBe("house");
+    expect(adFill({ country: "IN", native: false, adsConsent: true })).toBe("house");
   });
 
   it("stays off entirely when nothing is configured, native or not", async () => {
     const { adFill } = await load(BLANK);
-    expect(adFill({ country: "IN", native: false })).toBe("off");
-    expect(adFill({ country: "IN", native: true })).toBe("off");
+    expect(adFill({ country: "IN", native: false, adsConsent: true })).toBe("off");
+    expect(adFill({ country: "IN", native: true, adsConsent: true })).toBe("off");
   });
 
   it("falls back to house rather than leaving a hole", async () => {
     // The placement rules have already reserved a slot by the time this is
     // asked. "off" there would be a gap in the middle of the feed.
     const { adFill, adsEnabled } = await load(CONFIGURED);
-    expect(adFill({ country: "GB", native: true })).toBe("house");
-    expect(adsEnabled({ country: "GB", native: true })).toBe(true);
+    expect(adFill({ country: "GB", native: true, adsConsent: true })).toBe("house");
+    expect(adsEnabled({ country: "GB", native: true, adsConsent: true })).toBe(true);
   });
 
   it("places no slots at all when off", async () => {
     const { adsEnabled } = await load(BLANK);
-    expect(adsEnabled({ country: "IN", native: false })).toBe(false);
+    expect(adsEnabled({ country: "IN", native: false, adsConsent: true })).toBe(false);
   });
 });
 
@@ -217,6 +217,27 @@ describe("the publisher id", () => {
   });
 });
 
+describe("advertising consent", () => {
+  it("serves no Google ad to a reader who refused advertising cookies", async () => {
+    // Not a non-personalised ad either: those still set cookies for frequency
+    // capping and fraud checks, so they are not what "no" means.
+    const { adFill } = await load(CONFIGURED);
+    expect(adFill({ country: "IN", native: false, adsConsent: false })).toBe("house");
+  });
+
+  it("keeps the EEA on the house card even with consent given", async () => {
+    // A first-party banner is not the Google-certified CMP AdSense requires
+    // there.
+    const { adFill } = await load(CONFIGURED);
+    expect(adFill({ country: "DE", native: false, adsConsent: true })).toBe("house");
+  });
+
+  it("still fills the slot either way", async () => {
+    const { adsEnabled } = await load(CONFIGURED);
+    expect(adsEnabled({ country: "IN", native: false, adsConsent: false })).toBe(true);
+  });
+});
+
 describe("the origin guard", () => {
   const at = servingFrom;
 
@@ -224,7 +245,7 @@ describe("the origin guard", () => {
     const { adFill } = await load(CONFIGURED);
     for (const host of ["app.hypefy.chat", "hypefy.chat", "www.hypefy.chat"]) {
       at(host);
-      expect(adFill({ country: "IN", native: false })).toBe("adsense");
+      expect(adFill({ country: "IN", native: false, adsConsent: true })).toBe("adsense");
     }
   });
 
@@ -242,14 +263,14 @@ describe("the origin guard", () => {
       "app.hypefy.chat.attacker.test",
     ]) {
       at(host);
-      expect(adFill({ country: "IN", native: false })).toBe("house");
+      expect(adFill({ country: "IN", native: false, adsConsent: true })).toBe("house");
     }
   });
 
   it("still fills the card rather than leaving a hole", async () => {
     const { adsEnabled } = await load(CONFIGURED);
     at("localhost");
-    expect(adsEnabled({ country: "IN", native: false })).toBe(true);
+    expect(adsEnabled({ country: "IN", native: false, adsConsent: true })).toBe(true);
   });
 });
 

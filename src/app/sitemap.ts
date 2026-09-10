@@ -69,6 +69,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/privacy`, lastModified: now, changeFrequency: "monthly", priority: 0.3 },
     { url: `${BASE}/terms`, lastModified: now, changeFrequency: "monthly", priority: 0.3 },
     { url: `${BASE}/guidelines`, lastModified: now, changeFrequency: "monthly", priority: 0.3 },
+    { url: `${BASE}/cookies`, lastModified: now, changeFrequency: "monthly", priority: 0.3 },
   ];
 
   const supabase = anon();

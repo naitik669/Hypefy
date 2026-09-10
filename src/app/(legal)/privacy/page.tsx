@@ -4,7 +4,7 @@ export default function PrivacyPage() {
   return (
     <>
       <h1>Privacy Policy</h1>
-      <p className="text-xs text-faint">Last updated: September 9, 2026</p>
+      <p className="text-xs text-faint">Last updated: September 10, 2026</p>
 
       <p>
         This Privacy Policy explains how Hypefy Platform Private Limited (CIN
@@ -162,16 +162,16 @@ export default function PrivacyPage() {
         the Service. These are necessary for the Service to function.
       </p>
       <p>
-        Where ads are shown, Google may also set cookies or read device
-        identifiers to measure them and to limit how often you see the same
-        one. Section 11 explains where this applies and where it does not.
-      </p>
-      <p>
-        Google Analytics sets cookies to recognise a returning visit and to
-        count a session. It is subject to the same regional limit as ads: it
-        does not run for people in the European Economic Area, the United
-        Kingdom or Switzerland, because we do not yet operate a consent
-        management platform of the kind those rules require.
+        Analytics cookies (Google Analytics) and advertising cookies (Google
+        AdSense) are used only with your consent, which you give or refuse in
+        the cookie banner and can change at any time from Settings. In the
+        European Economic Area, the United Kingdom and Switzerland they are off
+        until you turn them on; elsewhere they are on until you turn them off.
+        Our{" "}
+        <a href="/cookies" className="text-accent">
+          Cookie Policy
+        </a>{" "}
+        lists every cookie we use, what it does and how long it lasts.
       </p>
 
       <h2 id="ads">11. Advertising</h2>
@@ -186,11 +186,12 @@ export default function PrivacyPage() {
       </p>
       <p>
         Ads are not shown everywhere. They are not shown in the Hypefy Android
-        app, and they are not shown to people in the European Economic Area,
-        the United Kingdom or Switzerland, because we do not yet operate a
-        consent management platform of the kind those rules require. Where ads
-        do not run, the slot carries a Hypefy notice instead and no third-party
-        script loads at all.
+        app. They are not shown to anyone who has turned advertising cookies
+        off. And they are not yet shown to people in the European Economic
+        Area, the United Kingdom or Switzerland, even with consent, because
+        ads there require a Google-certified consent platform we do not yet
+        use. Where ads do not run, the slot carries a Hypefy notice instead
+        and no third-party script loads at all.
       </p>
       <p>
         Ads are personalised only where we can confirm you are 18 or over from

@@ -39,47 +39,42 @@ afterEach(() => {
 describe("gaEnabled", () => {
   it("is off with no measurement id", async () => {
     const { gaEnabled } = await load({ ...ON, NEXT_PUBLIC_GA_ID: undefined });
-    expect(gaEnabled({ country: "IN" })).toBe(false);
+    expect(gaEnabled({ analytics: true })).toBe(false);
   });
 
-  it("measures a reader on the live site", async () => {
+  it("measures a reader on the live site who has analytics consent", async () => {
     const { gaEnabled } = await load(ON);
     for (const h of ["app.hypefy.chat", "hypefy.chat", "www.hypefy.chat"]) {
       servingFrom(h);
-      expect(gaEnabled({ country: "IN" })).toBe(true);
+      expect(gaEnabled({ analytics: true })).toBe(true);
     }
   });
 
-  it("does not measure a reader who needs a consent choice", async () => {
-    // Same answer as ads, and for the same reason: there is no CMP. GA sets
-    // cookies and is not strictly necessary, so it needs one.
+  it("does not load at all without analytics consent", async () => {
+    // Consent Mode "basic": no consent, no Google script — not a script that
+    // has been told to hold back.
     const { gaEnabled } = await load(ON);
-    expect(gaEnabled({ country: "DE" })).toBe(false);
-    expect(gaEnabled({ country: null })).toBe(false);
+    expect(gaEnabled({ analytics: false })).toBe(false);
   });
 
   it("sends nothing from a developer's machine by default", async () => {
     const { gaEnabled } = await load(ON);
     for (const h of ["localhost", "127.0.0.1", "x-git-main.vercel.app"]) {
       servingFrom(h);
-      expect(gaEnabled({ country: "IN" })).toBe(false);
+      expect(gaEnabled({ analytics: true })).toBe(false);
     }
   });
 
   it("sends from a developer's machine when debug is asked for", async () => {
-    // And only then, and the hits carry debug_mode so they land in DebugView
-    // rather than the reports. Without this branch an installation could
-    // never be verified: localhost has no country header, and null reads as
-    // "consent required".
     const { gaEnabled } = await load({ ...ON, NEXT_PUBLIC_GA_DEBUG: "1" });
     servingFrom("localhost");
-    expect(gaEnabled({ country: null })).toBe(true);
+    expect(gaEnabled({ analytics: false })).toBe(true);
   });
 
   it("does not let the debug switch speak for a real reader", async () => {
     // Debug set in Production must not become a way past consent.
     const { gaEnabled } = await load({ ...ON, NEXT_PUBLIC_GA_DEBUG: "1" });
     servingFrom("app.hypefy.chat");
-    expect(gaEnabled({ country: "DE" })).toBe(false);
+    expect(gaEnabled({ analytics: false })).toBe(false);
   });
 });

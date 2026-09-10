@@ -214,7 +214,8 @@ rules put a card.
 | Reader | Why |
 |---|---|
 | Inside the Android app | `capacitor.config.ts` points the Play Store app at the live site, so a web tag there is a tag inside the app. That is AdMob's territory, not AdSense's |
-| EEA, UK, Switzerland | No consent management platform exists in this app |
+| EEA, UK, Switzerland | Google requires a Google-certified CMP (IAB TCF) there. Our cookie banner is first-party and is not one — see below |
+| Refused advertising cookies | The reader said no in the cookie banner. No Google ad at all, not a non-personalised one: those still set cookies |
 | Unknown country | Read as EEA. A header that did not arrive is not evidence of anything |
 
 Personalisation is separate: ads are personalised only for a reader confirmed
@@ -231,3 +232,24 @@ that never passed `/age-check` — gets non-personalised ads via
 - **A CMP**, if EEA readers ever matter.
 - **The private-profile filter in the sitemap is untested by data** — there are
   currently no private or suspended accounts, so nothing has been excluded yet.
+
+## Consent
+
+The cookie banner (`src/components/consent/ConsentBanner.tsx`, rules in
+`src/lib/consent.ts`) asks once, stores the choice in `hypefy_consent` for six
+months, and both Analytics and the ad slots follow it live.
+
+- **EEA, UK, Switzerland, unknown:** everything off until the reader turns it on.
+- **Everywhere else:** on until they turn it off.
+
+It covers Google Analytics everywhere. It does **not** unlock AdSense in the
+EEA/UK/CH, because Google requires a Google-certified CMP there and a
+first-party banner is not one. To serve ads to those readers:
+
+1. AdSense → **Privacy & messaging → European regulations** → create and publish
+   the message. That is Google's own certified CMP; it shows Google's banner,
+   not ours, to EEA/UK/CH readers only.
+2. Remove the `needsConsent(ctx.country)` line from `adFill` in `src/lib/ads.ts`,
+   so those readers are served once Google's message has their consent.
+
+Until both are done they get the house card, which is the safe default.

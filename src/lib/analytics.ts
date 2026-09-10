@@ -1,5 +1,3 @@
-import { needsConsent } from "@/lib/ads";
-
 /**
  * Google Analytics 4 — whether it runs, and where its data lands.
  *
@@ -13,9 +11,12 @@ import { needsConsent } from "@/lib/ads";
  *      DebugView instead of the reports.
  *
  *   2. **Consent.** GA sets cookies and is analytics, not strictly necessary,
- *      so an EEA/UK reader needs a consent choice this app cannot yet offer.
- *      Same answer as ads: not until there is a CMP. Unknown region counts as
- *      EEA.
+ *      so it runs only when the reader's analytics consent is on — their own
+ *      choice from the cookie banner, or, before they have chosen, their
+ *      region's default (see lib/consent.ts: off in the EEA, UK and
+ *      Switzerland, on elsewhere). This is Consent Mode's "basic" setup:
+ *      without consent, Google's script is never loaded at all, rather than
+ *      loaded and told to hold back.
  *
  *   3. **NOT the native shell.** This is the one that differs from ads.
  *      AdSense is barred from an app WebView by policy; analytics is not, and
@@ -46,16 +47,9 @@ export function gaDebug(): boolean {
 }
 
 export type GaContext = {
-  /** The reader's country, resolved server-side. Null means unknown. */
-  country: string | null;
+  /** Whether analytics consent is in force — chosen, or the regional default. */
+  analytics: boolean;
 };
-
-export function needsGaConsent(country: string | null | undefined): boolean {
-  // Delegating rather than keeping a second copy of the country list: two
-  // lists drift, and the day they disagree is the day one of them is wrong
-  // about a jurisdiction.
-  return needsConsent(country);
-}
 
 export function gaEnabled(ctx: GaContext): boolean {
   if (!GA_ID) return false;
@@ -70,7 +64,7 @@ export function gaEnabled(ctx: GaContext): boolean {
   // could never be verified anywhere.
   if (!MEASURED_HOSTS.has(window.location.hostname)) return gaDebug();
 
-  // On the live site there is a reader, and the debug switch does not speak
-  // for them.
-  return !needsGaConsent(ctx.country);
+  // On the live site there is a reader, and only their consent decides. The
+  // debug switch does not speak for them.
+  return ctx.analytics;
 }
