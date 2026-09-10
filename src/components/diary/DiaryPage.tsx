@@ -61,3 +61,56 @@ export function pageTint(hue: number) {
     screen: `radial-gradient(90% 60% at 10% 0%, hsl(${hue} 55% 40% / 0.35), transparent 70%), linear-gradient(180deg, hsl(${hue} 10% 12%), hsl(${hue} 8% 6%))`,
   };
 }
+
+/**
+ * The colours you can give your Diary.
+ *
+ * Deep, saturated inks, every one dark enough for white words — a stack of
+ * friends' pages in different colours is the point, so the palette spreads
+ * round the wheel rather than clustering. "Ink" is the default page: the
+ * charcoal above, glowing faintly in your own avatar hue.
+ *
+ * Keys are what the database stores; changing a hue here recolours every
+ * Diary in that colour, and a key removed from this list falls back to Ink.
+ */
+export const DIARY_COLORS = [
+  { key: "ink", label: "Ink", hue: -1, sat: 0 },
+  { key: "plum", label: "Plum", hue: 285, sat: 42 },
+  { key: "cobalt", label: "Cobalt", hue: 226, sat: 58 },
+  { key: "teal", label: "Teal", hue: 186, sat: 60 },
+  { key: "forest", label: "Forest", hue: 152, sat: 42 },
+  { key: "moss", label: "Moss", hue: 82, sat: 48 },
+  { key: "ember", label: "Ember", hue: 16, sat: 62 },
+  { key: "rose", label: "Rose", hue: 338, sat: 52 },
+] as const;
+
+export type DiaryColor = (typeof DIARY_COLORS)[number]["key"];
+
+/** A colour's key, or "ink" for anything unknown or unset. */
+export function colorKey(color: string | null | undefined): DiaryColor {
+  return DIARY_COLORS.some((c) => c.key === color) ? (color as DiaryColor) : "ink";
+}
+
+/** What a swatch shows for a colour. */
+export function swatchOf(color: DiaryColor, hue: number): string {
+  const c = DIARY_COLORS.find((d) => d.key === color)!;
+  return c.key === "ink"
+    ? `linear-gradient(135deg, hsl(${hue} 40% 34%), hsl(${hue} 8% 12%) 70%)`
+    : `linear-gradient(135deg, hsl(${c.hue} ${c.sat + 10}% 52%), hsl(${c.hue} ${c.sat}% 26%))`;
+}
+
+/**
+ * The page for a Diary: its chosen colour, or Ink in the author's hue. Same
+ * four surfaces as pageTint, so every place a page is drawn takes either.
+ */
+export function diaryTheme(color: string | null | undefined, hue: number) {
+  const c = DIARY_COLORS.find((d) => d.key === colorKey(color))!;
+  if (c.key === "ink") return pageTint(hue);
+  const { hue: h, sat: s } = c;
+  return {
+    background: `radial-gradient(120% 90% at 0% 0%, hsl(${h} ${s + 10}% 58% / 0.32), transparent 60%), linear-gradient(165deg, hsl(${h} ${s}% 29%), hsl(${h} ${s - 6}% 15%))`,
+    shadow: `inset 0 1px 0 hsl(${h} 80% 88% / 0.14), 0 22px 44px -26px hsl(${h} 60% 6% / 0.95)`,
+    burn: `hsl(${h} 90% 72%)`,
+    screen: `radial-gradient(90% 60% at 10% 0%, hsl(${h} ${s + 10}% 55% / 0.45), transparent 70%), linear-gradient(180deg, hsl(${h} ${s}% 24%), hsl(${h} ${s - 6}% 9%))`,
+  };
+}

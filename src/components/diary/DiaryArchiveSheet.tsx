@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Lock, Music, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-import { pageTint } from "@/components/diary/DiaryPage";
+import { diaryTheme } from "@/components/diary/DiaryPage";
 import { toArchive, type ArchivedDiary } from "@/lib/diary";
 
 const ENDED: Record<ArchivedDiary["endedHow"], string> = {
@@ -35,7 +35,7 @@ export function DiaryArchiveSheet({
 }: {
   open: boolean;
   onClose: () => void;
-  /** Your hue, so past pages look like yours. */
+  /** Your hue, for past pages in the default colour. */
   hue: number;
 }) {
   const [items, setItems] = useState<ArchivedDiary[] | null>(null);
@@ -68,7 +68,6 @@ export function DiaryArchiveSheet({
     setItems((prev) => (prev ?? []).filter((i) => i.writtenAt !== writtenAt));
   }
 
-  const tint = pageTint(hue);
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Past Diaries">
@@ -96,7 +95,7 @@ export function DiaryArchiveSheet({
             <li
               key={d.writtenAt}
               className="relative overflow-hidden rounded-2xl p-3.5"
-              style={{ background: tint.background, boxShadow: tint.shadow }}
+              style={{ background: diaryTheme(d.color, hue).background, boxShadow: diaryTheme(d.color, hue).shadow }}
             >
               <div className="flex items-center gap-2 text-[11px] text-white/55">
                 <span className="font-semibold text-white/80">{when(d.writtenAt)}</span>

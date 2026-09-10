@@ -4,22 +4,21 @@ import { useRef } from "react";
 import Link from "next/link";
 import { Maximize2, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
-import { DiscSleeve, SongLine } from "@/components/diary/DiaryDisc";
+import { SongLine } from "@/components/diary/DiaryDisc";
 import { DiaryResponder } from "@/components/diary/DiaryResponder";
-import { lifeLeft, noteSize, pageTint, shortLeft } from "@/components/diary/DiaryPage";
+import { diaryTheme, lifeLeft, noteSize, shortLeft } from "@/components/diary/DiaryPage";
 import type { DiaryEntry } from "@/lib/diary";
 
+/** Every card in the stack is the same height, so they sit square as a deck. */
+export const CARD_HEIGHT = 312;
+
 /**
- * One friend's Diary in the list — everything on it readable, and everything
- * you can do with it doable, without opening anything.
+ * One friend's Diary as a card in the stack.
  *
- * The note is shown whole, never clamped: the database caps a Diary at 60
- * characters, which always fits, so there is no "more" to hide. A song is a
- * CD tucked behind the page; tap it to play. The six emoji and the reply
- * field sit under the note at rest, and both go to your DMs with them.
- *
- * Opening full-screen (the corner button, or the note) is there for swiping
- * through everyone — as an extra, not a step.
+ * The whole Diary is on it: the note in full (a Diary is at most 60
+ * characters, which always fits), the song, six emoji and a reply arrow. The
+ * cards behind the top one are drawn the same way but inert — you see their
+ * colour and edges, and act on the one in front.
  */
 export function FriendDiaryCard({
   entry,
@@ -27,76 +26,78 @@ export function FriendDiaryCard({
   mine,
   onReacted,
   onOpen,
+  inert = false,
 }: {
   entry: DiaryEntry;
   fresh: boolean;
   mine: string | null;
   onReacted: (userId: string, emoji: string | null) => void;
   onOpen: () => void;
+  /** A card behind the top one: shown, not usable. */
+  inert?: boolean;
 }) {
   const avatar = useRef<HTMLSpanElement>(null);
-  const tint = pageTint(entry.hue);
+  const theme = diaryTheme(entry.color, entry.hue);
   const { size } = noteSize(entry.text);
   const first = entry.name.split(" ")[0];
 
   return (
-    <DiscSleeve track={entry.track}>
-      <article
-        className="relative overflow-hidden rounded-[28px] px-4 pb-2 pt-3.5"
-        style={{ background: tint.background, boxShadow: tint.shadow }}
-      >
-        <header className="flex items-center gap-2">
-          <Link
-            href={entry.username ? `/u/${entry.username}` : "#"}
-            className="flex min-w-0 items-center gap-2"
-          >
-            <span ref={avatar} className="shrink-0 rounded-full">
-              <Avatar name={entry.name} hue={entry.hue} size={32} src={entry.avatarUrl ?? undefined} />
-            </span>
-            <span className="truncate text-sm font-bold text-white">{entry.name}</span>
-          </Link>
-          {entry.audience === "close" && (
-            <Star size={12} className="shrink-0 fill-accent text-accent" aria-label="Close friends" />
-          )}
-          {fresh && <span aria-label="New" className="h-2 w-2 shrink-0 rounded-full bg-accent" />}
-          <span className="ml-auto shrink-0 text-xs tabular-nums text-white/45" suppressHydrationWarning>
-            {shortLeft(entry.createdAt)} left
+    <article
+      inert={inert}
+      aria-hidden={inert || undefined}
+      className="relative flex flex-col overflow-hidden rounded-[28px] px-4 pb-3.5 pt-3.5"
+      style={{ height: CARD_HEIGHT, background: theme.background, boxShadow: theme.shadow }}
+    >
+      <header className="flex items-center gap-2">
+        <Link href={entry.username ? `/u/${entry.username}` : "#"} className="flex min-w-0 items-center gap-2">
+          <span ref={avatar} className="shrink-0 rounded-full">
+            <Avatar name={entry.name} hue={entry.hue} size={32} src={entry.avatarUrl ?? undefined} />
           </span>
-          <button
-            type="button"
-            onClick={onOpen}
-            aria-label={`Open ${first}'s Diary full-screen`}
-            className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/50 hover:bg-white/10 hover:text-white"
-          >
-            <Maximize2 size={14} />
-          </button>
-        </header>
-
-        <p
+          <span className="truncate text-sm font-bold text-white">{entry.name}</span>
+        </Link>
+        {entry.audience === "close" && (
+          <Star size={12} className="shrink-0 fill-accent text-accent" aria-label="Close friends" />
+        )}
+        {fresh && <span aria-label="New" className="h-2 w-2 shrink-0 rounded-full bg-accent" />}
+        <span className="ml-auto shrink-0 text-xs tabular-nums text-white/55" suppressHydrationWarning>
+          {shortLeft(entry.createdAt)} left
+        </span>
+        <button
+          type="button"
           onClick={onOpen}
-          className="mt-3 cursor-pointer break-words font-extrabold leading-[1.08] tracking-[-0.02em] text-white"
-          style={{ fontSize: Math.min(Math.round(size * 1.1), 48) }}
+          aria-label={`Open ${first}'s Diary full-screen`}
+          className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white"
+        >
+          <Maximize2 size={14} />
+        </button>
+      </header>
+
+      {/* The note, in the middle of the page. */}
+      <div className="flex min-h-0 flex-1 flex-col justify-center py-2" onClick={onOpen}>
+        <p
+          className="cursor-pointer break-words font-extrabold leading-[1.06] tracking-[-0.02em] text-white"
+          style={{ fontSize: Math.min(Math.round(size * 1.08), 46) }}
         >
           {entry.text}
         </p>
+      </div>
 
-        {entry.track && (
-          <div className="mt-2">
-            <SongLine track={entry.track} />
-          </div>
-        )}
-
-        <div className="mt-3">
-          <DiaryResponder entry={entry} mine={mine} onReacted={onReacted} target={() => avatar.current} />
+      {entry.track && (
+        <div className="-mb-0.5">
+          <SongLine track={entry.track} />
         </div>
+      )}
 
-        <span
-          aria-hidden
-          className="absolute bottom-0 left-0 h-[2px] rounded-r-full opacity-90"
-          style={{ width: `${lifeLeft(entry.createdAt) * 100}%`, background: tint.burn }}
-          suppressHydrationWarning
-        />
-      </article>
-    </DiscSleeve>
+      <div className="mt-2">
+        <DiaryResponder entry={entry} mine={mine} onReacted={onReacted} target={() => avatar.current} />
+      </div>
+
+      <span
+        aria-hidden
+        className="absolute bottom-0 left-0 h-[3px] rounded-r-full"
+        style={{ width: `${lifeLeft(entry.createdAt) * 100}%`, background: theme.burn }}
+        suppressHydrationWarning
+      />
+    </article>
   );
 }

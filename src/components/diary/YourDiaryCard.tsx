@@ -3,7 +3,7 @@
 import { PenLine, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { DiscSleeve, SongLine } from "@/components/diary/DiaryDisc";
-import { lifeLeft, noteSize, pageTint, shortLeft } from "@/components/diary/DiaryPage";
+import { diaryTheme, lifeLeft, noteSize, shortLeft } from "@/components/diary/DiaryPage";
 import { reactionSummary, type DiaryEntry, type DiaryReaction } from "@/lib/diary";
 
 /**
@@ -19,7 +19,7 @@ export function YourDiaryCard({
   reactions: DiaryReaction[];
   onEdit: () => void;
 }) {
-  const tint = pageTint(entry.hue);
+  const tint = diaryTheme(entry.color, entry.hue);
   const { size } = noteSize(entry.text);
   const summary = reactionSummary(reactions);
 

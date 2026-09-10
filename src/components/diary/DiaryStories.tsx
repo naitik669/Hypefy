@@ -6,7 +6,7 @@ import { Star, X } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { DiaryDisc, SongLine } from "@/components/diary/DiaryDisc";
 import { DiaryResponder } from "@/components/diary/DiaryResponder";
-import { noteSize, pageTint, shortLeft } from "@/components/diary/DiaryPage";
+import { diaryTheme, noteSize, shortLeft } from "@/components/diary/DiaryPage";
 import { STORY_MS, stepStory, type DiaryEntry } from "@/lib/diary";
 
 /**
@@ -124,7 +124,7 @@ export function DiaryStories({
       aria-modal="true"
       aria-label={`${entry.name}'s Diary`}
       className="fixed inset-0 z-[80] mx-auto flex max-w-[480px] flex-col overflow-hidden text-white"
-      style={{ background: pageTint(entry.hue).screen }}
+      style={{ background: diaryTheme(entry.color, entry.hue).screen }}
     >
       {/* Progress: one segment per Diary. */}
       <div className="flex gap-1 px-3 pt-[max(env(safe-area-inset-top),12px)]" aria-hidden>

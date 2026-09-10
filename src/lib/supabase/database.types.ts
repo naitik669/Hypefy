@@ -543,6 +543,7 @@ export type Database = {
       diary_archive: {
         Row: {
           audience: string
+          color: string | null
           ended_at: string
           ended_how: string
           id: string
@@ -1008,6 +1009,7 @@ export type Database = {
       notes: {
         Row: {
           audience: string
+          color: string | null
           created_at: string
           expires_at: string
           text: string
@@ -1016,6 +1018,7 @@ export type Database = {
         }
         Insert: {
           audience?: string
+          color?: string | null
           created_at?: string
           expires_at?: string
           text: string
@@ -1024,6 +1027,7 @@ export type Database = {
         }
         Update: {
           audience?: string
+          color?: string | null
           created_at?: string
           expires_at?: string
           text?: string
@@ -2222,6 +2226,7 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: {
           audience: string
+          color: string | null
           ended_how: string
           id: string | null
           text: string
@@ -2234,6 +2239,7 @@ export type Database = {
         Args: never
         Returns: {
           audience: string
+          color: string | null
           avatar_hue: number
           avatar_url: string
           created_at: string
@@ -2403,9 +2409,10 @@ export type Database = {
         Returns: undefined
       }
       set_note: {
-        Args: { p_audience?: string; p_text: string; p_track?: Json }
+        Args: { p_audience?: string; p_color?: string; p_text: string; p_track?: Json }
         Returns: {
           audience: string
+          color: string | null
           created_at: string
           expires_at: string
           text: string

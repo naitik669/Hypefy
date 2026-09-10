@@ -1,20 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
-import { Plane } from "@/components/ui/Plane";
+import { Reply } from "lucide-react";
 import { flyEmoji } from "@/components/diary/flyEmoji";
+import { DiaryReplyPopup } from "@/components/diary/DiaryReplyPopup";
 import { QUICK_EMOJIS, useDiaryActions } from "@/components/diary/useDiaryActions";
 import type { DiaryEntry } from "@/lib/diary";
 
 /**
- * The six emoji and the reply field under someone's Diary — on the card and
- * full-screen alike.
+ * The row under someone's Diary: six emoji and a reply arrow — on the card
+ * and full-screen alike.
  *
- * Both are there at rest: no button to open the reply first. An emoji flies
- * off to the Diary's owner (their avatar, via `target`) and goes to your DMs
- * with them; nothing stays outlined on the button afterwards. A line below
- * says it went, then clears itself.
+ * An emoji flies off to the Diary's owner (their avatar, via `target`) and
+ * goes to your DMs with them; nothing stays outlined on the button. The
+ * arrow opens a popup to write a reply in, rather than a text field sitting
+ * on every card. Either way a small "Sent" shows over the row for a moment.
  */
 export function DiaryResponder({
   entry,
@@ -29,27 +29,52 @@ export function DiaryResponder({
   onReacted: (userId: string, emoji: string | null) => void;
   /** Where a sent emoji flies to — the owner's avatar. */
   target: () => Element | null;
-  /** Full-screen pauses its clock while you type. */
+  /** Full-screen pauses its clock while you are replying. */
   onTyping?: (typing: boolean) => void;
   size?: "card" | "screen";
 }) {
   const { react, reply, status, error, sent, resetStatus } = useDiaryActions({ entry, mine, onReacted });
-  const [draft, setDraft] = useState("");
+  const [replying, setReplying] = useState(false);
   const first = entry.name.split(" ")[0];
   const big = size === "screen";
-  const sentLine =
-    status === "sent" ? (sent ? `Sent ${sent} to ${first} · in your DMs` : `Sent to your DMs with ${first}`) : null;
 
   // "Sent" is news for a moment, not a state; clear it after a few seconds.
   useEffect(() => {
     if (status !== "sent") return;
-    const id = window.setTimeout(resetStatus, 2800);
+    const id = window.setTimeout(resetStatus, 2400);
     return () => window.clearTimeout(id);
   }, [status, sent, resetStatus]);
 
+  const note =
+    status === "sent"
+      ? sent
+        ? `Sent ${sent} to ${first}`
+        : `Sent to your DMs with ${first}`
+      : status === "error" && !replying
+        ? error
+        : null;
+
+  function openReply(v: boolean) {
+    setReplying(v);
+    onTyping?.(v);
+    if (v && status === "error") resetStatus();
+  }
+
   return (
-    <div className={`flex flex-col ${big ? "gap-2.5" : "gap-2"}`}>
-      <div className="flex items-center justify-between px-0.5">
+    <div className="relative">
+      {note && (
+        <p
+          key={`${status}${sent}`}
+          aria-live="polite"
+          className={`animate-toast-drop pointer-events-none absolute -top-9 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold shadow-lg ${
+            status === "error" ? "bg-danger text-white" : "bg-white text-black"
+          }`}
+        >
+          {note}
+        </p>
+      )}
+
+      <div className="flex items-center justify-between">
         {QUICK_EMOJIS.map((e) => (
           <button
             key={e}
@@ -59,58 +84,34 @@ export function DiaryResponder({
               void react(e);
             }}
             aria-label={`Send ${e} to ${first}`}
-            className={`flex items-center justify-center rounded-full transition-transform duration-150 hover:bg-white/[0.07] active:scale-[0.8] ${
-              big ? "h-12 w-12 text-[26px]" : "h-10 w-10 text-[22px]"
+            className={`flex items-center justify-center rounded-full transition-transform duration-150 hover:bg-white/[0.08] active:scale-[0.8] ${
+              big ? "h-11 w-11 text-[25px]" : "h-9 w-9 text-[20px]"
             }`}
           >
             {e}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => openReply(true)}
+          aria-label={`Reply to ${first}`}
+          aria-haspopup="dialog"
+          className={`flex items-center justify-center rounded-full bg-white/[0.12] text-white transition-colors hover:bg-white/20 active:scale-95 ${
+            big ? "h-11 w-11" : "h-9 w-9"
+          }`}
+        >
+          <Reply size={big ? 20 : 17} strokeWidth={2.4} />
+        </button>
       </div>
 
-      <form
-        onSubmit={async (ev) => {
-          ev.preventDefault();
-          if (await reply(draft)) setDraft("");
-        }}
-        className={`flex items-center gap-2 rounded-full pl-4 pr-1 transition-colors focus-within:bg-white/[0.11] ${
-          big ? "h-12 bg-white/[0.1] backdrop-blur-md" : "h-11 bg-white/[0.07]"
-        }`}
-      >
-        <input
-          value={draft}
-          onChange={(ev) => {
-            setDraft(ev.target.value);
-            if (status === "error") resetStatus();
-          }}
-          onFocus={() => onTyping?.(true)}
-          onBlur={() => onTyping?.(false)}
-          // "Sent" shows where you were about to type, for a moment, rather
-          // than on a line of its own that would hold space on every card.
-          placeholder={sentLine ?? `Reply to ${first}…`}
-          aria-label={`Reply to ${first}`}
-          maxLength={500}
-          enterKeyHint="send"
-          className="min-w-0 flex-1 bg-transparent text-[14px] text-white outline-none placeholder:text-white/40"
-        />
-        <button
-          type="submit"
-          disabled={!draft.trim() || status === "sending"}
-          aria-label="Send reply"
-          className={`flex shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
-            big ? "h-10 w-10" : "h-9 w-9"
-          } ${draft.trim() ? "scale-100 bg-accent text-accent-ink" : "scale-90 text-white/35"}`}
-        >
-          {status === "sending" ? <Loader2 size={15} className="animate-spin" /> : <Plane size={15} />}
-        </button>
-      </form>
-
-      <p aria-live="polite" className="sr-only">
-        {sentLine}
-      </p>
-      {status === "error" && error && (
-        <p className={`px-1 text-xs font-semibold text-danger ${big ? "text-center" : ""}`}>{error}</p>
-      )}
+      <DiaryReplyPopup
+        entry={entry}
+        open={replying}
+        onClose={() => openReply(false)}
+        reply={reply}
+        status={status}
+        error={error}
+      />
     </div>
   );
 }

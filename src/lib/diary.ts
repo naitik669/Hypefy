@@ -26,6 +26,8 @@ export type DiaryEntry = {
   hue: number;
   avatarUrl: string | null;
   track: Track | null;
+  /** The page colour they picked (a DIARY_COLORS key), or null for the default. */
+  color: string | null;
 };
 
 /** Shape get_notes() returns. Kept loose: the RPC's typing is generated. */
@@ -40,6 +42,7 @@ type NoteRow = {
   avatar_hue: number | null;
   avatar_url: string | null;
   track: unknown;
+  color?: string | null;
 };
 
 function asTrack(v: unknown): Track | null {
@@ -65,6 +68,7 @@ export function toDiaryEntries(rows: NoteRow[] | null | undefined): DiaryEntry[]
     hue: r.avatar_hue ?? 280,
     avatarUrl: r.avatar_url,
     track: asTrack(r.track),
+    color: r.color ?? null,
   }));
 }
 
@@ -194,6 +198,7 @@ export type ArchivedDiary = {
   track: Track | null;
   writtenAt: string;
   endedHow: "replaced" | "taken_down" | "expired";
+  color: string | null;
 };
 
 type ArchiveRow = {
@@ -202,6 +207,7 @@ type ArchiveRow = {
   track: unknown;
   written_at: string;
   ended_how: string;
+  color?: string | null;
 };
 
 export function toArchive(rows: ArchiveRow[] | null | undefined): ArchivedDiary[] {
@@ -212,6 +218,7 @@ export function toArchive(rows: ArchiveRow[] | null | undefined): ArchivedDiary[
     writtenAt: r.written_at,
     endedHow:
       r.ended_how === "replaced" || r.ended_how === "taken_down" ? r.ended_how : "expired",
+    color: r.color ?? null,
   }));
 }
 
@@ -249,4 +256,29 @@ export function stepStory(index: number, count: number, dir: 1 | -1): number | n
   const next = index + dir;
   if (next >= count) return null;
   return Math.max(0, next);
+}
+
+/* ─── The stack ────────────────────────────────────────────────────────── */
+
+/**
+ * The deck after the top card is swiped away: it goes to the back and the
+ * next comes up. Swiping the other way (-1) brings the back card to the top,
+ * so a card swiped by mistake is one swipe from coming back.
+ */
+export function cycleDeck<T>(deck: T[], dir: 1 | -1 = 1): T[] {
+  if (deck.length < 2) return deck;
+  return dir === 1 ? [...deck.slice(1), deck[0]] : [deck[deck.length - 1], ...deck.slice(0, -1)];
+}
+
+/**
+ * Each card's own lean, in degrees — the same for a given person every time,
+ * so a card does not change its tilt as the deck moves. Alternates in sign
+ * by a hash of the id, between 2 and 5 degrees either way.
+ */
+export function cardTilt(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+  h >>>= 0;
+  const size = 2 + (h % 7) * 0.5; // 2, 2.5 … 5
+  return (h >> 3) % 2 === 0 ? -size : size;
 }

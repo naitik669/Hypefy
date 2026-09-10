@@ -5,7 +5,8 @@ import { Music, Plus, X } from "lucide-react";
 import { ensurePreviewPlaying, pausePreview, playPreview, useIsPlaying, type Track } from "@/lib/music";
 
 /**
- * The song on a Diary, as a CD tucked behind the page.
+ * The song on a Diary, as a black CD tucked behind the page, its cover in
+ * the middle.
  *
  * A sliver shows past the page's right edge at rest — enough to see there is
  * a song, not enough to compete with the words. Tap it and it slides out a
@@ -71,13 +72,14 @@ export function DiaryDisc({
         className={`relative block h-full w-full rounded-full ${playing ? "diary-disc-spin" : ""}`}
         style={{
           background: track ? DISC : DISC_BLANK,
-          boxShadow: "inset 0 0 0 1px rgb(255 255 255 / 0.28), 0 10px 24px -8px rgb(0 0 0 / 0.75)",
+          boxShadow: "inset 0 0 0 1px rgb(255 255 255 / 0.14), 0 12px 26px -8px rgb(0 0 0 / 0.8)",
         }}
       >
-        {/* The label — the album art, or a plus on a blank disc. */}
+        {/* The label — the song's cover, filling the middle of the disc, or a
+            plus on a blank one. */}
         <span
-          className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full bg-[#1b1b1f]"
-          style={{ width: size * 0.46, height: size * 0.46 }}
+          className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full bg-[#1d1d23]"
+          style={{ width: size * 0.6, height: size * 0.6, boxShadow: "0 0 0 1.5px rgb(0 0 0 / 0.6), 0 0 0 3px rgb(255 255 255 / 0.08)" }}
         >
           {track?.artwork ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -92,9 +94,9 @@ export function DiaryDisc({
         <span
           className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background"
           style={{
-            width: size * 0.1,
-            height: size * 0.1,
-            boxShadow: "0 0 0 2px rgb(255 255 255 / 0.18)",
+            width: size * 0.09,
+            height: size * 0.09,
+            boxShadow: "0 0 0 2px rgb(0 0 0 / 0.5), 0 0 0 3.5px rgb(255 255 255 / 0.22)",
           }}
         />
       </span>
@@ -185,18 +187,18 @@ export function SongLine({ track, onRemove }: { track: Track; onRemove?: () => v
 }
 
 /**
- * A CD's face: silver, catching colour as it turns. The conic gradient is the
- * rainbow a real disc throws; the fine rings over it are its grooves. Kept a
- * shade darker than a real CD so it sits in a dark app rather than glaring.
+ * A CD's face, in black: a dark disc with the faint rainbow a real one throws
+ * where the light catches it, and the fine rings of its grooves. Dark so the
+ * cover in the middle is the colour on it — the song, not the plastic.
  */
 const DISC = [
-  "repeating-radial-gradient(circle at 50% 50%, rgb(255 255 255 / 0.05) 0 1px, transparent 1px 3px)",
-  "radial-gradient(circle at 50% 50%, transparent 46%, rgb(0 0 0 / 0.08) 47%, transparent 60%)",
-  "conic-gradient(from 30deg, #b8bec9, #8e9bb0 10%, #d6c6e8 20%, #93c7bd 32%, #e2d4a8 44%, #a7afbd 56%, #e3c3d7 68%, #93b3d6 82%, #b8bec9)",
+  "repeating-radial-gradient(circle at 50% 50%, rgb(255 255 255 / 0.035) 0 1px, transparent 1px 3px)",
+  "conic-gradient(from 20deg, transparent, rgb(150 180 255 / 0.18) 10%, transparent 22%, rgb(255 160 215 / 0.14) 38%, transparent 52%, rgb(160 255 215 / 0.12) 68%, transparent 82%, rgb(255 225 150 / 0.1) 92%, transparent)",
+  "radial-gradient(circle at 50% 50%, #1e1e24 0%, #0c0c0f 72%, #16161b 100%)",
 ].join(", ");
 
-/** A blank disc — no song on it yet. Same silver, less colour. */
+/** A blank disc — no song on it yet. The same black, without the shine. */
 const DISC_BLANK = [
-  "repeating-radial-gradient(circle at 50% 50%, rgb(255 255 255 / 0.05) 0 1px, transparent 1px 3px)",
-  "conic-gradient(from 30deg, #5a5f69, #7a8190 20%, #555a64 45%, #7c8391 70%, #5a5f69)",
+  "repeating-radial-gradient(circle at 50% 50%, rgb(255 255 255 / 0.03) 0 1px, transparent 1px 3px)",
+  "radial-gradient(circle at 50% 50%, #202026 0%, #0e0e11 75%, #18181d 100%)",
 ].join(", ");

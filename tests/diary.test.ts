@@ -198,3 +198,46 @@ describe("stories", () => {
     expect(stepStory(0, 0, 1)).toBeNull();
   });
 });
+
+describe("the stack", () => {
+  it("sends the top card to the back, and brings the back card to the top going the other way", async () => {
+    const { cycleDeck } = await import("@/lib/diary");
+    expect(cycleDeck(["a", "b", "c"])).toEqual(["b", "c", "a"]);
+    expect(cycleDeck(["a", "b", "c"], -1)).toEqual(["c", "a", "b"]);
+    expect(cycleDeck(cycleDeck(["a", "b", "c"]), -1)).toEqual(["a", "b", "c"]);
+    expect(cycleDeck(["a"])).toEqual(["a"]);
+  });
+
+  it("leans each card its own way, the same way every time, both ways across people", async () => {
+    const { cardTilt } = await import("@/lib/diary");
+    const ids = Array.from({ length: 40 }, (_, i) => `user-${i}`);
+    const tilts = ids.map(cardTilt);
+    expect(ids.map(cardTilt)).toEqual(tilts);
+    for (const t of tilts) {
+      expect(Math.abs(t)).toBeGreaterThanOrEqual(2);
+      expect(Math.abs(t)).toBeLessThanOrEqual(5);
+    }
+    expect(tilts.some((t) => t < 0)).toBe(true);
+    expect(tilts.some((t) => t > 0)).toBe(true);
+  });
+});
+
+describe("Diary colours", () => {
+  it("falls back to the default page for an unknown or missing colour", async () => {
+    const { colorKey, diaryTheme, pageTint } = await import("@/components/diary/DiaryPage");
+    expect(colorKey("plum")).toBe("plum");
+    expect(colorKey("chartreuse")).toBe("ink");
+    expect(colorKey(null)).toBe("ink");
+    expect(diaryTheme(null, 120)).toEqual(pageTint(120));
+    expect(diaryTheme("plum", 120)).not.toEqual(pageTint(120));
+    // A chosen colour is the writer's, not their avatar's: the same for everyone.
+    expect(diaryTheme("plum", 10)).toEqual(diaryTheme("plum", 300));
+  });
+
+  it("reads a Diary's colour from get_notes, and none as none", async () => {
+    const { toDiaryEntries } = await import("@/lib/diary");
+    const row = { user_id: "u", text: "hi", audience: "mutual", created_at: "x", is_self: false, display_name: "A", username: "a", avatar_hue: 1, avatar_url: null, track: null };
+    expect(toDiaryEntries([{ ...row, color: "teal" }])[0].color).toBe("teal");
+    expect(toDiaryEntries([row])[0].color).toBeNull();
+  });
+});

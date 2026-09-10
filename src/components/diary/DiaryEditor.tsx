@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Dices, Loader2, Star } from "lucide-react";
+import { Check, Dices, Loader2, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CenterModal } from "@/components/ui/CenterModal";
 import { Avatar } from "@/components/ui/Avatar";
@@ -9,7 +9,7 @@ import { TrackPicker } from "@/components/music/TrackPicker";
 import { DICE_POOL, EMOJI_STRIP, joinStatus } from "@/components/ui/StatusComposer";
 import { haptics } from "@/lib/haptics";
 import { type Track } from "@/lib/music";
-import { noteSize, pageTint } from "@/components/diary/DiaryPage";
+import { DIARY_COLORS, colorKey, diaryTheme, noteSize, swatchOf, type DiaryColor } from "@/components/diary/DiaryPage";
 import { DiscSleeve, SongLine } from "@/components/diary/DiaryDisc";
 import { AudiencePicker, type Audience } from "@/components/diary/AudiencePicker";
 
@@ -24,7 +24,12 @@ const STARTERS = [
   "🫠 long day",
 ];
 
-export type DiaryDraft = { text: string; audience: "mutual" | "close"; track: Track | null } | null;
+export type DiaryDraft = {
+  text: string;
+  audience: "mutual" | "close";
+  track: Track | null;
+  color: string | null;
+} | null;
 
 /**
  * Writing a Diary — on the page itself.
@@ -61,6 +66,7 @@ export function DiaryComposer({
   const [text, setText] = useState(current?.text ?? "");
   const [audience, setAudience] = useState<Audience>(current?.audience ?? "mutual");
   const [track, setTrack] = useState<Track | null>(current?.track ?? null);
+  const [color, setColor] = useState<DiaryColor>(colorKey(current?.color));
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -73,7 +79,7 @@ export function DiaryComposer({
     if (autoFocus) field.current?.focus();
   }, [autoFocus]);
 
-  const tint = pageTint(me.hue);
+  const tint = diaryTheme(color, me.hue);
   const { size } = noteSize(text || "What's on your mind?");
   const left = MAX - Array.from(text).length;
 
@@ -107,6 +113,7 @@ export function DiaryComposer({
       p_text: value,
       p_audience: audience,
       ...(track ? { p_track: track } : {}),
+      p_color: color,
     });
     setBusy(false);
     if (error) {
@@ -114,7 +121,7 @@ export function DiaryComposer({
       return;
     }
     haptics.tap();
-    onSaved({ text: value, audience, track });
+    onSaved({ text: value, audience, track, color });
   }
 
   async function remove() {
@@ -221,6 +228,30 @@ export function DiaryComposer({
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl transition-transform hover:bg-white/[0.07] active:scale-[0.8]"
                 >
                   {e}
+                </button>
+              ))}
+            </div>
+
+            {/* ── The page's colour ── */}
+            <div role="radiogroup" aria-label="Page colour" className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-0.5">
+              {DIARY_COLORS.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={color === c.key}
+                  aria-label={c.label}
+                  title={c.label}
+                  onClick={() => {
+                    haptics.select();
+                    setColor(c.key);
+                  }}
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90 ${
+                    color === c.key ? "scale-110" : ""
+                  }`}
+                  style={{ background: swatchOf(c.key, me.hue), boxShadow: "inset 0 1px 0 rgb(255 255 255 / 0.18)" }}
+                >
+                  {color === c.key && <Check size={15} strokeWidth={3} className="text-white drop-shadow" />}
                 </button>
               ))}
             </div>

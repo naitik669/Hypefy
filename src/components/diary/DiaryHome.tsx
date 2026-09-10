@@ -5,7 +5,7 @@ import { Archive } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DiaryComposer, DiaryEditor, type DiaryDraft } from "@/components/diary/DiaryEditor";
 import { YourDiaryCard } from "@/components/diary/YourDiaryCard";
-import { FriendDiaryCard } from "@/components/diary/FriendDiaryCard";
+import { DiaryStack } from "@/components/diary/DiaryStack";
 import { DiaryStories } from "@/components/diary/DiaryStories";
 import { DiaryArchiveSheet } from "@/components/diary/DiaryArchiveSheet";
 import {
@@ -25,12 +25,12 @@ const NO_FRESH = new Set<string>();
  * The Diary page — one tap from Messages, and then nothing else to tap to
  * see what is here.
  *
- * Top to bottom: your Diary with everyone's reactions on it (or, if you have
- * not written one, the page to write it on, right there — no pop-up), then
- * everyone else's, each complete on its own card: the note in full, the song
- * as a CD to tap, six emoji and a reply in place. Past Diaries are a small
- * box at the top right, out of the way of anyone's Diary. Swiping through them full-screen is there for when you want it; it
- * is never the only way to see or do anything.
+ * Top: everyone else's Diaries as a stack of tilted cards — the one in
+ * front complete and usable where it lies (the note, the song as a CD, six
+ * emoji and a reply arrow), the rest peeking out behind; swipe to bring the
+ * next up. Below: yours, with everyone's reactions on it, or the page to
+ * write it on, right there. Past Diaries are a small box at the top right.
+ * Full-screen is there from any card, never the only way to see anything.
  */
 export function DiaryHome({
   entries: initial,
@@ -90,6 +90,7 @@ export function DiaryHome({
           hue: me.hue,
           avatarUrl: me.avatarUrl,
           track: draft.track,
+          color: draft.color,
         },
         ...rest,
       ];
@@ -140,7 +141,25 @@ export function DiaryHome({
           )}
         </p>
 
+        {/* ── Theirs, as a stack ── */}
+        {others.length > 0 ? (
+          <div className="pb-2 pt-3">
+            <DiaryStack
+              list={others}
+              fresh={fresh}
+              reacted={reacted}
+              onReacted={onReacted}
+              onOpen={(i) => setStoryAt(i)}
+            />
+          </div>
+        ) : (
+          <p className="px-6 py-4 text-center text-sm leading-snug text-faint">
+            When people you follow back write a Diary, it lands here on the pile.
+          </p>
+        )}
+
         {/* ── Yours ── */}
+        <h2 className="px-1 pt-3 text-xs font-bold uppercase tracking-[0.08em] text-muted">Yours</h2>
         {mine ? (
           <YourDiaryCard entry={mine} reactions={onMine} onEdit={() => setEditing(true)} />
         ) : (
@@ -148,32 +167,12 @@ export function DiaryHome({
             <DiaryComposer current={null} me={me} onSaved={onSaved} compact />
           </section>
         )}
-
-        {/* ── Theirs ── */}
-        {others.length > 0 && (
-          <h2 className="px-1 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-muted">From your circle</h2>
-        )}
-        {others.map((e, i) => (
-          <FriendDiaryCard
-            key={e.userId}
-            entry={e}
-            fresh={fresh.has(e.userId)}
-            mine={reacted[e.userId] ?? null}
-            onReacted={onReacted}
-            onOpen={() => setStoryAt(i)}
-          />
-        ))}
-        {others.length === 0 && (
-          <p className="px-6 py-6 text-center text-sm leading-snug text-faint">
-            When people you follow back write a Diary, it shows up here in full.
-          </p>
-        )}
       </div>
 
       <DiaryEditor
         open={editing}
         onClose={() => setEditing(false)}
-        current={mine ? { text: mine.text, audience: mine.audience, track: mine.track } : null}
+        current={mine ? { text: mine.text, audience: mine.audience, track: mine.track, color: mine.color } : null}
         onSaved={onSaved}
         me={me}
       />
