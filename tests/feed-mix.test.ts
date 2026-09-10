@@ -6,6 +6,10 @@ import {
   spliceFeed,
   PLACE_DEFAULTS,
   AD_DEFAULTS,
+  SHOT_AD_OPTS,
+  EMPTY_LANE,
+  extendAdLane,
+  type AdLane,
 } from "@/lib/feed-mix";
 
 const posts = (n: number, author = (i: number) => `u${i}`) =>
@@ -238,5 +242,72 @@ describe("spliceFeed", () => {
   it("drops an over-slotted ad rather than parking it at the bottom", () => {
     const out = spliceFeed(posts(2), [], [{ id: "a0", slot: 99 }]);
     expect(out.every((i) => i.kind === "post")).toBe(true);
+  });
+});
+
+describe("extendAdLane", () => {
+  const ext = (lane: AdLane, n: number, reserved: number[] = [], budget = 99) =>
+    extendAdLane(lane, n, reserved, { budget });
+
+  it("places the first page like placeAds does", () => {
+    const lane = ext(EMPTY_LANE, 30);
+    expect(lane.ads.map((a) => a.slot)).toEqual(
+      placeAds(30, []).map((a) => a.slot)
+    );
+  });
+
+  it("never places into content the reader already had", () => {
+    // The bug this exists to prevent. 30 posts at 2 per pass leaves the
+    // cursor at 21; the next page must not put an ad at 21, because the
+    // reader is already past it — above them in the feed, behind them in
+    // Shots, where it would replace the video on screen.
+    const first = ext(EMPTY_LANE, 30);
+    const second = ext(first, 50);
+    const added = second.ads.slice(first.ads.length);
+    expect(added.length).toBeGreaterThan(0);
+    for (const ad of added) expect(ad.slot).toBeGreaterThanOrEqual(30);
+  });
+
+  it("does nothing when the count has not changed", () => {
+    // StrictMode runs effects twice; an effect can re-run for unrelated
+    // reasons. Neither may mint more ads.
+    const lane = ext(EMPTY_LANE, 30);
+    expect(ext(lane, 30)).toBe(lane);
+  });
+
+  it("keeps ids unique and indices continuous across pages", () => {
+    let lane = EMPTY_LANE;
+    for (const n of [20, 40, 60, 80]) lane = ext(lane, n);
+    const ids = lane.ads.map((a) => a.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(lane.ads.map((a) => a.index)).toEqual(ids.map((_, i) => i));
+  });
+
+  it("keeps the spacing across a page boundary", () => {
+    let lane = EMPTY_LANE;
+    for (const n of [20, 40, 60, 80]) lane = ext(lane, n);
+    const slots = lane.ads.map((a) => a.slot);
+    for (let i = 1; i < slots.length; i++) {
+      expect(slots[i] - slots[i - 1]).toBeGreaterThanOrEqual(AD_DEFAULTS.every);
+    }
+  });
+
+  it("places nothing once the session budget is spent", () => {
+    expect(ext(EMPTY_LANE, 30, [], 0).ads).toEqual([]);
+  });
+
+  it("caps a pass at the remaining budget", () => {
+    expect(
+      extendAdLane(EMPTY_LANE, 80, [], { ...SHOT_AD_OPTS, budget: 1 }).ads
+    ).toHaveLength(1);
+  });
+
+  it("spaces Shots ads wider than feed ads, and never at the start", () => {
+    const lane = extendAdLane(EMPTY_LANE, 80, [], { ...SHOT_AD_OPTS, budget: 99 });
+    expect(lane.ads[0].slot).toBe(SHOT_AD_OPTS.firstSlot);
+    const slots = lane.ads.map((a) => a.slot);
+    for (let i = 1; i < slots.length; i++) {
+      expect(slots[i] - slots[i - 1]).toBeGreaterThanOrEqual(SHOT_AD_OPTS.every!);
+    }
   });
 });

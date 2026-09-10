@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ReelsFeed } from "@/components/shots/ReelsFeed";
 import { diversify } from "@/lib/feed-rank";
 import { one, jsonRecord } from "@/lib/supabase/typed";
+import { getAdContext } from "@/lib/ads-server";
 
 /** Personalized Shot score: engagement (capped) + tiered recency + author affinity. */
 function shotScore(s: any, now: number, authorAff: Record<string, number>) {
@@ -24,13 +25,16 @@ export default async function ShotsPage() {
   } = await supabase.auth.getUser();
 
   // Candidate window + interaction affinity, ranked into a personalized reel.
-  const [{ data: shots }, affRes] = await Promise.all([
+  const [{ data: shots }, affRes, adContext] = await Promise.all([
     supabase
       .from("shots")
       .select("id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, save_count, profiles(display_name, avatar_hue, avatar_url, username)")
       .order("created_at", { ascending: false })
       .limit(80),
     user ? supabase.rpc("get_affinity", { p_lookback_days: 60 }) : Promise.resolve({ data: null }),
+    // In parallel with the reel, not after it: the date-of-birth lookup is
+    // one more round trip, and it should not add to the time to first frame.
+    getAdContext(supabase, user?.id),
   ]);
 
   const authorAff = jsonRecord((affRes.data as any)?.authors);
@@ -57,5 +61,7 @@ export default async function ShotsPage() {
     );
   }
 
-  return <ReelsFeed reels={reels} currentUserId={user?.id ?? null} />;
+  return (
+    <ReelsFeed reels={reels} currentUserId={user?.id ?? null} {...adContext} />
+  );
 }

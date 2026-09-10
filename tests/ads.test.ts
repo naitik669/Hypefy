@@ -252,3 +252,26 @@ describe("the origin guard", () => {
     expect(adsEnabled({ country: "IN", native: false })).toBe(true);
   });
 });
+
+describe("isAdult", () => {
+  const now = new Date("2026-09-10T12:00:00Z");
+
+  it("is true from the eighteenth birthday on", async () => {
+    const { isAdult } = await load(CONFIGURED);
+    expect(isAdult("2008-09-10", now)).toBe(true);
+    expect(isAdult("1990-01-01", now)).toBe(true);
+  });
+
+  it("is false the day before", async () => {
+    const { isAdult } = await load(CONFIGURED);
+    expect(isAdult("2008-09-11", now)).toBe(false);
+  });
+
+  it("falls on the safe side when it cannot tell", async () => {
+    // Every OAuth account that skipped /age-check has no date of birth.
+    const { isAdult } = await load(CONFIGURED);
+    for (const dob of [null, undefined, "", "not a date"]) {
+      expect(isAdult(dob, now)).toBe(false);
+    }
+  });
+});

@@ -19,6 +19,7 @@ import {
   shotFeedScore,
 } from "@/lib/feed-rank";
 import { placeShots } from "@/lib/feed-mix";
+import { isAdult } from "@/lib/ads";
 import { getBlockedIds } from "@/lib/blocked";
 import { jsonRecord } from "@/lib/supabase/typed";
 
@@ -388,10 +389,9 @@ export default async function HomePage() {
   // and this decides whether a reader who may be fourteen gets a personalised
   // ad. A null date of birth — every OAuth account that never passed
   // /age-check — is a no, not a maybe.
-  const dob = (myProfile as any)?.date_of_birth as string | null | undefined;
-  const eighteen = new Date();
-  eighteen.setFullYear(eighteen.getFullYear() - 18);
-  const adPersonalised = !!dob && new Date(dob) <= eighteen;
+  const adPersonalised = isAdult(
+    (myProfile as any)?.date_of_birth as string | null | undefined
+  );
 
   // Country comes from the edge. An absent header is left null and read as
   // "consent required" downstream, so a misconfigured deploy serves nothing

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Star, MessageCircle, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban } from "lucide-react";
@@ -20,6 +20,10 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { scheduleUndoable } from "@/lib/undoable";
 import { safeBack } from "@/lib/safe-back";
+import { spliceFeed, SHOT_AD_OPTS } from "@/lib/feed-mix";
+import { noteAdShown } from "@/lib/ads";
+import { useAdFill, useAdSlots } from "@/components/feed/useAdSlots";
+import { ShotAdCard } from "@/components/shots/ShotAdCard";
 
 type ReelProfile = {
   display_name: string | null;
@@ -68,16 +72,40 @@ export function clampPinch(
   return Math.max(PINCH_MIN, Math.min(PINCH_MAX, startScale * ratio));
 }
 
+const NO_SHOTS: { slot: number }[] = [];
+const NO_RESERVED: number[] = [];
+
 export function ReelsFeed({
   reels: initialReels,
   currentUserId,
+  adCountry = null,
+  adPersonalised = false,
 }: {
   reels: Reel[];
   currentUserId: string | null;
+  /** The reader's country, resolved on the server. Null means unknown. */
+  adCountry?: string | null;
+  /** Confirmed 18+, from the server. Null date of birth is a no. */
+  adPersonalised?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const [reels, setReels] = useState<Reel[]>(initialReels);
+
+  // Ads, spliced in at render. `reels` stays a plain Reel[] so the pagination
+  // cursor (the oldest created_at) and the dedupe-by-id keep working on real
+  // shots alone; everything that means a POSITION — the active index, the
+  // swipe bounds, when to fetch more — works on `items`.
+  const fill = useAdFill(adCountry);
+  const ads = useAdSlots({
+    fill,
+    count: reels.length,
+    reserved: NO_RESERVED,
+    lane: "shots",
+    resetKey: initialReels,
+    opts: SHOT_AD_OPTS,
+  });
+  const items = useMemo(() => spliceFeed(reels, NO_SHOTS, ads), [reels, ads]);
   /**
    * A sheet is up over the active reel.
    *
@@ -114,7 +142,7 @@ export function ReelsFeed({
   // Fetch the next batch when the viewer nears the end of the loaded reels
   useEffect(() => {
     if (noMore || fetchingMore.current) return;
-    if (activeIdx < reels.length - 2) return;
+    if (activeIdx < items.length - 2) return;
     fetchingMore.current = true;
     const oldest = reels[reels.length - 1]?.created_at;
     if (!oldest) {
@@ -146,7 +174,7 @@ export function ReelsFeed({
         fetchingMore.current = false;
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIdx, reels.length, noMore]);
+  }, [activeIdx, items.length, noMore]);
 
   function onSwipeTouchStart(e: React.TouchEvent) {
     if (sheetOpen) return;
@@ -179,7 +207,7 @@ export function ReelsFeed({
     // Resist at the ends so pulling past the last reel feels like a boundary
     // rather than a broken screen. Downward at index 0 stays free, because
     // that gesture exits Shots and should not fight the user.
-    const atEnd = activeIdx === reels.length - 1 && dy < 0;
+    const atEnd = activeIdx === items.length - 1 && dy < 0;
     if (atEnd) dy *= 0.3;
 
     setDrag(dy);
@@ -201,7 +229,7 @@ export function ReelsFeed({
     if (!committed) return; // springs back via the transition
 
     if (dy < 0) {
-      setActiveIdx((i) => Math.min(i + 1, reels.length - 1));
+      setActiveIdx((i) => Math.min(i + 1, items.length - 1));
     } else if (activeIdx === 0) {
       // Pulling down on the first reel leaves Shots.
       safeBack(router);
@@ -220,9 +248,9 @@ export function ReelsFeed({
       onTouchCancel={() => setDrag(null)}
     >
       {/* Absolute-positioned reels: each fills the container, translated by index offset */}
-      {reels.map((reel, i) => (
+      {items.map((item, i) => (
         <div
-          key={reel.id}
+          key={item.kind === "ad" ? item.ad.id : item.kind === "post" ? item.post.id : i}
           className={`absolute inset-0 will-change-transform ${
             i === activeIdx ? "" : "pointer-events-none"
           }`}
@@ -239,8 +267,19 @@ export function ReelsFeed({
                 : "none",
           }}
         >
+          {item.kind === "ad" ? (
+            <ShotAdCard
+              ad={item.ad}
+              fill={fill}
+              personalised={adPersonalised}
+              isActive={i === activeIdx}
+              near={Math.abs(i - activeIdx) <= 1}
+              onBack={() => safeBack(router)}
+              onSeen={noteAdShown}
+            />
+          ) : item.kind === "post" ? (
           <ReelCard
-            reel={reel}
+            reel={item.post}
             currentUserId={currentUserId}
             muted={muted}
             onToggleMute={() => setMuted((m) => !m)}
@@ -253,6 +292,7 @@ export function ReelsFeed({
             // the next one is instant; keep the rest at metadata only.
             preload={Math.abs(i - activeIdx) <= 1 ? "auto" : "metadata"}
           />
+          ) : null}
         </div>
       ))}
     </div>

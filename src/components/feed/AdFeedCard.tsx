@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Megaphone } from "lucide-react";
 import { AD_RESERVED_PX, type AdFill } from "@/lib/ads";
 import { AdImpression } from "@/components/feed/AdImpression";
@@ -47,6 +47,37 @@ export function AdFeedCard({
   const [empty, setEmpty] = useState(false);
   const handleEmpty = useCallback(() => setEmpty(true), []);
 
+  // Request the ad when the card is about to scroll into view, not when it is
+  // placed. Placement happens a page ahead, so an eager unit asks Google for
+  // an ad the reader may never scroll to — wasted inventory, and the kind of
+  // viewability that gets a site's fill rate throttled. The box below is a
+  // fixed height either way, so arming late costs no layout shift. Once armed
+  // it stays armed; unmounting on the way past would request it again.
+  const boxRef = useRef<HTMLDivElement>(null);
+  // Without IntersectionObserver there is nothing to wait for, so start
+  // armed rather than never arming at all.
+  const [armed, setArmed] = useState(
+    () => typeof IntersectionObserver === "undefined"
+  );
+  useEffect(() => {
+    if (armed) return;
+    const el = boxRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setArmed(true);
+          io.disconnect();
+        }
+      },
+      // About one screen ahead: enough for the creative to arrive before the
+      // card does, not so much that it arms ads nobody reaches.
+      { rootMargin: "800px 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [armed]);
+
   const house = fill !== "adsense" || empty;
 
   return (
@@ -80,14 +111,15 @@ export function AdFeedCard({
           the feed jumping under their thumb instead. Both cost the same to
           avoid: never change the height. */}
       <div
+        ref={boxRef}
         className="mx-4 overflow-hidden rounded-2xl bg-elevated"
         style={{ height: AD_RESERVED_PX }}
       >
         {house ? (
           <HouseSponsoredCard seed={ad.index} />
-        ) : (
+        ) : armed ? (
           <AdSenseUnit personalised={personalised} onEmpty={handleEmpty} />
-        )}
+        ) : null}
       </div>
 
       <p className="px-4 pt-2 text-xs text-faint">

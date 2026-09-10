@@ -18,9 +18,41 @@ placed, no third-party script loads, and no connection to Google is opened.
 | `src/components/feed/AdFeedCard.tsx` | The card — a post's exact chrome |
 | `src/components/feed/AdSenseUnit.tsx` | The `<ins>` and its lifecycle |
 | `src/components/feed/HouseSponsoredCard.tsx` | What fills the card when Google doesn't |
-| `src/components/feed/FeedList.tsx` | Placement effect and the render arm |
+| `src/components/feed/useAdSlots.ts` | `useAdFill` and `useAdSlots`, shared by both feeds |
+| `src/components/feed/FeedList.tsx` | Home feed — every tab, one lane each |
+| `src/components/shots/ShotAdCard.tsx` | The full-screen card in the Shots reel |
+| `src/components/shots/ReelsFeed.tsx` | Splices ads into the reel |
+| `src/lib/ads-server.ts` | Country and age, resolved on the server |
 
-Tests: `tests/feed-mix.test.ts`, `tests/ads.test.ts`, `tests/adsense.test.ts`.
+Tests: `tests/feed-mix.test.ts`, `tests/ads.test.ts`, `tests/adsense.test.ts`,
+`tests/ad-slots-hook.test.ts`.
+
+## Where ads appear
+
+| Surface | Cadence | Notes |
+|---|---|---|
+| Home feed, every tab | First after post 5, then every 8, at most 2 per page | Each tab keeps its own placements. For You also keeps 2 slots clear of every Shot |
+| Shots reel (`/shots`, `/shots/[id]`) | First after shot 4, then every 7, up to 6 per load | A full-screen card; the ad sits in a box with swipe room above and below |
+
+Both share one session budget of 8 impressions (`AD_SESSION_BUDGET`), spent on
+impression rather than placement.
+
+**New ads only ever land in content that just loaded.** Each pass is capped, so
+after a long first page the cursor can stop well short of the end; without a
+floor, the next page would put an ad above the reader in the feed, or in front
+of the video they are watching in Shots. `extendAdLane` in `feed-mix.ts` is
+where that rule lives.
+
+**A Shots ad never covers the screen.** A touch that starts inside the ad's
+iframe belongs to Google's document and never reaches the reel's swipe
+handler, so a full-screen creative would be a screen you could only tap your
+way out of. The margins are where the swipe lives. Covering the creative with
+a transparent layer instead would make it unclickable, and ads under overlays
+are against AdSense policy.
+
+**Units are requested late.** A feed card asks for its ad about one screen
+before it scrolls into view; a Shots card asks when it is one swipe away. Both
+keep the unit once requested.
 
 ---
 

@@ -274,3 +274,71 @@ export function spliceShots<P, S extends { slot: number }>(
 ): FeedItem<P, S>[] {
   return spliceFeed(posts, placed, [] as never[]) as FeedItem<P, S>[];
 }
+
+/**
+ * Ad cadence for the Shots reel.
+ *
+ * Every card there is the whole screen, so an ad is a much larger ask than a
+ * card between posts — hence a later start and a wider gap than the feed. The
+ * per-pass max is higher only because the Shots page loads up to 80 reels in
+ * one go and paginates rarely; at the feed's 2 per pass, someone watching
+ * forty shots would meet two ads and then none. The session budget in
+ * lib/ads.ts still caps the total.
+ */
+export const SHOT_AD_OPTS: AdPlaceOpts = {
+  firstSlot: 4,
+  every: 7,
+  max: 6,
+  minPosts: 5,
+  gap: 2,
+};
+
+/**
+ * One list's ad placements, carried across pagination.
+ *
+ * `seenCount` is the item count the lane was last extended against, and it is
+ * what makes pagination safe. placeAds caps each pass at `max`, so after a
+ * long first page the cursor can stop well short of the end — 30 posts at 2
+ * per pass stops it at 21. Without a floor, the next page would put an ad at
+ * 21: above the reader in a scrolling feed, which shifts the page under them,
+ * and before the active reel in Shots, which swaps the video they are watching
+ * for an ad. New ads may only land in the content that just arrived.
+ */
+export type AdLane = {
+  ads: PlacedAd[];
+  nextSlot: number;
+  count: number;
+  seenCount: number;
+};
+
+export const EMPTY_LANE: AdLane = { ads: [], nextSlot: 0, count: 0, seenCount: -1 };
+
+export function extendAdLane(
+  lane: AdLane,
+  itemCount: number,
+  reservedSlots: readonly number[],
+  opts: AdPlaceOpts & { budget: number }
+): AdLane {
+  // Same count as last time: nothing arrived, so nothing to place. Also what
+  // makes this idempotent under StrictMode's double-run and any effect re-run.
+  if (itemCount === lane.seenCount) return lane;
+
+  const every = opts.every ?? AD_DEFAULTS.every;
+  const floor = Math.max(lane.nextSlot, lane.seenCount < 0 ? 0 : lane.seenCount);
+  const fresh =
+    opts.budget > 0
+      ? placeAds(itemCount, reservedSlots, {
+          ...opts,
+          startAfter: floor,
+          startIndex: lane.count,
+          max: Math.min(opts.max ?? AD_DEFAULTS.max, opts.budget),
+        })
+      : [];
+
+  return {
+    ads: fresh.length ? [...lane.ads, ...fresh] : lane.ads,
+    nextSlot: fresh.length ? fresh[fresh.length - 1].slot + every : lane.nextSlot,
+    count: lane.count + fresh.length,
+    seenCount: itemCount,
+  };
+}

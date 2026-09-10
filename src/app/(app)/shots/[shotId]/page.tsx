@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { ReelsFeed } from "@/components/shots/ReelsFeed";
+import { getAdContext } from "@/lib/ads-server";
 
 const SELECT =
   "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, profiles(display_name, avatar_hue, username, avatar_url)";
@@ -63,12 +64,15 @@ export default async function ShotPage({
   const target = await getShot(shotId);
   if (!target) notFound();
 
-  const { data: rest } = await supabase
-    .from("shots")
-    .select(SELECT)
-    .neq("id", shotId)
-    .order("created_at", { ascending: false })
-    .limit(49);
+  const [{ data: rest }, adContext] = await Promise.all([
+    supabase
+      .from("shots")
+      .select(SELECT)
+      .neq("id", shotId)
+      .order("created_at", { ascending: false })
+      .limit(49),
+    getAdContext(supabase, user?.id),
+  ]);
 
   const norm = (s: any) => ({
     ...s,
@@ -77,5 +81,10 @@ export default async function ShotPage({
 
   const reels = [norm(target), ...(rest ?? []).map(norm)];
 
-  return <ReelsFeed reels={reels} currentUserId={user?.id ?? null} />;
+  // A shared link lands here, often for someone with no account. They get the
+  // same reel — and the same ads — as anyone else; the shot they came for is
+  // always first, and SHOT_AD_OPTS never puts an ad before the fourth.
+  return (
+    <ReelsFeed reels={reels} currentUserId={user?.id ?? null} {...adContext} />
+  );
 }

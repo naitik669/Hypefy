@@ -25,11 +25,17 @@ const GIVE_UP_MS = 3500;
 export const AdSenseUnit = memo(function AdSenseUnit({
   personalised,
   onEmpty,
+  slot = AD_SLOT_FEED,
+  layoutKey = AD_LAYOUT_KEY,
 }: {
   /** False for anyone we cannot confirm is 18+, including a null date of birth. */
   personalised: boolean;
   /** Called once when the slot will not fill, so the card can show a house ad. */
   onEmpty: () => void;
+  /** Which unit. Defaults to the feed's In-feed unit. */
+  slot?: string;
+  /** Pass "" to render as a responsive Display unit. */
+  layoutKey?: string;
 }) {
   const ref = useRef<HTMLModElement>(null);
   const [outcome, setOutcome] = useState<Outcome>("pending");
@@ -94,14 +100,14 @@ export const AdSenseUnit = memo(function AdSenseUnit({
       className="adsbygoogle block h-full w-full"
       style={{ display: "block" }}
       data-ad-client={AD_CLIENT}
-      data-ad-slot={AD_SLOT_FEED}
+      data-ad-slot={slot}
       // In-feed when there is a layout key, Display when there is not.
       //
       // "fluid" without a layout key is not a smaller version of in-feed —
       // it is a unit with no shape at all, which collapses. So the two go
       // together or neither does.
-      {...(AD_LAYOUT_KEY
-        ? { "data-ad-format": "fluid", "data-ad-layout-key": AD_LAYOUT_KEY }
+      {...(layoutKey
+        ? { "data-ad-format": "fluid", "data-ad-layout-key": layoutKey }
         : { "data-ad-format": "auto", "data-full-width-responsive": "true" })}
       // Non-personalised for anyone we cannot confirm is an adult. The app's
       // only age threshold is 13, so this is most readers.

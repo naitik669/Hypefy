@@ -12,23 +12,11 @@ import { CaughtUp } from "@/components/feed/CaughtUp";
 import { useFeedTab, type FeedTab } from "@/components/layout/FeedTabDropdown";
 import { loadSeen, saveSeen } from "@/lib/feed-seen";
 import { rankBatch } from "@/lib/feed-rank";
-import {
-  spliceFeed,
-  placeAds,
-  AD_DEFAULTS,
-  type PlacedShot,
-  type PlacedAd,
-  type ShotCard,
-} from "@/lib/feed-mix";
+import { spliceFeed, type PlacedShot, type ShotCard } from "@/lib/feed-mix";
 import { ShotFeedCard } from "@/components/feed/ShotFeedCard";
 import { AdFeedCard } from "@/components/feed/AdFeedCard";
-import {
-  adFill,
-  adBudgetLeft,
-  noteAdShown,
-  type AdFill,
-} from "@/lib/ads";
-import { isNative } from "@/lib/native";
+import { noteAdShown } from "@/lib/ads";
+import { useAdFill, useAdSlots } from "@/components/feed/useAdSlots";
 
 const PAGE_SIZE = 20;
 const POST_SELECT =
@@ -102,20 +90,6 @@ export function FeedList({
   const [shots, setShots] = useState<PlacedShot<ShotCard>[]>(initialShots);
   const [fyDone, setFyDone] = useState(initialPosts.length < PAGE_SIZE);
 
-  // Ads. Placed entirely client-side, after mount, and never server-rendered:
-  // isNative() answers false during SSR because Capacitor is absent there, so
-  // a server-rendered slot would ship an ad tag into the Play Store app and
-  // then have to take it back out. The gate has to run where it can tell.
-  const [ads, setAds] = useState<PlacedAd[]>([]);
-  const [fill, setFill] = useState<AdFill>("off");
-  // Where the next ad may start, and how many have been minted. Append-only:
-  // recomputing placement from scratch on every page would move an ad the
-  // reader has already scrolled past, which remounts the unit — a second
-  // request, a double-counted impression, and a jump above the scroll.
-  const adCursor = useRef({ nextSlot: 0, count: 0 });
-  // Bumped on refresh so the new slots get new ids and new units.
-  const adEpoch = useRef(0);
-
   // Following / Favourite / Hypers — each lazily loaded client-side.
   const [idsState, setIdsState] = useState<Record<IdsTab, IdsListState>>({
     following: EMPTY_IDS_STATE,
@@ -153,59 +127,12 @@ export function FeedList({
     // more confusing here because the stale cards would be video.
     setShots(initialShots);
     setFyDone(initialPosts.length < PAGE_SIZE);
-    // A refresh is a genuinely new page view, so the ad slots start over:
-    // new positions, new ids, new units. Carrying the old ones across would
-    // leave a unit that has already been requested sitting next to posts it
-    // was never placed against.
-    setAds([]);
-    adCursor.current = { nextSlot: 0, count: 0 };
-    adEpoch.current += 1;
     // Mark the ranked page as seen so the chronological tail won't resurface it.
     seenRef.current = loadSeen();
     initialPosts.forEach((p) => seenRef.current.add(p.id));
     saveSeen(seenRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPosts]);
-
-  // What may fill a slot for this reader. Resolved after mount because
-  // isNative() is only truthful in a browser.
-  useEffect(() => {
-    setFill(adFill({ country: adCountry, native: isNative() }));
-  }, [adCountry]);
-
-  // Place ads as the feed grows.
-  //
-  // Unlike shots — which arrive as a server prop and are therefore stuck on
-  // page one — an ad carries no server data, so it can be placed against
-  // whatever is currently loaded. Appends only, never renumbers.
-  useEffect(() => {
-    if (tab !== "foryou" || fill === "off") return;
-    const budget = adBudgetLeft();
-    if (budget <= 0) return;
-
-    // Placed out here, and the cursor advanced out here, because React may
-    // call a state updater more than once for a single update. An updater that
-    // reads and writes adCursor would then see its own first pass and produce
-    // a different answer the second time — which for ads means slots that move
-    // between renders.
-    const fresh = placeAds(
-      posts.length,
-      shots.map((shot) => shot.slot),
-      {
-        startAfter: adCursor.current.nextSlot,
-        startIndex: adCursor.current.count,
-        idPrefix: `ad-${adEpoch.current}-`,
-        max: Math.min(AD_DEFAULTS.max, budget),
-      }
-    );
-    if (fresh.length === 0) return;
-
-    adCursor.current = {
-      nextSlot: fresh[fresh.length - 1].slot + AD_DEFAULTS.every,
-      count: adCursor.current.count + fresh.length,
-    };
-    setAds((prev) => [...prev, ...fresh]);
-  }, [posts.length, shots, tab, fill]);
 
   /** Attach the current user's hype/save state to a freshly fetched batch. */
   async function withUserState(fresh: FeedPost[]): Promise<FeedPost[]> {
@@ -361,6 +288,19 @@ export function FeedList({
 
   const activePosts = tab === "foryou" ? posts : idsState[tab].posts;
   const activeDone = tab === "foryou" ? fyDone : idsState[tab].done;
+
+  // Ads, on every tab. Each tab is its own lane, so Following keeps its
+  // placements while you look at For You and switching back loses nothing.
+  // Only For You has shots to keep clear of. A pull-to-refresh changes
+  // initialPosts, which starts every lane over — a new page view.
+  const fill = useAdFill(adCountry);
+  const ads = useAdSlots({
+    fill,
+    count: activePosts.length,
+    reserved: tab === "foryou" ? shots.map((shot) => shot.slot) : [],
+    lane: tab,
+    resetKey: initialPosts,
+  });
   const idsEmpty = tab !== "foryou" && idsState[tab].init && idsState[tab].posts.length === 0;
   // Zero Hypers picked takes priority over post content — otherwise a user's
   // own posts (always included in the scope query) would mask the empty state.
@@ -386,11 +326,7 @@ export function FeedList({
         // stays a plain FeedPost[] so every post-keyed path in this file —
         // withUserState's .in() lookups, the seen ring, the `oldest` cursor,
         // initialHyped/initialSaved — keeps working on post ids alone.
-        spliceFeed(
-          activePosts,
-          tab === "foryou" ? shots : [],
-          tab === "foryou" ? ads : []
-        ).map((item, i) =>
+        spliceFeed(activePosts, tab === "foryou" ? shots : [], ads).map((item, i) =>
           item.kind === "ad" ? (
             // No content-visibility here, unlike its neighbours. It skips
             // layout for off-screen subtrees, and an AdSense creative is an

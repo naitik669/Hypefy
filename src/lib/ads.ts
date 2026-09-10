@@ -51,6 +51,16 @@ export const AD_SLOT_FEED = process.env.NEXT_PUBLIC_ADSENSE_FEED_SLOT ?? "";
 export const AD_LAYOUT_KEY = process.env.NEXT_PUBLIC_ADSENSE_FEED_LAYOUT_KEY ?? "";
 
 /**
+ * Optional: a separate Display unit for the Shots reel.
+ *
+ * The feed's In-feed unit is shaped for a card between posts, so on a
+ * full-screen reel it renders at card height in the middle of a tall black
+ * page. A responsive Display unit fills the space instead. Unset, Shots falls
+ * back to the feed unit, which works — it is just smaller than the screen.
+ */
+export const AD_SLOT_SHOTS = process.env.NEXT_PUBLIC_ADSENSE_SHOTS_SLOT ?? "";
+
+/**
  * The height an ad card's body occupies from first paint, in every branch —
  * filled, unfilled, blocked, or house.
  *
@@ -241,4 +251,19 @@ export function noteAdShown() {
 /** How many more this session may place. Never negative. */
 export function adBudgetLeft(): number {
   return Math.max(0, AD_SESSION_BUDGET - adsShown());
+}
+
+/**
+ * Whether a date of birth makes someone 18 today.
+ *
+ * Null, empty and unparseable all answer no. This is the input to a
+ * compliance decision, and "we could not tell" has to fall on the safe side.
+ */
+export function isAdult(dob: string | null | undefined, now = new Date()): boolean {
+  if (!dob) return false;
+  const born = new Date(dob);
+  if (Number.isNaN(born.getTime())) return false;
+  const eighteen = new Date(now);
+  eighteen.setFullYear(eighteen.getFullYear() - 18);
+  return born <= eighteen;
 }
