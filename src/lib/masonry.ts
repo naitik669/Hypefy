@@ -41,15 +41,10 @@ export function clampRatio(ratio: number | null | undefined): number {
 }
 
 /**
- * A pin's height in units of its column's width: the image, plus the lines of
- * text under it. The text allowance is a rough constant on purpose — it only
- * has to be close enough that two columns end up about level.
+ * A pin's height in units of its column's width. Pins are the picture alone,
+ * so this is exact rather than estimated: 1 / ratio for an image, and 5:4
+ * for the card a picture-less post becomes.
  */
-export function pinHeight(p: {
-  aspect_ratio: number | null;
-  hasImage: boolean;
-  hasCaption: boolean;
-}): number {
-  const media = p.hasImage ? 1 / clampRatio(p.aspect_ratio) : 5 / 4;
-  return media + (p.hasCaption ? 0.3 : 0.16);
+export function pinHeight(p: { aspect_ratio: number | null; hasImage: boolean }): number {
+  return p.hasImage ? 1 / clampRatio(p.aspect_ratio) : 5 / 4;
 }

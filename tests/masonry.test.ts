@@ -56,14 +56,11 @@ describe("clampRatio", () => {
 });
 
 describe("pinHeight", () => {
-  it("is taller for a portrait image than a landscape one", () => {
-    const portrait = pinHeight({ aspect_ratio: 0.75, hasImage: true, hasCaption: false });
-    const landscape = pinHeight({ aspect_ratio: 1.6, hasImage: true, hasCaption: false });
-    expect(portrait).toBeGreaterThan(landscape);
+  it("is the image's own height, in column widths", () => {
+    expect(pinHeight({ aspect_ratio: 0.75, hasImage: true })).toBeCloseTo(4 / 3);
+    expect(pinHeight({ aspect_ratio: 2, hasImage: true })).toBeCloseTo(9 / 16);
   });
-  it("allows for a caption", () => {
-    const a = pinHeight({ aspect_ratio: 1, hasImage: true, hasCaption: false });
-    const b = pinHeight({ aspect_ratio: 1, hasImage: true, hasCaption: true });
-    expect(b).toBeGreaterThan(a);
+  it("gives a picture-less post its 5:4 card", () => {
+    expect(pinHeight({ aspect_ratio: null, hasImage: false })).toBeCloseTo(5 / 4);
   });
 });

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Avatar } from "@/components/ui/Avatar";
 import { GridPeek } from "@/components/feed/GridPeek";
 import { clampRatio, distribute, pinHeight } from "@/lib/masonry";
 
@@ -74,11 +73,7 @@ export function PinFeed({
   const columns = useMemo(
     () =>
       distribute(visible, 2, (p) =>
-        pinHeight({
-          aspect_ratio: p.aspect_ratio,
-          hasImage: !!imageOf(p),
-          hasCaption: !!textOf(p),
-        })
+        pinHeight({ aspect_ratio: p.aspect_ratio, hasImage: !!imageOf(p) })
       ),
     [visible]
   );
@@ -223,10 +218,14 @@ export function PinFeed({
 }
 
 /**
- * A pin: the picture in its own shape, and the words under it rather than
- * over it. No counters on the tile — Pinterest shows none, and hype and
- * comment counts on every tile turned a place for looking into a
- * scoreboard. Holding a tile still lifts the whole post, counts and all.
+ * A pin: the picture in its own shape, and nothing else.
+ *
+ * No caption, no author and no counters under or over it. Discover is for
+ * looking, and a line of text and a name under every tile made the grid read
+ * as a list of posts to get through rather than pictures to browse. Who made
+ * it and what it says are one press away — holding a tile lifts the whole
+ * post, author, caption and counts included — and the caption still rides on
+ * the image as its alt text for anyone who cannot see it.
  */
 function PinTile({ pin, currentUserId }: { pin: Pin; currentUserId: string }) {
   const img = imageOf(pin);
@@ -286,20 +285,6 @@ function PinTile({ pin, currentUserId }: { pin: Pin; currentUserId: string }) {
             </p>
           </div>
         )}
-
-        {img && text && (
-          <p className="line-clamp-2 px-1 pt-1.5 text-[13px] font-semibold leading-snug">
-            {text}
-          </p>
-        )}
-      </Link>
-
-      <Link
-        href={pin.profiles?.username ? `/u/${pin.profiles.username}` : `/p/${pin.id}`}
-        className="flex min-w-0 items-center gap-1.5 px-1 pt-1"
-      >
-        <Avatar name={name} hue={hue} size={18} src={pin.profiles?.avatar_url ?? undefined} />
-        <span className="truncate text-xs text-muted">{name}</span>
       </Link>
     </GridPeek>
   );

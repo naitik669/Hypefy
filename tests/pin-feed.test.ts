@@ -124,14 +124,18 @@ const columns = () => [...host.querySelectorAll(".flex.items-start > div")];
 const ids = () => columns().map((c) => [...c.querySelectorAll("a[href^='/p/']")].map((a) => a.getAttribute("href")));
 
 describe("PinFeed layout", () => {
-  it("is two columns of pins, with the words under the picture and no counters", async () => {
+  it("is two columns of pictures and nothing else — no caption, name or counters", async () => {
     await mount(range(0, 6));
     expect(columns()).toHaveLength(2);
     const first = host.querySelector("[data-pin]")!;
-    expect(first.textContent).toContain("caption 0");
-    expect(first.textContent).toContain("Name 0");
-    // No hype or comment numbers on the tile.
-    expect(first.textContent).not.toMatch(/\b5\b|\b2\b/);
+    expect(first.textContent).toBe("");
+    expect(first.querySelector("img")).not.toBeNull();
+    expect(first.querySelector("a[href^='/u/']")).toBeNull();
+  });
+
+  it("keeps the caption as the picture's alt text", async () => {
+    await mount([pin(0)]);
+    expect(host.querySelector("img")!.getAttribute("alt")).toBe("caption 0");
   });
 
   it("renders a picture-less post as a card of its words", async () => {
