@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { NotebookPen } from "lucide-react";
+import { BookOpenText } from "lucide-react";
 import { loadSeen, unseen } from "@/lib/diary";
 
 /**
@@ -30,7 +30,7 @@ export function DiaryButton({
       aria-label={count > 0 ? `Diary, ${count} new` : "Diary"}
       className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground transition-transform active:scale-90"
     >
-      <NotebookPen size={21} />
+      <BookOpenText size={22} />
       {count > 0 && (
         <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-black leading-none text-white">
           {count > 9 ? "9+" : count}

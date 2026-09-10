@@ -4,9 +4,9 @@ import {
   Clapperboard,
   Heart,
   ImageIcon,
+  BookOpenText,
   Lock,
   Mail,
-  NotebookPen,
   Star,
   Users,
   Zap,
@@ -57,11 +57,11 @@ const CONTENT: Entry[] = [
     hrefLabel: "Your Shows",
   },
   {
-    // The same notebook glyph as the button in Messages, so the glossary
+    // The same open-book glyph as the button in Messages, so the glossary
     // draws it the way the app does.
-    icon: NotebookPen,
+    icon: BookOpenText,
     term: "Diary",
-    what: "A short note — a line, an emoji, a song — that people you follow back can read for 24 hours. Open it from Messages.",
+    what: "A short note — a line, an emoji, a song — that people you follow back can read for 24 hours. Tap the open book in Messages.",
     href: "/messages/diary",
     hrefLabel: "Open Diary",
   },

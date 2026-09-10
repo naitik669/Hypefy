@@ -29,7 +29,12 @@ export function lifeLeft(createdAt: string, now = Date.now()): number {
 
 /** "22h", "40m", "now" — for the signature line, where "left" is implied. */
 export function shortLeft(createdAt: string, now = Date.now()): string {
-  const ms = new Date(createdAt).getTime() + DIARY_HOURS * 3_600_000 - now;
+  // Capped at the full day: a phone whose clock runs behind the server's
+  // would otherwise count a fresh Diary as having more than 24 hours left.
+  const ms = Math.min(
+    new Date(createdAt).getTime() + DIARY_HOURS * 3_600_000 - now,
+    DIARY_HOURS * 3_600_000
+  );
   if (!(ms > 0)) return "now";
   const h = Math.floor(ms / 3_600_000);
   return h >= 1 ? `${h}h` : `${Math.max(1, Math.floor(ms / 60_000))}m`;

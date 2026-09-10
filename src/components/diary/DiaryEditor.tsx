@@ -35,18 +35,25 @@ export type DiaryDraft = { text: string; audience: "mutual" | "close"; track: Tr
  * shown, your signature at the foot, a full burn line because the day has not
  * started. What you see here is exactly the card in the grid.
  */
-export function DiaryEditor({
-  open,
-  onClose,
+export function DiaryComposer({
   current,
   onSaved,
   me,
+  autoFocus = false,
+  compact = false,
 }: {
-  open: boolean;
-  onClose: () => void;
   current: DiaryDraft;
+  /** Called after a successful save (or take-down, with null). */
   onSaved: (d: DiaryDraft) => void;
   me: { name: string; hue: number; avatarUrl: string | null };
+  autoFocus?: boolean;
+  /**
+   * Start folded: just the page to write on, the controls appearing once you
+   * tap into it. Used inline at the top of the Diary page, where a composer
+   * showing every control at rest pushed everyone else's Diaries below the
+   * fold — the thing the page exists to show.
+   */
+  compact?: boolean;
 }) {
   const supabase = createClient();
   const [text, setText] = useState(current?.text ?? "");
@@ -55,26 +62,14 @@ export function DiaryEditor({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [engaged, setEngaged] = useState(!compact);
   const field = useRef<HTMLTextAreaElement>(null);
   const lastRoll = useRef(-1);
 
-  // Start from what is saved each time it opens — reset during render,
-  // keyed on the open transition, rather than one render late in an effect.
-  const [wasOpen, setWasOpen] = useState(open);
-  if (open !== wasOpen) {
-    setWasOpen(open);
-    if (open) {
-      setText(current?.text ?? "");
-      setAudience(current?.audience ?? "mutual");
-      setTrack(current?.track ?? null);
-      setFailed(false);
-    }
-  }
-
-  // Focus the page when it opens empty, so you can just start writing.
+  // Focus the page when asked, so you can just start writing.
   useEffect(() => {
-    if (open && !current) field.current?.focus();
-  }, [open, current]);
+    if (autoFocus) field.current?.focus();
+  }, [autoFocus]);
 
   const tint = pageTint(me.hue);
   const { size } = noteSize(text || "What's on your mind?");
@@ -118,7 +113,6 @@ export function DiaryEditor({
     }
     haptics.tap();
     onSaved({ text: value, audience, track });
-    onClose();
   }
 
   async function remove() {
@@ -131,15 +125,22 @@ export function DiaryEditor({
       return;
     }
     onSaved(null);
-    onClose();
   }
 
   return (
-    <CenterModal open={open} onClose={onClose} title={current ? "Your Diary" : "Today's page"}>
+    <>
       <div className="flex flex-col gap-3">
         {/* ── The page ── */}
         <div
-          className="relative flex min-h-[240px] flex-col overflow-hidden rounded-[32px] border p-5"
+          onClick={() => {
+            if (!engaged) {
+              setEngaged(true);
+              field.current?.focus();
+            }
+          }}
+          className={`relative flex flex-col overflow-hidden rounded-[32px] border ${
+            engaged ? "min-h-[240px] p-5" : "min-h-[150px] cursor-text p-4"
+          }`}
           style={{ background: tint.background, borderColor: tint.borderColor }}
         >
           <div className="flex items-center gap-2">
@@ -178,7 +179,8 @@ export function DiaryEditor({
                 void post();
               }
             }}
-            rows={3}
+            rows={engaged ? 3 : 2}
+            onFocus={() => setEngaged(true)}
             placeholder="What's on your mind today?"
             aria-label="Your Diary"
             className="mt-auto w-full resize-none bg-transparent font-extrabold leading-[1.08] tracking-[-0.02em] text-white outline-none placeholder:text-white/25"
@@ -198,6 +200,8 @@ export function DiaryEditor({
           <span aria-hidden className="absolute bottom-0 left-0 h-[3px] w-full opacity-80" style={{ background: tint.burn }} />
         </div>
 
+        {engaged && (
+        <>
         {/* ── Emoji, one tap each ── */}
         <div className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1">
           {EMOJI_STRIP.map((e) => (
@@ -280,9 +284,55 @@ export function DiaryEditor({
             Take it down
           </button>
         )}
+        </>
+        )}
       </div>
 
       <TrackPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={setTrack} />
+    </>
+  );
+}
+
+/**
+ * The composer in a pop-up — for editing a Diary you have already posted.
+ * Writing a first one happens inline on the Diary page instead.
+ *
+ * Keyed on each opening, so it always starts from what is saved rather than
+ * from whatever was half-typed the last time it was dismissed.
+ */
+export function DiaryEditor({
+  open,
+  onClose,
+  current,
+  onSaved,
+  me,
+}: {
+  open: boolean;
+  onClose: () => void;
+  current: DiaryDraft;
+  onSaved: (d: DiaryDraft) => void;
+  me: { name: string; hue: number; avatarUrl: string | null };
+}) {
+  const [opening, setOpening] = useState(0);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setOpening((n) => n + 1);
+  }
+  return (
+    <CenterModal open={open} onClose={onClose} title={current ? "Your Diary" : "Today's page"}>
+      {open && (
+        <DiaryComposer
+          key={opening}
+          current={current}
+          me={me}
+          autoFocus={!current}
+          onSaved={(d) => {
+            onSaved(d);
+            onClose();
+          }}
+        />
+      )}
     </CenterModal>
   );
 }
