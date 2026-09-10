@@ -27,20 +27,20 @@
  */
 
 /**
- * Hypefy's GA4 measurement id, with the environment able to override it.
+ * Hypefy's GA4 measurement id. In the code, and deliberately not overridable
+ * from the environment.
  *
- * In the code rather than only in Vercel's settings because the setting did
- * not survive the trip: it was added, the site was rebuilt, and the id was
- * not in the build. A measurement id is not a secret — Google's own snippet
- * prints it into every page — and it is not what keeps this safe anyway.
- * MEASURED_HOSTS is: off the live domains nothing is sent whatever id is set,
- * so a local checkout, a preview deploy or a fork still measures nothing.
+ * It used to read NEXT_PUBLIC_GA_ID first, and Production's value turned out
+ * to be a different property (G-9BHYTW0V95) — so the site measured into one
+ * property while the one being set up saw nothing, and the setting survived
+ * an attempt to change it. One id, in one place, that a review can see.
  *
- * `||` rather than `??` so an empty variable falls back instead of switching
- * analytics off.
+ * A measurement id is not a secret: Google's own snippet prints it into every
+ * page. What keeps this safe is MEASURED_HOSTS below — off the live domains
+ * nothing is sent, so a local checkout, a preview deploy or a fork measures
+ * nothing whatever this says. To change properties, change this line.
  */
-const HYPEFY_GA_ID = "G-EQD7SK0DGZ";
-export const GA_ID = process.env.NEXT_PUBLIC_GA_ID || HYPEFY_GA_ID;
+export const GA_ID = "G-EQD7SK0DGZ";
 
 /**
  * Origins whose traffic belongs in the reports.

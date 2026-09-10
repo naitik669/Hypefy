@@ -37,8 +37,10 @@ afterEach(() => {
 });
 
 describe("gaEnabled", () => {
-  it("uses Hypefy's own id when the environment sets none — or sets it empty", async () => {
-    for (const v of [undefined, ""]) {
+  it("always uses Hypefy's own id — the environment cannot swap the property", async () => {
+    // Production's NEXT_PUBLIC_GA_ID once pointed at a different property,
+    // and the site measured into it while the real one saw nothing.
+    for (const v of [undefined, "", "G-9BHYTW0V95"]) {
       const { GA_ID, gaEnabled } = await load({ ...ON, NEXT_PUBLIC_GA_ID: v });
       expect(GA_ID).toBe("G-EQD7SK0DGZ");
       expect(gaEnabled({ analytics: true })).toBe(true);
@@ -52,10 +54,6 @@ describe("gaEnabled", () => {
     expect(gaEnabled({ analytics: true })).toBe(false);
   });
 
-  it("lets the environment override the id", async () => {
-    const { GA_ID } = await load({ ...ON, NEXT_PUBLIC_GA_ID: "G-OTHER" });
-    expect(GA_ID).toBe("G-OTHER");
-  });
 
   it("measures a reader on the live site who has analytics consent", async () => {
     const { gaEnabled } = await load(ON);
