@@ -145,6 +145,61 @@ describe("PinFeed layout", () => {
   });
 });
 
+describe("PinFeed with Shots", () => {
+  const shot = (i: number) => ({
+    id: `s${i}-${(i * 7919).toString(36)}`,
+    media_url: `https://v/${i}.mp4`,
+    poster_url: `https://p/${i}.jpg`,
+    caption: `shot ${i}`,
+  });
+
+  it("scatters Shots through the grid as tiles that open the reel", async () => {
+    const { PinFeed } = await import("@/components/discover/PinFeed");
+    root = createRoot(host);
+    await act(async () =>
+      root!.render(
+        createElement(PinFeed, {
+          posts: range(0, 20),
+          shots: [shot(1), shot(2), shot(3)],
+          currentUserId: "me",
+        })
+      )
+    );
+    const shotLinks = [...host.querySelectorAll("a[href^='/shots/']")];
+    expect(shotLinks).toHaveLength(3);
+    // Marked as video, and bare like a pin — no caption text on the tile.
+    expect(shotLinks[0].querySelector("svg")).not.toBeNull();
+    expect(shotLinks[0].textContent).toBe("");
+    // Scattered, not all at the top: posts come before the first one.
+    const order = [...host.querySelectorAll("a")].map((a) => a.getAttribute("href")!);
+    expect(order.findIndex((h) => h.startsWith("/shots/"))).toBeGreaterThan(0);
+  });
+
+  it("never moves a Shot when older posts load beneath", async () => {
+    pages = [range(100, 24)];
+    const { PinFeed } = await import("@/components/discover/PinFeed");
+    root = createRoot(host);
+    await act(async () =>
+      root!.render(
+        createElement(PinFeed, {
+          posts: range(0, 10),
+          shots: [shot(1), shot(2)],
+          currentUserId: "me",
+          endless: { cursor: null, blockedIds: [] },
+        })
+      )
+    );
+    const where = () =>
+      columns().map((c) => [...c.querySelectorAll("a")].map((a) => a.getAttribute("href")));
+    const before = where();
+    await nearBottom();
+    const after = where();
+    for (let c = 0; c < 3; c++) {
+      expect(after[c].slice(0, before[c].length)).toEqual(before[c]);
+    }
+  });
+});
+
 describe("PinFeed endless", () => {
   it("shows the pool a step at a time, without asking the database", async () => {
     await mount(range(0, 60), { cursor: "2026-08-01T00:00:00.000Z", blockedIds: [] });

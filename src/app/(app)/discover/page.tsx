@@ -151,9 +151,10 @@ export default async function DiscoverPage() {
   const feedCursor = pool.length
     ? (pool[pool.length - 1] as { created_at: string }).created_at
     : null;
-  const trendingShots = [...shots]
-    .sort((a, b) => b._score - a._score)
-    .slice(0, 12);
+  // All of them, ranked, for scattering through the For You feed; the top 12
+  // are still what the Shots chip shows.
+  const feedShots = [...shots].sort((a, b) => b._score - a._score);
+  const trendingShots = feedShots.slice(0, 12);
 
   // Velocity-based trending tags (rising, not raw count)
   const tags = ((trendingRes.data ?? []) as any[]).map((t) => ({
@@ -261,6 +262,7 @@ export default async function DiscoverPage() {
           blockedIds={[...blockedIds]}
           trendingPosts={trendingPosts}
           trendingShots={trendingShots}
+          feedShots={feedShots}
           people={(people ?? []) as any[]}
           newPeople={newPeople}
           categoryRails={categoryRails}

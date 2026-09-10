@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { GridPeek } from "@/components/feed/GridPeek";
+import { Play } from "lucide-react";
 import { clampRatio, distribute, pinHeight } from "@/lib/masonry";
+import { mixShots, type Mixed } from "@/lib/discover-mix";
 
 export type Pin = {
   id: string;
@@ -25,6 +27,22 @@ export type Pin = {
     avatar_url: string | null;
   } | null;
 };
+
+/** A Shot as a tile in the grid: its poster, or its first frame. */
+export type ShotPin = {
+  id: string;
+  media_url: string;
+  poster_url: string | null;
+  caption: string | null;
+};
+
+type Tile = Mixed<Pin, ShotPin>;
+
+/** Shared, so a feed with no Shots keeps a stable mix between renders. */
+const NO_SHOTS: ShotPin[] = [];
+
+/** A Shot is 9:16 — in column widths, 16/9 tall. */
+const SHOT_HEIGHT = 16 / 9;
 
 /** The same columns the server selects, so a fetched page renders the same. */
 export const PIN_SELECT =
@@ -57,10 +75,13 @@ const textOf = (p: Pin) => (p.caption ?? p.body ?? "").trim();
  */
 export function PinFeed({
   posts,
+  shots = NO_SHOTS,
   currentUserId,
   endless,
 }: {
   posts: Pin[];
+  /** Scattered through the posts, in a fixed pseudo-random pattern. */
+  shots?: ShotPin[];
   currentUserId: string;
   /** Keep going past `posts`, fetching older ones, until there are none. */
   endless?: { cursor: string | null; blockedIds: string[] };
@@ -72,24 +93,36 @@ export function PinFeed({
   const [done, setDone] = useState(!endless);
   const [failed, setFailed] = useState(false);
 
+  // Posts alone, for the pagination cursor and de-duplication.
   const all = useMemo(() => [...posts, ...extra], [posts, extra]);
+
+  // What is drawn: the Shots mixed through the posts that came with the page,
+  // then every post loaded since. Shots mix only into that first stretch, so
+  // a page arriving later is appended after them and never moves one.
+  const mixed = useMemo(() => mixShots(posts, shots), [posts, shots]);
+  const tiles = useMemo<Tile[]>(
+    () => [...mixed, ...extra.map((item) => ({ kind: "post" as const, item }))],
+    [mixed, extra]
+  );
   const visible = useMemo(
-    () => (Number.isFinite(shown) ? all.slice(0, shown) : all),
-    [all, shown]
+    () => (Number.isFinite(shown) ? tiles.slice(0, shown) : tiles),
+    [tiles, shown]
   );
   const columns = useMemo(
     () =>
-      distribute(visible, COLUMNS, (p) =>
-        pinHeight({ aspect_ratio: p.aspect_ratio, hasImage: !!imageOf(p) })
+      distribute(visible, COLUMNS, (t) =>
+        t.kind === "shot"
+          ? SHOT_HEIGHT
+          : pinHeight({ aspect_ratio: t.item.aspect_ratio, hasImage: !!imageOf(t.item) })
       ),
     [visible]
   );
 
   // A ref so the observer's callback always sees the latest state without
   // being rebuilt for each change. Synced after commit, not during render.
-  const state = useRef({ all, shown, loading, done, failed });
+  const state = useRef({ all, count: tiles.length, shown, loading, done, failed });
   useLayoutEffect(() => {
-    state.current = { all, shown, loading, done, failed };
+    state.current = { all, count: tiles.length, shown, loading, done, failed };
   });
 
   // How far back the database has been read. Separate from the posts we hold
@@ -149,7 +182,7 @@ export function PinFeed({
   const step = useCallback(() => {
     const s = state.current;
     if (s.loading || s.failed) return;
-    if (s.shown < s.all.length) setShown((n) => n + STEP);
+    if (s.shown < s.count) setShown((n) => n + STEP);
     else if (!s.done) void fetchOlder();
   }, [fetchOlder]);
 
@@ -158,7 +191,7 @@ export function PinFeed({
   // not enough to push the sentinel out of range — a short screen, a page of
   // landscape photos — the next step follows without waiting for a scroll.
   const sentinel = useRef<HTMLDivElement>(null);
-  const more = !done || shown < all.length;
+  const more = !done || shown < tiles.length;
   useEffect(() => {
     if (!endless || !more) return;
     const el = sentinel.current;
@@ -183,9 +216,13 @@ export function PinFeed({
       <div className="flex items-start gap-2 px-2">
         {columns.map((col, c) => (
           <div key={c} className="flex min-w-0 flex-1 flex-col gap-2">
-            {col.map((p) => (
-              <PinTile key={p.id} pin={p} currentUserId={currentUserId} />
-            ))}
+            {col.map((t) =>
+              t.kind === "shot" ? (
+                <ShotTile key={`shot-${t.item.id}`} shot={t.item} />
+              ) : (
+                <PinTile key={t.item.id} pin={t.item} currentUserId={currentUserId} />
+              )
+            )}
             {/* One placeholder per column while a page is on its way,
                 different heights so it reads as pins rather than a bar. */}
             {loading && (
@@ -215,7 +252,7 @@ export function PinFeed({
             </button>
           ) : (
             !more &&
-            all.length > 0 && (
+            tiles.length > 0 && (
               <p className="pt-6 text-center text-xs text-faint">
                 You&apos;ve seen everything for now
               </p>
@@ -297,5 +334,44 @@ function PinTile({ pin, currentUserId }: { pin: Pin; currentUserId: string }) {
         )}
       </Link>
     </GridPeek>
+  );
+}
+
+/**
+ * A Shot in the grid. Same bare treatment as a pin — no caption, no author —
+ * with one small play mark, because a video you did not know was a video is a
+ * surprise when it opens into the reel.
+ */
+function ShotTile({ shot }: { shot: ShotPin }) {
+  return (
+    <Link
+      href={`/shots/${shot.id}`}
+      aria-label={shot.caption ? `Shot: ${shot.caption}` : "Shot"}
+      className="relative block aspect-[9/16] overflow-hidden rounded-2xl bg-black"
+    >
+      {shot.poster_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={shot.poster_url}
+          alt={shot.caption ?? "Shot"}
+          loading="lazy"
+          decoding="async"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        // #t=0.1 forces a decoded frame; preload="metadata" alone is not
+        // obliged to produce one, and Safari does not.
+        <video
+          src={`${shot.media_url}#t=0.1`}
+          muted
+          playsInline
+          preload="metadata"
+          className="h-full w-full object-cover"
+        />
+      )}
+      <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm">
+        <Play size={11} className="fill-white" />
+      </span>
+    </Link>
   );
 }

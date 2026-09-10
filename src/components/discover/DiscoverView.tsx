@@ -42,8 +42,9 @@ const FIXED = ["For You", "Blowing Up", "Shots", "People", "Tags"] as const;
  * own; together they made Discover a page you read down rather than one you
  * browse, and every rail was a sideways scroll inside a vertical one.
  *
- * Now For You is one thing: the Shots rail on top, as before, and under it a
- * single ranked masonry of posts that carries on by itself as you scroll.
+ * Now For You is one thing: a single ranked masonry that carries on by itself
+ * as you scroll, with Shots scattered through it among the posts rather than
+ * parked in a rail above — a video is just another thing you come across.
  * The topics that were rails are chips, the way Pinterest's are — tapping one
  * turns the grid into that topic. People and tags keep their own chips, so
  * nothing that was here is gone; it just is not all in one scroll.
@@ -55,6 +56,7 @@ export function DiscoverView({
   blockedIds,
   trendingPosts,
   trendingShots,
+  feedShots = [],
   people,
   newPeople = [],
   categoryRails = [],
@@ -68,6 +70,8 @@ export function DiscoverView({
   blockedIds: string[];
   trendingPosts: Pin[];
   trendingShots: Shot[];
+  /** Every Shot in the pool, best first, for scattering through the feed. */
+  feedShots?: Shot[];
   people: Person[];
   newPeople?: Person[];
   categoryRails?: { label: string; posts: Pin[] }[];
@@ -123,26 +127,14 @@ export function DiscoverView({
 
       <div key={cat} className="animate-fade-swap pb-6">
         {cat === "For You" && (
-          <>
-            {trendingShots.length > 0 && (
-              <Section eyebrow="Watch" title="Trending Shots">
-                <div className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4">
-                  {trendingShots.map((s) => (
-                    <div key={s.id} className="w-36 shrink-0 snap-start">
-                      <ShotTile shot={s} />
-                    </div>
-                  ))}
-                </div>
-              </Section>
-            )}
-            <div className="pt-5">
-              <PinFeed
-                posts={rankedPosts}
-                currentUserId={currentUserId}
-                endless={{ cursor: feedCursor, blockedIds }}
-              />
-            </div>
-          </>
+          <div className="pt-2">
+            <PinFeed
+              posts={rankedPosts}
+              shots={feedShots}
+              currentUserId={currentUserId}
+              endless={{ cursor: feedCursor, blockedIds }}
+            />
+          </div>
         )}
 
         {cat === "Blowing Up" && (

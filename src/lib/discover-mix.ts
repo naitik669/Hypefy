@@ -1,0 +1,62 @@
+/**
+ * Scattering Shots through Discover's posts.
+ *
+ * "Randomly" — but a fixed random. Each Shot's gap from the one before is
+ * derived from its own id, so the same Shots against the same posts always
+ * produce the same feed. A real Math.random() here would draw one grid on the
+ * server and a different one in the browser, and a new one on every render,
+ * so tiles would swap places under the reader for no reason at all.
+ *
+ * Shots keep the order they arrive in (the server ranks them); only the gaps
+ * between them vary, between MIN_GAP and MAX_GAP posts, so the feed never
+ * clumps two videos together and never goes too long without one.
+ */
+
+export type Mixed<P, S> = { kind: "post"; item: P } | { kind: "shot"; item: S };
+
+const MIN_GAP = 3;
+const MAX_GAP = 7;
+
+/** FNV-1a — small, fast, and stable across runtimes. */
+function hash(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+export function gapFor(id: string): number {
+  return MIN_GAP + (hash(id) % (MAX_GAP - MIN_GAP + 1));
+}
+
+export function mixShots<P, S extends { id: string }>(
+  posts: readonly P[],
+  shots: readonly S[]
+): Mixed<P, S>[] {
+  const out: Mixed<P, S>[] = [];
+  let s = 0;
+  // The first Shot comes a little earlier than the rest, so a video is on
+  // the first screen rather than two scrolls down.
+  let untilNext = shots.length ? Math.max(1, gapFor(shots[0].id) - 2) : Infinity;
+
+  for (const post of posts) {
+    out.push({ kind: "post", item: post });
+    untilNext -= 1;
+    if (untilNext <= 0 && s < shots.length) {
+      out.push({ kind: "shot", item: shots[s] });
+      s += 1;
+      untilNext = s < shots.length ? gapFor(shots[s].id) : Infinity;
+    }
+  }
+
+  // More Shots than the posts could space out: the rest go at the end rather
+  // than being dropped. Posts loaded later are appended after these, so they
+  // still never move.
+  while (s < shots.length) {
+    out.push({ kind: "shot", item: shots[s] });
+    s += 1;
+  }
+  return out;
+}
