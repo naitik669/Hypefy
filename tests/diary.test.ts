@@ -135,3 +135,66 @@ describe("markSeen / loadSeen", () => {
     expect(loadSeen()).toEqual({});
   });
 });
+
+describe("reactions to your Diary", () => {
+  it("maps reactor profiles, newest first", async () => {
+    const { toReactions } = await import("@/lib/diary");
+    const rs = toReactions([
+      { emoji: "😂", created_at: "2026-09-10T01:00:00Z", reactor_id: "a", profiles: { display_name: "Aman", username: "aman", avatar_hue: 10, avatar_url: null } },
+      { emoji: "❤️", created_at: "2026-09-10T03:00:00Z", reactor_id: "b", profiles: [{ display_name: null, username: "riya", avatar_hue: null, avatar_url: null }] },
+    ] as never);
+    expect(rs.map((r) => r.userId)).toEqual(["b", "a"]);
+    expect(rs[0]).toMatchObject({ name: "riya", hue: 280, emoji: "❤️" });
+  });
+
+  it("summarises by emoji, most used first", async () => {
+    const { reactionSummary } = await import("@/lib/diary");
+    const r = (emoji: string) => ({ emoji }) as never;
+    expect(reactionSummary([r("❤️"), r("😂"), r("❤️"), r("❤️")])).toEqual([
+      { emoji: "❤️", count: 3 },
+      { emoji: "😂", count: 1 },
+    ]);
+  });
+});
+
+describe("archive", () => {
+  it("maps rows and keeps only known endings", async () => {
+    const { toArchive } = await import("@/lib/diary");
+    const [a, b] = toArchive([
+      { text: "x", audience: "close", track: null, written_at: "2026-09-09T00:00:00Z", ended_how: "taken_down" },
+      { text: "y", audience: "odd", track: { id: "t" }, written_at: "2026-09-08T00:00:00Z", ended_how: "???" },
+    ]);
+    expect(a).toMatchObject({ audience: "close", endedHow: "taken_down" });
+    // An unknown ending is read as the ordinary one, and a malformed track dropped.
+    expect(b).toMatchObject({ audience: "mutual", endedHow: "expired", track: null });
+  });
+});
+
+describe("stories", () => {
+  it("play unseen first, then newest, and never include your own", async () => {
+    const { storyOrder } = await import("@/lib/diary");
+    const e = (userId: string, createdAt: string, isSelf = false) => ({ userId, createdAt, isSelf });
+    const order = storyOrder(
+      [e("me", "9", true), e("old", "1"), e("new-seen", "8"), e("fresh", "2")],
+      new Set(["fresh"])
+    ).map((x) => x.userId);
+    expect(order).toEqual(["fresh", "new-seen", "old"]);
+  });
+
+  it("step forward, and end after the last", async () => {
+    const { stepStory } = await import("@/lib/diary");
+    expect(stepStory(0, 3, 1)).toBe(1);
+    expect(stepStory(2, 3, 1)).toBeNull();
+  });
+
+  it("stay on the first when going back from it, rather than closing", async () => {
+    const { stepStory } = await import("@/lib/diary");
+    expect(stepStory(0, 3, -1)).toBe(0);
+    expect(stepStory(2, 3, -1)).toBe(1);
+  });
+
+  it("have nowhere to go with nothing to show", async () => {
+    const { stepStory } = await import("@/lib/diary");
+    expect(stepStory(0, 0, 1)).toBeNull();
+  });
+});

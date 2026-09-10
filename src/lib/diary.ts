@@ -126,3 +126,127 @@ export function unseen<T extends { userId: string; createdAt: string; isSelf?: b
 ): T[] {
   return entries.filter((e) => !e.isSelf && seen[e.userId] !== e.createdAt);
 }
+
+/* ─── Who reacted to yours ─────────────────────────────────────────────── */
+
+export type DiaryReaction = {
+  userId: string;
+  emoji: string;
+  at: string;
+  name: string;
+  username: string | null;
+  hue: number;
+  avatarUrl: string | null;
+};
+
+/**
+ * Reactions to YOUR current Diary, newest first.
+ *
+ * Only reactions whose note_created_at matches the Diary on screen: a
+ * reaction row is kept per person, not per Diary, and is overwritten when
+ * they react again — so without the match, yesterday's "❤️" would show under
+ * today's page from someone who has not seen it.
+ */
+export const REACTIONS_SELECT =
+  "emoji, created_at, reactor_id, profiles!note_reactions_reactor_id_fkey(display_name, username, avatar_hue, avatar_url)";
+
+type ReactionRow = {
+  emoji: string;
+  created_at: string;
+  reactor_id: string;
+  profiles:
+    | { display_name: string | null; username: string | null; avatar_hue: number | null; avatar_url: string | null }
+    | { display_name: string | null; username: string | null; avatar_hue: number | null; avatar_url: string | null }[]
+    | null;
+};
+
+export function toReactions(rows: ReactionRow[] | null | undefined): DiaryReaction[] {
+  return (rows ?? [])
+    .map((r) => {
+      const p = Array.isArray(r.profiles) ? (r.profiles[0] ?? null) : r.profiles;
+      return {
+        userId: r.reactor_id,
+        emoji: r.emoji,
+        at: r.created_at,
+        name: p?.display_name ?? p?.username ?? "Someone",
+        username: p?.username ?? null,
+        hue: p?.avatar_hue ?? 280,
+        avatarUrl: p?.avatar_url ?? null,
+      };
+    })
+    .sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/** "❤️ 3 · 😂 1", most-used first — the summary line under your page. */
+export function reactionSummary(rs: DiaryReaction[]): { emoji: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const r of rs) counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
+  return [...counts]
+    .map(([emoji, count]) => ({ emoji, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/* ─── Your archive ─────────────────────────────────────────────────────── */
+
+export type ArchivedDiary = {
+  text: string;
+  audience: "mutual" | "close";
+  track: Track | null;
+  writtenAt: string;
+  endedHow: "replaced" | "taken_down" | "expired";
+};
+
+type ArchiveRow = {
+  text: string;
+  audience: string;
+  track: unknown;
+  written_at: string;
+  ended_how: string;
+};
+
+export function toArchive(rows: ArchiveRow[] | null | undefined): ArchivedDiary[] {
+  return (rows ?? []).map((r) => ({
+    text: r.text,
+    audience: r.audience === "close" ? "close" : "mutual",
+    track: asTrack(r.track),
+    writtenAt: r.written_at,
+    endedHow:
+      r.ended_how === "replaced" || r.ended_how === "taken_down" ? r.ended_how : "expired",
+  }));
+}
+
+/* ─── Stories ──────────────────────────────────────────────────────────── */
+
+/** How long one Diary stays on screen before the next, when not held. */
+export const STORY_MS = 6000;
+
+/**
+ * The order Diaries play in: ones you have not seen first, then newest. The
+ * same order as the grid, so tapping the third card and swiping on reaches
+ * the fourth — never a Diary the grid put somewhere else.
+ */
+export function storyOrder<T extends { userId: string; createdAt: string; isSelf?: boolean }>(
+  entries: T[],
+  fresh: ReadonlySet<string>
+): T[] {
+  return entries
+    .filter((e) => !e.isSelf)
+    .sort((a, b) => {
+      const fa = fresh.has(a.userId) ? 1 : 0;
+      const fb = fresh.has(b.userId) ? 1 : 0;
+      if (fa !== fb) return fb - fa;
+      return b.createdAt.localeCompare(a.createdAt);
+    });
+}
+
+/**
+ * Where "next" and "back" go. Past the last Diary is the end of the run
+ * (null closes the viewer); back on the first stays on the first rather
+ * than closing — a tap on the left edge is rarely a request to leave.
+ */
+export function stepStory(index: number, count: number, dir: 1 | -1): number | null {
+  if (count <= 0) return null;
+  const next = index + dir;
+  if (next >= count) return null;
+  return Math.max(0, next);
+}

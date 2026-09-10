@@ -540,6 +540,21 @@ export type Database = {
           },
         ]
       }
+      diary_archive: {
+        Row: {
+          audience: string
+          ended_at: string
+          ended_how: string
+          id: string
+          text: string
+          track: Json | null
+          user_id: string
+          written_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       follows: {
         Row: {
           created_at: string
@@ -2203,6 +2218,18 @@ export type Database = {
           unread_count: number
         }[]
       }
+      get_diary_archive: {
+        Args: { p_limit?: number }
+        Returns: {
+          audience: string
+          ended_how: string
+          id: string | null
+          text: string
+          track: Json | null
+          written_at: string
+        }[]
+      }
+      forget_diary: { Args: { p_written_at: string }; Returns: undefined }
       get_notes: {
         Args: never
         Returns: {
