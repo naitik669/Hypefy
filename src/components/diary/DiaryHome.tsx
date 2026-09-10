@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Archive, ChevronRight } from "lucide-react";
+import { Archive } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { DiaryComposer, DiaryEditor, type DiaryDraft } from "@/components/diary/DiaryEditor";
 import { YourDiaryCard } from "@/components/diary/YourDiaryCard";
 import { FriendDiaryCard } from "@/components/diary/FriendDiaryCard";
@@ -25,10 +26,10 @@ const NO_FRESH = new Set<string>();
  * see what is here.
  *
  * Top to bottom: your Diary with everyone's reactions on it (or, if you have
- * not written one, the page to write it on, right there — no pop-up), your
- * past Diaries one row down, then everyone else's, each complete on its own
- * card: the note in full, the song playable, six reactions and a reply in
- * place. Swiping through them full-screen is there for when you want it; it
+ * not written one, the page to write it on, right there — no pop-up), then
+ * everyone else's, each complete on its own card: the note in full, the song
+ * as a CD to tap, six emoji and a reply in place. Past Diaries are a small
+ * box at the top right, out of the way of anyone's Diary. Swiping through them full-screen is there for when you want it; it
  * is never the only way to see or do anything.
  */
 export function DiaryHome({
@@ -104,66 +105,70 @@ export function DiaryHome({
     });
   }
 
-  return (
-    <div className="flex flex-col gap-3 px-3 pb-24">
-      <p className="px-1 text-[13px] text-muted">
-        {others.length === 0 ? (
-          "Short notes from your circle. Each one lasts a day."
-        ) : newCount > 0 ? (
-          <>
-            <span className="font-semibold text-accent">{newCount} new</span> · each one lasts a day
-          </>
-        ) : (
-          `${others.length} from your circle today · each one lasts a day`
-        )}
-      </p>
-
-      {/* ── Yours ── */}
-      {mine ? (
-        <YourDiaryCard entry={mine} reactions={onMine} onEdit={() => setEditing(true)} />
-      ) : (
-        <section aria-label="Write your Diary">
-          <DiaryComposer current={null} me={me} onSaved={onSaved} compact />
-        </section>
-      )}
-
-
-      {/* ── Theirs ── */}
-      {others.length > 0 && (
-        <h2 className="px-1 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-muted">From your circle</h2>
-      )}
-      {others.map((e, i) => (
-        <FriendDiaryCard
-          key={e.userId}
-          entry={e}
-          fresh={fresh.has(e.userId)}
-          mine={reacted[e.userId] ?? null}
-          onReacted={onReacted}
-          onOpen={() => setStoryAt(i)}
-        />
-      ))}
-      {others.length === 0 && (
-        <p className="px-6 py-6 text-center text-sm leading-snug text-faint">
-          When people you follow back write a Diary, it shows up here in full.
-        </p>
-      )}
-
-      {/* Last: the least urgent thing on the page, one tap away and never in
-          the way of anyone's Diary. */}
-      <button
-        type="button"
-        onClick={() => setArchiveOpen(true)}
-        className="flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 text-left transition-colors hover:bg-elevated"
-      >
-        <Archive size={17} className="text-muted" />
-        <span className="flex-1">
-          <span className="block text-sm font-semibold">Past Diaries</span>
-          <span className="block text-xs text-muted">
-            {archiveCount > 0 ? `${archiveCount} kept · only you can see them` : "Kept here when a Diary ends · only you"}
-          </span>
+  // Past Diaries: a small box at the top right — the least urgent thing on
+  // the page, so it stays out of the way of anyone's Diary.
+  const pastBox = (
+    <button
+      type="button"
+      onClick={() => setArchiveOpen(true)}
+      aria-label={archiveCount > 0 ? `Past Diaries, ${archiveCount} kept` : "Past Diaries"}
+      className="mr-1 flex h-9 items-center gap-1.5 rounded-xl bg-white/[0.07] pl-2.5 pr-2 text-[13px] font-semibold text-foreground transition-colors hover:bg-white/[0.11]"
+    >
+      <Archive size={15} className="text-white/75" />
+      Past
+      {archiveCount > 0 && (
+        <span className="min-w-5 rounded-md bg-white/10 px-1 text-center text-[11px] font-bold tabular-nums">
+          {archiveCount}
         </span>
-        <ChevronRight size={17} className="text-muted" />
-      </button>
+      )}
+    </button>
+  );
+
+  return (
+    <>
+      <PageHeader title="Diary" showBack right={pastBox} />
+      <div className="flex flex-col gap-3 px-3 pb-24 pt-2">
+        <p className="px-1 text-[13px] text-muted">
+          {others.length === 0 ? (
+            "Short notes from your circle. Each one lasts a day."
+          ) : newCount > 0 ? (
+            <>
+              <span className="font-semibold text-accent">{newCount} new</span> · each one lasts a day
+            </>
+          ) : (
+            `${others.length} from your circle today · each one lasts a day`
+          )}
+        </p>
+
+        {/* ── Yours ── */}
+        {mine ? (
+          <YourDiaryCard entry={mine} reactions={onMine} onEdit={() => setEditing(true)} />
+        ) : (
+          <section aria-label="Write your Diary">
+            <DiaryComposer current={null} me={me} onSaved={onSaved} compact />
+          </section>
+        )}
+
+        {/* ── Theirs ── */}
+        {others.length > 0 && (
+          <h2 className="px-1 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-muted">From your circle</h2>
+        )}
+        {others.map((e, i) => (
+          <FriendDiaryCard
+            key={e.userId}
+            entry={e}
+            fresh={fresh.has(e.userId)}
+            mine={reacted[e.userId] ?? null}
+            onReacted={onReacted}
+            onOpen={() => setStoryAt(i)}
+          />
+        ))}
+        {others.length === 0 && (
+          <p className="px-6 py-6 text-center text-sm leading-snug text-faint">
+            When people you follow back write a Diary, it shows up here in full.
+          </p>
+        )}
+      </div>
 
       <DiaryEditor
         open={editing}
@@ -182,6 +187,6 @@ export function DiaryHome({
           onReacted={onReacted}
         />
       )}
-    </div>
+    </>
   );
 }

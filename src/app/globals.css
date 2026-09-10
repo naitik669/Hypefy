@@ -708,6 +708,33 @@ body {
   animation: spin-slow 8s linear infinite;
 }
 
+/* A Diary's CD turning while its song plays — slow, like a real one seen
+   from above. Stopped outright for reduced motion; the disc still slides
+   out, which is what says "playing". */
+.diary-disc-spin {
+  animation: spin-slow 7s linear infinite;
+}
+/* The three bars beside a Diary's song name, bouncing while it plays. */
+@keyframes diary-eq {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.diary-eq {
+  transform-origin: bottom;
+  animation: diary-eq 0.9s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .diary-disc-spin,
+  .diary-eq {
+    animation: none;
+  }
+}
+
 /* Slowly orbiting avatar ring (onboarding "Find your people").
    The ring rotates; each avatar counter-rotates to stay upright. */
 @keyframes orbit {

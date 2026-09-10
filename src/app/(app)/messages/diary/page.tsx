@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { DiaryHome } from "@/components/diary/DiaryHome";
 import { REACTIONS_SELECT, toDiaryEntries, toReactions } from "@/lib/diary";
 
@@ -65,20 +64,17 @@ export default async function DiaryPage() {
   }
 
   return (
-    <>
-      <PageHeader title="Diary" showBack />
-      <DiaryHome
-        entries={entries}
-        currentUserId={user.id}
-        me={{
-          name: me?.display_name ?? me?.username ?? "You",
-          hue: me?.avatar_hue ?? 280,
-          avatarUrl: me?.avatar_url ?? null,
-        }}
-        reactionsOnMine={toReactions(onMine as never)}
-        myReactions={myReactions}
-        archiveCount={archiveCount ?? 0}
-      />
-    </>
+    <DiaryHome
+      entries={entries}
+      currentUserId={user.id}
+      me={{
+        name: me?.display_name ?? me?.username ?? "You",
+        hue: me?.avatar_hue ?? 280,
+        avatarUrl: me?.avatar_url ?? null,
+      }}
+      reactionsOnMine={toReactions(onMine as never)}
+      myReactions={myReactions}
+      archiveCount={archiveCount ?? 0}
+    />
   );
 }

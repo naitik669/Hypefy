@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Star, X } from "lucide-react";
+import { Star, X } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
-import { Plane } from "@/components/ui/Plane";
-import { TrackChip } from "@/components/music/TrackChip";
+import { DiaryDisc, SongLine } from "@/components/diary/DiaryDisc";
+import { DiaryResponder } from "@/components/diary/DiaryResponder";
 import { noteSize, pageTint, shortLeft } from "@/components/diary/DiaryPage";
-import { QUICK_EMOJIS, useDiaryActions } from "@/components/diary/useDiaryActions";
 import { STORY_MS, stepStory, type DiaryEntry } from "@/lib/diary";
 
 /**
@@ -21,6 +20,9 @@ import { STORY_MS, stepStory, type DiaryEntry } from "@/lib/diary";
  * Typing a reply stops it too — a Diary moving on under a half-written reply
  * is the worst thing this screen could do. Arrow keys and Escape work on a
  * keyboard.
+ *
+ * A Diary with a song shows its CD at the right edge, playing and turning as
+ * soon as the Diary is on screen.
  */
 export function DiaryStories({
   list,
@@ -40,6 +42,7 @@ export function DiaryStories({
   const [held, setHeld] = useState(false);
   const [typing, setTyping] = useState(false);
   const entry = list[index];
+  const avatar = useRef<HTMLSpanElement>(null);
 
   const elapsedRef = useRef(0);
   useLayoutEffect(() => {
@@ -120,13 +123,13 @@ export function DiaryStories({
       role="dialog"
       aria-modal="true"
       aria-label={`${entry.name}'s Diary`}
-      className="fixed inset-0 z-[80] mx-auto flex max-w-[480px] flex-col text-white"
-      style={{ background: pageTint(entry.hue).background }}
+      className="fixed inset-0 z-[80] mx-auto flex max-w-[480px] flex-col overflow-hidden text-white"
+      style={{ background: pageTint(entry.hue).screen }}
     >
       {/* Progress: one segment per Diary. */}
       <div className="flex gap-1 px-3 pt-[max(env(safe-area-inset-top),12px)]" aria-hidden>
         {list.map((d, i) => (
-          <span key={d.userId} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/25">
+          <span key={d.userId} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/20">
             <span
               className="block h-full rounded-full bg-white"
               style={{
@@ -138,10 +141,12 @@ export function DiaryStories({
       </div>
 
       <header className="flex items-center gap-2 px-4 py-3">
-        <Avatar name={entry.name} hue={entry.hue} size={32} src={entry.avatarUrl ?? undefined} />
+        <span ref={avatar} className="shrink-0 rounded-full">
+          <Avatar name={entry.name} hue={entry.hue} size={32} src={entry.avatarUrl ?? undefined} />
+        </span>
         <span className="truncate text-sm font-bold">{entry.name}</span>
         {entry.audience === "close" && <Star size={12} className="fill-accent text-accent" aria-label="Close friends" />}
-        <span className="text-xs text-white/55" suppressHydrationWarning>
+        <span className="text-xs text-white/50" suppressHydrationWarning>
           · {shortLeft(entry.createdAt)} left
         </span>
         <button
@@ -156,7 +161,7 @@ export function DiaryStories({
 
       {/* The page — the part you tap, hold and swipe. */}
       <div
-        className="flex flex-1 touch-none select-none flex-col justify-end px-6 pb-4"
+        className="relative flex flex-1 touch-none select-none flex-col justify-end pb-4 pl-6 pr-6"
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         onPointerCancel={() => {
@@ -164,89 +169,42 @@ export function DiaryStories({
           setHeld(false);
         }}
       >
+        {entry.track && (
+          // Its own tap target: a press on the disc must not count as a tap
+          // on the page, which would move on to the next Diary.
+          <div className="absolute right-0 top-[18%] translate-x-[46%]" onPointerDown={(e) => e.stopPropagation()}>
+            {/* Keyed per Diary so each one's song starts as it comes on screen. */}
+            <DiaryDisc key={entry.userId} track={entry.track} size={168} slide={-18} autoPlay />
+          </div>
+        )}
         <p
-          className="break-words font-extrabold leading-[1.04] tracking-[-0.025em]"
+          className="relative break-words font-extrabold leading-[1.04] tracking-[-0.025em]"
           style={{ fontSize: Math.min(Math.round(noteSize(entry.text).size * 1.5), 68) }}
         >
           {entry.text}
         </p>
+        {entry.track && (
+          <div className="relative mt-3" onPointerDown={(e) => e.stopPropagation()}>
+            <SongLine track={entry.track} />
+          </div>
+        )}
         {paused && held && <p className="mt-3 text-xs font-semibold text-white/55">Paused</p>}
       </div>
 
-      <StoryActions
+      <div
         key={entry.userId}
-        entry={entry}
-        mine={myReactions[entry.userId] ?? null}
-        onReacted={onReacted}
-        onTyping={setTyping}
-      />
+        className="px-3 pb-[max(env(safe-area-inset-bottom),12px)]"
+      >
+        <DiaryResponder
+          entry={entry}
+          mine={myReactions[entry.userId] ?? null}
+          onReacted={onReacted}
+          target={() => avatar.current}
+          onTyping={setTyping}
+          size="screen"
+        />
+      </div>
     </div>,
     document.body
-  );
-}
-
-/** Keyed per Diary, so a half-typed reply never carries over to the next. */
-function StoryActions({
-  entry,
-  mine,
-  onReacted,
-  onTyping,
-}: {
-  entry: DiaryEntry;
-  mine: string | null;
-  onReacted: (userId: string, emoji: string | null) => void;
-  onTyping: (v: boolean) => void;
-}) {
-  const { react, reply, status, error } = useDiaryActions({ entry, mine, onReacted });
-  const [draft, setDraft] = useState("");
-  const first = entry.name.split(" ")[0];
-
-  return (
-    <div className="flex flex-col gap-2 px-3 pb-[max(env(safe-area-inset-bottom),16px)]">
-      {entry.track && <TrackChip track={entry.track} autoPlayInView className="w-full" />}
-      <div className="flex items-center justify-between rounded-pill border border-white/10 bg-black/35 p-1 backdrop-blur-sm">
-        {QUICK_EMOJIS.map((e) => (
-          <button
-            key={e}
-            type="button"
-            onClick={() => react(e)}
-            aria-label={`React ${e}`}
-            aria-pressed={mine === e}
-            className={`flex h-10 w-10 items-center justify-center rounded-full text-[20px] transition-transform active:scale-90 ${
-              mine === e ? "scale-110 bg-accent/20 ring-2 ring-accent" : "hover:bg-white/10"
-            }`}
-          >
-            {e}
-          </button>
-        ))}
-      </div>
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (await reply(draft)) setDraft("");
-        }}
-        className="flex items-center gap-2 rounded-pill border border-white/10 bg-black/35 py-1 pl-4 pr-1 backdrop-blur-sm"
-      >
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onFocus={() => onTyping(true)}
-          onBlur={() => onTyping(false)}
-          placeholder={`Reply to ${first}…`}
-          maxLength={500}
-          className="min-w-0 flex-1 bg-transparent py-1.5 text-sm outline-none placeholder:text-white/45"
-        />
-        <button
-          type="submit"
-          disabled={!draft.trim() || status === "sending"}
-          aria-label="Send reply"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink disabled:opacity-40"
-        >
-          {status === "sending" ? <Loader2 size={15} className="animate-spin" /> : <Plane size={15} />}
-        </button>
-      </form>
-      {status === "sent" && <p className="text-center text-xs font-semibold text-accent">Sent to your DMs with {first}</p>}
-      {status === "error" && error && <p className="text-center text-xs font-semibold text-danger">{error}</p>}
-    </div>
   );
 }

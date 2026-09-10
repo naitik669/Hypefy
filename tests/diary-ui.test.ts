@@ -13,16 +13,24 @@ import type { DiaryEntry, DiaryReaction } from "@/lib/diary";
  * what you have not opened.
  */
 
-// Nothing here should reach the network; the page only needs a client to exist.
+// Nothing here reaches the network: RPCs are recorded, and a DM conversation
+// always exists, so what a tap sends can be read back.
+const rpcCalls = vi.hoisted(() => [] as { fn: string; args: Record<string, unknown> }[]);
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
-    rpc: async () => ({ data: null, error: null }),
+    rpc: async (fn: string, args: Record<string, unknown>) => {
+      rpcCalls.push({ fn, args });
+      return { data: fn === "get_or_create_dm" ? "conv-1" : null, error: null };
+    },
     from: () => ({
       select: () => ({
         eq: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) }),
       }),
     }),
   }),
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ back() {}, push() {}, replace() {} }),
 }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: unknown }) =>
@@ -72,6 +80,7 @@ let host: HTMLDivElement;
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   localStorage.clear();
+  rpcCalls.length = 0;
   host = document.createElement("div");
   document.body.appendChild(host);
 });
@@ -99,8 +108,13 @@ describe("DiaryHome", () => {
     await render(
       createElement(DiaryHome, home({
         entries: [
-          entry({ userId: "a", name: "Aman", text: "HDB" }),
-          entry({ userId: "b", name: "Riya", text: "exams done. finally free. don't text me about syllabus" }),
+          entry({ userId: "a", name: "Aman", text: "HDB", createdAt: new Date(Date.now() - 60_000).toISOString() }),
+          entry({
+            userId: "b",
+            name: "Riya",
+            text: "exams done. finally free. don't text me about syllabus",
+            createdAt: new Date(Date.now() - 3_600_000).toISOString(),
+          }),
         ],
       }))
     );
@@ -112,10 +126,61 @@ describe("DiaryHome", () => {
       expect.stringContaining("exams done. finally free. don't text me about syllabus"),
     ]);
     for (const card of cards) {
-      expect(card.querySelectorAll('button[aria-label^="React "]')).toHaveLength(6);
+      const emoji = [...card.querySelectorAll("button")].filter((b) => /^Send .+ to /.test(b.getAttribute("aria-label") ?? ""));
+      expect(emoji).toHaveLength(6);
     }
-    expect(button("Reply to Aman")).not.toBeNull();
+    // The reply field is there at rest — no button to open it first.
+    expect(host.querySelector<HTMLInputElement>('input[aria-label="Reply to Aman"]')?.placeholder).toBe("Reply to Aman…");
     expect(host.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("sends an emoji to their DMs as a reply to their Diary, and keeps it on the Diary", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman Verma" })] })));
+    await click(button("Send 😂 to Aman"));
+
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["react_to_note", "get_or_create_dm", "send_message"]);
+    expect(rpcCalls[0].args).toEqual({ p_owner: "a", p_emoji: "😂" });
+    expect(rpcCalls[2].args).toMatchObject({ p_conversation_id: "conv-1", p_body: "📔 Replied to your Diary: 😂" });
+    // It went; nothing stays lit on the button.
+    expect(host.querySelector<HTMLInputElement>('input[aria-label="Reply to Aman"]')!.placeholder).toBe(
+      "Sent 😂 to Aman · in your DMs"
+    );
+    expect(host.querySelector("[aria-pressed]")).toBeNull();
+  });
+
+  it("does not send the same emoji twice in a row", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman" })] })));
+    await click(button("Send ❤️ to Aman"));
+    await click(button("Send ❤️ to Aman"));
+    expect(rpcCalls.filter((c) => c.fn === "send_message")).toHaveLength(1);
+  });
+
+  it("sends a typed reply to their DMs with the same prefix", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman" })] })));
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="Reply to Aman"]')!;
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      set.call(input, "same, chai?");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => input.form!.requestSubmit());
+    expect(rpcCalls.at(-1)).toMatchObject({ fn: "send_message", args: { p_body: "📔 Replied to your Diary: same, chai?" } });
+    expect(input.value).toBe("");
+  });
+
+  it("tucks a CD behind a Diary with a song, and none behind one without", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    const track = { id: "t1", title: "Pasoori", artist: "Ali Sethi", artwork: "", preview: "x.mp3" };
+    await render(
+      createElement(DiaryHome, home({
+        entries: [entry({ userId: "me", isSelf: true }), entry({ userId: "a", name: "Aman", track }), entry({ userId: "b", name: "Riya" })],
+      }))
+    );
+    expect(document.querySelectorAll('button[aria-label="Play Pasoori by Ali Sethi"]')).toHaveLength(1);
+    expect(host.textContent).toContain("Pasoori · Ali Sethi");
   });
 
   it("puts the page to write on right there when you have no Diary, folded until you tap it", async () => {
@@ -130,6 +195,28 @@ describe("DiaryHome", () => {
 
     await act(async () => field.focus());
     expect(host.textContent).toContain("Post to Diary");
+    // A blank CD behind the page is how a song gets added.
+    expect(button("Add a song")).not.toBeNull();
+  });
+
+  it("picks who can see it from a dropdown beside Post", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(createElement(DiaryHome, home()));
+    await act(async () => host.querySelector("textarea")!.focus());
+
+    const picker = host.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!;
+    expect(picker.textContent).toBe("Mutuals");
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+
+    await click(picker);
+    const options = [...host.querySelectorAll('[role="menuitemradio"]')];
+    expect(options.map((o) => [o.querySelector(".font-semibold")!.textContent, o.getAttribute("aria-checked")])).toEqual([
+      ["Mutuals", "true"],
+      ["Close friends", "false"],
+    ]);
+    await click(options[1]);
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+    expect(picker.textContent).toBe("Close friends");
   });
 
   it("shows your Diary with who reacted, by name, instead of the page to write on", async () => {
@@ -164,7 +251,7 @@ describe("DiaryHome", () => {
     expect(host.textContent).toContain("No reactions yet");
   });
 
-  it("has your reaction already picked on a Diary you reacted to", async () => {
+  it("does not resend the emoji you already sent to that Diary on an earlier visit", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(
       createElement(DiaryHome, home({
@@ -172,18 +259,10 @@ describe("DiaryHome", () => {
         myReactions: { a: "😂" },
       }))
     );
-    const pressed = [...host.querySelectorAll('[aria-pressed="true"]')].map((b) => b.textContent);
-    expect(pressed).toEqual(["😂"]);
-  });
-
-  it("opens the reply field inside the card, not somewhere else", async () => {
-    const { DiaryHome } = await import("@/components/diary/DiaryHome");
-    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman Verma" })] })));
-    expect(host.querySelector("input")).toBeNull();
-    await click(button("Reply to Aman"));
-    const input = host.querySelector("article input") as HTMLInputElement;
-    expect(input.placeholder).toBe("Reply to Aman…");
-    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    await click(button("Send 😂 to Aman"));
+    expect(rpcCalls).toEqual([]);
+    await click(button("Send 🥰 to Aman"));
+    expect(rpcCalls.filter((c) => c.fn === "send_message")).toHaveLength(1);
   });
 
   it("marks what is new, then marks it seen for next time", async () => {
@@ -197,12 +276,13 @@ describe("DiaryHome", () => {
     });
   });
 
-  it("says whose Diaries go here when there are none, and still offers your past ones", async () => {
+  it("says whose Diaries go here when there are none, and keeps your past ones in the top-right box", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home({ archiveCount: 4 })));
     expect(host.textContent).toContain("When people you follow back write a Diary");
-    expect(host.textContent).toContain("Past Diaries");
-    expect(host.textContent).toContain("4 kept · only you can see them");
+    const past = button("Past Diaries, 4 kept")!;
+    expect(past.closest("header")).not.toBeNull();
+    expect(past.textContent).toBe("Past4");
   });
 
   it("goes full-screen at the Diary you opened, steps with the arrow keys, and closes", async () => {
@@ -210,8 +290,8 @@ describe("DiaryHome", () => {
     await render(
       createElement(DiaryHome, home({
         entries: [
-          entry({ userId: "a", name: "Aman", text: "HDB" }),
-          entry({ userId: "b", name: "Riya", text: "can't sleep" }),
+          entry({ userId: "a", name: "Aman", text: "HDB", createdAt: new Date(Date.now() - 60_000).toISOString() }),
+          entry({ userId: "b", name: "Riya", text: "can't sleep", createdAt: new Date(Date.now() - 3_600_000).toISOString() }),
         ],
       }))
     );
@@ -234,59 +314,6 @@ describe("DiaryHome", () => {
     await click(button("Open Aman's Diary full-screen"));
     await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" })));
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-  });
-});
-
-describe("DiaryPage", () => {
-  it("sets a short note large and a long one small, so each fills its page", async () => {
-    const { DiaryPage } = await import("@/components/diary/DiaryPage");
-    root = createRoot(host);
-    await act(async () =>
-      root!.render(
-        createElement("div", null,
-          createElement(DiaryPage, { entry: entry({ userId: "s", text: "HDB" }), label: "A" }),
-          createElement(DiaryPage, {
-            entry: entry({ userId: "l", text: "exams done. finally free. don't text me about syllabus ever again" }),
-            label: "B",
-          })
-        )
-      )
-    );
-    const [short, long] = [...host.querySelectorAll("p")].map((p) => parseFloat(p.style.fontSize));
-    expect(short).toBeGreaterThan(long * 2);
-  });
-
-  it("burns down its bottom line as the day runs out", async () => {
-    const { DiaryPage } = await import("@/components/diary/DiaryPage");
-    const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
-    root = createRoot(host);
-    await act(async () =>
-      root!.render(
-        createElement("div", null,
-          createElement(DiaryPage, { entry: entry({ userId: "f", createdAt: hoursAgo(1) }), label: "Fresh" }),
-          createElement(DiaryPage, { entry: entry({ userId: "o", createdAt: hoursAgo(20) }), label: "Old" })
-        )
-      )
-    );
-    const widths = [...host.querySelectorAll("span[aria-hidden]")]
-      .map((s) => parseFloat((s as HTMLElement).style.width))
-      .filter((w) => !Number.isNaN(w));
-    expect(widths[0]).toBeGreaterThan(90);
-    expect(widths[1]).toBeLessThan(20);
-  });
-
-  it("marks only what is new in lime, not every page", async () => {
-    const { DiaryPage } = await import("@/components/diary/DiaryPage");
-    root = createRoot(host);
-    await act(async () =>
-      root!.render(
-        createElement("div", null,
-          createElement(DiaryPage, { entry: entry({ userId: "n" }), label: "New", fresh: true }),
-          createElement(DiaryPage, { entry: entry({ userId: "s" }), label: "Seen" })
-        )
-      )
-    );
-    expect(host.querySelectorAll('[aria-label="New"]')).toHaveLength(1);
   });
 });
 

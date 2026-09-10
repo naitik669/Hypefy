@@ -95,8 +95,8 @@ export function DiaryArchiveSheet({
           {(items ?? []).map((d) => (
             <li
               key={d.writtenAt}
-              className="relative overflow-hidden rounded-2xl border p-3.5"
-              style={{ background: tint.background, borderColor: tint.borderColor }}
+              className="relative overflow-hidden rounded-2xl p-3.5"
+              style={{ background: tint.background, boxShadow: tint.shadow }}
             >
               <div className="flex items-center gap-2 text-[11px] text-white/55">
                 <span className="font-semibold text-white/80">{when(d.writtenAt)}</span>
