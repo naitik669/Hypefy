@@ -33,16 +33,23 @@ export const PIN_SELECT =
 /** Tiles revealed per step, whether from memory or from the database. */
 const STEP = 24;
 
+/**
+ * Three across. The app is one 480px column on every screen, so this is the
+ * same on a phone and a desktop: about 150px a tile, which is small enough to
+ * take in a whole screen of them at a glance — the point of browsing — and
+ * big enough that a picture is still a picture.
+ */
+const COLUMNS = 3;
+
 const imageOf = (p: Pin) => p.image_urls?.[0] ?? p.image_url ?? null;
 const textOf = (p: Pin) => (p.caption ?? p.body ?? "").trim();
 
 /**
  * A Pinterest-style feed of posts.
  *
- * Two columns, always: the app is a 480px column on every screen, so what
- * used to become three columns on a desktop was three columns squeezed into
- * the same 480px. Tiles are placed by `distribute`, shortest column first,
- * which is what keeps a tile where it is when more load beneath it.
+ * Three columns on every screen (see COLUMNS). Tiles are placed by
+ * `distribute`, shortest column first, which is what keeps a tile where it
+ * is when more load beneath it.
  *
  * With `endless`, the feed never ends in a button. It shows what it already
  * has a step at a time, then asks the database for older posts, and it does
@@ -72,7 +79,7 @@ export function PinFeed({
   );
   const columns = useMemo(
     () =>
-      distribute(visible, 2, (p) =>
+      distribute(visible, COLUMNS, (p) =>
         pinHeight({ aspect_ratio: p.aspect_ratio, hasImage: !!imageOf(p) })
       ),
     [visible]
@@ -170,9 +177,12 @@ export function PinFeed({
 
   return (
     <>
-      <div className="flex items-start gap-3 px-3">
+      {/* 8px gutters rather than 12: at three across, every pixel of gutter
+          comes out of three pictures, and 8 is what the three-across search
+          grid already uses. */}
+      <div className="flex items-start gap-2 px-2">
         {columns.map((col, c) => (
-          <div key={c} className="flex min-w-0 flex-1 flex-col gap-3">
+          <div key={c} className="flex min-w-0 flex-1 flex-col gap-2">
             {col.map((p) => (
               <PinTile key={p.id} pin={p} currentUserId={currentUserId} />
             ))}
@@ -182,7 +192,7 @@ export function PinFeed({
               <div
                 aria-hidden
                 className="skeleton w-full rounded-2xl"
-                style={{ aspectRatio: c === 0 ? "3 / 4" : "1 / 1" }}
+                style={{ aspectRatio: ["3 / 4", "1 / 1", "4 / 5"][c % 3] }}
               />
             )}
           </div>
@@ -275,12 +285,12 @@ function PinTile({ pin, currentUserId }: { pin: Pin; currentUserId: string }) {
           // A post with no picture still earns a pin: its words, set large on
           // the author's colour, so it reads as a card rather than a hole.
           <div
-            className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl p-4"
+            className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl p-3"
             style={{
               background: `linear-gradient(150deg, hsl(${hue} 55% 26%), hsl(${hue} 40% 12%))`,
             }}
           >
-            <p className="line-clamp-6 text-center text-[15px] font-bold leading-snug text-white">
+            <p className="line-clamp-5 text-center text-[13px] font-bold leading-snug text-white">
               {text}
             </p>
           </div>

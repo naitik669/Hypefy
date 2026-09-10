@@ -124,9 +124,9 @@ const columns = () => [...host.querySelectorAll(".flex.items-start > div")];
 const ids = () => columns().map((c) => [...c.querySelectorAll("a[href^='/p/']")].map((a) => a.getAttribute("href")));
 
 describe("PinFeed layout", () => {
-  it("is two columns of pictures and nothing else — no caption, name or counters", async () => {
+  it("is three columns of pictures and nothing else — no caption, name or counters", async () => {
     await mount(range(0, 6));
-    expect(columns()).toHaveLength(2);
+    expect(columns()).toHaveLength(3);
     const first = host.querySelector("[data-pin]")!;
     expect(first.textContent).toBe("");
     expect(first.querySelector("img")).not.toBeNull();
@@ -171,7 +171,7 @@ describe("PinFeed endless", () => {
     const before = ids();
     await nearBottom();
     const after = ids();
-    for (let c = 0; c < 2; c++) {
+    for (let c = 0; c < 3; c++) {
       expect(after[c].slice(0, before[c].length)).toEqual(before[c]);
     }
   });
