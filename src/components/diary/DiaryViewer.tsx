@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Loader2, Star } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CenterModal } from "@/components/ui/CenterModal";
-import { Avatar } from "@/components/ui/Avatar";
 import { TrackChip } from "@/components/music/TrackChip";
 import { Plane } from "@/components/ui/Plane";
 import { haptics } from "@/lib/haptics";
-import { timeLeft, type DiaryEntry } from "@/lib/diary";
+import { type DiaryEntry } from "@/lib/diary";
+import { DiaryPage } from "@/components/diary/DiaryPage";
 
 const QUICK_EMOJIS = ["❤️", "🥰", "😂", "👍", "😮", "😢"];
 
@@ -130,43 +130,25 @@ export function DiaryViewer({
   return (
     <CenterModal open={!!entry} onClose={onClose}>
       {entry && (
-        <div className="flex flex-col items-center gap-4 pb-1">
-          <Link
-            href={entry.username ? `/u/${entry.username}` : "#"}
-            onClick={onClose}
-            className="flex flex-col items-center gap-2"
-          >
-            <Avatar
-              name={entry.name}
-              hue={entry.hue}
-              size={72}
-              src={entry.avatarUrl ?? undefined}
-            />
-            <div className="text-center">
-              <p className="text-base font-bold leading-tight">{entry.name}</p>
-              <p className="text-xs text-faint">
-                {entry.username ? `@${entry.username} · ` : ""}
-                {timeLeft(entry.createdAt)}
-              </p>
-            </div>
-          </Link>
-
-          {entry.audience === "close" && (
-            <span className="-mt-1 flex items-center gap-1 rounded-pill bg-accent/15 px-2.5 py-0.5 text-[11px] font-bold text-accent">
-              <Star size={11} fill="currentColor" /> Close friends
-            </span>
-          )}
-
-          {/* The Diary itself. A chat bubble, squared at the top-left where it
-              leaves the person who wrote it — the same shape the profile
-              status used, so the two read as one thing. */}
-          <p className="w-full whitespace-pre-wrap break-words rounded-[20px] rounded-tl-md border border-border bg-elevated px-4 py-3 text-center text-lg font-semibold leading-snug">
-            {entry.text}
-          </p>
+        <div className="flex flex-col gap-3">
+          {/* The same page as in the grid, larger — opening a Diary should
+              feel like picking up the page, not like visiting a profile. */}
+          <DiaryPage entry={entry} label={entry.name} size="open" />
 
           {entry.track && <TrackChip track={entry.track} className="w-full" />}
 
-          <div className="flex w-full items-center justify-between px-1">
+          {entry.username && (
+            <Link
+              href={`/u/${entry.username}`}
+              onClick={onClose}
+              className="-mt-1 self-end text-xs font-semibold text-muted hover:text-foreground"
+            >
+              @{entry.username} · View profile
+            </Link>
+          )}
+
+          {/* Reactions as one bar rather than six loose circles. */}
+          <div className="flex items-center justify-between rounded-pill border border-border bg-surface p-1">
             {QUICK_EMOJIS.map((e) => (
               <button
                 key={e}
@@ -174,8 +156,8 @@ export function DiaryViewer({
                 onClick={() => react(e)}
                 aria-label={`React ${e}`}
                 aria-pressed={mine === e}
-                className={`flex h-10 w-10 items-center justify-center rounded-full text-xl transition-transform active:scale-90 ${
-                  mine === e ? "scale-110 bg-accent/20 ring-2 ring-accent" : "bg-surface"
+                className={`flex h-10 w-10 items-center justify-center rounded-full text-[20px] transition-transform active:scale-90 ${
+                  mine === e ? "scale-110 bg-accent/20 ring-2 ring-accent" : "hover:bg-white/5"
                 }`}
               >
                 {e}
@@ -188,7 +170,7 @@ export function DiaryViewer({
               e.preventDefault();
               void sendReply();
             }}
-            className="flex w-full items-center gap-2 rounded-pill border border-border bg-surface py-1 pl-4 pr-1"
+            className="flex items-center gap-2 rounded-pill border border-border bg-surface py-1 pl-4 pr-1"
           >
             <input
               value={reply}
@@ -215,10 +197,12 @@ export function DiaryViewer({
           </form>
 
           {status === "sent" && (
-            <p className="-mt-2 text-xs font-semibold text-accent">Sent to your DMs</p>
+            <p className="-mt-1 text-center text-xs font-semibold text-accent">
+              Sent to your DMs with {entry.name.split(" ")[0]}
+            </p>
           )}
           {status === "error" && error && (
-            <p className="-mt-2 text-xs font-semibold text-danger">{error}</p>
+            <p className="-mt-1 text-center text-xs font-semibold text-danger">{error}</p>
           )}
         </div>
       )}

@@ -75,6 +75,31 @@ describe("timeLeft", () => {
   });
 });
 
+describe("page type and burn line", () => {
+  it("steps the type down as the note gets longer", async () => {
+    const { noteSize } = await import("@/components/diary/DiaryPage");
+    const sizes = ["HDB", "gym then chai", "who's up for chai at 5 ☕", "x".repeat(40), "y".repeat(58)]
+      .map((t) => noteSize(t).size);
+    for (let i = 1; i < sizes.length; i++) expect(sizes[i]).toBeLessThan(sizes[i - 1]);
+  });
+
+  it("counts an emoji as one character, not two", async () => {
+    const { noteSize } = await import("@/components/diary/DiaryPage");
+    // "☕☕☕☕☕☕" is six characters to a reader and twelve UTF-16 units.
+    expect(noteSize("☕☕☕☕☕☕").size).toBe(noteSize("abcdef").size);
+  });
+
+  it("measures what is left of the day, clamped to 0..1", async () => {
+    const { lifeLeft } = await import("@/components/diary/DiaryPage");
+    const at = "2026-09-10T00:00:00Z";
+    const t0 = new Date(at).getTime();
+    expect(lifeLeft(at, t0)).toBe(1);
+    expect(lifeLeft(at, t0 + 12 * 3_600_000)).toBeCloseTo(0.5);
+    expect(lifeLeft(at, t0 + 30 * 3_600_000)).toBe(0);
+    expect(lifeLeft(at, t0 - 3_600_000)).toBe(1);
+  });
+});
+
 describe("unseen", () => {
   const a = { userId: "a", createdAt: "1", isSelf: false };
   const b = { userId: "b", createdAt: "1", isSelf: false };

@@ -1,17 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Music, PenLine, Plus, Star } from "lucide-react";
+import { PenLine } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
-import { NoteEditorSheet, type MyNote } from "@/components/notes/NoteEditorSheet";
+import { DiaryPage } from "@/components/diary/DiaryPage";
+import { DiaryEditor, type DiaryDraft } from "@/components/diary/DiaryEditor";
 import { DiaryViewer } from "@/components/diary/DiaryViewer";
-import {
-  loadSeen,
-  markSeen,
-  timeLeft,
-  unseen,
-  type DiaryEntry,
-} from "@/lib/diary";
+import { loadSeen, markSeen, unseen, type DiaryEntry } from "@/lib/diary";
 
 type Me = { name: string; hue: number; avatarUrl: string | null };
 
@@ -69,7 +64,7 @@ export function DiaryGrid({
     [entries, fresh]
   );
 
-  function onSaved(note: MyNote) {
+  function onSaved(note: DiaryDraft) {
     setEntries((prev) => {
       const rest = prev.filter((e) => !e.isSelf);
       if (!note) return rest;
@@ -89,73 +84,92 @@ export function DiaryGrid({
     });
   }
 
+  const newCount = fresh.size;
+
   return (
     <>
-      <div className="grid grid-cols-2 gap-3 px-4 pb-24 pt-2">
+      {/* One quiet line of context under the title: what this is, and how
+          many are new — the only place a count belongs. */}
+      <p className="px-4 pb-3 text-[13px] text-muted">
+        {others.length === 0
+          ? "Pages from your circle, gone after a day."
+          : newCount > 0
+            ? <><span className="font-semibold text-accent">{newCount} new</span> · gone after a day</>
+            : `${others.length} ${others.length === 1 ? "page" : "pages"} today · gone after a day`}
+      </p>
+
+      <div className="grid grid-cols-2 gap-2.5 px-4 pb-24">
         {/* ── Yours ── */}
         {mine ? (
-          <DiaryCard
-            entry={mine}
-            label="You"
-            onOpen={() => setEditorOpen(true)}
-            corner={
-              <span className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-elevated text-muted">
-                <PenLine size={13} />
-              </span>
-            }
-          />
-        ) : (
           <button
             type="button"
             onClick={() => setEditorOpen(true)}
-            className="flex aspect-[4/5] flex-col items-center justify-center gap-3 rounded-[28px] border border-dashed border-border bg-surface/60 p-3 transition-transform active:scale-[0.98]"
+            aria-label="Edit your Diary"
+            className="relative text-left transition-transform active:scale-[0.97]"
           >
-            <Avatar name={me.name} hue={me.hue} size={60} src={me.avatarUrl ?? undefined} />
-            <span className="text-sm font-bold">You</span>
-            <span className="flex items-center gap-1 rounded-pill bg-accent px-3 py-1.5 text-xs font-extrabold text-accent-ink">
-              <Plus size={13} strokeWidth={3} /> Leave your Diary
+            <DiaryPage entry={mine} label="You" />
+            <span className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white/80 backdrop-blur-sm">
+              <PenLine size={13} />
+            </span>
+          </button>
+        ) : (
+          // A blank page: the one card with nothing written on it yet, and
+          // the only lime in the grid that is not saying "new".
+          <button
+            type="button"
+            onClick={() => setEditorOpen(true)}
+            className="group relative flex aspect-[4/5] flex-col justify-between overflow-hidden rounded-[26px] border border-dashed border-white/15 bg-white/[0.025] p-3.5 text-left transition-colors active:scale-[0.97] hover:border-accent/50"
+          >
+            <span className="text-[22px] font-extrabold leading-[1.08] tracking-[-0.02em] text-white/30">
+              What&apos;s on your mind today?
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Avatar name={me.name} hue={me.hue} size={20} src={me.avatarUrl ?? undefined} />
+              <span className="text-xs font-semibold text-white/90">You</span>
+              <span className="ml-auto flex h-7 items-center gap-1 rounded-pill bg-accent px-2.5 text-[11px] font-extrabold text-accent-ink">
+                <PenLine size={11} strokeWidth={2.6} /> Write
+              </span>
             </span>
           </button>
         )}
 
         {/* ── Theirs ── */}
         {others.map((e) => (
-          <DiaryCard
+          <button
             key={e.userId}
-            entry={e}
-            label={e.name}
-            fresh={fresh.has(e.userId)}
-            onOpen={() => setViewing(e)}
-          />
+            type="button"
+            onClick={() => setViewing(e)}
+            aria-label={`${e.name}'s Diary`}
+            className="text-left transition-transform active:scale-[0.97]"
+          >
+            <DiaryPage entry={e} label={e.name} fresh={fresh.has(e.userId)} />
+          </button>
         ))}
 
-        {/* Nobody else has one. The sketch's empty squares, kept as a
-            promise of what goes here rather than a blank page. */}
+        {/* Nobody else has written one: faint blank pages, and one line
+            saying whose will appear there. */}
         {others.length === 0 && (
           <>
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
                 aria-hidden
-                className="aspect-[4/5] rounded-[28px] border border-dashed border-border/60"
+                className="aspect-[4/5] rounded-[26px] border border-dashed border-white/[0.07]"
               />
             ))}
-            <p className="col-span-2 px-6 pt-2 text-center text-sm leading-snug text-faint">
-              When people you follow back leave a Diary, it shows up here for 24
-              hours.
+            <p className="col-span-2 px-6 pt-3 text-center text-sm leading-snug text-faint">
+              When people you follow back write a Diary, their pages appear here.
             </p>
           </>
         )}
       </div>
 
-      <NoteEditorSheet
+      <DiaryEditor
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
         current={mine ? { text: mine.text, audience: mine.audience, track: mine.track } : null}
         onSaved={onSaved}
         me={me}
-        title={mine ? "Your Diary" : "Leave your Diary"}
-        subtitle="your circle sees it for 24 hours"
       />
 
       <DiaryViewer
@@ -164,65 +178,5 @@ export function DiaryGrid({
         onClose={() => setViewing(null)}
       />
     </>
-  );
-}
-
-function DiaryCard({
-  entry,
-  label,
-  fresh = false,
-  onOpen,
-  corner,
-}: {
-  entry: DiaryEntry;
-  label: string;
-  fresh?: boolean;
-  onOpen: () => void;
-  corner?: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={`relative flex aspect-[4/5] flex-col items-center gap-2 rounded-[28px] border bg-surface p-3 text-center transition-transform active:scale-[0.98] ${
-        fresh ? "border-accent" : "border-border"
-      }`}
-    >
-      {fresh && (
-        <span
-          aria-label="New"
-          className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-accent"
-        />
-      )}
-      {entry.audience === "close" && (
-        <span
-          aria-label="Close friends"
-          className="absolute left-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-accent/15 text-accent"
-        >
-          <Star size={11} fill="currentColor" />
-        </span>
-      )}
-      {corner}
-
-      <Avatar name={entry.name} hue={entry.hue} size={52} src={entry.avatarUrl ?? undefined} />
-      <div className="w-full min-w-0 leading-tight">
-        <p className="truncate text-sm font-bold">{label}</p>
-        {/* Clock-dependent: the server and the browser can straddle an hour. */}
-        <p className="text-[11px] text-faint" suppressHydrationWarning>
-          {timeLeft(entry.createdAt)}
-        </p>
-      </div>
-
-      <p className="line-clamp-4 w-full flex-1 break-words rounded-2xl rounded-tl-md bg-elevated px-2.5 py-2 text-[13px] font-semibold leading-snug">
-        {entry.text}
-      </p>
-
-      {entry.track && (
-        <p className="flex w-full min-w-0 items-center justify-center gap-1 text-[11px] text-muted">
-          <Music size={11} className="shrink-0" />
-          <span className="truncate">{entry.track.title}</span>
-        </p>
-      )}
-    </button>
   );
 }
