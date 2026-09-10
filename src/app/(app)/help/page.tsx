@@ -6,6 +6,7 @@ import {
   ImageIcon,
   Lock,
   Mail,
+  NotebookPen,
   Star,
   Users,
   Zap,
@@ -15,7 +16,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 /**
  * The glossary.
  *
- * Hypefy invents its own words — Hype, Hyper, Favourite, Shot, Show —
+ * Hypefy invents its own words — Hype, Hyper, Favourite, Shot, Show, Diary —
  * and defined none of them anywhere. FeatureHint is rendered in exactly one
  * place, explaining Shows, so every other term had to be guessed from context.
  * This is also the app's only real support contact; the one that existed was
@@ -54,6 +55,15 @@ const CONTENT: Entry[] = [
     what: "A moment that disappears after 24 hours — unless you keep it, in which case it stays on your profile.",
     href: "/shows",
     hrefLabel: "Your Shows",
+  },
+  {
+    // The same notebook glyph as the button in Messages, so the glossary
+    // draws it the way the app does.
+    icon: NotebookPen,
+    term: "Diary",
+    what: "A short note — a line, an emoji, a song — that people you follow back can read for 24 hours. Open it from Messages.",
+    href: "/messages/diary",
+    hrefLabel: "Open Diary",
   },
 ];
 

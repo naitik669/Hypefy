@@ -63,9 +63,13 @@ describe("notifHref — every combination that exists in production", () => {
     expect(notifHref(n({ type: "missed_call", target_id: null }))).toBe("/calls");
   });
 
-  it("a reaction to your status opens YOUR profile", () => {
-    // It used to open the reactor's profile, where your status is not.
-    expect(notifHref(n({ type: "note_reaction", target_type: "profile" }))).toBe("/profile");
+  it("a reaction to your Diary opens the Diary page", () => {
+    // Not the reactor's profile, where your Diary is not — and no longer your
+    // own profile either, where it used to show as a status bubble that is now
+    // switched off.
+    expect(notifHref(n({ type: "note_reaction", target_type: "profile" }))).toBe(
+      "/messages/diary"
+    );
   });
 
   it("still refuses to invent a link for a follow with no username", () => {

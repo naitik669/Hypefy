@@ -112,8 +112,10 @@ export function notifHref(n: Notif): string {
   // itself, so it opens the page where you can act on it.
   if (n.type === "security_alert") return "/settings/security";
 
-  // Your own status is on your own profile, not on theirs.
-  if (n.type === "note_reaction") return "/profile";
+  // A reaction to your Diary opens the Diary page, where yours is. It used to
+  // open your profile, back when the same note was a status bubble there —
+  // which is switched off, so that link now lands on nothing.
+  if (n.type === "note_reaction") return "/messages/diary";
 
   if (
     n.type === "follow" || n.type === "referral_joined" ||

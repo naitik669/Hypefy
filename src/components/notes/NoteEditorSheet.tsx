@@ -41,12 +41,17 @@ export function NoteEditorSheet({
   current,
   onSaved,
   me,
+  title = "Leave a note",
+  subtitle = "your circle sees it for 24 hours",
 }: {
   open: boolean;
   onClose: () => void;
   current: MyNote;
   onSaved: (note: MyNote) => void;
   me?: { name: string; hue: number; avatarUrl: string | null };
+  /** The same row is a "note" on a profile and a "Diary" in Messages. */
+  title?: string;
+  subtitle?: string;
 }) {
   const supabase = createClient();
   const [draft, setDraft] = useState<StatusValue>(() => splitStatus(current?.text ?? null));
@@ -107,7 +112,7 @@ export function NoteEditorSheet({
   }
 
   return (
-    <CenterModal open={open} onClose={onClose} title="Leave a note" subtitle="your circle sees it for 24 hours">
+    <CenterModal open={open} onClose={onClose} title={title} subtitle={subtitle}>
       <div className="flex flex-col gap-4">
         {/* ── The stage: your note exactly as your circle sees it ── */}
         <div className="relative flex flex-col items-center overflow-hidden rounded-3xl bg-surface/60 px-4 pb-6 pt-8">

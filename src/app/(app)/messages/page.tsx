@@ -9,11 +9,19 @@ export default async function MessagesPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
 
-  const { data: me } = await supabase
-    .from("profiles")
-    .select("display_name, username, avatar_hue, avatar_url")
-    .eq("id", user.id)
-    .maybeSingle();
+  const [{ data: me }, { data: notes }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("display_name, username, avatar_hue, avatar_url")
+      .eq("id", user.id)
+      .maybeSingle(),
+    // Only what the Diary badge needs to count unseen ones — the full rows
+    // load on the Diary page itself.
+    supabase.rpc("get_notes"),
+  ]);
+  const diaries = ((notes ?? []) as { user_id: string; created_at: string; is_self: boolean }[]).map(
+    (n) => ({ userId: n.user_id, createdAt: n.created_at, isSelf: n.is_self })
+  );
 
   // Conversations I'm a member of (RLS filters to mine), newest first
   const { data: convs } = await supabase
@@ -187,7 +195,7 @@ export default async function MessagesPage() {
         hue={(me as any)?.avatar_hue ?? 280}
       />
       <PullToRefresh>
-        <MessagesInbox rows={rows} currentUserId={user.id} />
+        <MessagesInbox rows={rows} currentUserId={user.id} diaries={diaries} />
       </PullToRefresh>
     </>
   );

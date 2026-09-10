@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { STATUS_ENABLED } from "@/lib/status-feature";
+import { DiaryButton } from "@/components/diary/DiaryButton";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -170,10 +171,13 @@ export function MessagesInbox({
   rows,
   currentUserId,
   children,
+  diaries = [],
 }: {
   rows: InboxRow[];
   currentUserId: string;
   children?: React.ReactNode;
+  /** Live Diaries you can see, for the entry button's unseen count. */
+  diaries?: { userId: string; createdAt: string; isSelf: boolean }[];
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -519,13 +523,21 @@ export function MessagesInbox({
 
   if (rows.length === 0) {
     return (
-      <EmptyState
-        icon={MessageCircle}
-        title="It's quiet in here"
-        text="Slide into a DM or rally a group chat."
-        ctaLabel="New message"
-        ctaHref="/messages/new"
-      />
+      <>
+        {/* No conversations means no filter row, and the filter row is where
+            Diary lives — so without this, a new account whose mutuals have
+            written one would have no way to read it. */}
+        <div className="flex justify-end px-4 pt-3">
+          <DiaryButton diaries={diaries} />
+        </div>
+        <EmptyState
+          icon={MessageCircle}
+          title="It's quiet in here"
+          text="Slide into a DM or rally a group chat."
+          ctaLabel="New message"
+          ctaHref="/messages/new"
+        />
+      </>
     );
   }
 
@@ -743,6 +755,9 @@ export function MessagesInbox({
             )}
           </button>
         ))}
+        <div className="ml-auto pl-2">
+          <DiaryButton diaries={diaries} />
+        </div>
       </div>
 
       {/* List */}
