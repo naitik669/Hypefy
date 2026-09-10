@@ -2,33 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Zap, MessageCircle, Play, Compass, Hash, Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { Zap, MessageCircle, Play, Compass, Hash } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { UserSuggestionCard } from "@/components/discover/UserSuggestionCard";
-import { GridPeek } from "@/components/feed/GridPeek";
+import { PinFeed, type Pin } from "@/components/discover/PinFeed";
 import { formatCount } from "@/lib/format";
 
-type Post = {
-  id: string;
-  // Both of these were already in the page's select and simply absent from
-  // this type; the peek needs an author to show and a target to hype.
-  user_id: string;
-  caption: string | null;
-  body: string | null;
-  image_url: string | null;
-  image_urls: string[] | null;
-  /** width / height; drives the masonry tile shape. */
-  aspect_ratio: number | null;
-  hype_count: number;
-  comment_count: number;
-  profiles: {
-    display_name: string | null;
-    username: string | null;
-    avatar_hue: number | null;
-    avatar_url: string | null;
-  } | null;
-};
 type Shot = {
   id: string;
   media_url: string;
@@ -52,80 +31,53 @@ type Person = {
 };
 type Tag = { tag: string; count: number };
 
-const CATEGORIES = [
-  "For You",
-  "Blowing Up",
-  "Posts",
-  "Shots",
-  "People",
-  "Tags",
-] as const;
-type Cat = (typeof CATEGORIES)[number];
+const FIXED = ["For You", "Blowing Up", "Shots", "People", "Tags"] as const;
 
-function postImage(p: Post): string | null {
-  return p.image_urls?.[0] ?? p.image_url ?? null;
-}
-
+/**
+ * Discover, laid out like Pinterest.
+ *
+ * It used to be a stack of sections — trending tags, a Shots rail, a
+ * "Blowing up" grid, an interests rail, creators, six topic rails and a
+ * "Fresh" grid that ended in a Show more button. Each was reasonable on its
+ * own; together they made Discover a page you read down rather than one you
+ * browse, and every rail was a sideways scroll inside a vertical one.
+ *
+ * Now For You is one thing: the Shots rail on top, as before, and under it a
+ * single ranked masonry of posts that carries on by itself as you scroll.
+ * The topics that were rails are chips, the way Pinterest's are — tapping one
+ * turns the grid into that topic. People and tags keep their own chips, so
+ * nothing that was here is gone; it just is not all in one scroll.
+ */
 export function DiscoverView({
   currentUserId,
+  rankedPosts,
+  feedCursor,
+  blockedIds,
   trendingPosts,
-  freshPosts,
   trendingShots,
   people,
   newPeople = [],
-  interestPosts = [],
   categoryRails = [],
   tags,
 }: {
   currentUserId: string;
-  trendingPosts: Post[];
-  freshPosts: Post[];
+  /** Every post in the server's pool, best first. The For You feed. */
+  rankedPosts: Pin[];
+  /** The oldest post in that pool; the endless feed reads on from here. */
+  feedCursor: string | null;
+  blockedIds: string[];
+  trendingPosts: Pin[];
   trendingShots: Shot[];
   people: Person[];
   newPeople?: Person[];
-  interestPosts?: Post[];
-  categoryRails?: { label: string; posts: Post[] }[];
+  categoryRails?: { label: string; posts: Pin[] }[];
   tags: Tag[];
 }) {
-  const supabase = createClient();
-  const [cat, setCat] = useState<Cat>("For You");
-  const [extraFresh, setExtraFresh] = useState<Post[]>([]);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [noMore, setNoMore] = useState(false);
-  const fresh = [...freshPosts, ...extraFresh];
-  const allPosts = [...trendingPosts, ...fresh];
-
-  async function loadMoreFresh() {
-    if (loadingMore || noMore) return;
-    setLoadingMore(true);
-    const last = fresh[fresh.length - 1] as any;
-    const cursor = last?.created_at ?? new Date().toISOString();
-    const { data } = await supabase
-      .from("posts")
-      .select(
-        "id, caption, body, image_url, image_urls, hype_count, comment_count, created_at, profiles!posts_user_id_fkey(display_name, username, avatar_hue)"
-      )
-      .lt("created_at", cursor)
-      .order("created_at", { ascending: false })
-      .limit(12);
-    const mapped = (data ?? [])
-      .map((p: any) => ({
-        ...p,
-        profiles: Array.isArray(p.profiles)
-          ? p.profiles[0] ?? null
-          : p.profiles,
-      }))
-      .filter((p: any) => !allPosts.some((x) => x.id === p.id));
-    if ((data?.length ?? 0) < 12) setNoMore(true);
-    setExtraFresh((prev) => [...prev, ...mapped]);
-    setLoadingMore(false);
-  }
+  const chips = [...FIXED, ...categoryRails.map((c) => c.label)];
+  const [cat, setCat] = useState<string>("For You");
 
   const everythingEmpty =
-    trendingPosts.length === 0 &&
-    freshPosts.length === 0 &&
-    trendingShots.length === 0 &&
-    people.length === 0;
+    rankedPosts.length === 0 && trendingShots.length === 0 && people.length === 0;
 
   if (everythingEmpty) {
     return (
@@ -142,9 +94,11 @@ export function DiscoverView({
     );
   }
 
+  const topic = categoryRails.find((c) => c.label === cat);
+
   return (
     <>
-      {/* Category chips — soft fade at the right edge hints there's more */}
+      {/* Chips — soft fade at the right edge hints there's more */}
       <div className="sticky top-14 z-10 bg-background/90 backdrop-blur-xl">
         <div
           className="no-scrollbar flex gap-2 overflow-x-auto px-4 py-2.5"
@@ -152,15 +106,13 @@ export function DiscoverView({
             maskImage: "linear-gradient(to right, black 92%, transparent)",
           }}
         >
-          {CATEGORIES.map((c) => (
+          {chips.map((c) => (
             <button
               key={c}
               type="button"
               onClick={() => setCat(c)}
               className={`shrink-0 rounded-pill px-3.5 py-1.5 text-sm font-semibold transition-colors ${
-                cat === c
-                  ? "bg-accent text-accent-ink"
-                  : "bg-surface text-muted"
+                cat === c ? "bg-accent text-accent-ink" : "bg-surface text-muted"
               }`}
             >
               {c}
@@ -172,7 +124,6 @@ export function DiscoverView({
       <div key={cat} className="animate-fade-swap pb-6">
         {cat === "For You" && (
           <>
-            {tags.length > 0 && <TagRail tags={tags} />}
             {trendingShots.length > 0 && (
               <Section eyebrow="Watch" title="Trending Shots">
                 <div className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4">
@@ -184,108 +135,25 @@ export function DiscoverView({
                 </div>
               </Section>
             )}
-            {trendingPosts.length > 0 && (
-              <Section eyebrow="Right now" title="Blowing up 🔥">
-                <Grid>
-                  {trendingPosts.map((p) => (
-                    <PostTile
-                      key={p.id}
-                      post={p}
-                      currentUserId={currentUserId}
-                    />
-                  ))}
-                </Grid>
-              </Section>
-            )}
-            {interestPosts.length > 0 && (
-              <Section eyebrow="For you" title="Based on your interests">
-                <div className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto px-4">
-                  {interestPosts.map((p) => (
-                    <div key={p.id} className="w-32 shrink-0 snap-start">
-                      <PostTile post={p} currentUserId={currentUserId} />
-                    </div>
-                  ))}
-                </div>
-              </Section>
-            )}
-            {people.length > 0 && (
-              <Section eyebrow="Follow" title="Creators">
-                <div className="flex flex-col">
-                  {people.slice(0, 5).map((person) => (
-                    <CreatorRow key={person.id} person={person} />
-                  ))}
-                </div>
-              </Section>
-            )}
-            {newPeople.length > 0 && (
-              <Section eyebrow="Say hi first" title="New this week">
-                <div className="flex flex-col">
-                  {newPeople.slice(0, 5).map((person) => (
-                    <CreatorRow key={person.id} person={person} />
-                  ))}
-                </div>
-              </Section>
-            )}
-            {categoryRails.map(({ label, posts: catPosts }) => (
-              <Section key={label} eyebrow="Explore" title={label}>
-                <div className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto px-4">
-                  {catPosts.map((p) => (
-                    <div key={p.id} className="w-32 shrink-0 snap-start">
-                      <PostTile post={p} currentUserId={currentUserId} />
-                    </div>
-                  ))}
-                </div>
-              </Section>
-            ))}
-            {fresh.length > 0 && (
-              <Section eyebrow="Just posted" title="Fresh">
-                <Grid>
-                  {fresh.map((p) => (
-                    <PostTile
-                      key={p.id}
-                      post={p}
-                      currentUserId={currentUserId}
-                    />
-                  ))}
-                </Grid>
-                {!noMore && (
-                  <div className="px-4 pt-3">
-                    <button
-                      type="button"
-                      onClick={loadMoreFresh}
-                      disabled={loadingMore}
-                      className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface text-sm font-semibold text-muted transition-colors hover:text-foreground disabled:opacity-60"
-                    >
-                      {loadingMore ? (
-                        <Loader2 size={15} className="animate-spin" />
-                      ) : (
-                        "Show more"
-                      )}
-                    </button>
-                  </div>
-                )}
-              </Section>
-            )}
+            <div className="pt-5">
+              <PinFeed
+                posts={rankedPosts}
+                currentUserId={currentUserId}
+                endless={{ cursor: feedCursor, blockedIds }}
+              />
+            </div>
           </>
         )}
 
         {cat === "Blowing Up" && (
           <Section title="Blowing up 🔥">
-            <Grid>
-              {trendingPosts.map((p) => (
-                <PostTile key={p.id} post={p} currentUserId={currentUserId} />
-              ))}
-            </Grid>
+            <PinFeed posts={trendingPosts} currentUserId={currentUserId} />
           </Section>
         )}
 
-        {cat === "Posts" && (
-          <Section title="All posts">
-            <Grid>
-              {allPosts.map((p) => (
-                <PostTile key={p.id} post={p} currentUserId={currentUserId} />
-              ))}
-            </Grid>
+        {topic && (
+          <Section title={topic.label}>
+            <PinFeed posts={topic.posts} currentUserId={currentUserId} />
           </Section>
         )}
 
@@ -299,20 +167,31 @@ export function DiscoverView({
               </div>
             </Section>
           ) : (
-            <EmptyState
-              icon={Play}
-              title="No Shots fired yet"
-              text="Be the first one on the reel."
-            />
+            <EmptyState icon={Play} title="No Shots fired yet" text="Be the first one on the reel." />
           ))}
 
         {cat === "People" &&
-          (people.length > 0 ? (
-            <div className="flex flex-col pt-2">
-              {people.map((person) => (
-                <CreatorRow key={person.id} person={person} />
-              ))}
-            </div>
+          (people.length > 0 || newPeople.length > 0 ? (
+            <>
+              {people.length > 0 && (
+                <Section eyebrow="Follow" title="Creators">
+                  <div className="flex flex-col">
+                    {people.map((person) => (
+                      <CreatorRow key={person.id} person={person} />
+                    ))}
+                  </div>
+                </Section>
+              )}
+              {newPeople.length > 0 && (
+                <Section eyebrow="Say hi first" title="New this week">
+                  <div className="flex flex-col">
+                    {newPeople.map((person) => (
+                      <CreatorRow key={person.id} person={person} />
+                    ))}
+                  </div>
+                </Section>
+              )}
+            </>
           ) : (
             <EmptyState
               icon={Compass}
@@ -343,11 +222,7 @@ export function DiscoverView({
               ))}
             </div>
           ) : (
-            <EmptyState
-              icon={Hash}
-              title="No tags trending"
-              text="Throw #tags on your posts and start a wave."
-            />
+            <EmptyState icon={Hash} title="No tags trending" text="Throw #tags on your posts and start a wave." />
           ))}
       </div>
     </>
@@ -382,145 +257,11 @@ function Section({
   );
 }
 
-/**
- * Pinterest-style masonry.
- *
- * CSS multi-column rather than a grid: tiles keep their own height and the
- * columns simply flow, which is what makes a browse feed feel browsable. A
- * uniform grid of squares reads as a catalogue — fine on a profile, where
- * the question is "who is this", and wrong here, where the question is
- * "what is there".
- *
- * The trade-off is reading order: columns fill top-to-bottom, so items run
- * down each column rather than across rows. That is how Pinterest behaves
- * and is the right call for ranked discovery, where nothing depends on
- * strict sequence.
- */
-function Grid({ children }: { children: React.ReactNode }) {
-  return (
-    // gap-3 / mb-3 rather than 2: at two columns the tiles were very nearly
-    // touching, which reads as one continuous surface rather than as separate
-    // posts.
-    <div className="columns-2 gap-3 px-3 sm:columns-3 [&>*]:mb-3">
-      {children}
-    </div>
-  );
-}
-
-function TagRail({ tags }: { tags: Tag[] }) {
-  return (
-    <Section eyebrow="Rising" title="Trending tags">
-      <div className="no-scrollbar flex gap-2 overflow-x-auto px-4">
-        {tags.map(({ tag, count }) => (
-          <Link
-            key={tag}
-            href={`/search?q=%23${encodeURIComponent(tag)}`}
-            className="flex shrink-0 flex-col rounded-2xl border border-border bg-surface px-4 py-2.5"
-          >
-            <span className="text-sm font-bold text-hashtag">#{tag}</span>
-            <span className="text-xs text-muted">
-              {count} {count === 1 ? "post" : "posts"}
-            </span>
-          </Link>
-        ))}
-      </div>
-    </Section>
-  );
-}
-
 function Stat({ icon, value }: { icon: React.ReactNode; value: number }) {
   return (
     <span className="flex items-center gap-1 text-xs font-semibold text-white drop-shadow">
       {icon} {formatCount(value)}
     </span>
-  );
-}
-
-/** 9:16 to 16:9. Beyond that a single post starts dictating the layout. */
-function tileRatio(ratio: number | null | undefined): number {
-  if (typeof ratio !== "number" || !(ratio > 0)) return 1;
-  return Math.min(16 / 9, Math.max(9 / 16, ratio));
-}
-
-function PostTile({
-  post,
-  currentUserId,
-}: {
-  post: Post;
-  currentUserId?: string;
-}) {
-  const img = postImage(post);
-  const hue = post.profiles?.avatar_hue ?? 280;
-  return (
-    // Hold to lift the whole post out of the grid. A grid trades context for
-    // density — twelve posts on screen and no idea who made any of them — and
-    // this buys the context back without spending a navigation on it.
-    <GridPeek
-      currentUserId={currentUserId}
-      // break-inside lives on the wrapper now, because the wrapper is what
-      // the column layout actually places.
-      className="break-inside-avoid"
-      post={{
-        id: post.id,
-        user_id: post.user_id,
-        caption: post.caption ?? post.body ?? null,
-        image: img,
-        hype_count: post.hype_count,
-        comment_count: post.comment_count,
-        author: post.profiles
-          ? {
-              id: post.user_id,
-              name:
-                post.profiles.display_name ??
-                post.profiles.username ??
-                "Someone",
-              username: post.profiles.username ?? null,
-              avatarUrl: post.profiles.avatar_url ?? null,
-              hue,
-              verified: false,
-            }
-          : null,
-      }}
-    >
-      <Link
-        href={`/p/${post.id}`}
-        // The post's own shape, not a forced square. aspect_ratio is
-        // width/height and is set on every post since 0035; anything older
-        // falls back to a square. Clamped to 9:16..16:9 so one extreme
-        // panorama cannot own the screen.
-        style={{ aspectRatio: String(tileRatio(post.aspect_ratio)) }}
-        className="group relative block overflow-hidden rounded-2xl bg-surface"
-      >
-        {img ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={img}
-            alt={post.caption ?? "Post"}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div
-            className="flex h-full w-full items-end p-3"
-            style={{
-              background: `linear-gradient(140deg, hsl(${hue} 55% 22%), #141414)`,
-            }}
-          >
-            <p className="line-clamp-4 text-xs font-medium text-white/90">
-              {post.caption ?? post.body ?? ""}
-            </p>
-          </div>
-        )}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent p-2.5 pt-6">
-          <Stat
-            icon={<Zap size={12} className="fill-accent text-accent" />}
-            value={post.hype_count}
-          />
-          <Stat icon={<MessageCircle size={12} />} value={post.comment_count} />
-        </div>
-      </Link>
-    </GridPeek>
   );
 }
 
@@ -554,10 +295,7 @@ function ShotTile({ shot }: { shot: Shot }) {
         <Play size={9} className="fill-white" /> Shot
       </span>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent p-2.5 pt-6">
-        <Stat
-          icon={<Zap size={12} className="fill-accent text-accent" />}
-          value={shot.hype_count}
-        />
+        <Stat icon={<Zap size={12} className="fill-accent text-accent" />} value={shot.hype_count} />
         <Stat icon={<MessageCircle size={12} />} value={shot.comment_count} />
       </div>
     </Link>

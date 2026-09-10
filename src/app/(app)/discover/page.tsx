@@ -138,11 +138,19 @@ export default async function DiscoverPage() {
       _score: score(s, now, interests, authorAff, tagAff, followedTags),
     }));
 
-  const trendingPosts = [...posts]
-    .sort((a, b) => b._score - a._score)
-    .slice(0, 12);
-  const trendingIds = new Set(trendingPosts.map((p) => p.id));
-  const freshPosts = posts.filter((p) => !trendingIds.has(p.id)).slice(0, 12);
+  // The whole pool, best first — this is the For You feed. It used to be cut
+  // into a top-12 "Blowing up" and a next-12 "Fresh", which left the other
+  // 126 posts the server had already fetched unused behind a Show more
+  // button. Now all of it is the feed, revealed as you scroll, and the feed
+  // reads on into older posts from where the pool ends.
+  const rankedPosts = [...posts].sort((a, b) => b._score - a._score);
+  const trendingPosts = rankedPosts.slice(0, 12);
+  // Oldest in the pool BEFORE the blocked filter, so the endless feed resumes
+  // exactly where this query stopped rather than re-reading its tail.
+  const pool = postsRes.data ?? [];
+  const feedCursor = pool.length
+    ? (pool[pool.length - 1] as { created_at: string }).created_at
+    : null;
   const trendingShots = [...shots]
     .sort((a, b) => b._score - a._score)
     .slice(0, 12);
@@ -166,15 +174,6 @@ export default async function DiscoverPage() {
     ((p.hashtags ?? []) as string[]).map((t) =>
       t.replace(/^#/, "").toLowerCase()
     );
-
-  // "Based on your interests": posts matching the user's own tags
-  const interestPosts =
-    interests.size > 0
-      ? posts
-          .filter((p: any) => tagsOf(p).some((t) => interests.has(t)))
-          .sort((a: any, b: any) => b._score - a._score)
-          .slice(0, 6)
-      : [];
 
   // Interest-category rails — synonym buckets over the same pool
   const CATEGORY_DEFS: { label: string; tags: string[] }[] = [
@@ -241,7 +240,7 @@ export default async function DiscoverPage() {
     const items = posts
       .filter((p: any) => tagsOf(p).some((t) => set.has(t)))
       .sort((a: any, b: any) => b._score - a._score)
-      .slice(0, 8);
+      .slice(0, 40);
     return { label, posts: items };
   }).filter((c) => c.posts.length >= 2);
 
@@ -257,12 +256,13 @@ export default async function DiscoverPage() {
         </div>
         <DiscoverView
           currentUserId={user.id}
+          rankedPosts={rankedPosts}
+          feedCursor={feedCursor}
+          blockedIds={[...blockedIds]}
           trendingPosts={trendingPosts}
-          freshPosts={freshPosts}
           trendingShots={trendingShots}
           people={(people ?? []) as any[]}
           newPeople={newPeople}
-          interestPosts={interestPosts}
           categoryRails={categoryRails}
           tags={tags}
         />
