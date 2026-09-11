@@ -69,6 +69,36 @@ describe("SquircleSwatch", () => {
   });
 });
 
+describe("page colours", () => {
+  it("come in groups of at most eight — one line each — with keys the database takes", async () => {
+    const { COLOR_GROUPS, DIARY_COLORS } = await import("@/components/diary/DiaryPage");
+    expect(COLOR_GROUPS.length).toBeGreaterThan(1);
+    for (const g of COLOR_GROUPS) expect(g.colors.length, g.key).toBeLessThanOrEqual(8);
+    const keys = DIARY_COLORS.map((c) => c.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const k of keys) expect(k).toMatch(/^[a-z]{2,16}$/); // set_note's check
+    expect(COLOR_GROUPS.flatMap((g) => g.colors).length).toBe(DIARY_COLORS.length);
+  });
+
+  it("draws a Glow colour as a blend of its two inks, and anything unknown as Ink", async () => {
+    const { diaryTheme, colorKey, pageTint } = await import("@/components/diary/DiaryPage");
+    const sunset = diaryTheme("sunset", 200);
+    expect(sunset.background).toContain("hsl(14 ");
+    expect(sunset.background).toContain("hsl(334 ");
+    expect(sunset.burn).toContain("linear-gradient");
+    expect(colorKey("neon")).toBe("ink");
+    expect(diaryTheme("neon", 200)).toEqual(pageTint(200));
+  });
+
+  it("opens the colour line on the group holding the chosen colour", async () => {
+    const { ColorPager } = await import("@/components/ui/ColorPager");
+    const { pageColorGroups } = await import("@/components/diary/DiaryPage");
+    const html = renderToStaticMarkup(createElement(ColorPager, { groups: pageColorGroups(200), value: "sage", onChange: () => {} }));
+    expect(html).toMatch(/aria-label="Dusk colours" aria-current="true"/);
+    expect(html).toContain('aria-label="Sage"');
+  });
+});
+
 describe("SpotlightIcon", () => {
   it("gives each copy its own mask, so two on a screen do not share one", () => {
     const html = renderToStaticMarkup(createElement("div", null, createElement(SpotlightIcon), createElement(SpotlightIcon)));

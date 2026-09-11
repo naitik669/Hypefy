@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { FolderArt } from "@/components/saved/FolderArt";
-import { SquircleSwatch } from "@/components/ui/SquircleSwatch";
-import { cleanFolderName, FOLDER_COLORS, FOLDER_EMOJI, folderFill, type Folder } from "@/lib/folders";
+import { ColorPager } from "@/components/ui/ColorPager";
+import { cleanFolderName, FOLDER_EMOJI, folderColorGroups, type Folder } from "@/lib/folders";
 
 export type FolderDraft = { name: string; emoji: string | null; color: string };
 
@@ -113,18 +113,7 @@ function EditorForm({
 
       <fieldset>
         <legend className="sr-only">Colour</legend>
-        <div role="radiogroup" aria-label="Colour" className="flex items-center justify-between py-1">
-          {FOLDER_COLORS.map((c) => (
-            <SquircleSwatch
-              key={c.key}
-              label={c.label}
-              selected={draft.color === c.key}
-              background={folderFill(c.key).background}
-              onClick={() => setDraft({ ...draft, color: c.key })}
-              size={36}
-            />
-          ))}
-        </div>
+        <ColorPager groups={folderColorGroups()} value={draft.color} onChange={(k) => setDraft({ ...draft, color: k })} size={36} />
       </fieldset>
 
       <fieldset>

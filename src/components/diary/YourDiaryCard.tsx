@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { Palette, PenLine, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
-import { SquircleSwatch } from "@/components/ui/SquircleSwatch";
+import { ColorPager } from "@/components/ui/ColorPager";
 import { DiscSleeve, SongLine } from "@/components/diary/DiaryDisc";
-import { DIARY_COLORS, colorKey, diaryTheme, fillSize, lifeLeft, swatchOf, timeAgo, type DiaryColor } from "@/components/diary/DiaryPage";
+import { colorKey, diaryTheme, fillSize, lifeLeft, pageColorGroups, timeAgo, type DiaryColor } from "@/components/diary/DiaryPage";
 import { ReactionsTab, byPerson } from "@/components/diary/PageReactions";
 import type { DiaryEntry, DiaryReaction } from "@/lib/diary";
 
@@ -71,18 +71,14 @@ export function YourDiaryCard({
         </header>
 
         {picking && onColor && (
-          <div role="radiogroup" aria-label="Page colour" className="mt-3 grid grid-cols-8 justify-items-center gap-1.5 px-[3px] py-1">
-            {DIARY_COLORS.map((c) => (
-              <SquircleSwatch
-                key={c.key}
-                label={c.label}
-                selected={current === c.key}
-                background={swatchOf(c.key, entry.hue)}
-                onClick={() => onColor(c.key)}
-                size={30}
-                fill
-              />
-            ))}
+          <div className="mt-3">
+            <ColorPager
+              label="Page colour"
+              groups={pageColorGroups(entry.hue)}
+              value={current}
+              onChange={(k) => onColor(k as DiaryColor)}
+              size={30}
+            />
           </div>
         )}
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Dices, Loader2, MoreHorizontal, Palette, Star } from "lucide-react";
 import { EmojiPicker } from "@/components/ui/EmojiPicker";
-import { SquircleSwatch } from "@/components/ui/SquircleSwatch";
+import { ColorPager } from "@/components/ui/ColorPager";
 import { quickRow, recentEmoji, rememberEmoji } from "@/lib/emoji";
 import { createClient } from "@/lib/supabase/client";
 import { CenterModal } from "@/components/ui/CenterModal";
@@ -12,7 +12,7 @@ import { TrackPicker } from "@/components/music/TrackPicker";
 import { DICE_POOL, EMOJI_STRIP, joinStatus } from "@/components/ui/StatusComposer";
 import { haptics } from "@/lib/haptics";
 import { type Track } from "@/lib/music";
-import { DIARY_COLORS, colorKey, diaryTheme, noteSize, swatchOf, type DiaryColor } from "@/components/diary/DiaryPage";
+import { colorKey, diaryTheme, noteSize, pageColorGroups, type DiaryColor } from "@/components/diary/DiaryPage";
 import { DiscSleeve, SongLine } from "@/components/diary/DiaryDisc";
 import { AudiencePicker, type Audience } from "@/components/diary/AudiencePicker";
 
@@ -291,27 +291,16 @@ export function DiaryComposer({
             </div>
 
             {/* ── The page's colour ── */}
-            {/* Eight equal cells, each swatch as wide as its cell up to 34px, so
-                the row fits the edit pop-up on the narrowest phone with a gap
-                between every colour. No negative margin: 4px past the edge
-                was enough to let the whole pop-up scroll sideways. The padding
-                is room for the chosen swatch to grow into. */}
-            <div role="radiogroup" aria-label="Page colour" className="grid grid-cols-8 justify-items-center gap-2 px-[3px] py-1">
-              {DIARY_COLORS.map((c) => (
-                <SquircleSwatch
-                  key={c.key}
-                  label={c.label}
-                  selected={color === c.key}
-                  background={swatchOf(c.key, me.hue)}
-                  onClick={() => {
-                    haptics.select();
-                    setColor(c.key);
-                  }}
-                  size={34}
-                  fill
-                />
-              ))}
-            </div>
+            {/* A line of colours per group; swipe for the next group. */}
+            <ColorPager
+              label="Page colour"
+              groups={pageColorGroups(me.hue)}
+              value={color}
+              onChange={(k) => {
+                haptics.select();
+                setColor(k as DiaryColor);
+              }}
+            />
 
             {/* ── Starters, for when nothing comes to mind ── */}
             {!text && (

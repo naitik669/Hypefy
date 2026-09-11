@@ -1,4 +1,4 @@
-import { DIARY_COLORS } from "@/components/diary/DiaryPage";
+import { COLOR_GROUPS, DIARY_COLORS } from "@/components/diary/DiaryPage";
 import type { createClient } from "@/lib/supabase/client";
 
 /**
@@ -26,9 +26,19 @@ export type Folder = {
 /** The colours a folder can be — the page palette, less Ink. */
 export const FOLDER_COLORS = DIARY_COLORS.filter((c) => c.key !== "ink");
 
-/** A colour for a new folder: the next one round the wheel. */
+/** The same groups as a page's colour line, less Ink, drawn as folder tiles. */
+export function folderColorGroups() {
+  return COLOR_GROUPS.map((g) => ({
+    key: g.key,
+    label: g.label,
+    colors: g.colors.filter((c) => c.key !== "ink").map((c) => ({ key: c.key, label: c.label, background: folderFill(c.key).background })),
+  }));
+}
+
+/** A colour for a new folder: the next Jewel one round the wheel. */
 export function nextFolderColor(count: number): string {
-  return FOLDER_COLORS[count % FOLDER_COLORS.length].key;
+  const jewel = FOLDER_COLORS.filter((c) => c.group === "jewel");
+  return jewel[count % jewel.length].key;
 }
 
 /** A folder's tile colour. Unknown or unset colours pick one from its id, so
@@ -43,10 +53,13 @@ export function folderFill(color: string | null | undefined, seed = "") {
       ink: "#a3e635",
     };
   const known = FOLDER_COLORS.find((c) => c.key === color);
-  const c = known ?? FOLDER_COLORS[[...seed].reduce((n, ch) => n + ch.charCodeAt(0), 0) % FOLDER_COLORS.length];
+  // An unset colour picks a Jewel one from the id, as folders always did.
+  const jewel = FOLDER_COLORS.filter((x) => x.group === "jewel");
+  const c = known ?? jewel[[...seed].reduce((n, ch) => n + ch.charCodeAt(0), 0) % jewel.length];
+  const h2 = c.hue2 ?? c.hue;
   return {
     key: c.key,
-    background: `radial-gradient(120% 90% at 0% 0%, hsl(${c.hue} ${c.sat + 12}% 60% / 0.5), transparent 62%), linear-gradient(160deg, hsl(${c.hue} ${c.sat}% 34%), hsl(${c.hue} ${c.sat - 6}% 17%))`,
+    background: `radial-gradient(120% 90% at 0% 0%, hsl(${c.hue} ${c.sat + 12}% 60% / 0.5), transparent 62%), linear-gradient(160deg, hsl(${c.hue} ${c.sat}% 34%), hsl(${h2} ${c.sat - 6}% ${c.hue2 === undefined ? 17 : 22}%))`,
     ink: `hsl(${c.hue} 90% 80%)`,
   };
 }
