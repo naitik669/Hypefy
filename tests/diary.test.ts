@@ -241,3 +241,19 @@ describe("Diary colours", () => {
     expect(toDiaryEntries([row])[0].color).toBeNull();
   });
 });
+
+describe("fillSize", () => {
+  it("sets a few letters large enough to fill the card, and a sentence small enough to fit", async () => {
+    const { fillSize } = await import("@/components/diary/DiaryPage");
+    expect(fillSize("HDB")).toBeGreaterThanOrEqual(100);
+    expect(fillSize("HDB")).toBeGreaterThan(fillSize("can't sleep, talk?") * 2);
+    expect(fillSize("exams done. finally free. don't text me about syllabus ever")).toBeLessThanOrEqual(26);
+  });
+
+  it("never sets one word too wide for the card", async () => {
+    const { fillSize } = await import("@/components/diary/DiaryPage");
+    for (const word of ["HELLOO", "finally", "supercalifragilistic"]) {
+      expect(fillSize(word) * 0.68 * Array.from(word).length).toBeLessThanOrEqual(250);
+    }
+  });
+});

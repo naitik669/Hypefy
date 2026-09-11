@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, Palette, PenLine, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { DiscSleeve, SongLine } from "@/components/diary/DiaryDisc";
-import { DIARY_COLORS, colorKey, diaryTheme, lifeLeft, noteSize, shortLeft, swatchOf, type DiaryColor } from "@/components/diary/DiaryPage";
+import { DIARY_COLORS, colorKey, diaryTheme, fillSize, lifeLeft, shortLeft, swatchOf, type DiaryColor } from "@/components/diary/DiaryPage";
 import { ReactionsTab, byPerson } from "@/components/diary/PageReactions";
 import type { DiaryEntry, DiaryReaction } from "@/lib/diary";
 
@@ -32,7 +32,6 @@ export function YourDiaryCard({
   const [picking, setPicking] = useState(false);
   const current = colorKey(entry.color);
   const tint = diaryTheme(entry.color, entry.hue);
-  const { size } = noteSize(entry.text);
 
   return (
     <DiscSleeve track={entry.track}>
@@ -94,7 +93,7 @@ export function YourDiaryCard({
 
         <p
           className="mt-3 break-words font-extrabold leading-[1.08] tracking-[-0.02em] text-white"
-          style={{ fontSize: Math.min(Math.round(size * 1.1), 48) }}
+          style={{ fontSize: fillSize(entry.text, 280) }}
         >
           {entry.text}
         </p>

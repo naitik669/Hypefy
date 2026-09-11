@@ -41,6 +41,26 @@ export function noteSize(text: string): { size: number; clamp: number } {
 }
 
 /**
+ * The note's size on a card, px: as large as the card can take it, so a
+ * page that says "HDB" fills its card instead of leaving it looking empty,
+ * and a full sentence still fits in a few lines.
+ *
+ * Two limits, the smaller wins: one by how much there is to say, and one so
+ * the longest word fits across the card on its own (a 6-letter word at 80px
+ * would run off the edge). Measured for a card about 250px wide inside; wider
+ * cards simply have room to spare.
+ */
+export function fillSize(text: string, inside = 250): number {
+  const t = text.trim();
+  const n = Array.from(t).length;
+  const byLength = n <= 3 ? 104 : n <= 6 ? 84 : n <= 10 ? 60 : n <= 16 ? 46 : n <= 24 ? 38 : n <= 36 ? 31 : n <= 48 ? 26 : 22;
+  // Bold letters run about 0.68em wide; an emoji counts as a letter.
+  const longest = Math.max(1, ...t.split(/\s+/).map((w) => Array.from(w).length));
+  const byWord = Math.floor(inside / (0.68 * longest));
+  return Math.max(18, Math.min(byLength, byWord));
+}
+
+/**
  * The page colours for an author's hue.
  *
  * One ink for every page — a deep, nearly neutral charcoal — with the

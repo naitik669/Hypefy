@@ -6,7 +6,7 @@ import { Maximize2, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { SongLine } from "@/components/diary/DiaryDisc";
 import { DiaryResponder } from "@/components/diary/DiaryResponder";
-import { diaryTheme, lifeLeft, noteSize, shortLeft } from "@/components/diary/DiaryPage";
+import { diaryTheme, fillSize, lifeLeft, shortLeft } from "@/components/diary/DiaryPage";
 import type { DiaryEntry } from "@/lib/diary";
 
 /**
@@ -51,7 +51,6 @@ export function FriendDiaryCard({
   const avatar = useRef<HTMLSpanElement>(null);
   const card = useRef<HTMLElement>(null);
   const theme = diaryTheme(entry.color, entry.hue);
-  const { size } = noteSize(entry.text);
   const big = shape === "spotlight";
   const first = entry.name.split(" ")[0];
 
@@ -98,7 +97,8 @@ export function FriendDiaryCard({
         <div className="flex min-h-0 flex-1 flex-col justify-center py-2" onClick={onOpen}>
           <p
             className="cursor-pointer break-words font-extrabold leading-[1.06] tracking-[-0.02em] text-white"
-            style={{ fontSize: big ? Math.min(Math.round(size * 1.1), 42) : Math.min(Math.round(size * 1.05), 44) }}
+            // As big as the card can take: "HDB" fills it, a sentence fits.
+            style={{ fontSize: fillSize(entry.text, big ? 250 : 280) }}
           >
             {entry.text}
           </p>

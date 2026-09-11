@@ -40,7 +40,8 @@ const SPOTLIGHT_HEIGHT =
  * cards in the middle of it, the one in front complete and usable where it
  * lies (its song playing by itself), the next two fanned out behind; swipe
  * to send it to the back. Scroll, and every page is there one to a row —
- * yours first (or the page to write one on), then everyone's. Reactions to
+ * yours first (or the page to write one on), then everyone's. With nobody
+ * else's page up, the spotlight is yours: your page, or the one to write. Reactions to
  * yours float up over it when they are new; the tab on it says who sent what. Past pages are the icon at the top right. As few words on
  * the screen as will do.
  */
@@ -152,6 +153,20 @@ export function DiaryHome({
     });
   }
 
+  // Your page — or the page to write one on. At the head of the list, or in
+  // the spotlight itself when there is nobody else's to show there.
+  const alone = others.length === 0;
+  const yours = mine ? (
+    <div className="relative">
+      <YourDiaryCard entry={mine} reactions={onMine} onEdit={() => setEditing(true)} onColor={onColor} />
+      <FloatingReactions reactions={flying} />
+    </div>
+  ) : (
+    <section aria-label="Write your page">
+      <DiaryComposer current={null} me={me} onSaved={onSaved} compact />
+    </section>
+  );
+
   return (
     <>
       <PageHeader
@@ -170,23 +185,27 @@ export function DiaryHome({
       />
       <div className="flex flex-col px-3 pb-24">
         {/* ── The spotlight: the whole first screen ── */}
-        {others.length > 0 && (
-          <section
-            aria-label="Deck"
-            // Edge to edge, clipped there: the CD peeks right up to the side of
-            // the screen and must not scroll the page sideways when it grows.
-            // Isolated, so the light can sit behind the deck.
-            className="relative isolate -mx-3 flex flex-col justify-center overflow-x-clip px-3 py-4"
-            style={{
-              minHeight: SPOTLIGHT_HEIGHT,
-              // Only a little taller than it is wide — a tenth — so it reads as a
-              // card, not a column. Its width is the screen less the margins
-              // (2 × (12 + 40)px); a very short screen can take it down to 260px.
-              ["--card-h" as string]: `clamp(260px, calc((min(100vw, 480px) - 104px) * 1.1), calc(${SPOTLIGHT_HEIGHT} - 250px))`,
-            }}
-          >
-            {/* A light from above, onto the deck — just a touch. */}
-            <div aria-hidden className="pages-spotlight pointer-events-none absolute inset-0 -z-10" />
+        <section
+          aria-label="Deck"
+          // Edge to edge, clipped there: the CD peeks right up to the side of
+          // the screen and must not scroll the page sideways when it grows.
+          // Isolated, so the light can sit behind the deck.
+          className="relative isolate -mx-3 flex flex-col justify-center overflow-x-clip px-3 py-4"
+          style={{
+            minHeight: SPOTLIGHT_HEIGHT,
+            // Only a little taller than it is wide — a tenth — so it reads as a
+            // card, not a column. Its width is the screen less the margins
+            // (2 × (12 + 40)px); a very short screen can take it down to 260px.
+            ["--card-h" as string]: `clamp(260px, calc((min(100vw, 480px) - 104px) * 1.1), calc(${SPOTLIGHT_HEIGHT} - 250px))`,
+          }}
+        >
+          {/* A light from above, onto the deck — just a touch. */}
+          <div aria-hidden className="pages-spotlight pointer-events-none absolute inset-0 -z-10" />
+          {alone ? (
+            // Nobody else has a page up: the light falls on yours — or on
+            // the page to write it on.
+            <div className="mx-auto w-full max-w-[360px] px-2">{yours}</div>
+          ) : (
             <DiaryStack
               list={others}
               fresh={fresh}
@@ -196,37 +215,30 @@ export function DiaryHome({
               onHyped={onHyped}
               onOpen={(i) => setStoryAt(i)}
             />
-          </section>
-        )}
+          )}
+        </section>
 
         {/* ── Every page, one to a row ── */}
         {/* Clipped at the screen edge too: a big CD playing slides out a little. */}
-        <div className="-mx-3 flex flex-col gap-4 overflow-x-clip px-3 pt-4">
-          {mine ? (
-            <div className="relative">
-              <YourDiaryCard entry={mine} reactions={onMine} onEdit={() => setEditing(true)} onColor={onColor} />
-              <FloatingReactions reactions={flying} />
-            </div>
-          ) : (
-            <section aria-label="Write your page">
-              <DiaryComposer current={null} me={me} onSaved={onSaved} compact />
-            </section>
-          )}
-          {others.map((e, i) => (
-            <DiscSleeve key={e.userId} track={e.track}>
-              <FriendDiaryCard
-                entry={e}
-                fresh={fresh.has(e.userId)}
-                mine={reacted[e.userId] ?? null}
-                onReacted={onReacted}
-                hyped={hyped.has(e.userId)}
-                onHyped={onHyped}
-                onOpen={() => setStoryAt(i)}
-                size="list"
-              />
-            </DiscSleeve>
-          ))}
-        </div>
+        {!alone && (
+          <div className="-mx-3 flex flex-col gap-4 overflow-x-clip px-3 pt-4">
+            {yours}
+            {others.map((e, i) => (
+              <DiscSleeve key={e.userId} track={e.track}>
+                <FriendDiaryCard
+                  entry={e}
+                  fresh={fresh.has(e.userId)}
+                  mine={reacted[e.userId] ?? null}
+                  onReacted={onReacted}
+                  hyped={hyped.has(e.userId)}
+                  onHyped={onHyped}
+                  onOpen={() => setStoryAt(i)}
+                  size="list"
+                />
+              </DiscSleeve>
+            ))}
+          </div>
+        )}
       </div>
 
       <DiaryEditor

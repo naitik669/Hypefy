@@ -492,6 +492,24 @@ describe("DiaryHome", () => {
     expect(host.textContent).toContain("2/2");
   });
 
+  it("puts the page to write on in the spotlight when nobody else has a page up", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(createElement(DiaryHome, home()));
+    const deck = host.querySelector('section[aria-label="Deck"]')!;
+    expect(deck.querySelector('textarea[aria-label="Your page"]')).not.toBeNull();
+    expect(deck.querySelector('[aria-roledescription="card stack"]')).toBeNull();
+    // Once, in the spotlight — not again in a list under it.
+    expect(host.querySelectorAll('textarea[aria-label="Your page"]')).toHaveLength(1);
+  });
+
+  it("puts your page in the spotlight when it is the only one up", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "me", isSelf: true, text: "gym then chai" })] })));
+    const deck = host.querySelector('section[aria-label="Deck"]')!;
+    expect(deck.querySelector("article")!.textContent).toContain("gym then chai");
+    expect(host.querySelectorAll("article")).toHaveLength(1);
+  });
+
   it("moves the deck by swiping alone — no arrow buttons", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(
