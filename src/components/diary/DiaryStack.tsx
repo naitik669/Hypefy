@@ -13,9 +13,13 @@ const VISIBLE = 3;
 const THROW_PX = 80;
 /** How long the thrown card takes to leave before it is tucked in behind. */
 const THROW_MS = 240;
-/** Room on the right of the deck for the top card's CD to peek into. */
-const GUTTER = 44;
-const DISC = 108;
+/**
+ * The deck sits in the middle of the screen, the same margin either side;
+ * the top card's CD peeks out into the right-hand one.
+ */
+const INSET = 28;
+const DISC = 112;
+const PEEK = 24;
 /**
  * Where each depth sits. The cards behind fan out like a hand of cards — the
  * first leaning left, the second leaning right — so their colours and
@@ -145,7 +149,7 @@ export function DiaryStack({
     <section aria-label="Pages from your circle" aria-roledescription="card stack">
       <div
         className="relative"
-        style={{ height: CARD_H + DEPTH[Math.min(VISIBLE, deck.length) - 1].y + 10 }}
+        style={{ height: `calc(${CARD_H} + ${DEPTH[Math.min(VISIBLE, deck.length) - 1].y + 10}px)` }}
         onKeyDown={(e) => {
           if (e.key === "ArrowRight") next(1);
           else if (e.key === "ArrowLeft") next(-1);
@@ -175,9 +179,10 @@ export function DiaryStack({
           return (
             <div
               key={id}
-              className="absolute left-2 top-0 select-none"
+              className="absolute top-0 select-none"
               style={{
-                right: GUTTER,
+                left: INSET,
+                right: INSET,
                 transform,
                 transformOrigin: "50% 60%",
                 zIndex: isThrown ? 40 : 30 - Math.min(depth, 20),
@@ -220,7 +225,7 @@ export function DiaryStack({
                   slide={12}
                   autoPlay
                   className="absolute top-1/2 z-0"
-                  style={{ right: -(GUTTER - 8), marginTop: -DISC / 2 }}
+                  style={{ right: -PEEK, marginTop: -DISC / 2 }}
                 />
               )}
               <div className="relative z-10">
@@ -233,6 +238,7 @@ export function DiaryStack({
                   onHyped={onHyped}
                   onOpen={() => onOpen(list.findIndex((e) => e.userId === id))}
                   inert={!isTop}
+                  size="spotlight"
                 />
               </div>
             </div>

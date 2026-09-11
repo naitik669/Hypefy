@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Archive } from "lucide-react";
+import { Archive, ChevronDown } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { CenterModal } from "@/components/ui/CenterModal";
-import { DiaryEditor, type DiaryDraft } from "@/components/diary/DiaryEditor";
-import { DiaryTile, WriteTile } from "@/components/diary/DiaryTile";
+import { DiaryComposer, DiaryEditor, type DiaryDraft } from "@/components/diary/DiaryEditor";
+import { DiscSleeve } from "@/components/diary/DiaryDisc";
+import { FriendDiaryCard } from "@/components/diary/FriendDiaryCard";
 import { YourDiaryCard } from "@/components/diary/YourDiaryCard";
 import { DiaryStack } from "@/components/diary/DiaryStack";
 import { DiaryStories } from "@/components/diary/DiaryStories";
 import { DiaryArchiveSheet } from "@/components/diary/DiaryArchiveSheet";
-import { ReactionsSheet } from "@/components/diary/PageReactions";
+import { FloatingReactions } from "@/components/diary/PageReactions";
 import {
   loadSeen,
   markReactionsFlown,
@@ -27,15 +27,19 @@ type Me = { name: string; hue: number; avatarUrl: string | null };
 const NO_FRESH = new Set<string>();
 const NONE: DiaryReaction[] = [];
 
+/** The first screen, exactly: all of the window between the header and the tab bar. */
+const SPOTLIGHT_HEIGHT =
+  "calc(100dvh - 3.5rem - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom))";
+
 /**
  * Pages — one tap from Messages.
  *
- * Top, the spotlight: everyone else's pages as a deck of cards, the one in
- * front complete and usable where it lies (its song playing by itself), the
- * next two fanned out behind; swipe to send it to the back. Below, every page
- * at once as a grid — yours first (or a plus to write one), then everyone's.
- * Reactions to yours float up over it when they are new; the tab on it says
- * who sent what. Past pages are the icon at the top right. As few words on
+ * The first screen is the spotlight: everyone else's pages as a deck of
+ * cards in the middle of it, the one in front complete and usable where it
+ * lies (its song playing by itself), the next two fanned out behind; swipe
+ * to send it to the back. Scroll, and every page is there one to a row —
+ * yours first (or the page to write one on), then everyone's. Reactions to
+ * yours float up over it when they are new; the tab on it says who sent what. Past pages are the icon at the top right. As few words on
  * the screen as will do.
  */
 export function DiaryHome({
@@ -63,10 +67,9 @@ export function DiaryHome({
   const [reacted, setReacted] = useState(initialMine);
   const [hyped, setHyped] = useState<Set<string>>(() => new Set(initialMyHypes));
   const [editing, setEditing] = useState(false);
-  const [mineOpen, setMineOpen] = useState(false);
-  const [whoOpen, setWhoOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [storyAt, setStoryAt] = useState<number | null>(null);
+  const list = useRef<HTMLDivElement>(null);
 
   const mine = entries.find((e) => e.isSelf) ?? null;
 
@@ -155,60 +158,68 @@ export function DiaryHome({
           </button>
         }
       />
-      <div className="flex flex-col gap-3 px-3 pb-24 pt-4">
-        {/* ── The spotlight ── */}
+      <div className="flex flex-col px-3 pb-24">
+        {/* ── The spotlight: the whole first screen ── */}
         {others.length > 0 && (
-          <DiaryStack
-            list={others}
-            fresh={fresh}
-            reacted={reacted}
-            onReacted={onReacted}
-            hyped={hyped}
-            onHyped={onHyped}
-            onOpen={(i) => setStoryAt(i)}
-          />
+          <section
+            aria-label="Spotlight"
+            className="relative flex flex-col justify-center py-4"
+            style={{
+              minHeight: SPOTLIGHT_HEIGHT,
+              // The card takes what the screen has left after the arrows and
+              // the fan: never under 320px, never over 500px.
+              ["--card-h" as string]: `clamp(320px, calc(${SPOTLIGHT_HEIGHT} - 170px), 500px)`,
+            }}
+          >
+            <DiaryStack
+              list={others}
+              fresh={fresh}
+              reacted={reacted}
+              onReacted={onReacted}
+              hyped={hyped}
+              onHyped={onHyped}
+              onOpen={(i) => setStoryAt(i)}
+            />
+            <button
+              type="button"
+              onClick={() => list.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              aria-label="All pages"
+              className="absolute bottom-1 left-1/2 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full text-white/40 transition-colors hover:text-white"
+            >
+              <ChevronDown size={22} className="animate-bounce" />
+            </button>
+          </section>
         )}
 
-        {/* ── Every page, at once ── */}
-        <div className={`grid grid-cols-2 gap-3 ${others.length > 0 ? "pt-5" : ""}`}>
+        {/* ── Every page, one to a row ── */}
+        <div ref={list} className="flex scroll-mt-20 flex-col gap-4 pt-4">
           {mine ? (
-            <DiaryTile
-              entry={mine}
-              label="You"
-              reactions={onMine}
-              flying={flying}
-              onReactions={() => setWhoOpen(true)}
-              onOpen={() => setMineOpen(true)}
-            />
+            <div className="relative">
+              <YourDiaryCard entry={mine} reactions={onMine} onEdit={() => setEditing(true)} />
+              <FloatingReactions reactions={flying} />
+            </div>
           ) : (
-            <WriteTile me={me} onWrite={() => setEditing(true)} />
+            <section aria-label="Write your page">
+              <DiaryComposer current={null} me={me} onSaved={onSaved} compact />
+            </section>
           )}
           {others.map((e, i) => (
-            <DiaryTile
-              key={e.userId}
-              entry={e}
-              label={e.name}
-              fresh={fresh.has(e.userId)}
-              onOpen={() => setStoryAt(i)}
-            />
+            <DiscSleeve key={e.userId} track={e.track}>
+              <FriendDiaryCard
+                entry={e}
+                fresh={fresh.has(e.userId)}
+                mine={reacted[e.userId] ?? null}
+                onReacted={onReacted}
+                hyped={hyped.has(e.userId)}
+                onHyped={onHyped}
+                onOpen={() => setStoryAt(i)}
+                size="list"
+              />
+            </DiscSleeve>
           ))}
         </div>
       </div>
 
-      {/* Your page, opened from your tile. */}
-      <CenterModal open={mineOpen && !!mine} onClose={() => setMineOpen(false)}>
-        {mine && (
-          <YourDiaryCard
-            entry={mine}
-            reactions={onMine}
-            onEdit={() => {
-              setMineOpen(false);
-              setEditing(true);
-            }}
-          />
-        )}
-      </CenterModal>
-      <ReactionsSheet open={whoOpen} onClose={() => setWhoOpen(false)} reactions={onMine} />
       <DiaryEditor
         open={editing}
         onClose={() => setEditing(false)}

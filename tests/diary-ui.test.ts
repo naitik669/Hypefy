@@ -132,7 +132,7 @@ describe("DiaryHome", () => {
       el.dispatchEvent(new Event("input", { bubbles: true }));
     });
   const wait = (ms: number) => act(async () => void (await new Promise((r) => setTimeout(r, ms))));
-  const openComposer = () => click(button("New page"));
+  const openComposer = () => act(async () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Your page"]')!.focus());
 
   it("stacks everyone's Diaries, the one on top whole and usable, the rest behind it", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
@@ -261,7 +261,12 @@ describe("DiaryHome", () => {
       }))
     );
     // Only the top card has its CD out, and it is already playing, on loop.
-    const discs = () => [...document.querySelectorAll<HTMLButtonElement>('button[aria-label^="Pause "], button[aria-label^="Play "]')];
+    // The deck's CD — the list's cards have their own, which wait to be tapped.
+    const discs = () => [
+      ...document.querySelectorAll<HTMLButtonElement>(
+        '[aria-roledescription="card stack"] button[aria-label^="Pause "], [aria-roledescription="card stack"] button[aria-label^="Play "]'
+      ),
+    ];
     expect(discs().map((d) => d.getAttribute("aria-label"))).toEqual(["Pause Pasoori by X"]);
     expect(discs()[0].querySelector("img")!.getAttribute("src")).toBe("t1.jpg"); // the cover in the middle
     expect(played.at(-1)).toContain("t1.mp3");
@@ -288,26 +293,38 @@ describe("DiaryHome", () => {
     expect(top.style.background).toBe(probe.style.background);
   });
 
-  it("lays every Diary out in a grid under the spotlight, yours first", async () => {
+  /** The cards in the list under the spotlight, in order. */
+  const listCards = () =>
+    [...host.querySelectorAll<HTMLElement>("article")].filter((a) => !a.closest('[aria-roledescription="card stack"]'));
+
+  it("gives the spotlight the whole first screen, and lists every page one to a row under it", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(
       createElement(DiaryHome, home({
         entries: [
+          entry({ userId: "me", isSelf: true, text: "gym then chai" }),
           entry({ userId: "a", name: "Aman", text: "HDB", createdAt: minsAgo(1) }),
           entry({ userId: "b", name: "Riya", text: "free", createdAt: minsAgo(60) }),
         ],
       }))
     );
-    const grid = host.querySelector(".grid")!;
-    expect(grid.compareDocumentPosition(topCard()!) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
-    expect([...grid.children].map((t) => t.getAttribute("aria-label") ?? t.querySelector("button")?.getAttribute("aria-label"))).toEqual([
-      "New page",
-      "Aman's page",
-      "Riya's page",
+    const spotlight = host.querySelector<HTMLElement>('section[aria-label="Spotlight"]')!;
+    expect(spotlight.style.minHeight).toContain("100dvh");
+    expect(spotlight.querySelector('[aria-roledescription="card stack"]')).not.toBeNull();
+
+    // Yours first, then everyone's — whole cards, each usable where it lies.
+    const cards = listCards();
+    expect(cards.map((c) => c.textContent)).toEqual([
+      expect.stringContaining("gym then chai"),
+      expect.stringContaining("HDB"),
+      expect.stringContaining("free"),
     ]);
+    expect(cards[0].compareDocumentPosition(spotlight) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    expect(cards[1].querySelector('button[aria-label="Hype Aman\'s page"]')).not.toBeNull();
+    expect(cards[1].querySelector('button[aria-label="Reply to Aman"]')).not.toBeNull();
   });
 
-  it("opens a Diary from the grid full-screen, at that Diary", async () => {
+  it("opens a page from the list full-screen, at that page", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(
       createElement(DiaryHome, home({
@@ -317,18 +334,18 @@ describe("DiaryHome", () => {
         ],
       }))
     );
-    await click(host.querySelector('.grid [aria-label="Riya\'s page"]'));
+    await click(listCards()[1].querySelector(`button[aria-label="Open Riya's page full-screen"]`));
     expect(document.querySelector('[role="dialog"]')?.getAttribute("aria-label")).toBe("Riya's page");
   });
 
-  it("opens the page to write on from the blank tile in the grid", async () => {
+  it("puts the page to write on in the list when you have none, folded until you tap it", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", text: "HDB" })] })));
-    expect(document.querySelector("textarea")).toBeNull();
-
-    await openComposer();
     const field = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Your page"]')!;
     expect(field.placeholder).toBe("What's on your mind today?");
+    expect([...document.querySelectorAll("button")].some((b) => b.textContent === "Post")).toBe(false);
+
+    await openComposer();
     expect([...document.querySelectorAll("button")].some((b) => b.textContent === "Post")).toBe(true);
     // A blank CD behind the page is how a song gets added.
     expect(button("Add a song")).not.toBeNull();
@@ -400,11 +417,10 @@ describe("DiaryHome", () => {
     expect(floating()).toEqual([]);
   });
 
-  it("opens your page to edit from your tile, and says nothing when nobody has reacted", async () => {
+  it("shows your page with an edit button, and says nothing when nobody has reacted", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "me", isSelf: true, text: "gym then chai" })] })));
     expect(host.querySelector('[aria-label^="Reactions from"]')).toBeNull();
-    await click(button("Your page"));
     const mine = document.querySelector("article")!;
     expect(mine.textContent).toContain("gym then chai");
     expect(mine.textContent).not.toMatch(/reaction/i);

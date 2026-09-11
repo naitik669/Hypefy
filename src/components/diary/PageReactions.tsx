@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
-import { BottomSheet } from "@/components/ui/BottomSheet";
 import { reactionSummary, type DiaryReaction } from "@/lib/diary";
 
 /**
@@ -10,6 +9,9 @@ import { reactionSummary, type DiaryReaction } from "@/lib/diary";
  * last looked, two or three copies apiece, rising and swaying and fading.
  * It plays once and clears itself; nothing to read, just the news that
  * people reacted. Who sent what is one tap away, on the tab.
+ *
+ * It waits until your page is on screen — under the spotlight it usually
+ * starts below the fold, and reactions nobody saw fly have not been shown.
  */
 export function FloatingReactions({ reactions }: { reactions: DiaryReaction[] }) {
   // Positions are random, so they are made after mount — never on the server,
@@ -17,9 +19,32 @@ export function FloatingReactions({ reactions }: { reactions: DiaryReaction[] })
   const [bits, setBits] = useState<
     { key: string; emoji: string; left: number; size: number; style: React.CSSProperties }[]
   >([]);
+  const box = useRef<HTMLSpanElement>(null);
+  const [seen, setSeen] = useState(false);
 
   useEffect(() => {
-    if (reactions.length === 0) return;
+    if (reactions.length === 0 || seen) return;
+    const el = box.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      // No way to tell what is on screen: just play.
+      setSeen(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setSeen(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.6 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [reactions, seen]);
+
+  useEffect(() => {
+    if (reactions.length === 0 || !seen) return;
     const made = reactions.slice(0, 12).flatMap((r, i) =>
       Array.from({ length: reactions.length > 5 ? 2 : 3 }, (_, j) => {
         const n = i * 3 + j;
@@ -41,11 +66,11 @@ export function FloatingReactions({ reactions }: { reactions: DiaryReaction[] })
     setBits(made);
     const done = window.setTimeout(() => setBits([]), made.length * 130 + 3000);
     return () => window.clearTimeout(done);
-  }, [reactions]);
+  }, [reactions, seen]);
 
-  if (bits.length === 0) return null;
+  if (reactions.length === 0) return null;
   return (
-    <span aria-hidden className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+    <span ref={box} aria-hidden className="pointer-events-none absolute inset-0 z-20 overflow-hidden rounded-[28px]">
       {bits.map((b) => (
         <span key={b.key} className="page-float" style={{ left: `${b.left}%`, fontSize: b.size, ...b.style }}>
           {b.emoji}
@@ -56,7 +81,7 @@ export function FloatingReactions({ reactions }: { reactions: DiaryReaction[] })
 }
 
 /** One row per person, with everything they sent (an emoji, a hype, or both). */
-function byPerson(reactions: DiaryReaction[]) {
+export function byPerson(reactions: DiaryReaction[]) {
   const people = new Map<string, DiaryReaction & { sent: string[] }>();
   for (const r of reactions) {
     const p = people.get(r.userId);
@@ -102,31 +127,5 @@ export function ReactionsTab({
       <span className="tabular-nums">{tally.map((t) => t.emoji).join("")}</span>
       <span className="tabular-nums text-white/70">{people.length}</span>
     </button>
-  );
-}
-
-/** Who reacted to your page, and with what. */
-export function ReactionsSheet({
-  open,
-  onClose,
-  reactions,
-}: {
-  open: boolean;
-  onClose: () => void;
-  reactions: DiaryReaction[];
-}) {
-  const people = byPerson(reactions);
-  return (
-    <BottomSheet open={open} onClose={onClose} title="Reactions">
-      <ul className="flex flex-col pb-4">
-        {people.map((p) => (
-          <li key={p.userId} className="flex h-12 items-center gap-3 px-1">
-            <Avatar name={p.name} hue={p.hue} size={32} src={p.avatarUrl ?? undefined} />
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold">{p.name}</span>
-            <span className="text-lg">{p.sent.join(" ")}</span>
-          </li>
-        ))}
-      </ul>
-    </BottomSheet>
   );
 }

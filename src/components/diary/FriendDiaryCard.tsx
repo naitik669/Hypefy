@@ -11,13 +11,14 @@ import type { DiaryEntry } from "@/lib/diary";
 
 /**
  * Every card in the spotlight is the same height, so they sit square as a
- * deck. Wide and short — the shape of your own page's card — rather than a
- * tall playing card.
+ * deck — as tall as the screen allows, within reason: the spotlight sets
+ * --card-h from the height it has; 356px wherever it does not.
  */
-export const CARD_H = 244;
+export const CARD_H = "var(--card-h, 356px)";
 
 /**
- * One friend's page as a card in the spotlight deck.
+ * One friend's page as a card — in the spotlight deck, or one to a row in the
+ * list under it.
  *
  * The whole page is on it: who wrote it, the words (at most 60 characters,
  * which always fit), the song, and the row to react, hype and reply. The
@@ -33,6 +34,7 @@ export function FriendDiaryCard({
   onHyped,
   onOpen,
   inert = false,
+  size: shape = "spotlight",
 }: {
   entry: DiaryEntry;
   fresh: boolean;
@@ -43,11 +45,14 @@ export function FriendDiaryCard({
   onOpen: () => void;
   /** A card behind the top one: shown, not usable. */
   inert?: boolean;
+  /** "spotlight": the fixed, larger card of the deck. "list": as tall as it needs. */
+  size?: "spotlight" | "list";
 }) {
   const avatar = useRef<HTMLSpanElement>(null);
   const card = useRef<HTMLElement>(null);
   const theme = diaryTheme(entry.color, entry.hue);
   const { size } = noteSize(entry.text);
+  const big = shape === "spotlight";
   const first = entry.name.split(" ")[0];
 
   return (
@@ -55,8 +60,8 @@ export function FriendDiaryCard({
       ref={card}
       inert={inert}
       aria-hidden={inert || undefined}
-      className="relative flex flex-col overflow-hidden rounded-[28px] px-4 pb-3 pt-3.5"
-      style={{ height: CARD_H, background: theme.background, boxShadow: theme.shadow }}
+      className={`relative flex flex-col overflow-hidden rounded-[28px] px-4 pb-3 pt-3.5 ${big ? "" : "gap-3"}`}
+      style={{ height: big ? CARD_H : undefined, background: theme.background, boxShadow: theme.shadow }}
     >
       <header className="flex items-center gap-2">
         <Link href={entry.username ? `/u/${entry.username}` : "#"} className="flex min-w-0 items-center gap-2">
@@ -86,7 +91,7 @@ export function FriendDiaryCard({
       <div className="flex min-h-0 flex-1 flex-col justify-center" onClick={onOpen}>
         <p
           className="cursor-pointer break-words font-extrabold leading-[1.06] tracking-[-0.02em] text-white"
-          style={{ fontSize: Math.min(Math.round(size * 1.05), 44) }}
+          style={{ fontSize: big ? Math.min(Math.round(size * 1.3), 56) : Math.min(Math.round(size * 1.05), 44) }}
         >
           {entry.text}
         </p>

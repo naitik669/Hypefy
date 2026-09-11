@@ -83,7 +83,7 @@ export function DiaryResponder({
       )}
 
       <div className="flex items-center gap-1.5">
-        <div className={`flex flex-1 items-center justify-between rounded-full bg-black/25 px-1 ${big ? "h-12" : "h-9"}`}>
+        <div className={`flex min-w-0 flex-1 items-center justify-between rounded-full bg-black/25 px-1 ${big ? "h-12" : "h-9"}`}>
           {QUICK_EMOJIS.map((e) => (
             <button
               key={e}
@@ -93,8 +93,8 @@ export function DiaryResponder({
                 void react(e);
               }}
               aria-label={`Send ${e} to ${first}`}
-              className={`flex items-center justify-center rounded-full transition-transform duration-150 hover:scale-110 ${
-                big ? "h-10 w-10 text-[23px]" : "h-8 w-8 text-[18px]"
+              className={`flex min-w-0 flex-1 items-center justify-center rounded-full transition-transform duration-150 hover:scale-110 ${
+                big ? "h-10 max-w-10 text-[23px]" : "h-8 max-w-8 text-[18px]"
               }`}
             >
               {e}

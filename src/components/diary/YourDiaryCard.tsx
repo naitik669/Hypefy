@@ -5,7 +5,7 @@ import { PenLine, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { DiscSleeve, SongLine } from "@/components/diary/DiaryDisc";
 import { diaryTheme, lifeLeft, noteSize, shortLeft } from "@/components/diary/DiaryPage";
-import { ReactionsTab } from "@/components/diary/PageReactions";
+import { ReactionsTab, byPerson } from "@/components/diary/PageReactions";
 import type { DiaryEntry, DiaryReaction } from "@/lib/diary";
 
 /**
@@ -25,14 +25,6 @@ export function YourDiaryCard({
   const [showWho, setShowWho] = useState(false);
   const tint = diaryTheme(entry.color, entry.hue);
   const { size } = noteSize(entry.text);
-
-  // One row per person, with all they sent.
-  const people = new Map<string, DiaryReaction & { sent: string[] }>();
-  for (const r of reactions) {
-    const p = people.get(r.userId);
-    if (p) p.sent.push(r.emoji);
-    else people.set(r.userId, { ...r, sent: [r.emoji] });
-  }
 
   return (
     <DiscSleeve track={entry.track}>
@@ -75,7 +67,7 @@ export function YourDiaryCard({
             <ReactionsTab reactions={reactions} onOpen={() => setShowWho((v) => !v)} />
             {showWho && (
               <ul className="mt-2 flex flex-col gap-1.5 rounded-2xl bg-black/25 p-2.5">
-                {[...people.values()].map((p) => (
+                {byPerson(reactions).map((p) => (
                   <li key={p.userId} className="flex items-center gap-2">
                     <Avatar name={p.name} hue={p.hue} size={22} src={p.avatarUrl ?? undefined} />
                     <span className="truncate text-[13px] font-semibold text-white/90">{p.name}</span>

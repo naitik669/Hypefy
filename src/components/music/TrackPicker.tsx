@@ -87,10 +87,15 @@ export function TrackPicker({
     return () => clearTimeout(debounceRef.current);
   }, [query, open]);
 
-  // Reset + stop audio when the sheet closes
+  // Reset + stop audio when the sheet closes. Only on an actual close: a
+  // picker mounted closed (the Pages composer keeps one ready under the
+  // spotlight) must not silence a song already playing somewhere else.
+  const wasOpen = useRef(false);
   useEffect(() => {
+    const closing = wasOpen.current && !open;
+    wasOpen.current = open;
     if (!open) {
-      stopPreview();
+      if (closing) stopPreview();
       setQuery("");
       setTracks([]);
       setSearched(false);
