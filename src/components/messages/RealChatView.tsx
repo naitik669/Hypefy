@@ -1528,7 +1528,13 @@ export function RealChatView({
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
                           className="relative select-none"
                         >
-                          <PageReplyEmbed page={pageSnapshot(m.metadata)!} body={m.body} mine={mine} />
+                          <PageReplyEmbed
+                            page={pageSnapshot(m.metadata)!}
+                            body={m.body}
+                            mine={mine}
+                            // Your reply is to their page; theirs, to yours.
+                            owner={mine ? { name: other.name, hue: other.hue, avatarUrl: other.avatarUrl } : null}
+                          />
                         </div>
                       ) : m.kind === "oneshot" ? (
                         <OneShotBubble

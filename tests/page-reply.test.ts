@@ -21,7 +21,7 @@ const meta = {
     color: "plum",
     hue: 330,
     written_at: "2026-09-11T10:00:00Z",
-    track: { title: "Kho Gaye Hum Kahan", artist: "Prateek Kuhad", artwork: "" },
+    track: { title: "Kho Gaye Hum Kahan", artist: "Prateek Kuhad", artwork: "cover.jpg" },
   },
 };
 
@@ -32,7 +32,8 @@ describe("pageSnapshot", () => {
       text: "exams done. finally free",
       color: "plum",
       hue: 330,
-      track: { title: "Kho Gaye Hum Kahan", artist: "Prateek Kuhad" },
+      writtenAt: "2026-09-11T10:00:00Z",
+      track: { title: "Kho Gaye Hum Kahan", artist: "Prateek Kuhad", artwork: "cover.jpg" },
     });
   });
 
@@ -41,7 +42,7 @@ describe("pageSnapshot", () => {
     expect(pageSnapshot(null)).toBeNull();
     expect(pageSnapshot({})).toBeNull();
     expect(pageSnapshot({ page: { text: 3 } })).toBeNull();
-    expect(pageSnapshot({ page: { text: "hi" } })).toEqual({ text: "hi", color: null, hue: 280, track: null });
+    expect(pageSnapshot({ page: { text: "hi" } })).toEqual({ text: "hi", color: null, hue: 280, writtenAt: null, track: null });
   });
 });
 
@@ -54,24 +55,45 @@ describe("isEmojiReply", () => {
 });
 
 describe("PageReplyEmbed", () => {
-  it("shows which page was answered, with an emoji large on its corner", async () => {
+  const live = new Date("2026-09-11T12:00:00Z").getTime(); // two hours after it was written
+
+  it("shows the page reacted to — yours, its words, its song and cover — with the emoji on its corner", async () => {
     const { PageReplyEmbed, pageSnapshot } = await import("@/components/diary/PageReplyEmbed");
     const html = renderToStaticMarkup(
-      createElement(PageReplyEmbed, { page: pageSnapshot(meta)!, body: "❤️", mine: false })
+      createElement(PageReplyEmbed, { page: pageSnapshot(meta)!, body: "❤️", mine: false, now: live })
     );
-    expect(html).toContain("Replied to your page");
+    expect(html).toContain("Reacted to your page");
+    expect(html).toContain("Your page");
     expect(html).toContain("exams done. finally free");
     expect(html).toContain("Kho Gaye Hum Kahan");
-    expect(html).toContain("text-[40px]"); // the emoji, drawn large
+    expect(html).toContain("cover.jpg");
+    expect(html).toContain("animate-react-pop"); // the emoji, landed on the corner
+    expect(html).toContain('href="/messages/spotlight"'); // still up: it opens
   });
 
-  it("puts words in a bubble under the page, and says whose page from the sender's side", async () => {
+  it("says a page has ended, and does not link to it", async () => {
     const { PageReplyEmbed, pageSnapshot } = await import("@/components/diary/PageReplyEmbed");
     const html = renderToStaticMarkup(
-      createElement(PageReplyEmbed, { page: pageSnapshot(meta)!, body: "same, chai?", mine: true })
+      createElement(PageReplyEmbed, { page: pageSnapshot(meta)!, body: "❤️", mine: false, now: live + 30 * 3_600_000 })
     );
-    expect(html).toContain("Replied to their page");
+    expect(html).toContain("Ended");
+    expect(html).not.toContain('href="/messages/spotlight"');
+  });
+
+  it("hangs words off the page as a bubble, and names whose page from the sender's side", async () => {
+    const { PageReplyEmbed, pageSnapshot } = await import("@/components/diary/PageReplyEmbed");
+    const html = renderToStaticMarkup(
+      createElement(PageReplyEmbed, {
+        page: pageSnapshot(meta)!,
+        body: "same, chai?",
+        mine: true,
+        owner: { name: "Riya Sharma", hue: 330 },
+        now: live,
+      })
+    );
+    expect(html).toContain("You replied to Riya&#x27;s page");
+    expect(html).toContain("Riya Sharma");
     expect(html).toContain("same, chai?");
-    expect(html).not.toContain("text-[40px]");
+    expect(html).not.toContain("animate-react-pop");
   });
 });
