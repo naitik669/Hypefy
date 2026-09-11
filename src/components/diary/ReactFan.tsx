@@ -72,7 +72,8 @@ export function ReactFan({
   function layout() {
     const r = btn.current!.getBoundingClientRect();
     const from = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    const radius = big ? 124 : 110;
+    // Wide enough that the one grown under the finger does not crowd its neighbours.
+    const radius = big ? 134 : 120;
     return {
       from,
       spots: items.map((_, i) => {
@@ -221,7 +222,7 @@ export function ReactFan({
             {/* One label, above the whole fan, so it never covers an emoji. */}
             {active !== null && (
               <span
-                className="absolute -translate-x-1/2 whitespace-nowrap rounded-full bg-elevated px-3 py-1.5 text-[13px] font-bold text-foreground shadow-lg ring-1 ring-border"
+                className="absolute -translate-x-1/2 whitespace-nowrap rounded-full bg-black/70 px-3 py-1.5 text-[13px] font-bold text-white shadow-lg backdrop-blur-md"
                 style={{ left: Math.min(...spots.map((s) => s.x)) + 64, top: Math.min(...spots.map((s) => s.y)) - 58 }}
               >
                 {items[active] === "⋯" ? "More emoji" : `Send ${items[active]}`}
@@ -243,9 +244,12 @@ export function ReactFan({
                     choose(i);
                   }}
                   onPointerEnter={detached ? () => setActive(i) : undefined}
-                  className={`absolute flex items-center justify-center rounded-full border shadow-[0_12px_24px_-10px_rgb(0_0_0/0.85)] transition-[transform,background-color,border-color] duration-150 ${
-                    big ? "h-[52px] w-[52px] text-[27px]" : "h-12 w-12 text-[24px]"
-                  } ${on ? "scale-[1.32] border-accent bg-[#262626]" : "border-white/10 bg-[#161616]/95"}`}
+                  // Just the emoji — no disc behind it, no ring: a soft shadow
+                  // keeps it clear over any page, and the one under the
+                  // finger says so by growing and lifting towards it.
+                  className={`absolute flex items-center justify-center rounded-full leading-none transition-transform duration-150 [filter:drop-shadow(0_6px_10px_rgb(0_0_0/0.55))] ${
+                    big ? "h-[52px] w-[52px] text-[34px]" : "h-12 w-12 text-[30px]"
+                  } ${on ? "-translate-y-2 scale-[1.55]" : ""}`}
                   style={
                     {
                       left: s.x,
@@ -260,7 +264,7 @@ export function ReactFan({
                     } as React.CSSProperties
                   }
                 >
-                  {more ? <span className="text-[15px] font-black tracking-wider text-white">•••</span> : items[i]}
+                  {more ? <span className="text-[17px] font-black tracking-[0.12em] text-white">•••</span> : items[i]}
                 </button>
               );
             })}
