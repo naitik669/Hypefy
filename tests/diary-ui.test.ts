@@ -315,7 +315,7 @@ describe("DiaryHome", () => {
         ],
       }))
     );
-    const spotlight = host.querySelector<HTMLElement>('section[aria-label="Spotlight"]')!;
+    const spotlight = host.querySelector<HTMLElement>('section[aria-label="Deck"]')!;
     expect(spotlight.style.minHeight).toContain("100dvh");
     expect(spotlight.querySelector('[aria-roledescription="card stack"]')).not.toBeNull();
 
@@ -474,6 +474,24 @@ describe("DiaryHome", () => {
     });
   });
 
+  it("brings the next page to the front the moment the top one is thrown, not after it lands", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    const song = { id: "t2", title: "Blinding Lights", artist: "X", artwork: "", preview: "t2.mp3" };
+    await render(
+      createElement(DiaryHome, home({
+        entries: [
+          entry({ userId: "a", name: "Aman", createdAt: minsAgo(1) }),
+          entry({ userId: "b", name: "Riya", track: song, createdAt: minsAgo(60) }),
+        ],
+      }))
+    );
+    await swipe("ArrowRight");
+    // No waiting for the thrown card: Riya is on top, and her song is on.
+    expect(topCard()!.textContent).toContain("Riya");
+    expect(played.at(-1)).toContain("t2.mp3");
+    expect(host.textContent).toContain("2/2");
+  });
+
   it("moves the deck by swiping alone — no arrow buttons", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(
@@ -490,7 +508,7 @@ describe("DiaryHome", () => {
   it("keeps words off the page: a titled header, an icon for past pages, no status lines", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home()));
-    expect(host.querySelector("h1")!.textContent).toBe("Pages");
+    expect(host.querySelector("h1")!.textContent).toBe("Spotlight");
     const past = button("Past pages")!;
     expect(past.closest("header")).not.toBeNull();
     expect(past.textContent).toBe("");
@@ -558,9 +576,9 @@ describe("DiaryButton", () => {
       })
     );
     const link = host.querySelector("a")!;
-    expect(link.getAttribute("href")).toBe("/messages/pages");
+    expect(link.getAttribute("href")).toBe("/messages/spotlight");
     expect(link.textContent).toBe("2");
-    expect(link.getAttribute("aria-label")).toBe("Pages, 2 new");
+    expect(link.getAttribute("aria-label")).toBe("Spotlight, 2 new");
   });
 
   it("shows no badge when there is nothing new", async () => {

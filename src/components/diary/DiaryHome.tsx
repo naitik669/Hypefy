@@ -34,7 +34,7 @@ const SPOTLIGHT_HEIGHT =
   "calc(100dvh - 3.5rem - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom))";
 
 /**
- * Pages — one tap from Messages.
+ * Spotlight — the screen of pages, one tap from Messages.
  *
  * The first screen is the spotlight: everyone else's pages as a deck of
  * cards in the middle of it, the one in front complete and usable where it
@@ -155,7 +155,7 @@ export function DiaryHome({
   return (
     <>
       <PageHeader
-        title="Pages"
+        title="Spotlight"
         showBack
         right={
           <button
@@ -172,7 +172,7 @@ export function DiaryHome({
         {/* ── The spotlight: the whole first screen ── */}
         {others.length > 0 && (
           <section
-            aria-label="Spotlight"
+            aria-label="Deck"
             // Edge to edge, clipped there: the CD peeks right up to the side of
             // the screen and must not scroll the page sideways when it grows.
             // Isolated, so the light can sit behind the deck.

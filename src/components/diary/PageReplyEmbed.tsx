@@ -65,7 +65,7 @@ export function PageReplyEmbed({
       </span>
       <div className="relative">
         <Link
-          href="/messages/pages"
+          href="/messages/spotlight"
           aria-label={`Page: ${page.text}`}
           className={`block w-40 rounded-[18px] p-3 ${mine ? "rotate-2" : "-rotate-2"}`}
           style={{ background: theme.background, boxShadow: theme.shadow }}

@@ -1,6 +1,7 @@
 /**
- * Pages — a 24-hour note, one per person, for your mutual circle. Called
- * "Diary" in the code, where it was built; "Pages" is the name people see.
+ * Pages — a 24-hour note, one per person, for your mutual circle, on the
+ * Spotlight screen. Called "Diary" in the code, where it was built; people
+ * see "Spotlight" for the screen and "page" for each note.
  *
  * Built on the `notes` table rather than beside it. That table already is
  * exactly this: one row per user, a 24-hour expiry, an audience of mutuals or
@@ -9,7 +10,8 @@
  * that notify the owner. What was missing was a place to read them — the old
  * surface was a bubble on a profile, which is switched off.
  *
- * So "Pages" is the name of the surface, and "note" stays the name of the row.
+ * So "Spotlight" is the name of the screen, "page" of what is on it, and
+ * "note" stays the name of the row.
  */
 
 import type { Track } from "@/lib/music";

@@ -6,7 +6,7 @@ import { BookOpenText } from "lucide-react";
 import { loadSeen, unseen } from "@/lib/diary";
 
 /**
- * The way into Pages, from the Messages filter row.
+ * The way into Spotlight, from the Messages filter row.
  *
  * The badge counts other people's Diaries you have not opened since they were
  * written. It is read after mount because "seen" lives in localStorage, which
@@ -26,8 +26,8 @@ export function DiaryButton({
 
   return (
     <Link
-      href="/messages/pages"
-      aria-label={count > 0 ? `Pages, ${count} new` : "Pages"}
+      href="/messages/spotlight"
+      aria-label={count > 0 ? `Spotlight, ${count} new` : "Spotlight"}
       className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground transition-transform active:scale-90"
     >
       <BookOpenText size={22} />

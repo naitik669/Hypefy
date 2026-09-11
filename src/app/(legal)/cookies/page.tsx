@@ -110,7 +110,7 @@ export default function CookiesPage() {
       </p>
       <Table
         rows={[
-          ["hypefy_feed_seen, hypefy_seen_shows, hypefy:diary:seen, hypefy:pages:flown", "Which posts, Shows and Pages you have already seen, and which reactions to your page have already been shown, so they are not shown as new again.", "Until cleared"],
+          ["hypefy_feed_seen, hypefy_seen_shows, hypefy:diary:seen, hypefy:pages:flown", "Which posts, Shows and Spotlight pages you have already seen, and which reactions to your page have already been shown, so they are not shown as new again.", "Until cleared"],
           ["hypefy_music_muted, hypefy.shots.muted", "Whether you had sound on.", "Until cleared"],
           ["hypefy_recent_searches, hypefy_gif_faves, hypefy_post_draft", "Your recent searches, favourite GIFs, and an unfinished post.", "Until cleared"],
           ["hypefy_accounts", "Accounts you have signed in to on this device, for the account switcher.", "Until you remove them"],

@@ -68,6 +68,7 @@ export function DiaryDisc({
       aria-label={label}
       aria-pressed={track ? playing : undefined}
       data-playing={playing || undefined}
+      data-disc=""
       className={`rounded-full transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${className}`}
       style={{
         width: size,
