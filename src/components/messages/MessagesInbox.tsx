@@ -19,7 +19,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { STATUS_ENABLED } from "@/lib/status-feature";
-import { DiaryButton } from "@/components/diary/DiaryButton";
+import { FloatingPages } from "@/components/diary/FloatingPages";
+import type { DiaryEntry } from "@/lib/diary";
 import { isEmojiReply } from "@/components/diary/PageReplyEmbed";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -179,13 +180,13 @@ export function MessagesInbox({
   rows,
   currentUserId,
   children,
-  diaries = [],
+  pages = [],
 }: {
   rows: InboxRow[];
   currentUserId: string;
   children?: React.ReactNode;
-  /** Live pages you can see, for the entry button's unseen count. */
-  diaries?: { userId: string; createdAt: string; isSelf: boolean }[];
+  /** Today's pages you can see, yours included — for the card floating over the inbox. */
+  pages?: DiaryEntry[];
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -532,12 +533,9 @@ export function MessagesInbox({
   if (rows.length === 0) {
     return (
       <>
-        {/* No conversations means no filter row, and the filter row is where
-            Diary lives — so without this, a new account whose mutuals have
-            written one would have no way to read it. */}
-        <div className="flex justify-end px-4 pt-3">
-          <DiaryButton diaries={diaries} />
-        </div>
+        {/* Spotlight floats here even with no conversations, so a new account
+            whose mutuals have written a page can still read it. */}
+        <FloatingPages pages={pages} />
         <EmptyState
           icon={MessageCircle}
           title="It's quiet in here"
@@ -763,10 +761,11 @@ export function MessagesInbox({
             )}
           </button>
         ))}
-        <div className="ml-auto pl-2">
-          <DiaryButton diaries={diaries} />
-        </div>
       </div>
+
+      {/* Spotlight: a small deck of today's pages floating at the bottom
+          right, shuffling itself; tap to open Spotlight on the one showing. */}
+      <FloatingPages pages={pages} />
 
       {/* List */}
       {filtered.length === 0 ? (
@@ -778,7 +777,9 @@ export function MessagesInbox({
             : "Nobody by that name."}
         </p>
       ) : (
-        <div className="flex flex-col pt-1">
+        // Room at the foot, so the last chats can scroll up clear of the
+        // floating Spotlight card rather than ending underneath it.
+        <div className="flex flex-col pb-36 pt-1">
           {/* Requests explainer — what this tab is and what accepting does */}
           {tab === "requests" && (
             <div className="mx-4 mb-2 mt-2 rounded-2xl border border-border bg-surface px-4 py-3">

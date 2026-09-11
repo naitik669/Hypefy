@@ -17,7 +17,11 @@ export const metadata = { title: "Spotlight" };
  * Under /messages so the Messages tab stays lit while you are here — the
  * bottom nav matches on the /messages prefix.
  */
-export default async function SpotlightPage() {
+export default async function SpotlightPage({ searchParams }: { searchParams: Promise<{ page?: string | string[] }> }) {
+  // ?page=<user> opens the deck on that person's page — how the card floating
+  // in Messages brings you to the page it was showing.
+  const { page } = await searchParams;
+  const startAt = typeof page === "string" ? page : null;
   const supabase = await createClient();
   const {
     data: { user },
@@ -79,6 +83,7 @@ export default async function SpotlightPage() {
       hypesOnMine={toHypes(hypesOnMine as never)}
       myReactions={myReactions}
       myHypes={myHypes}
+      startAt={startAt}
     />
   );
 }

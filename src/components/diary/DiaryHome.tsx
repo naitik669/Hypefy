@@ -18,6 +18,7 @@ import {
   markReactionsFlown,
   markSeen,
   newReactions,
+  startFrom,
   storyOrder,
   unseen,
   type DiaryEntry,
@@ -53,6 +54,7 @@ export function DiaryHome({
   hypesOnMine: initialHypes = NONE,
   myReactions: initialMine,
   myHypes: initialMyHypes = [],
+  startAt = null,
 }: {
   entries: DiaryEntry[];
   me: Me;
@@ -64,6 +66,8 @@ export function DiaryHome({
   myReactions: Record<string, string>;
   /** Friends whose current page you have hyped. */
   myHypes?: string[];
+  /** Whose page the deck opens on (?page= in the URL); the newest if unset. */
+  startAt?: string | null;
 }) {
   const [entries, setEntries] = useState(initial);
   const [onMine, setOnMine] = useState(() => [...initialReactions, ...initialHypes].sort((a, b) => b.at.localeCompare(a.at)));
@@ -98,7 +102,8 @@ export function DiaryHome({
     markReactionsFlown(minePage, all);
   }, [minePage, initialReactions, initialHypes]);
 
-  const others = useMemo(() => storyOrder(entries, fresh), [entries, fresh]);
+  // Opened from a page tapped in Messages: the deck starts on it.
+  const others = useMemo(() => startFrom(storyOrder(entries, fresh), startAt), [entries, fresh, startAt]);
 
   function onSaved(draft: DiaryDraft) {
     // A saved page is a new one: reactions and hypes were to the old one.

@@ -624,30 +624,80 @@ describe("timeAgo", () => {
   });
 });
 
-describe("DiaryButton", () => {
-  it("counts only other people's pages you have not opened", async () => {
-    const { DiaryButton } = await import("@/components/diary/DiaryButton");
-    localStorage.setItem("hypefy:diary:seen", JSON.stringify({ a: "1" }));
-    await render(
-      createElement(DiaryButton, {
-        diaries: [
-          { userId: "a", createdAt: "1", isSelf: false }, // seen
-          { userId: "b", createdAt: "1", isSelf: false }, // new
-          { userId: "c", createdAt: "1", isSelf: false }, // new
-          { userId: "me", createdAt: "1", isSelf: true }, // yours, never counted
-        ],
-      })
-    );
-    const link = host.querySelector("a")!;
-    expect(link.getAttribute("href")).toBe("/messages/spotlight");
-    expect(link.textContent).toBe("2");
-    expect(link.getAttribute("aria-label")).toBe("Spotlight, 2 new");
+describe("FloatingPages", () => {
+  const at = (m: number) => new Date(Date.UTC(2026, 8, 11, 12) - m * 60_000).toISOString();
+  const pages = [
+    entry({ userId: "a", name: "Aman", text: "HDB", createdAt: at(1) }), // newest, but seen
+    entry({ userId: "b", name: "Riya", text: "free", createdAt: at(60) }), // new
+    entry({ userId: "c", name: "Dev", text: "can't sleep", createdAt: at(30) }), // new, newer than Riya's
+    entry({ userId: "me", name: "Naitik", text: "mine", isSelf: true, createdAt: at(5) }), // yours, never in it
+  ];
+  const link = () => host.querySelector("a")!;
+
+  it("shows the page you have not opened first, counts only those, and opens Spotlight on it", async () => {
+    const { FloatingPages } = await import("@/components/diary/FloatingPages");
+    localStorage.setItem("hypefy:diary:seen", JSON.stringify({ a: at(1) }));
+    await render(createElement(FloatingPages, { pages, firstMs: 60_000 }));
+    expect(link().getAttribute("href")).toBe("/messages/spotlight?page=c");
+    expect(link().getAttribute("aria-label")).toBe("Dev's page: can't sleep. Open Spotlight, 2 new");
+    expect(link().textContent).toContain("can't sleep");
+    expect(link().textContent).not.toContain("mine");
   });
 
-  it("shows no badge when there is nothing new", async () => {
-    const { DiaryButton } = await import("@/components/diary/DiaryButton");
-    await render(createElement(DiaryButton, { diaries: [] }));
-    expect(host.querySelector("a")!.textContent).toBe("");
+  it("shuffles by itself, goes round once, and rests on the first", async () => {
+    const { FloatingPages } = await import("@/components/diary/FloatingPages");
+    localStorage.setItem("hypefy:diary:seen", JSON.stringify({ a: at(1) }));
+    await render(createElement(FloatingPages, { pages, firstMs: 30, everyMs: 30 }));
+    const seen = [link().getAttribute("href")];
+    // Each shuffle is the wait plus the 300ms slide off; a round of three and
+    // then some quiet, to show it stays.
+    for (let i = 0; i < 30; i++) {
+      await act(async () => void (await new Promise((r) => setTimeout(r, 60))));
+      const h = link().getAttribute("href");
+      if (h !== seen.at(-1)) seen.push(h);
+    }
+    const page = (h: string | null) => h!.split("=")[1];
+    // Dev, then Riya, then Aman, then back to Dev — and there it stays.
+    expect(seen.map(page)).toEqual(["c", "b", "a", "c"]);
+  });
+
+  it("holds still while your finger is on it", async () => {
+    const { FloatingPages } = await import("@/components/diary/FloatingPages");
+    await render(createElement(FloatingPages, { pages, firstMs: 30, everyMs: 30 }));
+    const first = link().getAttribute("href");
+    await act(async () => void link().dispatchEvent(new MouseEvent("pointerdown", { bubbles: true })));
+    await act(async () => void (await new Promise((r) => setTimeout(r, 400))));
+    expect(link().getAttribute("href")).toBe(first);
+  });
+
+  it("with nobody else's page up, shows yours — or a + to write one — and still opens Spotlight", async () => {
+    const { FloatingPages } = await import("@/components/diary/FloatingPages");
+    await render(createElement(FloatingPages, { pages: [pages[3]] }));
+    expect(link().getAttribute("href")).toBe("/messages/spotlight");
+    expect(link().getAttribute("aria-label")).toBe("Your page. Open Spotlight");
+    await act(async () => root!.render(createElement(FloatingPages, { pages: [] })));
+    expect(link().getAttribute("aria-label")).toBe("Write your page in Spotlight");
+  });
+});
+
+describe("Spotlight opened on a page", () => {
+  const minsAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+  const topCard = () => host.querySelector<HTMLElement>('section[aria-roledescription="card stack"] article:not([inert])');
+
+  it("starts the deck on the page tapped in Messages, the rest following in order", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(
+      createElement(DiaryHome, home({
+        entries: [
+          entry({ userId: "a", name: "Aman", text: "HDB", createdAt: minsAgo(1) }),
+          entry({ userId: "b", name: "Riya", text: "free", createdAt: minsAgo(60) }),
+          entry({ userId: "c", name: "Dev", text: "can't sleep", createdAt: minsAgo(120) }),
+        ],
+        startAt: "b",
+      }))
+    );
+    expect(topCard()!.textContent).toContain("Riya");
+    expect(host.textContent).toContain("1/3");
   });
 });
 

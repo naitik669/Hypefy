@@ -294,6 +294,17 @@ export function storyOrder<T extends { userId: string; createdAt: string; isSelf
 }
 
 /**
+ * The same order, started at one person's page — for opening Spotlight on
+ * the page that was tapped elsewhere (the card floating in Messages). The
+ * rest follow in their usual order and wrap round, so swiping on from there
+ * reaches the page that was next where you tapped. Unknown or absent: as is.
+ */
+export function startFrom<T extends { userId: string }>(list: T[], userId: string | null | undefined): T[] {
+  const i = userId ? list.findIndex((e) => e.userId === userId) : -1;
+  return i <= 0 ? list : [...list.slice(i), ...list.slice(0, i)];
+}
+
+/**
  * Where "next" and "back" go. Past the last Diary is the end of the run
  * (null closes the viewer); back on the first stays on the first rather
  * than closing — a tap on the left edge is rarely a request to leave.
