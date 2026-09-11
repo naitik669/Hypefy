@@ -6,23 +6,36 @@ import { Star, X } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { DiaryDisc, SongLine } from "@/components/diary/DiaryDisc";
 import { DiaryResponder } from "@/components/diary/DiaryResponder";
-import { diaryTheme, noteSize, shortLeft } from "@/components/diary/DiaryPage";
+import { diaryTheme, fillSize, shortLeft } from "@/components/diary/DiaryPage";
 import { STORY_MS, stepStory, type DiaryEntry } from "@/lib/diary";
+
+/** The CD: big, but never more than about a third of the screen's height. */
+const DISC = "min(270px, 34dvh)";
+
+/**
+ * The words full-screen: a third larger than on a card, with the longest
+ * word still fitting across the screen (about 330px of it).
+ */
+function screenSize(text: string): number {
+  const scale = 1.3;
+  return Math.min(150, Math.round(fillSize(text, 330 / scale) * scale));
+}
 
 /**
  * Pages full-screen, one after another — for when you want to go through
  * everyone's rather than scan the list. Never required: everything here is
  * also on the cards.
  *
+ * The words are large, in the upper part of the screen; a page with a song
+ * has its CD low on the right, big and half off the edge, turning while the
+ * song plays, with the song's name under it.
+ *
  * Gestures, in the order people reach for them: tap the right of the screen
- * for the next Diary and the left for the one before; swipe sideways for the
+ * for the next page and the left for the one before; swipe sideways for the
  * same; swipe down to leave; press and hold to stop the clock while you read.
- * Typing a reply stops it too — a Diary moving on under a half-written reply
+ * Typing a reply stops it too — a page moving on under a half-written reply
  * is the worst thing this screen could do. Arrow keys and Escape work on a
  * keyboard.
- *
- * A Diary with a song shows its CD at the right edge, playing and turning as
- * soon as the Diary is on screen.
  */
 export function DiaryStories({
   list,
@@ -164,10 +177,14 @@ export function DiaryStories({
         </button>
       </header>
 
-      {/* The page — the part you tap, hold and swipe. */}
+      {/* The page — the part you tap, hold and swipe. The words, large, in
+          its upper part; the CD low on the right, half off the edge, with
+          the song's name under it. With no song the words sit in the middle. */}
       <div
         ref={page}
-        className="relative flex flex-1 touch-none select-none flex-col justify-end pb-4 pl-6 pr-6"
+        className={`relative flex flex-1 touch-none select-none flex-col items-center px-7 text-center ${
+          entry.track ? "justify-start pt-[7dvh]" : "justify-center"
+        }`}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         onPointerCancel={() => {
@@ -175,26 +192,30 @@ export function DiaryStories({
           setHeld(false);
         }}
       >
-        {entry.track && (
-          // Its own tap target: a press on the disc must not count as a tap
-          // on the page, which would move on to the next Diary.
-          <div className="absolute right-0 top-[18%] translate-x-[46%]" onPointerDown={(e) => e.stopPropagation()}>
-            {/* Keyed per Diary so each one's song starts as it comes on screen. */}
-            <DiaryDisc key={entry.userId} track={entry.track} size={168} slide={-18} autoPlay />
-          </div>
-        )}
         <p
           className="relative break-words font-extrabold leading-[1.04] tracking-[-0.025em]"
-          style={{ fontSize: Math.min(Math.round(noteSize(entry.text).size * 1.5), 68) }}
+          style={{ fontSize: screenSize(entry.text) }}
         >
           {entry.text}
         </p>
+        {paused && held && <p className="mt-3 text-xs font-semibold text-white/55">Paused</p>}
+
         {entry.track && (
-          <div className="relative mt-3" onPointerDown={(e) => e.stopPropagation()}>
-            <SongLine track={entry.track} />
+          // Its own tap target: a press on the disc or the song must not count
+          // as a tap on the page, which would move on to the next page.
+          <div
+            className="absolute bottom-3 right-0 flex flex-col items-end"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="translate-x-[42%]">
+              {/* Keyed per page so each one's song starts as it comes on screen. */}
+              <DiaryDisc key={entry.userId} track={entry.track} size={DISC} slide={-28} autoPlay />
+            </div>
+            <div className="mr-5 mt-3 flex max-w-[78vw] justify-end">
+              <SongLine track={entry.track} />
+            </div>
           </div>
         )}
-        {paused && held && <p className="mt-3 text-xs font-semibold text-white/55">Paused</p>}
       </div>
 
       <div
