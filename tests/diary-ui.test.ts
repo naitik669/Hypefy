@@ -132,6 +132,13 @@ describe("DiaryHome", () => {
       el.dispatchEvent(new Event("input", { bubbles: true }));
     });
   const wait = (ms: number) => act(async () => void (await new Promise((r) => setTimeout(r, ms))));
+  /** Move the deck on, the way a keyboard does it — there are no buttons for it. */
+  const swipe = (key: "ArrowRight" | "ArrowLeft") =>
+    act(async () => {
+      host
+        .querySelector('[aria-keyshortcuts="ArrowLeft ArrowRight"]')!
+        .dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    });
   const openComposer = () => act(async () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Your page"]')!.focus());
 
   it("stacks everyone's Diaries, the one on top whole and usable, the rest behind it", async () => {
@@ -161,7 +168,7 @@ describe("DiaryHome", () => {
     expect(host.textContent).toContain("1/3");
   });
 
-  it("sends the top card to the back and brings the next up, and ‹ brings it back", async () => {
+  it("sends the top card to the back and brings the next up, and back again the other way", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(
       createElement(DiaryHome, home({
@@ -172,19 +179,19 @@ describe("DiaryHome", () => {
         ],
       }))
     );
-    await click(button("Next page"));
+    await swipe("ArrowRight");
     await wait(300); // out to the side, then tucked in behind
     expect(topCard()!.textContent).toContain("Riya");
     expect(host.textContent).toContain("2/3");
 
-    await click(button("Next page"));
+    await swipe("ArrowRight");
     await wait(300);
-    await click(button("Next page"));
+    await swipe("ArrowRight");
     await wait(300);
     // Round again: Aman is back on top, having been at the back.
     expect(topCard()!.textContent).toContain("Aman");
 
-    await click(button("Previous page"));
+    await swipe("ArrowLeft");
     expect(topCard()!.textContent).toContain("Dev");
   });
 
@@ -271,12 +278,12 @@ describe("DiaryHome", () => {
     expect(discs()[0].querySelector("img")!.getAttribute("src")).toBe("t1.jpg"); // the cover in the middle
     expect(played.at(-1)).toContain("t1.mp3");
 
-    await click(button("Next page")); // Riya: no song, so silence
+    await swipe("ArrowRight"); // Riya: no song, so silence
     await wait(300);
     expect(discs()).toEqual([]);
     expect(paused).toBeGreaterThan(0);
 
-    await click(button("Next page")); // Dev: his song starts
+    await swipe("ArrowRight"); // Dev: his song starts
     await wait(300);
     expect(discs().map((d) => d.getAttribute("aria-label"))).toEqual(["Pause Blinding Lights by X"]);
     expect(played.at(-1)).toContain("t2.mp3");
@@ -449,6 +456,19 @@ describe("DiaryHome", () => {
     expect(JSON.parse(localStorage.getItem("hypefy:diary:seen")!)).toEqual({
       a: "2026-09-10T01:00:00Z",
     });
+  });
+
+  it("moves the deck by swiping alone — no arrow buttons", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(
+      createElement(DiaryHome, home({
+        entries: [entry({ userId: "a", name: "Aman", createdAt: minsAgo(1) }), entry({ userId: "b", name: "Riya", createdAt: minsAgo(60) })],
+      }))
+    );
+    expect(button("Next page")).toBeNull();
+    expect(button("Previous page")).toBeNull();
+    expect(button("All pages")).toBeNull();
+    expect(host.textContent).toContain("1/2");
   });
 
   it("keeps words off the page: a titled header, an icon for past pages, no status lines", async () => {

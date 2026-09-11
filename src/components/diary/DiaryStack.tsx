@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DiaryDisc } from "@/components/diary/DiaryDisc";
 import { CARD_H, FriendDiaryCard } from "@/components/diary/FriendDiaryCard";
 import { haptics } from "@/lib/haptics";
@@ -14,12 +13,14 @@ const THROW_PX = 80;
 /** How long the thrown card takes to leave before it is tucked in behind. */
 const THROW_MS = 240;
 /**
- * The deck sits in the middle of the screen, the same margin either side;
- * the top card's CD peeks out into the right-hand one.
+ * The deck sits in the middle of the screen, the same margin either side.
+ * The top card's CD — big, the size of a real one in the hand — is tucked
+ * behind the card's top-right corner and sticks out over it, into the space
+ * above the deck, so a good part of the disc and its cover shows.
  */
-const INSET = 28;
-const DISC = 112;
-const PEEK = 24;
+const INSET = 40;
+const DISC = 150;
+const PEEK = { right: 34, top: 64 };
 /**
  * Where each depth sits. The cards behind fan out like a hand of cards — the
  * first leaning left, the second leaning right — so their colours and
@@ -40,8 +41,8 @@ const DEPTH = [
  * it has a song, its CD — tucked behind it on the right — starts playing and
  * turning by itself, and keeps going round until the card moves on. Swipe the
  * top card either way and it flies off, then tucks in at the back of the pile
- * as the next one comes up. The arrows underneath do the same, and ‹ brings
- * the last one back, for a card swiped by mistake.
+ * as the next one comes up. No buttons for it: the swipe is the way, with the
+ * arrow keys for a keyboard (← brings the last one back).
  */
 export function DiaryStack({
   list,
@@ -148,7 +149,9 @@ export function DiaryStack({
   return (
     <section aria-label="Pages from your circle" aria-roledescription="card stack">
       <div
-        className="relative"
+        tabIndex={deck.length > 1 ? 0 : undefined}
+        aria-keyshortcuts="ArrowLeft ArrowRight"
+        className="relative rounded-[28px] outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         style={{ height: `calc(${CARD_H} + ${DEPTH[Math.min(VISIBLE, deck.length) - 1].y + 10}px)` }}
         onKeyDown={(e) => {
           if (e.key === "ArrowRight") next(1);
@@ -222,10 +225,11 @@ export function DiaryStack({
                   key={id}
                   track={entry.track}
                   size={DISC}
-                  slide={12}
+                  slide={6}
+                  lift={10}
                   autoPlay
-                  className="absolute top-1/2 z-0"
-                  style={{ right: -PEEK, marginTop: -DISC / 2 }}
+                  className="absolute z-0"
+                  style={{ right: -PEEK.right, top: -PEEK.top }}
                 />
               )}
               <div className="relative z-10">
@@ -247,27 +251,9 @@ export function DiaryStack({
       </div>
 
       {deck.length > 1 && (
-        <div className="mt-2 flex items-center justify-center gap-2">
-          <button
-            type="button"
-            onClick={() => next(-1)}
-            aria-label="Previous page"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <p className="min-w-10 text-center text-xs font-semibold tabular-nums text-muted" aria-live="polite">
-            <span className="text-foreground">{position + 1}</span>/{list.length}
-          </p>
-          <button
-            type="button"
-            onClick={() => next(1)}
-            aria-label="Next page"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
+        <p className="mt-3 text-center text-xs font-semibold tabular-nums text-muted" aria-live="polite">
+          <span className="text-foreground">{position + 1}</span>/{list.length}
+        </p>
       )}
     </section>
   );

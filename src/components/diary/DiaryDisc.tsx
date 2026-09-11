@@ -18,13 +18,14 @@ const LOOP = { loop: true } as const;
  * composer), the same disc is blank with a plus, and tapping it adds one.
  *
  * The parent positions it (absolute, behind the page); the disc only moves
- * itself relative to that spot, by `slide` pixels to the right, so each place
- * it sits can decide how much room there is.
+ * itself relative to that spot, `slide` pixels right and `lift` pixels up, so
+ * each place it sits can decide how much room there is.
  */
 export function DiaryDisc({
   track,
   size = 112,
   slide = 12,
+  lift = 0,
   onAdd,
   autoPlay = false,
   className = "",
@@ -33,6 +34,8 @@ export function DiaryDisc({
   track: Track | null;
   size?: number;
   slide?: number;
+  /** And this far up, for a disc that peeks out over the top of its page. */
+  lift?: number;
   /** For an empty disc: what tapping it does. */
   onAdd?: () => void;
   /** Start playing on mount, stop on unmount — the card on top of the deck, and full-screen. */
@@ -67,7 +70,7 @@ export function DiaryDisc({
       style={{
         width: size,
         height: size,
-        transform: playing ? `translateX(${slide}px) scale(1.12)` : undefined,
+        transform: playing ? `translate(${slide}px, ${-lift}px) scale(1.12)` : undefined,
         ...style,
       }}
     >

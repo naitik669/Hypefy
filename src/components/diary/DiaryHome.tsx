@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Archive, ChevronDown } from "lucide-react";
+import { Archive } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DiaryComposer, DiaryEditor, type DiaryDraft } from "@/components/diary/DiaryEditor";
 import { DiscSleeve } from "@/components/diary/DiaryDisc";
@@ -69,7 +69,6 @@ export function DiaryHome({
   const [editing, setEditing] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [storyAt, setStoryAt] = useState<number | null>(null);
-  const list = useRef<HTMLDivElement>(null);
 
   const mine = entries.find((e) => e.isSelf) ?? null;
 
@@ -163,12 +162,14 @@ export function DiaryHome({
         {others.length > 0 && (
           <section
             aria-label="Spotlight"
-            className="relative flex flex-col justify-center py-4"
+            // Edge to edge, clipped there: the CD peeks right up to the side of
+            // the screen and must not scroll the page sideways when it grows.
+            className="relative -mx-3 flex flex-col justify-center overflow-x-clip px-3 py-4"
             style={{
               minHeight: SPOTLIGHT_HEIGHT,
-              // The card takes what the screen has left after the arrows and
-              // the fan: never under 320px, never over 500px.
-              ["--card-h" as string]: `clamp(320px, calc(${SPOTLIGHT_HEIGHT} - 170px), 500px)`,
+              // The card takes most of what the screen has, leaving the fan and
+              // some air: never under 300px, never over 440px.
+              ["--card-h" as string]: `clamp(300px, calc(${SPOTLIGHT_HEIGHT} - 220px), 440px)`,
             }}
           >
             <DiaryStack
@@ -180,19 +181,11 @@ export function DiaryHome({
               onHyped={onHyped}
               onOpen={(i) => setStoryAt(i)}
             />
-            <button
-              type="button"
-              onClick={() => list.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              aria-label="All pages"
-              className="absolute bottom-1 left-1/2 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full text-white/40 transition-colors hover:text-white"
-            >
-              <ChevronDown size={22} className="animate-bounce" />
-            </button>
           </section>
         )}
 
         {/* ── Every page, one to a row ── */}
-        <div ref={list} className="flex scroll-mt-20 flex-col gap-4 pt-4">
+        <div className="flex flex-col gap-4 pt-4">
           {mine ? (
             <div className="relative">
               <YourDiaryCard entry={mine} reactions={onMine} onEdit={() => setEditing(true)} />
