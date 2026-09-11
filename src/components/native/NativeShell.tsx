@@ -25,6 +25,13 @@ import { isAuthCallbackUrl, completeNativeSignIn } from "@/lib/native-auth";
  */
 const ROOT_ROUTES = ["/home", "/messages", "/shots", "/profile"];
 
+/** Away this long and the screen is refreshed on return; less, and it is left alone. */
+export const STALE_AFTER_MS = 30 * 60_000;
+
+export function shouldRefreshOnResume(awayMs: number): boolean {
+  return awayMs >= STALE_AFTER_MS;
+}
+
 /**
  * The native behaviours a WebView does not get for free.
  *
@@ -121,16 +128,28 @@ export function NativeShell() {
     return () => remove?.();
   }, [router]);
 
-  // ── Resume: re-check server state after the app was backgrounded.
+  // ── Resume: come back to exactly what you left.
   //
-  // A WebView that sat in the background for hours comes back showing stale
-  // data; a native app is expected to be current the moment it opens.
+  // This used to refresh the screen from the server on EVERY return, however
+  // brief. On Home that swapped the feed you were reading for a newly ranked
+  // one and dropped every page you had scrolled through, so glancing at a
+  // notification and coming back felt like the app restarting. The live
+  // screens catch up on their own now — a chat fetches what arrived while you
+  // were away, the inbox refreshes its list — so the whole-screen refresh is
+  // kept for a long absence only, when a fresh feed is what you would expect.
+  const awaySince = useRef<number | null>(null);
   useEffect(() => {
     if (!isNative()) return;
     let remove: (() => void) | undefined;
 
     void App.addListener("appStateChange", ({ isActive }) => {
-      if (isActive) router.refresh();
+      if (!isActive) {
+        awaySince.current = Date.now();
+        return;
+      }
+      const away = awaySince.current === null ? 0 : Date.now() - awaySince.current;
+      awaySince.current = null;
+      if (shouldRefreshOnResume(away)) router.refresh();
     }).then((handle) => { remove = () => void handle.remove(); });
 
     return () => remove?.();

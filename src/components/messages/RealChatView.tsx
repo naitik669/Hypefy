@@ -652,6 +652,36 @@ export function RealChatView({
 
   // Realtime: messages
   useEffect(() => {
+    // Pull whatever arrived after the newest message on screen, and append it.
+    // Never replaces what is already shown, so nothing jumps.
+    function catchUp() {
+      const latest = messagesRef.current.reduce(
+        (max, m) => (m.created_at > max ? m.created_at : max),
+        "1970-01-01T00:00:00Z",
+      );
+      supabase
+        .from("messages")
+        .select(MSG_SELECT)
+        .eq("conversation_id", conversationId)
+        .gt("created_at", latest)
+        .order("created_at", { ascending: true })
+        .then(({ data }) => {
+          const rows = (data ?? []).map(mapMessageRow);
+          if (!rows.length) return;
+          setMessages((prev) => {
+            const have = new Set(prev.map((p) => p.id));
+            const add = rows.filter((r) => !have.has(r.id));
+            return add.length ? [...prev, ...add] : prev;
+          });
+        });
+    }
+    // Back from the background: the socket may not have noticed it was
+    // dropped yet, so ask directly instead of waiting for it to rejoin.
+    function onVisible() {
+      if (document.visibilityState === "visible") catchUp();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+
     const channel = supabase
       .channel(`chat:${conversationId}`)
       .on("postgres_changes",
@@ -686,29 +716,12 @@ export function RealChatView({
       .subscribe((status) => {
         // On (re)subscribe — including after a dropped connection — pull any
         // messages that arrived while we were offline so nothing is missed.
-        if (status === "SUBSCRIBED") {
-          const latest = messagesRef.current.reduce(
-            (max, m) => (m.created_at > max ? m.created_at : max),
-            "1970-01-01T00:00:00Z",
-          );
-          supabase
-            .from("messages")
-            .select(MSG_SELECT)
-            .eq("conversation_id", conversationId)
-            .gt("created_at", latest)
-            .order("created_at", { ascending: true })
-            .then(({ data }) => {
-              const rows = (data ?? []).map(mapMessageRow);
-              if (!rows.length) return;
-              setMessages((prev) => {
-                const have = new Set(prev.map((p) => p.id));
-                const add = rows.filter((r) => !have.has(r.id));
-                return add.length ? [...prev, ...add] : prev;
-              });
-            });
-        }
+        if (status === "SUBSCRIBED") catchUp();
       });
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      supabase.removeChannel(channel);
+    };
   }, [conversationId, currentUserId, supabase]);
 
   // Realtime: reactions (refetch the affected set on any change)

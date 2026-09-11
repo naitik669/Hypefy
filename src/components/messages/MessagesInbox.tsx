@@ -327,6 +327,22 @@ export function MessagesInbox({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as it appears
   }, []);
 
+  // Back from another app: the live updates were asleep, so fetch the list
+  // again. The rows update in place; nothing on screen is thrown away.
+  useEffect(() => {
+    let hiddenAt: number | null = null;
+    function onVisibility() {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+        return;
+      }
+      if (hiddenAt !== null && Date.now() - hiddenAt > 5000) router.refresh();
+      hiddenAt = null;
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [router]);
+
   // Realtime: keep the inbox live without a manual refresh.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
