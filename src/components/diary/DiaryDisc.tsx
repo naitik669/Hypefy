@@ -47,11 +47,21 @@ export function DiaryDisc({
   const playing = useIsPlaying(track?.id);
   const icon = typeof size === "number" ? Math.round(size * 0.15) : 20;
 
+  // The song by its id, not the object: a page re-read from the server is a
+  // new object with the same song, and must not restart it.
+  const song = useRef(track);
   useEffect(() => {
-    if (!autoPlay || !track) return;
-    ensurePreviewPlaying(track, LOOP);
+    song.current = track;
+  });
+  const songId = track?.id;
+  useEffect(() => {
+    const t = song.current;
+    if (!autoPlay || !t) return;
+    // From the top each time: a page coming round again plays its song
+    // afresh rather than picking up where it was cut off.
+    ensurePreviewPlaying(t, { ...LOOP, restart: true });
     return () => pausePreview();
-  }, [autoPlay, track]);
+  }, [autoPlay, songId]);
 
   const label = track
     ? `${playing ? "Pause" : "Play"} ${track.title}${track.artist ? ` by ${track.artist}` : ""}`

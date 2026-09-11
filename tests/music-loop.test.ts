@@ -76,4 +76,15 @@ describe("looping", () => {
     expect(played.map((p) => p.src.split("/").pop())).toEqual(["c.mp3", "d.mp3"]);
     stopPreview();
   });
+
+  it("starts a returning song from its snippet, not where it was cut off", async () => {
+    const { ensurePreviewPlaying, pausePreview, stopPreview } = await import("@/lib/music");
+    const t = track("e", 9);
+    ensurePreviewPlaying(t, { loop: true, restart: true });
+    el!.currentTime = 20; // it had played on a while
+    pausePreview();
+    ensurePreviewPlaying(t, { loop: true, restart: true });
+    expect(el!.currentTime).toBe(9);
+    stopPreview();
+  });
 });

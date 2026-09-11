@@ -69,6 +69,20 @@ let playingId: string | null = null;
  * Cleared by any play that does not ask to loop.
  */
 let loopFrom: { id: string; start: number } | null = null;
+/**
+ * Which play() is the latest. A play interrupted by the next one (or by a
+ * pause) rejects later; only the latest may say "it did not start", or a
+ * stale rejection would mark a song that is playing as stopped.
+ */
+let playSeq = 0;
+function startPlay(a: HTMLAudioElement) {
+  const seq = ++playSeq;
+  a.play().catch(() => {
+    if (seq !== playSeq) return;
+    playingId = null;
+    emit();
+  });
+}
 const listeners = new Set<() => void>();
 
 const MUTE_KEY = "hypefy_music_muted";
@@ -132,6 +146,8 @@ export type PlayOpts = {
   audible?: boolean;
   /** Start again from the snippet start each time it ends (a Diary's song). */
   loop?: boolean;
+  /** Start from the snippet start even if this track was paused part-way. */
+  restart?: boolean;
 };
 
 function setLoop(track: Track, opts?: PlayOpts) {
@@ -171,10 +187,7 @@ export function playPreview(track: Track, opts?: PlayOpts) {
   a.src = srcFor(track);
   playingId = track.id;
   emit();
-  a.play().catch(() => {
-    playingId = null;
-    emit();
-  });
+  startPlay(a);
 }
 
 export function stopPreview() {
@@ -205,15 +218,13 @@ export function ensurePreviewPlaying(track: Track, opts?: PlayOpts) {
   const a = ensureAudio();
   const sameSrc = a.src === srcFor(track);
   setLoop(track, opts);
-  if (sameSrc && playingId === track.id && !a.paused) return;
+  if (sameSrc && playingId === track.id && !a.paused && !opts?.restart) return;
   applyMute(a, opts);
   if (!sameSrc) a.src = srcFor(track);
+  else if (opts?.restart) a.currentTime = track.start ?? 0;
   playingId = track.id;
   emit();
-  a.play().catch(() => {
-    playingId = null;
-    emit();
-  });
+  startPlay(a);
 }
 
 /** Pause without clearing the source, so ensurePreviewPlaying can resume. */

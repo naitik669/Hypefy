@@ -255,7 +255,7 @@ describe("DiaryHome", () => {
     expect(host.textContent).toContain("Sent");
   });
 
-  it("plays the top card's song by itself, on its CD, and the next card's when it comes up", async () => {
+  it("plays the front card's song by itself, shows every card's CD, and plays the next when it comes up", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     const song = (id: string, title: string) => ({ id, title, artist: "X", artwork: `${id}.jpg`, preview: `${id}.mp3` });
     await render(
@@ -274,18 +274,23 @@ describe("DiaryHome", () => {
         '[aria-roledescription="card stack"] button[aria-label^="Pause "], [aria-roledescription="card stack"] button[aria-label^="Play "]'
       ),
     ];
-    expect(discs().map((d) => d.getAttribute("aria-label"))).toEqual(["Pause Pasoori by X"]);
-    expect(discs()[0].querySelector("img")!.getAttribute("src")).toBe("t1.jpg"); // the cover in the middle
+    const playing = () => discs().filter((d) => d.getAttribute("aria-label")!.startsWith("Pause ")).map((d) => d.getAttribute("aria-label"));
+    // Every card with a song shows its CD — Dev's, behind, too — and only the
+    // one in front plays.
+    expect(discs()).toHaveLength(2);
+    expect(playing()).toEqual(["Pause Pasoori by X"]);
+    const front = discs().find((d) => d.getAttribute("aria-label")!.startsWith("Pause "))!;
+    expect(front.querySelector("img")!.getAttribute("src")).toBe("t1.jpg"); // the cover in the middle
     expect(played.at(-1)).toContain("t1.mp3");
 
     await swipe("ArrowRight"); // Riya: no song, so silence
     await wait(300);
-    expect(discs()).toEqual([]);
+    expect(playing()).toEqual([]);
     expect(paused).toBeGreaterThan(0);
 
     await swipe("ArrowRight"); // Dev: his song starts
     await wait(300);
-    expect(discs().map((d) => d.getAttribute("aria-label"))).toEqual(["Pause Blinding Lights by X"]);
+    expect(playing()).toEqual(["Pause Blinding Lights by X"]);
     expect(played.at(-1)).toContain("t2.mp3");
   });
 

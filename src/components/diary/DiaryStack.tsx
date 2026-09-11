@@ -22,8 +22,8 @@ const FLY = "420ms cubic-bezier(0.3, 0.6, 0.35, 1)";
 
 /**
  * The deck sits in the middle of the screen, the same margin either side.
- * The top card's CD — big, about half the card's height — is tucked behind
- * its right edge, a sliver showing. When the song plays the card nudges left
+ * A page's CD — big, about half the card's height — is tucked behind its
+ * right edge, a sliver showing, on the cards behind as on the one in front. When the song plays the card nudges left
  * and the disc slides out to the right, far enough to show its cover.
  */
 const INSET = 40;
@@ -184,6 +184,11 @@ export function DiaryStack({
     setThrown({ id, dir: from < 0 ? -1 : 1 });
     timer.current = window.setTimeout(() => {
       setInner(id, ""); // it is off-screen now; drop the drag without a trace
+      const disc = discOf(id); // and its CD, faded by the drag, back for the pile
+      if (disc) {
+        disc.style.transition = "opacity 300ms ease";
+        disc.style.opacity = "";
+      }
       setDeck((d) => cycleDeck(d, 1));
       setThrown(null);
     }, THROW_MS);
@@ -309,16 +314,17 @@ export function DiaryStack({
                 onPointerUp={isTop ? onPointerUp : undefined}
                 onPointerCancel={isTop ? onPointerCancel : undefined}
               >
-                {/* The top card's song: its CD, playing by itself, round and
-                    round, until this card leaves the top. Keyed per card, so
-                    each one's song starts as it arrives. */}
-                {isTop && entry.track && (
+                {/* Every page with a song keeps its CD tucked at its edge, so a
+                    card behind shows it has music. It is the same disc as the
+                    card comes forward, so arriving at the front it slides out
+                    smoothly as its song starts — from the top, round and round
+                    until the card moves on. */}
+                {entry.track && (
                   <DiaryDisc
-                    key={id}
                     track={entry.track}
                     size={DISC}
                     slide={PLAYING_SLIDE}
-                    autoPlay
+                    autoPlay={isTop}
                     className="absolute top-1/2 z-0"
                     style={DISC_AT}
                   />
