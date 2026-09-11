@@ -219,15 +219,6 @@ export function ReactFan({
             onClick={detached ? close : undefined}
             style={{ pointerEvents: detached ? "auto" : "none" }}
           >
-            {/* One label, above the whole fan, so it never covers an emoji. */}
-            {active !== null && (
-              <span
-                className="absolute -translate-x-1/2 whitespace-nowrap rounded-full bg-black/70 px-3 py-1.5 text-[13px] font-bold text-white shadow-lg backdrop-blur-md"
-                style={{ left: Math.min(...spots.map((s) => s.x)) + 64, top: Math.min(...spots.map((s) => s.y)) - 58 }}
-              >
-                {items[active] === "⋯" ? "More emoji" : `Send ${items[active]}`}
-              </span>
-            )}
             {spots.map((s, i) => {
               const on = i === active;
               const more = items[i] === "⋯";
@@ -244,12 +235,13 @@ export function ReactFan({
                     choose(i);
                   }}
                   onPointerEnter={detached ? () => setActive(i) : undefined}
-                  // Just the emoji — no disc behind it, no ring: a soft shadow
-                  // keeps it clear over any page, and the one under the
-                  // finger says so by growing and lifting towards it.
-                  className={`absolute flex items-center justify-center rounded-full leading-none transition-transform duration-150 [filter:drop-shadow(0_6px_10px_rgb(0_0_0/0.55))] ${
-                    big ? "h-[52px] w-[52px] text-[34px]" : "h-12 w-12 text-[30px]"
-                  } ${on ? "-translate-y-2 scale-[1.55]" : ""}`}
+                  // A see-through, frosted disc, no ring: it keeps each emoji
+                  // clear over any page colour without boxing it in. The one
+                  // under the finger says so by growing and lifting, a little
+                  // brighter behind.
+                  className={`absolute flex items-center justify-center rounded-full leading-none backdrop-blur-md transition-[transform,background-color] duration-150 shadow-[0_10px_22px_-10px_rgb(0_0_0/0.6)] ${
+                    big ? "h-[52px] w-[52px] text-[28px]" : "h-12 w-12 text-[26px]"
+                  } ${on ? "-translate-y-2 scale-[1.4] bg-white/[0.3]" : "bg-white/[0.16]"}`}
                   style={
                     {
                       left: s.x,

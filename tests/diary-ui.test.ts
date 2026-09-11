@@ -783,6 +783,16 @@ describe("FloatingPages", () => {
     expect(link().getAttribute("href")).toBe("/messages/spotlight?page=a");
   });
 
+  it("keeps its swipes from turning into a swipe between tabs", async () => {
+    const { FloatingPages } = await import("@/components/diary/FloatingPages");
+    const { gestureBlocked } = await import("@/components/layout/SwipeNav");
+    await render(createElement(FloatingPages, { pages }));
+    // A touch starting anywhere on the deck — deep inside a card — is the deck's.
+    const inner = link().querySelector("span span")!;
+    expect(gestureBlocked(0, inner)).toBe(true);
+    expect(gestureBlocked(0, document.body)).toBe(false);
+  });
+
   it("does not swipe while it is peeking — the deck is still at the edge", async () => {
     const { FloatingPages } = await import("@/components/diary/FloatingPages");
     await render(createElement(FloatingPages, { pages, introHoldMs: 0 }));
