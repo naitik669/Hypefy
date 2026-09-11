@@ -1,3 +1,5 @@
+import type { createClient } from "@/lib/supabase/client";
+
 /**
  * Saved posts and Shots, as one kind of thing.
  *
@@ -58,6 +60,40 @@ export function savedShot(r: Row): SavedItem | null {
     caption: (s.caption as string | null) ?? null,
     savedAt: r.created_at as string,
     multi: false,
+  };
+}
+
+/** A collection_items row with whichever of its post or Shot it holds. */
+export function folderItem(r: Row): SavedItem | null {
+  return savedPost(r) ?? savedShot(r);
+}
+
+export const FOLDER_ITEM_COLS =
+  "created_at, posts(id, image_url, image_urls, caption), shots(id, media_url, poster_url, caption)";
+
+/**
+ * One page of your saved posts or Shots, from where the last page ended.
+ * Null when it failed — a failed page must not read as the end of the list.
+ */
+export async function fetchSavedPage(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  kind: "post" | "shot",
+  after: string | undefined,
+  order: SavedOrder,
+  size: number
+): Promise<{ items: SavedItem[]; done: boolean } | null> {
+  let query = supabase
+    .from(kind === "post" ? "saved_posts" : "saved_shots")
+    .select(kind === "post" ? SAVED_POST_COLS : SAVED_SHOT_COLS)
+    .eq("user_id", userId);
+  if (after) query = order === "newest" ? query.lt("created_at", after) : query.gt("created_at", after);
+  const { data, error } = await query.order("created_at", { ascending: order === "oldest" }).limit(size);
+  if (error) return null;
+  const rows = (data ?? []) as unknown as Row[];
+  return {
+    items: rows.flatMap((r) => (kind === "post" ? savedPost(r) : savedShot(r)) ?? []),
+    done: rows.length < size,
   };
 }
 

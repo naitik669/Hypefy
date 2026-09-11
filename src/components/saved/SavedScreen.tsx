@@ -14,17 +14,7 @@ import { FolderPickSheet } from "@/components/saved/FolderPickSheet";
 import { scheduleUndoable } from "@/lib/undoable";
 import { haptics } from "@/lib/haptics";
 import { makeFolder, nextFolderColor, toFolder, type Folder } from "@/lib/folders";
-import {
-  foundItem,
-  itemKey,
-  mergeSaved,
-  SAVED_POST_COLS,
-  SAVED_SHOT_COLS,
-  savedPost,
-  savedShot,
-  type SavedItem,
-  type SavedOrder,
-} from "@/lib/saved";
+import { fetchSavedPage, foundItem, itemKey, mergeSaved, type SavedItem, type SavedOrder } from "@/lib/saved";
 
 type Tab = "all" | "posts" | "shots";
 
@@ -89,23 +79,7 @@ export function SavedScreen({
 
   // ── Loading ───────────────────────────────────────────────────────────
   const fetchPage = useCallback(
-    async (kind: "post" | "shot", after: string | undefined, o: SavedOrder) => {
-      let query = supabase
-        .from(kind === "post" ? "saved_posts" : "saved_shots")
-        .select(kind === "post" ? SAVED_POST_COLS : SAVED_SHOT_COLS)
-        .eq("user_id", userId);
-      if (after) query = o === "newest" ? query.lt("created_at", after) : query.gt("created_at", after);
-      const { data, error } = await query.order("created_at", { ascending: o === "oldest" }).limit(pageSize);
-      if (error) return null;
-      const rows = (data ?? []) as unknown as Record<string, unknown>[];
-      return {
-        items: rows.flatMap((r) => {
-          const i = kind === "post" ? savedPost(r) : savedShot(r);
-          return i ? [i] : [];
-        }),
-        done: rows.length < pageSize,
-      };
-    },
+    (kind: "post" | "shot", after: string | undefined, o: SavedOrder) => fetchSavedPage(supabase, userId, kind, after, o, pageSize),
     [supabase, userId, pageSize]
   );
 
