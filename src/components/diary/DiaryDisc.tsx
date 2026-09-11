@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Music, Plus, X } from "lucide-react";
 import { ensurePreviewPlaying, pausePreview, playPreview, useIsPlaying, type Track } from "@/lib/music";
 
@@ -32,7 +32,8 @@ export function DiaryDisc({
   style,
 }: {
   track: Track | null;
-  size?: number;
+  /** px, or any CSS length — the cover and the hole are drawn in proportion. */
+  size?: number | string;
   slide?: number;
   /** And this far up, for a disc that peeks out over the top of its page. */
   lift?: number;
@@ -44,6 +45,7 @@ export function DiaryDisc({
   style?: React.CSSProperties;
 }) {
   const playing = useIsPlaying(track?.id);
+  const icon = typeof size === "number" ? Math.round(size * 0.15) : 20;
 
   useEffect(() => {
     if (!autoPlay || !track) return;
@@ -84,24 +86,22 @@ export function DiaryDisc({
         {/* The label — the song's cover, filling the middle of the disc, or a
             plus on a blank one. */}
         <span
-          className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full bg-[#1d1d23]"
-          style={{ width: size * 0.6, height: size * 0.6, boxShadow: "0 0 0 1.5px rgb(0 0 0 / 0.6), 0 0 0 3px rgb(255 255 255 / 0.08)" }}
+          className="absolute left-1/2 top-1/2 flex h-[60%] w-[60%] -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full bg-[#1d1d23]"
+          style={{ boxShadow: "0 0 0 1.5px rgb(0 0 0 / 0.6), 0 0 0 3px rgb(255 255 255 / 0.08)" }}
         >
           {track?.artwork ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={track.artwork} alt="" className="h-full w-full object-cover" draggable={false} />
           ) : track ? (
-            <Music size={size * 0.14} className="text-white/70" />
+            <Music size={icon} className="text-white/70" />
           ) : (
-            <Plus size={size * 0.16} className="text-white/80" strokeWidth={2.5} />
+            <Plus size={icon} className="text-white/80" strokeWidth={2.5} />
           )}
         </span>
         {/* The hole. */}
         <span
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background"
+          className="absolute left-1/2 top-1/2 h-[9%] w-[9%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-background"
           style={{
-            width: size * 0.09,
-            height: size * 0.09,
             boxShadow: "0 0 0 2px rgb(0 0 0 / 0.5), 0 0 0 3.5px rgb(255 255 255 / 0.22)",
           }}
         />
@@ -112,12 +112,19 @@ export function DiaryDisc({
 
 /** How far the page stops short of the right edge to leave the disc room. */
 const GUTTER = 44;
+/** The disc before the page has been measured, and its limits after. */
 const SLEEVE_DISC = 108;
+const SLEEVE_MIN = 96;
+const SLEEVE_MAX = 176;
 
 /**
  * A page with its CD tucked behind it: the page stops short of the right edge
  * and the disc sits in that gap, most of it hidden under the page. Without a
  * song (and nothing to add one with) the page takes the full width.
+ *
+ * The disc is sized to the page — about 60% of its height — so a tall page
+ * has a big CD and a short one a small one. The gap stays the same width, so
+ * resizing the disc never moves the page: a bigger disc shows a taller arc.
  */
 export function DiscSleeve({
   track,
@@ -128,18 +135,35 @@ export function DiscSleeve({
   onAdd?: () => void;
   children: React.ReactNode;
 }) {
-  if (!track && !onAdd) return <>{children}</>;
+  const page = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState(SLEEVE_DISC);
+  const sleeved = !!track || !!onAdd;
+  useEffect(() => {
+    const el = page.current;
+    if (!sleeved || !el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => {
+      // In steps of 4px, so a page settling by a pixel does not redraw it.
+      const next = Math.round(Math.min(SLEEVE_MAX, Math.max(SLEEVE_MIN, e.contentRect.height * 0.6)) / 4) * 4;
+      setSize((s) => (s === next ? s : next));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [sleeved]);
+
+  if (!sleeved) return <>{children}</>;
   return (
     <div className="relative" style={{ paddingRight: GUTTER }}>
       <DiaryDisc
         track={track}
         onAdd={onAdd}
-        size={SLEEVE_DISC}
+        size={size}
         slide={12}
         className="absolute right-2 top-1/2 z-0"
-        style={{ marginTop: -SLEEVE_DISC / 2 }}
+        style={{ marginTop: -size / 2 }}
       />
-      <div className="relative z-10">{children}</div>
+      <div ref={page} className="relative z-10">
+        {children}
+      </div>
     </div>
   );
 }

@@ -16,11 +16,13 @@ const THROW_MS = 240;
  * The deck sits in the middle of the screen, the same margin either side.
  * The top card's CD — big, the size of a real one in the hand — is tucked
  * behind the card's top-right corner and sticks out over it, into the space
- * above the deck, so a good part of the disc and its cover shows.
+ * above the deck, so a good part of the disc and its cover shows. It is
+ * sized from the card (about half its height, 150px on a 314px card), so a
+ * bigger card has a bigger disc and a smaller one a smaller disc.
  */
 const INSET = 40;
-const DISC = 150;
-const PEEK = { right: 34, top: 64 };
+const DISC = `calc(${CARD_H} * 0.48)`;
+const PEEK = { right: `calc(${CARD_H} * -0.11)`, top: `calc(${CARD_H} * -0.2)` };
 /**
  * Where each depth sits. The cards behind fan out like a hand of cards — the
  * first leaning left, the second leaning right — so their colours and
@@ -229,7 +231,7 @@ export function DiaryStack({
                   lift={10}
                   autoPlay
                   className="absolute z-0"
-                  style={{ right: -PEEK.right, top: -PEEK.top }}
+                  style={{ right: PEEK.right, top: PEEK.top }}
                 />
               )}
               <div className="relative z-10">

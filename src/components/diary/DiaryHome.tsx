@@ -11,6 +11,8 @@ import { DiaryStack } from "@/components/diary/DiaryStack";
 import { DiaryStories } from "@/components/diary/DiaryStories";
 import { DiaryArchiveSheet } from "@/components/diary/DiaryArchiveSheet";
 import { FloatingReactions } from "@/components/diary/PageReactions";
+import type { DiaryColor } from "@/components/diary/DiaryPage";
+import { createClient } from "@/lib/supabase/client";
 import {
   loadSeen,
   markReactionsFlown,
@@ -132,6 +134,15 @@ export function DiaryHome({
     });
   }
 
+  // Recolour your page in place: shown at once, put back if the server says no.
+  async function onColor(color: DiaryColor) {
+    const before = mine?.color ?? null;
+    const paint = (c: string | null) => setEntries((prev) => prev.map((e) => (e.isSelf ? { ...e, color: c } : e)));
+    paint(color);
+    const { error } = await createClient().rpc("set_note_color", { p_color: color });
+    if (error) paint(before);
+  }
+
   function onHyped(userId: string, on: boolean) {
     setHyped((prev) => {
       const next = new Set(prev);
@@ -164,7 +175,8 @@ export function DiaryHome({
             aria-label="Spotlight"
             // Edge to edge, clipped there: the CD peeks right up to the side of
             // the screen and must not scroll the page sideways when it grows.
-            className="relative -mx-3 flex flex-col justify-center overflow-x-clip px-3 py-4"
+            // Isolated, so the light can sit behind the deck.
+            className="relative isolate -mx-3 flex flex-col justify-center overflow-x-clip px-3 py-4"
             style={{
               minHeight: SPOTLIGHT_HEIGHT,
               // Only a little taller than it is wide — a tenth — so it reads as a
@@ -173,6 +185,8 @@ export function DiaryHome({
               ["--card-h" as string]: `clamp(260px, calc((min(100vw, 480px) - 104px) * 1.1), calc(${SPOTLIGHT_HEIGHT} - 250px))`,
             }}
           >
+            {/* A light from above, onto the deck — just a touch. */}
+            <div aria-hidden className="pages-spotlight pointer-events-none absolute inset-0 -z-10" />
             <DiaryStack
               list={others}
               fresh={fresh}
@@ -186,10 +200,11 @@ export function DiaryHome({
         )}
 
         {/* ── Every page, one to a row ── */}
-        <div className="flex flex-col gap-4 pt-4">
+        {/* Clipped at the screen edge too: a big CD playing slides out a little. */}
+        <div className="-mx-3 flex flex-col gap-4 overflow-x-clip px-3 pt-4">
           {mine ? (
             <div className="relative">
-              <YourDiaryCard entry={mine} reactions={onMine} onEdit={() => setEditing(true)} />
+              <YourDiaryCard entry={mine} reactions={onMine} onEdit={() => setEditing(true)} onColor={onColor} />
               <FloatingReactions reactions={flying} />
             </div>
           ) : (

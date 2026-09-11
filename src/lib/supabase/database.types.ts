@@ -2453,6 +2453,7 @@ export type Database = {
         }
       }
       send_page_reply: { Args: { p_body: string; p_owner: string }; Returns: string }
+      set_note_color: { Args: { p_color: string }; Returns: undefined }
       toggle_note_hype: { Args: { p_owner: string }; Returns: boolean }
       set_notif_pref: {
         Args: { p_key: string; p_on: boolean }

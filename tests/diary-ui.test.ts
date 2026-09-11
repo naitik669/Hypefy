@@ -424,6 +424,22 @@ describe("DiaryHome", () => {
     expect(floating()).toEqual([]);
   });
 
+  it("recolours your page from its palette, without rewriting it", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    const { diaryTheme } = await import("@/components/diary/DiaryPage");
+    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "me", isSelf: true, text: "gym then chai", color: "cobalt" })] })));
+    await click(button("Page colour"));
+    expect(button("Cobalt")!.getAttribute("aria-checked")).toBe("true");
+
+    await click(button("Rose"));
+    // Only the colour: not set_note, which would start the page afresh.
+    expect(rpcCalls).toEqual([{ fn: "set_note_color", args: { p_color: "rose" } }]);
+    expect(button("Rose")!.getAttribute("aria-checked")).toBe("true");
+    const probe = document.createElement("div");
+    probe.style.background = diaryTheme("rose", 100).background;
+    expect(host.querySelector("article")!.style.background).toBe(probe.style.background);
+  });
+
   it("shows your page with an edit button, and says nothing when nobody has reacted", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "me", isSelf: true, text: "gym then chai" })] })));

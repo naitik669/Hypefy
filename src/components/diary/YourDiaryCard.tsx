@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { PenLine, Star } from "lucide-react";
+import { Check, Palette, PenLine, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { DiscSleeve, SongLine } from "@/components/diary/DiaryDisc";
-import { diaryTheme, lifeLeft, noteSize, shortLeft } from "@/components/diary/DiaryPage";
+import { DIARY_COLORS, colorKey, diaryTheme, lifeLeft, noteSize, shortLeft, swatchOf, type DiaryColor } from "@/components/diary/DiaryPage";
 import { ReactionsTab, byPerson } from "@/components/diary/PageReactions";
 import type { DiaryEntry, DiaryReaction } from "@/lib/diary";
 
@@ -12,17 +12,25 @@ import type { DiaryEntry, DiaryReaction } from "@/lib/diary";
  * Your page, as your circle sees it. If anyone reacted or hyped it, a small
  * tab at its foot shows their faces and emoji; tap it for who sent what.
  * If nobody has, there is nothing there at all.
+ *
+ * The palette in its corner recolours it on the spot — same words, same 24
+ * hours, same reactions; only the colour changes.
  */
 export function YourDiaryCard({
   entry,
   reactions,
   onEdit,
+  onColor,
 }: {
   entry: DiaryEntry;
   reactions: DiaryReaction[];
   onEdit: () => void;
+  /** Recolour this page without rewriting it. */
+  onColor?: (color: DiaryColor) => void;
 }) {
   const [showWho, setShowWho] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const current = colorKey(entry.color);
   const tint = diaryTheme(entry.color, entry.hue);
   const { size } = noteSize(entry.text);
 
@@ -39,6 +47,19 @@ export function YourDiaryCard({
           <span className="ml-auto text-xs tabular-nums text-white/45" suppressHydrationWarning>
             {shortLeft(entry.createdAt)}
           </span>
+          {onColor && (
+            <button
+              type="button"
+              onClick={() => setPicking((v) => !v)}
+              aria-label="Page colour"
+              aria-expanded={picking}
+              className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                picking ? "bg-white/15 text-white" : "text-white/60 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <Palette size={15} />
+            </button>
+          )}
           <button
             type="button"
             onClick={onEdit}
@@ -48,6 +69,28 @@ export function YourDiaryCard({
             <PenLine size={15} />
           </button>
         </header>
+
+        {picking && onColor && (
+          <div role="radiogroup" aria-label="Page colour" className="no-scrollbar -mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+            {DIARY_COLORS.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                role="radio"
+                aria-checked={current === c.key}
+                aria-label={c.label}
+                title={c.label}
+                onClick={() => onColor(c.key)}
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90 ${
+                  current === c.key ? "scale-110" : ""
+                }`}
+                style={{ background: swatchOf(c.key, entry.hue), boxShadow: "inset 0 1px 0 rgb(255 255 255 / 0.2), 0 0 0 1.5px rgb(0 0 0 / 0.25)" }}
+              >
+                {current === c.key && <Check size={13} strokeWidth={3} className="text-white drop-shadow" />}
+              </button>
+            ))}
+          </div>
+        )}
 
         <p
           className="mt-3 break-words font-extrabold leading-[1.08] tracking-[-0.02em] text-white"

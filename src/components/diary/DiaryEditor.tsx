@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Dices, Loader2, Star } from "lucide-react";
+import { Check, Dices, Loader2, Palette, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CenterModal } from "@/components/ui/CenterModal";
 import { Avatar } from "@/components/ui/Avatar";
@@ -163,6 +163,21 @@ export function DiaryComposer({
               <Avatar name={me.name} hue={me.hue} size={28} src={me.avatarUrl ?? undefined} />
               <span className="text-sm font-bold text-white">You</span>
               {audience === "close" && <Star size={12} className="fill-accent text-accent" aria-label="Close friends" />}
+              {!engaged && (
+                // Colours are one of the first things people look for: say
+                // they are here even before the page is opened up.
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEngaged(true);
+                  }}
+                  aria-label="Page colour"
+                  className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] text-white/75 transition-colors hover:bg-white/[0.12] hover:text-white"
+                >
+                  <Palette size={15} />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={(e) => {
@@ -171,7 +186,7 @@ export function DiaryComposer({
                   roll();
                 }}
                 aria-label="Write something random"
-                className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] text-white/75 transition-colors hover:bg-white/[0.12] hover:text-white"
+                className={`${engaged ? "ml-auto" : ""} flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] text-white/75 transition-colors hover:bg-white/[0.12] hover:text-white`}
               >
                 <Dices size={15} />
               </button>
