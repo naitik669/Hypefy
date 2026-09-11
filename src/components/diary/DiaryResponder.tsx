@@ -100,7 +100,7 @@ export function DiaryResponder({
     <button
       key="more"
       type="button"
-      onClick={(ev) => openMore(ev.currentTarget)}
+      onClick={(ev) => openMore(moreFrom ? null : ev.currentTarget)}
       aria-label={`More emoji for ${first}`}
       aria-haspopup="dialog"
       aria-expanded={!!moreFrom}

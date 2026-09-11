@@ -19,8 +19,12 @@ import { AudiencePicker, type Audience } from "@/components/diary/AudiencePicker
 /** notes.text is capped at 60 characters by the database. */
 const MAX = 60;
 
-/** Emoji on the line before ⋯ — as many as fit a phone without scrolling. */
-const QUICK_COUNT = 7;
+/**
+ * Emoji on the line before ⋯. Five: the line has to fit the edit pop-up,
+ * which on a phone leaves about 310px — seven and ⋯ at 40px each ran past
+ * it and let the whole pop-up scroll sideways.
+ */
+const QUICK_COUNT = 5;
 
 const STARTERS = [
   "🎧 on repeat today",
@@ -251,7 +255,9 @@ export function DiaryComposer({
         {engaged && (
           <>
             {/* ── Emoji: one line, the ones you use first, then ⋯ for the rest ── */}
-            <div className="-mx-1 flex items-center justify-between px-1">
+            {/* The buttons give way if there is even less room, so the line
+                never pushes past its box. */}
+            <div className="flex items-center justify-between gap-1">
               {quick.map((e) => (
                 <button
                   key={e}
@@ -262,7 +268,7 @@ export function DiaryComposer({
                     insert(e);
                   }}
                   aria-label={`Add ${e}`}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[22px] transition-transform hover:bg-white/[0.07] active:scale-[0.8]"
+                  className="flex h-10 min-w-0 max-w-10 flex-1 items-center justify-center rounded-full text-[22px] transition-transform hover:bg-white/[0.07] active:scale-[0.8]"
                 >
                   {e}
                 </button>
@@ -271,7 +277,7 @@ export function DiaryComposer({
                 type="button"
                 onClick={(ev) => {
                   flushTapped();
-                  setEmojiFrom(ev.currentTarget);
+                  setEmojiFrom(emojiFrom ? null : ev.currentTarget);
                 }}
                 aria-label="More emoji"
                 aria-haspopup="dialog"
@@ -285,7 +291,12 @@ export function DiaryComposer({
             </div>
 
             {/* ── The page's colour ── */}
-            <div role="radiogroup" aria-label="Page colour" className="-mx-1 flex items-center justify-between px-1 py-1">
+            {/* Eight equal cells, each swatch as wide as its cell up to 34px, so
+                the row fits the edit pop-up on the narrowest phone with a gap
+                between every colour. No negative margin: 4px past the edge
+                was enough to let the whole pop-up scroll sideways. The padding
+                is room for the chosen swatch to grow into. */}
+            <div role="radiogroup" aria-label="Page colour" className="grid grid-cols-8 justify-items-center gap-2 px-[3px] py-1">
               {DIARY_COLORS.map((c) => (
                 <SquircleSwatch
                   key={c.key}
@@ -297,13 +308,14 @@ export function DiaryComposer({
                     setColor(c.key);
                   }}
                   size={34}
+                  fill
                 />
               ))}
             </div>
 
             {/* ── Starters, for when nothing comes to mind ── */}
             {!text && (
-              <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
+              <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
                 {STARTERS.map((s) => (
                   <button
                     key={s}

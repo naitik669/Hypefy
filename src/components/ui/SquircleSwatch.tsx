@@ -31,12 +31,16 @@ export function SquircleSwatch({
   label,
   onClick,
   size = 32,
+  fill = false,
 }: {
   background: string;
   selected: boolean;
   label: string;
   onClick: () => void;
+  /** Its size; with `fill`, the most it grows to. */
   size?: number;
+  /** As wide as its cell, up to `size` — for a row that must fit any width. */
+  fill?: boolean;
 }) {
   return (
     <button
@@ -47,7 +51,7 @@ export function SquircleSwatch({
       title={label}
       onClick={onClick}
       className={`relative shrink-0 transition-transform duration-200 active:scale-90 ${selected ? "scale-110" : ""}`}
-      style={{ width: size, height: size }}
+      style={fill ? { width: "100%", maxWidth: size, aspectRatio: "1" } : { width: size, height: size }}
     >
       <span aria-hidden className="absolute inset-0" style={{ background, clipPath: SQUIRCLE }} />
       {/* A little light along the top, as if lit from above. */}

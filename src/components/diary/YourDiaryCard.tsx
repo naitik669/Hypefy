@@ -71,7 +71,7 @@ export function YourDiaryCard({
         </header>
 
         {picking && onColor && (
-          <div role="radiogroup" aria-label="Page colour" className="-mx-0.5 mt-3 flex items-center justify-between px-0.5 py-1">
+          <div role="radiogroup" aria-label="Page colour" className="mt-3 grid grid-cols-8 justify-items-center gap-1.5 px-[3px] py-1">
             {DIARY_COLORS.map((c) => (
               <SquircleSwatch
                 key={c.key}
@@ -80,6 +80,7 @@ export function YourDiaryCard({
                 background={swatchOf(c.key, entry.hue)}
                 onClick={() => onColor(c.key)}
                 size={30}
+                fill
               />
             ))}
           </div>

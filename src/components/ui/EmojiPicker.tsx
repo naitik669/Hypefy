@@ -86,6 +86,27 @@ function Panel({ anchor, onPick, onClose }: { anchor: HTMLElement | null; onPick
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
+  /**
+   * A tap outside closes it. A tap on the button that opened it closes it
+   * too — and only that: the backdrop takes the press, but the click that
+   * follows lands on the button once the backdrop has gone, and would open
+   * it straight back up. So that one click is swallowed.
+   */
+  function closeFrom(x: number, y: number) {
+    const r = anchor?.getBoundingClientRect();
+    if (r && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+      const swallow = (ev: MouseEvent) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        window.removeEventListener("click", swallow, true);
+      };
+      window.addEventListener("click", swallow, true);
+      // If no click comes (a drag off the button), do not eat a later one.
+      window.setTimeout(() => window.removeEventListener("click", swallow, true), 600);
+    }
+    onClose();
+  }
+
   function pick(e: string) {
     haptics.select();
     rememberEmoji(e);
@@ -140,7 +161,7 @@ function Panel({ anchor, onPick, onClose }: { anchor: HTMLElement | null; onPick
       onTouchMove={(e) => e.stopPropagation()}
       onTouchEnd={(e) => e.stopPropagation()}
     >
-      <div aria-hidden className="fixed inset-0 z-[250]" onPointerDown={onClose} />
+      <div aria-hidden className="fixed inset-0 z-[250]" onPointerDown={(e) => closeFrom(e.clientX, e.clientY)} />
       <div
         role="dialog"
         aria-label="Emoji"

@@ -232,6 +232,17 @@ describe("DiaryHome", () => {
     expect(JSON.parse(localStorage.getItem("hypefy.emoji.recent")!)).toEqual(["☕"]);
   });
 
+  it("closes the emoji popup when ⋯ is tapped again", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman" })] })));
+    const popup = () => document.querySelector('[role="dialog"][aria-label="Emoji"]');
+    await click(button("More emoji for Aman"));
+    expect(popup()).not.toBeNull();
+    await click(button("More emoji for Aman"));
+    expect(popup()).toBeNull();
+    expect(rpcCalls).toEqual([]);
+  });
+
   it("hypes a page with the star, silently, and takes it back with a second tap", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman" })] })));
