@@ -70,14 +70,22 @@ describe("SquircleSwatch", () => {
 });
 
 describe("page colours", () => {
-  it("come in groups of at most eight — one line each — with keys the database takes", async () => {
+  it("come a family to a line, at most eight, with keys the database takes", async () => {
     const { COLOR_GROUPS, DIARY_COLORS } = await import("@/components/diary/DiaryPage");
-    expect(COLOR_GROUPS.length).toBeGreaterThan(1);
+    expect(COLOR_GROUPS.map((g) => g.key)).toEqual(["neutral", "red", "orange", "green", "blue", "purple"]);
     for (const g of COLOR_GROUPS) expect(g.colors.length, g.key).toBeLessThanOrEqual(8);
     const keys = DIARY_COLORS.map((c) => c.key);
     expect(new Set(keys).size).toBe(keys.length);
     for (const k of keys) expect(k).toMatch(/^[a-z]{2,16}$/); // set_note's check
     expect(COLOR_GROUPS.flatMap((g) => g.colors).length).toBe(DIARY_COLORS.length);
+    expect(DIARY_COLORS[0].key).toBe("ink"); // the default comes first
+  });
+
+  it("keeps every colour pages have already been posted in", async () => {
+    const { DIARY_COLORS } = await import("@/components/diary/DiaryPage");
+    const keys = new Set(DIARY_COLORS.map((c) => c.key));
+    for (const k of ["ink", "plum", "cobalt", "teal", "forest", "moss", "ember", "rose", "slate", "lilac", "mauve", "wine", "clay", "sand", "olive", "sage", "sunset", "candy", "galaxy", "ocean", "aurora", "lagoon", "zest", "flame"])
+      expect(keys.has(k as never), k).toBe(true);
   });
 
   it("draws a Glow colour as a blend of its two inks, and anything unknown as Ink", async () => {
@@ -94,7 +102,7 @@ describe("page colours", () => {
     const { ColorPager } = await import("@/components/ui/ColorPager");
     const { pageColorGroups } = await import("@/components/diary/DiaryPage");
     const html = renderToStaticMarkup(createElement(ColorPager, { groups: pageColorGroups(200), value: "sage", onChange: () => {} }));
-    expect(html).toMatch(/aria-label="Dusk colours" aria-current="true"/);
+    expect(html).toMatch(/aria-label="Greens colours" aria-current="true"/);
     expect(html).toContain('aria-label="Sage"');
   });
 });

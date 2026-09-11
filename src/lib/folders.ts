@@ -35,10 +35,18 @@ export function folderColorGroups() {
   }));
 }
 
-/** A colour for a new folder: the next Jewel one round the wheel. */
+/**
+ * The seven a new folder cycles through, one from each family and round the
+ * wheel — and the ones a folder with no colour saved is drawn in, picked by
+ * its id. The order must not change, or those older folders change colour.
+ */
+const DEFAULTS = (["plum", "cobalt", "teal", "forest", "moss", "ember", "rose"] as const).map(
+  (k) => FOLDER_COLORS.find((c) => c.key === k)!
+);
+
+/** A colour for a new folder: the next one round the wheel. */
 export function nextFolderColor(count: number): string {
-  const jewel = FOLDER_COLORS.filter((c) => c.group === "jewel");
-  return jewel[count % jewel.length].key;
+  return DEFAULTS[count % DEFAULTS.length].key;
 }
 
 /** A folder's tile colour. Unknown or unset colours pick one from its id, so
@@ -53,14 +61,13 @@ export function folderFill(color: string | null | undefined, seed = "") {
       ink: "#a3e635",
     };
   const known = FOLDER_COLORS.find((c) => c.key === color);
-  // An unset colour picks a Jewel one from the id, as folders always did.
-  const jewel = FOLDER_COLORS.filter((x) => x.group === "jewel");
-  const c = known ?? jewel[[...seed].reduce((n, ch) => n + ch.charCodeAt(0), 0) % jewel.length];
+  const c = known ?? DEFAULTS[[...seed].reduce((n, ch) => n + ch.charCodeAt(0), 0) % DEFAULTS.length];
   const h2 = c.hue2 ?? c.hue;
+  const l = c.lum ?? 0;
   return {
     key: c.key,
-    background: `radial-gradient(120% 90% at 0% 0%, hsl(${c.hue} ${c.sat + 12}% 60% / 0.5), transparent 62%), linear-gradient(160deg, hsl(${c.hue} ${c.sat}% 34%), hsl(${h2} ${c.sat - 6}% ${c.hue2 === undefined ? 17 : 22}%))`,
-    ink: `hsl(${c.hue} 90% 80%)`,
+    background: `radial-gradient(120% 90% at 0% 0%, hsl(${c.hue} ${c.sat + 12}% 60% / 0.5), transparent 62%), linear-gradient(160deg, hsl(${c.hue} ${c.sat}% ${34 + l}%), hsl(${h2} ${Math.max(0, c.sat - 6)}% ${(c.hue2 === undefined ? 17 : 22) + l / 2}%))`,
+    ink: `hsl(${c.hue} ${c.sat < 20 ? c.sat + 40 : 90}% 80%)`,
   };
 }
 
