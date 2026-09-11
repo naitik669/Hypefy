@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { DiaryDisc } from "@/components/diary/DiaryDisc";
 import { CARD_H, FriendDiaryCard } from "@/components/diary/FriendDiaryCard";
 import { haptics } from "@/lib/haptics";
-import { useIsPlaying } from "@/lib/music";
 import { cardTilt, cycleDeck, type DiaryEntry } from "@/lib/diary";
 
 /** How many cards are drawn: the top one and the two fanned out behind it. */
@@ -22,15 +21,16 @@ const FLY = "420ms cubic-bezier(0.3, 0.6, 0.35, 1)";
 
 /**
  * The deck sits in the middle of the screen, the same margin either side.
- * A page's CD — big, about half the card's height — is tucked behind its
- * right edge, a sliver showing, on the cards behind as on the one in front. When the song plays the card nudges left
- * and the disc slides out to the right, far enough to show its cover.
+ * A page's CD — big, about half the card's height — is tucked behind the
+ * card's top-right corner and sticks out over it, into the space above the
+ * deck, on the cards behind as on the one in front: a good part of the disc
+ * and its cover shows. When the song plays it lifts up and out to the right.
  */
 const INSET = 40;
 const DISC = `calc(${CARD_H} * 0.48)`;
-const DISC_AT = { right: `calc(${CARD_H} * -0.1)`, marginTop: `calc(${CARD_H} * -0.24)` };
-const PLAYING_NUDGE = 30;
-const PLAYING_SLIDE = 46;
+const DISC_AT = { right: `calc(${CARD_H} * -0.11)`, top: `calc(${CARD_H} * -0.2)` };
+const PLAYING_SLIDE = 8;
+const PLAYING_LIFT = 12;
 
 type Pose = { x: number; y: number; scale: number; rot: number };
 
@@ -121,7 +121,6 @@ export function DiaryStack({
   const order = thrown ? [...deck.filter((id) => id !== thrown.id), thrown.id] : deck;
   const topId = order[0];
   const top = byId.get(topId);
-  const playing = useIsPlaying(top?.track?.id);
 
   /** Lay a transform on a card's inner layer, now or with a transition. */
   function setInner(id: string | undefined, transform: string, transition = "none") {
@@ -278,7 +277,7 @@ export function DiaryStack({
 
           const transform = isThrown
             ? `translate(${thrown!.dir * 125}%, -10px) rotate(${thrown!.dir * 16}deg)`
-            : css(pose(depth, lean), isTop && playing ? -PLAYING_NUDGE : 0);
+            : css(pose(depth, lean));
 
           return (
             <div
@@ -324,8 +323,9 @@ export function DiaryStack({
                     track={entry.track}
                     size={DISC}
                     slide={PLAYING_SLIDE}
+                    lift={PLAYING_LIFT}
                     autoPlay={isTop}
-                    className="absolute top-1/2 z-0"
+                    className="absolute z-0"
                     style={DISC_AT}
                   />
                 )}
