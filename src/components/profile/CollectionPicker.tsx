@@ -88,7 +88,7 @@ export function CollectionPicker({
         .select("post_id")
         .eq("collection_id", collectionId);
       if (!cancelled) {
-        setInIt(new Set((data ?? []).map((r: { post_id: string }) => r.post_id)));
+        setInIt(new Set((data ?? []).flatMap((r) => (r.post_id ? [r.post_id] : []))));
       }
     })();
     void loadMore();

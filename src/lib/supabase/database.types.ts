@@ -182,19 +182,22 @@ export type Database = {
           collection_id: string
           created_at: string
           id: string
-          post_id: string
+          post_id: string | null
+          shot_id: string | null
         }
         Insert: {
           collection_id: string
           created_at?: string
           id?: string
-          post_id: string
+          post_id?: string | null
+          shot_id?: string | null
         }
         Update: {
           collection_id?: string
           created_at?: string
           id?: string
-          post_id?: string
+          post_id?: string | null
+          shot_id?: string | null
         }
         Relationships: [
           {
@@ -211,28 +214,44 @@ export type Database = {
             referencedRelation: "posts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "collection_items_shot_id_fkey"
+            columns: ["shot_id"]
+            isOneToOne: false
+            referencedRelation: "shots"
+            referencedColumns: ["id"]
+          },
         ]
       }
       collections: {
         Row: {
+          color: string | null
           cover_url: string | null
           created_at: string
+          emoji: string | null
           id: string
           name: string
+          position: number
           user_id: string
         }
         Insert: {
+          color?: string | null
           cover_url?: string | null
           created_at?: string
+          emoji?: string | null
           id?: string
           name: string
+          position?: number
           user_id: string
         }
         Update: {
+          color?: string | null
           cover_url?: string | null
           created_at?: string
+          emoji?: string | null
           id?: string
           name?: string
+          position?: number
           user_id?: string
         }
         Relationships: [
@@ -2261,6 +2280,20 @@ export type Database = {
         }[]
       }
       forget_diary: { Args: { p_written_at: string }; Returns: undefined }
+      get_folders: {
+        Args: never
+        Returns: {
+          color: string | null
+          cover_url: string | null
+          covers: Json
+          created_at: string
+          emoji: string | null
+          id: string
+          item_count: number
+          name: string
+          position: number
+        }[]
+      }
       get_notes: {
         Args: never
         Returns: {
@@ -2387,6 +2420,17 @@ export type Database = {
         Args: { p_details?: string; p_message_id: string; p_reason: string }
         Returns: undefined
       }
+      search_saved: {
+        Args: { p_limit?: number; p_q: string }
+        Returns: {
+          caption: string | null
+          id: string
+          kind: string
+          saved_at: string
+          thumb: string | null
+          video: string | null
+        }[]
+      }
       search_people: {
         Args: { p_limit?: number; p_q: string }
         Returns: {
@@ -2453,6 +2497,10 @@ export type Database = {
         }
       }
       send_page_reply: { Args: { p_body: string; p_owner: string }; Returns: string }
+      set_item_folders: {
+        Args: { p_folders?: string[]; p_post?: string; p_shot?: string }
+        Returns: undefined
+      }
       set_note_color: { Args: { p_color: string }; Returns: undefined }
       toggle_note_hype: { Args: { p_owner: string }; Returns: boolean }
       set_notif_pref: {
