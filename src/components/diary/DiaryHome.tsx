@@ -167,9 +167,10 @@ export function DiaryHome({
             className="relative -mx-3 flex flex-col justify-center overflow-x-clip px-3 py-4"
             style={{
               minHeight: SPOTLIGHT_HEIGHT,
-              // A rectangle a little taller than wide, leaving the CD, the fan
-              // and some air: between 290px and 370px, by the screen.
-              ["--card-h" as string]: `clamp(290px, calc(${SPOTLIGHT_HEIGHT} - 270px), 370px)`,
+              // Only a little taller than it is wide — a tenth — so it reads as a
+              // card, not a column. Its width is the screen less the margins
+              // (2 × (12 + 40)px); a very short screen can take it down to 260px.
+              ["--card-h" as string]: `clamp(260px, calc((min(100vw, 480px) - 104px) * 1.1), calc(${SPOTLIGHT_HEIGHT} - 250px))`,
             }}
           >
             <DiaryStack

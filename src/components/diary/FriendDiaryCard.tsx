@@ -11,10 +11,10 @@ import type { DiaryEntry } from "@/lib/diary";
 
 /**
  * Every card in the spotlight is the same height, so they sit square as a
- * deck — a rectangle a little taller than it is wide, sized to the screen
- * by the spotlight (--card-h); 340px wherever that is not set.
+ * deck — only a little taller than it is wide, sized to the screen by the
+ * spotlight (--card-h); 314px wherever that is not set.
  */
-export const CARD_H = "var(--card-h, 340px)";
+export const CARD_H = "var(--card-h, 314px)";
 
 /**
  * One friend's page as a card — in the spotlight deck, or one to a row in the
@@ -98,7 +98,7 @@ export function FriendDiaryCard({
         <div className="flex min-h-0 flex-1 flex-col justify-center py-2" onClick={onOpen}>
           <p
             className="cursor-pointer break-words font-extrabold leading-[1.06] tracking-[-0.02em] text-white"
-            style={{ fontSize: big ? Math.min(Math.round(size * 1.15), 46) : Math.min(Math.round(size * 1.05), 44) }}
+            style={{ fontSize: big ? Math.min(Math.round(size * 1.1), 42) : Math.min(Math.round(size * 1.05), 44) }}
           >
             {entry.text}
           </p>
