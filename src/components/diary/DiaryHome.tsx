@@ -167,9 +167,9 @@ export function DiaryHome({
             className="relative -mx-3 flex flex-col justify-center overflow-x-clip px-3 py-4"
             style={{
               minHeight: SPOTLIGHT_HEIGHT,
-              // The card takes most of what the screen has, leaving the fan and
-              // some air: never under 300px, never over 440px.
-              ["--card-h" as string]: `clamp(300px, calc(${SPOTLIGHT_HEIGHT} - 220px), 440px)`,
+              // A rectangle a little taller than wide, leaving the CD, the fan
+              // and some air: between 290px and 370px, by the screen.
+              ["--card-h" as string]: `clamp(290px, calc(${SPOTLIGHT_HEIGHT} - 270px), 370px)`,
             }}
           >
             <DiaryStack
