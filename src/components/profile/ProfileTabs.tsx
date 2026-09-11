@@ -6,7 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RichPostText } from "@/components/ui/RichPostText";
-import { CollectionsStrip } from "@/components/profile/CollectionsStrip";
+import { FoldersStrip } from "@/components/saved/FoldersStrip";
 import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
 
 type Tab = "Posts" | "Shots" | "Saved";
@@ -287,7 +287,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
             />
           ) : (
             <>
-              <CollectionsStrip userId={userId} />
+              <FoldersStrip userId={userId} />
               <div className={GRID_WRAP}>
                 <div className={GRID}>
                   {saved.map((p) => (

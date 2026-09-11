@@ -32,7 +32,10 @@ export function useFocusTrap<T extends HTMLElement>(active: boolean) {
       );
     container.setAttribute("tabindex", "-1");
     container.style.outline = "none";
-    container.focus();
+    // Unless something inside already took it: a field with autoFocus is
+    // focused as it mounts, before this runs, and taking focus back from it
+    // left the name field of a sheet unfocused and ignoring the keyboard.
+    if (!container.contains(document.activeElement)) container.focus();
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== "Tab") return;

@@ -94,7 +94,7 @@ const ACTIONS: Entry[] = [
   {
     icon: Bookmark,
     term: "Saved",
-    what: "Anything you keep for later. Saved posts can be filed into collections — folders only you can see.",
+    what: "Anything you keep for later. Hold the bookmark to put a post or Shot in a folder — folders only you can see.",
     href: "/saved",
     hrefLabel: "Your Saved",
   },

@@ -37,6 +37,8 @@ import { MusicMuteButton } from "@/components/music/MusicMuteButton";
 import { parseTrack } from "@/lib/music";
 import { hypeResult } from "@/lib/supabase/typed";
 import { PollBlock, parsePoll } from "@/components/feed/PollBlock";
+import { FolderSheet } from "@/components/saved/FolderSheet";
+import { useLongPress } from "@/lib/useLongPress";
 
 export type FeedPost = {
   id: string;
@@ -353,6 +355,13 @@ export function FeedCard({
     e.preventDefault();
   }
   const showToast = useToast();
+  // Holding the bookmark files the post in folders; a tap still just saves.
+  const [foldersOpen, setFoldersOpen] = useState(false);
+  const holdSave = useLongPress(() => {
+    if (!uid) return showToast("Sign in to save");
+    haptics.select();
+    setFoldersOpen(true);
+  });
   // A ?comment= link opens the sheet itself — landing on the post with the
   // comments closed is the same dead end the notification already had.
   const [commentsOpen, setCommentsOpen] = useState(!!focusCommentId);
@@ -810,6 +819,7 @@ export function FeedCard({
 
         <button
           type="button"
+          {...holdSave}
           onClick={toggleSave}
           disabled={savePending}
           aria-label="Save"
@@ -883,6 +893,16 @@ export function FeedCard({
         onCountChange={(n) => setCommentCount(n)}
         focusCommentId={focusId}
       />
+
+      {uid && (
+        <FolderSheet
+          open={foldersOpen}
+          onClose={() => setFoldersOpen(false)}
+          target={{ post: post.id }}
+          userId={uid}
+          onSaved={() => setSaved(true)}
+        />
+      )}
 
       <ShareSheet
         open={shareOpen}

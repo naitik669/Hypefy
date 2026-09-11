@@ -1185,3 +1185,23 @@ html[data-splash="off"] #hypefy-splash {
   opacity: 0.05;
   mix-blend-mode: overlay;
 }
+
+/* Saved: folders being arranged rock gently, each a beat apart, so you can
+   tell the grid is picked up and waiting to be moved. */
+@keyframes folder-wiggle {
+  0%,
+  100% {
+    transform: rotate(-1.2deg);
+  }
+  50% {
+    transform: rotate(1.2deg);
+  }
+}
+.animate-folder-wiggle {
+  animation: folder-wiggle 0.34s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-folder-wiggle {
+    animation: none;
+  }
+}

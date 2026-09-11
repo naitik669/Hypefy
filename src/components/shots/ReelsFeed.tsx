@@ -24,6 +24,8 @@ import { spliceFeed, SHOT_AD_OPTS } from "@/lib/feed-mix";
 import { noteAdShown } from "@/lib/ads";
 import { useAdFill, useAdSlots } from "@/components/feed/useAdSlots";
 import { ShotAdCard } from "@/components/shots/ShotAdCard";
+import { FolderSheet } from "@/components/saved/FolderSheet";
+import { useLongPress } from "@/lib/useLongPress";
 
 type ReelProfile = {
   display_name: string | null;
@@ -423,6 +425,13 @@ function ReelCard({
 
   const [saved, setSaved] = useState(false);
   const [savePending, setSavePending] = useState(false);
+  // Holding Save files the Shot in folders; a tap still just saves.
+  const [foldersOpen, setFoldersOpen] = useState(false);
+  const holdSave = useLongPress(() => {
+    if (!currentUserId) return;
+    haptics.select();
+    setFoldersOpen(true);
+  });
 
   // Owner controls
   const isOwner = !!currentUserId && currentUserId === reel.user_id;
@@ -928,7 +937,7 @@ function ReelCard({
           <Plane size={29} weight="bold" className="text-white" />
         </RailButton>
 
-        <RailButton label="Save" onClick={toggleSave} disabled={savePending}>
+        <RailButton label="Save" onClick={toggleSave} disabled={savePending} hold={holdSave}>
           <Bookmark
             size={30}
             className={saved ? "text-accent" : "text-white"}
@@ -1174,6 +1183,13 @@ function ReelCard({
             targetType="shot"
             postId={reel.id}
           />
+          <FolderSheet
+            open={foldersOpen}
+            onClose={() => setFoldersOpen(false)}
+            target={{ shot: reel.id }}
+            userId={currentUserId}
+            onSaved={() => setSaved(true)}
+          />
         </>
       )}
     </section>
@@ -1185,15 +1201,19 @@ function RailButton({
   label,
   onClick,
   disabled,
+  hold,
 }: {
   children: React.ReactNode;
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  /** Long-press handlers, from useLongPress. */
+  hold?: ReturnType<typeof useLongPress>;
 }) {
   return (
     <button
       type="button"
+      {...hold}
       onClick={onClick}
       disabled={disabled}
       className="flex flex-col items-center gap-1 transition-transform active:scale-90 disabled:opacity-60"

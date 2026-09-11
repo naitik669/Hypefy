@@ -2279,6 +2279,10 @@ export type Database = {
           written_at: string
         }[]
       }
+      file_items: {
+        Args: { p_folder: string; p_from?: string; p_posts?: string[]; p_shots?: string[] }
+        Returns: undefined
+      }
       forget_diary: { Args: { p_written_at: string }; Returns: undefined }
       get_folders: {
         Args: never
@@ -2408,6 +2412,7 @@ export type Database = {
         Returns: undefined
       }
       reap_oneshots: { Args: never; Returns: undefined }
+      reorder_folders: { Args: { p_ids: string[] }; Returns: undefined }
       record_login_session: {
         Args: { p_label?: string; p_session_id: string }
         Returns: undefined
