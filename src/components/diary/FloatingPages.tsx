@@ -1,21 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { diaryTheme, fillSize } from "@/components/diary/DiaryPage";
-import { loadSeen, storyOrder, unseen, type DiaryEntry } from "@/lib/diary";
+import { cycleDeck, loadSeen, storyOrder, unseen, type DiaryEntry } from "@/lib/diary";
 
-/** Before the first shuffle, so the inbox is read before anything moves. */
-export const FIRST_MS = 2500;
-/** Between shuffles. */
-export const EVERY_MS = 3600;
-/** How long a card takes to slide off before it tucks in at the back. */
-const OUT_MS = 300;
-/** Still this long after a scroll, and the card comes back out. */
-const SETTLE_MS = 700;
-const MOVE = "transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease";
+/** How much of the card shows at the right edge while it is peeking. */
+export const PEEK_PX = 30;
+/** Scroll this far down the inbox and the card is all the way out. */
+export const REVEAL_PX = 140;
+/** A drag this far, or a quick flick, sends the top page to the back. */
+const THROW_PX = 40;
+const THROW_MS = 300;
+const MOVE = "transform 480ms cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms ease";
+const SLIDE = "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)";
 
 /** How each card in the little deck stands, by how far back it is. */
 function pose(depth: number): { transform: string; opacity: number } {
@@ -23,7 +23,7 @@ function pose(depth: number): { transform: string; opacity: number } {
   if (depth === 1) return { transform: "translate(7px, 5px) rotate(4deg) scale(0.95)", opacity: 1 };
   return { transform: "translate(-7px, 8px) rotate(-7deg) scale(0.9)", opacity: depth === 2 ? 1 : 0 };
 }
-const OUT = { transform: "translate(-125%, -6px) rotate(-16deg)", opacity: 0 };
+const thrownPose = (dir: 1 | -1) => ({ transform: `translate(${dir * 130}%, -6px) rotate(${dir * 16}deg)`, opacity: 0 });
 
 /** Reduce Motion, where the browser can say (older WebViews cannot). */
 const motionQuery = () =>
@@ -39,34 +39,24 @@ const reducedMotion = {
 };
 
 /**
- * Spotlight, floating in Messages: a small tilted deck of your circle's
- * pages at the bottom right, where your thumb is. It shuffles by itself —
- * the top page slides off and tucks in at the back, the way Spotlight's deck
- * does when you swipe it — so you see whose page is up without opening
- * anything. Tap it and Spotlight opens on the page it was showing.
+ * Spotlight, in Messages: a small tilted deck of your circle's pages at the
+ * bottom right, where your thumb is.
+ *
+ * It moves only when you move it. At the top of the inbox it waits at the
+ * right edge, a sliver of the top page and its count peeking out; scroll down
+ * and it slides in with you, all the way out by the time you have scrolled a
+ * little. Tap the sliver and it comes out without scrolling. Once out, swipe
+ * it either way to send the top page to the back and bring the next up — the
+ * same throw as Spotlight's deck — and tap it to open Spotlight on the page
+ * on top, the rest following in the same order. Back at the top of the
+ * inbox, it tucks away again.
  *
  * Pages you have not opened come first, newest first (Spotlight's own
- * order). It goes round once and then rests on the first of them, so it is
- * not moving for as long as you are in Messages. It holds still while your
- * finger is on it and while the app is in the background, and while you
- * scroll it slips to the edge of the screen, out of the way of the chats,
- * coming back when you stop. With Reduce Motion it fades between pages
- * instead of sliding.
- *
- * With nobody else's page up it shows yours, or a "+" to write one, and does
- * not move: Spotlight is still one tap away.
+ * order), with their count on the card's corner and a lime edge. With nobody
+ * else's page up it shows yours, or a "+" to write one: Spotlight is always
+ * one tap away.
  */
-export function FloatingPages({
-  pages,
-  firstMs = FIRST_MS,
-  everyMs = EVERY_MS,
-}: {
-  /** Today's pages as get_notes returns them, yours included. */
-  pages: DiaryEntry[];
-  /** For tests. */
-  firstMs?: number;
-  everyMs?: number;
-}) {
+export function FloatingPages({ pages }: { pages: DiaryEntry[] }) {
   // What you have not opened lives on this device, so it is read after
   // mount; the server draws the newest first, and the order settles here.
   const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set());
@@ -77,95 +67,196 @@ export function FloatingPages({
 
   const others = useMemo(() => storyOrder(pages, fresh).slice(0, 8), [pages, fresh]);
   const mine = pages.find((e) => e.isSelf) ?? null;
-  const n = others.length;
   const ids = others.map((e) => e.userId).join("|");
 
-  // How many times it has shuffled. One round, then it rests.
-  const [turn, setTurn] = useState(0);
-  const [turnFor, setTurnFor] = useState(ids);
-  if (turnFor !== ids) {
-    setTurnFor(ids);
-    setTurn(0);
+  // The deck: an order of ids over `others`, starting again when they change.
+  const [deck, setDeck] = useState(() => others.map((e) => e.userId));
+  const [deckFor, setDeckFor] = useState(ids);
+  if (deckFor !== ids) {
+    setDeckFor(ids);
+    setDeck(others.map((e) => e.userId));
   }
-  const [leaving, setLeaving] = useState<string | null>(null);
-  const [held, setHeld] = useState(false);
-  const [tucked, setTucked] = useState(false);
-  const [away, setAway] = useState(false);
+  const [thrown, setThrown] = useState<{ id: string; dir: 1 | -1 } | null>(null);
   const reduce = useSyncExternalStore(reducedMotion.subscribe, reducedMotion.get, reducedMotion.server);
 
-  const order = n ? [...others.slice(turn % n), ...others.slice(0, turn % n)] : [];
-  const top = order[0] ?? null;
+  const byId = new Map(others.map((e) => [e.userId, e]));
+  // A thrown card already counts as the back one, so the next comes up as it leaves.
+  const order = thrown ? [...deck.filter((id) => id !== thrown.id), thrown.id] : deck;
+  const top = byId.get(order[0]) ?? null;
 
-  // The next shuffle, unless it is held or has been round once.
-  useEffect(() => {
-    if (n < 2 || turn >= n || held || tucked || away) return;
-    const t = window.setTimeout(
-      () => {
-        if (reduce) {
-          setTurn((x) => x + 1);
-          return;
-        }
-        setLeaving(order[0].userId);
-        window.setTimeout(() => {
-          setLeaving(null);
-          setTurn((x) => x + 1);
-        }, OUT_MS);
-      },
-      turn === 0 ? firstMs : everyMs
-    );
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- order follows turn
-  }, [n, turn, held, tucked, away, reduce, firstMs, everyMs]);
+  const link = useRef<HTMLAnchorElement>(null);
+  const cards = useRef(new Map<string, HTMLSpanElement>());
+  const press = useRef<{ x: number; y: number; t: number; axis: "x" | "y" | null } | null>(null);
+  const swiped = useRef(false);
+  const out = useRef(false);
+  /** Brought out by a tap at the top of the inbox, where scrolling would not. */
+  const pinned = useRef(false);
+  const lastY = useRef(0);
+  const throwTimer = useRef<number | undefined>(undefined);
+  const width = top ? 104 : 64;
+  // Where it starts: peeking, as the inbox opens at the top. The first scroll
+  // reading takes over from here; this string never changes, so React does
+  // not fight the transform set below.
+  const [resting] = useState(() => `translateX(${width - PEEK_PX}px)`);
 
-  // Out of the way while you scroll — any scroller on the page, hence capture.
+  /** Slide it: 0 is peeking at the edge, 1 all the way out. */
+  function place(p: number, transition: string) {
+    const el = link.current;
+    if (!el) return;
+    out.current = p >= 1;
+    el.style.transition = transition;
+    el.style.transform = p >= 1 ? "none" : `translateX(${(1 - p) * (width - PEEK_PX)}px)`;
+  }
+
+  // Out as you scroll down, back at the edge at the top. Read each frame at
+  // most, straight to the transform: a scroll must never re-render the inbox.
   useEffect(() => {
-    let settle = 0;
+    let frame = 0;
+    const read = (animate: boolean) => {
+      const y = window.scrollY;
+      if (y <= 0 && lastY.current > 0) pinned.current = false; // back at the top: tuck away
+      lastY.current = y;
+      const p = pinned.current ? 1 : Math.min(1, Math.max(0, y / REVEAL_PX));
+      place(p, animate ? SLIDE : "transform 90ms linear");
+    };
     const onScroll = () => {
-      setTucked(true);
-      window.clearTimeout(settle);
-      settle = window.setTimeout(() => setTucked(false), SETTLE_MS);
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        read(false);
+      });
     };
-    const onVisible = () => setAway(document.visibilityState === "hidden");
-    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
-    document.addEventListener("visibilitychange", onVisible);
+    read(true);
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
-      window.clearTimeout(settle);
-      window.removeEventListener("scroll", onScroll, { capture: true });
-      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- width only changes with top, which place reads fresh
+  }, [width]);
+
+  useEffect(() => () => window.clearTimeout(throwTimer.current), []);
+
+  /** Move a card's inner layer — straight to the DOM, no re-render. */
+  function drag(dx: number, transition = "none", id = top?.userId) {
+    const el = id ? cards.current.get(id) : undefined;
+    if (!el) return;
+    el.style.transition = transition;
+    el.style.transform = dx ? `translate(${dx}px, 0) rotate(${dx / 16}deg)` : "";
+  }
+
+  /** The top page to the back (the way it was thrown), or the back one to the top. */
+  function flick(dir: 1 | -1, back = false) {
+    if (order.length < 2 || thrown) return;
+    if (back) {
+      setDeck((d) => cycleDeck(d, -1));
+      return;
+    }
+    // It flies on from wherever the finger left it, then drops the drag once
+    // it is out of sight, ready for its place at the back.
+    const id = order[0];
+    setThrown({ id, dir });
+    throwTimer.current = window.setTimeout(() => {
+      drag(0, "none", id);
+      setDeck((d) => cycleDeck(d, 1));
+      setThrown(null);
+    }, reduce ? 0 : THROW_MS);
+  }
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    swiped.current = false;
+    press.current = out.current && order.length > 1 ? { x: e.clientX, y: e.clientY, t: e.timeStamp, axis: null } : null;
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    const p = press.current;
+    if (!p) return;
+    const dx = e.clientX - p.x;
+    const dy = e.clientY - p.y;
+    if (!p.axis) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      p.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+      if (p.axis === "x") {
+        swiped.current = true;
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* still follows while the finger stays on the card */
+        }
+      }
+    }
+    if (p.axis === "x") drag(dx);
+  }
+  function onPointerUp(e: React.PointerEvent) {
+    const p = press.current;
+    press.current = null;
+    if (!p || p.axis !== "x") return;
+    const dx = e.clientX - p.x;
+    const quick = Math.abs(dx) > 24 && Math.abs(dx) / Math.max(1, e.timeStamp - p.t) > 0.5;
+    if (Math.abs(dx) > THROW_PX || quick) flick(dx < 0 ? -1 : 1);
+    else drag(0, "transform 460ms cubic-bezier(0.34, 1.4, 0.64, 1)"); // springs back
+  }
 
   const newCount = others.filter((e) => fresh.has(e.userId)).length;
   const href = top ? `/messages/spotlight?page=${encodeURIComponent(top.userId)}` : "/messages/spotlight";
   const label = top
-    ? `${top.name.split(" ")[0]}'s page: ${top.text}. Open Spotlight${newCount ? `, ${newCount} new` : ""}`
+    ? `${top.name.split(" ")[0]}'s page: ${top.text}. Open Spotlight${newCount ? `, ${newCount} new` : ""}${order.length > 1 ? ". Swipe for the next page" : ""}`
     : mine
       ? "Your page. Open Spotlight"
       : "Write your page in Spotlight";
 
   return (
     <Link
+      ref={link}
       href={href}
       aria-label={label}
-      onPointerDown={() => setHeld(true)}
-      onPointerUp={() => setHeld(false)}
-      onPointerLeave={() => setHeld(false)}
-      onPointerCancel={() => setHeld(false)}
-      className="fixed bottom-[86px] z-20 block rounded-[18px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => {
+        press.current = null;
+        drag(0, "transform 300ms ease");
+      }}
+      onClick={(e) => {
+        // A swipe is not a tap; and a tap on the sliver brings it out first.
+        if (swiped.current) {
+          e.preventDefault();
+          swiped.current = false;
+        } else if (!out.current) {
+          e.preventDefault();
+          pinned.current = true;
+          place(1, SLIDE);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowRight") flick(1);
+        if (e.key === "ArrowLeft") flick(-1, true);
+      }}
+      onFocus={(e) => {
+        // Tabbed to: all the way out, so what is focused can be seen. Only
+        // for the keyboard — a tap focuses it too, and that tap is the one
+        // that should bring it out, not go straight through to Spotlight.
+        if (!e.currentTarget.matches(":focus-visible")) return;
+        pinned.current = true;
+        place(1, SLIDE);
+      }}
+      onDragStart={(e) => e.preventDefault()}
+      className="fixed bottom-[86px] z-20 block select-none rounded-[18px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
       style={{
         right: "calc(max(0px, (100vw - 480px) / 2) + 14px)",
-        width: top ? 104 : 64,
+        width,
         height: top ? 132 : 84,
-        // Slips to the edge while you scroll, a sliver still showing.
-        transform: tucked ? `translateX(${top ? 78 : 44}px) scale(0.94)` : "none",
-        transition: "transform 380ms cubic-bezier(0.22, 1, 0.36, 1)",
+        transform: resting,
+        // Up and down still scroll the inbox from the card; sideways is the deck's.
+        touchAction: "pan-y",
+        WebkitTouchCallout: "none",
         filter: "drop-shadow(0 18px 22px rgb(0 0 0 / 0.7))",
       }}
     >
       {top ? (
         <>
           {/* The CD of the page on top, peeking out behind it. */}
-          {top.track?.artwork && !leaving && (
+          {top.track?.artwork && !thrown && (
             <span aria-hidden className="absolute -right-3 -top-3 h-9 w-9 rounded-full">
               <span
                 className="diary-disc-spin relative flex h-full w-full items-center justify-center rounded-full"
@@ -178,43 +269,55 @@ export function FloatingPages({
             </span>
           )}
           {others.map((e) => {
-            const depth = order.indexOf(e);
-            const p = leaving === e.userId ? OUT : pose(depth);
+            const depth = order.indexOf(e.userId);
+            const isThrown = thrown?.id === e.userId;
+            const p = isThrown ? thrownPose(thrown.dir) : pose(depth);
             const theme = diaryTheme(e.color, e.hue);
             const isNew = fresh.has(e.userId);
             return (
               <span
                 key={e.userId}
                 aria-hidden
-                className="absolute inset-0 flex flex-col overflow-hidden rounded-[16px] p-2 text-white"
+                className="absolute inset-0"
                 style={{
-                  background: theme.background,
-                  boxShadow: isNew ? `${theme.shadow}, inset 0 0 0 1.5px rgb(163 230 53 / 0.85)` : theme.shadow,
                   transform: reduce ? "none" : p.transform,
-                  opacity: reduce ? (depth === 0 ? 1 : 0) : p.opacity,
-                  zIndex: leaving === e.userId ? 11 : 10 - depth,
-                  transition: reduce ? "opacity 400ms ease" : MOVE,
+                  opacity: reduce ? (depth === 0 && !isThrown ? 1 : 0) : p.opacity,
+                  zIndex: isThrown ? 11 : 10 - depth,
+                  transition: reduce ? "opacity 300ms ease" : MOVE,
                 }}
               >
-                <span className="flex min-w-0 items-center gap-1">
-                  <Avatar name={e.name} hue={e.hue} size={18} src={e.avatarUrl ?? undefined} className="rounded-md" />
-                  <span className="truncate text-[10px] font-bold">{e.name.split(" ")[0]}</span>
-                  {isNew && <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-accent" />}
-                </span>
+                {/* The inner layer is what a finger drags. */}
                 <span
-                  className="mt-auto break-words font-extrabold leading-[1.04] tracking-[-0.02em]"
+                  ref={(el) => {
+                    if (el) cards.current.set(e.userId, el);
+                    else cards.current.delete(e.userId);
+                  }}
+                  className="absolute inset-0 flex flex-col overflow-hidden rounded-[16px] p-2 text-white"
                   style={{
-                    // Sized for the ~72px inside the card's padding.
-                    fontSize: Math.min(32, fillSize(e.text, 70)),
-                    display: "-webkit-box",
-                    WebkitLineClamp: 4,
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
+                    background: theme.background,
+                    boxShadow: isNew ? `${theme.shadow}, inset 0 0 0 1.5px rgb(163 230 53 / 0.85)` : theme.shadow,
                   }}
                 >
-                  {e.text}
+                  <span className="flex min-w-0 items-center gap-1">
+                    <Avatar name={e.name} hue={e.hue} size={18} src={e.avatarUrl ?? undefined} className="rounded-md" />
+                    <span className="truncate text-[10px] font-bold">{e.name.split(" ")[0]}</span>
+                    {isNew && <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-accent" />}
+                  </span>
+                  <span
+                    className="mt-auto break-words font-extrabold leading-[1.04] tracking-[-0.02em]"
+                    style={{
+                      // Sized for the ~72px inside the card's padding.
+                      fontSize: Math.min(32, fillSize(e.text, 70)),
+                      display: "-webkit-box",
+                      WebkitLineClamp: 4,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {e.text}
+                  </span>
+                  <span aria-hidden className="absolute bottom-0 left-0 h-[2px] w-full opacity-80" style={{ background: theme.burn }} />
                 </span>
-                <span aria-hidden className="absolute bottom-0 left-0 h-[2px] w-full opacity-80" style={{ background: theme.burn }} />
               </span>
             );
           })}

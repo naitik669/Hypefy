@@ -633,40 +633,95 @@ describe("FloatingPages", () => {
     entry({ userId: "me", name: "Naitik", text: "mine", isSelf: true, createdAt: at(5) }), // yours, never in it
   ];
   const link = () => host.querySelector("a")!;
+  const wait = (ms: number) => act(async () => void (await new Promise((r) => setTimeout(r, ms))));
+  const scrollTo = async (y: number) => {
+    Object.defineProperty(window, "scrollY", { value: y, configurable: true });
+    await act(async () => void window.dispatchEvent(new Event("scroll")));
+    await wait(40); // it reads the scroll on the next frame
+  };
+  /** Tap the card; says whether it went through to Spotlight (not stopped). */
+  const tap = async () => {
+    let wentThrough = false;
+    const note = (e: Event) => {
+      wentThrough = !e.defaultPrevented;
+      e.preventDefault(); // jsdom cannot navigate; the answer is all we need
+    };
+    window.addEventListener("click", note);
+    await act(async () => void link().dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })));
+    window.removeEventListener("click", note);
+    return wentThrough;
+  };
+  const swipe = async (dx: number) => {
+    const fire = (type: string, x: number) =>
+      act(async () => void link().dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: 400, button: 0 })));
+    await fire("pointerdown", 200);
+    await fire("pointermove", 200 + dx / 2);
+    await fire("pointermove", 200 + dx);
+    await fire("pointerup", 200 + dx);
+    await wait(360); // the throw
+  };
+  afterEach(() => Object.defineProperty(window, "scrollY", { value: 0, configurable: true }));
+  /** Far enough down the inbox that the card is all the way out. */
+  const REVEAL_PX_ALL = 1000;
 
   it("shows the page you have not opened first, counts only those, and opens Spotlight on it", async () => {
     const { FloatingPages } = await import("@/components/diary/FloatingPages");
     localStorage.setItem("hypefy:diary:seen", JSON.stringify({ a: at(1) }));
-    await render(createElement(FloatingPages, { pages, firstMs: 60_000 }));
+    await render(createElement(FloatingPages, { pages }));
     expect(link().getAttribute("href")).toBe("/messages/spotlight?page=c");
-    expect(link().getAttribute("aria-label")).toBe("Dev's page: can't sleep. Open Spotlight, 2 new");
+    expect(link().getAttribute("aria-label")).toBe("Dev's page: can't sleep. Open Spotlight, 2 new. Swipe for the next page");
     expect(link().textContent).toContain("can't sleep");
     expect(link().textContent).not.toContain("mine");
   });
 
-  it("shuffles by itself, goes round once, and rests on the first", async () => {
+  it("never moves on its own", async () => {
     const { FloatingPages } = await import("@/components/diary/FloatingPages");
-    localStorage.setItem("hypefy:diary:seen", JSON.stringify({ a: at(1) }));
-    await render(createElement(FloatingPages, { pages, firstMs: 30, everyMs: 30 }));
-    const seen = [link().getAttribute("href")];
-    // Each shuffle is the wait plus the 300ms slide off; a round of three and
-    // then some quiet, to show it stays.
-    for (let i = 0; i < 30; i++) {
-      await act(async () => void (await new Promise((r) => setTimeout(r, 60))));
-      const h = link().getAttribute("href");
-      if (h !== seen.at(-1)) seen.push(h);
-    }
-    const page = (h: string | null) => h!.split("=")[1];
-    // Dev, then Riya, then Aman, then back to Dev — and there it stays.
-    expect(seen.map(page)).toEqual(["c", "b", "a", "c"]);
+    await render(createElement(FloatingPages, { pages }));
+    const first = link().getAttribute("href");
+    await wait(500);
+    expect(link().getAttribute("href")).toBe(first);
   });
 
-  it("holds still while your finger is on it", async () => {
+  it("peeks at the edge at the top of the inbox, and slides out as you scroll down", async () => {
     const { FloatingPages } = await import("@/components/diary/FloatingPages");
-    await render(createElement(FloatingPages, { pages, firstMs: 30, everyMs: 30 }));
+    await render(createElement(FloatingPages, { pages }));
+    const { PEEK_PX, REVEAL_PX } = await import("@/components/diary/FloatingPages");
+    expect(link().style.transform).toBe(`translateX(${104 - PEEK_PX}px)`);
+    await scrollTo(REVEAL_PX / 2);
+    expect(link().style.transform).toBe(`translateX(${(104 - PEEK_PX) / 2}px)`);
+    await scrollTo(REVEAL_PX * 3);
+    expect(link().style.transform).toBe("none");
+    await scrollTo(0);
+    expect(link().style.transform).toBe(`translateX(${104 - PEEK_PX}px)`);
+  });
+
+  it("a tap on the sliver brings it out; the next tap opens Spotlight", async () => {
+    const { FloatingPages } = await import("@/components/diary/FloatingPages");
+    await render(createElement(FloatingPages, { pages }));
+    expect(await tap()).toBe(false);
+    expect(link().style.transform).toBe("none");
+    expect(await tap()).toBe(true);
+  });
+
+  it("swipes either way to send the top page to the back; a short drag springs back", async () => {
+    const { FloatingPages } = await import("@/components/diary/FloatingPages");
+    localStorage.setItem("hypefy:diary:seen", JSON.stringify({ a: at(1) }));
+    await render(createElement(FloatingPages, { pages }));
+    await scrollTo(REVEAL_PX_ALL);
+    await swipe(-90);
+    expect(link().getAttribute("href")).toBe("/messages/spotlight?page=b");
+    await swipe(90);
+    expect(link().getAttribute("href")).toBe("/messages/spotlight?page=a");
+    // A short drag springs back.
+    await swipe(-15);
+    expect(link().getAttribute("href")).toBe("/messages/spotlight?page=a");
+  });
+
+  it("does not swipe while it is peeking — the deck is still at the edge", async () => {
+    const { FloatingPages } = await import("@/components/diary/FloatingPages");
+    await render(createElement(FloatingPages, { pages }));
     const first = link().getAttribute("href");
-    await act(async () => void link().dispatchEvent(new MouseEvent("pointerdown", { bubbles: true })));
-    await act(async () => void (await new Promise((r) => setTimeout(r, 400))));
+    await swipe(-90);
     expect(link().getAttribute("href")).toBe(first);
   });
 
