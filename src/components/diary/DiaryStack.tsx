@@ -263,6 +263,8 @@ export function DiaryStack({
         className="relative rounded-[28px] outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         style={{ height: `calc(${CARD_H} + ${pose(Math.min(VISIBLE, order.length) - 1, 0).y + 10}px)` }}
         onKeyDown={(e) => {
+          // Arrows typed in the reply bar move its cursor, not the deck.
+          if ((e.target as HTMLElement).closest("input, textarea")) return;
           if (e.key === "ArrowRight") next(1);
           else if (e.key === "ArrowLeft") next(-1);
         }}

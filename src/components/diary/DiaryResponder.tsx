@@ -1,23 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MoreHorizontal, Reply, Star } from "lucide-react";
-import { EmojiPicker } from "@/components/ui/EmojiPicker";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { ArrowUp, Loader2, Star } from "lucide-react";
 import { flyEmoji, starBurst } from "@/components/diary/flyEmoji";
-import { DiaryReplyPopup } from "@/components/diary/DiaryReplyPopup";
+import { ReactFan } from "@/components/diary/ReactFan";
+import { EmojiPicker } from "@/components/ui/EmojiPicker";
 import { QUICK_EMOJIS, useDiaryActions } from "@/components/diary/useDiaryActions";
+import { lastReaction, rememberReaction } from "@/lib/emoji";
 import type { DiaryEntry } from "@/lib/diary";
 
+type Actions = {
+  entry: DiaryEntry;
+  mine: string | null;
+  onReacted: (userId: string, emoji: string | null) => void;
+  hyped?: boolean;
+  onHyped?: (userId: string, hyped: boolean) => void;
+};
+
 /**
- * The row under someone's page: five emoji and ⋯ for any other (a popup
- * with search and your recent ones), a star to hype it, and an arrow to
- * reply. On a card it is a tray along the card's foot; full-screen, a
- * pill and two round buttons sized for thumbs.
+ * The foot of someone's page: a bar to reply in — “Reply to Aman's page” —
+ * and one emoji button beside it.
  *
- * An emoji pops up over the page and flies into its owner's avatar, and goes
- * to your DMs with them; nothing stays lit on the button. The star stays lit
- * while you hype the page, because a hype is a thing that is on. The arrow
- * opens a popup to write in. A tiny "Sent" floats over the row for a moment.
+ * The reply is typed right there, on the page; send, and it goes to your DMs
+ * with them with the page attached, and the bar clears. The button sends the
+ * emoji on its face with a tap (the one you reacted with last, ❤️ at first);
+ * hold it and a fan of emoji opens to slide to and let go on, with ⋯ for
+ * every emoji. A sent emoji pops up over the page and flies into their
+ * avatar. Full-screen, the hype star is at the end of the row; on a card it
+ * is in the card's top corner (HypeStar), where the row has no room for it.
+ *
+ * A tiny "Sent" floats over the row for a moment after either.
  */
 export function DiaryResponder({
   entry,
@@ -29,43 +41,24 @@ export function DiaryResponder({
   stage,
   onTyping,
   size = "card",
-}: {
-  entry: DiaryEntry;
-  mine: string | null;
-  onReacted: (userId: string, emoji: string | null) => void;
-  hyped?: boolean;
-  onHyped?: (userId: string, hyped: boolean) => void;
+}: Actions & {
   /** Where a sent emoji lands — the owner's avatar. */
   target: () => Element | null;
   /** Where it pops up first — the page itself. */
   stage?: () => Element | null;
-  /** Full-screen pauses its clock while you are replying. */
-  onTyping?: (typing: boolean) => void;
+  /** Full-screen holds still while you type or choose an emoji. */
+  onTyping?: (busy: boolean) => void;
   size?: "card" | "screen";
 }) {
-  const { react, reply, hype, status, error, sent, resetStatus } = useDiaryActions({
-    entry,
-    mine,
-    onReacted,
-    hyped,
-    onHyped,
-  });
-  const [replying, setReplying] = useState(false);
-  /** The ⋯ button, while the emoji popup is open from it. */
+  const { react, reply, status, error, sent, resetStatus } = useDiaryActions({ entry, mine, onReacted, hyped, onHyped });
+  const [draft, setDraft] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [fanOpen, setFanOpen] = useState(false);
+  /** The emoji button, while every emoji is open from it. */
   const [moreFrom, setMoreFrom] = useState<HTMLElement | null>(null);
+  const face = useSyncExternalStore(lastReaction.subscribe, lastReaction.get, lastReaction.server);
   const first = entry.name.split(" ")[0];
   const big = size === "screen";
-
-  function openMore(from: HTMLElement | null) {
-    setMoreFrom(from);
-    // Full-screen holds the page while you choose, as it does while you reply.
-    onTyping?.(!!from);
-  }
-
-  function send(e: string, from: Element) {
-    flyEmoji(e, from, target(), stage?.());
-    void react(e);
-  }
 
   // "Sent" is news for a moment, not a state; clear it after a few seconds.
   useEffect(() => {
@@ -74,71 +67,24 @@ export function DiaryResponder({
     return () => window.clearTimeout(id);
   }, [status, sent, resetStatus]);
 
-  const note = status === "sent" ? "Sent" : status === "error" && !replying ? error : null;
+  const busy = focused || fanOpen || !!moreFrom;
+  useEffect(() => onTyping?.(busy), [busy, onTyping]);
 
-  function openReply(v: boolean) {
-    setReplying(v);
-    onTyping?.(v);
-    if (v && status === "error") resetStatus();
+  const note = status === "sent" ? "Sent" : status === "error" ? error : null;
+
+  function send(e: string, from: Element) {
+    flyEmoji(e, from, target(), stage?.());
+    rememberReaction(e);
+    void react(e);
   }
 
-  const emoji = [
-    ...QUICK_EMOJIS.map((e) => (
-      <button
-        key={e}
-        type="button"
-        onClick={(ev) => send(e, ev.currentTarget)}
-        aria-label={`Send ${e} to ${first}`}
-        className={`flex min-w-0 flex-1 items-center justify-center rounded-full transition-transform duration-150 hover:scale-110 ${
-          big ? "h-10 max-w-10 text-[23px]" : "h-9 max-w-9 text-[19px]"
-        }`}
-      >
-        {e}
-      </button>
-    )),
-    // Any other emoji: the popup, with search and your recent ones.
-    <button
-      key="more"
-      type="button"
-      onClick={(ev) => openMore(moreFrom ? null : ev.currentTarget)}
-      aria-label={`More emoji for ${first}`}
-      aria-haspopup="dialog"
-      aria-expanded={!!moreFrom}
-      className={`flex shrink-0 items-center justify-center rounded-full transition-colors ${
-        big ? "h-9 w-9" : "h-7 w-7"
-      } ${moreFrom ? "bg-white/20 text-white" : "bg-white/[0.09] text-white/80 hover:bg-white/15 hover:text-white"}`}
-    >
-      <MoreHorizontal size={big ? 18 : 16} strokeWidth={2.6} />
-    </button>,
-  ];
-  const hypeButton = (className: string) => (
-    <button
-      type="button"
-      onClick={(ev) => {
-        if (!hyped) starBurst(ev.currentTarget);
-        void hype();
-      }}
-      aria-label={hyped ? `Hyped ${first}'s page` : `Hype ${first}'s page`}
-      aria-pressed={hyped}
-      className={className}
-    >
-      <Star size={big ? 19 : 18} strokeWidth={2.3} className={hyped ? "fill-current" : ""} />
-    </button>
-  );
-  const replyButton = (className: string) => (
-    <button
-      type="button"
-      onClick={() => openReply(true)}
-      aria-label={`Reply to ${first}`}
-      aria-haspopup="dialog"
-      className={className}
-    >
-      <Reply size={big ? 19 : 18} strokeWidth={2.3} />
-    </button>
-  );
+  async function submit() {
+    if (!draft.trim() || status === "sending") return;
+    if (await reply(draft)) setDraft("");
+  }
 
   return (
-    <div className={`relative ${big ? "" : "border-t border-white/[0.07] bg-black/20 px-2 py-1.5"}`}>
+    <div className={`relative ${big ? "" : "border-t border-white/[0.07] bg-black/20 px-2.5 py-2"}`}>
       {note && (
         <p
           key={`${status}${sent}`}
@@ -151,35 +97,63 @@ export function DiaryResponder({
         </p>
       )}
 
-      {big ? (
-        // Full-screen: a pill of emoji and two round buttons, sized for thumbs.
-        <div className="flex items-center gap-1.5">
-          <div className="flex h-12 min-w-0 flex-1 items-center justify-between rounded-full bg-black/25 px-1">{emoji}</div>
-          {hypeButton(
-            `flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors ${
-              hyped ? "bg-accent text-accent-ink" : "bg-black/25 text-white hover:bg-black/35"
-            }`
+      <div className="flex items-center gap-2">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+          className={`flex min-w-0 flex-1 items-center gap-1 rounded-full bg-white/[0.1] ring-1 ring-white/[0.12] transition-colors focus-within:bg-white/[0.14] focus-within:ring-white/25 ${
+            big ? "h-12 pl-4 pr-1.5" : "h-10 pl-3.5 pr-1"
+          }`}
+        >
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={`Reply to ${first}'s page…`}
+            aria-label={`Reply to ${first}'s page`}
+            maxLength={500}
+            enterKeyHint="send"
+            className={`min-w-0 flex-1 bg-transparent text-white outline-none placeholder:text-white/55 ${big ? "text-[15px]" : "text-[13px]"}`}
+          />
+          {draft.trim() && (
+            <button
+              type="submit"
+              disabled={status === "sending"}
+              aria-label="Send reply"
+              className={`flex shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition-opacity disabled:opacity-50 ${
+                big ? "h-9 w-9" : "h-8 w-8"
+              }`}
+            >
+              {status === "sending" ? <Loader2 size={15} className="animate-spin" /> : <ArrowUp size={17} strokeWidth={2.6} />}
+            </button>
           )}
-          {replyButton(
-            "flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/25 text-white transition-colors hover:bg-black/35"
-          )}
-        </div>
-      ) : (
-        // On a card: one tray along its foot — the emoji spread evenly, a
-        // hairline, then the star and the arrow as plain icons.
-        <div className="flex items-center">
-          <div className="flex min-w-0 flex-1 items-center justify-between">{emoji}</div>
-          <span aria-hidden className="mx-1.5 h-5 w-px shrink-0 bg-white/15" />
-          {hypeButton(
-            `flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/[0.08] ${
-              hyped ? "text-accent" : "text-white/85"
-            }`
-          )}
-          {replyButton(
-            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/[0.08]"
-          )}
-        </div>
-      )}
+        </form>
+
+        <ReactFan
+          face={face}
+          quick={QUICK_EMOJIS}
+          label={`React to ${first}'s page with ${face}. Hold for more`}
+          optionLabel={(e) => `Send ${e} to ${first}`}
+          onPick={send}
+          onMore={setMoreFrom}
+          onOpenChange={setFanOpen}
+          size={size}
+        />
+
+        {big && (
+          <HypeStar
+            entry={entry}
+            mine={mine}
+            onReacted={onReacted}
+            hyped={hyped}
+            onHyped={onHyped}
+            className={`h-12 w-12 ${hyped ? "bg-accent text-accent-ink" : "bg-white/[0.12] text-white hover:bg-white/[0.18]"}`}
+          />
+        )}
+      </div>
 
       <EmojiPicker
         open={!!moreFrom}
@@ -187,20 +161,36 @@ export function DiaryResponder({
         // One pick is one reaction (and one DM), so it closes as it sends.
         onPick={(e) => {
           const from = moreFrom;
-          openMore(null);
+          setMoreFrom(null);
           if (from) send(e, from);
         }}
-        onClose={() => openMore(null)}
-      />
-
-      <DiaryReplyPopup
-        entry={entry}
-        open={replying}
-        onClose={() => openReply(false)}
-        reply={reply}
-        status={status}
-        error={error}
+        onClose={() => setMoreFrom(null)}
       />
     </div>
+  );
+}
+
+/**
+ * The hype star: silent, seen only by the page's owner, lit while you hype
+ * it. On a card it sits in the top corner; full-screen, at the end of the
+ * reply row.
+ */
+export function HypeStar({ className = "", ...actions }: Actions & { className?: string }) {
+  const { hype } = useDiaryActions(actions);
+  const { hyped = false, entry } = actions;
+  const first = entry.name.split(" ")[0];
+  return (
+    <button
+      type="button"
+      onClick={(ev) => {
+        if (!hyped) starBurst(ev.currentTarget);
+        void hype();
+      }}
+      aria-label={hyped ? `Hyped ${first}'s page` : `Hype ${first}'s page`}
+      aria-pressed={hyped}
+      className={`flex shrink-0 items-center justify-center rounded-full transition-colors ${className}`}
+    >
+      <Star size={17} strokeWidth={2.3} className={hyped ? "fill-current" : ""} />
+    </button>
   );
 }

@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Palette, PenLine, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ColorPager } from "@/components/ui/ColorPager";
 import { DiscSleeve, SongLine } from "@/components/diary/DiaryDisc";
 import { colorKey, diaryTheme, fillSize, lifeLeft, pageColorGroups, timeAgo, type DiaryColor } from "@/components/diary/DiaryPage";
 import { ReactionsTab, byPerson } from "@/components/diary/PageReactions";
-import type { DiaryEntry, DiaryReaction } from "@/lib/diary";
+import { reactionSummary, type DiaryEntry, type DiaryReaction } from "@/lib/diary";
 
 /**
  * Your page, as your circle sees it. If anyone reacted or hyped it, a small
@@ -97,18 +99,7 @@ export function YourDiaryCard({
 
         {reactions.length > 0 && (
           <div className="mt-3">
-            <ReactionsTab reactions={reactions} onOpen={() => setShowWho((v) => !v)} />
-            {showWho && (
-              <ul className="mt-2 flex flex-col gap-1.5 rounded-2xl bg-black/25 p-2.5">
-                {byPerson(reactions).map((p) => (
-                  <li key={p.userId} className="flex items-center gap-2">
-                    <Avatar name={p.name} hue={p.hue} size={22} src={p.avatarUrl ?? undefined} />
-                    <span className="truncate text-[13px] font-semibold text-white/90">{p.name}</span>
-                    <span className="ml-auto text-base">{p.sent.join(" ")}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <ReactionsTab reactions={reactions} onOpen={() => setShowWho(true)} />
           </div>
         )}
 
@@ -119,6 +110,53 @@ export function YourDiaryCard({
           suppressHydrationWarning
         />
       </article>
+      <ReactionsSheet open={showWho} onClose={() => setShowWho(false)} reactions={reactions} />
     </DiscSleeve>
+  );
+}
+
+/**
+ * Who reacted to your page, in a sheet over half the screen — the way
+ * comments and sharing open — so the list has room and the page stays put.
+ * The tally across the top, then one row per person with everything they
+ * sent (an emoji, a hype, or both), newest first, each opening their profile.
+ */
+function ReactionsSheet({ open, onClose, reactions }: { open: boolean; onClose: () => void; reactions: DiaryReaction[] }) {
+  const people = byPerson(reactions);
+  const tally = reactionSummary(reactions);
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Reactions">
+      <div className="flex flex-col gap-3 pb-3">
+        <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
+          {tally.map((t) => (
+            <span key={t.emoji} className="flex shrink-0 items-center gap-1.5 rounded-full bg-white/[0.07] px-3 py-1.5 text-sm font-bold tabular-nums">
+              <span className="text-base leading-none">{t.emoji}</span>
+              {t.count}
+            </span>
+          ))}
+        </div>
+        <ul className="flex flex-col">
+          {people.map((p) => (
+            <li key={p.userId}>
+              <Link
+                href={p.username ? `/u/${p.username}` : "#"}
+                onClick={onClose}
+                className="-mx-2 flex items-center gap-3 rounded-2xl px-2 py-2 transition-colors hover:bg-white/[0.04]"
+              >
+                <Avatar name={p.name} hue={p.hue} size={40} src={p.avatarUrl ?? undefined} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-bold">{p.name}</span>
+                  <span className="block text-xs text-muted" suppressHydrationWarning>
+                    {p.username ? `@${p.username} · ` : ""}
+                    {timeAgo(p.at)}
+                  </span>
+                </span>
+                <span className="shrink-0 text-[22px] leading-none tracking-[0.1em]">{p.sent.join("")}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </BottomSheet>
   );
 }

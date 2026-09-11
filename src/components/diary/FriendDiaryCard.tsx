@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Maximize2, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { SongLine } from "@/components/diary/DiaryDisc";
-import { DiaryResponder } from "@/components/diary/DiaryResponder";
+import { DiaryResponder, HypeStar } from "@/components/diary/DiaryResponder";
 import { diaryTheme, fillSize, lifeLeft, timeAgo } from "@/components/diary/DiaryPage";
 import type { DiaryEntry } from "@/lib/diary";
 
@@ -83,11 +83,21 @@ export function FriendDiaryCard({
               </span>
             </span>
           </Link>
+          {/* The hype star, up here: the row at the foot is the reply and
+              the emoji button, with no room for a third thing. */}
+          <HypeStar
+            entry={entry}
+            mine={mine}
+            onReacted={onReacted}
+            hyped={hyped}
+            onHyped={onHyped}
+            className={`ml-auto h-8 w-8 ${hyped ? "bg-accent text-accent-ink" : "bg-black/20 text-white/80 hover:bg-black/30 hover:text-white"}`}
+          />
           <button
             type="button"
             onClick={onOpen}
             aria-label={`Open ${first}'s page full-screen`}
-            className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/20 text-white/70 transition-colors hover:bg-black/30 hover:text-white"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/20 text-white/70 transition-colors hover:bg-black/30 hover:text-white"
           >
             <Maximize2 size={13} />
           </button>

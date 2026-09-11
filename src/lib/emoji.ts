@@ -234,6 +234,44 @@ export function rememberEmoji(e: string): void {
   listeners.forEach((fn) => fn());
 }
 
+// ── The reaction a tap sends ─────────────────────────────────────────────
+// Its own memory, not the recents: an emoji typed into your own page should
+// not become what a quick tap sends to someone else's.
+
+const REACT_KEY = "hypefy.react.last";
+export const DEFAULT_REACTION = "❤️";
+const reactListeners = new Set<() => void>();
+let reactCache: { raw: string | null; value: string } = { raw: null, value: DEFAULT_REACTION };
+
+/** For useSyncExternalStore: the emoji you reacted with last. */
+export const lastReaction = {
+  get(): string {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(REACT_KEY);
+    } catch {
+      /* storage blocked */
+    }
+    if (raw !== reactCache.raw) reactCache = { raw, value: raw && raw.length <= 16 ? raw : DEFAULT_REACTION };
+    return reactCache.value;
+  },
+  server: (): string => DEFAULT_REACTION,
+  subscribe(fn: () => void) {
+    reactListeners.add(fn);
+    return () => reactListeners.delete(fn);
+  },
+};
+
+/** Remember a reaction as the one a tap sends next. */
+export function rememberReaction(e: string): void {
+  try {
+    localStorage.setItem(REACT_KEY, e);
+  } catch {
+    return;
+  }
+  reactListeners.forEach((fn) => fn());
+}
+
 /** A row of `n`: your recents first, then `defaults` to fill it. */
 export function quickRow(recent: string[], defaults: readonly string[], n: number): string[] {
   return [...new Set([...recent, ...defaults])].slice(0, n);

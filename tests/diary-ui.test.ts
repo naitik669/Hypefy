@@ -140,6 +140,14 @@ describe("DiaryHome", () => {
         .dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
     });
   const openComposer = () => act(async () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Your page"]')!.focus());
+  /** The emoji button on someone's page (the first — the deck's). */
+  const reactButton = (first: string) => document.querySelector<HTMLButtonElement>(`button[aria-label^="React to ${first}'s page"]`);
+  /**
+   * Open its fan the way a keyboard does (↑): a finger holds and slides,
+   * which needs the fan laid out on a real screen.
+   */
+  const openFan = (first: string) =>
+    act(async () => void reactButton(first)!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true })));
 
   it("stacks everyone's Diaries, the one on top whole and usable, the rest behind it", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
@@ -158,13 +166,13 @@ describe("DiaryHome", () => {
     expect(cards.filter((c) => !c.hasAttribute("inert"))).toHaveLength(1);
     const top = topCard()!;
     expect(top.textContent).toContain("HDB");
-    const emoji = [...top.querySelectorAll("button")].filter((b) => /^Send .+ to /.test(b.getAttribute("aria-label") ?? ""));
-    // A few a tap away, and ⋯ for the rest.
-    expect(emoji).toHaveLength(5);
-    expect(top.querySelector('button[aria-label="More emoji for Aman"]')).not.toBeNull();
-    // Reply is an arrow, not a field on the card.
-    expect(top.querySelector('button[aria-label="Reply to Aman"]')).not.toBeNull();
-    expect(top.querySelector("input")).toBeNull();
+    // Replying is a bar on the page; reacting is one button (tap, or hold for
+    // more); the hype star is up in the corner.
+    expect(top.querySelector('input[aria-label="Reply to Aman\'s page"]')).not.toBeNull();
+    expect(top.querySelector('button[aria-label^="React to Aman\'s page"]')).not.toBeNull();
+    expect(top.querySelector('button[aria-label="Hype Aman\'s page"]')).not.toBeNull();
+    // No row of emoji until the button is held.
+    expect([...top.querySelectorAll("button")].some((b) => /^Send .+ to /.test(b.getAttribute("aria-label") ?? ""))).toBe(false);
     // The longest note there is, whole, on the card behind — nothing clamped.
     expect(host.textContent).toContain("exams done. finally free. don't text me about syllabus");
     expect(host.textContent).toContain("1/3");
@@ -197,9 +205,10 @@ describe("DiaryHome", () => {
     expect(topCard()!.textContent).toContain("Dev");
   });
 
-  it("sends an emoji to their DMs as a reply to their page, and keeps it on the page", async () => {
+  it("sends an emoji from the fan to their DMs as a reply to their page, and keeps it on the page", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman Verma" })] })));
+    await openFan("Aman");
     await click(button("Send 😂 to Aman"));
 
     expect(rpcCalls).toEqual([
@@ -216,7 +225,8 @@ describe("DiaryHome", () => {
     localStorage.removeItem("hypefy.emoji.recent");
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman" })] })));
-    await click(button("More emoji for Aman"));
+    await openFan("Aman");
+    await click(button("More emoji"));
 
     const popup = () => document.querySelector('[role="dialog"][aria-label="Emoji"]');
     expect(popup()).not.toBeNull();
@@ -232,15 +242,57 @@ describe("DiaryHome", () => {
     expect(JSON.parse(localStorage.getItem("hypefy.emoji.recent")!)).toEqual(["☕"]);
   });
 
-  it("closes the emoji popup when ⋯ is tapped again", async () => {
+  it("holding the emoji button opens the fan; letting go off it sends nothing", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman" })] })));
-    const popup = () => document.querySelector('[role="dialog"][aria-label="Emoji"]');
-    await click(button("More emoji for Aman"));
-    expect(popup()).not.toBeNull();
-    await click(button("More emoji for Aman"));
-    expect(popup()).toBeNull();
+    const face = reactButton("Aman")!;
+    await act(async () => void face.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 })));
+    await wait(320);
+    expect(document.querySelector('[role="menu"][aria-label="Pick an emoji"]')).not.toBeNull();
+    // Let go nowhere near an emoji (the fan stands a hand's width away).
+    await act(async () => void face.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, clientX: 0, clientY: 0 })));
+    expect(document.querySelector('[role="menu"]')).toBeNull();
     expect(rpcCalls).toEqual([]);
+  });
+
+  it("a tap on the emoji button sends the one on its face — ❤️ first, then whatever you sent last", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman" }), entry({ userId: "b", name: "Riya", createdAt: minsAgo(9) })] })));
+    expect(reactButton("Aman")!.textContent).toBe("❤️");
+    await click(reactButton("Aman"));
+    expect(rpcCalls[0]).toEqual({ fn: "react_to_note", args: { p_owner: "a", p_emoji: "❤️" } });
+    // Sent 😂 from the fan, and 😂 is what a tap sends next — on every page.
+    await openFan("Aman");
+    await click(button("Send 😂 to Aman"));
+    expect(reactButton("Riya")!.textContent).toBe("😂");
+  });
+
+  it("replies from the bar on the page: typed there, sent to their DMs, and cleared", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman", text: "HDB" })] })));
+    const input = document.querySelector<HTMLInputElement>('input[aria-label="Reply to Aman\'s page"]')!;
+    expect(input.placeholder).toBe("Reply to Aman's page…");
+    // The send arrow appears once there is something to send.
+    expect(button("Send reply")).toBeNull();
+    await setValue(input, "same, chai?");
+    expect(button("Send reply")).not.toBeNull();
+    await act(async () => input.form!.requestSubmit());
+    expect(rpcCalls.at(-1)).toEqual({ fn: "send_page_reply", args: { p_owner: "a", p_body: "same, chai?" } });
+    expect(input.value).toBe("");
+    expect(host.textContent).toContain("Sent");
+  });
+
+  it("does not flip the deck with the arrow keys while you type a reply", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(
+      createElement(DiaryHome, home({
+        entries: [entry({ userId: "a", name: "Aman", createdAt: minsAgo(1) }), entry({ userId: "b", name: "Riya", createdAt: minsAgo(60) })],
+      }))
+    );
+    const input = topCard()!.querySelector("input")!;
+    await act(async () => void input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
+    await wait(300);
+    expect(topCard()!.textContent).toContain("Aman");
   });
 
   it("hypes a page with the star, silently, and takes it back with a second tap", async () => {
@@ -266,26 +318,9 @@ describe("DiaryHome", () => {
   it("does not send the same emoji twice in a row", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman" })] })));
-    await click(button("Send ❤️ to Aman"));
-    await click(button("Send ❤️ to Aman"));
+    await click(reactButton("Aman"));
+    await click(reactButton("Aman"));
     expect(rpcCalls.filter((c) => c.fn === "send_page_reply")).toHaveLength(1);
-  });
-
-  it("opens a reply popup from the arrow, sends it to their DMs, and closes", async () => {
-    const { DiaryHome } = await import("@/components/diary/DiaryHome");
-    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman", text: "HDB" })] })));
-    await click(button("Reply to Aman"));
-
-    const popup = document.querySelector('[role="dialog"][aria-label="Reply to Aman\'s page"]')!;
-    expect(popup.textContent).toContain("HDB"); // what you are replying to
-    const input = popup.querySelector("input")!;
-    expect(document.activeElement).toBe(input);
-
-    await setValue(input, "same, chai?");
-    await act(async () => input.form!.requestSubmit());
-    expect(rpcCalls.at(-1)).toEqual({ fn: "send_page_reply", args: { p_owner: "a", p_body: "same, chai?" } });
-    expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(host.textContent).toContain("Sent");
   });
 
   it("plays the front card's song by itself, shows every card's CD, and plays the next when it comes up", async () => {
@@ -366,7 +401,7 @@ describe("DiaryHome", () => {
     ]);
     expect(cards[0].compareDocumentPosition(spotlight) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
     expect(cards[1].querySelector('button[aria-label="Hype Aman\'s page"]')).not.toBeNull();
-    expect(cards[1].querySelector('button[aria-label="Reply to Aman"]')).not.toBeNull();
+    expect(cards[1].querySelector('input[aria-label="Reply to Aman\'s page"]')).not.toBeNull();
   });
 
   it("opens a page from the list full-screen, at that page", async () => {
@@ -448,12 +483,15 @@ describe("DiaryHome", () => {
     const floating = () => [...host.querySelectorAll(".page-float")].map((f) => f.textContent);
     expect(new Set(floating())).toEqual(new Set(["❤️", "😂", "⭐"]));
 
-    // The tab: faces and emoji, no words; it opens who sent what.
+    // The tab: faces and emoji, no words; it opens who sent what in a sheet
+    // over half the screen, like comments.
     const tab = button("Reactions from 2 people")!;
     expect(tab.textContent).toContain("2");
     await click(tab);
-    const rows = [...document.querySelectorAll("li")].map((li) => li.textContent);
-    expect(rows).toEqual([expect.stringMatching(/Riya⭐ ❤️$/), expect.stringMatching(/Dev😂$/)]);
+    const sheet = document.querySelector('[role="dialog"]')!;
+    expect(sheet.textContent).toContain("Reactions");
+    const rows = [...sheet.querySelectorAll("li")].map((li) => li.textContent);
+    expect(rows).toEqual([expect.stringMatching(/Riya.*⭐❤️$/), expect.stringMatching(/Dev.*😂$/)]);
 
     // Seen: the next visit, nothing floats.
     await act(async () => root!.unmount());
@@ -496,8 +534,10 @@ describe("DiaryHome", () => {
         myReactions: { a: "😂" },
       }))
     );
+    await openFan("Aman");
     await click(button("Send 😂 to Aman"));
     expect(rpcCalls).toEqual([]);
+    await openFan("Aman");
     await click(button("Send 🥰 to Aman"));
     expect(rpcCalls.filter((c) => c.fn === "send_page_reply")).toHaveLength(1);
   });
