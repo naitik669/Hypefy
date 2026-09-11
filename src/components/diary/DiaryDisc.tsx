@@ -4,6 +4,9 @@ import { useEffect } from "react";
 import { Music, Plus, X } from "lucide-react";
 import { ensurePreviewPlaying, pausePreview, playPreview, useIsPlaying, type Track } from "@/lib/music";
 
+/** A Diary's song goes round again when it ends, wherever it is played. */
+const LOOP = { loop: true } as const;
+
 /**
  * The song on a Diary, as a black CD tucked behind the page, its cover in
  * the middle.
@@ -11,8 +14,8 @@ import { ensurePreviewPlaying, pausePreview, playPreview, useIsPlaying, type Tra
  * A sliver shows past the page's right edge at rest — enough to see there is
  * a song, not enough to compete with the words. Tap it and it slides out a
  * little further, grows, and turns slowly while the song plays; tap again and
- * it slips back. With no song yet (the composer), the same disc is blank with
- * a plus, and tapping it adds one.
+ * it slips back. The song repeats until it is stopped. With no song yet (the
+ * composer), the same disc is blank with a plus, and tapping it adds one.
  *
  * The parent positions it (absolute, behind the page); the disc only moves
  * itself relative to that spot, by `slide` pixels to the right, so each place
@@ -32,7 +35,7 @@ export function DiaryDisc({
   slide?: number;
   /** For an empty disc: what tapping it does. */
   onAdd?: () => void;
-  /** Start playing on mount, stop on unmount (full-screen). */
+  /** Start playing on mount, stop on unmount — the card on top of the deck, and full-screen. */
   autoPlay?: boolean;
   className?: string;
   style?: React.CSSProperties;
@@ -41,7 +44,7 @@ export function DiaryDisc({
 
   useEffect(() => {
     if (!autoPlay || !track) return;
-    ensurePreviewPlaying(track);
+    ensurePreviewPlaying(track, LOOP);
     return () => pausePreview();
   }, [autoPlay, track]);
 
@@ -54,7 +57,7 @@ export function DiaryDisc({
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        if (track) playPreview(track);
+        if (track) playPreview(track, LOOP);
         else onAdd?.();
       }}
       aria-label={label}
@@ -150,7 +153,7 @@ export function SongLine({ track, onRemove }: { track: Track; onRemove?: () => v
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          playPreview(track);
+          playPreview(track, LOOP);
         }}
         className="flex min-w-0 items-center gap-2 rounded-full py-1 pr-2 text-left text-[12px] text-white/70 transition-colors hover:text-white"
       >

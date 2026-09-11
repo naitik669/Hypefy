@@ -78,10 +78,29 @@ const home = (over: Record<string, unknown> = {}) => ({
 let root: Root | undefined;
 let host: HTMLDivElement;
 
+// jsdom cannot play audio. Record what was asked to play and pause instead.
+let played: string[] = [];
+let paused = 0;
+Object.defineProperty(HTMLMediaElement.prototype, "play", {
+  configurable: true,
+  value(this: HTMLMediaElement) {
+    played.push(this.src);
+    return Promise.resolve();
+  },
+});
+Object.defineProperty(HTMLMediaElement.prototype, "pause", {
+  configurable: true,
+  value() {
+    paused++;
+  },
+});
+
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   localStorage.clear();
   rpcCalls.length = 0;
+  played = [];
+  paused = 0;
   host = document.createElement("div");
   document.body.appendChild(host);
 });
@@ -114,6 +133,7 @@ describe("DiaryHome", () => {
       el.dispatchEvent(new Event("input", { bubbles: true }));
     });
   const wait = (ms: number) => act(async () => void (await new Promise((r) => setTimeout(r, ms))));
+  const openComposer = () => click(document.querySelector(".grid button")); // the "Leave your Diary" tile
 
   it("stacks everyone's Diaries, the one on top whole and usable, the rest behind it", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
@@ -207,19 +227,33 @@ describe("DiaryHome", () => {
     expect(host.textContent).toContain("Sent to your DMs with Aman");
   });
 
-  it("tucks a black CD behind the top card when it has a song", async () => {
+  it("plays the top card's song by itself, on its CD, and the next card's when it comes up", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
-    const track = { id: "t1", title: "Pasoori", artist: "Ali Sethi", artwork: "cover.jpg", preview: "x.mp3" };
+    const song = (id: string, title: string) => ({ id, title, artist: "X", artwork: `${id}.jpg`, preview: `${id}.mp3` });
     await render(
       createElement(DiaryHome, home({
-        entries: [entry({ userId: "a", name: "Aman", track, createdAt: minsAgo(1) }), entry({ userId: "b", name: "Riya", createdAt: minsAgo(60) })],
+        entries: [
+          entry({ userId: "a", name: "Aman", track: song("t1", "Pasoori"), createdAt: minsAgo(1) }),
+          entry({ userId: "b", name: "Riya", createdAt: minsAgo(60) }),
+          entry({ userId: "c", name: "Dev", track: song("t2", "Blinding Lights"), createdAt: minsAgo(120) }),
+        ],
       }))
     );
-    const disc = document.querySelectorAll<HTMLButtonElement>('button[aria-label="Play Pasoori by Ali Sethi"]');
-    expect(disc).toHaveLength(1);
-    // The cover sits in the middle of the disc.
-    expect(disc[0].querySelector("img")!.getAttribute("src")).toBe("cover.jpg");
-    expect(topCard()!.textContent).toContain("Pasoori · Ali Sethi");
+    // Only the top card has its CD out, and it is already playing, on loop.
+    const discs = () => [...document.querySelectorAll<HTMLButtonElement>("button[aria-pressed]")];
+    expect(discs().map((d) => d.getAttribute("aria-label"))).toEqual(["Pause Pasoori by X"]);
+    expect(discs()[0].querySelector("img")!.getAttribute("src")).toBe("t1.jpg"); // the cover in the middle
+    expect(played.at(-1)).toContain("t1.mp3");
+
+    await click(button("Next Diary")); // Riya: no song, so silence
+    await wait(300);
+    expect(discs()).toEqual([]);
+    expect(paused).toBeGreaterThan(0);
+
+    await click(button("Next Diary")); // Dev: his song starts
+    await wait(300);
+    expect(discs().map((d) => d.getAttribute("aria-label"))).toEqual(["Pause Blinding Lights by X"]);
+    expect(played.at(-1)).toContain("t2.mp3");
   });
 
   it("draws each Diary in the colour its writer picked", async () => {
@@ -233,18 +267,48 @@ describe("DiaryHome", () => {
     expect(top.style.background).toBe(probe.style.background);
   });
 
-  it("puts the page to write on right there when you have no Diary, folded until you tap it", async () => {
+  it("lays every Diary out in a grid under the spotlight, yours first", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(
+      createElement(DiaryHome, home({
+        entries: [
+          entry({ userId: "a", name: "Aman", text: "HDB", createdAt: minsAgo(1) }),
+          entry({ userId: "b", name: "Riya", text: "free", createdAt: minsAgo(60) }),
+        ],
+      }))
+    );
+    const grid = host.querySelector(".grid")!;
+    expect(grid.compareDocumentPosition(topCard()!) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    expect([...grid.children].map((t) => t.getAttribute("aria-label") ?? t.textContent)).toEqual([
+      expect.stringContaining("Leave your Diary"),
+      "Aman's Diary",
+      "Riya's Diary",
+    ]);
+  });
+
+  it("opens a Diary from the grid full-screen, at that Diary", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(
+      createElement(DiaryHome, home({
+        entries: [
+          entry({ userId: "a", name: "Aman", createdAt: minsAgo(1) }),
+          entry({ userId: "b", name: "Riya", createdAt: minsAgo(60) }),
+        ],
+      }))
+    );
+    await click(host.querySelector('.grid [aria-label="Riya\'s Diary"]'));
+    expect(document.querySelector('[role="dialog"]')?.getAttribute("aria-label")).toBe("Riya's Diary");
+  });
+
+  it("opens the page to write on from the blank tile in the grid", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", text: "HDB" })] })));
+    expect(document.querySelector("textarea")).toBeNull();
 
-    const field = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Your Diary"]')!;
+    await openComposer();
+    const field = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Your Diary"]')!;
     expect(field.placeholder).toBe("What's on your mind today?");
-    // Under everyone else's stack, folded small until you tap into it.
-    expect(field.compareDocumentPosition(host.querySelector("article")!) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
-    expect(host.textContent).not.toContain("Post to Diary");
-
-    await act(async () => field.focus());
-    expect(host.textContent).toContain("Post to Diary");
+    expect(document.body.textContent).toContain("Post to Diary");
     // A blank CD behind the page is how a song gets added.
     expect(button("Add a song")).not.toBeNull();
   });
@@ -252,14 +316,14 @@ describe("DiaryHome", () => {
   it("posts your Diary in the colour you pick", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home()));
-    const field = host.querySelector<HTMLTextAreaElement>("textarea")!;
-    await act(async () => field.focus());
+    await openComposer();
+    const field = document.querySelector<HTMLTextAreaElement>("textarea")!;
     expect(button("Ink")!.getAttribute("aria-checked")).toBe("true");
 
     await click(button("Plum"));
     expect(button("Plum")!.getAttribute("aria-checked")).toBe("true");
     await setValue(field, "new playlist dropping");
-    await click([...host.querySelectorAll("button")].find((b) => b.textContent === "Post to Diary")!);
+    await click([...document.querySelectorAll("button")].find((b) => b.textContent === "Post to Diary")!);
     expect(rpcCalls.find((c) => c.fn === "set_note")?.args).toMatchObject({
       p_text: "new playlist dropping",
       p_audience: "mutual",
@@ -270,24 +334,24 @@ describe("DiaryHome", () => {
   it("picks who can see it from a dropdown beside Post", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home()));
-    await act(async () => host.querySelector("textarea")!.focus());
+    await openComposer();
 
-    const picker = host.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!;
+    const picker = document.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!;
     expect(picker.textContent).toBe("Mutuals");
-    expect(host.querySelector('[role="menu"]')).toBeNull();
+    expect(document.querySelector('[role="menu"]')).toBeNull();
 
     await click(picker);
-    const options = [...host.querySelectorAll('[role="menuitemradio"]')];
+    const options = [...document.querySelectorAll('[role="menuitemradio"]')];
     expect(options.map((o) => [o.querySelector(".font-semibold")!.textContent, o.getAttribute("aria-checked")])).toEqual([
       ["Mutuals", "true"],
       ["Close friends", "false"],
     ]);
     await click(options[1]);
-    expect(host.querySelector('[role="menu"]')).toBeNull();
+    expect(document.querySelector('[role="menu"]')).toBeNull();
     expect(picker.textContent).toBe("Close friends");
   });
 
-  it("shows your Diary with who reacted, by name, instead of the page to write on", async () => {
+  it("shows a tally of reactions on your tile, and who sent them when you open it", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(
       createElement(DiaryHome, home({
@@ -299,10 +363,13 @@ describe("DiaryHome", () => {
         ],
       }))
     );
-    const mine = host.querySelector("article")!;
+    const tile = button("Your Diary")!;
+    expect(tile.textContent).toContain("gym then chai");
+    expect(tile.textContent).toContain("❤️2 😂1");
+
+    await click(tile);
+    const mine = document.querySelector("article")!;
     expect(mine.textContent).toContain("Your Diary");
-    expect(mine.textContent).toContain("gym then chai");
-    expect(mine.textContent).toContain("❤️ 2");
     expect(mine.textContent).toContain("3 reactions");
     // Each line ends "<name><emoji>" (the avatar's initial comes first).
     expect([...mine.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
@@ -310,13 +377,13 @@ describe("DiaryHome", () => {
       expect.stringMatching(/Dev😂$/),
       expect.stringMatching(/Kabir❤️$/),
     ]);
-    expect(host.querySelector("textarea")).toBeNull();
   });
 
   it("says so on your Diary when nobody has reacted yet", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "me", isSelf: true })] })));
-    expect(host.textContent).toContain("No reactions yet");
+    await click(button("Your Diary"));
+    expect(document.body.textContent).toContain("No reactions yet");
   });
 
   it("does not resend the emoji you already sent to that Diary on an earlier visit", async () => {

@@ -9,16 +9,20 @@ import { DiaryResponder } from "@/components/diary/DiaryResponder";
 import { diaryTheme, lifeLeft, noteSize, shortLeft } from "@/components/diary/DiaryPage";
 import type { DiaryEntry } from "@/lib/diary";
 
-/** Every card in the stack is the same height, so they sit square as a deck. */
-export const CARD_HEIGHT = 312;
+/**
+ * Every card in the spotlight is the same height, so they sit square as a
+ * deck. Wide and short — the shape of your own Diary card — rather than a
+ * tall playing card.
+ */
+export const CARD_H = 258;
 
 /**
- * One friend's Diary as a card in the stack.
+ * One friend's Diary as a card in the spotlight deck.
  *
- * The whole Diary is on it: the note in full (a Diary is at most 60
- * characters, which always fits), the song, six emoji and a reply arrow. The
- * cards behind the top one are drawn the same way but inert — you see their
- * colour and edges, and act on the one in front.
+ * The whole Diary is on it: who wrote it, the words (at most 60 characters,
+ * which always fit), the song, six emoji and a reply arrow. The cards behind
+ * the top one are drawn the same way but inert — you see their colour and
+ * edges, and act on the one in front.
  */
 export function FriendDiaryCard({
   entry,
@@ -45,8 +49,8 @@ export function FriendDiaryCard({
     <article
       inert={inert}
       aria-hidden={inert || undefined}
-      className="relative flex flex-col overflow-hidden rounded-[28px] px-4 pb-3.5 pt-3.5"
-      style={{ height: CARD_HEIGHT, background: theme.background, boxShadow: theme.shadow }}
+      className="relative flex flex-col overflow-hidden rounded-[28px] px-4 pb-3 pt-3.5"
+      style={{ height: CARD_H, background: theme.background, boxShadow: theme.shadow }}
     >
       <header className="flex items-center gap-2">
         <Link href={entry.username ? `/u/${entry.username}` : "#"} className="flex min-w-0 items-center gap-2">
@@ -72,11 +76,11 @@ export function FriendDiaryCard({
         </button>
       </header>
 
-      {/* The note, in the middle of the page. */}
-      <div className="flex min-h-0 flex-1 flex-col justify-center py-2" onClick={onOpen}>
+      {/* The words, in the middle of what is left. */}
+      <div className="flex min-h-0 flex-1 flex-col justify-center" onClick={onOpen}>
         <p
           className="cursor-pointer break-words font-extrabold leading-[1.06] tracking-[-0.02em] text-white"
-          style={{ fontSize: Math.min(Math.round(size * 1.08), 46) }}
+          style={{ fontSize: Math.min(Math.round(size * 1.05), 44) }}
         >
           {entry.text}
         </p>
@@ -88,7 +92,7 @@ export function FriendDiaryCard({
         </div>
       )}
 
-      <div className="mt-2">
+      <div className="mt-1.5">
         <DiaryResponder entry={entry} mine={mine} onReacted={onReacted} target={() => avatar.current} />
       </div>
 

@@ -63,6 +63,12 @@ function srcFor(track: Track): string {
  */
 let audio: HTMLAudioElement | null = null;
 let playingId: string | null = null;
+/**
+ * The track that should start again when it ends, and from where — its
+ * snippet start, not 0:00, so a Diary loops the part its writer picked.
+ * Cleared by any play that does not ask to loop.
+ */
+let loopFrom: { id: string; start: number } | null = null;
 const listeners = new Set<() => void>();
 
 const MUTE_KEY = "hypefy_music_muted";
@@ -81,6 +87,15 @@ function ensureAudio(): HTMLAudioElement {
     audio.preload = "none";
     audio.muted = musicMuted;
     const clear = () => {
+      // A looping track that just ran out goes round again instead. "pause"
+      // fires before "ended" at the end of a track; whichever comes first
+      // finds it stopped at the end, seeks back and plays, and the other then
+      // finds it playing and leaves it be.
+      if (audio && audio.ended && audio.paused && loopFrom && loopFrom.id === playingId) {
+        audio.currentTime = loopFrom.start;
+        void audio.play().catch(() => {});
+        return;
+      }
       // pause/error events are queued async — if another play() already
       // started (track switch), the element isn't paused anymore: keep state.
       if (audio && !audio.paused) return;
@@ -113,7 +128,15 @@ function usesSpotify(track: Track): boolean {
  * persisted, and the next ambient play re-reads musicMuted, so the mute switch
  * is untouched by any of this.
  */
-export type PlayOpts = { audible?: boolean };
+export type PlayOpts = {
+  audible?: boolean;
+  /** Start again from the snippet start each time it ends (a Diary's song). */
+  loop?: boolean;
+};
+
+function setLoop(track: Track, opts?: PlayOpts) {
+  loopFrom = opts?.loop ? { id: track.id, start: track.start ?? 0 } : null;
+}
 
 function applyMute(a: HTMLAudioElement, opts?: PlayOpts) {
   a.muted = opts?.audible ? false : musicMuted;
@@ -132,7 +155,7 @@ export function playPreview(track: Track, opts?: PlayOpts) {
     audio?.pause();
     playingId = track.id;
     emit();
-    void spotifyPlay(track.uri!, (track.start ?? 0) * 1000).then((ok) => {
+    void spotifyPlay(track.uri!, (track.start ?? 0) * 1000, { repeat: !!opts?.loop }).then((ok) => {
       if (!ok) { playingId = null; emit(); }
     });
     return;
@@ -143,6 +166,7 @@ export function playPreview(track: Track, opts?: PlayOpts) {
     a.pause();
     return;
   }
+  setLoop(track, opts);
   applyMute(a, opts);
   a.src = srcFor(track);
   playingId = track.id;
@@ -172,7 +196,7 @@ export function ensurePreviewPlaying(track: Track, opts?: PlayOpts) {
     // Always restarts at `start`. The SDK cannot resume mid-snippet from a
     // different offset, and for scrubbing — the only caller that repeats —
     // restarting at the new point is the intended behaviour anyway.
-    void spotifyPlay(track.uri!, (track.start ?? 0) * 1000).then((ok) => {
+    void spotifyPlay(track.uri!, (track.start ?? 0) * 1000, { repeat: !!opts?.loop }).then((ok) => {
       if (!ok) { playingId = null; emit(); }
     });
     return;
@@ -180,6 +204,7 @@ export function ensurePreviewPlaying(track: Track, opts?: PlayOpts) {
 
   const a = ensureAudio();
   const sameSrc = a.src === srcFor(track);
+  setLoop(track, opts);
   if (sameSrc && playingId === track.id && !a.paused) return;
   applyMute(a, opts);
   if (!sameSrc) a.src = srcFor(track);

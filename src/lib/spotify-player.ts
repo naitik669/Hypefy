@@ -157,13 +157,20 @@ export function initSpotifyPlayer(): Promise<SpotifyStatus> {
   return initPromise;
 }
 
+/** What the device's repeat mode was last set to, so it is only sent on a change. */
+let repeatMode: "track" | "off" = "off";
+
 /**
- * Play `uri` from `positionMs`.
+ * Play `uri` from `positionMs`, repeating the track if asked.
  *
  * Uses the Web API transfer-and-play endpoint because the SDK cannot start at
  * an offset, and a snippet is defined by exactly that.
  */
-export async function spotifyPlay(uri: string, positionMs = 0): Promise<boolean> {
+export async function spotifyPlay(
+  uri: string,
+  positionMs = 0,
+  opts: { repeat?: boolean } = {},
+): Promise<boolean> {
   if (status !== "ready" || !deviceId) {
     const s = await initSpotifyPlayer();
     if (s !== "ready" || !deviceId) return false;
@@ -183,7 +190,22 @@ export async function spotifyPlay(uri: string, positionMs = 0): Promise<boolean>
       body: JSON.stringify({ uris: [uri], position_ms: Math.max(0, Math.round(positionMs)) }),
     },
   );
-  return res.ok || res.status === 204;
+  const ok = res.ok || res.status === 204;
+
+  // Repeat is a setting of the device, not of the play request: a Diary's
+  // song goes round again (from the top — Spotify repeats whole tracks),
+  // and anything else switches it back off. Only this app's own player is
+  // touched, and only when the mode changes. A failure here just means the
+  // song plays once.
+  const want = opts.repeat ? "track" : "off";
+  if (ok && want !== repeatMode) {
+    const r = await fetch(
+      `https://api.spotify.com/v1/me/player/repeat?state=${want}&device_id=${encodeURIComponent(deviceId!)}`,
+      { method: "PUT", headers: { Authorization: `Bearer ${token}` } },
+    ).catch(() => null);
+    if (r && (r.ok || r.status === 204)) repeatMode = want;
+  }
+  return ok;
 }
 
 export async function spotifyPause() {

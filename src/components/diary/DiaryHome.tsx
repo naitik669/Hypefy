@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Archive } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { DiaryComposer, DiaryEditor, type DiaryDraft } from "@/components/diary/DiaryEditor";
+import { CenterModal } from "@/components/ui/CenterModal";
+import { DiaryEditor, type DiaryDraft } from "@/components/diary/DiaryEditor";
+import { DiaryTile, WriteTile } from "@/components/diary/DiaryTile";
 import { YourDiaryCard } from "@/components/diary/YourDiaryCard";
 import { DiaryStack } from "@/components/diary/DiaryStack";
 import { DiaryStories } from "@/components/diary/DiaryStories";
@@ -22,15 +24,14 @@ type Me = { name: string; hue: number; avatarUrl: string | null };
 const NO_FRESH = new Set<string>();
 
 /**
- * The Diary page — one tap from Messages, and then nothing else to tap to
- * see what is here.
+ * The Diary page — one tap from Messages.
  *
- * Top: everyone else's Diaries as a stack of tilted cards — the one in
- * front complete and usable where it lies (the note, the song as a CD, six
- * emoji and a reply arrow), the rest peeking out behind; swipe to bring the
- * next up. Below: yours, with everyone's reactions on it, or the page to
- * write it on, right there. Past Diaries are a small box at the top right.
- * Full-screen is there from any card, never the only way to see anything.
+ * Top, the spotlight: everyone else's Diaries as a deck of cards, the one in
+ * front complete and usable where it lies (its song playing by itself), the
+ * next two fanned out behind; swipe to send it to the back. Scroll a little
+ * and every Diary is there at once as a grid — yours first (or a blank one to
+ * write), then everyone's — each opening full-screen. Past Diaries are a
+ * small box at the top right.
  */
 export function DiaryHome({
   entries: initial,
@@ -53,6 +54,7 @@ export function DiaryHome({
   const [reacted, setReacted] = useState(initialMine);
   const [archiveCount, setArchiveCount] = useState(initialArchiveCount);
   const [editing, setEditing] = useState(false);
+  const [mineOpen, setMineOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [storyAt, setStoryAt] = useState<number | null>(null);
 
@@ -141,9 +143,9 @@ export function DiaryHome({
           )}
         </p>
 
-        {/* ── Theirs, as a stack ── */}
-        {others.length > 0 ? (
-          <div className="pb-2 pt-3">
+        {/* ── The spotlight ── */}
+        {others.length > 0 && (
+          <div className="pt-3">
             <DiaryStack
               list={others}
               fresh={fresh}
@@ -152,23 +154,46 @@ export function DiaryHome({
               onOpen={(i) => setStoryAt(i)}
             />
           </div>
-        ) : (
-          <p className="px-6 py-4 text-center text-sm leading-snug text-faint">
-            When people you follow back write a Diary, it lands here on the pile.
-          </p>
         )}
 
-        {/* ── Yours ── */}
-        <h2 className="px-1 pt-3 text-xs font-bold uppercase tracking-[0.08em] text-muted">Yours</h2>
-        {mine ? (
-          <YourDiaryCard entry={mine} reactions={onMine} onEdit={() => setEditing(true)} />
-        ) : (
-          <section aria-label="Write your Diary">
-            <DiaryComposer current={null} me={me} onSaved={onSaved} compact />
-          </section>
+        {/* ── Everyone, at once ── */}
+        <h2 className="px-1 pt-4 text-xs font-bold uppercase tracking-[0.08em] text-muted">All Diaries</h2>
+        <div className="grid grid-cols-2 gap-3">
+          {mine ? (
+            <DiaryTile entry={mine} label="You" reactions={onMine} onOpen={() => setMineOpen(true)} />
+          ) : (
+            <WriteTile me={me} onWrite={() => setEditing(true)} />
+          )}
+          {others.map((e, i) => (
+            <DiaryTile
+              key={e.userId}
+              entry={e}
+              label={e.name}
+              fresh={fresh.has(e.userId)}
+              onOpen={() => setStoryAt(i)}
+            />
+          ))}
+        </div>
+        {others.length === 0 && (
+          <p className="px-6 py-4 text-center text-sm leading-snug text-faint">
+            When people you follow back write a Diary, it shows up here.
+          </p>
         )}
       </div>
 
+      {/* Your Diary, opened from your tile: the page, and everyone who reacted. */}
+      <CenterModal open={mineOpen && !!mine} onClose={() => setMineOpen(false)}>
+        {mine && (
+          <YourDiaryCard
+            entry={mine}
+            reactions={onMine}
+            onEdit={() => {
+              setMineOpen(false);
+              setEditing(true);
+            }}
+          />
+        )}
+      </CenterModal>
       <DiaryEditor
         open={editing}
         onClose={() => setEditing(false)}

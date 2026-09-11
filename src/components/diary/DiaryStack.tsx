@@ -3,39 +3,41 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DiaryDisc } from "@/components/diary/DiaryDisc";
-import { CARD_HEIGHT, FriendDiaryCard } from "@/components/diary/FriendDiaryCard";
+import { CARD_H, FriendDiaryCard } from "@/components/diary/FriendDiaryCard";
 import { haptics } from "@/lib/haptics";
-import { pausePreview } from "@/lib/music";
 import { cardTilt, cycleDeck, type DiaryEntry } from "@/lib/diary";
 
-/** How many cards are drawn: the top one and the two peeking behind it. */
+/** How many cards are drawn: the top one and the two fanned out behind it. */
 const VISIBLE = 3;
 /** How far a drag has to go (px) to send the card away rather than back. */
 const THROW_PX = 80;
 /** How long the thrown card takes to leave before it is tucked in behind. */
-const THROW_MS = 230;
+const THROW_MS = 240;
+/** Room on the right of the deck for the top card's CD to peek into. */
+const GUTTER = 44;
+const DISC = 108;
 /**
- * Where each depth sits. The cards behind fan out — the first leaning left
- * and nudged left, the second leaning right — so their colours and corners
- * show on both sides of the one in front. How far each leans is the card's
- * own (cardTilt), so the fan is never quite the same twice.
+ * Where each depth sits. The cards behind fan out like a hand of cards — the
+ * first leaning left, the second leaning right — so their colours and
+ * corners show on both sides of the one in front. How far each leans is the
+ * card's own (cardTilt), so the fan is never quite the same twice.
  */
 const DEPTH = [
   { x: 0, y: 0, scale: 1, side: 0, base: 0 },
-  { x: -14, y: 12, scale: 0.96, side: -1, base: 3 },
-  { x: 14, y: 24, scale: 0.92, side: 1, base: 2.5 },
+  { x: -6, y: 12, scale: 0.97, side: -1, base: 3 },
+  { x: 8, y: 22, scale: 0.94, side: 1, base: 3 },
 ];
 
 /**
- * Everyone's Diaries as a stack of cards, each leaning its own way.
+ * The spotlight: everyone's Diaries as a deck of cards, for going through
+ * them one at a time.
  *
- * The top card is the whole Diary, readable and usable where it lies. Swipe
- * it either way and it goes to the back of the pile and the next comes up;
- * the arrows underneath do the same, and ‹ brings the last one back, for a
- * card swiped by mistake. The cards behind show their colour and a sliver of
- * their words — enough to see who else is waiting.
- *
- * The song is a CD tucked behind the top card, peeking out on the right.
+ * The top card is the whole Diary, readable and usable where it lies, and if
+ * it has a song, its CD — tucked behind it on the right — starts playing and
+ * turning by itself, and keeps going round until the card moves on. Swipe the
+ * top card either way and it flies off, then tucks in at the back of the pile
+ * as the next one comes up. The arrows underneath do the same, and ‹ brings
+ * the last one back, for a card swiped by mistake.
  */
 export function DiaryStack({
   list,
@@ -73,17 +75,15 @@ export function DiaryStack({
   const byId = new Map(list.map((e) => [e.userId, e]));
   const top = byId.get(deck[0]);
 
-  function next(dir: 1 | -1 = 1) {
+  function next(dir: 1 | -1 = 1, from = 0) {
     if (deck.length < 2 || thrown) return;
     haptics.select();
-    // The song belongs to the card leaving the top; it stops with it.
-    pausePreview();
     if (dir === -1) {
       setDeck((d) => cycleDeck(d, -1));
       return;
     }
-    // Out to the side first, then tucked in at the back.
-    setThrown({ id: deck[0], dir: drag < 0 ? -1 : 1 });
+    // Off to the side it was pushed, then tucked in at the back.
+    setThrown({ id: deck[0], dir: from < 0 ? -1 : 1 });
     setDrag(0);
     timer.current = window.setTimeout(() => {
       setDeck((d) => cycleDeck(d, 1));
@@ -123,103 +123,114 @@ export function DiaryStack({
     setDragging(false);
     const dx = e.clientX - p.x;
     const speed = Math.abs(dx) / Math.max(1, performance.now() - p.t);
-    if (Math.abs(dx) > THROW_PX || (Math.abs(dx) > 30 && speed > 0.6)) next(1);
+    if (Math.abs(dx) > THROW_PX || (Math.abs(dx) > 30 && speed > 0.6)) next(1, dx);
     else setDrag(0);
   }
 
   if (!top) return null;
   const position = list.findIndex((e) => e.userId === deck[0]);
 
+  // Drawn: the visible cards, one more waiting invisibly behind them (so it
+  // can fade in as the pile moves up), and the last card in the deck — where
+  // a thrown card lands, so it can be seen tucking in rather than vanishing.
+  const drawn = deck.slice(0, VISIBLE + 1).map((id, depth) => ({ id, depth }));
+  if (deck.length > VISIBLE + 1) drawn.push({ id: deck[deck.length - 1], depth: deck.length - 1 });
+
   return (
     <section aria-label="Diaries from your circle" aria-roledescription="card stack">
       <div
-        className="relative mx-auto"
-        style={{ height: CARD_HEIGHT + DEPTH[Math.min(VISIBLE, deck.length) - 1].y + 8 }}
+        className="relative"
+        style={{ height: CARD_H + DEPTH[Math.min(VISIBLE, deck.length) - 1].y + 10 }}
         onKeyDown={(e) => {
           if (e.key === "ArrowRight") next(1);
           else if (e.key === "ArrowLeft") next(-1);
         }}
       >
         {/* Back to front, so the top card is painted last. */}
-        {deck
-          .slice(0, VISIBLE + 1)
-          .map((id, depth) => ({ id, depth }))
-          .reverse()
-          .map(({ id, depth }) => {
-            const entry = byId.get(id)!;
-            const lean = cardTilt(id);
-            const isTop = depth === 0;
-            const hidden = depth >= VISIBLE;
-            const at = DEPTH[Math.min(depth, VISIBLE - 1)];
-            const isThrown = thrown?.id === id;
+        {[...drawn].reverse().map(({ id, depth }) => {
+          const entry = byId.get(id)!;
+          const lean = cardTilt(id);
+          const isTop = depth === 0;
+          const hidden = depth >= VISIBLE;
+          const at = DEPTH[Math.min(depth, VISIBLE - 1)];
+          const isThrown = thrown?.id === id;
 
-            let transform: string;
-            if (isThrown) {
-              transform = `translate(${thrown!.dir * 125}%, -12px) rotate(${thrown!.dir * 16}deg)`;
-            } else if (isTop) {
-              // The top card leans only a little, so it reads straight; it
-              // follows your finger and tips the way you drag.
-              transform = `translateX(${drag}px) rotate(${lean * 0.35 + drag / 22}deg)`;
-            } else {
-              const tilt = at.side * (at.base + Math.abs(lean) * 0.7);
-              transform = `translate(${at.x}px, ${at.y}px) scale(${at.scale}) rotate(${tilt}deg)`;
-            }
+          let transform: string;
+          if (isThrown) {
+            transform = `translate(${thrown!.dir * 120}%, -14px) rotate(${thrown!.dir * 14}deg)`;
+          } else if (isTop) {
+            // The top card leans only a little, so it reads straight; it
+            // follows your finger and tips the way you drag.
+            transform = `translateX(${drag}px) rotate(${lean * 0.3 + drag / 24}deg)`;
+          } else {
+            const tilt = at.side * (at.base + Math.abs(lean) * 0.5);
+            transform = `translate(${at.x}px, ${at.y}px) scale(${at.scale}) rotate(${tilt}deg)`;
+          }
 
-            return (
-              <div
-                key={id}
-                className="absolute inset-x-7 top-0 select-none"
-                style={{
-                  transform,
-                  transformOrigin: "50% 85%",
-                  zIndex: isThrown ? 40 : 30 - depth,
-                  opacity: hidden ? 0 : 1,
-                  transition: isTop && dragging ? "none" : "transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 260ms",
-                  touchAction: isTop ? "pan-y" : undefined,
-                  pointerEvents: isTop && !thrown ? "auto" : "none",
-                }}
-                onClickCapture={(e) => {
-                  if (swiped.current) {
-                    swiped.current = false;
-                    e.stopPropagation();
-                    e.preventDefault();
-                  }
-                }}
-                onPointerDown={isTop ? onPointerDown : undefined}
-                onPointerMove={isTop ? onPointerMove : undefined}
-                onPointerUp={isTop ? onPointerUp : undefined}
-                onPointerCancel={
-                  isTop
-                    ? () => {
-                        press.current = null;
-                        setDragging(false);
-                        setDrag(0);
-                      }
-                    : undefined
+          return (
+            <div
+              key={id}
+              className="absolute left-2 top-0 select-none"
+              style={{
+                right: GUTTER,
+                transform,
+                transformOrigin: "50% 60%",
+                zIndex: isThrown ? 40 : 30 - Math.min(depth, 20),
+                opacity: hidden ? 0 : 1,
+                transition:
+                  isTop && dragging
+                    ? "none"
+                    : "transform 420ms cubic-bezier(0.22, 0.9, 0.24, 1), opacity 320ms ease",
+                touchAction: isTop ? "pan-y" : undefined,
+                pointerEvents: isTop && !thrown ? "auto" : "none",
+              }}
+              onClickCapture={(e) => {
+                if (swiped.current) {
+                  swiped.current = false;
+                  e.stopPropagation();
+                  e.preventDefault();
                 }
-              >
-                {isTop && entry.track && (
-                  <DiaryDisc
-                    track={entry.track}
-                    size={104}
-                    slide={10}
-                    className="absolute -right-6 top-1/2 z-0"
-                    style={{ marginTop: -52 - 8 }}
-                  />
-                )}
-                <div className="relative z-10">
-                  <FriendDiaryCard
-                    entry={entry}
-                    fresh={fresh.has(id)}
-                    mine={reacted[id] ?? null}
-                    onReacted={onReacted}
-                    onOpen={() => onOpen(list.findIndex((e) => e.userId === id))}
-                    inert={!isTop}
-                  />
-                </div>
+              }}
+              onPointerDown={isTop ? onPointerDown : undefined}
+              onPointerMove={isTop ? onPointerMove : undefined}
+              onPointerUp={isTop ? onPointerUp : undefined}
+              onPointerCancel={
+                isTop
+                  ? () => {
+                      press.current = null;
+                      setDragging(false);
+                      setDrag(0);
+                    }
+                  : undefined
+              }
+            >
+              {/* The top card's song: its CD, playing by itself, round and
+                  round, until this card leaves the top. Keyed per card, so
+                  each one's song starts as it arrives. */}
+              {isTop && !isThrown && entry.track && (
+                <DiaryDisc
+                  key={id}
+                  track={entry.track}
+                  size={DISC}
+                  slide={12}
+                  autoPlay
+                  className="absolute top-1/2 z-0"
+                  style={{ right: -(GUTTER - 8), marginTop: -DISC / 2 }}
+                />
+              )}
+              <div className="relative z-10">
+                <FriendDiaryCard
+                  entry={entry}
+                  fresh={fresh.has(id)}
+                  mine={reacted[id] ?? null}
+                  onReacted={onReacted}
+                  onOpen={() => onOpen(list.findIndex((e) => e.userId === id))}
+                  inert={!isTop}
+                />
               </div>
-            );
-          })}
+            </div>
+          );
+        })}
       </div>
 
       {deck.length > 1 && (
