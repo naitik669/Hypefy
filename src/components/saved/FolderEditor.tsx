@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { FolderArt } from "@/components/saved/FolderArt";
+import { SquircleSwatch } from "@/components/ui/SquircleSwatch";
 import { cleanFolderName, FOLDER_COLORS, FOLDER_EMOJI, folderFill, type Folder } from "@/lib/folders";
 
 export type FolderDraft = { name: string; emoji: string | null; color: string };
@@ -112,23 +113,17 @@ function EditorForm({
 
       <fieldset>
         <legend className="sr-only">Colour</legend>
-        <div className="flex flex-wrap gap-2.5">
-          {FOLDER_COLORS.map((c) => {
-            const on = draft.color === c.key;
-            return (
-              <button
-                key={c.key}
-                type="button"
-                onClick={() => setDraft({ ...draft, color: c.key })}
-                aria-label={c.label}
-                aria-pressed={on}
-                className={`h-9 w-9 rounded-full transition-transform ${
-                  on ? "scale-110 ring-2 ring-foreground ring-offset-2 ring-offset-elevated" : "active:scale-95"
-                }`}
-                style={{ background: folderFill(c.key).background }}
-              />
-            );
-          })}
+        <div role="radiogroup" aria-label="Colour" className="flex items-center justify-between py-1">
+          {FOLDER_COLORS.map((c) => (
+            <SquircleSwatch
+              key={c.key}
+              label={c.label}
+              selected={draft.color === c.key}
+              background={folderFill(c.key).background}
+              onClick={() => setDraft({ ...draft, color: c.key })}
+              size={36}
+            />
+          ))}
         </div>
       </fieldset>
 

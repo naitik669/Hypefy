@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpenText, Music } from "lucide-react";
+import { Music } from "lucide-react";
+import { SpotlightIcon } from "@/components/diary/SpotlightIcon";
 import { Avatar } from "@/components/ui/Avatar";
 import { diaryTheme, fillSize } from "@/components/diary/DiaryPage";
 import { DIARY_HOURS } from "@/lib/diary";
@@ -103,7 +104,7 @@ export function PageReplyEmbed({
           <Avatar name={owner.name} hue={owner.hue} size={18} src={owner.avatarUrl ?? undefined} />
         ) : (
           <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-white/15">
-            <BookOpenText size={10} className="text-white" />
+            <SpotlightIcon size={12} strokeWidth={2.6} className="text-white" />
           </span>
         )}
         <span className="truncate text-[11px] font-bold text-white/90">{owner ? owner.name : "Your page"}</span>

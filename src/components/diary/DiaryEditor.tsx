@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Check, Dices, Loader2, Palette, Star } from "lucide-react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Dices, Loader2, MoreHorizontal, Palette, Star } from "lucide-react";
+import { EmojiPicker } from "@/components/ui/EmojiPicker";
+import { SquircleSwatch } from "@/components/ui/SquircleSwatch";
+import { quickRow, recentEmoji, rememberEmoji } from "@/lib/emoji";
 import { createClient } from "@/lib/supabase/client";
 import { CenterModal } from "@/components/ui/CenterModal";
 import { Avatar } from "@/components/ui/Avatar";
@@ -15,6 +18,9 @@ import { AudiencePicker, type Audience } from "@/components/diary/AudiencePicker
 
 /** notes.text is capped at 60 characters by the database. */
 const MAX = 60;
+
+/** Emoji on the line before ⋯ — as many as fit a phone without scrolling. */
+const QUICK_COUNT = 7;
 
 const STARTERS = [
   "🎧 on repeat today",
@@ -73,6 +79,20 @@ export function DiaryComposer({
   const [engaged, setEngaged] = useState(!compact);
   const field = useRef<HTMLTextAreaElement>(null);
   const lastRoll = useRef(-1);
+  /** The ⋯ button while the emoji popup is open from it. */
+  const [emojiFrom, setEmojiFrom] = useState<HTMLElement | null>(null);
+  const recent = useSyncExternalStore(recentEmoji.subscribe, recentEmoji.get, recentEmoji.server);
+  const quick = quickRow(recent, EMOJI_STRIP, QUICK_COUNT);
+  // Emoji tapped on the line are remembered later, not at once: remembering
+  // moves them to the front, and a line that reshuffles as you tap puts a
+  // different emoji under your finger for the second 🔥 of three.
+  const tapped = useRef<string[]>([]);
+  const flushTapped = () => {
+    for (const e of tapped.current.reverse()) rememberEmoji(e);
+    tapped.current = [];
+  };
+  // Once, on the way out.
+  useEffect(() => () => flushTapped(), []);
 
   // Focus the page when asked, so you can just start writing.
   useEffect(() => {
@@ -83,15 +103,17 @@ export function DiaryComposer({
   const { size } = noteSize(text || "What's on your mind?");
   const left = MAX - Array.from(text).length;
 
-  function insert(fragment: string) {
+  function insert(fragment: string, focus = true) {
     const el = field.current;
     const start = el?.selectionStart ?? text.length;
     const end = el?.selectionEnd ?? text.length;
     const next = (text.slice(0, start) + fragment + text.slice(end)).slice(0, MAX);
     setText(next);
     requestAnimationFrame(() => {
-      el?.focus();
+      if (focus) el?.focus();
       const at = Math.min(start + fragment.length, next.length);
+      // Moves the caret past what went in even unfocused, so the next one
+      // follows it rather than landing where the caret last was.
       el?.setSelectionRange(at, at);
     });
   }
@@ -228,45 +250,54 @@ export function DiaryComposer({
 
         {engaged && (
           <>
-            {/* ── Emoji, one tap each ── */}
-            <div className="no-scrollbar -mx-1 flex gap-0.5 overflow-x-auto px-1">
-              {EMOJI_STRIP.map((e) => (
+            {/* ── Emoji: one line, the ones you use first, then ⋯ for the rest ── */}
+            <div className="-mx-1 flex items-center justify-between px-1">
+              {quick.map((e) => (
                 <button
                   key={e}
                   type="button"
                   onClick={() => {
                     haptics.select();
+                    tapped.current.push(e);
                     insert(e);
                   }}
                   aria-label={`Add ${e}`}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl transition-transform hover:bg-white/[0.07] active:scale-[0.8]"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[22px] transition-transform hover:bg-white/[0.07] active:scale-[0.8]"
                 >
                   {e}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={(ev) => {
+                  flushTapped();
+                  setEmojiFrom(ev.currentTarget);
+                }}
+                aria-label="More emoji"
+                aria-haspopup="dialog"
+                aria-expanded={!!emojiFrom}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
+                  emojiFrom ? "bg-white/15 text-white" : "bg-white/[0.07] text-white/75 hover:bg-white/[0.12] hover:text-white"
+                }`}
+              >
+                <MoreHorizontal size={20} strokeWidth={2.6} />
+              </button>
             </div>
 
             {/* ── The page's colour ── */}
-            <div role="radiogroup" aria-label="Page colour" className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-0.5">
+            <div role="radiogroup" aria-label="Page colour" className="-mx-1 flex items-center justify-between px-1 py-1">
               {DIARY_COLORS.map((c) => (
-                <button
+                <SquircleSwatch
                   key={c.key}
-                  type="button"
-                  role="radio"
-                  aria-checked={color === c.key}
-                  aria-label={c.label}
-                  title={c.label}
+                  label={c.label}
+                  selected={color === c.key}
+                  background={swatchOf(c.key, me.hue)}
                   onClick={() => {
                     haptics.select();
                     setColor(c.key);
                   }}
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90 ${
-                    color === c.key ? "scale-110" : ""
-                  }`}
-                  style={{ background: swatchOf(c.key, me.hue), boxShadow: "inset 0 1px 0 rgb(255 255 255 / 0.18)" }}
-                >
-                  {color === c.key && <Check size={15} strokeWidth={3} className="text-white drop-shadow" />}
-                </button>
+                  size={34}
+                />
               ))}
             </div>
 
@@ -323,6 +354,14 @@ export function DiaryComposer({
       </div>
 
       <TrackPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={setTrack} />
+      <EmojiPicker
+        open={!!emojiFrom}
+        anchor={emojiFrom}
+        // Not focusing the page as it goes in: that would raise the keyboard
+        // over the popup you are still picking from.
+        onPick={(e) => insert(e, false)}
+        onClose={() => setEmojiFrom(null)}
+      />
     </>
   );
 }

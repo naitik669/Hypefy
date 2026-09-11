@@ -4,13 +4,13 @@ import {
   Clapperboard,
   Heart,
   ImageIcon,
-  BookOpenText,
   Lock,
   Mail,
   Star,
   Users,
   Zap,
 } from "lucide-react";
+import { SpotlightIcon } from "@/components/diary/SpotlightIcon";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 /**
@@ -59,7 +59,7 @@ const CONTENT: Entry[] = [
   {
     // The same open-book glyph as the button in Messages, so the glossary
     // draws it the way the app does.
-    icon: BookOpenText,
+    icon: SpotlightIcon,
     term: "Spotlight",
     what: "Where your circle's pages are: a page is a short note — a line, an emoji, a song — that people you follow back can read for 24 hours. React, hype it with a star, or reply. Tap the open book in Messages.",
     href: "/messages/spotlight",

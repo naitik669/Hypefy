@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Palette, PenLine, Star } from "lucide-react";
+import { Palette, PenLine, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
+import { SquircleSwatch } from "@/components/ui/SquircleSwatch";
 import { DiscSleeve, SongLine } from "@/components/diary/DiaryDisc";
 import { DIARY_COLORS, colorKey, diaryTheme, fillSize, lifeLeft, swatchOf, timeAgo, type DiaryColor } from "@/components/diary/DiaryPage";
 import { ReactionsTab, byPerson } from "@/components/diary/PageReactions";
@@ -70,23 +71,16 @@ export function YourDiaryCard({
         </header>
 
         {picking && onColor && (
-          <div role="radiogroup" aria-label="Page colour" className="no-scrollbar -mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+          <div role="radiogroup" aria-label="Page colour" className="-mx-0.5 mt-3 flex items-center justify-between px-0.5 py-1">
             {DIARY_COLORS.map((c) => (
-              <button
+              <SquircleSwatch
                 key={c.key}
-                type="button"
-                role="radio"
-                aria-checked={current === c.key}
-                aria-label={c.label}
-                title={c.label}
+                label={c.label}
+                selected={current === c.key}
+                background={swatchOf(c.key, entry.hue)}
                 onClick={() => onColor(c.key)}
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90 ${
-                  current === c.key ? "scale-110" : ""
-                }`}
-                style={{ background: swatchOf(c.key, entry.hue), boxShadow: "inset 0 1px 0 rgb(255 255 255 / 0.2), 0 0 0 1.5px rgb(0 0 0 / 0.25)" }}
-              >
-                {current === c.key && <Check size={13} strokeWidth={3} className="text-white drop-shadow" />}
-              </button>
+                size={30}
+              />
             ))}
           </div>
         )}
