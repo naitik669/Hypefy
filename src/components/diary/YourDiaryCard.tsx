@@ -1,14 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { PenLine, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { DiscSleeve, SongLine } from "@/components/diary/DiaryDisc";
 import { diaryTheme, lifeLeft, noteSize, shortLeft } from "@/components/diary/DiaryPage";
-import { reactionSummary, type DiaryEntry, type DiaryReaction } from "@/lib/diary";
+import { ReactionsTab } from "@/components/diary/PageReactions";
+import type { DiaryEntry, DiaryReaction } from "@/lib/diary";
 
 /**
- * Your Diary, as your circle sees it, with what they did about it underneath
- * — the reactions are on the card, by name, not behind a tap.
+ * Your page, as your circle sees it. If anyone reacted or hyped it, a small
+ * tab at its foot shows their faces and emoji; tap it for who sent what.
+ * If nobody has, there is nothing there at all.
  */
 export function YourDiaryCard({
   entry,
@@ -19,9 +22,17 @@ export function YourDiaryCard({
   reactions: DiaryReaction[];
   onEdit: () => void;
 }) {
+  const [showWho, setShowWho] = useState(false);
   const tint = diaryTheme(entry.color, entry.hue);
   const { size } = noteSize(entry.text);
-  const summary = reactionSummary(reactions);
+
+  // One row per person, with all they sent.
+  const people = new Map<string, DiaryReaction & { sent: string[] }>();
+  for (const r of reactions) {
+    const p = people.get(r.userId);
+    if (p) p.sent.push(r.emoji);
+    else people.set(r.userId, { ...r, sent: [r.emoji] });
+  }
 
   return (
     <DiscSleeve track={entry.track}>
@@ -31,19 +42,15 @@ export function YourDiaryCard({
       >
         <header className="flex items-center gap-2">
           <Avatar name={entry.name} hue={entry.hue} size={32} src={entry.avatarUrl ?? undefined} />
-          <span className="text-sm font-bold text-white">Your Diary</span>
-          {entry.audience === "close" && (
-            <span className="flex items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-bold text-accent">
-              <Star size={10} className="fill-accent" /> Close friends
-            </span>
-          )}
+          <span className="text-sm font-bold text-white">You</span>
+          {entry.audience === "close" && <Star size={12} className="fill-accent text-accent" aria-label="Close friends" />}
           <span className="ml-auto text-xs tabular-nums text-white/45" suppressHydrationWarning>
-            {shortLeft(entry.createdAt)} left
+            {shortLeft(entry.createdAt)}
           </span>
           <button
             type="button"
             onClick={onEdit}
-            aria-label="Edit your Diary"
+            aria-label="Edit your page"
             className="-mr-1.5 flex h-8 w-8 items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white"
           >
             <PenLine size={15} />
@@ -63,38 +70,26 @@ export function YourDiaryCard({
           </div>
         )}
 
-        {/* Who reacted — the whole answer, on the card. */}
-        <div className="mt-3 rounded-2xl bg-white/[0.05] p-3">
-          {reactions.length === 0 ? (
-            <p className="text-xs text-white/50">No reactions yet. They show up here as they come in.</p>
-          ) : (
-            <>
-              <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-bold text-white/90">
-                {summary.map((s) => (
-                  <span key={s.emoji} className="tabular-nums">
-                    {s.emoji} {s.count}
-                  </span>
-                ))}
-                <span className="font-medium text-white/45">
-                  · {reactions.length} {reactions.length === 1 ? "reaction" : "reactions"}
-                </span>
-              </p>
-              <ul className="mt-2.5 flex flex-col gap-2">
-                {reactions.map((r) => (
-                  <li key={r.userId} className="flex items-center gap-2">
-                    <Avatar name={r.name} hue={r.hue} size={22} src={r.avatarUrl ?? undefined} />
-                    <span className="truncate text-[13px] font-semibold text-white/90">{r.name}</span>
-                    <span className="ml-auto text-base">{r.emoji}</span>
+        {reactions.length > 0 && (
+          <div className="mt-3">
+            <ReactionsTab reactions={reactions} onOpen={() => setShowWho((v) => !v)} />
+            {showWho && (
+              <ul className="mt-2 flex flex-col gap-1.5 rounded-2xl bg-black/25 p-2.5">
+                {[...people.values()].map((p) => (
+                  <li key={p.userId} className="flex items-center gap-2">
+                    <Avatar name={p.name} hue={p.hue} size={22} src={p.avatarUrl ?? undefined} />
+                    <span className="truncate text-[13px] font-semibold text-white/90">{p.name}</span>
+                    <span className="ml-auto text-base">{p.sent.join(" ")}</span>
                   </li>
                 ))}
               </ul>
-            </>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         <span
           aria-hidden
-          className="absolute bottom-0 left-0 h-[2px] rounded-r-full opacity-90"
+          className="absolute bottom-0 left-0 h-[3px] rounded-r-full"
           style={{ width: `${lifeLeft(entry.createdAt) * 100}%`, background: tint.burn }}
           suppressHydrationWarning
         />

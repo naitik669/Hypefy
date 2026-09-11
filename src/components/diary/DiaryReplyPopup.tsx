@@ -12,12 +12,12 @@ import type { DiaryEntry } from "@/lib/diary";
 import type { ReplyStatus } from "@/components/diary/useDiaryActions";
 
 /**
- * Replying to a Diary: their page, small and tilted, above a field to answer
+ * Replying to a page: the page, small and tilted, above a field to answer
  * it — so you can see what you are replying to while you type, with the
  * keyboard up and the card list out of view.
  *
- * Opened by the reply arrow on a card. The reply goes to your DMs with them,
- * as "📔 Replied to your Diary: …"; the popup closes once it has gone.
+ * Opened by the reply arrow on a card. The reply goes to your DMs with them
+ * as an embed of the page; the popup closes once it has gone.
  */
 export function DiaryReplyPopup({
   entry,
@@ -69,7 +69,7 @@ export function DiaryReplyPopup({
         ref={trap}
         role="dialog"
         aria-modal="true"
-        aria-label={`Reply to ${first}'s Diary`}
+        aria-label={`Reply to ${first}'s page`}
         onClick={(e) => e.stopPropagation()}
         className="animate-modal-pop flex w-full max-w-[420px] flex-col gap-4"
       >
@@ -128,9 +128,7 @@ export function DiaryReplyPopup({
             {status === "sending" ? <Loader2 size={16} className="animate-spin" /> : <Plane size={16} />}
           </button>
         </form>
-        <p className="-mt-2 text-center text-xs text-white/50">
-          {status === "error" && error ? <span className="font-semibold text-danger">{error}</span> : "Goes to your DMs with " + first}
-        </p>
+        {status === "error" && error && <p className="-mt-2 text-center text-xs font-semibold text-danger">{error}</p>}
       </div>
     </div>,
     document.body

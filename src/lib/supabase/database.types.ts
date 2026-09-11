@@ -1044,6 +1044,32 @@ export type Database = {
           },
         ]
       }
+      note_hypes: {
+        Row: {
+          created_at: string
+          hyper_id: string
+          note_created_at: string
+          note_owner_id: string
+        }
+        Insert: never
+        Update: never
+        Relationships: [
+          {
+            foreignKeyName: "note_hypes_hyper_id_fkey"
+            columns: ["hyper_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_hypes_note_owner_id_fkey"
+            columns: ["note_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           actor_id: string | null
@@ -2426,6 +2452,8 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      send_page_reply: { Args: { p_body: string; p_owner: string }; Returns: string }
+      toggle_note_hype: { Args: { p_owner: string }; Returns: boolean }
       set_notif_pref: {
         Args: { p_key: string; p_on: boolean }
         Returns: Json

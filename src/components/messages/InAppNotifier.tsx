@@ -6,6 +6,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
+import { isEmojiReply } from "@/components/diary/PageReplyEmbed";
 
 /** Human verbs for non-text message kinds — never surface raw URLs in a toast. */
 const KIND_VERB: Record<string, string> = {
@@ -135,7 +136,10 @@ export function InAppNotifier({ currentUserId }: { currentUserId: string }) {
       if (pathRef.current === `/messages/${row.conversation_id}`) return; // viewing it
       const mem = await getMembership(row.conversation_id);
       if (!mem || mem.muted) return;
-      const content = KIND_VERB[row.kind] ?? (row.body ?? "Sent a message");
+      const content =
+        row.kind === "page_reply"
+          ? isEmojiReply(row.body) ? `Reacted ${row.body} to your page` : `Replied to your page: ${row.body ?? ""}`
+          : KIND_VERB[row.kind] ?? (row.body ?? "Sent a message");
       const key = `m-${row.id}`;
       // Render immediately with what we know; enrich the sender below.
       push({

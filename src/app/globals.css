@@ -728,10 +728,41 @@ body {
   transform-origin: bottom;
   animation: diary-eq 0.9s ease-in-out infinite;
 }
+/* Reactions to your page floating up over it, the way they rise up a live
+   video: each drifts side to side as it climbs and fades near the top. Its
+   own path comes from the custom properties set on it. */
+@keyframes page-float {
+  0% {
+    transform: translate(-50%, 0) scale(0.4);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(calc(-50% + var(--sway) * 0.4), calc(var(--rise) * -0.15)) scale(1);
+    opacity: 1;
+  }
+  60% {
+    transform: translate(calc(-50% - var(--sway) * 0.5), calc(var(--rise) * -0.6)) scale(1);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--sway)), calc(var(--rise) * -1)) scale(0.85);
+    opacity: 0;
+  }
+}
+.page-float {
+  position: absolute;
+  bottom: 10%;
+  line-height: 1;
+  pointer-events: none;
+  animation: page-float var(--dur) ease-out var(--delay) both;
+}
 @media (prefers-reduced-motion: reduce) {
   .diary-disc-spin,
   .diary-eq {
     animation: none;
+  }
+  .page-float {
+    display: none;
   }
 }
 

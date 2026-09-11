@@ -11,24 +11,26 @@ import type { DiaryEntry } from "@/lib/diary";
 
 /**
  * Every card in the spotlight is the same height, so they sit square as a
- * deck. Wide and short — the shape of your own Diary card — rather than a
+ * deck. Wide and short — the shape of your own page's card — rather than a
  * tall playing card.
  */
-export const CARD_H = 258;
+export const CARD_H = 244;
 
 /**
- * One friend's Diary as a card in the spotlight deck.
+ * One friend's page as a card in the spotlight deck.
  *
- * The whole Diary is on it: who wrote it, the words (at most 60 characters,
- * which always fit), the song, six emoji and a reply arrow. The cards behind
- * the top one are drawn the same way but inert — you see their colour and
- * edges, and act on the one in front.
+ * The whole page is on it: who wrote it, the words (at most 60 characters,
+ * which always fit), the song, and the row to react, hype and reply. The
+ * cards behind the top one are drawn the same way but inert — you see their
+ * colour and edges, and act on the one in front.
  */
 export function FriendDiaryCard({
   entry,
   fresh,
   mine,
   onReacted,
+  hyped = false,
+  onHyped,
   onOpen,
   inert = false,
 }: {
@@ -36,17 +38,21 @@ export function FriendDiaryCard({
   fresh: boolean;
   mine: string | null;
   onReacted: (userId: string, emoji: string | null) => void;
+  hyped?: boolean;
+  onHyped?: (userId: string, hyped: boolean) => void;
   onOpen: () => void;
   /** A card behind the top one: shown, not usable. */
   inert?: boolean;
 }) {
   const avatar = useRef<HTMLSpanElement>(null);
+  const card = useRef<HTMLElement>(null);
   const theme = diaryTheme(entry.color, entry.hue);
   const { size } = noteSize(entry.text);
   const first = entry.name.split(" ")[0];
 
   return (
     <article
+      ref={card}
       inert={inert}
       aria-hidden={inert || undefined}
       className="relative flex flex-col overflow-hidden rounded-[28px] px-4 pb-3 pt-3.5"
@@ -64,12 +70,12 @@ export function FriendDiaryCard({
         )}
         {fresh && <span aria-label="New" className="h-2 w-2 shrink-0 rounded-full bg-accent" />}
         <span className="ml-auto shrink-0 text-xs tabular-nums text-white/55" suppressHydrationWarning>
-          {shortLeft(entry.createdAt)} left
+          {shortLeft(entry.createdAt)}
         </span>
         <button
           type="button"
           onClick={onOpen}
-          aria-label={`Open ${first}'s Diary full-screen`}
+          aria-label={`Open ${first}'s page full-screen`}
           className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white"
         >
           <Maximize2 size={14} />
@@ -93,7 +99,15 @@ export function FriendDiaryCard({
       )}
 
       <div className="mt-1.5">
-        <DiaryResponder entry={entry} mine={mine} onReacted={onReacted} target={() => avatar.current} />
+        <DiaryResponder
+          entry={entry}
+          mine={mine}
+          onReacted={onReacted}
+          hyped={hyped}
+          onHyped={onHyped}
+          target={() => avatar.current}
+          stage={() => card.current}
+        />
       </div>
 
       <span

@@ -161,7 +161,7 @@ export function DiaryComposer({
           >
             <div className="flex items-center gap-2">
               <Avatar name={me.name} hue={me.hue} size={28} src={me.avatarUrl ?? undefined} />
-              <span className="text-sm font-bold text-white">{current ? "Your Diary" : "Today"}</span>
+              <span className="text-sm font-bold text-white">You</span>
               {audience === "close" && <Star size={12} className="fill-accent text-accent" aria-label="Close friends" />}
               <button
                 type="button"
@@ -191,7 +191,7 @@ export function DiaryComposer({
               rows={engaged ? 3 : 2}
               onFocus={() => setEngaged(true)}
               placeholder="What's on your mind today?"
-              aria-label="Your Diary"
+              aria-label="Your page"
               className="mt-auto w-full resize-none bg-transparent pt-3 font-extrabold leading-[1.08] tracking-[-0.02em] text-white outline-none placeholder:text-white/25"
               style={{ fontSize: Math.min(Math.round(size * 1.1), 46) }}
             />
@@ -202,10 +202,9 @@ export function DiaryComposer({
               </div>
             )}
 
-            {engaged && (
-              <p className="mt-2 flex items-center justify-between text-[11px] text-white/40">
-                <span>{track ? "Tap the disc to play it" : "Tap the disc to add a song"}</span>
-                <span className={`tabular-nums ${left <= 10 ? "font-semibold text-accent" : ""}`}>{left} left</span>
+            {engaged && left <= 20 && (
+              <p className={`mt-2 text-right text-[11px] tabular-nums ${left <= 10 ? "font-semibold text-accent" : "text-white/40"}`}>
+                {left}
               </p>
             )}
             <span aria-hidden className="absolute bottom-0 left-0 h-[2px] w-full opacity-90" style={{ background: tint.burn }} />
@@ -278,7 +277,7 @@ export function DiaryComposer({
 
             {failed && (
               <p className="text-center text-xs font-semibold text-danger">
-                Couldn&apos;t save your Diary. Check your connection and try again.
+                Couldn&apos;t save. Try again.
               </p>
             )}
 
@@ -291,7 +290,7 @@ export function DiaryComposer({
                 disabled={!text.trim() || busy}
                 className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-accent text-sm font-extrabold text-accent-ink transition-transform active:scale-[0.98] disabled:opacity-40"
               >
-                {busy ? <Loader2 size={16} className="animate-spin" /> : current ? "Update Diary" : "Post to Diary"}
+                {busy ? <Loader2 size={16} className="animate-spin" /> : current ? "Update" : "Post"}
               </button>
             </div>
             {current && (
@@ -340,7 +339,7 @@ export function DiaryEditor({
     if (open) setOpening((n) => n + 1);
   }
   return (
-    <CenterModal open={open} onClose={onClose} title={current ? "Your Diary" : "Today's page"}>
+    <CenterModal open={open} onClose={onClose} title={current ? "Your page" : "New page"}>
       {open && (
         <DiaryComposer
           key={opening}

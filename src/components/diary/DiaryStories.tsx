@@ -10,7 +10,7 @@ import { diaryTheme, noteSize, shortLeft } from "@/components/diary/DiaryPage";
 import { STORY_MS, stepStory, type DiaryEntry } from "@/lib/diary";
 
 /**
- * Diaries full-screen, one after another — for when you want to go through
+ * Pages full-screen, one after another — for when you want to go through
  * everyone's rather than scan the list. Never required: everything here is
  * also on the cards.
  *
@@ -30,12 +30,16 @@ export function DiaryStories({
   onClose,
   myReactions,
   onReacted,
+  hyped,
+  onHyped,
 }: {
   list: DiaryEntry[];
   start: number;
   onClose: () => void;
   myReactions: Record<string, string>;
   onReacted: (userId: string, emoji: string | null) => void;
+  hyped: ReadonlySet<string>;
+  onHyped: (userId: string, hyped: boolean) => void;
 }) {
   const [index, setIndex] = useState(start);
   const [elapsed, setElapsed] = useState(0);
@@ -43,6 +47,7 @@ export function DiaryStories({
   const [typing, setTyping] = useState(false);
   const entry = list[index];
   const avatar = useRef<HTMLSpanElement>(null);
+  const page = useRef<HTMLDivElement>(null);
 
   const elapsedRef = useRef(0);
   useLayoutEffect(() => {
@@ -122,7 +127,7 @@ export function DiaryStories({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`${entry.name}'s Diary`}
+      aria-label={`${entry.name}'s page`}
       className="fixed inset-0 z-[80] mx-auto flex max-w-[480px] flex-col overflow-hidden text-white"
       style={{ background: diaryTheme(entry.color, entry.hue).screen }}
     >
@@ -147,7 +152,7 @@ export function DiaryStories({
         <span className="truncate text-sm font-bold">{entry.name}</span>
         {entry.audience === "close" && <Star size={12} className="fill-accent text-accent" aria-label="Close friends" />}
         <span className="text-xs text-white/50" suppressHydrationWarning>
-          · {shortLeft(entry.createdAt)} left
+          · {shortLeft(entry.createdAt)}
         </span>
         <button
           type="button"
@@ -161,6 +166,7 @@ export function DiaryStories({
 
       {/* The page — the part you tap, hold and swipe. */}
       <div
+        ref={page}
         className="relative flex flex-1 touch-none select-none flex-col justify-end pb-4 pl-6 pr-6"
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
@@ -199,7 +205,10 @@ export function DiaryStories({
           entry={entry}
           mine={myReactions[entry.userId] ?? null}
           onReacted={onReacted}
+          hyped={hyped.has(entry.userId)}
+          onHyped={onHyped}
           target={() => avatar.current}
+          stage={() => page.current}
           onTyping={setTyping}
           size="screen"
         />

@@ -20,6 +20,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { STATUS_ENABLED } from "@/lib/status-feature";
 import { DiaryButton } from "@/components/diary/DiaryButton";
+import { isEmojiReply } from "@/components/diary/PageReplyEmbed";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -147,6 +148,13 @@ function preview(r: InboxRow) {
   // name. The body already reads as a full sentence naming who did it.
   if (r.lastKind === "system") return r.lastBody ?? "Chat settings updated";
 
+  // A reply to a page: an emoji reads as a reaction, words as a reply.
+  if (r.lastKind === "page_reply") {
+    const b = r.lastBody ?? "";
+    if (isEmojiReply(b)) return r.lastMine ? `You reacted ${b} to their page` : `Reacted ${b} to your page`;
+    return r.lastMine ? `You: ${b}` : `Replied to your page: ${b}`;
+  }
+
   const verb = r.lastKind ? KIND_VERB[r.lastKind] : undefined;
 
   if (verb) {
@@ -176,7 +184,7 @@ export function MessagesInbox({
   rows: InboxRow[];
   currentUserId: string;
   children?: React.ReactNode;
-  /** Live Diaries you can see, for the entry button's unseen count. */
+  /** Live pages you can see, for the entry button's unseen count. */
   diaries?: { userId: string; createdAt: string; isSelf: boolean }[];
 }) {
   const supabase = createClient();

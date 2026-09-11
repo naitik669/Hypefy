@@ -1,5 +1,6 @@
 /**
- * Diary — a 24-hour note, one per person, for your mutual circle.
+ * Pages — a 24-hour note, one per person, for your mutual circle. Called
+ * "Diary" in the code, where it was built; "Pages" is the name people see.
  *
  * Built on the `notes` table rather than beside it. That table already is
  * exactly this: one row per user, a 24-hour expiry, an audience of mutuals or
@@ -8,7 +9,7 @@
  * that notify the owner. What was missing was a place to read them — the old
  * surface was a bubble on a profile, which is switched off.
  *
- * So "Diary" is the name of the surface, and "note" stays the name of the row.
+ * So "Pages" is the name of the surface, and "note" stays the name of the row.
  */
 
 import type { Track } from "@/lib/music";
@@ -179,6 +180,50 @@ export function toReactions(rows: ReactionRow[] | null | undefined): DiaryReacti
       };
     })
     .sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/** The star a hype shows as, beside the emoji people sent. */
+export const HYPE = "⭐";
+
+/**
+ * Hypes on YOUR current page, as reactions with the star for an emoji — so
+ * the tally and the who-sent-what list take both without a second shape.
+ * Matched to the page on screen by note_created_at, like reactions.
+ */
+export const HYPES_SELECT =
+  "created_at, note_created_at, hyper_id, profiles!note_hypes_hyper_id_fkey(display_name, username, avatar_hue, avatar_url)";
+
+type HypeRow = Omit<ReactionRow, "emoji" | "reactor_id"> & { hyper_id: string };
+
+export function toHypes(rows: HypeRow[] | null | undefined): DiaryReaction[] {
+  return toReactions((rows ?? []).map((r) => ({ ...r, emoji: HYPE, reactor_id: r.hyper_id })));
+}
+
+/**
+ * Which reactions on your page have already flown in. They fly up over your
+ * page the first time you see them, not every time you open Pages; kept on
+ * the device per page (its created_at), holding the newest one seen.
+ */
+const FLOWN_KEY = "hypefy:pages:flown";
+
+export function newReactions(page: string, all: DiaryReaction[]): DiaryReaction[] {
+  let seen: { page?: string; at?: string } = {};
+  try {
+    seen = JSON.parse(localStorage.getItem(FLOWN_KEY) ?? "{}") ?? {};
+  } catch {
+    /* nothing stored, or storage unavailable: everything is new */
+  }
+  const since = seen.page === page ? (seen.at ?? "") : "";
+  return all.filter((r) => r.at > since);
+}
+
+export function markReactionsFlown(page: string, all: DiaryReaction[]) {
+  const at = all.reduce((m, r) => (r.at > m ? r.at : m), "");
+  try {
+    localStorage.setItem(FLOWN_KEY, JSON.stringify({ page, at }));
+  } catch {
+    /* private mode: they fly again next time, which is harmless */
+  }
 }
 
 /** "❤️ 3 · 😂 1", most-used first — the summary line under your page. */

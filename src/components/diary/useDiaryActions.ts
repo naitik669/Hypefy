@@ -7,64 +7,49 @@ import type { DiaryEntry } from "@/lib/diary";
 
 export type ReplyStatus = "idle" | "sending" | "sent" | "error";
 
-/** What lands in their DMs — the same prefix for a word or an emoji. */
-export const diaryReplyBody = (text: string) => `📔 Replied to your Diary: ${text}`;
+function sendError(message: string | undefined): string {
+  if (message?.includes("No active note")) return "This page has ended.";
+  if (message?.includes("dm_restricted")) return "They only take DMs from people they follow.";
+  if (message?.includes("blocked") || message?.includes("Blocked")) return "You can't reply to this account.";
+  return "Couldn't send. Try again.";
+}
 
 /**
- * Reacting to and replying to someone's Diary — the same actions on the card
- * in the list and on the full-screen page, so both behave identically.
+ * What you can do with someone's page — the same on the card in the deck and
+ * full-screen, so both behave identically.
  *
- * Both end up in your DMs with them, as "📔 Replied to your Diary: …" — an
- * emoji is a reply, just a short one. A reaction is also kept on the Diary
- * itself (react_to_note), which is what lets its owner see everyone who
- * reacted on the Diary page.
+ * An emoji and a reply both arrive in your DMs with them as an embed of the
+ * page (send_page_reply copies the page into the message, so the chat still
+ * shows what was answered after the page is gone). An emoji is also kept on
+ * the page (react_to_note), which is what lets its owner see who sent what.
+ * A hype is a star on the page: silent, seen only by its owner.
  *
- * Tapping the emoji you last sent to this Diary again replays the animation
+ * Tapping the emoji you last sent to this page again replays the animation
  * but sends nothing, so a double tap is not two messages.
  */
 export function useDiaryActions({
   entry,
   mine,
   onReacted,
+  hyped = false,
+  onHyped,
 }: {
   entry: DiaryEntry;
   mine: string | null;
   onReacted: (userId: string, emoji: string | null) => void;
+  hyped?: boolean;
+  onHyped?: (userId: string, hyped: boolean) => void;
 }) {
   const [status, setStatus] = useState<ReplyStatus>("idle");
   const [error, setError] = useState<string | null>(null);
-  /** What was last sent, for the "Sent … to Aman" line. */
+  /** What was last sent, for the "Sent" note. */
   const [sent, setSent] = useState<string | null>(null);
   const resetStatus = useCallback(() => setStatus("idle"), []);
 
   async function toDm(text: string): Promise<boolean> {
-    const supabase = createClient();
-    const { data: convId, error: convErr } = await supabase.rpc("get_or_create_dm", {
-      p_other: entry.userId,
-    });
-    if (convErr || !convId) {
-      setError(
-        convErr?.message?.includes("dm_restricted")
-          ? "They only accept DMs from people they follow"
-          : convErr?.message?.includes("blocked")
-            ? "You can't reply to this account"
-            : "Couldn't send. Check your connection and try again."
-      );
-      return false;
-    }
-    const { error: sendErr } = await supabase.rpc("send_message", {
-      p_conversation_id: convId,
-      p_body: diaryReplyBody(text),
-      p_kind: "text",
-      p_post_id: undefined,
-      p_reply_to_id: undefined,
-      p_shot_id: undefined,
-    });
-    if (sendErr) {
-      setError("Couldn't send. Check your connection and try again.");
-      return false;
-    }
-    return true;
+    const { error: err } = await createClient().rpc("send_page_reply", { p_owner: entry.userId, p_body: text });
+    if (err) setError(sendError(err.message));
+    return !err;
   }
 
   async function react(emoji: string) {
@@ -83,7 +68,7 @@ export function useDiaryActions({
     if (err) {
       onReacted(entry.userId, previous);
       setStatus("error");
-      setError(err.message?.includes("No active note") ? "This Diary has ended." : "Couldn't send. Check your connection and try again.");
+      setError(sendError(err.message));
       return;
     }
     if (!(await toDm(emoji))) setStatus("error");
@@ -104,7 +89,22 @@ export function useDiaryActions({
     return true;
   }
 
-  return { react, reply, status, error, sent, resetStatus };
+  async function hype() {
+    haptics.tap();
+    const next = !hyped;
+    onHyped?.(entry.userId, next); // optimistic
+    const { data, error: err } = await createClient().rpc("toggle_note_hype", { p_owner: entry.userId });
+    if (err) {
+      onHyped?.(entry.userId, hyped);
+      setStatus("error");
+      setError(sendError(err.message));
+      return;
+    }
+    // The server says where it landed; a double tap elsewhere may have raced.
+    if (typeof data === "boolean" && data !== next) onHyped?.(entry.userId, data);
+  }
+
+  return { react, reply, hype, status, error, sent, resetStatus };
 }
 
 export const QUICK_EMOJIS = ["❤️", "😂", "🥰", "👍", "😮", "😢"] as const;

@@ -8,9 +8,9 @@ import { diaryTheme } from "@/components/diary/DiaryPage";
 import { toArchive, type ArchivedDiary } from "@/lib/diary";
 
 const ENDED: Record<ArchivedDiary["endedHow"], string> = {
-  expired: "Ran its 24 hours",
-  replaced: "Replaced by a newer one",
-  taken_down: "You took it down",
+  expired: "",
+  replaced: "Replaced",
+  taken_down: "Taken down",
 };
 
 function when(iso: string) {
@@ -23,9 +23,9 @@ function when(iso: string) {
 }
 
 /**
- * Your past Diaries. Only you can open this — the archive table has no
+ * Your past pages. Only you can open this — the archive table has no
  * policy that lets anyone else read a row — and it says so at the top,
- * because "where did my old Diary go, and who can see it" is the first thing
+ * because "where did my old page go, and who can see it" is the first thing
  * anyone wonders.
  */
 export function DiaryArchiveSheet({
@@ -70,14 +70,14 @@ export function DiaryArchiveSheet({
 
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Past Diaries">
+    <BottomSheet open={open} onClose={onClose} title="Past pages">
       <p className="flex items-center gap-1.5 px-1 pb-3 text-xs text-muted">
-        <Lock size={12} /> Only you can see these.
+        <Lock size={12} /> Only you
       </p>
 
       {failed && (
         <p className="px-1 pb-3 text-xs font-semibold text-danger">
-          Couldn&apos;t load your past Diaries. Close this and try again.
+          Couldn&apos;t load. Try again.
         </p>
       )}
 
@@ -87,7 +87,7 @@ export function DiaryArchiveSheet({
         </div>
       ) : items && items.length === 0 ? (
         <p className="px-1 py-8 text-center text-sm text-muted">
-          Nothing here yet. When a Diary ends, it’s kept here for you.
+          Pages you write end up here.
         </p>
       ) : (
         <ul className="flex flex-col gap-2 pb-4">
@@ -99,12 +99,12 @@ export function DiaryArchiveSheet({
             >
               <div className="flex items-center gap-2 text-[11px] text-white/55">
                 <span className="font-semibold text-white/80">{when(d.writtenAt)}</span>
-                <span>· {ENDED[d.endedHow]}</span>
+                {ENDED[d.endedHow] && <span>· {ENDED[d.endedHow]}</span>}
                 <button
                   type="button"
                   onClick={() => forget(d.writtenAt)}
                   disabled={forgetting === d.writtenAt}
-                  aria-label="Delete this Diary for good"
+                  aria-label="Delete this page for good"
                   className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-white/55 hover:bg-white/10 hover:text-danger disabled:opacity-50"
                 >
                   {forgetting === d.writtenAt ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}

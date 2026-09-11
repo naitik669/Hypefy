@@ -29,7 +29,7 @@ const DEPTH = [
 ];
 
 /**
- * The spotlight: everyone's Diaries as a deck of cards, for going through
+ * The spotlight: everyone's pages as a deck of cards, for going through
  * them one at a time.
  *
  * The top card is the whole Diary, readable and usable where it lies, and if
@@ -44,12 +44,17 @@ export function DiaryStack({
   fresh,
   reacted,
   onReacted,
+  hyped,
+  onHyped,
   onOpen,
 }: {
   list: DiaryEntry[];
   fresh: ReadonlySet<string>;
   reacted: Record<string, string>;
   onReacted: (userId: string, emoji: string | null) => void;
+  /** The pages you have hyped, by owner. */
+  hyped: ReadonlySet<string>;
+  onHyped: (userId: string, hyped: boolean) => void;
   /** Open full-screen at this Diary (its index in `list`). */
   onOpen: (index: number) => void;
 }) {
@@ -137,7 +142,7 @@ export function DiaryStack({
   if (deck.length > VISIBLE + 1) drawn.push({ id: deck[deck.length - 1], depth: deck.length - 1 });
 
   return (
-    <section aria-label="Diaries from your circle" aria-roledescription="card stack">
+    <section aria-label="Pages from your circle" aria-roledescription="card stack">
       <div
         className="relative"
         style={{ height: CARD_H + DEPTH[Math.min(VISIBLE, deck.length) - 1].y + 10 }}
@@ -224,6 +229,8 @@ export function DiaryStack({
                   fresh={fresh.has(id)}
                   mine={reacted[id] ?? null}
                   onReacted={onReacted}
+                  hyped={hyped.has(id)}
+                  onHyped={onHyped}
                   onOpen={() => onOpen(list.findIndex((e) => e.userId === id))}
                   inert={!isTop}
                 />
@@ -234,26 +241,23 @@ export function DiaryStack({
       </div>
 
       {deck.length > 1 && (
-        <div className="mt-3 flex items-center justify-center gap-3">
+        <div className="mt-2 flex items-center justify-center gap-2">
           <button
             type="button"
             onClick={() => next(-1)}
-            aria-label="Previous Diary"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.07] text-white/75 transition-colors hover:bg-white/[0.12] hover:text-white"
+            aria-label="Previous page"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
           >
             <ChevronLeft size={18} />
           </button>
-          <p className="min-w-[128px] text-center text-xs text-muted" aria-live="polite">
-            <span className="font-semibold tabular-nums text-foreground">
-              {position + 1} of {list.length}
-            </span>{" "}
-            · swipe for the next
+          <p className="min-w-10 text-center text-xs font-semibold tabular-nums text-muted" aria-live="polite">
+            <span className="text-foreground">{position + 1}</span>/{list.length}
           </p>
           <button
             type="button"
             onClick={() => next(1)}
-            aria-label="Next Diary"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.07] text-white/75 transition-colors hover:bg-white/[0.12] hover:text-white"
+            aria-label="Next page"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
           >
             <ChevronRight size={18} />
           </button>

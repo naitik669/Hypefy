@@ -12,6 +12,7 @@ import { useGroupCall } from "@/components/calls/GroupCallProvider";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { VoiceRecorder } from "@/components/messages/VoiceRecorder";
+import { PageReplyEmbed, pageSnapshot } from "@/components/diary/PageReplyEmbed";
 import { VoiceMessage } from "@/components/messages/VoiceMessage";
 import { GifPicker } from "@/components/messages/GifPicker";
 import { ReportSheet } from "@/components/ui/ReportSheet";
@@ -56,7 +57,12 @@ export type ChatMsg = {
   /** claim_oneshot writes { oneshot_opened, oneshot_opened_at } here — the
    *  only channel the sender has for "did they open it yet", since the
    *  oneshots table itself is unreadable by any client. */
-  metadata?: { oneshot_opened?: boolean; oneshot_opened_at?: string } | null;
+  metadata?: {
+    oneshot_opened?: boolean;
+    oneshot_opened_at?: string;
+    /** A reply to someone's page: the page as it was, copied by send_page_reply. */
+    page?: unknown;
+  } | null;
   /** Client-only: set on optimistic messages before server confirms */
   _status?: "pending" | "failed";
   /** Client-only: the OneShot's private storage path, kept so a failed send
@@ -103,6 +109,7 @@ function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null 
     case "shot": return "Shot";
     case "post": return "Post";
     case "oneshot": return "Photo";
+    case "page_reply": return m.body ? `Page reply: ${m.body}` : "Page reply";
     case "document": {
       try { return JSON.parse(m.body ?? "")?.name ?? "Document"; } catch { return "Document"; }
     }
@@ -1512,6 +1519,17 @@ export function RealChatView({
                             {m.shot.caption && <p className="line-clamp-1 text-[11px] text-white/85 drop-shadow">{m.shot.caption}</p>}
                           </div>
                         </Link>
+                      ) : m.kind === "page_reply" && pageSnapshot(m.metadata) ? (
+                        <div
+                          onPointerDown={(e) => onPressStart(m, e)}
+                          onPointerUp={onPressEnd}
+                          onPointerMove={onPressEnd}
+                          onPointerLeave={onPressEnd}
+                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          className="relative select-none"
+                        >
+                          <PageReplyEmbed page={pageSnapshot(m.metadata)!} body={m.body} mine={mine} />
+                        </div>
                       ) : m.kind === "oneshot" ? (
                         <OneShotBubble
                           m={m}
@@ -1706,7 +1724,7 @@ export function RealChatView({
 
                       {/* External time+status — for voice, document, post, and shot cards.
                           Plain text, gif, image, and video bubbles embed the time+tick inside themselves. */}
-                      {(m.kind === "voice" || m.kind === "document" || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
+                      {(m.kind === "voice" || m.kind === "document" || m.kind === "page_reply" || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
                         (showTime || (mine && m._status === "failed")) && (
                         <div className={`flex items-center gap-1 px-1 pt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
                           {showTime && (

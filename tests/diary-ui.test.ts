@@ -71,7 +71,6 @@ const home = (over: Record<string, unknown> = {}) => ({
   currentUserId: "me",
   reactionsOnMine: [] as DiaryReaction[],
   myReactions: {} as Record<string, string>,
-  archiveCount: 0,
   ...over,
 });
 
@@ -133,7 +132,7 @@ describe("DiaryHome", () => {
       el.dispatchEvent(new Event("input", { bubbles: true }));
     });
   const wait = (ms: number) => act(async () => void (await new Promise((r) => setTimeout(r, ms))));
-  const openComposer = () => click(document.querySelector(".grid button")); // the "Leave your Diary" tile
+  const openComposer = () => click(button("New page"));
 
   it("stacks everyone's Diaries, the one on top whole and usable, the rest behind it", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
@@ -159,7 +158,7 @@ describe("DiaryHome", () => {
     expect(top.querySelector("input")).toBeNull();
     // The longest note there is, whole, on the card behind — nothing clamped.
     expect(host.textContent).toContain("exams done. finally free. don't text me about syllabus");
-    expect(host.textContent).toContain("1 of 3");
+    expect(host.textContent).toContain("1/3");
   });
 
   it("sends the top card to the back and brings the next up, and ‹ brings it back", async () => {
@@ -173,33 +172,55 @@ describe("DiaryHome", () => {
         ],
       }))
     );
-    await click(button("Next Diary"));
+    await click(button("Next page"));
     await wait(300); // out to the side, then tucked in behind
     expect(topCard()!.textContent).toContain("Riya");
-    expect(host.textContent).toContain("2 of 3");
+    expect(host.textContent).toContain("2/3");
 
-    await click(button("Next Diary"));
+    await click(button("Next page"));
     await wait(300);
-    await click(button("Next Diary"));
+    await click(button("Next page"));
     await wait(300);
     // Round again: Aman is back on top, having been at the back.
     expect(topCard()!.textContent).toContain("Aman");
 
-    await click(button("Previous Diary"));
+    await click(button("Previous page"));
     expect(topCard()!.textContent).toContain("Dev");
   });
 
-  it("sends an emoji to their DMs as a reply to their Diary, and keeps it on the Diary", async () => {
+  it("sends an emoji to their DMs as a reply to their page, and keeps it on the page", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman Verma" })] })));
     await click(button("Send 😂 to Aman"));
 
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["react_to_note", "get_or_create_dm", "send_message"]);
-    expect(rpcCalls[0].args).toEqual({ p_owner: "a", p_emoji: "😂" });
-    expect(rpcCalls[2].args).toMatchObject({ p_conversation_id: "conv-1", p_body: "📔 Replied to your Diary: 😂" });
+    expect(rpcCalls).toEqual([
+      { fn: "react_to_note", args: { p_owner: "a", p_emoji: "😂" } },
+      // The server copies the page into the message; the client sends only this.
+      { fn: "send_page_reply", args: { p_owner: "a", p_body: "😂" } },
+    ]);
     // It went; a note says so, and nothing stays lit on the button.
-    expect(host.textContent).toContain("Sent 😂 to Aman");
-    expect(host.querySelector("[aria-pressed]")).toBeNull();
+    expect(host.textContent).toContain("Sent");
+    expect(host.querySelector('[aria-pressed="true"]')).toBeNull();
+  });
+
+  it("hypes a page with the star, silently, and takes it back with a second tap", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman" })] })));
+    await click(button("Hype Aman's page"));
+    expect(rpcCalls).toEqual([{ fn: "toggle_note_hype", args: { p_owner: "a" } }]);
+    const star = button("Hyped Aman's page")!;
+    expect(star.getAttribute("aria-pressed")).toBe("true");
+
+    await click(star);
+    expect(button("Hype Aman's page")!.getAttribute("aria-pressed")).toBe("false");
+    // No DM, no reaction: a hype is only a star.
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["toggle_note_hype", "toggle_note_hype"]);
+  });
+
+  it("shows your hype already on a page you hyped before", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman" })], myHypes: ["a"] })));
+    expect(button("Hyped Aman's page")!.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("does not send the same emoji twice in a row", async () => {
@@ -207,7 +228,7 @@ describe("DiaryHome", () => {
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman" })] })));
     await click(button("Send ❤️ to Aman"));
     await click(button("Send ❤️ to Aman"));
-    expect(rpcCalls.filter((c) => c.fn === "send_message")).toHaveLength(1);
+    expect(rpcCalls.filter((c) => c.fn === "send_page_reply")).toHaveLength(1);
   });
 
   it("opens a reply popup from the arrow, sends it to their DMs, and closes", async () => {
@@ -215,16 +236,16 @@ describe("DiaryHome", () => {
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman", text: "HDB" })] })));
     await click(button("Reply to Aman"));
 
-    const popup = document.querySelector('[role="dialog"][aria-label="Reply to Aman\'s Diary"]')!;
+    const popup = document.querySelector('[role="dialog"][aria-label="Reply to Aman\'s page"]')!;
     expect(popup.textContent).toContain("HDB"); // what you are replying to
     const input = popup.querySelector("input")!;
     expect(document.activeElement).toBe(input);
 
     await setValue(input, "same, chai?");
     await act(async () => input.form!.requestSubmit());
-    expect(rpcCalls.at(-1)).toMatchObject({ fn: "send_message", args: { p_body: "📔 Replied to your Diary: same, chai?" } });
+    expect(rpcCalls.at(-1)).toEqual({ fn: "send_page_reply", args: { p_owner: "a", p_body: "same, chai?" } });
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(host.textContent).toContain("Sent to your DMs with Aman");
+    expect(host.textContent).toContain("Sent");
   });
 
   it("plays the top card's song by itself, on its CD, and the next card's when it comes up", async () => {
@@ -240,17 +261,17 @@ describe("DiaryHome", () => {
       }))
     );
     // Only the top card has its CD out, and it is already playing, on loop.
-    const discs = () => [...document.querySelectorAll<HTMLButtonElement>("button[aria-pressed]")];
+    const discs = () => [...document.querySelectorAll<HTMLButtonElement>('button[aria-label^="Pause "], button[aria-label^="Play "]')];
     expect(discs().map((d) => d.getAttribute("aria-label"))).toEqual(["Pause Pasoori by X"]);
     expect(discs()[0].querySelector("img")!.getAttribute("src")).toBe("t1.jpg"); // the cover in the middle
     expect(played.at(-1)).toContain("t1.mp3");
 
-    await click(button("Next Diary")); // Riya: no song, so silence
+    await click(button("Next page")); // Riya: no song, so silence
     await wait(300);
     expect(discs()).toEqual([]);
     expect(paused).toBeGreaterThan(0);
 
-    await click(button("Next Diary")); // Dev: his song starts
+    await click(button("Next page")); // Dev: his song starts
     await wait(300);
     expect(discs().map((d) => d.getAttribute("aria-label"))).toEqual(["Pause Blinding Lights by X"]);
     expect(played.at(-1)).toContain("t2.mp3");
@@ -279,10 +300,10 @@ describe("DiaryHome", () => {
     );
     const grid = host.querySelector(".grid")!;
     expect(grid.compareDocumentPosition(topCard()!) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
-    expect([...grid.children].map((t) => t.getAttribute("aria-label") ?? t.textContent)).toEqual([
-      expect.stringContaining("Leave your Diary"),
-      "Aman's Diary",
-      "Riya's Diary",
+    expect([...grid.children].map((t) => t.getAttribute("aria-label") ?? t.querySelector("button")?.getAttribute("aria-label"))).toEqual([
+      "New page",
+      "Aman's page",
+      "Riya's page",
     ]);
   });
 
@@ -296,8 +317,8 @@ describe("DiaryHome", () => {
         ],
       }))
     );
-    await click(host.querySelector('.grid [aria-label="Riya\'s Diary"]'));
-    expect(document.querySelector('[role="dialog"]')?.getAttribute("aria-label")).toBe("Riya's Diary");
+    await click(host.querySelector('.grid [aria-label="Riya\'s page"]'));
+    expect(document.querySelector('[role="dialog"]')?.getAttribute("aria-label")).toBe("Riya's page");
   });
 
   it("opens the page to write on from the blank tile in the grid", async () => {
@@ -306,9 +327,9 @@ describe("DiaryHome", () => {
     expect(document.querySelector("textarea")).toBeNull();
 
     await openComposer();
-    const field = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Your Diary"]')!;
+    const field = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Your page"]')!;
     expect(field.placeholder).toBe("What's on your mind today?");
-    expect(document.body.textContent).toContain("Post to Diary");
+    expect([...document.querySelectorAll("button")].some((b) => b.textContent === "Post")).toBe(true);
     // A blank CD behind the page is how a song gets added.
     expect(button("Add a song")).not.toBeNull();
   });
@@ -323,7 +344,7 @@ describe("DiaryHome", () => {
     await click(button("Plum"));
     expect(button("Plum")!.getAttribute("aria-checked")).toBe("true");
     await setValue(field, "new playlist dropping");
-    await click([...document.querySelectorAll("button")].find((b) => b.textContent === "Post to Diary")!);
+    await click([...document.querySelectorAll("button")].find((b) => b.textContent === "Post")!);
     expect(rpcCalls.find((c) => c.fn === "set_note")?.args).toMatchObject({
       p_text: "new playlist dropping",
       p_audience: "mutual",
@@ -351,42 +372,46 @@ describe("DiaryHome", () => {
     expect(picker.textContent).toBe("Close friends");
   });
 
-  it("shows a tally of reactions on your tile, and who sent them when you open it", async () => {
+  it("floats new reactions up over your page once, and lists who sent what from its tab", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
-    await render(
-      createElement(DiaryHome, home({
-        entries: [entry({ userId: "me", isSelf: true, text: "gym then chai" })],
-        reactionsOnMine: [
-          reaction({ userId: "r", name: "Riya", emoji: "❤️" }),
-          reaction({ userId: "d", name: "Dev", emoji: "😂" }),
-          reaction({ userId: "k", name: "Kabir", emoji: "❤️" }),
-        ],
-      }))
-    );
-    const tile = button("Your Diary")!;
-    expect(tile.textContent).toContain("gym then chai");
-    expect(tile.textContent).toContain("❤️2 😂1");
+    const props = home({
+      entries: [entry({ userId: "me", isSelf: true, text: "gym then chai" })],
+      reactionsOnMine: [
+        reaction({ userId: "r", name: "Riya", emoji: "❤️", at: minsAgo(3) }),
+        reaction({ userId: "d", name: "Dev", emoji: "😂", at: minsAgo(2) }),
+      ],
+      hypesOnMine: [reaction({ userId: "r", name: "Riya", emoji: "⭐", at: minsAgo(1) })],
+    });
+    await render(createElement(DiaryHome, props));
+    const floating = () => [...host.querySelectorAll(".page-float")].map((f) => f.textContent);
+    expect(new Set(floating())).toEqual(new Set(["❤️", "😂", "⭐"]));
 
-    await click(tile);
+    // The tab: faces and emoji, no words; it opens who sent what.
+    const tab = button("Reactions from 2 people")!;
+    expect(tab.textContent).toContain("2");
+    await click(tab);
+    const rows = [...document.querySelectorAll("li")].map((li) => li.textContent);
+    expect(rows).toEqual([expect.stringMatching(/Riya⭐ ❤️$/), expect.stringMatching(/Dev😂$/)]);
+
+    // Seen: the next visit, nothing floats.
+    await act(async () => root!.unmount());
+    host.innerHTML = "";
+    await render(createElement(DiaryHome, props));
+    expect(floating()).toEqual([]);
+  });
+
+  it("opens your page to edit from your tile, and says nothing when nobody has reacted", async () => {
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "me", isSelf: true, text: "gym then chai" })] })));
+    expect(host.querySelector('[aria-label^="Reactions from"]')).toBeNull();
+    await click(button("Your page"));
     const mine = document.querySelector("article")!;
-    expect(mine.textContent).toContain("Your Diary");
-    expect(mine.textContent).toContain("3 reactions");
-    // Each line ends "<name><emoji>" (the avatar's initial comes first).
-    expect([...mine.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
-      expect.stringMatching(/Riya❤️$/),
-      expect.stringMatching(/Dev😂$/),
-      expect.stringMatching(/Kabir❤️$/),
-    ]);
+    expect(mine.textContent).toContain("gym then chai");
+    expect(mine.textContent).not.toMatch(/reaction/i);
+    expect(button("Edit your page")).not.toBeNull();
   });
 
-  it("says so on your Diary when nobody has reacted yet", async () => {
-    const { DiaryHome } = await import("@/components/diary/DiaryHome");
-    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "me", isSelf: true })] })));
-    await click(button("Your Diary"));
-    expect(document.body.textContent).toContain("No reactions yet");
-  });
-
-  it("does not resend the emoji you already sent to that Diary on an earlier visit", async () => {
+  it("does not resend the emoji you already sent to that page on an earlier visit", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(
       createElement(DiaryHome, home({
@@ -397,7 +422,7 @@ describe("DiaryHome", () => {
     await click(button("Send 😂 to Aman"));
     expect(rpcCalls).toEqual([]);
     await click(button("Send 🥰 to Aman"));
-    expect(rpcCalls.filter((c) => c.fn === "send_message")).toHaveLength(1);
+    expect(rpcCalls.filter((c) => c.fn === "send_page_reply")).toHaveLength(1);
   });
 
   it("marks what is new, then marks it seen for next time", async () => {
@@ -405,22 +430,22 @@ describe("DiaryHome", () => {
     const a = entry({ userId: "a", createdAt: "2026-09-10T01:00:00Z" });
     await render(createElement(DiaryHome, home({ entries: [a] })));
     expect(host.querySelector('[aria-label="New"]')).not.toBeNull();
-    expect(host.textContent).toContain("1 new");
     expect(JSON.parse(localStorage.getItem("hypefy:diary:seen")!)).toEqual({
       a: "2026-09-10T01:00:00Z",
     });
   });
 
-  it("says whose Diaries go here when there are none, and keeps your past ones in the top-right box", async () => {
+  it("keeps words off the page: a titled header, an icon for past pages, no status lines", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
-    await render(createElement(DiaryHome, home({ archiveCount: 4 })));
-    expect(host.textContent).toContain("When people you follow back write a Diary");
-    const past = button("Past Diaries, 4 kept")!;
+    await render(createElement(DiaryHome, home()));
+    expect(host.querySelector("h1")!.textContent).toBe("Pages");
+    const past = button("Past pages")!;
     expect(past.closest("header")).not.toBeNull();
-    expect(past.textContent).toBe("Past4");
+    expect(past.textContent).toBe("");
+    expect(host.textContent).not.toMatch(/lasts a day|from your circle|no reactions/i);
   });
 
-  it("goes full-screen at the Diary you opened, steps with the arrow keys, and closes", async () => {
+  it("goes full-screen at the page you opened, steps with the arrow keys, and closes", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(
       createElement(DiaryHome, home({
@@ -430,25 +455,25 @@ describe("DiaryHome", () => {
         ],
       }))
     );
-    await click(topCard()!.querySelector(`button[aria-label="Open Aman's Diary full-screen"]`));
+    await click(topCard()!.querySelector(`button[aria-label="Open Aman's page full-screen"]`));
     const dialog = () => document.querySelector('[role="dialog"]');
-    expect(dialog()?.getAttribute("aria-label")).toBe("Aman's Diary");
+    expect(dialog()?.getAttribute("aria-label")).toBe("Aman's page");
     expect(document.body.style.overflow).toBe("hidden");
 
     await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" })));
-    expect(dialog()?.getAttribute("aria-label")).toBe("Riya's Diary");
+    expect(dialog()?.getAttribute("aria-label")).toBe("Riya's page");
     await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft" })));
-    expect(dialog()?.getAttribute("aria-label")).toBe("Aman's Diary");
+    expect(dialog()?.getAttribute("aria-label")).toBe("Aman's page");
 
     await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
     expect(dialog()).toBeNull();
     expect(document.body.style.overflow).toBe("");
   });
 
-  it("closes full-screen after the last Diary rather than looping", async () => {
+  it("closes full-screen after the last page rather than looping", async () => {
     const { DiaryHome } = await import("@/components/diary/DiaryHome");
     await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman" })] })));
-    await click(button("Open Aman's Diary full-screen"));
+    await click(button("Open Aman's page full-screen"));
     await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" })));
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
@@ -467,7 +492,7 @@ describe("shortLeft", () => {
 });
 
 describe("DiaryButton", () => {
-  it("counts only other people's Diaries you have not opened", async () => {
+  it("counts only other people's pages you have not opened", async () => {
     const { DiaryButton } = await import("@/components/diary/DiaryButton");
     localStorage.setItem("hypefy:diary:seen", JSON.stringify({ a: "1" }));
     await render(
@@ -481,9 +506,9 @@ describe("DiaryButton", () => {
       })
     );
     const link = host.querySelector("a")!;
-    expect(link.getAttribute("href")).toBe("/messages/diary");
+    expect(link.getAttribute("href")).toBe("/messages/pages");
     expect(link.textContent).toBe("2");
-    expect(link.getAttribute("aria-label")).toBe("Diary, 2 new");
+    expect(link.getAttribute("aria-label")).toBe("Pages, 2 new");
   });
 
   it("shows no badge when there is nothing new", async () => {
@@ -510,7 +535,6 @@ describe("hydration", () => {
       ],
       reactionsOnMine: [reaction({})],
       myReactions: { a: "❤️" },
-      archiveCount: 2,
     });
     host.innerHTML = renderToString(createElement(DiaryHome, props));
 
