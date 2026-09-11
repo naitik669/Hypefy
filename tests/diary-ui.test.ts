@@ -682,9 +682,34 @@ describe("FloatingPages", () => {
     expect(link().getAttribute("href")).toBe(first);
   });
 
+  it("comes in from the right as Messages opens, then goes back to wait at the edge", async () => {
+    const { FloatingPages, PEEK_PX } = await import("@/components/diary/FloatingPages");
+    await render(createElement(FloatingPages, { pages, introHoldMs: 200 }));
+    expect(link().style.transform).toBe("none");
+    expect(link().style.opacity).toBe("1");
+    await wait(260);
+    expect(link().style.transform).toBe(`translateX(${104 - PEEK_PX}px)`);
+  });
+
+  it("stops its entrance for a scroll or a touch, and stays out", async () => {
+    const { FloatingPages, REVEAL_PX } = await import("@/components/diary/FloatingPages");
+    await render(createElement(FloatingPages, { pages, introHoldMs: 200 }));
+    await scrollTo(REVEAL_PX * 3);
+    await wait(260);
+    expect(link().style.transform).toBe("none");
+    await act(async () => root!.unmount());
+    root = undefined;
+    Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
+    await render(createElement(FloatingPages, { pages, introHoldMs: 200 }));
+    await act(async () => void link().dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 })));
+    await wait(260);
+    expect(link().style.transform).toBe("none");
+  });
+
   it("peeks at the edge at the top of the inbox, and slides out as you scroll down", async () => {
     const { FloatingPages } = await import("@/components/diary/FloatingPages");
-    await render(createElement(FloatingPages, { pages }));
+    await render(createElement(FloatingPages, { pages, introHoldMs: 0 }));
+    await wait(20);
     const { PEEK_PX, REVEAL_PX } = await import("@/components/diary/FloatingPages");
     expect(link().style.transform).toBe(`translateX(${104 - PEEK_PX}px)`);
     await scrollTo(REVEAL_PX / 2);
@@ -697,7 +722,8 @@ describe("FloatingPages", () => {
 
   it("a tap on the sliver brings it out; the next tap opens Spotlight", async () => {
     const { FloatingPages } = await import("@/components/diary/FloatingPages");
-    await render(createElement(FloatingPages, { pages }));
+    await render(createElement(FloatingPages, { pages, introHoldMs: 0 }));
+    await wait(20);
     expect(await tap()).toBe(false);
     expect(link().style.transform).toBe("none");
     expect(await tap()).toBe(true);
@@ -719,7 +745,8 @@ describe("FloatingPages", () => {
 
   it("does not swipe while it is peeking — the deck is still at the edge", async () => {
     const { FloatingPages } = await import("@/components/diary/FloatingPages");
-    await render(createElement(FloatingPages, { pages }));
+    await render(createElement(FloatingPages, { pages, introHoldMs: 0 }));
+    await wait(20);
     const first = link().getAttribute("href");
     await swipe(-90);
     expect(link().getAttribute("href")).toBe(first);

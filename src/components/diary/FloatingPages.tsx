@@ -11,11 +11,17 @@ import { cycleDeck, loadSeen, storyOrder, unseen, type DiaryEntry } from "@/lib/
 export const PEEK_PX = 30;
 /** Scroll this far down the inbox and the card is all the way out. */
 export const REVEAL_PX = 140;
+/** Within this of the top counts as the top — browsers restore a pixel or two. */
+const TOP_PX = 8;
+/** As Messages opens, how long it stays out before tucking back to the edge. */
+export const INTRO_HOLD_MS = 1600;
 /** A drag this far, or a quick flick, sends the top page to the back. */
 const THROW_PX = 40;
 const THROW_MS = 300;
 const MOVE = "transform 480ms cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms ease";
 const SLIDE = "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)";
+/** Its entrance: in from past the edge, with a little overshoot. */
+const ENTER = "transform 620ms cubic-bezier(0.34, 1.25, 0.5, 1), opacity 260ms ease";
 
 /** How each card in the little deck stands, by how far back it is. */
 function pose(depth: number): { transform: string; opacity: number } {
@@ -42,10 +48,13 @@ const reducedMotion = {
  * Spotlight, in Messages: a small tilted deck of your circle's pages at the
  * bottom right, where your thumb is.
  *
- * It moves only when you move it. At the top of the inbox it waits at the
- * right edge, a sliver of the top page and its count peeking out; scroll down
- * and it slides in with you, all the way out by the time you have scrolled a
- * little. Tap the sliver and it comes out without scrolling. Once out, swipe
+ * As Messages opens it slides in from the right, stays a moment so you see
+ * it, and goes back to wait at the edge — a sliver of the top page and its
+ * count peeking out. Scroll down and it slides in with you, all the way out
+ * by the time you have scrolled a little. Tap the sliver and it comes out
+ * without scrolling. Scroll or touch it during its entrance and it stops
+ * there and follows you instead; with Reduce Motion it simply waits at the
+ * edge. Otherwise it moves only when you move it. Once out, swipe
  * it either way to send the top page to the back and bring the next up — the
  * same throw as Spotlight's deck — and tap it to open Spotlight on the page
  * on top, the rest following in the same order. Back at the top of the
@@ -56,7 +65,14 @@ const reducedMotion = {
  * else's page up it shows yours, or a "+" to write one: Spotlight is always
  * one tap away.
  */
-export function FloatingPages({ pages }: { pages: DiaryEntry[] }) {
+export function FloatingPages({
+  pages,
+  introHoldMs = INTRO_HOLD_MS,
+}: {
+  pages: DiaryEntry[];
+  /** For tests. */
+  introHoldMs?: number;
+}) {
   // What you have not opened lives on this device, so it is read after
   // mount; the server draws the newest first, and the order settles here.
   const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set());
@@ -93,11 +109,21 @@ export function FloatingPages({ pages }: { pages: DiaryEntry[] }) {
   const pinned = useRef(false);
   const lastY = useRef(0);
   const throwTimer = useRef<number | undefined>(undefined);
+  /** Its entrance is under way (out, about to go back to the edge). */
+  const entering = useRef(false);
+  const entered = useRef(false);
+  const enterTimer = useRef<number | undefined>(undefined);
   const width = top ? 104 : 64;
-  // Where it starts: peeking, as the inbox opens at the top. The first scroll
-  // reading takes over from here; this string never changes, so React does
-  // not fight the transform set below.
-  const [resting] = useState(() => `translateX(${width - PEEK_PX}px)`);
+  // Where it starts: just past the right edge, unseen, for its entrance. The
+  // effect below takes over from here; these never change, so React does not
+  // fight the transform and opacity set there.
+  const [resting] = useState(() => ({ transform: `translateX(${width + 20}px)`, opacity: 0 }));
+
+  /** The entrance is over: stop, and stay wherever it is. */
+  function endEntrance() {
+    entering.current = false;
+    window.clearTimeout(enterTimer.current);
+  }
 
   /** Slide it: 0 is peeking at the edge, 1 all the way out. */
   function place(p: number, transition: string) {
@@ -113,24 +139,52 @@ export function FloatingPages({ pages }: { pages: DiaryEntry[] }) {
   useEffect(() => {
     let frame = 0;
     const read = (animate: boolean) => {
-      const y = window.scrollY;
-      if (y <= 0 && lastY.current > 0) pinned.current = false; // back at the top: tuck away
+      const y = window.scrollY <= TOP_PX ? 0 : window.scrollY;
+      if (y === 0 && lastY.current > 0) pinned.current = false; // back at the top: tuck away
       lastY.current = y;
-      const p = pinned.current ? 1 : Math.min(1, Math.max(0, y / REVEAL_PX));
+      const p = pinned.current ? 1 : Math.min(1, y / REVEAL_PX);
       place(p, animate ? SLIDE : "transform 90ms linear");
     };
     const onScroll = () => {
+      // A real scroll during the entrance ends it; from here the scroll
+      // decides. (Not the pixel a browser restores as the page loads.)
+      if (entering.current) {
+        if (window.scrollY <= TOP_PX) return;
+        endEntrance();
+      }
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
         read(false);
       });
     };
-    read(true);
+    const el = link.current;
+    const still = motionQuery()?.matches ?? false;
+    if (el && !entered.current && top && window.scrollY <= TOP_PX && !still) {
+      // Messages has just opened, at the top: in from the right, a moment
+      // out, then back to wait at the edge. The read of offsetWidth makes
+      // sure its start, past the edge, is laid out before it moves, so it
+      // slides in even when Messages was reached without a full load.
+      entered.current = true;
+      entering.current = true;
+      lastY.current = 0;
+      void el.offsetWidth;
+      place(1, ENTER);
+      el.style.opacity = "1";
+      enterTimer.current = window.setTimeout(() => {
+        entering.current = false;
+        if (!pinned.current && window.scrollY <= TOP_PX) place(0, SLIDE);
+      }, introHoldMs);
+    } else {
+      entered.current = true;
+      read(false);
+      if (el) el.style.opacity = "1";
+    }
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
       cancelAnimationFrame(frame);
+      window.clearTimeout(enterTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- width only changes with top, which place reads fresh
   }, [width]);
@@ -165,6 +219,11 @@ export function FloatingPages({ pages }: { pages: DiaryEntry[] }) {
 
   function onPointerDown(e: React.PointerEvent) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    // Caught during its entrance: it stays out for you.
+    if (entering.current) {
+      endEntrance();
+      pinned.current = true;
+    }
     swiped.current = false;
     press.current = out.current && order.length > 1 ? { x: e.clientX, y: e.clientY, t: e.timeStamp, axis: null } : null;
   }
@@ -246,7 +305,8 @@ export function FloatingPages({ pages }: { pages: DiaryEntry[] }) {
         right: "calc(max(0px, (100vw - 480px) / 2) + 14px)",
         width,
         height: top ? 132 : 84,
-        transform: resting,
+        transform: resting.transform,
+        opacity: resting.opacity,
         // Up and down still scroll the inbox from the card; sideways is the deck's.
         touchAction: "pan-y",
         WebkitTouchCallout: "none",
