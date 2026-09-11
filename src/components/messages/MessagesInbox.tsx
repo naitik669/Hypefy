@@ -181,9 +181,12 @@ export function MessagesInbox({
   currentUserId,
   children,
   pages = [],
+  renderedAt,
 }: {
   rows: InboxRow[];
   currentUserId: string;
+  /** When the server drew this inbox (ms). */
+  renderedAt?: number;
   children?: React.ReactNode;
   /** Today's pages you can see, yours included — for the card floating over the inbox. */
   pages?: DiaryEntry[];
@@ -314,6 +317,14 @@ export function MessagesInbox({
       /* ignore */
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Shown from memory (you came back to it within 30s): what arrived while you
+  // were elsewhere was missed by the live updates, which only listen while the
+  // inbox is on screen. Draw what we have at once, and fetch the latest behind it.
+  useEffect(() => {
+    if (renderedAt && Date.now() - renderedAt > 4000) router.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as it appears
   }, []);
 
   // Realtime: keep the inbox live without a manual refresh.

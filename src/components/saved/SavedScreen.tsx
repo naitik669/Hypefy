@@ -18,7 +18,7 @@ import { fetchSavedPage, foundItem, itemKey, mergeSaved, type SavedItem, type Sa
 
 type Tab = "all" | "posts" | "shots";
 
-const HEADER = "sticky top-0 z-20 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-1 border-b border-border/60 bg-background/85 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-xl";
+const HEADER = "sticky top-0 z-20 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-1 border-b border-border/60 chrome-bar px-2 pt-[env(safe-area-inset-top)]";
 const ICON_BTN = "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5";
 
 /**
@@ -376,7 +376,7 @@ export function SavedScreen({
           />
 
           <div ref={recents} className="scroll-mt-[calc(3.5rem+env(safe-area-inset-top))] pt-6">
-            <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 flex items-center gap-1 bg-background/90 px-4 py-2 backdrop-blur-xl">
+            <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 flex items-center gap-1 chrome-bar px-4 py-2">
               {(
                 [
                   ["all", "All"],

@@ -20,7 +20,7 @@ export async function TopBar() {
   }
 
   return (
-    <header className="sticky top-0 z-20 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between border-b border-border/60 bg-background/80 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+    <header className="sticky top-0 z-20 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between border-b border-border/60 chrome-bar px-4 pt-[env(safe-area-inset-top)]">
       {/* Search briefly sat here beside the compass. Two icons crowded the
           wordmark and read as bolted on, so it moved to a hold on the Home tab
           alongside Discover, Activity and Saved — and swiping right from the

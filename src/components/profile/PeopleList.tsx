@@ -135,7 +135,7 @@ export function PeopleList({
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-14 z-10 border-b border-border/60 bg-background/90 px-4 py-2 backdrop-blur-xl">
+      <div className="sticky top-14 z-10 border-b border-border/60 chrome-bar px-4 py-2">
         <div className="flex h-10 items-center gap-2 rounded-pill border border-border bg-surface px-3">
           <Search size={15} className="shrink-0 text-faint" />
           <input

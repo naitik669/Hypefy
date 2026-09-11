@@ -6,7 +6,7 @@ import { FeedCardSkeleton, ListRowSkeleton } from "@/components/skeletons/Skelet
 export default function DiscoverLoading() {
   return (
     <>
-      <header className="sticky top-0 z-20 flex h-14 items-center border-b border-border/60 bg-background/80 px-4 backdrop-blur-xl">
+      <header className="sticky top-0 z-20 flex h-14 items-center border-b border-border/60 chrome-bar px-4">
         <h1 className="flex-1 text-[17px] font-extrabold tracking-tight">Discover</h1>
       </header>
 

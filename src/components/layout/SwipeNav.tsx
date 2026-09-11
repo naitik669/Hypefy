@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { haptics } from "@/lib/haptics";
 import { overlayCount } from "@/lib/overlay-stack";
@@ -112,37 +112,97 @@ export function gestureBlocked(
   return inHorizontalScroller(target);
 }
 
+/** What the destination is called, shown in the gap the finger opens. */
+const TAB_LABELS: Record<(typeof TABS)[number], string> = {
+  "/discover": "Discover",
+  "/home": "Home",
+  "/messages": "Messages",
+  "/shots": "Shots",
+  "/profile": "Profile",
+};
+
+const SETTLE = "transform 260ms cubic-bezier(0.16,1,0.3,1), opacity 260ms ease";
+
+/**
+ * The page follows the finger sideways, and the gap it opens names where you
+ * are going — "Messages ›" — rather than showing bare black. Let go past the
+ * line and the page carries on out while the next one slides in from the
+ * same side, as one movement; let go short of it and it springs back.
+ *
+ * Every frame of the drag is written straight to the page's transform. The
+ * old version set React state on each touchmove, which re-rendered this
+ * wrapper for every pixel of the gesture.
+ */
 export function SwipeNav({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const index = tabIndex(pathname);
   const enabled = index >= 0;
 
-  const [dx, setDx] = useState(0);
-  const [settling, setSettling] = useState(false);
+  const page = useRef<HTMLDivElement>(null);
+  const hintEl = useRef<HTMLDivElement>(null);
+  /** Where the finger is heading, once the gesture is ours. */
+  const [hint, setHint] = useState<{ label: string; side: "left" | "right" } | null>(null);
 
   const start = useRef({ x: 0, y: 0, t: 0 });
   /** null = undecided, "x" = ours, "y" = the page's */
   const axis = useRef<null | "x" | "y">(null);
   const ignore = useRef(false);
+  const dx = useRef(0);
+  /** Set while a committed swipe waits for its page: which way it went. */
+  const leaving = useRef<-1 | 1 | 0>(0);
 
-  // A committed navigation leaves the old page mounted for a moment; clear the
-  // offset when the route actually changes so the new one is not born shifted.
-  useEffect(() => {
-    setDx(0);
-    setSettling(false);
+  const canPrev = index > 0;
+  const canNext = index >= 0 && index < TABS.length - 1;
+
+  function paint(x: number, transition = "none") {
+    const el = page.current;
+    if (el) {
+      el.style.transition = transition;
+      el.style.transform = x ? `translate3d(${x}px,0,0)` : "";
+    }
+    const h = hintEl.current;
+    if (h) {
+      // Grows into view as the gap opens.
+      const w = window.innerWidth || 1;
+      const k = Math.min(1, Math.abs(x) / (w * COMMIT_RATIO));
+      h.style.transition = transition;
+      h.style.width = `${Math.abs(x)}px`;
+      h.style.opacity = String(k);
+      h.firstElementChild?.setAttribute("style", `transform: scale(${0.8 + 0.2 * k})`);
+    }
+  }
+
+  // The new page arrives: if a swipe brought us here, slide it in from the
+  // side the finger was pulling from. Before paint, so it never flashes in
+  // the middle first.
+  useLayoutEffect(() => {
+    const dir = leaving.current;
+    leaving.current = 0;
+    const el = page.current;
+    if (!el) return;
+    if (!dir) {
+      paint(0);
+      return;
+    }
+    const w = window.innerWidth || 1;
+    el.style.transition = "none";
+    el.style.transform = `translate3d(${-dir * w * 0.35}px,0,0)`;
+    el.style.opacity = "0.4";
+    void el.offsetWidth; // lay the start out before moving from it
+    el.style.transition = SETTLE;
+    el.style.transform = "";
+    el.style.opacity = "";
   }, [pathname]);
 
   if (!enabled) return <>{children}</>;
-
-  const canPrev = index > 0;
-  const canNext = index < TABS.length - 1;
 
   function onTouchStart(e: React.TouchEvent) {
     if (e.touches.length !== 1) return;
     const t = e.touches[0];
     start.current = { x: t.clientX, y: t.clientY, t: Date.now() };
     axis.current = null;
+    dx.current = 0;
     // A sheet on top of the page means the page is not what is being
     // touched. Sheets portal to <body>, so they escape this element in the
     // DOM — but React routes events through the COMPONENT tree, and the
@@ -150,7 +210,6 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     // every touch inside an open sheet still arrived, and dragging sideways
     // while reading comments changed tab out from under it.
     ignore.current = gestureBlocked(overlayCount(), e.target);
-    setSettling(false);
   }
 
   function onTouchMove(e: React.TouchEvent) {
@@ -159,10 +218,8 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     // rather than sliding the page under whatever just appeared.
     if (overlayCount() > 0) {
       ignore.current = true;
-      if (dx) {
-        setSettling(true);
-        setDx(0);
-      }
+      if (dx.current) paint(0, SETTLE);
+      dx.current = 0;
       return;
     }
     const t = e.touches[0];
@@ -178,8 +235,15 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
 
     // Resistance at the ends, so the first and last tabs feel like edges
     // rather than a broken gesture.
-    const atEdge = (ddx > 0 && !canPrev) || (ddx < 0 && !canNext);
-    setDx(atEdge ? ddx * 0.25 : ddx);
+    const toNext = ddx < 0;
+    const atEdge = (ddx > 0 && !canPrev) || (toNext && !canNext);
+    const x = atEdge ? ddx * 0.25 : ddx;
+    // Name the destination once per direction, not per frame.
+    const dest = atEdge ? null : TABS[toNext ? index + 1 : index - 1];
+    const want = dest ? { label: TAB_LABELS[dest], side: toNext ? ("right" as const) : ("left" as const) } : null;
+    if (want?.label !== hint?.label || want?.side !== hint?.side) setHint(want);
+    dx.current = x;
+    paint(x);
   }
 
   function onTouchEnd() {
@@ -191,7 +255,7 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
 
     const width = window.innerWidth || 1;
     const outcome = swipeOutcome({
-      dx,
+      dx: dx.current,
       width,
       elapsed: Date.now() - start.current.t,
       canPrev,
@@ -200,40 +264,56 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
 
     if (outcome !== "stay") {
       haptics.tap();
-      setSettling(true);
-      // Carry the page the rest of the way out before the route changes, so
-      // the movement reads as continuous rather than as a jump cut.
-      setDx(outcome === "next" ? -width : width);
-      router.push(TABS[outcome === "next" ? index + 1 : index - 1]);
+      const dir = outcome === "next" ? 1 : -1;
+      leaving.current = dir;
+      // Carry the page the rest of the way out while the next one loads; it
+      // arrives from the same side (see the layout effect above).
+      paint(-dir * width, SETTLE);
+      router.push(TABS[index + dir]);
       return;
     }
 
-    setSettling(true);
-    setDx(0);
+    dx.current = 0;
+    paint(0, SETTLE);
   }
 
   return (
-    <div
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onTouchCancel={() => {
-        axis.current = null;
-        setSettling(true);
-        setDx(0);
-      }}
-      // pan-y keeps vertical scrolling native and fast; only the horizontal
-      // axis is ours to interpret.
-      style={{
-        touchAction: "pan-y",
-        transform: dx ? `translate3d(${dx}px,0,0)` : undefined,
-        transition: settling
-          ? "transform 220ms cubic-bezier(0.16,1,0.3,1)"
-          : undefined,
-        willChange: dx ? "transform" : undefined,
-      }}
-    >
-      {children}
-    </div>
+    <>
+      {/* The gap the page leaves as it moves: where you are going. */}
+      <div
+        ref={hintEl}
+        aria-hidden
+        className="pointer-events-none fixed bottom-0 top-0 z-0 flex items-center justify-center"
+        style={{ [hint?.side === "left" ? "left" : "right"]: 0, width: 0, opacity: 0 }}
+      >
+        {hint && (
+          <span className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white/[0.07] px-3.5 py-2 text-sm font-bold text-foreground/85">
+            {hint.side === "left" && <span aria-hidden>‹</span>}
+            {hint.label}
+            {hint.side === "right" && <span aria-hidden>›</span>}
+          </span>
+        )}
+      </div>
+      <div
+        ref={page}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={() => {
+          axis.current = null;
+          dx.current = 0;
+          paint(0, SETTLE);
+        }}
+        // pan-y keeps vertical scrolling native and fast; only the horizontal
+        // axis is ours to interpret. Positioned, and after the hint, so it
+        // paints over it — but deliberately WITHOUT a z-index: that would
+        // make it a stacking context, and every full-screen menu and viewer
+        // drawn inside a page (not portalled) would sink under the bottom nav.
+        className="relative bg-background"
+        style={{ touchAction: "pan-y" }}
+      >
+        {children}
+      </div>
+    </>
   );
 }

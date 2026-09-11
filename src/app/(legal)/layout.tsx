@@ -4,7 +4,7 @@ import { ChevronLeft } from "lucide-react";
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-2xl px-5 pb-16">
-      <header className="sticky top-0 z-10 -mx-5 flex items-center gap-2 bg-background/90 px-3 py-3 backdrop-blur-xl">
+      <header className="sticky top-0 z-10 -mx-5 flex items-center gap-2 chrome-bar px-3 py-3">
         <Link
           href="/"
           aria-label="Back to Hypefy"

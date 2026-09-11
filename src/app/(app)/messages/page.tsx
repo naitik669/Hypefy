@@ -5,6 +5,9 @@ import { MessagesInbox, type InboxRow } from "@/components/messages/MessagesInbo
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { toDiaryEntries } from "@/lib/diary";
 
+/** When this inbox was drawn, so the page can tell a fresh one from one kept in memory. */
+const renderStamp = () => Date.now();
+
 export default async function MessagesPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -194,7 +197,7 @@ export default async function MessagesPage() {
         hue={(me as any)?.avatar_hue ?? 280}
       />
       <PullToRefresh>
-        <MessagesInbox rows={rows} currentUserId={user.id} pages={pages} />
+        <MessagesInbox rows={rows} currentUserId={user.id} pages={pages} renderedAt={renderStamp()} />
       </PullToRefresh>
     </>
   );

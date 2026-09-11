@@ -47,6 +47,7 @@
 html {
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
+  overflow-x: clip;
   width: 100%;
 }
 
@@ -104,7 +105,13 @@ body {
   /* Prevent text inflation on mobile orientation change */
   text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
+  /* clip, not hidden: with html also hiding x-overflow, `hidden` here made
+     body a scroll box of its own — one that never scrolls — and every sticky
+     header stuck to it instead of the screen, so they all scrolled away.
+     `clip` trims the same overflow without becoming a scroller. Old Safari
+     (<16) ignores it and keeps `hidden`. */
   overflow-x: hidden;
+  overflow-x: clip;
   width: 100%;
 }
 
@@ -1203,5 +1210,33 @@ html[data-splash="off"] #hypefy-splash {
 @media (prefers-reduced-motion: reduce) {
   .animate-folder-wiggle {
     animation: none;
+  }
+}
+
+/* Bars that stay on screen while the page scrolls under them — top bars,
+   sticky tab rows, the bottom nav. A live backdrop blur behind them has to
+   be recomputed for every frame of every scroll, and on phones (Android's
+   WebView above all) that is a large share of the stutter. On touch screens
+   they are near-solid instead, which reads the same on a dark app; a desktop
+   with a mouse keeps the frosted glass. */
+.chrome-bar {
+  background-color: rgb(10 10 10 / 0.96);
+}
+@media (hover: hover) and (pointer: fine) {
+  .chrome-bar {
+    background-color: rgb(10 10 10 / 0.8);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+  }
+}
+
+/* The small frosted pills over photos, videos and chat media (a timestamp, a
+   play mark, a count). They scroll by the dozen in feeds and chats, each one
+   another blur per frame; on touch screens their dark tint alone keeps them
+   legible. */
+@media (pointer: coarse) {
+  .backdrop-blur-sm {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 }

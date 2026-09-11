@@ -188,7 +188,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
   return (
     <div className="mt-2">
       {/* Tab bar — thin hairline dividers, blends with the page background */}
-      <div className="sticky top-14 z-10 flex border-y border-border bg-background/90 backdrop-blur-xl">
+      <div className="sticky top-14 z-10 flex border-y border-border chrome-bar">
         {tabs.map(({ key, Icon }) => (
           <button
             key={key}

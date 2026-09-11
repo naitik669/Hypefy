@@ -98,7 +98,7 @@ export function RequestsView({
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-14 z-10 flex gap-1 border-b border-border/60 bg-background/90 px-4 py-2 backdrop-blur-xl">
+      <div className="sticky top-14 z-10 flex gap-1 border-b border-border/60 chrome-bar px-4 py-2">
         {(["incoming", "sent"] as Tab[]).map((t) => {
           const count = t === "incoming" ? inRows.length : sentRows.length;
           const on = t === tab;

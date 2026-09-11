@@ -103,7 +103,7 @@ export function DiscoverView({
   return (
     <>
       {/* Chips — soft fade at the right edge hints there's more */}
-      <div className="sticky top-14 z-10 bg-background/90 backdrop-blur-xl">
+      <div className="sticky top-14 z-10 chrome-bar">
         <div
           className="no-scrollbar flex gap-2 overflow-x-auto px-4 py-2.5"
           style={{

@@ -2,6 +2,17 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Keep a page you just left for 30s, so going back to it — Home, then
+    // Messages, then Home again — is instant instead of a fresh trip to the
+    // server each time. (Next 15 made this 0s, which is what made switching
+    // tabs feel like loading a new website.) Pages that must be current catch
+    // themselves up: the inbox refreshes when it was drawn more than a few
+    // seconds ago, and a chat fetches anything newer as it reconnects.
+    staleTimes: {
+      dynamic: 30,
+    },
+  },
   images: {
     // Allow next/image to optimise user media served from Supabase storage.
     // Any host not listed here is handled by <OptimizedImage>, which falls

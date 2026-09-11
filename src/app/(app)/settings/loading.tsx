@@ -4,7 +4,7 @@ import { Skeleton, SkeletonCircle, SkeletonLine } from "@/components/ui/Skeleton
 export default function SettingsLoading() {
   return (
     <>
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border/60 bg-background/80 px-4 backdrop-blur-xl">
+      <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border/60 chrome-bar px-4">
         <SkeletonCircle size={32} />
         <SkeletonLine width={96} height={14} />
       </header>

@@ -86,7 +86,7 @@ export function PublicProfileTabs({
   return (
     <div className="mt-2">
       {/* Tab bar — thin hairline dividers, blends with the page background */}
-      <div className="sticky top-14 z-10 flex border-y border-border bg-background/90 backdrop-blur-xl">
+      <div className="sticky top-14 z-10 flex border-y border-border chrome-bar">
         {tabs.map((t) => {
           const Icon = t === "Posts" ? Grid3x3 : t === "Shots" ? Zap : Bookmark;
           return (

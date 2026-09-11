@@ -1280,7 +1280,7 @@ export function RealChatView({
   return (
     <div className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
       {/* Header */}
-      <header className="flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-2 border-b border-border/60 bg-background/90 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+      <header className="flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-2 border-b border-border/60 chrome-bar px-2 pt-[env(safe-area-inset-top)]">
         <button type="button" onClick={() => safeBack(router, "/messages")} aria-label="Back"
           className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5">
           <ChevronLeft size={24} />

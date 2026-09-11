@@ -264,7 +264,7 @@ export default function SearchPage() {
   return (
     <>
       {/* Header */}
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border/60 bg-background/80 px-2 backdrop-blur-xl">
+      <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border/60 chrome-bar px-2">
         <button
           type="button"
           onClick={() => safeBack(router)}

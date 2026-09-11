@@ -202,7 +202,7 @@ export function SetupStepper({
           screen of a new account and the only one with no navigation — the
           rest of the app frames itself, this did not. */}
       {!isLast && (
-        <header className="sticky top-0 z-10 bg-background/90 px-6 pt-5 pb-3 backdrop-blur-xl">
+        <header className="sticky top-0 z-10 chrome-bar px-6 pt-5 pb-3">
           <div className="mb-3 flex items-baseline justify-between">
             <span className="text-[15px] font-extrabold tracking-tight text-foreground/70">
               Hypefy<span className="text-accent">.</span>
