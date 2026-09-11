@@ -28,7 +28,7 @@ const FLY = "420ms cubic-bezier(0.3, 0.6, 0.35, 1)";
  */
 const INSET = 40;
 const DISC = `calc(${CARD_H} * 0.48)`;
-const DISC_AT = { right: `calc(${CARD_H} * -0.11)`, top: `calc(${CARD_H} * -0.2)` };
+const DISC_AT = { right: `calc(${CARD_H} * -0.11)`, top: `calc(${CARD_H} * -0.13)` };
 const PLAYING_SLIDE = 8;
 const PLAYING_LIFT = 12;
 
