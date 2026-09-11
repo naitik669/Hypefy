@@ -6,7 +6,7 @@ import { Star, X } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { DiaryDisc, SongLine } from "@/components/diary/DiaryDisc";
 import { DiaryResponder } from "@/components/diary/DiaryResponder";
-import { diaryTheme, fillSize, shortLeft } from "@/components/diary/DiaryPage";
+import { diaryTheme, fillSize, timeAgo } from "@/components/diary/DiaryPage";
 import { STORY_MS, stepStory, type DiaryEntry } from "@/lib/diary";
 
 /** The CD: big, but never more than about a third of the screen's height. */
@@ -165,7 +165,7 @@ export function DiaryStories({
         <span className="truncate text-sm font-bold">{entry.name}</span>
         {entry.audience === "close" && <Star size={12} className="fill-accent text-accent" aria-label="Close friends" />}
         <span className="text-xs text-white/50" suppressHydrationWarning>
-          · {shortLeft(entry.createdAt)}
+          · {timeAgo(entry.createdAt)}
         </span>
         <button
           type="button"

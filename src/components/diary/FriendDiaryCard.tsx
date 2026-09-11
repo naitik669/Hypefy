@@ -6,7 +6,7 @@ import { Maximize2, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { SongLine } from "@/components/diary/DiaryDisc";
 import { DiaryResponder } from "@/components/diary/DiaryResponder";
-import { diaryTheme, fillSize, lifeLeft, shortLeft } from "@/components/diary/DiaryPage";
+import { diaryTheme, fillSize, lifeLeft, timeAgo } from "@/components/diary/DiaryPage";
 import type { DiaryEntry } from "@/lib/diary";
 
 /**
@@ -79,7 +79,7 @@ export function FriendDiaryCard({
                 {fresh && <span aria-label="New" className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
               </span>
               <span className="text-[11px] leading-tight tabular-nums text-white/50" suppressHydrationWarning>
-                {shortLeft(entry.createdAt)}
+                {timeAgo(entry.createdAt)}
               </span>
             </span>
           </Link>

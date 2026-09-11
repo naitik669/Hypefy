@@ -572,15 +572,22 @@ describe("DiaryHome", () => {
   });
 });
 
-describe("shortLeft", () => {
-  it("never counts more than a day, even when the phone's clock runs behind", async () => {
-    const { shortLeft } = await import("@/components/diary/DiaryPage");
+describe("timeAgo", () => {
+  it("says how long ago a page went up", async () => {
+    const { timeAgo } = await import("@/components/diary/DiaryPage");
     const now = Date.UTC(2026, 8, 11, 12);
-    // Written "10 hours from now" by this phone's reckoning.
-    expect(shortLeft(new Date(now + 10 * 3_600_000).toISOString(), now)).toBe("24h");
-    expect(shortLeft(new Date(now - 3 * 3_600_000).toISOString(), now)).toBe("21h");
-    expect(shortLeft(new Date(now - 23.5 * 3_600_000).toISOString(), now)).toBe("30m");
-    expect(shortLeft(new Date(now - 25 * 3_600_000).toISOString(), now)).toBe("now");
+    const ago = (ms: number) => new Date(now - ms).toISOString();
+    expect(timeAgo(ago(20_000), now)).toBe("now");
+    expect(timeAgo(ago(60_000), now)).toBe("1m ago");
+    expect(timeAgo(ago(59 * 60_000), now)).toBe("59m ago");
+    expect(timeAgo(ago(3_600_000), now)).toBe("1h ago");
+    expect(timeAgo(ago(23.9 * 3_600_000), now)).toBe("23h ago");
+  });
+
+  it("says now, not a time in the future, when the phone's clock runs behind", async () => {
+    const { timeAgo } = await import("@/components/diary/DiaryPage");
+    const now = Date.UTC(2026, 8, 11, 12);
+    expect(timeAgo(new Date(now + 10 * 60_000).toISOString(), now)).toBe("now");
   });
 });
 

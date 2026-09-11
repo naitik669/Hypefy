@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, Palette, PenLine, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { DiscSleeve, SongLine } from "@/components/diary/DiaryDisc";
-import { DIARY_COLORS, colorKey, diaryTheme, fillSize, lifeLeft, shortLeft, swatchOf, type DiaryColor } from "@/components/diary/DiaryPage";
+import { DIARY_COLORS, colorKey, diaryTheme, fillSize, lifeLeft, swatchOf, timeAgo, type DiaryColor } from "@/components/diary/DiaryPage";
 import { ReactionsTab, byPerson } from "@/components/diary/PageReactions";
 import type { DiaryEntry, DiaryReaction } from "@/lib/diary";
 
@@ -44,7 +44,7 @@ export function YourDiaryCard({
           <span className="text-sm font-bold text-white">You</span>
           {entry.audience === "close" && <Star size={12} className="fill-accent text-accent" aria-label="Close friends" />}
           <span className="ml-auto text-xs tabular-nums text-white/45" suppressHydrationWarning>
-            {shortLeft(entry.createdAt)}
+            {timeAgo(entry.createdAt)}
           </span>
           {onColor && (
             <button

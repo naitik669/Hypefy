@@ -11,17 +11,20 @@ export function lifeLeft(createdAt: string, now = Date.now()): number {
   return Math.max(0, Math.min(1, ms / (DIARY_HOURS * 3_600_000)));
 }
 
-/** "22h", "40m", "now" — for the signature line, where "left" is implied. */
-export function shortLeft(createdAt: string, now = Date.now()): string {
-  // Capped at the full day: a phone whose clock runs behind the server's
-  // would otherwise count a fresh Diary as having more than 24 hours left.
-  const ms = Math.min(
-    new Date(createdAt).getTime() + DIARY_HOURS * 3_600_000 - now,
-    DIARY_HOURS * 3_600_000
-  );
-  if (!(ms > 0)) return "now";
-  const h = Math.floor(ms / 3_600_000);
-  return h >= 1 ? `${h}h` : `${Math.max(1, Math.floor(ms / 60_000))}m`;
+/**
+ * "now", "5m ago", "3h ago" — how long ago a page went up. People read a
+ * page by how fresh it is; how long it has left is the burn line's job.
+ * A phone whose clock runs behind the server's reads "now", never a time
+ * in the future.
+ */
+export function timeAgo(createdAt: string, now = Date.now()): string {
+  const ms = now - new Date(createdAt).getTime();
+  if (!(ms >= 60_000)) return "now";
+  const m = Math.floor(ms / 60_000);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
 /**
