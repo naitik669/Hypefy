@@ -128,11 +128,17 @@ function Panel({ anchor, onPick, onClose }: { anchor: HTMLElement | null; onPick
 
   return (
     <div
-      // Events stop here: this is portalled out of a modal or sheet, and React
-      // would otherwise carry a tap inside it up to that overlay's backdrop.
+      // Events stop here: this is portalled out of a modal, a sheet or a card
+      // deck, and React would otherwise carry a tap inside it up to that
+      // overlay's backdrop — or a scroll through the emoji up to the deck,
+      // as a swipe.
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
+      onPointerMove={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
     >
       <div aria-hidden className="fixed inset-0 z-[250]" onPointerDown={onClose} />
       <div

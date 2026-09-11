@@ -159,7 +159,9 @@ describe("DiaryHome", () => {
     const top = topCard()!;
     expect(top.textContent).toContain("HDB");
     const emoji = [...top.querySelectorAll("button")].filter((b) => /^Send .+ to /.test(b.getAttribute("aria-label") ?? ""));
-    expect(emoji).toHaveLength(6);
+    // A few a tap away, and ⋯ for the rest.
+    expect(emoji).toHaveLength(5);
+    expect(top.querySelector('button[aria-label="More emoji for Aman"]')).not.toBeNull();
     // Reply is an arrow, not a field on the card.
     expect(top.querySelector('button[aria-label="Reply to Aman"]')).not.toBeNull();
     expect(top.querySelector("input")).toBeNull();
@@ -208,6 +210,26 @@ describe("DiaryHome", () => {
     // It went; a note says so, and nothing stays lit on the button.
     expect(host.textContent).toContain("Sent");
     expect(host.querySelector('[aria-pressed="true"]')).toBeNull();
+  });
+
+  it("reacts with any emoji from the ⋯ popup, found by search, and remembers it", async () => {
+    localStorage.removeItem("hypefy.emoji.recent");
+    const { DiaryHome } = await import("@/components/diary/DiaryHome");
+    await render(createElement(DiaryHome, home({ entries: [entry({ userId: "a", name: "Aman" })] })));
+    await click(button("More emoji for Aman"));
+
+    const popup = () => document.querySelector('[role="dialog"][aria-label="Emoji"]');
+    expect(popup()).not.toBeNull();
+    await setValue(popup()!.querySelector<HTMLInputElement>('input[aria-label="Search emoji"]')!, "chai");
+    await click(popup()!.querySelector('button[aria-label="☕"]'));
+
+    expect(rpcCalls).toEqual([
+      { fn: "react_to_note", args: { p_owner: "a", p_emoji: "☕" } },
+      { fn: "send_page_reply", args: { p_owner: "a", p_body: "☕" } },
+    ]);
+    // One pick, one reaction: it closes as it sends, and ☕ is now recent.
+    expect(popup()).toBeNull();
+    expect(JSON.parse(localStorage.getItem("hypefy.emoji.recent")!)).toEqual(["☕"]);
   });
 
   it("hypes a page with the star, silently, and takes it back with a second tap", async () => {

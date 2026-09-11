@@ -107,4 +107,6 @@ export function useDiaryActions({
   return { react, reply, hype, status, error, sent, resetStatus };
 }
 
-export const QUICK_EMOJIS = ["❤️", "😂", "🥰", "👍", "😮", "😢"] as const;
+/** The reactions a tap away; the ⋯ beside them reaches the rest. Five, so
+ *  the row still has room for ⋯, the star and the arrow on a card. */
+export const QUICK_EMOJIS = ["❤️", "😂", "🥰", "😮", "😢"] as const;

@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Reply, Star } from "lucide-react";
+import { MoreHorizontal, Reply, Star } from "lucide-react";
+import { EmojiPicker } from "@/components/ui/EmojiPicker";
 import { flyEmoji, starBurst } from "@/components/diary/flyEmoji";
 import { DiaryReplyPopup } from "@/components/diary/DiaryReplyPopup";
 import { QUICK_EMOJIS, useDiaryActions } from "@/components/diary/useDiaryActions";
 import type { DiaryEntry } from "@/lib/diary";
 
 /**
- * The row under someone's page: six emoji, a star to hype it, and an arrow
- * to reply. On a card it is a tray along the card's foot; full-screen, a
+ * The row under someone's page: five emoji and ⋯ for any other (a popup
+ * with search and your recent ones), a star to hype it, and an arrow to
+ * reply. On a card it is a tray along the card's foot; full-screen, a
  * pill and two round buttons sized for thumbs.
  *
  * An emoji pops up over the page and flies into its owner's avatar, and goes
@@ -49,8 +51,21 @@ export function DiaryResponder({
     onHyped,
   });
   const [replying, setReplying] = useState(false);
+  /** The ⋯ button, while the emoji popup is open from it. */
+  const [moreFrom, setMoreFrom] = useState<HTMLElement | null>(null);
   const first = entry.name.split(" ")[0];
   const big = size === "screen";
+
+  function openMore(from: HTMLElement | null) {
+    setMoreFrom(from);
+    // Full-screen holds the page while you choose, as it does while you reply.
+    onTyping?.(!!from);
+  }
+
+  function send(e: string, from: Element) {
+    flyEmoji(e, from, target(), stage?.());
+    void react(e);
+  }
 
   // "Sent" is news for a moment, not a state; clear it after a few seconds.
   useEffect(() => {
@@ -67,22 +82,35 @@ export function DiaryResponder({
     if (v && status === "error") resetStatus();
   }
 
-  const emoji = QUICK_EMOJIS.map((e) => (
+  const emoji = [
+    ...QUICK_EMOJIS.map((e) => (
+      <button
+        key={e}
+        type="button"
+        onClick={(ev) => send(e, ev.currentTarget)}
+        aria-label={`Send ${e} to ${first}`}
+        className={`flex min-w-0 flex-1 items-center justify-center rounded-full transition-transform duration-150 hover:scale-110 ${
+          big ? "h-10 max-w-10 text-[23px]" : "h-9 max-w-9 text-[19px]"
+        }`}
+      >
+        {e}
+      </button>
+    )),
+    // Any other emoji: the popup, with search and your recent ones.
     <button
-      key={e}
+      key="more"
       type="button"
-      onClick={(ev) => {
-        flyEmoji(e, ev.currentTarget, target(), stage?.());
-        void react(e);
-      }}
-      aria-label={`Send ${e} to ${first}`}
-      className={`flex min-w-0 flex-1 items-center justify-center rounded-full transition-transform duration-150 hover:scale-110 ${
-        big ? "h-10 max-w-10 text-[23px]" : "h-9 max-w-9 text-[19px]"
-      }`}
+      onClick={(ev) => openMore(ev.currentTarget)}
+      aria-label={`More emoji for ${first}`}
+      aria-haspopup="dialog"
+      aria-expanded={!!moreFrom}
+      className={`flex shrink-0 items-center justify-center rounded-full transition-colors ${
+        big ? "h-9 w-9" : "h-7 w-7"
+      } ${moreFrom ? "bg-white/20 text-white" : "bg-white/[0.09] text-white/80 hover:bg-white/15 hover:text-white"}`}
     >
-      {e}
-    </button>
-  ));
+      <MoreHorizontal size={big ? 18 : 16} strokeWidth={2.6} />
+    </button>,
+  ];
   const hypeButton = (className: string) => (
     <button
       type="button"
@@ -152,6 +180,18 @@ export function DiaryResponder({
           )}
         </div>
       )}
+
+      <EmojiPicker
+        open={!!moreFrom}
+        anchor={moreFrom}
+        // One pick is one reaction (and one DM), so it closes as it sends.
+        onPick={(e) => {
+          const from = moreFrom;
+          openMore(null);
+          if (from) send(e, from);
+        }}
+        onClose={() => openMore(null)}
+      />
 
       <DiaryReplyPopup
         entry={entry}

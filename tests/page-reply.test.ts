@@ -49,7 +49,7 @@ describe("pageSnapshot", () => {
 describe("isEmojiReply", () => {
   it("tells an emoji from words", async () => {
     const { isEmojiReply } = await import("@/components/diary/PageReplyEmbed");
-    for (const e of ["❤️", "😂", "🥰", "👍", "😮", "😢", "👍🏽", "❤️❤️"]) expect(isEmojiReply(e)).toBe(true);
+    for (const e of ["❤️", "😂", "🥰", "👍", "😮", "😢", "👍🏽", "❤️❤️", "🇮🇳", "❤️‍🔥"]) expect(isEmojiReply(e)).toBe(true);
     for (const t of ["same, chai?", "ok ❤️", "", null, "3"]) expect(isEmojiReply(t)).toBe(false);
   });
 });

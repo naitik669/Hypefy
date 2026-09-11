@@ -44,9 +44,9 @@ export function pageSnapshot(metadata: unknown): PageSnapshot | null {
 export function isEmojiReply(body: string | null): boolean {
   if (!body) return false;
   const s = body.trim();
-  // Pictographs, skin tones, the joiner that builds combined emoji, and the
-  // variation selector that makes ❤ into ❤️.
-  return s.length > 0 && s.length <= 8 && /^(\p{Extended_Pictographic}|\p{Emoji_Modifier}|‍|️|\s)+$/u.test(s);
+  // Pictographs, skin tones, the joiner that builds combined emoji, the
+  // variation selector that makes ❤ into ❤️, and the letter pairs of a flag.
+  return s.length > 0 && s.length <= 8 && /^(\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|‍|️|\s)+$/u.test(s);
 }
 
 /** Whether the page has run its 24 hours. */
