@@ -90,17 +90,10 @@ export function ProfileAvatar({
         onContextMenu={(e) => e.preventDefault()}
         className="block touch-none select-none active:scale-[0.98]"
       >
-        <AvatarFrame id={decoration} size={hasActiveShow ? size + 12 : size}>
-        {hasActiveShow ? (
-          // Accent story ring
-          <div className="rounded-[30px] bg-accent p-[3px]">
-            <div className="rounded-[27px] bg-background p-[3px]">
-              <AvatarImg url={avatarUrl} name={name} hue={hue} size={size} className="rounded-[22px]" />
-            </div>
-          </div>
-        ) : (
+        {/* No green Show ring on profiles; Home's row shows who has a Show.
+            Tapping the photo still opens it. */}
+        <AvatarFrame id={decoration} size={size}>
           <AvatarImg url={avatarUrl} name={name} hue={hue} size={size} className="rounded-[26px] ring-4 ring-background" />
-        )}
         </AvatarFrame>
       </button>
 
