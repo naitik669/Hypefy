@@ -17,7 +17,7 @@ export default async function ThreadPage({
   const [{ data: members }, { data: conv }] = await Promise.all([
     supabase
       .from("conversation_members")
-      .select("user_id, role, last_read_at, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, hide_read_receipts)")
+      .select("user_id, role, last_read_at, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, hide_read_receipts, is_verified, is_premium, name_font, name_glow, avatar_decoration)")
       .eq("conversation_id", threadId),
     supabase.from("conversations").select("type, title, avatar_url, theme").eq("id", threadId).maybeSingle(),
   ]);
@@ -110,6 +110,15 @@ export default async function ThreadPage({
       };
     });
 
+  // The other person's badge and Premium styling, for the chat header.
+  const opStyle = op as {
+    is_verified?: boolean | null;
+    is_premium?: boolean | null;
+    name_font?: string | null;
+    name_glow?: string | null;
+    avatar_decoration?: string | null;
+  } | null;
+
   return (
     <RealChatView
       conversationId={threadId}
@@ -123,6 +132,10 @@ export default async function ThreadPage({
         lastSeenAt: (op as any)?.show_activity === false ? null : (op as any)?.last_seen_at ?? null,
         showActivity: (op as any)?.show_activity ?? true,
         hideReadReceipts: (op as any)?.hide_read_receipts ?? false,
+        verified: !!opStyle?.is_verified,
+        cosmetics: opStyle
+          ? { is_premium: opStyle.is_premium ?? false, name_font: opStyle.name_font ?? null, name_glow: opStyle.name_glow ?? null, avatar_decoration: opStyle.avatar_decoration ?? null }
+          : null,
       }}
       group={group}
       members={membersMap}

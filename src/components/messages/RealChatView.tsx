@@ -31,6 +31,10 @@ import { one } from "@/lib/supabase/typed";
 import { ForwardSheet } from "@/components/messages/ForwardSheet";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { findChatTheme } from "@/lib/chat-themes";
+import { AvatarFrame } from "@/components/ui/AvatarFrame";
+import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { DisplayName } from "@/components/ui/DisplayName";
+import { visibleDecoration } from "@/lib/cosmetics";
 
 type PostPreview = {
   id: string;
@@ -120,7 +124,7 @@ function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null 
 }
 
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
-type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null; lastSeenAt?: string | null; showActivity?: boolean; hideReadReceipts?: boolean };
+type Other = { id: string; name: string; username: string | null; hue: number; avatarUrl?: string | null; lastSeenAt?: string | null; showActivity?: boolean; hideReadReceipts?: boolean; verified?: boolean; cosmetics?: { is_premium: boolean; name_font: string | null; name_glow: string | null; avatar_decoration: string | null } | null };
 type GroupMember = { id: string; name: string; username: string | null; hue: number; avatarUrl: string | null; role: string };
 type GroupMeta = { title: string; memberCount: number; avatarUrl?: string | null; members?: GroupMember[]; myRole?: string };
 
@@ -1325,11 +1329,16 @@ export function RealChatView({
         ) : (
           <Link href={`/messages/${conversationId}/info`} className="flex min-w-0 flex-1 items-center gap-3">
             <div className="relative shrink-0">
-              <Avatar name={other.name} hue={other.hue} size={36} src={other.avatarUrl ?? undefined} />
+              <AvatarFrame id={other.cosmetics ? visibleDecoration(other.cosmetics) : null} size={36}>
+                <Avatar name={other.name} hue={other.hue} size={36} src={other.avatarUrl ?? undefined} />
+              </AvatarFrame>
               <PresenceDot lastSeenAt={otherLastSeen} size="sm" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{other.name}</p>
+              <p className="flex min-w-0 items-center gap-1 text-sm font-semibold">
+                <DisplayName name={other.name} profile={other.cosmetics} className="truncate" />
+                {other.verified && <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />}
+              </p>
               {(() => {
                 const pres = presenceLabel(otherLastSeen);
                 if (pres) return <p className={`truncate text-xs ${pres.status === "online" ? "text-green-500" : pres.status === "idle" ? "text-yellow-400" : "text-muted"}`}>{pres.text}</p>;

@@ -23,6 +23,10 @@ import { FloatingPages } from "@/components/diary/FloatingPages";
 import type { DiaryEntry } from "@/lib/diary";
 import { isEmojiReply } from "@/components/diary/PageReplyEmbed";
 import { Avatar } from "@/components/ui/Avatar";
+import { AvatarFrame } from "@/components/ui/AvatarFrame";
+import { DisplayName } from "@/components/ui/DisplayName";
+import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { visibleDecoration } from "@/lib/cosmetics";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PresenceDot } from "@/components/presence/PresenceDot";
@@ -35,6 +39,9 @@ export type InboxRow = {
   username: string | null;
   hue: number;
   avatarUrl?: string | null;
+  /** 1:1 only: the other person's badge and Premium styling. */
+  verified?: boolean;
+  cosmetics?: { is_premium: boolean; name_font: string | null; name_glow: string | null; avatar_decoration: string | null } | null;
   isGroup: boolean;
   memberCount: number;
   lastBody: string | null;
@@ -638,6 +645,7 @@ export function MessagesInbox({
             {r.isGroup ? (
               <GroupAvatar />
             ) : (
+              <AvatarFrame id={r.cosmetics ? visibleDecoration(r.cosmetics) : null} size={52}>
               <Avatar
                 name={r.name}
                 hue={r.hue}
@@ -648,6 +656,7 @@ export function MessagesInbox({
                    the app (nav avatar, create button) is already squircled. */
                 className="rounded-2xl"
               />
+              </AvatarFrame>
             )}
             {!r.isGroup && <PresenceDot lastSeenAt={r.lastSeenAt} size="md" />}
           </div>
@@ -658,7 +667,8 @@ export function MessagesInbox({
                   unread ? "font-bold text-foreground" : "font-semibold"
                 }`}
               >
-                {r.name}
+                <DisplayName name={r.name} profile={r.cosmetics} />
+                {r.verified && <VerifiedStar className="ml-1 inline-block h-3.5 w-3.5 align-[-2px] text-verified" />}
                 {r.isGroup && (
                   <span className="ml-1.5 text-xs font-normal text-faint">
                     · {r.memberCount}
