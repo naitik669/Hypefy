@@ -4,7 +4,7 @@ export default function PrivacyPage() {
   return (
     <>
       <h1>Privacy Policy</h1>
-      <p className="text-xs text-faint">Last updated: September 10, 2026</p>
+      <p className="text-xs text-faint">Last updated: September 15, 2026</p>
 
       <p>
         This Privacy Policy explains how Hypefy Platform Private Limited (CIN
@@ -51,6 +51,13 @@ export default function PrivacyPage() {
           diagnose and fix problems.
         </li>
         <li>
+          <strong>Purchases:</strong> if you buy a plan or a Shop item, what you
+          bought, its price, and the status of the payment and subscription
+          (for example, trial end and renewal dates). Your card or UPI details go
+          to our payment processor and never reach us; we receive only a payment
+          reference and its outcome.
+        </li>
+        <li>
           <strong>Push subscriptions:</strong> if you enable notifications, the
           push endpoint or device token needed to deliver them.
         </li>
@@ -89,6 +96,7 @@ export default function PrivacyPage() {
       <ul>
         <li><strong>Supabase</strong> — database, authentication, and media storage.</li>
         <li><strong>Vercel</strong> — application hosting and delivery.</li>
+        <li><strong>Razorpay</strong> — payments for plans and Shop purchases on the website. Purchases in the Google Play and Apple apps are handled by Google and Apple.</li>
         <li><strong>Sentry</strong> — error monitoring and diagnostics.</li>
         <li><strong>GIPHY</strong> — GIF search (your search query is proxied through our server).</li>
         <li><strong>Apple (iTunes Search API)</strong> — song search; previews and artwork are served directly by Apple.</li>
@@ -122,7 +130,7 @@ export default function PrivacyPage() {
         expire automatically (after 24 hours). When you delete your account, we
         remove your profile, content, messages, and subscriptions from production
         systems; residual copies in encrypted backups expire on a rolling basis, and
-        we may retain limited data where the law requires or to resolve disputes.
+        we may retain limited data where the law requires or to resolve disputes. Records of purchases are kept for as long as Indian tax and accounting law requires (currently up to eight years), even after you delete your account.
       </p>
 
       <h2>7. Your rights</h2>

@@ -4,7 +4,7 @@ export default function TermsPage() {
   return (
     <>
       <h1>Terms of Service</h1>
-      <p className="text-xs text-faint">Last updated: July 27, 2026</p>
+      <p className="text-xs text-faint">Last updated: September 15, 2026</p>
 
       <p>
         These Terms of Service (the &quot;Terms&quot;) are a binding agreement
@@ -104,7 +104,7 @@ export default function TermsPage() {
         (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021. You
         can report content in-app; reports are reviewed and acted on. We are not
         responsible for content created by users, but we will respond to valid
-        legal notices and grievances as described in Section 12.
+        legal notices and grievances as described in Section 13.
       </p>
 
       <h2>6. Copyright, DMCA, and music</h2>
@@ -126,17 +126,67 @@ export default function TermsPage() {
         </li>
       </ul>
 
-      <h2>7. Third-party services</h2>
+      <h2 id="paid">7. Paid features</h2>
+      <p>
+        Some features cost money. Prices are shown in Indian rupees before you
+        pay and include any taxes we are required to charge.
+      </p>
+      <ul>
+        <li>
+          <strong>Hypefy Premium</strong> (₹125 per month) and{" "}
+          <strong>Verified</strong> (₹99 per month) are subscriptions. They renew
+          automatically every month until you cancel.
+        </li>
+        <li>
+          <strong>Free month.</strong> Premium may start with a one-month free
+          trial, once per person. When you start it, you authorise a recurring
+          payment (a card or UPI Autopay mandate); a small verification charge may
+          be made and refunded. If you do not cancel before the free month ends,
+          the first monthly charge is taken on that date.
+        </li>
+        <li>
+          <strong>Cancelling.</strong> Cancel any time in Settings → Subscription.
+          You keep the features until the end of the period you have paid for (or
+          the end of your free month), and are not charged again. We do not refund
+          part-used periods, except where the law requires it or a charge was made
+          in error, which we will refund.
+        </li>
+        <li>
+          <strong>The Verified badge</strong> shows that an account holds a paid
+          Verified or Premium plan. It is not a confirmation of anyone&apos;s
+          identity. We may remove the badge from an account that impersonates
+          another person or breaks the Community Guidelines.
+        </li>
+        <li>
+          <strong>Shop items</strong> (such as avatar decorations and chat themes)
+          are a one-time purchase of a personal, non-transferable licence to use
+          them in the Service. They have no cash value and cannot be exchanged or
+          resold. Premium features are available only while your plan is active.
+        </li>
+        <li>
+          <strong>Payments</strong> on the website are processed by Razorpay; we
+          never receive or store your full card or UPI details. Purchases made in
+          the Google Play or Apple App Store apps are processed by those stores
+          under their terms, including their refund policies.
+        </li>
+        <li>
+          <strong>Price changes.</strong> We will tell you at least 30 days before a
+          subscription price changes. The new price applies from your next renewal
+          after that, and you can cancel before it does.
+        </li>
+      </ul>
+
+      <h2>8. Third-party services</h2>
       <p>
         The Service relies on third-party providers (for example, hosting,
-        database and authentication, GIF search, and music search) and may link to
+        database and authentication, payments, GIF search, and music search) and may link to
         third-party sites. We are not responsible for third-party services or
         content, and your use of them may be subject to their own terms. See our{" "}
         <a href="/privacy" className="text-accent">Privacy Policy</a> for the
         processors we use.
       </p>
 
-      <h2>8. Termination</h2>
+      <h2>9. Termination</h2>
       <p>
         You can delete your account at any time from Settings → Account. We may
         suspend or terminate your access if you violate these Terms or applicable
@@ -146,7 +196,7 @@ export default function TermsPage() {
         survive.
       </p>
 
-      <h2>9. Disclaimers</h2>
+      <h2>10. Disclaimers</h2>
       <p>
         To the maximum extent permitted by law, the Service is provided on an
         &quot;as is&quot; and &quot;as available&quot; basis without warranties of
@@ -155,7 +205,7 @@ export default function TermsPage() {
         Service will be uninterrupted, secure, or error-free.
       </p>
 
-      <h2>10. Limitation of liability</h2>
+      <h2>11. Limitation of liability</h2>
       <p>
         To the maximum extent permitted by law, Hypefy and its directors,
         employees, and agents will not be liable for any indirect, incidental,
@@ -167,7 +217,7 @@ export default function TermsPage() {
         applicable law.
       </p>
 
-      <h2>11. Indemnity</h2>
+      <h2>12. Indemnity</h2>
       <p>
         You agree to indemnify and hold harmless Hypefy from claims, damages, and
         expenses (including reasonable legal fees) arising out of Your Content,
@@ -175,7 +225,7 @@ export default function TermsPage() {
         others.
       </p>
 
-      <h2>12. Grievance redressal</h2>
+      <h2>13. Grievance redressal</h2>
       <p>
         In accordance with the Information Technology (Intermediary Guidelines and
         Digital Media Ethics Code) Rules, 2021 and the Digital Personal Data
@@ -202,7 +252,7 @@ export default function TermsPage() {
         or impersonating are addressed on an expedited basis.
       </p>
 
-      <h2>13. Governing law and dispute resolution</h2>
+      <h2>14. Governing law and dispute resolution</h2>
       <p>
         These Terms are governed by the laws of India, without regard to conflict
         of law principles. Subject to applicable law, the courts at Moradabad,
@@ -212,7 +262,7 @@ export default function TermsPage() {
         good-faith negotiation.
       </p>
 
-      <h2>14. Changes to these Terms</h2>
+      <h2>15. Changes to these Terms</h2>
       <p>
         We may update these Terms from time to time. We will announce material
         changes in-app or by other reasonable means and update the date above.
@@ -220,7 +270,7 @@ export default function TermsPage() {
         updated Terms.
       </p>
 
-      <h2>15. Miscellaneous</h2>
+      <h2>16. Miscellaneous</h2>
       <ul>
         <li>If any provision is found unenforceable, the remaining provisions stay in effect.</li>
         <li>Our failure to enforce a provision is not a waiver of it.</li>
@@ -228,7 +278,7 @@ export default function TermsPage() {
         <li>These Terms, together with the Privacy Policy and Community Guidelines, are the entire agreement between you and Hypefy regarding the Service.</li>
       </ul>
 
-      <h2>16. Contact</h2>
+      <h2>17. Contact</h2>
       <p>
         Questions about these Terms? Reach us at{" "}
         <a href="mailto:support@hypefy.chat" className="text-accent">support@hypefy.chat</a>.

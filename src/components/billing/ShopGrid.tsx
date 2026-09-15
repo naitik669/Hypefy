@@ -146,6 +146,11 @@ export function ShopGrid({
           ))}
         </div>
       </section>
+
+      <p className="px-1 text-center text-[11px] leading-snug text-faint">
+        By buying you agree to the{" "}
+        <Link href="/terms#paid" className="underline hover:text-muted">paid features terms</Link>.
+      </p>
     </div>
   );
 }

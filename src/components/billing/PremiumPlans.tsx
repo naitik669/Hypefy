@@ -178,6 +178,11 @@ export function PremiumPlans({
         </span>
         <span aria-hidden className="text-faint">›</span>
       </Link>
+
+      <p className="px-1 text-center text-[11px] leading-snug text-faint">
+        By subscribing you agree to the{" "}
+        <Link href="/terms#paid" className="underline hover:text-muted">paid features terms</Link>.
+      </p>
     </div>
   );
 }
