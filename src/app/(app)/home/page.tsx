@@ -440,10 +440,16 @@ export default async function HomePage() {
     }
   }
   // Seen only when EVERY active show from that user has a server-side view
-  const shows = [...byUser.values()].map(({ allIds, ...v }) => ({
-    ...v,
-    seen: allIds.every((id) => viewedShowIds.has(id)),
-  }));
+  // Open at the oldest Show you haven't watched yet, so a new Show isn't
+  // behind ones you've already seen; all watched, start from the beginning.
+  const shows = [...byUser.values()].map(({ allIds, ...v }) => {
+    const oldestFirst = [...allIds].reverse();
+    return {
+      ...v,
+      id: oldestFirst.find((id) => !viewedShowIds.has(id)) ?? v.id,
+      seen: allIds.every((id) => viewedShowIds.has(id)),
+    };
+  });
 
   return (
     <>

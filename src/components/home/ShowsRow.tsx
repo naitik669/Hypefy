@@ -100,14 +100,22 @@ export function ShowsRow({
             className="block active:opacity-70"
           >
             {currentUser ? (
+              // Green until you've watched your Show, then grey like any
+              // watched Show. No ring only when there's no Show at all —
+              // dropping it once watched made it look like nothing was posted.
               <div
-                className={`rounded-[22px] p-[2.5px] ${
-                  currentUser.hasActiveShow && !ownShowSeen ? "bg-accent" : "bg-transparent"
-                }`}
+                className="rounded-[22px] p-[2.5px]"
+                style={{
+                  background: !currentUser.hasActiveShow
+                    ? "transparent"
+                    : ownShowSeen
+                      ? "#3a3a3a"
+                      : "var(--color-accent)",
+                }}
               >
                 <div
                   className={`rounded-[20px] bg-background ${
-                    currentUser.hasActiveShow && !ownShowSeen ? "p-[2px]" : ""
+                    currentUser.hasActiveShow ? "p-[2px]" : ""
                   }`}
                 >
                   <Avatar name={currentUser.name} hue={currentUser.hue} size={56} src={currentUser.avatarUrl ?? undefined} className="rounded-[18px]" />

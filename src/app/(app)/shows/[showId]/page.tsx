@@ -23,27 +23,17 @@ export default async function ShowPage({
   if (!target) notFound();
 
   // 2. Fetch all active Shows from the same user.
-  //    Build the select string based on which optional columns exist — we probe
-  //    them independently so a single missing column doesn't break the whole page.
   const nowIso = new Date().toISOString();
   // profiles must be disambiguated: show_views adds a second shows<->profiles
   // relationship path, which makes a bare profiles(...) embed error (PGRST201).
   const baseSelect = `id, user_id, media_url, caption, created_at, hype_count, track, profiles!shows_user_id_fkey(display_name, avatar_hue, username)`;
 
-  // Probe for linked_post_id + is_showcase in one call; degrade gracefully.
-  const [probeLinked, probeShowcase] = await Promise.all([
-    supabase.from("shows").select("linked_post_id").eq("id", target.id).maybeSingle(),
-    supabase.from("shows").select("is_showcase").eq("id", target.id).maybeSingle(),
-  ]);
-  const hasLinkedPost  = !probeLinked.error;
-  const hasIsShowcase  = !probeShowcase.error;
+  // is_showcase and linked_post_id have long existed; probing for them cost
+  // two extra round trips on every Show opened.
+  const extraCols =
+    "is_showcase, linked_post_id, linked_post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(display_name, username, avatar_hue, avatar_url))";
 
-  const extraCols = [
-    hasIsShowcase  ? "is_showcase"   : "",
-    hasLinkedPost  ? "linked_post_id, linked_post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(display_name, username, avatar_hue, avatar_url))" : "",
-  ].filter(Boolean).join(", ");
-
-  const selectStr = extraCols ? `${baseSelect}, ${extraCols}` : baseSelect;
+  const selectStr = `${baseSelect}, ${extraCols}`;
 
   const { data: raw } = await supabase
     .from("shows")
