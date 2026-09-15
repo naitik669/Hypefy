@@ -141,6 +141,11 @@ export default async function PublicProfilePage({
     .limit(1);
   // Entry Show (oldest) for the avatar ring — never expose to non-followers of private accounts
   const entryShowId = (!isLocked && activeShows?.[0]?.id) || null;
+  // Already watched it (on any device)? Then the ring isn't green.
+  const { data: myView } =
+    entryShowId && currentUser && !isOwn
+      ? await supabase.from("show_views").select("show_id").eq("show_id", entryShowId).eq("viewer_id", currentUser.id).maybeSingle()
+      : { data: null };
 
   return (
     <>
@@ -156,6 +161,7 @@ export default async function PublicProfilePage({
         accentId={(profile as { accent_id?: string | null }).accent_id}
         hasActiveShow={!!entryShowId}
         entryShowId={entryShowId}
+        entryShowSeen={!!myView}
         userId={profile.id}
         currentUserId={currentUser?.id ?? null}
         stats={stats}
