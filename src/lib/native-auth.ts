@@ -19,9 +19,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * client — which writes cookies the server components can read.
  */
 
-/** Must match a Redirect URL in Supabase Auth settings, and the scheme
- *  already registered in AndroidManifest.xml. */
-export const NATIVE_AUTH_REDIRECT = "chat.hypefy://auth/callback";
+import { NATIVE_AUTH_REDIRECT, nativeReturnUrl } from "@/lib/native-auth-link";
+
+export { NATIVE_AUTH_REDIRECT };
 
 /** Starts the flow. Returns an error message, or null when the Custom Tab
  *  opened and the rest happens via the deep link. */
@@ -31,7 +31,8 @@ export async function startNativeGoogleSignIn(
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: NATIVE_AUTH_REDIRECT,
+      // Via the website's callback, which bounces the code into the app.
+      redirectTo: nativeReturnUrl(window.location.origin),
       // Without this the SDK navigates the WebView itself, which is exactly
       // what Google blocks. We want the URL so we can hand it to a real
       // browser.
