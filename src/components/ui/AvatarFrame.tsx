@@ -3,19 +3,18 @@
 import { useId } from "react";
 
 /**
- * The frame's drawing space: the photo fills 20–120 of a 140-unit square, and
- * rings sit just outside it at about 13. Viewing only 12–128 draws the ring
- * snug against the photo, reaching 8% past its edge instead of the full 20%.
+ * The frames are drawn on a 140-unit square with their rings at about 13.
+ * Viewing 8–132 maps that square onto the photo itself, so each ring lands
+ * just inside the photo's edge.
  */
-const VIEW = { from: 12, span: 116 };
-const REACH = (20 - VIEW.from) / 100;
+const VIEW = { from: 8, span: 124 };
 
 /**
- * A decoration around an avatar.
+ * A decoration on an avatar.
  *
- * The photo keeps its full size and the avatar keeps its place in the layout:
- * the frame is an overlay that hugs the photo's edge. Rings reach a few pixels
- * past it; small accents (a crown, sparkles) may poke out further.
+ * The frame is laid over the photo and never past it: same size, same place
+ * in the layout, nothing sticking out to crowd what sits beside it. Anything
+ * a frame draws beyond the photo's rounded corners is trimmed away.
  *
  * `id` null renders the avatar alone, so call sites can pass whatever the
  * wearer currently has without a branch.
@@ -31,18 +30,14 @@ export function AvatarFrame({
 }) {
   const uid = useId().replace(/:/g, "");
   if (!id) return <>{children}</>;
-  const pad = size * REACH;
   return (
     <span className="relative inline-block shrink-0 align-middle" style={{ width: size, height: size }}>
       {children}
-      <svg
-        aria-hidden
-        viewBox={`${VIEW.from} ${VIEW.from} ${VIEW.span} ${VIEW.span}`}
-        className="pointer-events-none absolute"
-        style={{ left: -pad, top: -pad, width: size + pad * 2, height: size + pad * 2, overflow: "visible" }}
-      >
-        <Frame id={id} uid={uid} />
-      </svg>
+      <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-[30%]">
+        <svg viewBox={`${VIEW.from} ${VIEW.from} ${VIEW.span} ${VIEW.span}`} className="h-full w-full">
+          <Frame id={id} uid={uid} />
+        </svg>
+      </span>
     </span>
   );
 }
