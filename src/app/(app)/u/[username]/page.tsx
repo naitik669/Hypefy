@@ -154,7 +154,7 @@ export default async function PublicProfilePage({
         avatarUrl={profile.avatar_url}
         bannerId={bannerId}
         bannerUrl={profile.banner_url}
-        bannerColors={(profile as { banner_colors?: string[] | null }).banner_colors ?? null}
+        profileColors={(profile as { profile_colors?: string[] | null }).profile_colors ?? null}
         accentId={(profile as { accent_id?: string | null }).accent_id}
         hasActiveShow={!!entryShowId}
         entryShowId={entryShowId}

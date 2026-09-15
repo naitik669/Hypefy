@@ -1556,7 +1556,7 @@ export type Database = {
           avatar_url: string | null
           banner_id: string | null
           banner_url: string | null
-          banner_colors: string[] | null
+          profile_colors: string[] | null
           bio: string | null
           bubble_style: string | null
           nameplate: string | null
@@ -1598,7 +1598,7 @@ export type Database = {
           avatar_url?: string | null
           banner_id?: string | null
           banner_url?: string | null
-          banner_colors?: string[] | null
+          profile_colors?: string[] | null
           bio?: string | null
           bubble_style?: string | null
           nameplate?: string | null
@@ -1640,7 +1640,7 @@ export type Database = {
           avatar_url?: string | null
           banner_id?: string | null
           banner_url?: string | null
-          banner_colors?: string[] | null
+          profile_colors?: string[] | null
           bio?: string | null
           bubble_style?: string | null
           nameplate?: string | null

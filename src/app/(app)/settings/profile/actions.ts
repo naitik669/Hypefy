@@ -17,7 +17,7 @@ export type UpdateProfileInput = {
   bannerId?: string | null;
   bannerUrl?: string | null;
   /** [top, bottom] hex colours for your own background — Premium. */
-  bannerColors?: string[] | null;
+  profileColors?: string[] | null;
 };
 
 export async function updateProfile(
@@ -56,11 +56,11 @@ export async function updateProfile(
       banner_url: input.bannerUrl ?? null,
       // Two hex colours or nothing. The database checks the shape too, and a
       // trigger refuses them outright without Premium.
-      banner_colors:
-        Array.isArray(input.bannerColors) &&
-        input.bannerColors.length === 2 &&
-        input.bannerColors.every(isHexColor)
-          ? input.bannerColors
+      profile_colors:
+        Array.isArray(input.profileColors) &&
+        input.profileColors.length === 2 &&
+        input.profileColors.every(isHexColor)
+          ? input.profileColors
           : null,
     })
     .eq("id", user.id);

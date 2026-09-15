@@ -20,7 +20,7 @@ vi.mock("@/lib/supabase/client", () => ({
 
 const ME = {
   id: "u1", display_name: "Naitik", username: "craziematez", avatar_url: null, avatar_hue: 150,
-  banner_id: "lime-pulse", banner_url: null, banner_colors: null, is_premium: false, is_verified: false,
+  banner_id: "lime-pulse", banner_url: null, profile_colors: null, is_premium: false, is_verified: false,
   name_font: null, name_glow: null, avatar_decoration: null, bubble_style: null, nameplate: null,
 };
 

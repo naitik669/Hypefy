@@ -23,7 +23,7 @@ export type Profile = {
   bannerId: string | null;
   bannerUrl: string | null;
   /** Two hex colours mixed into your own background — Premium. */
-  bannerColors: string[] | null;
+  profileColors: string[] | null;
   anthem: unknown;
   interests: string[];
   /** Profile-surface accent; see ./profile-accent.ts. */
@@ -108,13 +108,21 @@ export function isGifBanner(url: string | null | undefined): boolean {
 }
 
 /**
- * What to paint behind a profile: their own two colours when they have
- * Premium, else the preset banner they chose, else the default.
+ * The wash behind someone's whole profile — their own two colours, while
+ * they have Premium. Null means the app's own background, as before.
+ *
+ * The stops are in pixels, not percentages, and end transparent: the colour
+ * starts under the banner (which is opaque, so anything drawn behind it is
+ * wasted), holds through the name and buttons, and has faded out by the
+ * bottom of the header however tall that is. As the element's own
+ * background it needs no extra layer that something could paint over.
  */
 export function profileBackground(
-  p: { banner_id?: string | null; banner_colors?: unknown; is_premium?: boolean | null },
-): string {
-  return customGradient(p.banner_colors, !!p.is_premium) ?? bannerGradient(p.banner_id);
+  p: { profile_colors?: unknown; is_premium?: boolean | null },
+): string | null {
+  if (!customGradient(p.profile_colors, !!p.is_premium)) return null;
+  const [top, bottom] = p.profile_colors as [string, string];
+  return `linear-gradient(180deg, ${top} 96px, ${bottom} 72%, transparent 100%)`;
 }
 
 /** The preset gradient for a banner id, or the default for an unknown one. */
@@ -193,7 +201,7 @@ function mapProfile(row: any): Profile {
     avatarHue: row.avatar_hue,
     bannerId: row.banner_id,
     bannerUrl: row.banner_url,
-    bannerColors: (row.banner_colors as string[] | null) ?? null,
+    profileColors: (row.profile_colors as string[] | null) ?? null,
     anthem: row.anthem ?? null,
     interests: row.interests ?? [],
     accentId: (row as { accent_id?: string | null }).accent_id ?? null,

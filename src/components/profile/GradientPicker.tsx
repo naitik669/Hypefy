@@ -15,8 +15,8 @@ export const GRADIENT_PRESETS: [string, string][] = [
 ];
 
 /**
- * Mix your own profile background from two colours, the way Discord's
- * profile colours work: the first sits at the top, the second at the bottom.
+ * Mix the background of your whole profile from two colours, the way
+ * Discord's profile colours work: the first at the top, the second below.
  * Premium only — everyone else sees what it is and where to get it.
  */
 export function GradientPicker({
@@ -45,8 +45,8 @@ export function GradientPicker({
           style={{ background: customGradient(GRADIENT_PRESETS[0], true) ?? undefined }}
         />
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold">Your own colours</span>
-          <span className="block text-xs text-muted">Mix a gradient background with Premium</span>
+          <span className="block text-sm font-semibold">Your profile colours</span>
+          <span className="block text-xs text-muted">Mix your profile background with Premium</span>
         </span>
         <Sparkles size={16} className="shrink-0 text-accent" />
       </Link>
@@ -69,7 +69,7 @@ export function GradientPicker({
           <button
             type="button"
             onClick={() => onChange(null)}
-            aria-label="Use a preset instead"
+            aria-label="Remove your colours"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-muted transition active:scale-95"
           >
             <X size={15} />

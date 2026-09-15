@@ -1,4 +1,4 @@
-import { isGifBanner, profileBackground } from "@/lib/profile";
+import { bannerGradient, isGifBanner } from "@/lib/profile";
 
 /**
  * Renders a custom uploaded banner image if present, else a preset gradient.
@@ -17,14 +17,11 @@ import { isGifBanner, profileBackground } from "@/lib/profile";
 export function ProfileBanner({
   bannerId,
   bannerUrl,
-  bannerColors,
   isPremium = false,
   className = "",
 }: {
   bannerId?: string | null;
   bannerUrl?: string | null;
-  /** Two hex colours mixed by a Premium member; wins over the preset. */
-  bannerColors?: string[] | null;
   /** GIF banners draw only for Premium members. */
   isPremium?: boolean;
   className?: string;
@@ -35,7 +32,7 @@ export function ProfileBanner({
       // block auto-width, not w-full: callers add mx-* margins, and margins
       // don't shrink a 100%-width box — w-full made the banner overflow right.
       className={`relative aspect-[3/1] overflow-hidden ${className}`}
-      style={url ? undefined : { background: profileBackground({ banner_id: bannerId, banner_colors: bannerColors, is_premium: isPremium }) }}
+      style={url ? undefined : { background: bannerGradient(bannerId) }}
     >
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element

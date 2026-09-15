@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BANNERS, customGradient, isHexColor, profileBackground } from "@/lib/profile";
+import { customGradient, isHexColor, profileBackground } from "@/lib/profile";
 import { GRADIENT_PRESETS } from "@/components/profile/GradientPicker";
 
 /**
@@ -23,10 +23,10 @@ describe("a profile gradient", () => {
     expect(isHexColor("#abc")).toBe(false);
   });
 
-  it("falls back to the banner they chose, then the default", () => {
-    expect(profileBackground({ banner_colors: colors, is_premium: false, banner_id: "purple-night" })).toBe(BANNERS[1].gradient);
-    expect(profileBackground({ banner_id: "nope" })).toBe(BANNERS[0].gradient);
-    expect(profileBackground({ banner_colors: colors, is_premium: true })).toContain("#331163");
+  it("leaves the profile plain when there are no colours, or no Premium", () => {
+    expect(profileBackground({ profile_colors: colors, is_premium: false })).toBeNull();
+    expect(profileBackground({})).toBeNull();
+    expect(profileBackground({ profile_colors: colors, is_premium: true })).toContain("#331163");
   });
 
   it("offers presets that are themselves valid", () => {
