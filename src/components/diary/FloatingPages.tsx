@@ -358,7 +358,9 @@ export function FloatingPages({
                   className="absolute inset-0 flex flex-col overflow-hidden rounded-[16px] p-2 text-white"
                   style={{
                     background: theme.background,
-                    boxShadow: isNew ? `${theme.shadow}, inset 0 0 0 1.5px rgb(163 230 53 / 0.85)` : theme.shadow,
+                    // New pages are marked by the count badge and the dot by
+                    // the name, not an outline round the card.
+                    boxShadow: theme.shadow,
                   }}
                 >
                   <span className="flex min-w-0 items-center gap-1">
