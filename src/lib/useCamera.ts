@@ -5,6 +5,56 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export type FacingMode = "user" | "environment";
 
 /**
+ * What to ask the camera for.
+ *
+ * On a phone, never let the browser crop. Sensors only have landscape modes
+ * (16:9, 4:3); asking for a 9:16 picture made Chrome on Android pick one and
+ * crop-and-scale it down to 9:16 — keeping about a third of the width, which
+ * reads as a 3x zoom. `resizeMode: "none"` restricts it to the sensor's own
+ * modes, which the phone then rotates to portrait by itself, uncropped. The
+ * size ideals are the sensor's orientation (landscape) for the same reason.
+ *
+ * Desktop webcams are landscape and never rotate, so there a crop is still
+ * the only way to get a portrait Shot.
+ */
+export function videoConstraints(mode: FacingMode, portrait: boolean, phone: boolean): MediaTrackConstraints {
+  if (phone) {
+    return {
+      facingMode: { ideal: mode },
+      resizeMode: { ideal: "none" },
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    } as MediaTrackConstraints;
+  }
+  return {
+    facingMode: { ideal: mode },
+    aspectRatio: { ideal: portrait ? 9 / 16 : 4 / 3 },
+    width: { ideal: portrait ? 1080 : 1280 },
+    height: { ideal: portrait ? 1920 : 960 },
+  };
+}
+
+/** A touch device held like a phone: the camera rotates its frames for us. */
+export function isPhone(): boolean {
+  return typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true;
+}
+
+/**
+ * Some phones open at a zoom above 1x (or on a cropped digital zoom). Put it
+ * back to the widest the lens allows, where the browser exposes zoom at all.
+ */
+export async function widestZoom(stream: MediaStream) {
+  const track = stream.getVideoTracks()[0];
+  const caps = track?.getCapabilities?.() as (MediaTrackCapabilities & { zoom?: { min: number } }) | undefined;
+  if (!track || !caps?.zoom) return;
+  try {
+    await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min } as MediaTrackConstraintSet] });
+  } catch {
+    // Not every camera accepts it; the stream is still fine.
+  }
+}
+
+/**
  * Headless camera. Owns the MediaStream, facing mode, readiness and the
  * permission error; renders nothing.
  *
@@ -52,24 +102,11 @@ export function useCamera({
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: mode },
-            // aspectRatio is the constraint that actually governs SHAPE, and
-            // it was missing. Width and height ideals alone are a weak hint:
-            // a device that cannot do exactly 1080x1920 is free to hand back
-            // its nearest mode, and plenty hand back landscape. That is not a
-            // cosmetic problem, because MediaRecorder records this stream
-            // verbatim — a landscape stream produces a landscape Shot that
-            // the whole app then displays in a 9:16 frame.
-            aspectRatio: { ideal: portrait ? 9 / 16 : 4 / 3 },
-            // Ideals, not exact: a device that cannot do 1080x1920 should
-            // hand back its closest match rather than throwing.
-            width: { ideal: portrait ? 1080 : 1280 },
-            height: { ideal: portrait ? 1920 : 960 },
-          },
+          video: videoConstraints(mode, portrait, isPhone()),
           audio,
         });
         streamRef.current = stream;
+        void widestZoom(stream);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.onloadedmetadata = () => {

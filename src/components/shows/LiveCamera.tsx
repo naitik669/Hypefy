@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw, AlertCircle } from "lucide-react";
+import { isPhone, videoConstraints, widestZoom } from "@/lib/useCamera";
 
 type FacingMode = "user" | "environment";
 
@@ -39,20 +40,12 @@ export function LiveCamera({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: mode },
-          // Portrait, not the old 4:3 landscape. A Show is displayed
-          // full-screen portrait by ShowViewer, so capturing landscape meant
-          // the viewer cropped most of the frame away afterwards — and the
-          // preview here cropped a different amount, so what you framed was
-          // not what got posted.
-          aspectRatio: { ideal: 9 / 16 },
-          width: { ideal: 1080 },
-          height: { ideal: 1920 },
-        },
+        // Portrait on desktop; uncropped on a phone (see videoConstraints).
+        video: videoConstraints(mode, true, isPhone()),
         audio: false,
       });
       streamRef.current = stream;
+      void widestZoom(stream);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => setReady(true);

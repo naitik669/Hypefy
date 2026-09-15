@@ -151,7 +151,9 @@ export function CreateScreen({
             autoPlay
             playsInline
             muted
-            className={`aspect-[9/16] max-h-full w-full object-cover ${
+            // A landscape stream (a phone that didn't rotate it) is shown
+            // whole rather than cut down to its middle third.
+            className={`aspect-[9/16] max-h-full w-full ${cam.isLandscape ? "object-contain" : "object-cover"} ${
               cam.mirrored ? "[transform:scaleX(-1)]" : ""
             }`}
           />
