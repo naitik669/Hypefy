@@ -15,6 +15,7 @@ import {
   HelpCircle,
   ShieldAlert,
   Sparkles,
+  ShoppingBag,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -36,6 +37,12 @@ const ITEMS = [
     label: "Your style",
     sub: "Name font, glow, avatar decoration, banners",
     icon: Sparkles,
+  },
+  {
+    href: "/shop",
+    label: "Shop",
+    sub: "Decorations and chat themes to keep",
+    icon: ShoppingBag,
   },
   {
     href: "/settings/account",

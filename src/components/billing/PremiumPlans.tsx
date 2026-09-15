@@ -167,6 +167,17 @@ export function PremiumPlans({
           )}
         </section>
       )}
+
+      <Link
+        href="/shop"
+        className="flex items-center justify-between rounded-2xl border border-border bg-elevated px-4 py-3 text-sm"
+      >
+        <span>
+          <span className="block font-bold">Shop</span>
+          <span className="block text-xs text-muted">Decorations and chat themes to keep, Premium or not</span>
+        </span>
+        <span aria-hidden className="text-faint">›</span>
+      </Link>
     </div>
   );
 }

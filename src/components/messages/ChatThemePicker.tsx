@@ -117,11 +117,11 @@ function Selected() {
 }
 
 /** Two tiny bubbles in the theme's colours. */
-function PreviewBubbles({ theme }: { theme?: ChatTheme }) {
+export function PreviewBubbles({ theme }: { theme?: ChatTheme }) {
   const theirs = theme ? theme.theirs : { background: "var(--color-surface)", color: "var(--color-foreground)", border: undefined };
   const mine = theme ? theme.mine : { background: "var(--color-accent)", color: "var(--color-accent-ink)", border: undefined };
   return (
-    <span className="flex flex-col gap-2 pt-3">
+    <span className="flex flex-col gap-3 pt-4">
       <span
         className="relative self-start rounded-xl rounded-bl-sm px-2.5 py-1 text-[10px] font-medium"
         style={{ background: theirs.background, color: theirs.color, border: theirs.border }}
@@ -132,11 +132,7 @@ function PreviewBubbles({ theme }: { theme?: ChatTheme }) {
         className="relative self-end rounded-xl rounded-br-sm px-2.5 py-1 text-[10px] font-medium"
         style={{ background: mine.background, color: mine.color, border: mine.border }}
       >
-        {theme?.decor && (
-          <span className="absolute inset-0 origin-center scale-[0.7]">
-            <ChatThemeDecor decor={theme.decor} mine />
-          </span>
-        )}
+        {theme?.decor && <ChatThemeDecor decor={theme.decor} mine />}
         see you at 8
       </span>
     </span>
