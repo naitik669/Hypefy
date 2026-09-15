@@ -18,9 +18,9 @@ const ROWS: { icon: React.ReactNode; name: string; sub: string; verified: boolea
   { icon: <VerifiedStar className="h-[18px] w-[18px] text-verified" />, name: "Verified badge", sub: "The blue star", verified: true },
   { icon: <Type size={17} />, name: "Name styles", sub: "Fonts and glows", verified: false },
   { icon: <Frame size={17} />, name: "Avatar frames", sub: "On every post and chat", verified: false },
-  { icon: <MessageCircle size={17} />, name: "Chat bubbles", sub: "Your look in every chat", verified: false },
+  { icon: <MessageCircle size={17} />, name: "Bubbles & nameplates", sub: "Your look in Messages", verified: false },
   { icon: <Palette size={17} />, name: "Chat themes", sub: "Pond, Galaxy and more", verified: false },
-  { icon: <ImageIcon size={17} />, name: "Profile banners", sub: "Premium banners", verified: false },
+  { icon: <ImageIcon size={17} />, name: "GIF banner", sub: "An animated profile banner", verified: false },
 ];
 
 /**

@@ -40,7 +40,7 @@ export default async function MessagesPage() {
       // The other participant in each conversation
       supabase
         .from("conversation_members")
-        .select("conversation_id, user_id, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, is_verified, is_premium, name_font, name_glow, avatar_decoration)")
+        .select("conversation_id, user_id, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, is_verified, is_premium, name_font, name_glow, avatar_decoration, nameplate)")
         .in("conversation_id", convIds)
         .neq("user_id", user.id),
       // Last message + unread count per conversation, aggregated in the DB.
@@ -86,7 +86,7 @@ export default async function MessagesPage() {
         showActivity &&
         !!p.last_seen_at &&
         Date.now() - new Date(p.last_seen_at).getTime() < 90_000;
-      arr.push({ id: p.id, name: p.display_name ?? p.username ?? "User", username: p.username ?? null, hue: p.avatar_hue ?? 280, avatarUrl: p.avatar_url ?? null, online, lastSeenAt: showActivity ? (p.last_seen_at ?? null) : null, showActivity, verified: !!p.is_verified, cosmetics: { is_premium: p.is_premium ?? false, name_font: p.name_font ?? null, name_glow: p.name_glow ?? null, avatar_decoration: p.avatar_decoration ?? null } });
+      arr.push({ id: p.id, name: p.display_name ?? p.username ?? "User", username: p.username ?? null, hue: p.avatar_hue ?? 280, avatarUrl: p.avatar_url ?? null, online, lastSeenAt: showActivity ? (p.last_seen_at ?? null) : null, showActivity, verified: !!p.is_verified, cosmetics: { is_premium: p.is_premium ?? false, name_font: p.name_font ?? null, name_glow: p.name_glow ?? null, avatar_decoration: p.avatar_decoration ?? null, nameplate: p.nameplate ?? null } });
       membersByConv.set(m.conversation_id, arr);
     });
 

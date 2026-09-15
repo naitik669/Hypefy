@@ -21,7 +21,8 @@ import {
   type MarketItem,
   type SortId,
 } from "@/lib/marketplace";
-import { findFont, findGlow, findPremiumBanner, nameStyle } from "@/lib/cosmetics";
+import { findFont, findGlow, nameStyle } from "@/lib/cosmetics";
+import { Nameplate } from "@/components/ui/Nameplate";
 import { findBubbleStyle } from "@/lib/bubble-styles";
 import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
 import { formatInr } from "@/lib/billing/plans";
@@ -240,7 +241,7 @@ function Dock({
       : undefined;
   const bubble = item.category === "bubble" ? findBubbleStyle(item.id) : null;
   const theme = item.category === "theme" ? findChatTheme(item.id) : null;
-  const banner = item.category === "banner" ? findPremiumBanner(item.id) : null;
+  const plate = item.category === "nameplate" ? item.id : null;
 
   const cta = "flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-2xl px-5 text-sm font-extrabold transition active:scale-[0.97]";
   let action: React.ReactNode;
@@ -270,7 +271,7 @@ function Dock({
   return (
     <div className="fixed inset-x-0 bottom-[calc(84px+var(--sab))] z-30 mx-auto w-full max-w-[480px] px-3">
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-elevated shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)]">
-        {banner && <div className="absolute inset-x-0 top-0 h-14 opacity-90" style={{ background: banner.gradient }} />}
+        {plate && <Nameplate id={plate} className="inset-0" />}
         {theme && <div className="absolute inset-0 opacity-95" style={{ background: theme.background }} />}
 
         <div className="relative flex items-center gap-3 p-3 pr-4">
@@ -280,7 +281,7 @@ function Dock({
             </span>
           ) : (
             <AvatarFrame id={frame} size={52}>
-              <Avatar name={me.name} hue={me.hue} size={52} src={me.avatarUrl ?? undefined} className={banner ? "ring-2 ring-elevated" : undefined} />
+              <Avatar name={me.name} hue={me.hue} size={52} src={me.avatarUrl ?? undefined}  />
             </AvatarFrame>
           )}
 

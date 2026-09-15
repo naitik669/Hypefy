@@ -54,32 +54,6 @@ export const DECORATIONS: Decoration[] = [
   { id: "deco-gilded", label: "Gilded", tier: "shop", pricePaise: 9900 },
 ];
 
-export type PremiumBanner = { id: string; label: string; gradient: string; tier: Tier };
-
-export const PREMIUM_BANNERS: PremiumBanner[] = [
-  {
-    id: "banner-aurora",
-    label: "Aurora",
-    tier: "premium",
-    gradient:
-      "radial-gradient(90% 120% at 10% 0%, rgba(74,222,128,0.55), transparent 60%), radial-gradient(90% 120% at 90% 10%, rgba(56,189,248,0.5), transparent 60%), radial-gradient(80% 100% at 50% 110%, rgba(168,85,247,0.55), transparent 60%), #06070d",
-  },
-  {
-    id: "banner-gold",
-    label: "Gold Rush",
-    tier: "premium",
-    gradient:
-      "radial-gradient(70% 120% at 20% -10%, rgba(255,236,160,0.65), transparent 55%), linear-gradient(120deg, #3a2a05 0%, #a8781a 40%, #f5cf63 55%, #8a5a0e 75%, #2a1c03 100%)",
-  },
-  {
-    id: "banner-holo",
-    label: "Holo",
-    tier: "premium",
-    gradient:
-      "radial-gradient(60% 90% at 30% 20%, rgba(255,255,255,0.35), transparent 60%), linear-gradient(115deg, #ff9ad5 0%, #a5b4fc 25%, #7dd3fc 45%, #86efac 65%, #fde68a 85%, #ff9ad5 100%)",
-  },
-];
-
 /** Whoever wears it: may this item be drawn? */
 export function canShow(tier: Tier | undefined, isPremium: boolean): boolean {
   if (!tier) return false;
@@ -89,7 +63,6 @@ export function canShow(tier: Tier | undefined, isPremium: boolean): boolean {
 export const findFont = (id: string | null | undefined) => NAME_FONTS.find((f) => f.id === id);
 export const findGlow = (id: string | null | undefined) => NAME_GLOWS.find((g) => g.id === id);
 export const findDecoration = (id: string | null | undefined) => DECORATIONS.find((d) => d.id === id);
-export const findPremiumBanner = (id: string | null | undefined) => PREMIUM_BANNERS.find((b) => b.id === id);
 
 /** Plus Jakarta Sans's x-height as a share of its size; every name face is matched to it. */
 export const NAME_SIZE_ADJUST = "0.52";

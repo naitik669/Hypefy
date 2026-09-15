@@ -1,4 +1,5 @@
-import { DECORATIONS, NAME_FONTS, NAME_GLOWS, PREMIUM_BANNERS, type Tier } from "@/lib/cosmetics";
+import { DECORATIONS, NAME_FONTS, NAME_GLOWS, type Tier } from "@/lib/cosmetics";
+import { NAMEPLATES } from "@/lib/nameplates";
 import { CHAT_THEMES } from "@/lib/chat-themes";
 import { BUBBLE_STYLES } from "@/lib/bubble-styles";
 
@@ -8,7 +9,7 @@ import { BUBBLE_STYLES } from "@/lib/bubble-styles";
  * Free chat themes aren't listed: there is nothing to get.
  */
 
-export type Category = "frame" | "bubble" | "theme" | "name" | "banner";
+export type Category = "frame" | "bubble" | "theme" | "name" | "nameplate";
 
 export type MarketItem = {
   id: string;
@@ -27,7 +28,7 @@ export const CATEGORIES: { id: Category | "all"; label: string }[] = [
   { id: "bubble", label: "Bubbles" },
   { id: "theme", label: "Chat themes" },
   { id: "name", label: "Names" },
-  { id: "banner", label: "Banners" },
+  { id: "nameplate", label: "Nameplates" },
 ];
 
 export type SortId = "featured" | "price-low" | "price-high" | "premium";
@@ -56,7 +57,7 @@ export function buildItems(prices: Record<string, number> = {}): MarketItem[] {
     ...BUBBLE_STYLES.map((b) => item(b.id, b.label, "bubble", b.tier)),
     ...NAME_FONTS.map((f) => item(f.id, f.label, "name", f.tier)),
     ...NAME_GLOWS.map((g) => item(g.id, `${g.label} glow`, "name", g.tier)),
-    ...PREMIUM_BANNERS.map((b) => item(b.id, b.label, "banner", b.tier)),
+    ...NAMEPLATES.map((n) => item(n.id, n.label, "nameplate", n.tier)),
   ];
 }
 

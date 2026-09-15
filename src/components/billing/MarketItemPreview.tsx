@@ -6,7 +6,8 @@ import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { PreviewBubbles } from "@/components/messages/ChatThemePicker";
 import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
 import { findBubbleStyle } from "@/lib/bubble-styles";
-import { findFont, findGlow, findPremiumBanner, nameStyle } from "@/lib/cosmetics";
+import { findFont, findGlow, nameStyle } from "@/lib/cosmetics";
+import { NameplateRow } from "@/components/ui/Nameplate";
 import type { MarketItem } from "@/lib/marketplace";
 
 export type Me = { name: string; avatarUrl: string | null; hue: number };
@@ -72,16 +73,16 @@ export function MarketItemPreview({ item, me, large = false }: { item: MarketIte
         </Stage>
       );
     }
-    case "banner": {
-      const b = findPremiumBanner(item.id);
+    case "nameplate":
       return (
-        <div className="relative h-full w-full" style={{ background: b?.gradient }}>
-          <span className={`absolute ${large ? "bottom-5 left-6" : "bottom-3 left-3"}`}>
-            <Avatar name={me.name} hue={me.hue} size={large ? 56 : 32} src={me.avatarUrl ?? undefined} className="ring-2 ring-black/40" />
+        <Stage>
+          <span className={`flex w-full flex-col ${large ? "gap-2 px-6" : "gap-1 px-2"}`}>
+            <span className="opacity-40"><NameplateRow id={null} name="···" avatarUrl={null} hue={0} small={!large} preview="" /></span>
+            <NameplateRow id={item.id} name={me.name} avatarUrl={me.avatarUrl} hue={me.hue} small={!large} />
+            <span className="opacity-40"><NameplateRow id={null} name="···" avatarUrl={null} hue={0} small={!large} preview="" /></span>
           </span>
-        </div>
+        </Stage>
       );
-    }
   }
 }
 

@@ -27,6 +27,8 @@ import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { DisplayName } from "@/components/ui/DisplayName";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { visibleDecoration } from "@/lib/cosmetics";
+import { visibleNameplate } from "@/lib/nameplates";
+import { Nameplate } from "@/components/ui/Nameplate";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PresenceDot } from "@/components/presence/PresenceDot";
@@ -41,7 +43,7 @@ export type InboxRow = {
   avatarUrl?: string | null;
   /** 1:1 only: the other person's badge and Premium styling. */
   verified?: boolean;
-  cosmetics?: { is_premium: boolean; name_font: string | null; name_glow: string | null; avatar_decoration: string | null } | null;
+  cosmetics?: { is_premium: boolean; name_font: string | null; name_glow: string | null; avatar_decoration: string | null; nameplate?: string | null } | null;
   isGroup: boolean;
   memberCount: number;
   lastBody: string | null;
@@ -637,10 +639,14 @@ export function MessagesInbox({
             e.preventDefault();
             openMenu(r);
           }}
-          className={`flex items-center gap-3 transition-colors hover:bg-white/[0.03] ${
+          className={`relative flex items-center gap-3 transition-colors hover:bg-white/[0.03] ${
             pending ? "" : "px-4 py-3"
           }`}
         >
+          {/* Their nameplate, behind the row */}
+          {!r.isGroup && r.cosmetics && (
+            <Nameplate id={visibleNameplate(r.cosmetics)} className="inset-x-2 inset-y-1 rounded-2xl" />
+          )}
           <div className="relative shrink-0">
             {r.isGroup ? (
               <GroupAvatar />
@@ -660,7 +666,7 @@ export function MessagesInbox({
             )}
             {!r.isGroup && <PresenceDot lastSeenAt={r.lastSeenAt} size="md" />}
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="relative min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
               <p
                 className={`min-w-0 truncate text-sm ${
@@ -692,7 +698,7 @@ export function MessagesInbox({
               {matchBody ? highlightSnippet(matchBody, query) : preview(r)}
             </p>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <div className="relative flex shrink-0 flex-col items-end gap-1.5">
             <span className="flex items-center gap-1.5">
               {r.pinned && (
                 <Pin size={12} className="rotate-45 fill-faint text-faint" />

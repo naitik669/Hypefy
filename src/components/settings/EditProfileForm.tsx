@@ -32,8 +32,11 @@ export function EditProfileForm({
     profileTags: string[];
     interests: string[];
     accentId: string | null;
+    /** Premium members can upload a GIF banner. */
+    isPremium?: boolean;
   };
 }) {
+  const isPremium = !!initial.isPremium;
   const supabase = createClient();
   const router = useRouter();
 
@@ -94,8 +97,23 @@ export function EditProfileForm({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    // A GIF banner goes up as it is: cropping draws it onto a canvas, which
+    // would keep only its first frame.
+    if (kind === "banner" && file.type === "image/gif") {
+      if (!isPremium) {
+        setError("GIF banners come with Premium. Use a JPG, PNG, or WebP image.");
+        return;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        setError("GIF must be under 8MB.");
+        return;
+      }
+      setError(null);
+      void upload("banner", file, "gif", "image/gif");
+      return;
+    }
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setError("Use a JPG, PNG, or WebP image.");
+      setError(isPremium && kind === "banner" ? "Use a JPG, PNG, WebP or GIF image." : "Use a JPG, PNG, or WebP image.");
       return;
     }
     const max = kind === "banner" ? 8 : 5;
@@ -136,17 +154,21 @@ export function EditProfileForm({
     const { kind } = cropper;
     URL.revokeObjectURL(cropper.src);
     setCropper(null);
+    await upload(kind, blob, "jpg", "image/jpeg");
+  }
+
+  async function upload(kind: "avatar" | "banner", blob: Blob, ext: string, contentType: string) {
     const bucket = kind === "banner" ? "banners" : "avatars";
     // The one being replaced, captured before the new URL overwrites it.
     const previous = ownedPath(kind === "banner" ? bannerUrl : avatarUrl, bucket);
-    const path = `${userId}/${kind}-${Date.now()}.jpg`;
+    const path = `${userId}/${kind}-${Date.now()}.${ext}`;
     kind === "banner" ? setBannerUploading(true) : setUploading(true);
     const { error: upErr } = await supabase.storage
       .from(bucket)
       .upload(path, blob, {
         upsert: true,
         cacheControl: "3600",
-        contentType: "image/jpeg",
+        contentType,
       });
     if (upErr) {
       setError(upErr.message);
@@ -218,6 +240,7 @@ export function EditProfileForm({
         <ProfileBanner
           bannerId={bannerId}
           bannerUrl={bannerUrl}
+          isPremium={isPremium}
           className=""
         />
         <div className="flex items-center gap-3 px-3 pb-3">
@@ -333,10 +356,13 @@ export function EditProfileForm({
         <input
           ref={bannerRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/jpeg,image/png,image/webp,image/gif"
           hidden
           onChange={(e) => pickImage(e, "banner")}
         />
+        <p className="-mt-1 mb-3 text-xs text-muted">
+          {isPremium ? "Premium: GIF banners play on your profile." : "GIF banners come with Premium."}
+        </p>
         {!bannerUrl && <BannerPicker value={bannerId} onChange={setBannerId} />}
       </Field>
 

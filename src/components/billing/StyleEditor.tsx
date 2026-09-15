@@ -12,7 +12,9 @@ import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { BANNERS } from "@/lib/profile";
-import { DECORATIONS, NAME_FONTS, NAME_GLOWS, NAME_SIZE_ADJUST, PREMIUM_BANNERS, nameStyle, type Tier } from "@/lib/cosmetics";
+import { DECORATIONS, NAME_FONTS, NAME_GLOWS, NAME_SIZE_ADJUST, nameStyle, type Tier } from "@/lib/cosmetics";
+import { NAMEPLATES } from "@/lib/nameplates";
+import { NameplateRow } from "@/components/ui/Nameplate";
 import { BUBBLE_STYLES, findBubbleStyle } from "@/lib/bubble-styles";
 import { bubbleCss } from "@/lib/chat-themes";
 
@@ -30,16 +32,18 @@ export type StyleMe = {
   name_glow: string | null;
   avatar_decoration: string | null;
   bubble_style: string | null;
+  nameplate: string | null;
 };
 
-type Look = Pick<StyleMe, "name_font" | "name_glow" | "avatar_decoration" | "bubble_style" | "banner_id" | "banner_url">;
-const FIELDS = ["avatar_decoration", "name_font", "name_glow", "bubble_style", "banner_id", "banner_url"] as const;
+type Look = Pick<StyleMe, "name_font" | "name_glow" | "avatar_decoration" | "bubble_style" | "nameplate" | "banner_id" | "banner_url">;
+const FIELDS = ["avatar_decoration", "name_font", "name_glow", "bubble_style", "nameplate", "banner_id", "banner_url"] as const;
 
-type Tab = "frames" | "names" | "bubbles" | "banners";
+type Tab = "frames" | "names" | "bubbles" | "nameplates" | "banners";
 const TABS: { id: Tab; label: string }[] = [
   { id: "frames", label: "Frames" },
   { id: "names", label: "Names" },
   { id: "bubbles", label: "Bubbles" },
+  { id: "nameplates", label: "Nameplates" },
   { id: "banners", label: "Banners" },
 ];
 
@@ -62,6 +66,7 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
     name_glow: me.name_glow,
     avatar_decoration: me.avatar_decoration,
     bubble_style: me.bubble_style,
+    nameplate: me.nameplate,
     banner_id: me.banner_id,
     banner_url: me.banner_url,
   };
@@ -119,6 +124,12 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
               <span className="self-start rounded-2xl rounded-bl-md bg-surface px-3 py-1.5 text-[13px]">new look?</span>
               <MiniBubble id={draft.bubble_style} text="always" className="self-end" />
             </div>
+            {draft.nameplate && (
+              <div className="mt-4">
+                <p className="mb-1.5 text-[11px] font-semibold text-faint">In Messages</p>
+                <NameplateRow id={draft.nameplate} name={name} avatarUrl={me.avatar_url} hue={me.avatar_hue ?? 200} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -221,6 +232,29 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
           </Shelf>
         )}
 
+        {tab === "nameplates" && (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
+              <PlateOption on={!draft.nameplate} label="None" onClick={() => set({ nameplate: null })}>
+                <NameplateRow id={null} name={name} avatarUrl={me.avatar_url} hue={me.avatar_hue ?? 200} small />
+              </PlateOption>
+              {NAMEPLATES.filter((n) => has(n.id, n.tier)).map((n) => (
+                <PlateOption key={n.id} on={draft.nameplate === n.id} label={n.label} onClick={() => set({ nameplate: n.id })}>
+                  <NameplateRow id={n.id} name={name} avatarUrl={me.avatar_url} hue={me.avatar_hue ?? 200} small />
+                </PlateOption>
+              ))}
+            </div>
+            {NAMEPLATES.every((n) => !has(n.id, n.tier)) && (
+              <p className="px-1 text-[13px] text-muted">
+                No nameplates yet.{" "}
+                <Link href="/marketplace" className="font-semibold text-foreground underline-offset-2 hover:underline">
+                  Find some
+                </Link>
+              </p>
+            )}
+          </div>
+        )}
+
         {tab === "banners" && (
           <Shelf wide>
             {me.banner_url && (
@@ -230,7 +264,7 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
                 </span>
               </Tile>
             )}
-            {[...BANNERS.map((b) => ({ ...b, tier: "free" as Tier })), ...PREMIUM_BANNERS.filter((b) => has(b.id, b.tier))].map((b) => (
+            {BANNERS.map((b) => (
               <Tile
                 key={b.id}
                 on={!draft.banner_url && draft.banner_id === b.id}
@@ -253,7 +287,7 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-bold">Explore the Marketplace</span>
-          <span className="block text-xs text-muted">New frames, bubbles and themes</span>
+          <span className="block text-xs text-muted">New frames, bubbles, nameplates and themes</span>
         </span>
         <ChevronRight size={18} className="text-faint" />
       </Link>
@@ -272,8 +306,8 @@ export function withWorn(look: Look, id: string | null | undefined, has: (id: st
   if (g && has(g.id, g.tier)) return { ...look, name_glow: g.id };
   const b = BUBBLE_STYLES.find((x) => x.id === id);
   if (b && has(b.id, b.tier)) return { ...look, bubble_style: b.id };
-  const p = PREMIUM_BANNERS.find((x) => x.id === id);
-  if (p && has(p.id, p.tier)) return { ...look, banner_id: p.id, banner_url: null };
+  const n = NAMEPLATES.find((x) => x.id === id);
+  if (n && has(n.id, n.tier)) return { ...look, nameplate: n.id };
   return look;
 }
 
@@ -281,7 +315,7 @@ function tabFor(id: string | null | undefined): Tab {
   if (!id) return "frames";
   if (id.startsWith("font-") || id.startsWith("glow-")) return "names";
   if (id.startsWith("bubble-")) return "bubbles";
-  if (id.startsWith("banner-")) return "banners";
+  if (id.startsWith("plate-")) return "nameplates";
   return "frames";
 }
 
@@ -298,6 +332,21 @@ function Shelf({ children, wide = false, empty = null }: { children: React.React
         </p>
       )}
     </div>
+  );
+}
+
+function PlateOption({ on, label, onClick, children }: { on: boolean; label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      aria-label={label}
+      className={`flex items-center gap-2 rounded-2xl border-2 p-0.5 text-left transition active:scale-[0.99] ${on ? "border-accent" : "border-transparent"}`}
+    >
+      <span className="min-w-0 flex-1">{children}</span>
+      <span className={`w-20 shrink-0 truncate pr-2 text-right text-[11px] ${on ? "font-semibold text-foreground" : "text-muted"}`}>{label}</span>
+    </button>
   );
 }
 

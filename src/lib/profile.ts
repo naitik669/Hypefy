@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { canShow, findPremiumBanner } from "@/lib/cosmetics";
 
 export type MascotMood =
   | "hype"
@@ -85,17 +84,13 @@ export const BANNERS: Banner[] = [
 
 export const DEFAULT_BANNER_ID = "lime-pulse";
 
-/**
- * A Premium banner draws only while its owner has Premium; otherwise, and
- * for an unknown id, the default.
- */
-export function bannerGradient(id?: string | null, isPremium = false): string {
-  const premium = findPremiumBanner(id);
-  if (premium) {
-    return canShow(premium.tier, isPremium)
-      ? premium.gradient
-      : BANNERS.find((b) => b.id === DEFAULT_BANNER_ID)!.gradient;
-  }
+/** An uploaded banner that is a GIF — animated banners come with Premium. */
+export function isGifBanner(url: string | null | undefined): boolean {
+  return !!url && /\.gif(\?|#|$)/i.test(url);
+}
+
+/** The preset gradient for a banner id, or the default for an unknown one. */
+export function bannerGradient(id?: string | null): string {
   return (
     BANNERS.find((b) => b.id === id)?.gradient ??
     BANNERS.find((b) => b.id === DEFAULT_BANNER_ID)!.gradient

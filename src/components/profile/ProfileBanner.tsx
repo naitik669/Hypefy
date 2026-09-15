@@ -1,7 +1,10 @@
-import { bannerGradient } from "@/lib/profile";
+import { bannerGradient, isGifBanner } from "@/lib/profile";
 
 /**
  * Renders a custom uploaded banner image if present, else a preset gradient.
+ *
+ * A GIF banner is a Premium feature: it shows while its owner has Premium,
+ * and the preset gradient shows in its place if the plan lapses.
  *
  * The box is 3:1 — the ratio the cropper frames at — and never a fixed
  * height. It used to be h-36, which is a different SHAPE at every screen
@@ -19,20 +22,21 @@ export function ProfileBanner({
 }: {
   bannerId?: string | null;
   bannerUrl?: string | null;
-  /** Premium banners draw only for Premium members. */
+  /** GIF banners draw only for Premium members. */
   isPremium?: boolean;
   className?: string;
 }) {
+  const url = bannerUrl && (!isGifBanner(bannerUrl) || isPremium) ? bannerUrl : null;
   return (
     <div
       // block auto-width, not w-full: callers add mx-* margins, and margins
       // don't shrink a 100%-width box — w-full made the banner overflow right.
       className={`relative aspect-[3/1] overflow-hidden ${className}`}
-      style={bannerUrl ? undefined : { background: bannerGradient(bannerId, isPremium) }}
+      style={url ? undefined : { background: bannerGradient(bannerId) }}
     >
-      {bannerUrl ? (
+      {url ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
+        <img src={url} alt="" className="h-full w-full object-cover" />
       ) : (
         /* subtle top sheen on preset gradients */
         <div className="h-full w-full bg-gradient-to-b from-white/[0.06] to-transparent" />
