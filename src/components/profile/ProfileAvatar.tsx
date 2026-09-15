@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { onSeenShowsChange, readSeenShows } from "@/lib/seen-shows";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
@@ -28,7 +27,6 @@ export function ProfileAvatar({
   showId,
   card,
   decoration = null,
-  showSeen = false,
 }: {
   name: string;
   hue: number;
@@ -40,23 +38,11 @@ export function ProfileAvatar({
   card?: ProfileCardData;
   /** A decoration the owner can wear right now (see visibleDecoration). */
   decoration?: string | null;
-  /** The viewer has already watched this Show (from show_views). */
-  showSeen?: boolean;
 }) {
   const router = useRouter();
   const [cardOpen, setCardOpen] = useState(false);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPress = useRef(false);
-
-  // Green ring only until you've watched it — the same record Home uses.
-  const [seenHere, setSeenHere] = useState(false);
-  useEffect(() => {
-    if (!showId) return;
-    const sync = () => setSeenHere(readSeenShows().has(showId));
-    sync();
-    return onSeenShowsChange(sync);
-  }, [showId]);
-  const ringOn = hasActiveShow && !showSeen && !seenHere;
 
   // Gated on the card, not the photo: a profile with no avatar still has
   // a name, links and a QR worth opening.
@@ -106,8 +92,8 @@ export function ProfileAvatar({
       >
         <AvatarFrame id={decoration} size={hasActiveShow ? size + 12 : size}>
         {hasActiveShow ? (
-          // Story ring: green until watched, then grey
-          <div className={`rounded-[30px] p-[3px] ${ringOn ? "bg-accent" : "bg-[#3a3a3a]"}`}>
+          // Accent story ring
+          <div className="rounded-[30px] bg-accent p-[3px]">
             <div className="rounded-[27px] bg-background p-[3px]">
               <AvatarImg url={avatarUrl} name={name} hue={hue} size={size} className="rounded-[22px]" />
             </div>

@@ -32,7 +32,6 @@ export function ProfileHeader({
   bannerUrl,
   hasActiveShow,
   entryShowId,
-  entryShowSeen = false,
   userId,
   currentUserId,
   stats,
@@ -57,8 +56,6 @@ export function ProfileHeader({
   bannerUrl: string | null | undefined;
   hasActiveShow: boolean;
   entryShowId: string | null;
-  /** The viewer has already watched the entry Show. */
-  entryShowSeen?: boolean;
   userId: string;
   currentUserId: string | null;
   stats: { posts: number; followers: number; following: number };
@@ -111,7 +108,6 @@ export function ProfileHeader({
               avatarUrl={avatarUrl}
               hasActiveShow={hasActiveShow}
               showId={entryShowId}
-              showSeen={entryShowSeen}
               decoration={cosmetics ? visibleDecoration(cosmetics) : null}
               card={{
                 cosmetics: cosmetics ?? undefined,

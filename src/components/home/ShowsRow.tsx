@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
-import { markShowSeen, onSeenShowsChange, readSeenShows } from "@/lib/seen-shows";
 export type Show = {
   id: string;
   name: string;
@@ -22,6 +21,17 @@ type CurrentUser = {
   showId?: string; // entry show to watch your own
 };
 
+const STORAGE_KEY = "hypefy_seen_shows";
+
+function readSeen(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
 export function ShowsRow({
   shows,
   currentUser,
@@ -35,13 +45,17 @@ export function ShowsRow({
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    const sync = () => setSeenIds(readSeenShows());
-    sync();
-    return onSeenShowsChange(sync);
+    setSeenIds(readSeen());
   }, []);
 
   function handleShowTap(id: string) {
-    markShowSeen(id);
+    setSeenIds((prev) => {
+      const next = new Set([...prev, id]);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
     router.push(`/shows/${id}`);
   }
 

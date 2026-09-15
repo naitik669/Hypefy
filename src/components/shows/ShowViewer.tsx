@@ -33,7 +33,6 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { hypeResult } from "@/lib/supabase/typed";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { safeBack } from "@/lib/safe-back";
-import { markShowSeen } from "@/lib/seen-shows";
 
 type ShowProfile = {
   display_name: string | null;
@@ -216,11 +215,6 @@ function ShowScreen({
     "idle"
   );
   const [replyError, setReplyError] = useState<string | null>(null);
-
-  // Watched on this device: the green ring goes on Home and on profiles alike.
-  useEffect(() => {
-    markShowSeen(show.id);
-  }, [show.id]);
 
   // Server-side view tracking: viewers register a view, owners see the count
   useEffect(() => {
