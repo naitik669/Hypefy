@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { Tier } from "@/lib/cosmetics";
 
 /**
@@ -16,7 +17,25 @@ export type BubbleStyle = {
   /** Time and ticks inside the bubble. */
   meta: string;
   border?: string;
+  boxShadow?: string;
+  fontFamily?: string;
+  /** A moving background (globals.css), switched off under reduced motion. */
+  motion?: "drift" | "shimmer";
 };
+
+/** The inline style and class that draw a bubble. */
+export function bubbleCss(b: BubbleStyle): { style: CSSProperties; className: string } {
+  return {
+    style: {
+      background: b.background,
+      color: b.color,
+      border: b.border,
+      boxShadow: b.boxShadow,
+      fontFamily: b.fontFamily,
+    },
+    className: b.motion ? `hy-anim hy-${b.motion}` : "",
+  };
+}
 
 export type ChatTheme = {
   id: string;
@@ -29,6 +48,8 @@ export type ChatTheme = {
   theirs: BubbleStyle;
   /** Drawn on the last bubble of each run (see ChatThemeDecor). */
   decor?: "pond" | "sakura" | "galaxy" | "sunset" | "arcade" | "candy";
+  /** A slow effect over the chat background. */
+  ambient?: "stars" | "rain";
 };
 
 export const CHAT_THEMES: ChatTheme[] = [
@@ -114,6 +135,57 @@ export const CHAT_THEMES: ChatTheme[] = [
     mine: { background: "repeating-linear-gradient(135deg, #ff9ad5 0 10px, #ffb8e0 10px 20px)", color: "#3b0a2a", meta: "rgba(59,10,42,0.55)" },
     theirs: { background: "repeating-linear-gradient(135deg, #b8f2e6 0 10px, #d3f8f0 10px 20px)", color: "#073b33", meta: "rgba(7,59,51,0.5)" },
     decor: "candy",
+  },
+  {
+    id: "theme-citynight",
+    label: "City night",
+    tier: "premium",
+    background: "linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%)",
+    mine: { background: "#4f46e5", color: "#ffffff", meta: "rgba(255,255,255,0.65)" },
+    theirs: { background: "#312e81", color: "#e0e7ff", meta: "rgba(224,231,255,0.5)" },
+    ambient: "stars",
+  },
+  {
+    id: "theme-sunday",
+    label: "Sunday",
+    tier: "free",
+    background: "#1c1917",
+    mine: { background: "#fbbf24", color: "#422006", meta: "rgba(66,32,6,0.55)" },
+    theirs: { background: "#44403c", color: "#fafaf9", meta: "rgba(250,250,249,0.5)" },
+  },
+  {
+    id: "theme-matcha",
+    label: "Matcha",
+    tier: "premium",
+    background: "linear-gradient(180deg, #0f2e1b 0%, #0a1f12 100%)",
+    mine: { background: "#86efac", color: "#052e16", meta: "rgba(5,46,22,0.55)" },
+    theirs: { background: "#dcfce7", color: "#14532d", meta: "rgba(20,83,45,0.5)" },
+  },
+  {
+    id: "theme-monsoon",
+    label: "Monsoon",
+    tier: "shop",
+    pricePaise: 7900,
+    background: "linear-gradient(180deg, #0b1320 0%, #0f1e33 100%)",
+    mine: { background: "#38bdf8", color: "#082f49", meta: "rgba(8,47,73,0.55)" },
+    theirs: { background: "#1e3a5f", color: "#e0f2fe", meta: "rgba(224,242,254,0.5)" },
+    ambient: "rain",
+  },
+  {
+    id: "theme-void",
+    label: "Void",
+    tier: "free",
+    background: "#000000",
+    mine: { background: "#fafafa", color: "#0a0a0a", meta: "rgba(10,10,10,0.5)" },
+    theirs: { background: "#171717", color: "#d4d4d4", meta: "rgba(212,212,212,0.45)" },
+  },
+  {
+    id: "theme-lofi",
+    label: "Lo-fi",
+    tier: "premium",
+    background: "linear-gradient(180deg, #2e1065 0%, #1e0b45 100%)",
+    mine: { background: "#f0abfc", color: "#4a044e", meta: "rgba(74,4,78,0.55)" },
+    theirs: { background: "#4c1d95", color: "#ede9fe", meta: "rgba(237,233,254,0.5)" },
   },
 ];
 

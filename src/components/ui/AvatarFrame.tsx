@@ -147,6 +147,77 @@ function Frame({ id, uid }: { id: string; uid: string }) {
           <path d={heart(4, 90, 1)} fill="#ff9ad5" />
         </>
       );
+    case "deco-holo":
+      return (
+        <>
+          <defs>
+            <linearGradient id={`o${uid}`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#ff9ad5" />
+              <stop offset="0.25" stopColor="#a5b4fc" />
+              <stop offset="0.5" stopColor="#7dd3fc" />
+              <stop offset="0.75" stopColor="#86efac" />
+              <stop offset="1" stopColor="#fde68a" />
+            </linearGradient>
+          </defs>
+          <rect x="13" y="13" width="114" height="114" rx="38" fill="none" stroke={`url(#o${uid})`} strokeWidth="8" />
+        </>
+      );
+    case "deco-8bit":
+      return (
+        <g shapeRendering="crispEdges">
+          <rect x="12" y="12" width="116" height="116" fill="none" stroke="#052e16" strokeWidth="10" />
+          <rect x="12" y="12" width="116" height="116" fill="none" stroke="#22c55e" strokeWidth="5" />
+          {[[7, 7], [123, 7], [7, 123], [123, 123]].map(([x, y]) => (
+            <rect key={`${x}${y}`} x={x} y={y} width="10" height="10" fill="#86efac" />
+          ))}
+        </g>
+      );
+    case "deco-bolt":
+      return (
+        <>
+          <rect x="15" y="15" width="110" height="110" rx="36" fill="none" stroke="#fde047" strokeWidth="4" />
+          <path className="hy-anim motion-safe:animate-pulse" d="M118 2 L100 34 L114 34 L104 58 L132 22 L117 22 L128 2 Z" fill="#fde047" stroke="#713f12" strokeWidth="1.5" strokeLinejoin="round" />
+        </>
+      );
+    case "deco-petals":
+      return (
+        <>
+          <rect x="15" y="15" width="110" height="110" rx="36" fill="none" stroke="#fb7185" strokeWidth="3.5" />
+          <ellipse cx="120" cy="20" rx="13" ry="7" transform="rotate(-40 120 20)" fill="#fda4af" />
+          <ellipse cx="131" cy="34" rx="8" ry="4.5" transform="rotate(20 131 34)" fill="#fb7185" />
+          <ellipse cx="20" cy="120" rx="12" ry="6.5" transform="rotate(-40 20 120)" fill="#fb7185" />
+          <ellipse cx="8" cy="104" rx="7" ry="4" transform="rotate(30 8 104)" fill="#fda4af" />
+        </>
+      );
+    case "deco-hypestar":
+      return (
+        <>
+          <rect x="14" y="14" width="112" height="112" rx="37" fill="none" stroke="#ffd000" strokeWidth="4.5" />
+          <path
+            className="hy-anim motion-safe:animate-pulse"
+            d="M120 0 L125.3 12.7 L139 13.9 L128.6 22.8 L131.8 36.1 L120 29 L108.2 36.1 L111.4 22.8 L101 13.9 L114.7 12.7 Z"
+            fill="#ffd000"
+            stroke="#5c4300"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+        </>
+      );
+    case "deco-gilded":
+      return (
+        <>
+          <defs>
+            <linearGradient id={`g${uid}`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#fff1a8" />
+              <stop offset="0.35" stopColor="#c8911c" />
+              <stop offset="0.6" stopColor="#fff1a8" />
+              <stop offset="1" stopColor="#a8781a" />
+            </linearGradient>
+          </defs>
+          <rect x="12" y="12" width="116" height="116" rx="39" fill="none" stroke={`url(#g${uid})`} strokeWidth="9" />
+          <rect x="17" y="17" width="106" height="106" rx="35" fill="none" stroke="#5c4300" strokeOpacity="0.5" strokeWidth="1" />
+        </>
+      );
     default:
       return null;
   }

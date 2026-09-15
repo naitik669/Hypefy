@@ -21,7 +21,7 @@ describe("filter and sort", () => {
 
   it("filters to one category", () => {
     const bubbles = filterAndSort(items, "bubble", "featured");
-    expect(bubbles.length).toBe(9);
+    expect(bubbles.length).toBe(17);
     expect(bubbles.every((i) => i.category === "bubble")).toBe(true);
   });
 
@@ -97,7 +97,7 @@ describe("the Marketplace page", () => {
     await render();
     await click(button("Frames")!);
     const names = [...host.querySelectorAll("li")].map((li) => li.textContent);
-    expect(names.length).toBe(6);
+    expect(names.length).toBe(12);
     expect(names.some((n) => n?.includes("Crown"))).toBe(true);
     expect(names.some((n) => n?.includes("Pond"))).toBe(false);
   });
@@ -111,17 +111,17 @@ describe("the Marketplace page", () => {
     expect(flames?.textContent).toContain("₹49");
   });
 
-  it("offers to buy on the web and not in the app", async () => {
+  it("shows a picked item on you, with Get on the web and nothing to buy in the app", async () => {
     native.value = false;
     await render();
     await click(button("Flames")!);
-    expect(document.body.textContent).toContain("Buy · ₹49");
+    expect(document.body.textContent).toContain("Get · ₹49");
     await act(async () => root.unmount());
     root = createRoot(host);
     native.value = true;
     await render();
     await click(button("Flames")!);
-    expect(document.body.textContent).not.toContain("Buy · ₹49");
-    expect(document.body.textContent).toContain("Not available in the app yet");
+    expect(document.body.textContent).not.toContain("Get · ₹49");
+    expect(document.body.textContent).toContain("Not in the app yet");
   });
 });

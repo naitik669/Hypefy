@@ -46,9 +46,11 @@ describe("who gets styled", () => {
 });
 
 describe("the catalogue", () => {
-  const sql = readFileSync("supabase/migrations/0076_billing.sql", "utf8");
+  const sql = ["0076_billing", "0078_bubble_styles", "0079_more_cosmetics"]
+    .map((m) => readFileSync(`supabase/migrations/${m}.sql`, "utf8"))
+    .join("\n");
   const seeded = new Map<string, { kind: string; tier: string }>();
-  for (const m of sql.matchAll(/\('([a-z-]+)',\s*'([a-z_]+)',\s*'(free|premium|shop)'/g)) {
+  for (const m of sql.matchAll(/\('([a-z0-9-]+)',\s*'([a-z_]+)',\s*'(free|premium|shop)'/g)) {
     seeded.set(m[1], { kind: m[2], tier: m[3] });
   }
 

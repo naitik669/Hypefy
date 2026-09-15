@@ -91,7 +91,7 @@ const iso = (sec: number | null | undefined) => (sec ? new Date(sec * 1000).toIS
 
 /**
  * The period a Razorpay subscription has paid (or trialled) up to. During a
- * trial there is no current_end yet: the free month runs to the first charge.
+ * trial there is no current_end yet: the free trial runs to the first charge.
  */
 export function periodEnd(sub: RzpSubscription): string | null {
   return iso(sub.current_end) ?? iso(sub.start_at);

@@ -15,7 +15,7 @@ const PERK_ICONS = [VerifiedStar, Type, Frame, MessageCircle, Palette, Smartphon
 const noop = () => () => {};
 
 /**
- * The paywall, pitched as an invitation: Premium leads with a free month,
+ * The paywall, pitched as an invitation: Premium leads with a free trial,
  * and "just the badge" sits below for anyone who only wants that.
  *
  * Inside the Android app nothing can be bought — Play only allows its own
@@ -93,11 +93,11 @@ export function PremiumPlans({
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-accent py-3.5 text-sm font-extrabold text-accent-ink transition active:scale-[0.98] disabled:opacity-60"
             >
               {busy === "premium" ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-              {trial ? "Start your free month" : "Get Premium"}
+              {trial ? `Start your ${TRIAL_DAYS}-day free trial` : "Get Premium"}
             </button>
             <p className="mt-2.5 text-[11px] leading-snug text-faint">
               {trial
-                ? `Free for ${TRIAL_DAYS === 30 ? "1 month" : `${TRIAL_DAYS} days`}, then ${formatInr(premium.pricePaise)}/month. Cancel anytime in Settings — no charge if you cancel before the month ends.`
+                ? `Free for ${TRIAL_DAYS} days, then ${formatInr(premium.pricePaise)}/month. Cancel anytime, no charge before day ${TRIAL_DAYS}.`
                 : `${formatInr(premium.pricePaise)}/month, renews monthly. Cancel anytime in Settings.`}
             </p>
           </>

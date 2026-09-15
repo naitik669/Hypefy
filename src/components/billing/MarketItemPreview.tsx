@@ -4,7 +4,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { PreviewBubbles } from "@/components/messages/ChatThemePicker";
-import { findChatTheme } from "@/lib/chat-themes";
+import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
 import { findBubbleStyle } from "@/lib/bubble-styles";
 import { findFont, findGlow, findPremiumBanner, nameStyle } from "@/lib/cosmetics";
 import type { MarketItem } from "@/lib/marketplace";
@@ -35,8 +35,8 @@ export function MarketItemPreview({ item, me, large = false }: { item: MarketIte
           <span className={`flex w-full flex-col ${large ? "gap-3 px-8 text-sm" : "gap-2 px-3 text-[11px]"}`}>
             <span className="self-start rounded-2xl rounded-bl-md bg-surface px-2.5 py-1 text-foreground/80">wyd</span>
             <span
-              className="relative mt-2 self-end rounded-2xl rounded-br-md px-2.5 py-1 font-medium"
-              style={{ background: b.bubble.background, color: b.bubble.color, border: b.bubble.border }}
+              className={`relative mt-2 self-end rounded-2xl rounded-br-md px-2.5 py-1 font-medium ${bubbleCss(b.bubble).className}`}
+              style={bubbleCss(b.bubble).style}
             >
               {b.decor && <ChatThemeDecor decor={b.decor} mine />}
               being iconic

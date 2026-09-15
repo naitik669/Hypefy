@@ -11,7 +11,7 @@ export const runtime = "nodejs";
  * POST /api/billing/cancel { id } — stop renewing.
  *
  * You keep everything until the end of what you've paid for (or the end of
- * the free month). During a trial Razorpay has nothing to wait for, so the
+ * the free trial). During a trial Razorpay has nothing to wait for, so the
  * mandate is cancelled at once — no charge can ever happen — while our row
  * stays live to the trial's end.
  */

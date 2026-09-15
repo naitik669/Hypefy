@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   try {
     const sub = await rzp<RzpSubscription>(env, "GET", `/subscriptions/${subscriptionId}`);
 
-    // Two checkouts opened side by side could each carry a free month. The
+    // Two checkouts opened side by side could each carry a free trial. The
     // first to finish keeps it; any other is cancelled before it counts.
     const trialing = sub.status === "authenticated" && !!sub.start_at && sub.start_at * 1000 > Date.now();
     if (row.plan === "premium" && trialing) {
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
       if (other?.length) {
         await rzp(env, "POST", `/subscriptions/${subscriptionId}/cancel`, { cancel_at_cycle_end: 0 }).catch(() => {});
         await admin.from("subscriptions").update({ status: "expired" }).eq("id", row.id);
-        return NextResponse.json({ error: "Your free month has already been used." }, { status: 409 });
+        return NextResponse.json({ error: "You've already used your free trial." }, { status: 409 });
       }
     }
 

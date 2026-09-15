@@ -36,7 +36,9 @@ describe("which bubble a message gets", () => {
 });
 
 describe("the bubble catalogue", () => {
-  const sql = readFileSync("supabase/migrations/0078_bubble_styles.sql", "utf8");
+  const sql = ["0076_billing", "0078_bubble_styles", "0079_more_cosmetics"]
+    .map((m) => readFileSync(`supabase/migrations/${m}.sql`, "utf8"))
+    .join("\n");
   const seeded = new Map<string, { tier: string; price: string }>();
   for (const m of sql.matchAll(/\('(bubble-[a-z]+)',\s*'bubble_style',\s*'(free|premium|shop)',\s*'[^']+',\s*(null|\d+)/g)) {
     seeded.set(m[1], { tier: m[2], price: m[3] });

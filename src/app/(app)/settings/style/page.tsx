@@ -5,7 +5,12 @@ import { StyleEditor } from "@/components/billing/StyleEditor";
 
 export const metadata = { title: "Your style" };
 
-export default async function StylePage() {
+export default async function StylePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ wear?: string }>;
+}) {
+  const { wear } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
@@ -23,7 +28,7 @@ export default async function StylePage() {
   return (
     <>
       <PageHeader title="Your style" showBack />
-      <StyleEditor me={me} owned={(owned ?? []).map((o) => o.product_id)} />
+      <StyleEditor me={me} owned={(owned ?? []).map((o) => o.product_id)} wear={wear ?? null} />
     </>
   );
 }

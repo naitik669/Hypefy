@@ -28,7 +28,7 @@ export function planStatusLine(s: SubRow, now = Date.now()): string {
   if (s.status === "past_due") return "Payment failed — we'll retry. Update your payment method if it keeps failing.";
   const inTrial = s.status === "trialing" && s.trial_ends_at && new Date(s.trial_ends_at).getTime() > now;
   if (s.cancel_at_period_end) return `Cancelled · yours until ${end}`;
-  if (inTrial) return `Free month until ${day(s.trial_ends_at)}, then ${formatInr(plan.pricePaise)}/month`;
+  if (inTrial) return `Free trial until ${day(s.trial_ends_at)}, then ${formatInr(plan.pricePaise)}/month`;
   return `${formatInr(plan.pricePaise)}/month · renews ${end}`;
 }
 
@@ -85,7 +85,7 @@ export function SubscriptionList({ subs }: { subs: SubRow[] }) {
         title={`Cancel ${confirm ? PLANS[confirm.plan as PlanId]?.name ?? "" : ""}?`}
         body={
           confirm?.status === "trialing"
-            ? "You won't be charged. Everything stays on until your free month ends."
+            ? "You won't be charged. Everything stays on until your free trial ends."
             : "It won't renew. Everything stays on until the end of the period you've paid for."
         }
         confirmLabel="Cancel plan"

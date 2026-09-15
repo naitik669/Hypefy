@@ -6,7 +6,7 @@ import { Check, Lock } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { useToast } from "@/components/ui/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
-import { CHAT_THEMES, type ChatTheme } from "@/lib/chat-themes";
+import { CHAT_THEMES, bubbleCss, type ChatTheme } from "@/lib/chat-themes";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { formatInr } from "@/lib/billing/plans";
 
@@ -124,13 +124,13 @@ export function PreviewBubbles({ theme }: { theme?: ChatTheme }) {
     <span className="flex flex-col gap-3 pt-4">
       <span
         className="relative self-start rounded-xl rounded-bl-sm px-2.5 py-1 text-[10px] font-medium"
-        style={{ background: theirs.background, color: theirs.color, border: theirs.border }}
+        style={theme ? bubbleCss(theme.theirs).style : { background: theirs.background, color: theirs.color }}
       >
         hey!
       </span>
       <span
         className="relative self-end rounded-xl rounded-br-sm px-2.5 py-1 text-[10px] font-medium"
-        style={{ background: mine.background, color: mine.color, border: mine.border }}
+        style={theme ? bubbleCss(theme.mine).style : { background: mine.background, color: mine.color }}
       >
         {theme?.decor && <ChatThemeDecor decor={theme.decor} mine />}
         see you at 8

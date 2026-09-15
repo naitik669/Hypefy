@@ -39,15 +39,6 @@ export const SORTS: { id: SortId; label: string }[] = [
   { id: "premium", label: "Premium first" },
 ];
 
-/** One line that sells a whole category, shown in an item's sheet. */
-export const CATEGORY_PITCH: Record<Category, string> = {
-  frame: "A glow-up for your pfp, on every post and chat.",
-  bubble: "Every text you send, on brand. Even in themed chats.",
-  theme: "Set the vibe for the whole chat. Everyone in it sees it.",
-  name: "Your name, but louder.",
-  banner: "Top of your profile, top of the class.",
-};
-
 export function buildItems(prices: Record<string, number> = {}): MarketItem[] {
   let rank = 0;
   const item = (id: string, label: string, category: Category, tier: Tier): MarketItem => ({

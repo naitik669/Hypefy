@@ -28,7 +28,7 @@ export default async function SubscriptionPage() {
         ) : (
           <div className="rounded-2xl border border-border bg-elevated px-4 py-6 text-center">
             <p className="text-sm font-bold">No plan yet</p>
-            <p className="mt-1 text-xs text-muted">Premium starts with a free month.</p>
+            <p className="mt-1 text-xs text-muted">Premium starts with a 7-day free trial.</p>
             <Link
               href="/premium"
               className="mt-4 inline-flex rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-ink"

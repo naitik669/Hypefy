@@ -30,7 +30,8 @@ import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/compon
 import { one } from "@/lib/supabase/typed";
 import { ForwardSheet } from "@/components/messages/ForwardSheet";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
-import { findChatTheme } from "@/lib/chat-themes";
+import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
+import { ChatAmbient } from "@/components/messages/ChatAmbient";
 import { resolveBubble } from "@/lib/bubble-styles";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
@@ -1411,10 +1412,11 @@ export function RealChatView({
       <div
         ref={scrollContainerRef}
         onScroll={onMessagesScroll}
-        className="flex-1 overflow-y-auto px-4 py-4"
+        className="relative isolate flex-1 overflow-y-auto px-4 py-4"
         style={theme ? { background: theme.background } : undefined}
         onClick={() => { if (gifPickerOpen) setGifPickerOpen(false); }}
       >
+        {theme?.ambient && <ChatAmbient kind={theme.ambient} />}
         {/* Older-history loader — appears at the top while a chunk loads in */}
         {loadingOlder && (
           <div className="flex justify-center py-2">
@@ -1462,6 +1464,7 @@ export function RealChatView({
               const reacts = reactionsByMsg.get(m.id) ?? [];
               // The sender's own bubble style, else this side of the chat theme.
               const look = resolveBubble({ mine, senderStyleId: bubbleStyles[m.sender_id], theme });
+              const lookCss = look ? bubbleCss(look.bubble) : null;
               // Animate only messages that arrived after the initial load.
               const isNew = !seenAtLoadRef.current.has(m.id);
 
@@ -1725,10 +1728,10 @@ export function RealChatView({
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
                           className={`relative min-w-[80px] max-w-full cursor-default select-none rounded-2xl px-3.5 pt-2 pb-5 text-sm ${
                             mine ? "rounded-br-md" : "rounded-bl-md"
-                          } ${look ? "" : mine ? "bg-accent text-accent-ink" : "bg-surface text-foreground"} ${
+                          } ${lookCss ? lookCss.className : mine ? "bg-accent text-accent-ink" : "bg-surface text-foreground"} ${
                             look?.decor && showTime ? "mt-3" : ""
                           }`}
-                          style={look ? { background: look.bubble.background, color: look.bubble.color, border: look.bubble.border } : undefined}
+                          style={lookCss?.style}
                         >
                           {look?.decor && showTime && <ChatThemeDecor decor={look.decor} mine={mine} />}
                           {m.body}

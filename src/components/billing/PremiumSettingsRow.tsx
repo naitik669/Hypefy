@@ -14,7 +14,7 @@ export async function PremiumSettingsRow() {
   const member = !!me?.is_premium || !!me?.is_verified;
   const href = member ? "/settings/subscription" : "/premium";
   const title = me?.is_premium ? "Hypefy Premium" : me?.is_verified ? "Verified" : "Get Hypefy Premium";
-  const sub = member ? "Manage your plan" : "Badge, name styles, chat themes — first month free";
+  const sub = member ? "Manage your plan" : "Badge, name styles, chat themes · 7 days free";
 
   return (
     <Link

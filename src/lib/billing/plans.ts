@@ -6,7 +6,7 @@
 
 export type PlanId = "verified" | "premium";
 
-export const TRIAL_DAYS = 30;
+export const TRIAL_DAYS = 7;
 
 export const PLANS: Record<PlanId, { name: string; pricePaise: number; trial: boolean }> = {
   verified: { name: "Verified", pricePaise: 9900, trial: false },

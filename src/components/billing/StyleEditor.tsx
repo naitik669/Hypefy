@@ -1,28 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Lock } from "lucide-react";
+import { Check, ChevronRight, ImageIcon, Loader2, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Avatar } from "@/components/ui/Avatar";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
-import {
-  DECORATIONS,
-  NAME_FONTS,
-  NAME_GLOWS,
-  PREMIUM_BANNERS,
-  canShow,
-  nameStyle,
-  type Tier,
-} from "@/lib/cosmetics";
-import { formatInr } from "@/lib/billing/plans";
-import { BUBBLE_STYLES, findBubbleStyle, type BubbleStyleDef } from "@/lib/bubble-styles";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
+import { BANNERS } from "@/lib/profile";
+import { DECORATIONS, NAME_FONTS, NAME_GLOWS, PREMIUM_BANNERS, nameStyle, type Tier } from "@/lib/cosmetics";
+import { BUBBLE_STYLES, findBubbleStyle } from "@/lib/bubble-styles";
+import { bubbleCss } from "@/lib/chat-themes";
 
-type Me = {
+export type StyleMe = {
   id: string;
   display_name: string | null;
   username: string | null;
@@ -38,336 +32,319 @@ type Me = {
   bubble_style: string | null;
 };
 
-type Field = "name_font" | "name_glow" | "avatar_decoration" | "banner_id" | "bubble_style";
+type Look = Pick<StyleMe, "name_font" | "name_glow" | "avatar_decoration" | "bubble_style" | "banner_id" | "banner_url">;
+const FIELDS = ["avatar_decoration", "name_font", "name_glow", "bubble_style", "banner_id", "banner_url"] as const;
 
-/** A locked item shown on your preview without being saved. */
-type TryOn = { field: Field; id: string; tier: Tier; label: string; pricePaise?: number };
+type Tab = "frames" | "names" | "bubbles" | "banners";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "frames", label: "Frames" },
+  { id: "names", label: "Names" },
+  { id: "bubbles", label: "Bubbles" },
+  { id: "banners", label: "Banners" },
+];
 
 /**
- * Pick your name font, glow, avatar decoration, chat bubble and a Premium
- * banner, with a live preview of how you look. Every tap on something you
- * own saves; the database refuses anything you don't.
- *
- * A locked item is tried on instead: it shows on the preview, nothing is
- * saved, and a bar offers the way to unlock it. Seeing yourself in it sells
- * it far better than a price tag on a grey tile.
+ * Your style, as a wardrobe: your profile card on top showing exactly what
+ * people will see, Save right under it, and below that only the things you
+ * own. Picking changes the card at once; nothing is stored until Save.
+ * Finding new things is the Marketplace's job, one tap away.
  */
-export function StyleEditor({ me: initial, owned }: { me: Me; owned: string[] }) {
+export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[]; wear?: string | null }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const toast = useToast();
-  const [me, setMe] = useState(initial);
-  const [tryOn, setTryOn] = useState<TryOn | null>(null);
 
   const premium = me.is_premium;
-  const name = me.display_name ?? me.username ?? "You";
-  const unlocked = (id: string, tier: Tier) =>
-    tier === "free" || (tier === "premium" ? premium : owned.includes(id));
+  const has = (id: string, tier: Tier) => tier === "free" || (tier === "premium" ? premium : owned.includes(id));
 
-  async function choose(field: Field, id: string | null, tier: Tier = "free", label = "", pricePaise?: number) {
-    if (id && !unlocked(id, tier)) {
-      setTryOn(tryOn?.id === id ? null : { field, id, tier, label, pricePaise });
+  const initial: Look = {
+    name_font: me.name_font,
+    name_glow: me.name_glow,
+    avatar_decoration: me.avatar_decoration,
+    bubble_style: me.bubble_style,
+    banner_id: me.banner_id,
+    banner_url: me.banner_url,
+  };
+  const [saved, setSaved] = useState<Look>(initial);
+  const [draft, setDraft] = useState<Look>(() => withWorn(initial, wear, has));
+  const [tab, setTab] = useState<Tab>(() => tabFor(wear));
+  const [saving, setSaving] = useState(false);
+
+  const changed = FIELDS.filter((f) => draft[f] !== saved[f]);
+  // A banner swap touches two columns; count it once.
+  const changeCount = changed.filter((f) => f !== "banner_url" || !changed.includes("banner_id")).length;
+  const dirty = changeCount > 0;
+  const set = (patch: Partial<Look>) => setDraft((d) => ({ ...d, ...patch }));
+
+  async function save() {
+    if (!dirty || saving) return;
+    setSaving(true);
+    const patch: Partial<Look> = {};
+    for (const f of changed) patch[f] = draft[f];
+    const { error } = await supabase.from("profiles").update(patch).eq("id", me.id);
+    setSaving(false);
+    if (error) {
+      toast(error.message.includes("Not unlocked") ? "One of these isn't yours yet" : "Couldn't save. Try again.", "error");
       return;
     }
-    setTryOn(null);
-    const before = me;
-    const patch: Partial<Me> = { [field]: id };
-    // A banner theme draws in place of an uploaded banner image.
-    if (field === "banner_id" && id) patch.banner_url = null;
-    setMe({ ...me, ...patch });
-    const { error } = await supabase.from("profiles").update(patch).eq("id", me.id);
-    if (error) {
-      setMe(before);
-      toast(error.message.includes("Not unlocked") ? "That one isn't unlocked yet" : "Couldn't save", "error");
-    } else {
-      router.refresh();
-    }
+    setSaved(draft);
+    toast("Saved", "success");
+    router.refresh();
   }
 
-  // What the preview draws: your saved look, with anything being tried on
-  // laid over it as though you already had it.
-  const view: Me = tryOn ? { ...me, [tryOn.field]: tryOn.id, is_premium: premium || tryOn.tier === "premium" } : me;
-  const deco = DECORATIONS.find((d) => d.id === view.avatar_decoration);
-  const previewDeco = deco && canShow(deco.tier, view.is_premium) ? deco.id : null;
-  const bubble = findBubbleStyle(view.bubble_style);
-  const bubbleShown = bubble && canShow(bubble.tier, view.is_premium) ? bubble : null;
-  const isTrying = (id: string) => tryOn?.id === id;
+  const name = me.display_name ?? me.username ?? "You";
+  const view = { ...draft, is_premium: premium };
 
   return (
-    <div className="flex flex-col gap-6 px-4 pb-12 pt-3">
-      {/* Live preview */}
-      <section className="overflow-hidden rounded-2xl border border-border bg-elevated">
-        <ProfileBanner bannerId={view.banner_id} bannerUrl={tryOn?.field === "banner_id" ? null : view.banner_url} isPremium={view.is_premium} />
-        <div className="flex items-end gap-3 px-4 pb-4">
-          <div className="-mt-8 rounded-[22px] ring-4 ring-elevated">
-            <AvatarFrame id={previewDeco} size={64}>
-              <Avatar name={name} hue={me.avatar_hue ?? 200} size={64} src={me.avatar_url ?? undefined} className="rounded-[20px]" />
-            </AvatarFrame>
-          </div>
-          <div className="min-w-0 pb-1">
-            <p className="flex items-center gap-1 text-lg font-bold leading-tight">
+    <div className="flex flex-col gap-6 px-4 pb-16 pt-3">
+      {/* Your card, as others will see it */}
+      <section className="flex flex-col gap-3">
+        <div className="overflow-hidden rounded-3xl border border-white/[0.07] bg-elevated">
+          <ProfileBanner bannerId={draft.banner_id} bannerUrl={draft.banner_url} isPremium={premium} />
+          <div className="px-5 pb-5">
+            <div className="-mt-9 flex items-end justify-between">
+              <span className="rounded-[26px] bg-elevated p-1">
+                <AvatarFrame id={draft.avatar_decoration} size={76}>
+                  <Avatar name={name} hue={me.avatar_hue ?? 200} size={76} src={me.avatar_url ?? undefined} className="rounded-[22px]" />
+                </AvatarFrame>
+              </span>
+              {dirty && <span className="mb-1 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-muted">Preview</span>}
+            </div>
+            <p className="mt-3 flex items-center gap-1.5 text-lg font-bold leading-tight">
               <span className="truncate" style={nameStyle(view)}>{name}</span>
               {me.is_verified && <VerifiedStar className="h-4 w-4 shrink-0 text-verified" />}
             </p>
-            {me.username && <p className="text-xs text-muted">@{me.username}</p>}
+            {me.username && <p className="text-[13px] text-muted">@{me.username}</p>}
+            <div className="mt-4 flex flex-col gap-2">
+              <span className="self-start rounded-2xl rounded-bl-md bg-surface px-3 py-1.5 text-[13px]">new look?</span>
+              <MiniBubble id={draft.bubble_style} text="always" className="self-end" />
+            </div>
           </div>
         </div>
-        {/* How your messages look */}
-        <div className="flex flex-col gap-2 border-t border-border/60 bg-background/60 px-4 pb-4 pt-5">
-          <span className="self-start rounded-2xl rounded-bl-md bg-surface px-3 py-1.5 text-xs">are you coming?</span>
-          <MiniBubble style={bubbleShown} text="on my way 🏃" />
-        </div>
+
+        {dirty ? (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setDraft(saved)}
+              className="h-12 rounded-2xl bg-surface px-5 text-sm font-semibold text-muted transition active:scale-[0.98]"
+            >
+              Discard
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-accent text-sm font-extrabold text-accent-ink transition active:scale-[0.98]"
+            >
+              {saving && <Loader2 size={16} className="animate-spin" />}
+              {changeCount === 1 ? "Save change" : `Save ${changeCount} changes`}
+            </button>
+          </div>
+        ) : (
+          <div className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-surface text-sm font-semibold text-faint">
+            <Check size={15} /> Saved
+          </div>
+        )}
       </section>
 
-      {!premium && !tryOn && (
-        <button
-          type="button"
-          onClick={() => router.push("/premium")}
-          className="rounded-2xl border border-verified/25 bg-verified/10 px-4 py-3 text-left text-sm"
-        >
-          <span className="font-bold">Unlock everything with Premium</span>
-          <span className="block text-xs text-muted">Fonts, glows, decorations and banners — first month free.</span>
-        </button>
-      )}
-
-      <Section title="Name font">
-        <div className="grid grid-cols-4 gap-2">
-          <Tile selected={!me.name_font} onClick={() => choose("name_font", null)}>
-            <span className="text-lg font-bold">Aa</span>
-            <Label>Default</Label>
-          </Tile>
-          {NAME_FONTS.map((f) => (
-            <Tile
-              key={f.id}
-              selected={me.name_font === f.id}
-              trying={isTrying(f.id)}
-              locked={!unlocked(f.id, f.tier)}
-              onClick={() => choose("name_font", f.id, f.tier, `${f.label} font`)}
-            >
-              <span className="text-lg" style={{ fontFamily: f.family, fontWeight: f.weight, fontStyle: f.italic ? "italic" : undefined, fontSize: `${1.125 * f.scale}rem` }}>
-                Aa
-              </span>
-              <Label>{f.label}</Label>
-            </Tile>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Name glow">
-        <div className="grid grid-cols-7 gap-2">
-          <Swatch selected={!me.name_glow} onClick={() => choose("name_glow", null)} label="No glow">
-            <span className="h-1 w-4 rotate-45 rounded bg-faint" />
-          </Swatch>
-          {NAME_GLOWS.map((g) => (
-            <Swatch
-              key={g.id}
-              selected={me.name_glow === g.id}
-              trying={isTrying(g.id)}
-              locked={!unlocked(g.id, g.tier)}
-              onClick={() => choose("name_glow", g.id, g.tier, `${g.label} glow`)}
-              label={g.label}
-            >
-              <span className="h-5 w-5 rounded-full" style={{ background: g.color, boxShadow: `0 0 12px ${g.color}` }} />
-            </Swatch>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Avatar decoration">
-        <div className="grid grid-cols-4 gap-2">
-          <Tile selected={!me.avatar_decoration} onClick={() => choose("avatar_decoration", null)}>
-            <Avatar name={name} hue={me.avatar_hue ?? 200} size={36} src={me.avatar_url ?? undefined} />
-            <Label>None</Label>
-          </Tile>
-          {DECORATIONS.map((d) => {
-            const open = unlocked(d.id, d.tier);
-            return (
-              <Tile
-                key={d.id}
-                selected={me.avatar_decoration === d.id}
-                trying={isTrying(d.id)}
-                locked={!open}
-                onClick={() => choose("avatar_decoration", d.id, d.tier, d.label, d.pricePaise)}
-              >
-                <AvatarFrame id={d.id} size={36}>
-                  <Avatar name={name} hue={me.avatar_hue ?? 200} size={36} src={me.avatar_url ?? undefined} />
-                </AvatarFrame>
-                <Label>{!open && d.tier === "shop" && d.pricePaise ? formatInr(d.pricePaise) : d.label}</Label>
-              </Tile>
-            );
-          })}
-        </div>
-      </Section>
-
-      <Section title="Chat bubble">
-        <p className="-mt-1 mb-2 px-1 text-[11px] text-muted">Your messages look like this in every chat — even ones with a theme.</p>
-        <div className="grid grid-cols-2 gap-2">
-          <Tile selected={!me.bubble_style} onClick={() => choose("bubble_style", null)}>
-            <MiniBubble style={null} text="hey 👋" />
-            <Label>Default</Label>
-          </Tile>
-          {BUBBLE_STYLES.map((b) => {
-            const open = unlocked(b.id, b.tier);
-            return (
-              <Tile
-                key={b.id}
-                selected={me.bubble_style === b.id}
-                trying={isTrying(b.id)}
-                locked={!open}
-                onClick={() => choose("bubble_style", b.id, b.tier, `${b.label} bubble`, b.pricePaise)}
-              >
-                <MiniBubble style={b} text="hey 👋" />
-                <Label>{!open && b.tier === "shop" && b.pricePaise ? `${b.label} · ${formatInr(b.pricePaise)}` : b.label}</Label>
-              </Tile>
-            );
-          })}
-        </div>
-      </Section>
-
-      <Section title="Premium banners">
-        <div className="grid grid-cols-3 gap-2">
-          {PREMIUM_BANNERS.map((b) => (
+      {/* What you own */}
+      <section className="flex flex-col gap-3">
+        <h2 className="px-1 text-[15px] font-bold">Your items</h2>
+        <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4" data-hswipe="">
+          {TABS.map((t) => (
             <button
-              key={b.id}
+              key={t.id}
               type="button"
-              onClick={() => choose("banner_id", b.id, b.tier, `${b.label} banner`)}
-              className="flex flex-col items-center gap-1.5"
+              onClick={() => setTab(t.id)}
+              aria-pressed={tab === t.id}
+              className={`h-8 shrink-0 rounded-full px-3.5 text-xs font-bold transition-colors ${
+                tab === t.id ? "bg-foreground text-background" : "bg-surface text-muted"
+              }`}
             >
-              <span
-                className={`relative block aspect-[3/1] w-full rounded-xl border-2 ${me.banner_id === b.id ? "border-accent" : isTrying(b.id) ? "border-dashed border-verified" : "border-border"}`}
-                style={{ background: b.gradient }}
-              >
-                {!unlocked(b.id, b.tier) && (
-                  <span className="absolute inset-0 flex items-center justify-center rounded-[10px] bg-black/35">
-                    <Lock size={14} />
-                  </span>
-                )}
-              </span>
-              <Label>{b.label}</Label>
+              {t.label}
             </button>
           ))}
         </div>
-        {me.banner_url && (
-          <p className="mt-2 text-[11px] text-faint">Picking one replaces your uploaded banner photo.</p>
-        )}
-      </Section>
 
-      {tryOn && (
-        <div className="sticky bottom-[calc(96px+var(--sab))] z-30 flex items-center gap-3 rounded-2xl border border-verified/30 bg-elevated/95 p-3 shadow-[0_12px_32px_rgba(0,0,0,0.55)]">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold">Trying {tryOn.label}</p>
-            <p className="text-xs text-muted">Only you can see this preview.</p>
+        {tab === "frames" && (
+          <Shelf empty={DECORATIONS.every((d) => !has(d.id, d.tier)) ? "frames" : null}>
+            <Tile on={!draft.avatar_decoration} label="None" onClick={() => set({ avatar_decoration: null })}>
+              <Avatar name={name} hue={me.avatar_hue ?? 200} size={40} src={me.avatar_url ?? undefined} />
+            </Tile>
+            {DECORATIONS.filter((d) => has(d.id, d.tier)).map((d) => (
+              <Tile key={d.id} on={draft.avatar_decoration === d.id} label={d.label} onClick={() => set({ avatar_decoration: d.id })}>
+                <AvatarFrame id={d.id} size={44}>
+                  <Avatar name={name} hue={me.avatar_hue ?? 200} size={44} src={me.avatar_url ?? undefined} />
+                </AvatarFrame>
+              </Tile>
+            ))}
+          </Shelf>
+        )}
+
+        {tab === "names" && (
+          <div className="flex flex-col gap-4">
+            <Shelf empty={NAME_FONTS.every((f) => !has(f.id, f.tier)) ? "name styles" : null}>
+              <Tile on={!draft.name_font} label="Default" onClick={() => set({ name_font: null })}>
+                <span className="text-xl font-bold">Aa</span>
+              </Tile>
+              {NAME_FONTS.filter((f) => has(f.id, f.tier)).map((f) => (
+                <Tile key={f.id} on={draft.name_font === f.id} label={f.label} onClick={() => set({ name_font: f.id })}>
+                  <span style={{ fontFamily: f.family, fontWeight: f.weight, fontStyle: f.italic ? "italic" : undefined, fontSize: `${1.25 * f.scale}rem` }}>Aa</span>
+                </Tile>
+              ))}
+            </Shelf>
+            {NAME_GLOWS.some((g) => has(g.id, g.tier)) && (
+              <div className="flex flex-wrap gap-2.5">
+                <Swatch on={!draft.name_glow} label="No glow" onClick={() => set({ name_glow: null })}>
+                  <span className="h-0.5 w-4 rotate-45 rounded bg-faint" />
+                </Swatch>
+                {NAME_GLOWS.filter((g) => has(g.id, g.tier)).map((g) => (
+                  <Swatch key={g.id} on={draft.name_glow === g.id} label={`${g.label} glow`} onClick={() => set({ name_glow: g.id })}>
+                    <span className="h-5 w-5 rounded-full" style={{ background: g.color, boxShadow: `0 0 10px ${g.color}` }} />
+                  </Swatch>
+                ))}
+              </div>
+            )}
           </div>
-          <button type="button" onClick={() => setTryOn(null)} className="h-9 rounded-xl px-3 text-xs font-semibold text-muted">
-            Undo
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push(tryOn.tier === "premium" ? "/premium" : "/marketplace")}
-            className="h-9 shrink-0 rounded-xl bg-accent px-3.5 text-xs font-extrabold text-accent-ink"
-          >
-            {tryOn.tier === "premium" ? "Get Premium" : tryOn.pricePaise ? `Buy · ${formatInr(tryOn.pricePaise)}` : "Shop"}
-          </button>
-        </div>
+        )}
+
+        {tab === "bubbles" && (
+          <Shelf wide empty={BUBBLE_STYLES.every((b) => !has(b.id, b.tier)) ? "bubbles" : null}>
+            <Tile on={!draft.bubble_style} label="Default" onClick={() => set({ bubble_style: null })}>
+              <MiniBubble id={null} text="hey" />
+            </Tile>
+            {BUBBLE_STYLES.filter((b) => has(b.id, b.tier)).map((b) => (
+              <Tile key={b.id} on={draft.bubble_style === b.id} label={b.label} onClick={() => set({ bubble_style: b.id })}>
+                <MiniBubble id={b.id} text="hey" />
+              </Tile>
+            ))}
+          </Shelf>
+        )}
+
+        {tab === "banners" && (
+          <Shelf wide>
+            {me.banner_url && (
+              <Tile on={!!draft.banner_url} label="Your photo" onClick={() => set({ banner_id: me.banner_id, banner_url: me.banner_url })}>
+                <span className="flex h-10 w-full items-center justify-center rounded-lg bg-background text-muted">
+                  <ImageIcon size={16} />
+                </span>
+              </Tile>
+            )}
+            {[...BANNERS.map((b) => ({ ...b, tier: "free" as Tier })), ...PREMIUM_BANNERS.filter((b) => has(b.id, b.tier))].map((b) => (
+              <Tile
+                key={b.id}
+                on={!draft.banner_url && draft.banner_id === b.id}
+                label={b.label}
+                onClick={() => set({ banner_id: b.id, banner_url: null })}
+              >
+                <span className="block h-10 w-full rounded-lg" style={{ background: b.gradient }} />
+              </Tile>
+            ))}
+          </Shelf>
+        )}
+      </section>
+
+      <Link
+        href="/marketplace"
+        className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 transition active:scale-[0.99]"
+      >
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/15 text-accent">
+          <ShoppingBag size={18} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-bold">Explore the Marketplace</span>
+          <span className="block text-xs text-muted">New frames, bubbles and themes</span>
+        </span>
+        <ChevronRight size={18} className="text-faint" />
+      </Link>
+    </div>
+  );
+}
+
+/** Put an owned item from the Marketplace's "Wear" straight onto the draft. */
+export function withWorn(look: Look, id: string | null | undefined, has: (id: string, tier: Tier) => boolean): Look {
+  if (!id) return look;
+  const d = DECORATIONS.find((x) => x.id === id);
+  if (d && has(d.id, d.tier)) return { ...look, avatar_decoration: d.id };
+  const f = NAME_FONTS.find((x) => x.id === id);
+  if (f && has(f.id, f.tier)) return { ...look, name_font: f.id };
+  const g = NAME_GLOWS.find((x) => x.id === id);
+  if (g && has(g.id, g.tier)) return { ...look, name_glow: g.id };
+  const b = BUBBLE_STYLES.find((x) => x.id === id);
+  if (b && has(b.id, b.tier)) return { ...look, bubble_style: b.id };
+  const p = PREMIUM_BANNERS.find((x) => x.id === id);
+  if (p && has(p.id, p.tier)) return { ...look, banner_id: p.id, banner_url: null };
+  return look;
+}
+
+function tabFor(id: string | null | undefined): Tab {
+  if (!id) return "frames";
+  if (id.startsWith("font-") || id.startsWith("glow-")) return "names";
+  if (id.startsWith("bubble-")) return "bubbles";
+  if (id.startsWith("banner-")) return "banners";
+  return "frames";
+}
+
+function Shelf({ children, wide = false, empty = null }: { children: React.ReactNode; wide?: boolean; empty?: string | null }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className={`grid gap-2.5 ${wide ? "grid-cols-3" : "grid-cols-4"}`}>{children}</div>
+      {empty && (
+        <p className="px-1 text-[13px] text-muted">
+          No {empty} yet.{" "}
+          <Link href="/marketplace" className="font-semibold text-foreground underline-offset-2 hover:underline">
+            Find some
+          </Link>
+        </p>
       )}
     </div>
   );
 }
 
-/** One chat bubble in a bubble style, or the app default when none. */
-function MiniBubble({ style, text }: { style: BubbleStyleDef | null; text: string }) {
+function Tile({ on, label, onClick, children }: { on: boolean; label: string; onClick: () => void; children: React.ReactNode }) {
   return (
-    <span
-      className={`relative mt-2 self-end rounded-2xl rounded-br-md px-3 py-1.5 text-xs font-medium ${style ? "" : "bg-accent text-accent-ink"}`}
-      style={style ? { background: style.bubble.background, color: style.bubble.color, border: style.bubble.border } : undefined}
-    >
-      {style?.decor && <ChatThemeDecor decor={style.decor} mine />}
-      {text}
-    </span>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <p className="mb-2 px-1 text-xs font-bold uppercase tracking-widest text-faint">{title}</p>
-      {children}
-    </section>
-  );
-}
-
-function Label({ children }: { children: React.ReactNode }) {
-  return <span className="text-[11px] text-muted">{children}</span>;
-}
-
-function Tile({
-  selected,
-  trying = false,
-  locked = false,
-  onClick,
-  children,
-}: {
-  selected: boolean;
-  trying?: boolean;
-  locked?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      className={`relative flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-2xl border bg-elevated px-1 py-2 transition active:scale-95 ${
-        selected ? "border-accent" : trying ? "border-dashed border-verified" : "border-border"
-      }`}
-    >
-      {children}
-      {selected && (
-        <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-accent-ink">
-          <Check size={10} strokeWidth={3} />
-        </span>
-      )}
-      {locked && (
-        <span className="absolute right-1.5 top-1.5 text-faint">
-          <Lock size={12} />
-        </span>
-      )}
+    <button type="button" onClick={onClick} aria-pressed={on} className="flex min-w-0 flex-col items-center gap-1.5">
+      <span
+        className={`flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl border-2 bg-surface p-1.5 transition active:scale-95 ${
+          on ? "border-accent" : "border-transparent"
+        }`}
+      >
+        {children}
+      </span>
+      <span className={`w-full truncate text-center text-[11px] ${on ? "font-semibold text-foreground" : "text-muted"}`}>{label}</span>
     </button>
   );
 }
 
-function Swatch({
-  selected,
-  trying = false,
-  locked = false,
-  onClick,
-  label,
-  children,
-}: {
-  selected: boolean;
-  trying?: boolean;
-  locked?: boolean;
-  onClick: () => void;
-  label: string;
-  children: React.ReactNode;
-}) {
+function Swatch({ on, label, onClick, children }: { on: boolean; label: string; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
-      aria-pressed={selected}
-      className={`relative flex aspect-square items-center justify-center rounded-2xl border bg-elevated transition active:scale-95 ${
-        selected ? "border-accent" : trying ? "border-dashed border-verified" : "border-border"
+      aria-pressed={on}
+      className={`flex h-11 w-11 items-center justify-center rounded-full border-2 bg-surface transition active:scale-95 ${
+        on ? "border-accent" : "border-transparent"
       }`}
     >
       {children}
-      {locked && (
-        <span className="absolute bottom-1 right-1 text-faint">
-          <Lock size={10} />
-        </span>
-      )}
     </button>
+  );
+}
+
+/** One chat bubble in a bubble style, or the app's own when `id` is null. */
+function MiniBubble({ id, text, className = "" }: { id: string | null; text: string; className?: string }) {
+  const b = findBubbleStyle(id);
+  const css = b ? bubbleCss(b.bubble) : null;
+  return (
+    <span
+      className={`relative rounded-2xl rounded-br-md px-3 py-1.5 text-[13px] font-medium ${css ? css.className : "bg-accent text-accent-ink"} ${
+        b?.decor ? "mt-3" : ""
+      } ${className}`}
+      style={css?.style}
+    >
+      {b?.decor && <ChatThemeDecor decor={b.decor} mine />}
+      {text}
+    </span>
   );
 }

@@ -11,7 +11,7 @@ export const runtime = "nodejs";
  * POST /api/billing/subscribe { plan }
  *
  * Opens a Razorpay subscription for checkout to complete. Premium starts a
- * month from now when this person has never had a free month, so the first
+ * week from now when this person has never had a free trial, so the first
  * charge waits for the trial; checkout only verifies the card or UPI mandate.
  * Nothing is granted here — a pending row is not a plan.
  */

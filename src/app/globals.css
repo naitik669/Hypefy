@@ -1256,3 +1256,17 @@ html[data-splash="off"] #hypefy-splash {
     backdrop-filter: none !important;
   }
 }
+
+/* Moving bubbles and chat backgrounds (bubble styles, chat themes).
+   Everything here stops for people who ask for less motion. */
+@keyframes hy-drift { from { background-position: 0% 50%; } to { background-position: 200% 50%; } }
+@keyframes hy-shimmer { from { background-position: -150% 0; } to { background-position: 250% 0; } }
+@keyframes hy-twinkle { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.9; } }
+@keyframes hy-fall { from { transform: translateY(-10vh); } to { transform: translateY(110vh); } }
+.hy-drift { background-size: 200% 100% !important; animation: hy-drift 6s linear infinite; }
+.hy-shimmer { background-size: 200% 100% !important; animation: hy-shimmer 2.8s linear infinite; }
+.hy-twinkle { animation: hy-twinkle 3s ease-in-out infinite; }
+.hy-fall { animation: hy-fall 1.6s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .hy-anim, .hy-anim * { animation: none !important; }
+}

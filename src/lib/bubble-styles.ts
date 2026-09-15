@@ -85,6 +85,68 @@ export const BUBBLE_STYLES: BubbleStyleDef[] = [
     pricePaise: 5900,
     bubble: { background: "linear-gradient(135deg, #f5cf63, #c8911c)", color: "#2a1c03", meta: "rgba(42,28,3,0.55)", border: "1px solid #fff1a8" },
   },
+  {
+    id: "bubble-paper",
+    label: "Paper",
+    tier: "premium",
+    bubble: { background: "#fafaf9", color: "#0a0a0a", meta: "rgba(10,10,10,0.45)" },
+  },
+  {
+    id: "bubble-outline",
+    label: "Outline",
+    tier: "premium",
+    bubble: { background: "#0a0a0a", color: "#f5f5f4", meta: "rgba(245,245,244,0.5)", border: "1.5px solid #f5f5f4" },
+  },
+  {
+    id: "bubble-aurora",
+    label: "Aurora",
+    tier: "shop",
+    pricePaise: 5900,
+    bubble: {
+      background: "linear-gradient(90deg, #0e7490, #7e22ce, #be123c, #0e7490)",
+      color: "#ffffff",
+      meta: "rgba(255,255,255,0.7)",
+      motion: "drift",
+    },
+  },
+  {
+    id: "bubble-sticker",
+    label: "Sticker",
+    tier: "shop",
+    pricePaise: 5900,
+    bubble: { background: "#ffd000", color: "#2a2000", meta: "rgba(42,32,0,0.55)", border: "2.5px solid #2a2000", boxShadow: "3px 3px 0 #2a2000" },
+  },
+  {
+    id: "bubble-terminal",
+    label: "Terminal",
+    tier: "premium",
+    bubble: { background: "#052e16", color: "#86efac", meta: "rgba(134,239,172,0.5)", fontFamily: "ui-monospace, Menlo, Consolas, monospace" },
+  },
+  {
+    id: "bubble-limepop",
+    label: "Lime pop",
+    tier: "premium",
+    bubble: { background: "#a3e635", color: "#0a0a0a", meta: "rgba(10,10,10,0.5)" },
+  },
+  {
+    id: "bubble-chrome",
+    label: "Chrome",
+    tier: "shop",
+    pricePaise: 7900,
+    bubble: {
+      background: "linear-gradient(90deg, #1f1f1f 30%, #4b4b4b 50%, #1f1f1f 70%)",
+      color: "#fafafa",
+      meta: "rgba(250,250,250,0.55)",
+      motion: "shimmer",
+    },
+  },
+  {
+    id: "bubble-stitch",
+    label: "Stitch",
+    tier: "shop",
+    pricePaise: 5900,
+    bubble: { background: "#ffe4ef", color: "#6b1840", meta: "rgba(107,24,64,0.5)", border: "2px dashed #ff7ab8" },
+  },
 ];
 
 export function findBubbleStyle(id: string | null | undefined): BubbleStyleDef | null {

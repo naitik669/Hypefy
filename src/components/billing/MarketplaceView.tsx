@@ -3,13 +3,16 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowUpDown, Check, Loader2, Sparkles } from "lucide-react";
+import { ArrowUpDown, Check, Loader2, Sparkles, X } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { useToast } from "@/components/ui/ToastProvider";
+import { Avatar } from "@/components/ui/Avatar";
+import { AvatarFrame } from "@/components/ui/AvatarFrame";
+import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
+import { PreviewBubbles } from "@/components/messages/ChatThemePicker";
 import { MarketItemPreview, type Me } from "@/components/billing/MarketItemPreview";
 import {
   CATEGORIES,
-  CATEGORY_PITCH,
   SORTS,
   buildItems,
   filterAndSort,
@@ -18,21 +21,24 @@ import {
   type MarketItem,
   type SortId,
 } from "@/lib/marketplace";
+import { findFont, findGlow, findPremiumBanner, nameStyle } from "@/lib/cosmetics";
+import { findBubbleStyle } from "@/lib/bubble-styles";
+import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
 import { formatInr } from "@/lib/billing/plans";
-import { findChatTheme } from "@/lib/chat-themes";
-import { PreviewBubbles } from "@/components/messages/ChatThemePicker";
 import { buyItem } from "@/lib/billing/checkout";
 import { isNative } from "@/lib/native";
 
 const noop = () => () => {};
 
 /**
- * The Marketplace. Browse by category, sort, tap anything to see it on
- * yourself and get it. The grid carries only a preview, a name and one tag;
- * everything else waits in the item's sheet.
+ * The Marketplace: a quiet gallery, and a try-on dock.
+ *
+ * The grid is only previews, names and one tag each. Tapping a tile doesn't
+ * leave the page — the dock at the bottom shows the item on you with a
+ * single action, so ten things can be tried in ten taps.
  *
  * Prices come from the catalogue checkout charges from. Inside the Android
- * app nothing can be bought (Play's rules), but everything can be browsed.
+ * app nothing can be bought (Play's rules), but everything can be tried.
  */
 export function MarketplaceView({
   configured,
@@ -54,15 +60,12 @@ export function MarketplaceView({
   const [category, setCategory] = useState<Category | "all">("all");
   const [sort, setSort] = useState<SortId>("featured");
   const [sortOpen, setSortOpen] = useState(false);
-  const [open, setOpen] = useState<MarketItem | null>(null);
+  const [picked, setPicked] = useState<MarketItem | null>(null);
   const [owned, setOwned] = useState(initialOwned);
   const [busy, setBusy] = useState(false);
 
   const all = useMemo(() => buildItems(prices), [prices]);
   const items = useMemo(() => filterAndSort(all, category, sort), [all, category, sort]);
-  const featured = all.find((i) => i.id === "theme-pond");
-  const featuredTheme = findChatTheme("theme-pond");
-  const premiumCount = all.filter((i) => i.tier === "premium").length;
 
   async function buy(item: MarketItem) {
     if (busy) return;
@@ -85,30 +88,9 @@ export function MarketplaceView({
   }
 
   return (
-    <div className="pb-12">
-      {/* Featured: words on the left, the thing itself on the right */}
-      {featured && featuredTheme && category === "all" && (
-        <button
-          type="button"
-          onClick={() => setOpen(featured)}
-          className="mx-4 mt-3 flex h-40 w-[calc(100%-2rem)] items-stretch overflow-hidden rounded-3xl border border-white/10 text-left transition active:scale-[0.99]"
-          style={{ background: featuredTheme.background }}
-        >
-          <span className="flex flex-1 flex-col justify-end p-4">
-            <span className="w-fit rounded-full bg-accent px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-accent-ink">
-              Featured
-            </span>
-            <span className="mt-2 text-2xl font-black leading-none tracking-tight text-white">Pond</span>
-            <span className="mt-1 text-[13px] leading-snug text-white/70 [text-wrap:balance]">Chats, but make it a pond.</span>
-          </span>
-          <span className="flex w-[44%] shrink-0 items-center pr-4">
-            <PreviewBubbles theme={featuredTheme} />
-          </span>
-        </button>
-      )}
-
+    <div className={picked ? "pb-44" : "pb-16"}>
       {/* Filters */}
-      <div className="sticky top-[calc(3.5rem+var(--sat))] z-10 mt-3 flex items-center gap-2 chrome-bar py-2.5 pl-4 pr-2">
+      <div className="sticky top-[calc(3.5rem+var(--sat))] z-10 flex items-center gap-2 chrome-bar py-2.5 pl-4 pr-2">
         <div className="no-scrollbar flex flex-1 gap-1.5 overflow-x-auto" data-hswipe="">
           {CATEGORIES.map((c) => {
             const on = category === c.id;
@@ -137,56 +119,55 @@ export function MarketplaceView({
         </button>
       </div>
 
-      {/* Premium nudge — one line, only when it is news */}
-      {!isPremium && category === "all" && (
-        <Link
-          href="/premium"
-          className="mx-4 mt-3 flex items-center gap-2 rounded-2xl bg-verified/10 px-3 py-2.5 text-xs"
-        >
-          <Sparkles size={14} className="shrink-0 text-verified" />
-          <span className="flex-1">
-            <span className="font-bold">Premium unlocks {premiumCount} of these.</span>{" "}
-            <span className="text-muted">First month on us.</span>
-          </span>
-          <span aria-hidden className="text-faint">›</span>
-        </Link>
-      )}
-
-      {/* Grid */}
-      <ul className="mt-3 grid grid-cols-2 gap-3 px-4">
-        {items.map((item) => (
-          <li key={item.id}>
-            <button
-              type="button"
-              onClick={() => setOpen(item)}
-              className="group flex w-full flex-col gap-2 text-left"
-            >
-              <span className="block aspect-square overflow-hidden rounded-2xl border border-white/[0.06] transition-transform group-active:scale-[0.97]">
-                <MarketItemPreview item={item} me={me} />
-              </span>
-              <span className="flex items-center justify-between gap-2 px-0.5">
-                <span className="truncate text-sm font-semibold">{item.label}</span>
-                <Tag item={item} owned={isOwned(item, owned, isPremium)} />
-              </span>
-            </button>
-          </li>
-        ))}
+      {/* Gallery */}
+      <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-5 px-4">
+        {items.map((item) => {
+          const on = picked?.id === item.id;
+          return (
+            <li key={item.id}>
+              <button
+                type="button"
+                onClick={() => setPicked(on ? null : item)}
+                aria-pressed={on}
+                className="group flex w-full flex-col gap-2 text-left"
+              >
+                <span
+                  className={`block aspect-square overflow-hidden rounded-2xl border-2 transition group-active:scale-[0.97] ${
+                    on ? "border-accent" : "border-transparent"
+                  }`}
+                >
+                  <MarketItemPreview item={item} me={me} />
+                </span>
+                <span className="flex items-center justify-between gap-2 px-0.5">
+                  <span className="truncate text-[13px] font-semibold">{item.label}</span>
+                  <Tag item={item} owned={isOwned(item, owned, isPremium)} />
+                </span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
 
-      {/* Item sheet */}
-      <BottomSheet open={!!open} onClose={() => setOpen(null)}>
-        {open && (
-          <ItemSheet
-            item={open}
-            me={me}
-            owned={isOwned(open, owned, isPremium)}
-            native={native}
-            busy={busy}
-            onBuy={() => buy(open)}
-            onClose={() => setOpen(null)}
-          />
-        )}
-      </BottomSheet>
+      <p className="mt-10 px-6 text-center text-[11px] text-faint">
+        Buying means you agree to the{" "}
+        <Link href="/terms#paid" className="underline hover:text-muted">
+          paid features terms
+        </Link>
+        .
+      </p>
+
+      {/* Try-on dock */}
+      {picked && (
+        <Dock
+          item={picked}
+          me={me}
+          owned={isOwned(picked, owned, isPremium)}
+          native={native}
+          busy={busy}
+          onBuy={() => buy(picked)}
+          onClose={() => setPicked(null)}
+        />
+      )}
 
       {/* Sort */}
       <BottomSheet open={sortOpen} onClose={() => setSortOpen(false)} title="Sort by">
@@ -208,14 +189,6 @@ export function MarketplaceView({
           ))}
         </ul>
       </BottomSheet>
-
-      <p className="mt-8 px-6 text-center text-[11px] text-faint">
-        Buying means you agree to the{" "}
-        <Link href="/terms#paid" className="underline hover:text-muted">
-          paid features terms
-        </Link>
-        .
-      </p>
     </div>
   );
 }
@@ -223,26 +196,26 @@ export function MarketplaceView({
 function Tag({ item, owned }: { item: MarketItem; owned: boolean }) {
   if (owned) {
     return (
-      <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-bold text-accent">
-        <Check size={11} strokeWidth={3} /> Yours
+      <span className="flex shrink-0 items-center gap-0.5 text-[11px] font-bold text-accent">
+        <Check size={12} strokeWidth={3} /> Yours
       </span>
     );
   }
   if (item.tier === "premium") {
     return (
-      <span className="flex shrink-0 items-center gap-1 rounded-full bg-verified/15 px-2 py-0.5 text-[11px] font-bold text-verified">
-        <Sparkles size={10} /> Premium
+      <span className="flex shrink-0 items-center gap-1 text-[11px] font-bold text-verified">
+        <Sparkles size={11} /> Premium
       </span>
     );
   }
-  return (
-    <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold tabular-nums">
-      {item.pricePaise ? formatInr(item.pricePaise) : "Soon"}
-    </span>
-  );
+  return <span className="shrink-0 text-[12px] font-bold tabular-nums">{item.pricePaise ? formatInr(item.pricePaise) : "Soon"}</span>;
 }
 
-function ItemSheet({
+/**
+ * The picked item on you — framed photo, styled name, your bubble, a themed
+ * chat or a banner behind you — with the one thing to do next.
+ */
+function Dock({
   item,
   me,
   owned,
@@ -259,51 +232,88 @@ function ItemSheet({
   onBuy: () => void;
   onClose: () => void;
 }) {
-  const wearable = item.category !== "theme";
-  const primary = "flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-extrabold transition active:scale-[0.98]";
+  const first = me.name.split(" ")[0] || "You";
+  const frame = item.category === "frame" ? item.id : null;
+  const style =
+    item.category === "name"
+      ? nameStyle({ name_font: findFont(item.id)?.id ?? null, name_glow: findGlow(item.id)?.id ?? null, is_premium: true })
+      : undefined;
+  const bubble = item.category === "bubble" ? findBubbleStyle(item.id) : null;
+  const theme = item.category === "theme" ? findChatTheme(item.id) : null;
+  const banner = item.category === "banner" ? findPremiumBanner(item.id) : null;
 
+  const cta = "flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-2xl px-5 text-sm font-extrabold transition active:scale-[0.97]";
   let action: React.ReactNode;
   if (owned) {
     action = (
-      <Link href={wearable ? "/settings/style" : "/messages"} onClick={onClose} className={`${primary} bg-accent text-accent-ink`}>
-        {wearable ? "Wear it" : "Use it in a chat"}
+      <Link href={item.category === "theme" ? "/messages" : `/settings/style?wear=${encodeURIComponent(item.id)}`} className={`${cta} bg-accent text-accent-ink`}>
+        {item.category === "theme" ? "Use" : "Wear"}
       </Link>
     );
   } else if (item.tier === "premium") {
     action = (
-      <Link href="/premium" onClick={onClose} className={`${primary} bg-accent text-accent-ink`}>
-        <Sparkles size={16} /> Unlock with Premium
+      <Link href="/premium" className={`${cta} bg-accent text-accent-ink`}>
+        <Sparkles size={15} /> Premium
       </Link>
     );
-  } else if (native) {
-    action = <p className="py-3 text-center text-sm text-muted">Not available in the app yet.</p>;
+  } else if (native || !item.pricePaise) {
+    action = <span className="shrink-0 px-2 text-xs text-muted">{native ? "Not in the app yet" : "Soon"}</span>;
   } else {
     action = (
-      <button type="button" onClick={onBuy} disabled={busy || !item.pricePaise} className={`${primary} bg-accent text-accent-ink disabled:opacity-60`}>
-        {busy && <Loader2 size={16} className="animate-spin" />}
-        {item.pricePaise ? `Buy · ${formatInr(item.pricePaise)}` : "Coming soon"}
+      <button type="button" onClick={onBuy} disabled={busy} className={`${cta} bg-accent text-accent-ink disabled:opacity-60`}>
+        {busy && <Loader2 size={15} className="animate-spin" />}
+        Get · {formatInr(item.pricePaise)}
       </button>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-3">
-      <div className="aspect-[4/3] overflow-hidden rounded-3xl border border-white/[0.06]">
-        <MarketItemPreview item={item} me={me} large />
-      </div>
-      <div>
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-black tracking-tight">{item.label}</h2>
-          <Tag item={item} owned={owned} />
+    <div className="fixed inset-x-0 bottom-[calc(84px+var(--sab))] z-30 mx-auto w-full max-w-[480px] px-3">
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-elevated shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)]">
+        {banner && <div className="absolute inset-x-0 top-0 h-14 opacity-90" style={{ background: banner.gradient }} />}
+        {theme && <div className="absolute inset-0 opacity-95" style={{ background: theme.background }} />}
+
+        <div className="relative flex items-center gap-3 p-3 pr-4">
+          {theme ? (
+            <span className="w-28 shrink-0">
+              <PreviewBubbles theme={theme} />
+            </span>
+          ) : (
+            <AvatarFrame id={frame} size={52}>
+              <Avatar name={me.name} hue={me.hue} size={52} src={me.avatarUrl ?? undefined} className={banner ? "ring-2 ring-elevated" : undefined} />
+            </AvatarFrame>
+          )}
+
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px] font-bold" style={style}>
+              {item.category === "name" ? first : item.label}
+            </p>
+            {bubble ? (
+              <span
+                className={`relative mt-2 inline-block rounded-2xl rounded-br-md px-2.5 py-1 text-xs font-medium ${bubbleCss(bubble.bubble).className}`}
+                style={bubbleCss(bubble.bubble).style}
+              >
+                {bubble.decor && <ChatThemeDecor decor={bubble.decor} mine />}
+                being iconic
+              </span>
+            ) : (
+              <p className={`truncate text-xs ${theme ? "text-white/70" : "text-muted"}`}>
+                {owned ? "Yours" : item.tier === "premium" ? "Included in Premium" : "Yours to keep"}
+              </p>
+            )}
+          </div>
+
+          {action}
         </div>
-        <p className="mt-1 text-sm text-muted">{CATEGORY_PITCH[item.category]}</p>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className={`absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full ${theme ? "bg-black/40 text-white" : "bg-white/10 text-muted"}`}
+        >
+          <X size={12} />
+        </button>
       </div>
-      {action}
-      {!owned && wearable && (
-        <Link href="/settings/style" onClick={onClose} className="-mt-1 text-center text-xs font-semibold text-muted hover:text-foreground">
-          Try it on first
-        </Link>
-      )}
     </div>
   );
 }

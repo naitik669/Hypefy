@@ -48,6 +48,12 @@ export const DECORATIONS: Decoration[] = [
   { id: "deco-flames", label: "Flames", tier: "shop", pricePaise: 4900 },
   { id: "deco-crown", label: "Crown", tier: "shop", pricePaise: 4900 },
   { id: "deco-hearts", label: "Hearts", tier: "shop", pricePaise: 4900 },
+  { id: "deco-holo", label: "Holo foil", tier: "shop", pricePaise: 7900 },
+  { id: "deco-8bit", label: "8-bit", tier: "shop", pricePaise: 4900 },
+  { id: "deco-bolt", label: "Bolt", tier: "premium" },
+  { id: "deco-petals", label: "Petals", tier: "premium" },
+  { id: "deco-hypestar", label: "Hype star", tier: "premium" },
+  { id: "deco-gilded", label: "Gilded", tier: "shop", pricePaise: 9900 },
 ];
 
 export type PremiumBanner = { id: string; label: string; gradient: string; tier: Tier };

@@ -71,12 +71,12 @@ describe("the subscription line", () => {
     id: "1", plan: "premium", status: "active", provider: "razorpay",
     trial_ends_at: null, current_period_end: "2026-10-15T00:00:00Z", cancel_at_period_end: false,
   };
-  it("says when the free month ends and what comes after", () => {
+  it("says when the free trial ends and what comes after", () => {
     const line = planStatusLine(
       { ...base, status: "trialing", trial_ends_at: "2026-10-15T00:00:00Z" },
       Date.UTC(2026, 8, 20),
     );
-    expect(line).toContain("Free month until");
+    expect(line).toContain("Free trial until");
     expect(line).toContain("₹125/month");
   });
   it("says a cancelled plan is yours until the period ends", () => {
@@ -120,10 +120,10 @@ describe("the Premium page", () => {
     return host.textContent ?? "";
   }
 
-  it("leads with the free month on the web", async () => {
+  it("leads with the free trial on the web", async () => {
     native.value = false;
     const text = await render({});
-    expect(text).toContain("Start your free month");
+    expect(text).toContain("Start your 7-day free trial");
     expect(text).toContain("then ₹125/month");
     expect(text).toContain("Get Verified");
   });
@@ -131,15 +131,15 @@ describe("the Premium page", () => {
   it("offers nothing to buy inside the app", async () => {
     native.value = true;
     const text = await render({});
-    expect(text).not.toContain("Start your free month");
+    expect(text).not.toContain("Start your 7-day free trial");
     expect(text).not.toContain("Get Verified");
     expect(text).toContain("isn't available in the app yet");
   });
 
-  it("drops the trial wording once the free month is used", async () => {
+  it("drops the trial wording once the free trial is used", async () => {
     native.value = false;
     const text = await render({ trialEligible: false });
     expect(text).toContain("Get Premium");
-    expect(text).not.toContain("free month");
+    expect(text).not.toContain("free trial");
   });
 });

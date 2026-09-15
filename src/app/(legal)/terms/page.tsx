@@ -138,16 +138,16 @@ export default function TermsPage() {
           automatically every month until you cancel.
         </li>
         <li>
-          <strong>Free month.</strong> Premium may start with a one-month free
+          <strong>Free trial.</strong> Premium may start with a 7-day free
           trial, once per person. When you start it, you authorise a recurring
           payment (a card or UPI Autopay mandate); a small verification charge may
-          be made and refunded. If you do not cancel before the free month ends,
+          be made and refunded. If you do not cancel before the trial ends,
           the first monthly charge is taken on that date.
         </li>
         <li>
           <strong>Cancelling.</strong> Cancel any time in Settings → Subscription.
           You keep the features until the end of the period you have paid for (or
-          the end of your free month), and are not charged again. We do not refund
+          the end of your free trial), and are not charged again. We do not refund
           part-used periods, except where the law requires it or a charge was made
           in error, which we will refund.
         </li>
