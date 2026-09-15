@@ -82,7 +82,7 @@ export function PremiumPlans({
         }}
       />
 
-      <div className="flex min-h-[calc(100dvh-84px)] flex-col px-5 pb-8 pt-[calc(0.75rem+var(--sat))]">
+      <div className="flex min-h-[calc(100dvh-84px)] flex-col px-5 pb-4 pt-[calc(0.5rem+var(--sat))]">
         {/* Close and wordmark */}
         <div className="relative flex h-10 items-center justify-center">
           <button
@@ -99,30 +99,30 @@ export function PremiumPlans({
         </div>
 
         {/* Heading */}
-        <div className="mt-7 text-center">
+        <div className="mt-4 text-center [@media(max-height:760px)]:mt-2">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">
             {hasPremium ? "You're in" : trialEligible ? `${TRIAL_DAYS} days free` : "Hypefy Premium"}
           </p>
-          <h1 className="mt-2 text-[32px] font-extrabold leading-none tracking-tight">Go Premium</h1>
-          <p className="mt-2.5 text-[15px] text-muted">Look like no one else.</p>
+          <h1 className="mt-1.5 text-[28px] font-extrabold leading-none tracking-tight">Go Premium</h1>
+          <p className="mt-1.5 text-[14px] text-muted">Look like no one else.</p>
         </div>
 
         {/* Free vs Premium */}
-        <div className="mt-7">
-          <div className="flex items-center gap-3 px-1 pb-2">
+        <div className="mt-5 [@media(max-height:760px)]:mt-3">
+          <div className="flex items-center gap-3 px-1 pb-1">
             <span className="flex-1 text-[12px] text-muted">What you get</span>
             <span className="w-14 text-center text-[12px] font-semibold text-muted">Free</span>
             <span className="w-[72px] rounded-full bg-accent/15 py-1 text-center text-[12px] font-bold text-accent">Premium</span>
           </div>
           <ul className="flex flex-col">
             {ROWS.map((r) => (
-              <li key={r.name} className="flex items-center gap-3 px-1 py-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-foreground">
+              <li key={r.name} className="flex items-center gap-3 px-1 py-[7px]">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-foreground">
                   {r.icon}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] font-semibold leading-tight">{r.name}</span>
-                  <span className="block truncate text-[12px] text-muted">{r.sub}</span>
+                  <span className="block truncate text-[12px] text-muted [@media(max-height:760px)]:hidden">{r.sub}</span>
                 </span>
                 <span className="flex w-14 justify-center">
                   {r.free ? <Yes /> : <No />}
@@ -135,7 +135,7 @@ export function PremiumPlans({
           </ul>
         </div>
 
-        <div className="min-h-6 flex-1" />
+        <div className="min-h-3 flex-1" />
 
         {/* The card that starts it */}
         {hasPremium ? (
@@ -158,7 +158,7 @@ export function PremiumPlans({
             type="button"
             onClick={() => start("premium")}
             disabled={!!busy}
-            className="flex items-center gap-3 rounded-3xl bg-accent px-5 py-4 text-left text-accent-ink transition active:scale-[0.99] disabled:opacity-70"
+            className="flex items-center gap-3 rounded-3xl bg-accent px-5 py-3 text-left text-accent-ink transition active:scale-[0.99] disabled:opacity-70"
           >
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-2 text-[18px] font-extrabold leading-tight">
@@ -178,14 +178,17 @@ export function PremiumPlans({
         )}
 
         {!hasPremium && !native && (
-          <p className="mt-3 text-center text-[12px] text-muted">
-            {trialEligible ? "We’ll remind you 2 days before it ends. Cancel anytime." : "Cancel anytime."}
+          <p className="mt-2 text-center text-[12px] text-muted [text-wrap:balance]">
+            {trialEligible ? "We’ll remind you 2 days before it ends. " : ""}Cancel anytime ·{" "}
+            <Link href="/terms#paid" className="underline underline-offset-2">
+              Terms
+            </Link>
           </p>
         )}
 
         {!hasPremium && (
           hasVerified ? (
-            <p className="mt-4 flex h-12 items-center justify-center gap-1.5 text-[14px] font-semibold text-muted">
+            <p className="mt-3 flex h-11 items-center justify-center gap-1.5 text-[14px] font-semibold text-muted">
               <VerifiedStar className="h-4 w-4 text-verified" /> Verified · Active
             </p>
           ) : native ? null : (
@@ -193,7 +196,7 @@ export function PremiumPlans({
               type="button"
               onClick={() => start("verified")}
               disabled={!!busy}
-              className="mt-4 flex h-12 items-center justify-center gap-2 rounded-full bg-white/[0.07] text-[14px] font-semibold transition active:scale-[0.98] disabled:opacity-60"
+              className="mt-3 flex h-11 items-center justify-center gap-2 rounded-full bg-white/[0.07] text-[14px] font-semibold transition active:scale-[0.98] disabled:opacity-60"
             >
               {busy === "verified" && <Loader2 size={15} className="animate-spin" />}
               Just the badge · {formatInr(verified.pricePaise)}/month
@@ -201,11 +204,13 @@ export function PremiumPlans({
           )
         )}
 
-        <p className="mt-3 text-center text-[11px] text-faint">
-          <Link href="/terms#paid" className="underline-offset-2 hover:underline">
-            Terms
-          </Link>
-        </p>
+        {(hasPremium || native) && (
+          <p className="mt-3 text-center text-[11px] text-faint">
+            <Link href="/terms#paid" className="underline-offset-2 hover:underline">
+              Terms
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );
