@@ -90,8 +90,13 @@ jobs:
 
       # Always kept, so a build is retrievable even when distribution is not
       # configured yet or the upload step fails.
+      # Short-lived, and never allowed to fail the run: once the account's
+      # artifact storage filled up, this step failed and the build never
+      # reached testers.
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
+          retention-days: 3
           name: hypefy-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
@@ -100,7 +105,9 @@ jobs:
       # apps since 2021, so assembleRelease alone can never produce a
       # publishable build.
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
+          retention-days: 3
           name: hypefy-aab
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
