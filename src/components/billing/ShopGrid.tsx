@@ -10,13 +10,15 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { PreviewBubbles } from "@/components/messages/ChatThemePicker";
 import { DECORATIONS } from "@/lib/cosmetics";
 import { CHAT_THEMES } from "@/lib/chat-themes";
+import { BUBBLE_STYLES } from "@/lib/bubble-styles";
+import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { formatInr } from "@/lib/billing/plans";
 import { buyItem } from "@/lib/billing/checkout";
 import { isNative } from "@/lib/native";
 
 const noop = () => () => {};
 
-type Item = { id: string; label: string; kind: "decoration" | "theme"; tier: string };
+type Item = { id: string; label: string; kind: "decoration" | "theme" | "bubble"; tier: string };
 
 /**
  * One-off items you keep forever, whether or not you have Premium: the Shop
@@ -49,6 +51,7 @@ export function ShopGrid({
   const items: Item[] = [
     ...DECORATIONS.map((d) => ({ id: d.id, label: d.label, kind: "decoration" as const, tier: d.tier })),
     ...CHAT_THEMES.filter((t) => t.tier !== "free").map((t) => ({ id: t.id, label: t.label, kind: "theme" as const, tier: t.tier })),
+    ...BUBBLE_STYLES.map((b) => ({ id: b.id, label: b.label, kind: "bubble" as const, tier: b.tier })),
   ];
   const has = (id: string) => owned.includes(id) || justBought.includes(id);
 
@@ -75,10 +78,10 @@ export function ShopGrid({
     if (has(item.id)) {
       return (
         <Link
-          href={item.kind === "decoration" ? "/settings/style" : "/messages"}
+          href={item.kind === "theme" ? "/messages" : "/settings/style"}
           className="flex h-9 items-center justify-center gap-1 rounded-xl bg-white/10 text-xs font-bold"
         >
-          <Check size={13} /> {item.kind === "decoration" ? "Wear" : "Owned"}
+          <Check size={13} /> {item.kind === "theme" ? "Owned" : "Wear"}
         </Link>
       );
     }
@@ -102,7 +105,7 @@ export function ShopGrid({
   function premiumAction(item: Item) {
     return isPremium ? (
       <Link
-        href={item.kind === "decoration" ? "/settings/style" : "/messages"}
+        href={item.kind === "theme" ? "/messages" : "/settings/style"}
         className="flex h-9 items-center justify-center gap-1 rounded-xl bg-white/10 text-xs font-bold"
       >
         <Check size={13} /> Yours
@@ -131,6 +134,11 @@ export function ShopGrid({
             <Card key={item.id} item={item} me={me}>{shopAction(item)}</Card>
           ))}
         </div>
+        <div className="grid grid-cols-3 gap-2.5">
+          {group("shop", "bubble").map((item) => (
+            <Card key={item.id} item={item} me={me}>{shopAction(item)}</Card>
+          ))}
+        </div>
       </section>
 
       <section className="flex flex-col gap-3">
@@ -142,6 +150,11 @@ export function ShopGrid({
         </div>
         <div className="grid grid-cols-2 gap-2.5">
           {group("premium", "theme").map((item) => (
+            <Card key={item.id} item={item} me={me}>{premiumAction(item)}</Card>
+          ))}
+        </div>
+        <div className="grid grid-cols-3 gap-2.5">
+          {group("premium", "bubble").map((item) => (
             <Card key={item.id} item={item} me={me}>{premiumAction(item)}</Card>
           ))}
         </div>
@@ -174,9 +187,20 @@ function Card({
   children: React.ReactNode;
 }) {
   const theme = item.kind === "theme" ? CHAT_THEMES.find((t) => t.id === item.id) : undefined;
+  const bubble = item.kind === "bubble" ? BUBBLE_STYLES.find((b) => b.id === item.id) : undefined;
   return (
     <div className="flex flex-col gap-2.5 rounded-2xl border border-border bg-elevated p-2.5">
-      {theme ? (
+      {bubble ? (
+        <div className="flex h-24 items-center justify-center rounded-xl bg-background">
+          <span
+            className="relative mt-2 rounded-2xl rounded-br-md px-3 py-1.5 text-xs font-medium"
+            style={{ background: bubble.bubble.background, color: bubble.bubble.color, border: bubble.bubble.border }}
+          >
+            {bubble.decor && <ChatThemeDecor decor={bubble.decor} mine />}
+            hey 👋
+          </span>
+        </div>
+      ) : theme ? (
         <div className="flex h-28 flex-col justify-center overflow-hidden rounded-xl px-2.5" style={{ background: theme.background }}>
           <PreviewBubbles theme={theme} />
         </div>

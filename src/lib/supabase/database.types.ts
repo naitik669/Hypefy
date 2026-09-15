@@ -1557,6 +1557,7 @@ export type Database = {
           banner_id: string | null
           banner_url: string | null
           bio: string | null
+          bubble_style: string | null
           card_layout: string
           card_theme: string
           created_at: string
@@ -1596,6 +1597,7 @@ export type Database = {
           banner_id?: string | null
           banner_url?: string | null
           bio?: string | null
+          bubble_style?: string | null
           card_layout?: string
           card_theme?: string
           created_at?: string
@@ -1635,6 +1637,7 @@ export type Database = {
           banner_id?: string | null
           banner_url?: string | null
           bio?: string | null
+          bubble_style?: string | null
           card_layout?: string
           card_theme?: string
           created_at?: string

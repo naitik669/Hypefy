@@ -31,6 +31,7 @@ import { one } from "@/lib/supabase/typed";
 import { ForwardSheet } from "@/components/messages/ForwardSheet";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { findChatTheme } from "@/lib/chat-themes";
+import { resolveBubble } from "@/lib/bubble-styles";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { DisplayName } from "@/components/ui/DisplayName";
@@ -224,6 +225,7 @@ export function RealChatView({
   initialReactions = [],
   initialReaders = [],
   initialTheme = null,
+  bubbleStyles = {},
 }: {
   conversationId: string;
   currentUserId: string;
@@ -235,6 +237,8 @@ export function RealChatView({
   initialReaders?: Reader[];
   /** The conversation's chat theme id, or null for the default look. */
   initialTheme?: string | null;
+  /** Each member's bubble style they can show right now (user id → style id). */
+  bubbleStyles?: Record<string, string | null>;
 }) {
   const isGroup = !!group;
   const senderName = (id: string) => (id === currentUserId ? "You" : members?.[id]?.name ?? other.name);
@@ -1456,6 +1460,8 @@ export function RealChatView({
                 !sameDay(next.created_at, m.created_at) ||
                 new Date(next.created_at).getTime() - new Date(m.created_at).getTime() > 5 * 60 * 1000;
               const reacts = reactionsByMsg.get(m.id) ?? [];
+              // The sender's own bubble style, else this side of the chat theme.
+              const look = resolveBubble({ mine, senderStyleId: bubbleStyles[m.sender_id], theme });
               // Animate only messages that arrived after the initial load.
               const isNew = !seenAtLoadRef.current.has(m.id);
 
@@ -1719,21 +1725,21 @@ export function RealChatView({
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
                           className={`relative min-w-[80px] max-w-full cursor-default select-none rounded-2xl px-3.5 pt-2 pb-5 text-sm ${
                             mine ? "rounded-br-md" : "rounded-bl-md"
-                          } ${theme ? "" : mine ? "bg-accent text-accent-ink" : "bg-surface text-foreground"} ${
-                            theme?.decor && showTime ? "mt-3" : ""
+                          } ${look ? "" : mine ? "bg-accent text-accent-ink" : "bg-surface text-foreground"} ${
+                            look?.decor && showTime ? "mt-3" : ""
                           }`}
-                          style={theme ? { background: (mine ? theme.mine : theme.theirs).background, color: (mine ? theme.mine : theme.theirs).color, border: (mine ? theme.mine : theme.theirs).border } : undefined}
+                          style={look ? { background: look.bubble.background, color: look.bubble.color, border: look.bubble.border } : undefined}
                         >
-                          {theme?.decor && showTime && <ChatThemeDecor decor={theme.decor} mine={mine} />}
+                          {look?.decor && showTime && <ChatThemeDecor decor={look.decor} mine={mine} />}
                           {m.body}
                           {/* Time + status always at bottom-right inside the bubble */}
                           <span className="absolute bottom-1.5 right-2.5 flex items-center gap-[3px]">
                             {m.edited_at && (
-                              <span className={`text-[9px] font-medium italic leading-none ${theme ? "" : mine ? "text-accent-ink/45" : "text-faint"}`} style={theme ? { color: (mine ? theme.mine : theme.theirs).meta } : undefined}>
+                              <span className={`text-[9px] font-medium italic leading-none ${look ? "" : mine ? "text-accent-ink/45" : "text-faint"}`} style={look ? { color: look.bubble.meta } : undefined}>
                                 edited ·
                               </span>
                             )}
-                            <span className={`text-[9px] font-medium leading-none ${theme ? "" : mine ? "text-accent-ink/45" : "text-faint"}`} style={theme ? { color: (mine ? theme.mine : theme.theirs).meta } : undefined}>
+                            <span className={`text-[9px] font-medium leading-none ${look ? "" : mine ? "text-accent-ink/45" : "text-faint"}`} style={look ? { color: look.bubble.meta } : undefined}>
                               {timeLabel(m.created_at)}
                             </span>
                             {mine && <MsgStatusTick status={getMsgStatus(m)} />}

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { RealChatView } from "@/components/messages/RealChatView";
 import { one } from "@/lib/supabase/typed";
+import { visibleBubbleStyle } from "@/lib/bubble-styles";
 
 export default async function ThreadPage({
   params,
@@ -17,7 +18,7 @@ export default async function ThreadPage({
   const [{ data: members }, { data: conv }] = await Promise.all([
     supabase
       .from("conversation_members")
-      .select("user_id, role, last_read_at, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, hide_read_receipts, is_verified, is_premium, name_font, name_glow, avatar_decoration)")
+      .select("user_id, role, last_read_at, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, hide_read_receipts, is_verified, is_premium, name_font, name_glow, avatar_decoration, bubble_style)")
       .eq("conversation_id", threadId),
     supabase.from("conversations").select("type, title, avatar_url, theme").eq("id", threadId).maybeSingle(),
   ]);
@@ -110,6 +111,13 @@ export default async function ThreadPage({
       };
     });
 
+  // Everyone's own bubble style, including yours, as they can show it now.
+  const bubbleStyles: Record<string, string | null> = {};
+  for (const m of members) {
+    const p = (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles) as { bubble_style?: string | null; is_premium?: boolean | null } | null;
+    if (p) bubbleStyles[m.user_id] = visibleBubbleStyle(p);
+  }
+
   // The other person's badge and Premium styling, for the chat header.
   const opStyle = op as {
     is_verified?: boolean | null;
@@ -142,6 +150,7 @@ export default async function ThreadPage({
       initialMessages={messages}
       initialReactions={(reactRows ?? []) as any}
       initialReaders={readers}
+      bubbleStyles={bubbleStyles}
       initialTheme={(conv as { theme?: string | null } | null)?.theme ?? null}
     />
   );
