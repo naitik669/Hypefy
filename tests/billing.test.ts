@@ -123,17 +123,17 @@ describe("the Premium page", () => {
   it("leads with the free trial on the web", async () => {
     native.value = false;
     const text = await render({});
-    expect(text).toContain("How your 7-day free trial works");
-    expect(text).toContain("Start free trial");
+    expect(text).toContain("Go Premium");
+    expect(text).toContain("Start 7-day free trial");
     expect(text).toContain("then ₹125/month");
-    expect(text).toContain("Just the badge");
+    expect(text).toContain("Just the badge · ₹99/month");
   });
 
   it("offers nothing to buy inside the app", async () => {
     native.value = true;
     const text = await render({});
-    expect(text).not.toContain("Start free trial");
-    expect(text).not.toContain("Get Verified");
+    expect(text).not.toContain("Start 7-day free trial");
+    expect(text).not.toContain("Just the badge");
     expect(text).toContain("available in the app yet");
   });
 
@@ -142,5 +142,6 @@ describe("the Premium page", () => {
     const text = await render({ trialEligible: false });
     expect(text).toContain("Get Premium");
     expect(text).not.toContain("free trial");
+    expect(text).not.toContain("days free");
   });
 });

@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Check, Loader2, LockOpen, Palette, Sparkles, Type, X } from "lucide-react";
+import { ArrowRight, Check, Frame, Image as ImageIcon, Loader2, MessageCircle, Palette, Type, X } from "lucide-react";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { useToast } from "@/components/ui/ToastProvider";
 import { isNative } from "@/lib/native";
@@ -13,14 +13,23 @@ import { subscribe } from "@/lib/billing/checkout";
 
 const noop = () => () => {};
 
+/** What Premium adds, row by row. `free` is whether a free account has it. */
+const ROWS: { icon: React.ReactNode; name: string; sub: string; free: boolean }[] = [
+  { icon: <VerifiedStar className="h-[18px] w-[18px] text-verified" />, name: "Verified badge", sub: "The blue star", free: false },
+  { icon: <Type size={17} />, name: "Name styles", sub: "Fonts and glows", free: false },
+  { icon: <Frame size={17} />, name: "Avatar frames", sub: "On every post and chat", free: false },
+  { icon: <MessageCircle size={17} />, name: "Chat bubbles", sub: "Your look in every chat", free: false },
+  { icon: <Palette size={17} />, name: "Chat themes", sub: "Every theme, not a few", free: true },
+  { icon: <ImageIcon size={17} />, name: "Profile banners", sub: "Premium banners", free: false },
+];
+
 /**
- * The paywall. It leads with exactly how the free trial works — what unlocks
- * today, when you'll be reminded, when money happens — because a subscription
- * that explains itself doesn't feel like a trap. Then two plans and one button.
+ * The paywall: what Free has next to what Premium adds, then one card that
+ * starts the trial. The reminder it mentions is real — remind_trials_ending()
+ * (migration 0080) sends it two days before a trial ends.
  *
- * The Day 5 reminder is real: remind_trials_ending() (0080) sends it.
  * Inside the Android app nothing can be bought (Play only allows its own
- * billing for digital items), so the button gives way to a plain note.
+ * billing for digital items), so the card says so instead.
  */
 export function PremiumPlans({
   configured,
@@ -36,23 +45,20 @@ export function PremiumPlans({
   const router = useRouter();
   const toast = useToast();
   const native = useSyncExternalStore(noop, isNative, () => false);
-  const [plan, setPlan] = useState<PlanId>("premium");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<PlanId | null>(null);
 
   const premium = PLANS.premium;
   const verified = PLANS.verified;
-  const trial = trialEligible && plan === "premium";
-  const reminderDay = TRIAL_DAYS - 2;
 
-  async function start() {
+  async function start(plan: PlanId) {
     if (busy) return;
     if (!configured) {
       toast("Payments are coming soon", "plain");
       return;
     }
-    setBusy(true);
+    setBusy(plan);
     const result = await subscribe(plan, PLANS[plan].name);
-    setBusy(false);
+    setBusy(null);
     if (result.ok) {
       toast(plan === "premium" ? "Welcome to Premium" : "You're verified", "success");
       router.push("/settings/subscription");
@@ -64,203 +70,159 @@ export function PremiumPlans({
     }
   }
 
-  const title = hasPremium
-    ? "You’re Premium"
-    : trial
-      ? `How your ${TRIAL_DAYS}-day free trial works`
-      : plan === "premium"
-        ? "Hypefy Premium"
-        : "Just the badge";
-
   return (
-    <div className="relative mx-auto flex min-h-[calc(100dvh-84px)] w-full max-w-[480px] flex-col pb-8">
-      <div className="px-4 pt-[calc(0.75rem+var(--sat))]">
-        <button
-          type="button"
-          onClick={() => safeBack(router)}
-          aria-label="Close"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-surface text-foreground transition active:scale-95"
-        >
-          <X size={20} />
-        </button>
-      </div>
+    <div className="relative isolate mx-auto min-h-[calc(100dvh-84px)] w-full max-w-[480px] overflow-hidden">
+      {/* Black, a green glow through the middle, black again */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(70% 38% at 70% 46%, rgba(163,230,53,0.28), transparent 70%), radial-gradient(90% 45% at 25% 58%, rgba(21,128,61,0.45), transparent 72%), linear-gradient(180deg, #0a0a0a 0%, #0a0a0a 16%, #0c1f10 48%, #0a0a0a 86%)",
+        }}
+      />
 
-      <div className="mt-6 flex flex-1 flex-col px-6">
-        <h1 className="text-center text-[26px] font-extrabold leading-[1.15] tracking-tight [text-wrap:balance]">{title}</h1>
+      <div className="flex min-h-[calc(100dvh-84px)] flex-col px-5 pb-8 pt-[calc(0.75rem+var(--sat))]">
+        {/* Close and wordmark */}
+        <div className="relative flex h-10 items-center justify-center">
+          <button
+            type="button"
+            onClick={() => safeBack(router)}
+            aria-label="Close"
+            className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.07] text-foreground transition active:scale-95"
+          >
+            <X size={20} />
+          </button>
+          <span className="text-[22px] font-extrabold tracking-tight">
+            Hypefy<span className="text-accent">.</span>
+          </span>
+        </div>
 
-        {hasPremium ? (
-          <p className="mt-2 text-center text-sm text-muted">Your badge, frames, bubbles and themes are on.</p>
-        ) : trial ? (
-          <ol className="mx-auto mt-7 flex w-full max-w-[320px] flex-col">
-            <Step state="done" icon={<Check size={14} strokeWidth={3} />} title="Account ready" sub="You’re all set." />
-            <Step state="now" icon={<LockOpen size={14} strokeWidth={2.5} />} title="Today: everything unlocks" sub="Badge, frames, bubbles and themes." />
-            <Step icon={<Bell size={13} strokeWidth={2.5} />} title={`Day ${reminderDay}: a reminder`} sub="We’ll let you know before it ends." />
-            <Step last icon={<Sparkles size={13} strokeWidth={2.5} />} title={`Day ${TRIAL_DAYS}: trial ends`} sub={`${formatInr(premium.pricePaise)}/month after. Cancel anytime before.`} />
-          </ol>
-        ) : plan === "premium" ? (
-          <ul className="mx-auto mt-7 flex w-full max-w-[320px] flex-col gap-4">
-            <Perk icon={<VerifiedStar className="h-4 w-4 text-verified" />} text="The blue badge" />
-            <Perk icon={<Type size={15} />} text="Name styles and frames" />
-            <Perk icon={<Palette size={15} />} text="Bubbles and chat themes" />
-          </ul>
-        ) : (
-          <div className="mx-auto mt-7 flex w-full max-w-[320px] items-center gap-3">
-            <VerifiedStar className="h-10 w-10 shrink-0 text-verified" />
-            <p className="text-sm text-muted">The blue star next to your name, everywhere on Hypefy.</p>
+        {/* Heading */}
+        <div className="mt-7 text-center">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">
+            {hasPremium ? "You're in" : trialEligible ? `${TRIAL_DAYS} days free` : "Hypefy Premium"}
+          </p>
+          <h1 className="mt-2 text-[32px] font-extrabold leading-none tracking-tight">Go Premium</h1>
+          <p className="mt-2.5 text-[15px] text-muted">Look like no one else.</p>
+        </div>
+
+        {/* Free vs Premium */}
+        <div className="mt-7">
+          <div className="flex items-center gap-3 px-1 pb-2">
+            <span className="flex-1 text-[12px] text-muted">What you get</span>
+            <span className="w-14 text-center text-[12px] font-semibold text-muted">Free</span>
+            <span className="w-[72px] rounded-full bg-accent/15 py-1 text-center text-[12px] font-bold text-accent">Premium</span>
           </div>
-        )}
+          <ul className="flex flex-col">
+            {ROWS.map((r) => (
+              <li key={r.name} className="flex items-center gap-3 px-1 py-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-foreground">
+                  {r.icon}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold leading-tight">{r.name}</span>
+                  <span className="block truncate text-[12px] text-muted">{r.sub}</span>
+                </span>
+                <span className="flex w-14 justify-center">
+                  {r.free ? <Yes /> : <No />}
+                </span>
+                <span className="flex w-[72px] justify-center">
+                  <Yes />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-        <div className="flex-1" />
+        <div className="min-h-6 flex-1" />
 
+        {/* The card that starts it */}
         {hasPremium ? (
           <Link
             href="/settings/subscription"
-            className="mt-8 flex h-14 items-center justify-center rounded-full bg-surface text-[15px] font-bold transition active:scale-[0.98]"
+            className="flex items-center justify-between rounded-3xl border border-accent/40 bg-black/70 px-5 py-4 transition active:scale-[0.99]"
           >
-            Manage your plan
+            <span>
+              <span className="block text-[18px] font-extrabold">You’re Premium</span>
+              <span className="block text-[13px] text-muted">Manage your plan</span>
+            </span>
+            <span className="rounded-full bg-accent/15 px-3 py-1 text-[12px] font-bold text-accent">Active</span>
           </Link>
+        ) : native ? (
+          <p className="rounded-3xl bg-black/70 px-5 py-5 text-center text-sm text-muted">
+            Premium isn’t available in the app yet.
+          </p>
         ) : (
-          <>
-            <div className="mt-8 flex flex-col gap-3" role="radiogroup" aria-label="Plan">
-              <PlanCard
-                selected={plan === "premium"}
-                onSelect={() => setPlan("premium")}
-                badge="Most popular"
-                name="Premium"
-                note={trialEligible ? `${TRIAL_DAYS} days free` : "Everything"}
-                price={formatInr(premium.pricePaise)}
-              />
-              <PlanCard
-                selected={plan === "verified"}
-                onSelect={() => setPlan("verified")}
-                name="Just the badge"
-                note={hasVerified ? "Active" : "Verified"}
-                price={formatInr(verified.pricePaise)}
-                disabled={hasVerified}
-              />
-            </div>
-
-            {native ? (
-              <p className="mt-5 rounded-full bg-surface py-4 text-center text-sm text-muted">Premium isn’t available in the app yet.</p>
-            ) : (
-              <button
-                type="button"
-                onClick={start}
-                disabled={busy || (plan === "verified" && hasVerified)}
-                className="mt-5 flex h-14 items-center justify-center gap-2 rounded-full bg-accent text-[15px] font-extrabold text-accent-ink transition active:scale-[0.98] disabled:opacity-50"
-              >
-                {busy && <Loader2 size={18} className="animate-spin" />}
-                {trial ? "Start free trial" : plan === "premium" ? "Get Premium" : "Get Verified"}
-              </button>
-            )}
-
-            <p className="mt-3 text-center text-xs text-muted">
-              {trial
-                ? `₹0 today · then ${formatInr(premium.pricePaise)}/month · cancel anytime`
-                : `${formatInr(PLANS[plan].pricePaise)}/month · cancel anytime`}
-            </p>
-            <p className="mt-1 text-center text-[11px] text-faint">
-              <Link href="/terms#paid" className="underline-offset-2 hover:underline">
-                Terms
-              </Link>
-            </p>
-          </>
+          <button
+            type="button"
+            onClick={() => start("premium")}
+            disabled={!!busy}
+            className="flex items-center gap-3 rounded-3xl bg-accent px-5 py-4 text-left text-accent-ink transition active:scale-[0.99] disabled:opacity-70"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2 text-[18px] font-extrabold leading-tight">
+                {busy === "premium" && <Loader2 size={18} className="animate-spin" />}
+                {trialEligible ? `Start ${TRIAL_DAYS}-day free trial` : "Get Premium"}
+              </span>
+              <span className="mt-0.5 block text-[13px] font-medium text-accent-ink/70">
+                {trialEligible
+                  ? `₹0 today, then ${formatInr(premium.pricePaise)}/month`
+                  : `${formatInr(premium.pricePaise)}/month`}
+              </span>
+            </span>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/85 text-accent">
+              <ArrowRight size={18} strokeWidth={2.5} />
+            </span>
+          </button>
         )}
+
+        {!hasPremium && !native && (
+          <p className="mt-3 text-center text-[12px] text-muted">
+            {trialEligible ? "We’ll remind you 2 days before it ends. Cancel anytime." : "Cancel anytime."}
+          </p>
+        )}
+
+        {!hasPremium && (
+          hasVerified ? (
+            <p className="mt-4 flex h-12 items-center justify-center gap-1.5 text-[14px] font-semibold text-muted">
+              <VerifiedStar className="h-4 w-4 text-verified" /> Verified · Active
+            </p>
+          ) : native ? null : (
+            <button
+              type="button"
+              onClick={() => start("verified")}
+              disabled={!!busy}
+              className="mt-4 flex h-12 items-center justify-center gap-2 rounded-full bg-white/[0.07] text-[14px] font-semibold transition active:scale-[0.98] disabled:opacity-60"
+            >
+              {busy === "verified" && <Loader2 size={15} className="animate-spin" />}
+              Just the badge · {formatInr(verified.pricePaise)}/month
+            </button>
+          )
+        )}
+
+        <p className="mt-3 text-center text-[11px] text-faint">
+          <Link href="/terms#paid" className="underline-offset-2 hover:underline">
+            Terms
+          </Link>
+        </p>
       </div>
     </div>
   );
 }
 
-function Step({
-  icon,
-  title,
-  sub,
-  state = "later",
-  last = false,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  sub: string;
-  state?: "done" | "now" | "later";
-  last?: boolean;
-}) {
-  const dot =
-    state === "done"
-      ? "bg-accent text-accent-ink"
-      : state === "now"
-        ? "bg-accent/15 text-accent ring-4 ring-accent/10"
-        : "bg-surface text-muted";
+function Yes() {
   return (
-    <li className="flex gap-4">
-      <div className="flex flex-col items-center">
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${dot}`}>{icon}</span>
-        {!last && <span className={`w-0.5 flex-1 ${state === "done" ? "bg-accent/60" : "bg-border"}`} />}
-      </div>
-      <div className={last ? "pt-1" : "pb-5 pt-1"}>
-        <p className={`text-[15px] font-bold leading-tight ${state === "done" ? "text-muted line-through decoration-2" : ""}`}>{title}</p>
-        <p className="mt-1 text-[13px] leading-snug text-muted">{sub}</p>
-      </div>
-    </li>
+    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-ink" aria-label="Included">
+      <Check size={14} strokeWidth={3} />
+    </span>
   );
 }
 
-function Perk({ icon, text }: { icon: React.ReactNode; text: string }) {
+function No() {
   return (
-    <li className="flex items-center gap-3 text-[15px] font-semibold">
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-foreground">{icon}</span>
-      {text}
-    </li>
-  );
-}
-
-function PlanCard({
-  selected,
-  onSelect,
-  name,
-  note,
-  price,
-  badge,
-  disabled = false,
-}: {
-  selected: boolean;
-  onSelect: () => void;
-  name: string;
-  note: string;
-  price: string;
-  badge?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      onClick={onSelect}
-      disabled={disabled}
-      className={`relative flex items-center gap-3 rounded-3xl border-2 px-5 py-4 text-left transition active:scale-[0.99] disabled:opacity-60 ${
-        selected ? "border-accent bg-accent/[0.06]" : "border-border bg-surface"
-      }`}
-    >
-      {badge && (
-        <span className="absolute -top-2.5 left-5 rounded-full bg-accent px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-accent-ink">
-          {badge}
-        </span>
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="block text-[16px] font-bold">{name}</span>
-        <span className={`block text-[13px] ${selected ? "text-accent" : "text-muted"}`}>{note}</span>
-      </span>
-      <span className="text-right">
-        <span className="text-[17px] font-extrabold tabular-nums">{price}</span>
-        <span className="text-[13px] text-muted">/mo</span>
-      </span>
-      <span
-        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
-          selected ? "border-accent bg-accent text-accent-ink" : "border-faint"
-        }`}
-      >
-        {selected && <Check size={14} strokeWidth={3} />}
-      </span>
-    </button>
+    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 text-faint" aria-label="Not included">
+      <X size={12} strokeWidth={2.5} />
+    </span>
   );
 }
