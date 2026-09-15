@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { Bell, Check, Loader2, LockOpen, Palette, Sparkles, Type, X } from "lucide-react";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { useToast } from "@/components/ui/ToastProvider";
-import { PremiumHero } from "@/components/billing/PremiumHero";
 import { isNative } from "@/lib/native";
 import { safeBack } from "@/lib/safe-back";
 import { formatInr, PLANS, TRIAL_DAYS, type PlanId } from "@/lib/billing/plans";
@@ -75,19 +74,18 @@ export function PremiumPlans({
 
   return (
     <div className="relative mx-auto flex min-h-[calc(100dvh-84px)] w-full max-w-[480px] flex-col pb-8">
-      <div className="relative">
-        <PremiumHero />
+      <div className="px-4 pt-[calc(0.75rem+var(--sat))]">
         <button
           type="button"
           onClick={() => safeBack(router)}
           aria-label="Close"
-          className="absolute left-4 top-[calc(0.75rem+var(--sat))] flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition active:scale-95"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-surface text-foreground transition active:scale-95"
         >
           <X size={20} />
         </button>
       </div>
 
-      <div className="-mt-2 flex flex-1 flex-col px-6">
+      <div className="mt-6 flex flex-1 flex-col px-6">
         <h1 className="text-center text-[26px] font-extrabold leading-[1.15] tracking-tight [text-wrap:balance]">{title}</h1>
 
         {hasPremium ? (
