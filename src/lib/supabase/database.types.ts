@@ -418,6 +418,7 @@ export type Database = {
           last_message_at: string
           last_message_id: string | null
           screenshot_alert_at: string | null
+          theme: string | null
           title: string | null
           type: string
           updated_at: string | null
@@ -432,6 +433,7 @@ export type Database = {
           last_message_at?: string
           last_message_id?: string | null
           screenshot_alert_at?: string | null
+          theme?: string | null
           title?: string | null
           type?: string
           updated_at?: string | null
@@ -446,6 +448,7 @@ export type Database = {
           last_message_at?: string
           last_message_id?: string | null
           screenshot_alert_at?: string | null
+          theme?: string | null
           title?: string | null
           type?: string
           updated_at?: string | null
@@ -2292,6 +2295,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      set_chat_theme: {
+        Args: { p_conversation_id: string; p_theme: string | null }
+        Returns: undefined
+      }
       owns_product: {
         Args: { p_product: string; p_uid: string }
         Returns: boolean

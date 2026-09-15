@@ -19,7 +19,7 @@ export default async function ThreadPage({
       .from("conversation_members")
       .select("user_id, role, last_read_at, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, hide_read_receipts)")
       .eq("conversation_id", threadId),
-    supabase.from("conversations").select("type, title, avatar_url").eq("id", threadId).maybeSingle(),
+    supabase.from("conversations").select("type, title, avatar_url, theme").eq("id", threadId).maybeSingle(),
   ]);
 
   if (!members || members.length === 0) notFound();
@@ -129,6 +129,7 @@ export default async function ThreadPage({
       initialMessages={messages}
       initialReactions={(reactRows ?? []) as any}
       initialReaders={readers}
+      initialTheme={(conv as { theme?: string | null } | null)?.theme ?? null}
     />
   );
 }

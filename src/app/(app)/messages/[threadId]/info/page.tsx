@@ -36,7 +36,7 @@ export default async function ConversationInfoPage({
       .eq("conversation_id", threadId),
     supabase
       .from("conversations")
-      .select("type, title, avatar_url, vanish_mode, auto_delete_after, screenshot_alert_at")
+      .select("type, title, avatar_url, vanish_mode, auto_delete_after, screenshot_alert_at, theme")
       .eq("id", threadId)
       .maybeSingle(),
   ]);
@@ -88,6 +88,12 @@ export default async function ConversationInfoPage({
 
   // How many photos, videos, voice notes and files this conversation holds —
   // so the Media row can say whether it is worth opening.
+  // What this person can theme the chat with.
+  const [{ data: mine }, { data: bought }] = await Promise.all([
+    supabase.from("profiles").select("is_premium").eq("id", user.id).maybeSingle(),
+    supabase.from("purchases").select("product_id").eq("user_id", user.id),
+  ]);
+
   const { count: mediaCount } = await supabase
     .from("messages")
     .select("id", { count: "exact", head: true })
@@ -121,6 +127,9 @@ export default async function ConversationInfoPage({
       autoDeleteAfter={(conv?.auto_delete_after as string) ?? null}
       screenshotAlert={!!conv?.screenshot_alert_at}
       mediaCount={mediaCount ?? 0}
+      theme={(conv?.theme as string | null) ?? null}
+      isPremium={!!mine?.is_premium}
+      ownedThemes={(bought ?? []).map((b) => b.product_id)}
     />
   );
 }

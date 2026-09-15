@@ -29,6 +29,8 @@ import { PresenceDot } from "@/components/presence/PresenceDot";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
 import { one } from "@/lib/supabase/typed";
 import { ForwardSheet } from "@/components/messages/ForwardSheet";
+import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
+import { findChatTheme } from "@/lib/chat-themes";
 
 type PostPreview = {
   id: string;
@@ -217,6 +219,7 @@ export function RealChatView({
   initialMessages,
   initialReactions = [],
   initialReaders = [],
+  initialTheme = null,
 }: {
   conversationId: string;
   currentUserId: string;
@@ -226,10 +229,14 @@ export function RealChatView({
   initialMessages: ChatMsg[];
   initialReactions?: ReactionRow[];
   initialReaders?: Reader[];
+  /** The conversation's chat theme id, or null for the default look. */
+  initialTheme?: string | null;
 }) {
   const isGroup = !!group;
   const senderName = (id: string) => (id === currentUserId ? "You" : members?.[id]?.name ?? other.name);
   const supabase = createClient();
+  const [themeId, setThemeId] = useState<string | null>(initialTheme);
+  const theme = findChatTheme(themeId);
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMsg[]>(initialMessages);
   const [reactions, setReactions] = useState<ReactionRow[]>(initialReactions);
@@ -706,6 +713,12 @@ export function RealChatView({
           if (m.kind === "post" && m.post_id) hydratePost(m.id, m.post_id);
           if (m.kind === "shot" && m.shot_id) hydrateShot(m.id, m.shot_id);
           if (m.sender_id !== currentUserId) supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId }).then(() => {});
+          // Theme changes are announced as a system message; that is the cue
+          // to redraw, for whoever did not make the change.
+          if (m.kind === "system") {
+            supabase.from("conversations").select("theme").eq("id", conversationId).maybeSingle()
+              .then(({ data }) => { if (data) setThemeId(data.theme ?? null); });
+          }
         })
       .on("postgres_changes",
         { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
@@ -1386,6 +1399,7 @@ export function RealChatView({
         ref={scrollContainerRef}
         onScroll={onMessagesScroll}
         className="flex-1 overflow-y-auto px-4 py-4"
+        style={theme ? { background: theme.background } : undefined}
         onClick={() => { if (gifPickerOpen) setGifPickerOpen(false); }}
       >
         {/* Older-history loader — appears at the top while a chunk loads in */}
@@ -1695,18 +1709,22 @@ export function RealChatView({
                           onPointerLeave={onPressEnd}
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
                           className={`relative min-w-[80px] max-w-full cursor-default select-none rounded-2xl px-3.5 pt-2 pb-5 text-sm ${
-                            mine ? "rounded-br-md bg-accent text-accent-ink" : "rounded-bl-md bg-surface text-foreground"
+                            mine ? "rounded-br-md" : "rounded-bl-md"
+                          } ${theme ? "" : mine ? "bg-accent text-accent-ink" : "bg-surface text-foreground"} ${
+                            theme?.decor && showTime ? "mt-3" : ""
                           }`}
+                          style={theme ? { background: (mine ? theme.mine : theme.theirs).background, color: (mine ? theme.mine : theme.theirs).color, border: (mine ? theme.mine : theme.theirs).border } : undefined}
                         >
+                          {theme?.decor && showTime && <ChatThemeDecor decor={theme.decor} mine={mine} />}
                           {m.body}
                           {/* Time + status always at bottom-right inside the bubble */}
                           <span className="absolute bottom-1.5 right-2.5 flex items-center gap-[3px]">
                             {m.edited_at && (
-                              <span className={`text-[9px] font-medium italic leading-none ${mine ? "text-accent-ink/45" : "text-faint"}`}>
+                              <span className={`text-[9px] font-medium italic leading-none ${theme ? "" : mine ? "text-accent-ink/45" : "text-faint"}`} style={theme ? { color: (mine ? theme.mine : theme.theirs).meta } : undefined}>
                                 edited ·
                               </span>
                             )}
-                            <span className={`text-[9px] font-medium leading-none ${mine ? "text-accent-ink/45" : "text-faint"}`}>
+                            <span className={`text-[9px] font-medium leading-none ${theme ? "" : mine ? "text-accent-ink/45" : "text-faint"}`} style={theme ? { color: (mine ? theme.mine : theme.theirs).meta } : undefined}>
                               {timeLabel(m.created_at)}
                             </span>
                             {mine && <MsgStatusTick status={getMsgStatus(m)} />}

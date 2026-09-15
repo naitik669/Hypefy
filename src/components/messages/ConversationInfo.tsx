@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Palette,
   Ban,
   Bell,
   BellOff,
@@ -28,6 +29,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { useToast } from "@/components/ui/ToastProvider";
+import { ChatThemePicker } from "@/components/messages/ChatThemePicker";
+import { findChatTheme } from "@/lib/chat-themes";
 
 export type RosterMember = {
   id: string;
@@ -138,6 +141,9 @@ export function ConversationInfo({
   autoDeleteAfter,
   screenshotAlert,
   mediaCount,
+  theme = null,
+  isPremium = false,
+  ownedThemes = [],
 }: {
   conversationId: string;
   currentUserId: string;
@@ -152,6 +158,11 @@ export function ConversationInfo({
   autoDeleteAfter: string | null;
   screenshotAlert: boolean;
   mediaCount: number;
+  /** The chat's theme id, or null for the default look. */
+  theme?: string | null;
+  isPremium?: boolean;
+  /** Shop themes this person has bought. */
+  ownedThemes?: string[];
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -163,6 +174,8 @@ export function ConversationInfo({
   const [busy, setBusy] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(muted);
   const [vanish, setVanish] = useState(vanishMode);
+  const [chatTheme, setChatTheme] = useState<string | null>(theme);
+  const [themeOpen, setThemeOpen] = useState(false);
   const [shot, setShot] = useState(screenshotAlert);
   const [autoDelete, setAutoDelete] = useState<string | null>(
     // Postgres hands back "24:00:00" / "7 days"; match it to a known option.
@@ -341,6 +354,13 @@ export function ConversationInfo({
           label="Media and files"
           sub={mediaCount > 0 ? `${mediaCount} shared` : "Nothing shared yet"}
           href={`/messages/${conversationId}/media`}
+          right={<ChevronRight size={16} className="text-faint" />}
+        />
+        <Row
+          icon={<Palette size={20} />}
+          label="Theme"
+          sub={findChatTheme(chatTheme)?.label ?? "Default"}
+          onClick={() => setThemeOpen(true)}
           right={<ChevronRight size={16} className="text-faint" />}
         />
         <Row
@@ -614,6 +634,19 @@ export function ConversationInfo({
       </Section>
 
       <div className="h-8" />
+
+      <ChatThemePicker
+        open={themeOpen}
+        onClose={() => setThemeOpen(false)}
+        conversationId={conversationId}
+        current={chatTheme}
+        isPremium={isPremium}
+        owned={ownedThemes}
+        onChanged={(id) => {
+          setChatTheme(id);
+          router.refresh();
+        }}
+      />
 
       <ConfirmDialog
         open={confirmAutoDelete !== null}
