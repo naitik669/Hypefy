@@ -1425,6 +1425,126 @@ export type Database = {
           },
         ]
       }
+      billing_events: {
+        Row: {
+          event_id: string
+          received_at: string
+          type: string
+        }
+        Insert: {
+          event_id: string
+          received_at?: string
+          type: string
+        }
+        Update: {
+          event_id?: string
+          received_at?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          active: boolean
+          id: string
+          kind: string
+          name: string
+          price_paise: number | null
+          sort: number
+          tier: string
+        }
+        Insert: {
+          active?: boolean
+          id: string
+          kind: string
+          name: string
+          price_paise?: number | null
+          sort?: number
+          tier: string
+        }
+        Update: {
+          active?: boolean
+          id?: string
+          kind?: string
+          name?: string
+          price_paise?: number | null
+          sort?: number
+          tier?: string
+        }
+        Relationships: []
+      }
+      purchases: {
+        Row: {
+          amount_paise: number | null
+          created_at: string
+          id: string
+          product_id: string
+          provider: string
+          provider_ref: string | null
+          user_id: string
+        }
+        Insert: {
+          amount_paise?: number | null
+          created_at?: string
+          id?: string
+          product_id: string
+          provider: string
+          provider_ref?: string | null
+          user_id: string
+        }
+        Update: {
+          amount_paise?: number | null
+          created_at?: string
+          id?: string
+          product_id?: string
+          provider?: string
+          provider_ref?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean
+          created_at: string
+          current_period_end: string | null
+          id: string
+          plan: string
+          provider: string
+          provider_ref: string | null
+          status: string
+          trial_ends_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          plan: string
+          provider: string
+          provider_ref?: string | null
+          status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          plan?: string
+          provider?: string
+          provider_ref?: string | null
+          status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           accent_id: string
@@ -1447,6 +1567,11 @@ export type Database = {
           is_admin: boolean
           is_private: boolean
           is_verified: boolean
+          avatar_decoration: string | null
+          badge_revoked: boolean
+          is_premium: boolean
+          name_font: string | null
+          name_glow: string | null
           last_seen_at: string | null
           notif_prefs: Json
           profile_completed: boolean
@@ -1456,7 +1581,8 @@ export type Database = {
           suspended_at: string | null
           suspended_by: string | null
           suspended_until: string | null
-          suspension_reason: string | null          updated_at: string
+          suspension_reason: string | null
+          updated_at: string
           username: string | null
         }
         Insert: {
@@ -1480,6 +1606,11 @@ export type Database = {
           is_admin?: boolean
           is_private?: boolean
           is_verified?: boolean
+          avatar_decoration?: string | null
+          badge_revoked?: boolean
+          is_premium?: boolean
+          name_font?: string | null
+          name_glow?: string | null
           last_seen_at?: string | null
           notif_prefs?: Json
           profile_completed?: boolean
@@ -1489,7 +1620,8 @@ export type Database = {
           suspended_at?: string | null
           suspended_by?: string | null
           suspended_until?: string | null
-          suspension_reason?: string | null          updated_at?: string
+          suspension_reason?: string | null
+          updated_at?: string
           username?: string | null
         }
         Update: {
@@ -1513,6 +1645,11 @@ export type Database = {
           is_admin?: boolean
           is_private?: boolean
           is_verified?: boolean
+          avatar_decoration?: string | null
+          badge_revoked?: boolean
+          is_premium?: boolean
+          name_font?: string | null
+          name_glow?: string | null
           last_seen_at?: string | null
           notif_prefs?: Json
           profile_completed?: boolean
@@ -1522,7 +1659,8 @@ export type Database = {
           suspended_at?: string | null
           suspended_by?: string | null
           suspended_until?: string | null
-          suspension_reason?: string | null          updated_at?: string
+          suspension_reason?: string | null
+          updated_at?: string
           username?: string | null
         }
         Relationships: [
@@ -2154,6 +2292,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      owns_product: {
+        Args: { p_product: string; p_uid: string }
+        Returns: boolean
+      }
+      trial_eligible: { Args: { p_uid: string }; Returns: boolean }
       accept_call: { Args: { p_call_id: string }; Returns: undefined }
       add_conversation_member: {
         Args: { p_conversation_id: string; p_user_id: string }
