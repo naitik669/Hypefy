@@ -204,6 +204,7 @@ export function GridPeek({
       {open && post.image && (
         <PostPeek
           src={post.image}
+          postId={post.id}
           author={post.author}
           caption={post.caption}
           currentUserId={currentUserId ?? ""}

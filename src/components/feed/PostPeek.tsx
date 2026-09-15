@@ -15,6 +15,7 @@ import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { formatCount } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
+import { ShareButton } from "@/components/feed/QuickShare";
 
 /**
  * Hold a photo to lift the whole POST off the feed.
@@ -56,6 +57,8 @@ export type PeekAuthor = {
 
 export function PostPeek({
   src,
+  postId,
+  targetType = "post",
   author,
   caption,
   currentUserId,
@@ -70,6 +73,9 @@ export function PostPeek({
   onClose,
 }: {
   src: string;
+  /** What's being shared when the share button is held. */
+  postId: string;
+  targetType?: "post" | "shot";
   author: PeekAuthor | null;
   caption: string | null;
   currentUserId: string;
@@ -321,9 +327,14 @@ export function PostPeek({
               <MessageCircle size={22} strokeWidth={2.2} />
             </PeekAction>
 
-            <PeekAction label="Share" onClick={onShare}>
+            <ShareButton
+              postId={postId}
+              targetType={targetType}
+              onOpenSheet={onShare}
+              className="flex items-center gap-1.5 text-sm font-semibold text-foreground transition-transform duration-150 active:scale-90"
+            >
               <Plane size={21} weight="bold" />
-            </PeekAction>
+            </ShareButton>
           </div>
 
           <PeekAction

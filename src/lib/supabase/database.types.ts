@@ -2310,6 +2310,17 @@ export type Database = {
         Returns: boolean
       }
       trial_eligible: { Args: { p_uid: string }; Returns: boolean }
+      top_share_targets: {
+        Args: { p_limit?: number }
+        Returns: {
+          id: string
+          display_name: string | null
+          username: string | null
+          avatar_hue: number | null
+          avatar_url: string | null
+          sends: number
+        }[]
+      }
       accept_call: { Args: { p_call_id: string }; Returns: undefined }
       add_conversation_member: {
         Args: { p_conversation_id: string; p_user_id: string }

@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Plane } from "@/components/ui/Plane";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
+import { ShareButton } from "@/components/feed/QuickShare";
 import { HypeBreak } from "@/components/feed/HypeBreak";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { createClient } from "@/lib/supabase/client";
@@ -531,15 +532,14 @@ export function ShotFeedCard({
           )}
         </button>
 
-        <button
-          type="button"
-          onClick={() => setShareOpen(true)}
-          disabled={!currentUserId}
-          aria-label="Share"
-          className="flex h-10 items-center justify-center rounded-full px-2 text-foreground transition-colors hover:bg-white/5 active:scale-95 disabled:opacity-50"
+        <ShareButton
+          postId={shot.id}
+          targetType="shot"
+          onOpenSheet={() => setShareOpen(true)}
+          className="flex h-10 items-center justify-center rounded-full px-2 text-foreground transition-colors hover:bg-white/5 active:scale-95"
         >
           <Plane size={21} weight="bold" />
-        </button>
+        </ShareButton>
       </div>
 
       {shot.caption && (

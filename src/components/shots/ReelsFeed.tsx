@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
+import { ShareButton } from "@/components/feed/QuickShare";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { HypeBreak } from "@/components/feed/HypeBreak";
 import { formatCount } from "@/lib/format";
@@ -933,9 +934,16 @@ function ReelCard({
           <MessageCircle size={31} className="text-white" />
         </RailButton>
 
-        <RailButton label="Share" onClick={() => setShareOpen(true)}>
+        {/* Hold to send it straight to the people you share with most. */}
+        <ShareButton
+          postId={reel.id}
+          targetType="shot"
+          onOpenSheet={() => setShareOpen(true)}
+          className="flex flex-col items-center gap-1 transition-transform active:scale-90"
+        >
           <Plane size={29} weight="bold" className="text-white" />
-        </RailButton>
+          <span className="text-xs font-semibold tabular-nums text-white drop-shadow">Share</span>
+        </ShareButton>
 
         <RailButton label="Save" onClick={toggleSave} disabled={savePending} hold={holdSave}>
           <Bookmark

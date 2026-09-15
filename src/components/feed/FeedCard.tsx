@@ -22,6 +22,7 @@ import { PostPeek } from "@/components/feed/PostPeek";
 import { PinchLayer } from "@/components/feed/PinchLayer";
 import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
+import { ShareButton } from "@/components/feed/QuickShare";
 import { EditPostSheet } from "@/components/feed/EditPostSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { HypeBreak } from "@/components/feed/HypeBreak";
@@ -833,16 +834,17 @@ export function FeedCard({
             {formatCount(commentCount)}
           </button>
 
-          <button
-            type="button"
-            onClick={() => setShareOpen(true)}
-            aria-label="Share"
+          {/* Tap opens the share sheet; hold sends straight to the people
+              you share with most. */}
+          <ShareButton
+            postId={post.id}
+            onOpenSheet={() => setShareOpen(true)}
             className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 active:scale-90"
           >
             <Plane size={21} weight="bold" />
             {((post as any).share_count ?? 0) > 0 &&
               formatCount((post as any).share_count)}
-          </button>
+          </ShareButton>
         </div>
 
         <button
@@ -946,6 +948,7 @@ export function FeedCard({
       {peekSrc && (
         <PostPeek
           src={peekSrc}
+          postId={post.id}
           author={{
             id: post.user_id,
             name,
