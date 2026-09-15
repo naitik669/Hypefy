@@ -224,7 +224,7 @@ export default function SearchPage() {
         : await supabase
             .rpc("search_posts", { p_q: trimmed, p_limit: 24 })
             .select(
-              "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)"
+              "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
             );
 
       // Asked for on every search, shown only when the results are thin —

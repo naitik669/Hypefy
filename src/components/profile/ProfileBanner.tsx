@@ -14,10 +14,13 @@ import { bannerGradient } from "@/lib/profile";
 export function ProfileBanner({
   bannerId,
   bannerUrl,
+  isPremium = false,
   className = "",
 }: {
   bannerId?: string | null;
   bannerUrl?: string | null;
+  /** Premium banners draw only for Premium members. */
+  isPremium?: boolean;
   className?: string;
 }) {
   return (
@@ -25,7 +28,7 @@ export function ProfileBanner({
       // block auto-width, not w-full: callers add mx-* margins, and margins
       // don't shrink a 100%-width box — w-full made the banner overflow right.
       className={`relative aspect-[3/1] overflow-hidden ${className}`}
-      style={bannerUrl ? undefined : { background: bannerGradient(bannerId) }}
+      style={bannerUrl ? undefined : { background: bannerGradient(bannerId, isPremium) }}
     >
       {bannerUrl ? (
         // eslint-disable-next-line @next/next/no-img-element

@@ -14,6 +14,7 @@ import {
   CalendarClock,
   HelpCircle,
   ShieldAlert,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -29,6 +30,12 @@ const ITEMS = [
     label: "Edit profile",
     sub: "Photo, banner, name, bio, tags",
     icon: UserCircle,
+  },
+  {
+    href: "/settings/style",
+    label: "Your style",
+    sub: "Name font, glow, avatar decoration, banners",
+    icon: Sparkles,
   },
   {
     href: "/settings/account",

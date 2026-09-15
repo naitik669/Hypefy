@@ -47,7 +47,7 @@ export function PublicProfileTabs({
         const { data } = await supabase
           .from("posts")
           .select(
-            "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)"
+            "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
           )
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
@@ -65,7 +65,7 @@ export function PublicProfileTabs({
         const { data } = await supabase
           .from("saved_posts")
           .select(
-            "posts(*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified))"
+            "posts(*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration))"
           )
           .eq("user_id", userId)
           .order("created_at", { ascending: false })

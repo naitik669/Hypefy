@@ -26,6 +26,9 @@ import { EditPostSheet } from "@/components/feed/EditPostSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { HypeBreak } from "@/components/feed/HypeBreak";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { DisplayName } from "@/components/ui/DisplayName";
+import { AvatarFrame } from "@/components/ui/AvatarFrame";
+import { visibleDecoration } from "@/lib/cosmetics";
 import { HyperStar } from "@/components/ui/HyperStar";
 import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { formatCount } from "@/lib/format";
@@ -64,6 +67,10 @@ export type FeedPost = {
     avatar_url?: string | null;
     profile_tags: string[] | null;
     is_verified?: boolean | null;
+    is_premium?: boolean | null;
+    name_font?: string | null;
+    name_glow?: string | null;
+    avatar_decoration?: string | null;
   } | null;
   initialHyped?: boolean;
   initialSaved?: boolean;
@@ -614,19 +621,21 @@ export function FeedCard({
           }}
           className="shrink-0 active:scale-95 transition-transform"
         >
-          <Avatar
-            name={name}
-            hue={hue}
-            size={40}
-            src={profile?.avatar_url ?? undefined}
-          />
+          <AvatarFrame id={profile ? visibleDecoration(profile) : null} size={40}>
+            <Avatar
+              name={name}
+              hue={hue}
+              size={40}
+              src={profile?.avatar_url ?? undefined}
+            />
+          </AvatarFrame>
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <Link
             href={profileHref}
             className="truncate text-sm font-semibold hover:underline"
           >
-            {name}
+            <DisplayName name={name} profile={profile} />
           </Link>
           {profile?.is_verified && (
             <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />

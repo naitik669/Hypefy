@@ -1,5 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import {
+  Plus_Jakarta_Sans,
+  Pacifico,
+  Bungee,
+  Righteous,
+  Permanent_Marker,
+  Silkscreen,
+  Playfair_Display,
+} from "next/font/google";
 import { RegisterSW } from "@/components/pwa/RegisterSW";
 import { ReferralTracker } from "@/components/growth/ReferralTracker";
 import { ClientErrorReporter } from "@/components/pwa/ClientErrorReporter";
@@ -56,6 +64,19 @@ const jakarta = Plus_Jakarta_Sans({
     "sans-serif",
   ],
 });
+
+// Premium name fonts (src/lib/cosmetics.ts refers to these variables).
+// preload: false — the @font-face rules ship, but a face downloads only when
+// a name on screen uses it. Most names use none.
+const nameScript = Pacifico({ variable: "--font-name-script", weight: "400", subsets: ["latin"], preload: false, display: "swap" });
+const nameBlock = Bungee({ variable: "--font-name-block", weight: "400", subsets: ["latin"], preload: false, display: "swap" });
+const nameRetro = Righteous({ variable: "--font-name-retro", weight: "400", subsets: ["latin"], preload: false, display: "swap" });
+const nameMarker = Permanent_Marker({ variable: "--font-name-marker", weight: "400", subsets: ["latin"], preload: false, display: "swap" });
+const namePixel = Silkscreen({ variable: "--font-name-pixel", weight: "700", subsets: ["latin"], preload: false, display: "swap" });
+const nameClassic = Playfair_Display({ variable: "--font-name-classic", weight: "800", style: "italic", subsets: ["latin"], preload: false, display: "swap" });
+const NAME_FONT_VARIABLES = [nameScript, nameBlock, nameRetro, nameMarker, namePixel, nameClassic]
+  .map((f) => f.variable)
+  .join(" ");
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://app.hypefy.chat"),
@@ -133,7 +154,7 @@ export default async function RootLayout({
   const country = (await headers()).get("x-vercel-ip-country");
 
   return (
-    <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
+    <html lang="en" className={`${jakarta.variable} ${NAME_FONT_VARIABLES} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {/* The opening splash is removed for now, at request. Everything it
             needed is still here and unreferenced — SPLASH_BOOT, SPLASH_FACTS,

@@ -31,7 +31,7 @@ function normalise(raw: unknown[] | null) {
 }
 
 const POST_COLS =
-  "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)";
+  "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration)";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -80,7 +80,7 @@ export default async function HomePage() {
     supabase
       .from("posts")
       .select(
-        "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)"
+        "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
       )
       .in("user_id", feedUserIds)
       .order("created_at", { ascending: false })
@@ -90,7 +90,7 @@ export default async function HomePage() {
     supabase
       .from("posts")
       .select(
-        "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)"
+        "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
       )
       .order("created_at", { ascending: false })
       .limit(150),
@@ -142,7 +142,7 @@ export default async function HomePage() {
       ? supabase
           .from("reposts")
           .select(
-            "post_id, created_at, user_id, profiles:user_id(display_name, username), posts(*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified))"
+            "post_id, created_at, user_id, profiles:user_id(display_name, username), posts(*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration))"
           )
           .in("user_id", [...followingIds])
           .order("created_at", { ascending: false })

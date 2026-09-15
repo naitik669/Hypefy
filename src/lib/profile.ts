@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { canShow, findPremiumBanner } from "@/lib/cosmetics";
 
 export type MascotMood =
   | "hype"
@@ -29,6 +30,10 @@ export type Profile = {
   profileTags: string[];
   profileCompleted: boolean;
   isVerified: boolean;
+  isPremium: boolean;
+  nameFont: string | null;
+  nameGlow: string | null;
+  avatarDecoration: string | null;
   isAdmin: boolean;
   suspendedAt: string | null;
   suspendedUntil: string | null;
@@ -80,7 +85,17 @@ export const BANNERS: Banner[] = [
 
 export const DEFAULT_BANNER_ID = "lime-pulse";
 
-export function bannerGradient(id?: string | null): string {
+/**
+ * A Premium banner draws only while its owner has Premium; otherwise, and
+ * for an unknown id, the default.
+ */
+export function bannerGradient(id?: string | null, isPremium = false): string {
+  const premium = findPremiumBanner(id);
+  if (premium) {
+    return canShow(premium.tier, isPremium)
+      ? premium.gradient
+      : BANNERS.find((b) => b.id === DEFAULT_BANNER_ID)!.gradient;
+  }
   return (
     BANNERS.find((b) => b.id === id)?.gradient ??
     BANNERS.find((b) => b.id === DEFAULT_BANNER_ID)!.gradient
@@ -161,6 +176,10 @@ function mapProfile(row: any): Profile {
     profileTags: row.profile_tags ?? [],
     profileCompleted: row.profile_completed ?? false,
     isVerified: row.is_verified ?? false,
+    isPremium: row.is_premium ?? false,
+    nameFont: row.name_font ?? null,
+    nameGlow: row.name_glow ?? null,
+    avatarDecoration: row.avatar_decoration ?? null,
     isAdmin: row.is_admin ?? false,
     suspendedAt: row.suspended_at ?? null,
     suspendedUntil: row.suspended_until ?? null,

@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { DisplayName } from "@/components/ui/DisplayName";
 import { ZoomViewer } from "@/components/ui/ZoomViewer";
 import { bannerGradient } from "@/lib/profile";
 import {
@@ -44,6 +45,8 @@ export type ProfileCardData = {
   hue: number;
   avatarUrl: string | null | undefined;
   verified: boolean;
+  /** Name font and glow, when the owner has them. */
+  cosmetics?: { is_premium?: boolean | null; name_font?: string | null; name_glow?: string | null };
   stats: { posts: number; followers: number; following: number };
   isOwn: boolean;
 };
@@ -412,7 +415,7 @@ function Identity({
         className={`flex items-center gap-1 ${centred ? "justify-center" : ""}`}
       >
         <h2 className="truncate text-lg font-extrabold tracking-tight">
-          {data.name}
+          <DisplayName name={data.name} profile={data.cosmetics} />
         </h2>
         {data.verified && (
           <VerifiedStar className="h-[15px] w-[15px] shrink-0" />

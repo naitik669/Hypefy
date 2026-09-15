@@ -6,6 +6,8 @@ import { accentVars } from "@/lib/profile-accent";
 import { BannerEditMenu } from "@/components/profile/BannerEditMenu";
 import { FollowStats } from "@/components/profile/FollowStats";
 import { VerifiedBadgeButton } from "@/components/billing/VerifiedBadgeButton";
+import { DisplayName } from "@/components/ui/DisplayName";
+import { visibleDecoration } from "@/lib/cosmetics";
 import { HyperStar } from "@/components/ui/HyperStar";
 import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { AnthemChip } from "@/components/profile/AnthemChip";
@@ -43,6 +45,7 @@ export function ProfileHeader({
   note = null,
   noteEditable = false,
   accentId,
+  cosmetics = null,
 }: {
   name: string;
   username: string | null;
@@ -67,7 +70,10 @@ export function ProfileHeader({
   noteEditable?: boolean;
   /** Profile owner's accent. Tints THIS subtree only. */
   accentId?: string | null;
+  /** Premium and Shop styling: name font and glow, decoration, banner. */
+  cosmetics?: { is_premium?: boolean | null; name_font?: string | null; name_glow?: string | null; avatar_decoration?: string | null } | null;
 }) {
+  const isPremium = !!cosmetics?.is_premium;
   return (
     // Redefining the two accent variables here re-tints every bg-accent /
     // text-accent below it and nothing else — the bottom nav and feed are not
@@ -79,6 +85,7 @@ export function ProfileHeader({
         <ProfileBanner
           bannerId={bannerId}
           bannerUrl={bannerUrl}
+          isPremium={isPremium}
           className="rounded-card"
         />
         {currentUserId === userId && <BannerEditMenu userId={userId} />}
@@ -103,7 +110,9 @@ export function ProfileHeader({
               avatarUrl={avatarUrl}
               hasActiveShow={hasActiveShow}
               showId={entryShowId}
+              decoration={cosmetics ? visibleDecoration(cosmetics) : null}
               card={{
+                cosmetics: cosmetics ?? undefined,
                 accentId,
                 userId,
                 name,
@@ -129,7 +138,7 @@ export function ProfileHeader({
         {/* Identity */}
         <div className="mt-3">
           <span className="flex items-center gap-1 text-base font-bold leading-tight">
-            {name}
+            <DisplayName name={name} profile={cosmetics} />
             {verified && (
               <VerifiedBadgeButton name={name} isOwn={currentUserId === userId} />
             )}

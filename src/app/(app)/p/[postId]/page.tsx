@@ -32,7 +32,7 @@ const getPostWithAuthor = cache(async (postId: string) => {
   const { data: ownerProf } = await supabase
     .from("profiles")
     .select(
-      "id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified"
+      "id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration"
     )
     .eq("id", (raw as any).user_id)
     .maybeSingle();

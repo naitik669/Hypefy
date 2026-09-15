@@ -78,6 +78,7 @@ export default async function ProfilePage() {
         currentUserId={user.id}
         stats={stats}
         verified={profile?.isVerified ?? false}
+        cosmetics={profile ? { is_premium: profile.isPremium, name_font: profile.nameFont, name_glow: profile.nameGlow, avatar_decoration: profile.avatarDecoration } : null}
         anthemEditable
         anthem={profile?.anthem ?? null}
         note={myNote}

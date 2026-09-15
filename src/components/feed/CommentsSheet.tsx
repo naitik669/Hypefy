@@ -16,6 +16,10 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { Avatar } from "@/components/ui/Avatar";
+import { DisplayName } from "@/components/ui/DisplayName";
+import { AvatarFrame } from "@/components/ui/AvatarFrame";
+import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { visibleDecoration } from "@/lib/cosmetics";
 import { ZoomViewer } from "@/components/ui/ZoomViewer";
 import { GifPicker } from "@/components/messages/GifPicker";
 import { formatCount } from "@/lib/format";
@@ -60,6 +64,11 @@ type Profile = {
   username: string | null;
   avatar_hue: number | null;
   avatar_url?: string | null;
+  is_verified?: boolean | null;
+  is_premium?: boolean | null;
+  name_font?: string | null;
+  name_glow?: string | null;
+  avatar_decoration?: string | null;
 };
 
 type Node = {
@@ -202,7 +211,7 @@ export function CommentsSheet({
       let q = supabase
         .from("comments")
         .select(
-          "id, user_id, body, created_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url)"
+          "id, user_id, body, created_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
         )
         .eq(targetType === "shot" ? "shot_id" : "post_id", postId)
         .is("deleted_at", null)
@@ -465,7 +474,7 @@ export function CommentsSheet({
       const { data: row } = await supabase
         .from("comments")
         .select(
-          "id, user_id, body, created_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url)"
+          "id, user_id, body, created_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
         )
         .eq("id", data)
         .single();
@@ -934,12 +943,14 @@ const Row = memo(function Row({
         }}
         className="shrink-0 transition-transform active:scale-95"
       >
-        <Avatar
-          name={name}
-          hue={hue}
-          size={size}
-          src={node.profiles?.avatar_url ?? undefined}
-        />
+        <AvatarFrame id={node.profiles ? visibleDecoration(node.profiles) : null} size={size}>
+          <Avatar
+            name={name}
+            hue={hue}
+            size={size}
+            src={node.profiles?.avatar_url ?? undefined}
+          />
+        </AvatarFrame>
       </button>
 
       <div className="min-w-0 flex-1">
@@ -971,7 +982,8 @@ const Row = memo(function Row({
           }}
         >
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-semibold">{name}</span>
+            <DisplayName name={name} profile={node.profiles} className="text-sm font-semibold" />
+            {node.profiles?.is_verified && <VerifiedStar className="h-3 w-3 shrink-0 text-verified" />}
             <span className="text-xs text-faint">
               · {timeAgo(node.created_at)}
             </span>

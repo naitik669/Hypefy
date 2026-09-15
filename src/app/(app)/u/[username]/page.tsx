@@ -160,6 +160,7 @@ export default async function PublicProfilePage({
         currentUserId={currentUser?.id ?? null}
         stats={stats}
         verified={!!(profile as any).is_verified}
+        cosmetics={profile}
         isHyper={isHyper}
         isMutualHyper={isMutualHyper}
         anthemEditable={isOwn}

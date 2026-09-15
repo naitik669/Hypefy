@@ -20,7 +20,7 @@ import { useAdFill, useAdSlots } from "@/components/feed/useAdSlots";
 
 const PAGE_SIZE = 20;
 const POST_SELECT =
-  "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified)";
+  "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration)";
 
 
 function normalize(data: unknown[] | null): FeedPost[] {

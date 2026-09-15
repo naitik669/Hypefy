@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { ProfileCard, type ProfileCardData } from "@/components/profile/ProfileCard";
 
 const LONG_PRESS_MS = 450;
@@ -25,6 +26,7 @@ export function ProfileAvatar({
   hasActiveShow = false,
   showId,
   card,
+  decoration = null,
 }: {
   name: string;
   hue: number;
@@ -34,6 +36,8 @@ export function ProfileAvatar({
   showId?: string | null;
   /** Omitted on surfaces with no profile context; expanding is then a no-op. */
   card?: ProfileCardData;
+  /** A decoration the owner can wear right now (see visibleDecoration). */
+  decoration?: string | null;
 }) {
   const router = useRouter();
   const [cardOpen, setCardOpen] = useState(false);
@@ -86,6 +90,7 @@ export function ProfileAvatar({
         onContextMenu={(e) => e.preventDefault()}
         className="block touch-none select-none active:scale-[0.98]"
       >
+        <AvatarFrame id={decoration} size={hasActiveShow ? size + 12 : size}>
         {hasActiveShow ? (
           // Accent story ring
           <div className="rounded-[30px] bg-accent p-[3px]">
@@ -96,6 +101,7 @@ export function ProfileAvatar({
         ) : (
           <AvatarImg url={avatarUrl} name={name} hue={hue} size={size} className="rounded-[26px] ring-4 ring-background" />
         )}
+        </AvatarFrame>
       </button>
 
       {cardOpen && card && (
