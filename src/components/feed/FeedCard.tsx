@@ -934,6 +934,7 @@ export function FeedCard({
             avatarUrl: profile?.avatar_url ?? null,
             hue,
             verified: !!profile?.is_verified,
+            cosmetics: profile,
           }}
           caption={post.caption ?? null}
           currentUserId={uid}

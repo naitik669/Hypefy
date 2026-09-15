@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Star, MessageCircle, Bookmark } from "lucide-react";
 import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { Avatar } from "@/components/ui/Avatar";
+import { AvatarFrame } from "@/components/ui/AvatarFrame";
+import { DisplayName } from "@/components/ui/DisplayName";
+import { HypeParticles } from "@/components/feed/HypeParticles";
+import { visibleDecoration } from "@/lib/cosmetics";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { formatCount } from "@/lib/format";
@@ -40,6 +44,13 @@ export type PeekAuthor = {
   avatarUrl: string | null;
   hue: number;
   verified: boolean;
+  /** Their frame and name style, drawn in the peek as on the card. */
+  cosmetics?: {
+    is_premium?: boolean | null;
+    name_font?: string | null;
+    name_glow?: string | null;
+    avatar_decoration?: string | null;
+  } | null;
 };
 
 export function PostPeek({
@@ -77,6 +88,36 @@ export function PostPeek({
   const [following, setFollowing] = useState<boolean | null>(null);
 
   const isOwn = !!author && author.id === currentUserId;
+  /** Replays the burst on the icon that was just turned on. */
+  const [hypeBurst, setHypeBurst] = useState(0);
+  const [saveBurst, setSaveBurst] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
+
+  // Nothing behind the peek moves while it's open. The hold that opened it
+  // began on the post underneath, and touches stay with the element they
+  // started on, so without this the same finger kept scrolling and swiping
+  // the feed behind the card.
+  useEffect(() => {
+    const html = document.documentElement;
+    const prevHtml = html.style.overflow;
+    const prevBody = document.body.style.overflow;
+    html.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    const block = (e: Event) => {
+      // A sheet opened over the peek (comments, share) scrolls normally.
+      const el = e.target instanceof Element ? e.target.closest('[role="dialog"]') : null;
+      if (el && el !== root.current) return;
+      if (e.cancelable) e.preventDefault();
+    };
+    document.addEventListener("touchmove", block, { passive: false });
+    document.addEventListener("wheel", block, { passive: false });
+    return () => {
+      html.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+      document.removeEventListener("touchmove", block);
+      document.removeEventListener("wheel", block);
+    };
+  }, []);
 
   useEffect(() => {
     const id = setTimeout(() => setArmed(true), ARM_MS);
@@ -135,7 +176,10 @@ export function PostPeek({
          24px of padding here the "expanded" post came out NARROWER than the
          one it expanded from — measured at 342px against the card's 358 on a
          390px screen. A peek that shrinks the post is worse than no peek. */
-      className="fixed inset-0 z-[300] flex items-center justify-center p-3"
+      // Under the comment and share sheets (z-200), so they open over the
+      // peek instead of the peek closing first; above everything else.
+      ref={root}
+      className="fixed inset-0 z-[190] flex touch-none items-center justify-center overscroll-none p-3"
       // Ignored until the opening gesture is over. The hold that opens this
       // is still in progress, and its release lands here — as a touchend,
       // and then as the synthetic click browsers fire a moment later on
@@ -169,15 +213,17 @@ export function PostPeek({
         {/* Author. The one thing the old peek could not tell you. */}
         {author && (
           <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-            <Avatar
-              name={author.name}
-              hue={author.hue}
-              size={34}
-              src={author.avatarUrl ?? undefined}
-            />
+            <AvatarFrame id={author.cosmetics ? visibleDecoration(author.cosmetics) : null} size={34}>
+              <Avatar
+                name={author.name}
+                hue={author.hue}
+                size={34}
+                src={author.avatarUrl ?? undefined}
+              />
+            </AvatarFrame>
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-1 truncate text-sm font-semibold">
-                {author.name}
+                <DisplayName name={author.name} profile={author.cosmetics} className="truncate" />
                 {author.verified && (
                   <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />
                 )}
@@ -219,34 +265,33 @@ export function PostPeek({
               active={hyped}
               activeClass="text-hype"
               onClick={() => {
+                if (!hyped) setHypeBurst((n) => n + 1);
                 onHype();
               }}
             >
-              <Star
-                size={22}
-                strokeWidth={2.2}
-                className={hyped ? "text-hype" : ""}
-                fill={hyped ? "currentColor" : "none"}
-              />
+              <span className="relative">
+                <Star
+                  key={hypeBurst}
+                  size={22}
+                  strokeWidth={2.2}
+                  className={`${hypeBurst ? "animate-hype-burst" : ""} transition-colors ${hyped ? "text-hype" : ""}`}
+                  fill={hyped ? "currentColor" : "none"}
+                />
+                {hyped && hypeBurst > 0 && <HypeParticles key={hypeBurst} size={8} />}
+              </span>
             </PeekAction>
 
             <PeekAction
               label="Comments"
               count={commentCount}
-              onClick={() => {
-                onClose();
-                onComment();
-              }}
+              onClick={onComment}
             >
               <MessageCircle size={22} />
             </PeekAction>
 
             <PeekAction
               label="Share"
-              onClick={() => {
-                onClose();
-                onShare();
-              }}
+              onClick={onShare}
             >
               <Plane size={21} weight="bold" />
             </PeekAction>
@@ -256,11 +301,15 @@ export function PostPeek({
             <PeekAction
               label={saved ? "Remove from saved" : "Save"}
               active={saved}
-              onClick={onSave}
+              onClick={() => {
+                if (!saved) setSaveBurst((n) => n + 1);
+                onSave();
+              }}
             >
               <Bookmark
+                key={saveBurst}
                 size={21}
-                className={saved ? "fill-accent text-accent" : ""}
+                className={`${saveBurst ? "animate-hype-burst" : ""} ${saved ? "fill-accent text-accent" : ""}`}
               />
             </PeekAction>
           </div>
