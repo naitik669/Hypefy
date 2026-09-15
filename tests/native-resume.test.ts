@@ -70,7 +70,8 @@ describe("returning to the app", () => {
   it("refreshes after a long absence", async () => {
     const { STALE_AFTER_MS } = await import("@/components/native/NativeShell");
     awayFor(STALE_AFTER_MS + 1000);
-    expect(refresh).toHaveBeenCalledTimes(1);
+    // After checking for a new release (none here), so not synchronous.
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
   });
 });
 
