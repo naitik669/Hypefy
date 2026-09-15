@@ -23,6 +23,16 @@ describe("who gets styled", () => {
     expect(visibleDecoration({ ...styled, is_premium: true })).toBe("deco-neon");
   });
 
+  it("never changes the name's size, whichever font", () => {
+    for (const f of NAME_FONTS) {
+      const s = nameStyle({ name_font: f.id, is_premium: true });
+      expect(s?.fontSize).toBeUndefined();
+      // Matched to the default face's x-height, on a line that can't stretch.
+      expect(s?.fontSizeAdjust).toBe("0.52");
+      expect(s?.lineHeight).toBe("1");
+    }
+  });
+
   it("drops Premium styling when the plan lapses", () => {
     expect(nameStyle({ ...styled, is_premium: false })).toBeUndefined();
     expect(visibleDecoration({ ...styled, is_premium: false })).toBeNull();

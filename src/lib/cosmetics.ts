@@ -16,16 +16,15 @@ import type { CSSProperties } from "react";
 
 export type Tier = "free" | "premium" | "shop";
 
-export type NameFont = { id: string; label: string; family: string; weight: number; italic?: boolean; scale: number; tier: Tier };
+export type NameFont = { id: string; label: string; family: string; weight: number; italic?: boolean; tier: Tier };
 
-/** `scale` evens out faces that draw much larger or smaller at the same size. */
 export const NAME_FONTS: NameFont[] = [
-  { id: "font-script", label: "Script", family: "var(--font-name-script), cursive", weight: 400, scale: 1.05, tier: "premium" },
-  { id: "font-block", label: "Block", family: "var(--font-name-block), sans-serif", weight: 400, scale: 0.86, tier: "premium" },
-  { id: "font-retro", label: "Retro", family: "var(--font-name-retro), sans-serif", weight: 400, scale: 1, tier: "premium" },
-  { id: "font-marker", label: "Marker", family: "var(--font-name-marker), cursive", weight: 400, scale: 1, tier: "premium" },
-  { id: "font-pixel", label: "Pixel", family: "var(--font-name-pixel), monospace", weight: 700, scale: 0.84, tier: "premium" },
-  { id: "font-classic", label: "Classic", family: "var(--font-name-classic), serif", weight: 800, italic: true, scale: 1.08, tier: "premium" },
+  { id: "font-script", label: "Script", family: "var(--font-name-script), cursive", weight: 400, tier: "premium" },
+  { id: "font-block", label: "Block", family: "var(--font-name-block), sans-serif", weight: 400, tier: "premium" },
+  { id: "font-retro", label: "Retro", family: "var(--font-name-retro), sans-serif", weight: 400, tier: "premium" },
+  { id: "font-marker", label: "Marker", family: "var(--font-name-marker), cursive", weight: 400, tier: "premium" },
+  { id: "font-pixel", label: "Pixel", family: "var(--font-name-pixel), monospace", weight: 700, tier: "premium" },
+  { id: "font-classic", label: "Classic", family: "var(--font-name-classic), serif", weight: 800, italic: true, tier: "premium" },
 ];
 
 export type NameGlow = { id: string; label: string; color: string; tier: Tier };
@@ -93,6 +92,9 @@ export const findGlow = (id: string | null | undefined) => NAME_GLOWS.find((g) =
 export const findDecoration = (id: string | null | undefined) => DECORATIONS.find((d) => d.id === id);
 export const findPremiumBanner = (id: string | null | undefined) => PREMIUM_BANNERS.find((b) => b.id === id);
 
+/** Plus Jakarta Sans's x-height as a share of its size; every name face is matched to it. */
+export const NAME_SIZE_ADJUST = "0.52";
+
 /** The name's style for someone, with anything they can no longer wear dropped. */
 export function nameStyle(
   p: { name_font?: string | null; name_glow?: string | null; is_premium?: boolean | null },
@@ -103,7 +105,13 @@ export function nameStyle(
   const style: CSSProperties = {};
   if (font && canShow(font.tier, premium)) {
     style.fontFamily = font.family;
-    style.fontSize = `${font.scale}em`;
+    // Same size as the default font, whatever the face: font-size-adjust
+    // matches every face's lowercase height to Plus Jakarta Sans's, so a
+    // name never grows or shrinks when its font changes (or when the face
+    // swaps in over its fallback as it loads).
+    style.fontSizeAdjust = NAME_SIZE_ADJUST;
+    // Tall faces (Script's loops) would otherwise stretch the line they sit on.
+    style.lineHeight = "1";
     style.fontWeight = font.weight;
     if (font.italic) style.fontStyle = "italic";
     style.letterSpacing = "0.01em";

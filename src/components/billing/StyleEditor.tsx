@@ -12,7 +12,7 @@ import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { BANNERS } from "@/lib/profile";
-import { DECORATIONS, NAME_FONTS, NAME_GLOWS, PREMIUM_BANNERS, nameStyle, type Tier } from "@/lib/cosmetics";
+import { DECORATIONS, NAME_FONTS, NAME_GLOWS, NAME_SIZE_ADJUST, PREMIUM_BANNERS, nameStyle, type Tier } from "@/lib/cosmetics";
 import { BUBBLE_STYLES, findBubbleStyle } from "@/lib/bubble-styles";
 import { bubbleCss } from "@/lib/chat-themes";
 
@@ -189,7 +189,7 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
               </Tile>
               {NAME_FONTS.filter((f) => has(f.id, f.tier)).map((f) => (
                 <Tile key={f.id} on={draft.name_font === f.id} label={f.label} onClick={() => set({ name_font: f.id })}>
-                  <span style={{ fontFamily: f.family, fontWeight: f.weight, fontStyle: f.italic ? "italic" : undefined, fontSize: `${1.25 * f.scale}rem` }}>Aa</span>
+                  <span style={{ fontFamily: f.family, fontWeight: f.weight, fontStyle: f.italic ? "italic" : undefined, fontSize: "1.25rem", fontSizeAdjust: NAME_SIZE_ADJUST }}>Aa</span>
                 </Tile>
               ))}
             </Shelf>
