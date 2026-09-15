@@ -160,6 +160,9 @@ export function FeedCard({
   // JS-controlled swipe: one image per gesture, no native scroll momentum
   const galleryTouchStartX = useRef(0);
   const galleryTouchStartY = useRef(0);
+  /** When the finger landed, and whether it has since moved like a scroll. */
+  const galleryTouchStartAt = useRef(0);
+  const galleryMoved = useRef(false);
   const galleryIsTouchEvent = useRef(false);
 
   /**
@@ -286,6 +289,8 @@ export function FeedCard({
 
     galleryTouchStartX.current = e.touches[0].clientX;
     galleryTouchStartY.current = e.touches[0].clientY;
+    galleryTouchStartAt.current = e.timeStamp;
+    galleryMoved.current = false;
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;
       gestureConsumed.current = true;
@@ -318,7 +323,10 @@ export function FeedCard({
     const dy = Math.abs(e.touches[0].clientY - galleryTouchStartY.current);
     // Either axis: sideways is a swipe between images, vertical is the feed
     // scrolling past. Neither should still be arming a hold.
-    if (dx > HOLD_SLOP_PX || dy > HOLD_SLOP_PX) clearHold();
+    if (dx > HOLD_SLOP_PX || dy > HOLD_SLOP_PX) {
+      clearHold();
+      galleryMoved.current = true;
+    }
   }
 
   function onGalleryTouchEnd(e: React.TouchEvent) {
@@ -336,13 +344,22 @@ export function FeedCard({
     }
 
     const dx = galleryTouchStartX.current - e.changedTouches[0].clientX;
-    if (Math.abs(dx) >= 30) {
+    const dy = galleryTouchStartY.current - e.changedTouches[0].clientY;
+    if (Math.abs(dx) >= 30 && Math.abs(dx) > Math.abs(dy)) {
       // Swipe detected — advance exactly ONE image regardless of velocity
       setImgIdx((i) =>
         dx > 0 ? Math.min(i + 1, images.length - 1) : Math.max(i - 1, 0)
       );
-    } else {
-      handleImageTap(); // small move = tap
+    } else if (
+      // A tap is a touch that stayed put and lifted quickly. Anything that
+      // moved was the feed scrolling — two quick flicks up used to count as a
+      // double-tap and hype whatever photo was under your thumb.
+      !galleryMoved.current &&
+      Math.abs(dx) < HOLD_SLOP_PX &&
+      Math.abs(dy) < HOLD_SLOP_PX &&
+      e.timeStamp - galleryTouchStartAt.current < 250
+    ) {
+      handleImageTap(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
     }
   }
   function onGalleryTouchCancel() {
@@ -391,7 +408,7 @@ export function FeedCard({
   const postTrack = parseTrack(post.track);
   const postPoll = parsePoll(post.poll);
 
-  const lastTapRef = useRef(0);
+  const lastTapRef = useRef({ at: 0, x: 0, y: 0 });
 
   // â”€â”€ Self-sync: resolve user + fetch hype/save/comment state â”€â”€
   useEffect(() => {
@@ -546,16 +563,18 @@ export function FeedCard({
     setTimeout(() => setShowParticles(false), 640);
   }
 
-  function handleImageTap() {
+  function handleImageTap(x = 0, y = 0) {
     const now = Date.now();
-    if (now - lastTapRef.current < 300) {
+    const last = lastTapRef.current;
+    // Both taps close together in time AND on the same spot.
+    if (now - last.at < 300 && Math.hypot(x - last.x, y - last.y) < 40) {
       if (!hyped && !hypePending) {
         toggleHype(); // hypes (burst handled inside)
       } else {
         playBurst(); // already hyped â†’ replay heart, do NOT unhype
       }
     }
-    lastTapRef.current = now;
+    lastTapRef.current = { at: now, x, y };
   }
 
   async function toggleSave() {

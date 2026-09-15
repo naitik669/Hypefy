@@ -14,6 +14,7 @@ import { visibleDecoration } from "@/lib/cosmetics";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { formatCount } from "@/lib/format";
+import { haptics } from "@/lib/haptics";
 
 /**
  * Hold a photo to lift the whole POST off the feed.
@@ -92,6 +93,13 @@ export function PostPeek({
   const [hypeBurst, setHypeBurst] = useState(0);
   const [saveBurst, setSaveBurst] = useState(0);
   const root = useRef<HTMLDivElement>(null);
+  /** The big star over the photo on a double-tap, replayed each time. */
+  const [burst, setBurst] = useState(0);
+  const lastTap = useRef({ at: 0, x: 0, y: 0 });
+  function bigStar() {
+    haptics.success();
+    setBurst((n) => n + 1);
+  }
 
   // Nothing behind the peek moves while it's open. The hold that opened it
   // began on the post underneath, and touches stay with the element they
@@ -210,26 +218,26 @@ export function PostPeek({
             "transform 200ms cubic-bezier(0.16,1,0.3,1), opacity 140ms ease-out",
         }}
       >
-        {/* Author. The one thing the old peek could not tell you. */}
+        {/* Author */}
         {author && (
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-            <AvatarFrame id={author.cosmetics ? visibleDecoration(author.cosmetics) : null} size={34}>
+          <div className="flex items-center gap-3 px-4 pb-3 pt-3.5">
+            <AvatarFrame id={author.cosmetics ? visibleDecoration(author.cosmetics) : null} size={38}>
               <Avatar
                 name={author.name}
                 hue={author.hue}
-                size={34}
+                size={38}
                 src={author.avatarUrl ?? undefined}
               />
             </AvatarFrame>
-            <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-1 truncate text-sm font-semibold">
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="flex min-w-0 items-center gap-1 text-[15px] font-semibold">
                 <DisplayName name={author.name} profile={author.cosmetics} className="truncate" />
                 {author.verified && (
                   <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />
                 )}
               </p>
               {author.username && (
-                <p className="truncate text-xs text-muted">@{author.username}</p>
+                <p className="mt-0.5 truncate text-xs text-muted">@{author.username}</p>
               )}
             </div>
             {/* Only once resolved, and never on your own post — a button that
@@ -245,20 +253,48 @@ export function PostPeek({
           </div>
         )}
 
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt=""
-          /* object-contain is the real gain, not raw size. A feed card crops
-             to its composed aspect ratio with object-cover, so a wide or tall
-             post is showing you part of itself; this shows all of it. */
-          className="max-h-[58vh] w-full bg-black object-contain"
-        />
+        {/* The photo, whole. Double-tap hypes it, as on the feed. */}
+        <div
+          className="relative select-none bg-black"
+          onClick={(e) => {
+            const now = Date.now();
+            const last = lastTap.current;
+            if (now - last.at < 300 && Math.hypot(e.clientX - last.x, e.clientY - last.y) < 40) {
+              lastTap.current = { at: 0, x: 0, y: 0 };
+              bigStar();
+              if (!hyped) onHype();
+              return;
+            }
+            lastTap.current = { at: now, x: e.clientX, y: e.clientY };
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt=""
+            draggable={false}
+            /* object-contain is the real gain, not raw size. A feed card crops
+               to its composed aspect ratio with object-cover, so a wide or tall
+               post is showing you part of itself; this shows all of it. */
+            className="mx-auto max-h-[58vh] w-full object-contain"
+          />
+          {burst > 0 && (
+            <div key={burst} className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <Star
+                size={96}
+                className="animate-hype-pop text-hype drop-shadow-[0_4px_20px_rgba(255,208,0,0.5)]"
+                fill="currentColor"
+              />
+              <span className="absolute">
+                <HypeParticles size={16} />
+              </span>
+            </div>
+          )}
+        </div>
 
-        <div className="flex flex-col gap-2 px-3.5 pb-3 pt-2.5">
-          {/* Same actions as the feed row, in the same order, so the hold
-              does not become a second grammar to learn. */}
-          <div className="flex items-center gap-1">
+        {/* Same actions as the feed row, in the same order and spacing. */}
+        <div className="flex items-center justify-between px-4 pt-3">
+          <div className="flex items-center gap-5">
             <PeekAction
               label={hyped ? "Remove hype" : "Hype"}
               count={hypeCount}
@@ -272,52 +308,50 @@ export function PostPeek({
               <span className="relative">
                 <Star
                   key={hypeBurst}
-                  size={22}
+                  size={23}
                   strokeWidth={2.2}
                   className={`${hypeBurst ? "animate-hype-burst" : ""} transition-colors ${hyped ? "text-hype" : ""}`}
                   fill={hyped ? "currentColor" : "none"}
                 />
-                {hyped && hypeBurst > 0 && <HypeParticles key={hypeBurst} size={8} />}
+                {hyped && hypeBurst > 0 && <HypeParticles key={hypeBurst} size={9} />}
               </span>
             </PeekAction>
 
-            <PeekAction
-              label="Comments"
-              count={commentCount}
-              onClick={onComment}
-            >
-              <MessageCircle size={22} />
+            <PeekAction label="Comments" count={commentCount} onClick={onComment}>
+              <MessageCircle size={22} strokeWidth={2.2} />
             </PeekAction>
 
-            <PeekAction
-              label="Share"
-              onClick={onShare}
-            >
+            <PeekAction label="Share" onClick={onShare}>
               <Plane size={21} weight="bold" />
-            </PeekAction>
-
-            <div className="flex-1" />
-
-            <PeekAction
-              label={saved ? "Remove from saved" : "Save"}
-              active={saved}
-              onClick={() => {
-                if (!saved) setSaveBurst((n) => n + 1);
-                onSave();
-              }}
-            >
-              <Bookmark
-                key={saveBurst}
-                size={21}
-                className={`${saveBurst ? "animate-hype-burst" : ""} ${saved ? "fill-accent text-accent" : ""}`}
-              />
             </PeekAction>
           </div>
 
-          {caption && (
+          <PeekAction
+            label={saved ? "Remove from saved" : "Save"}
+            active={saved}
+            onClick={() => {
+              if (!saved) setSaveBurst((n) => n + 1);
+              onSave();
+            }}
+          >
+            <Bookmark
+              key={saveBurst}
+              size={21}
+              strokeWidth={2.2}
+              className={`${saveBurst ? "animate-hype-burst" : ""} transition-colors`}
+              fill={saved ? "currentColor" : "none"}
+            />
+          </PeekAction>
+        </div>
+
+        <div className="px-4 pb-4 pt-2">
+          {caption ? (
             <p className="line-clamp-3 text-sm leading-relaxed text-foreground/90">
+              {author?.username && <span className="mr-1.5 font-semibold text-foreground">{author.username}</span>}
               {caption}
             </p>
+          ) : (
+            <p className="text-xs text-faint">Double-tap to hype · tap outside to close</p>
           )}
         </div>
       </div>
@@ -347,13 +381,13 @@ function PeekAction({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className={`flex h-10 items-center gap-1.5 rounded-full px-2 transition-colors active:scale-95 ${
-        active ? activeClass : "text-foreground hover:bg-white/5"
+      className={`flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-transform duration-150 active:scale-90 ${
+        active ? activeClass : "text-foreground"
       }`}
     >
       {children}
       {count !== undefined && count > 0 && (
-        <span className="text-xs font-semibold tabular-nums">
+        <span>
           {formatCount(count)}
         </span>
       )}
