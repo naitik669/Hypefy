@@ -111,18 +111,14 @@ export function isGifBanner(url: string | null | undefined): boolean {
  * The wash behind someone's whole profile — their own two colours, while
  * they have Premium. Null means the app's own background, as before.
  *
- * The stops are in pixels, not percentages, and end transparent: the colour
- * starts under the banner (which is opaque, so anything drawn behind it is
- * wasted), holds through the name and buttons, and has faded out by the
- * bottom of the header however tall that is. As the element's own
- * background it needs no extra layer that something could paint over.
+ * It covers the whole profile — banner, name, buttons, posts — as the
+ * background of the page wrapper, so nothing paints over it and it stretches
+ * however long the profile is.
  */
 export function profileBackground(
   p: { profile_colors?: unknown; is_premium?: boolean | null },
 ): string | null {
-  if (!customGradient(p.profile_colors, !!p.is_premium)) return null;
-  const [top, bottom] = p.profile_colors as [string, string];
-  return `linear-gradient(180deg, ${top} 96px, ${bottom} 72%, transparent 100%)`;
+  return customGradient(p.profile_colors, !!p.is_premium);
 }
 
 /** The preset gradient for a banner id, or the default for an unknown one. */

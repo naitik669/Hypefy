@@ -3,7 +3,6 @@ import Link from "next/link";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { accentVars } from "@/lib/profile-accent";
-import { profileBackground } from "@/lib/profile";
 import { FollowStats } from "@/components/profile/FollowStats";
 import { VerifiedBadgeButton } from "@/components/billing/VerifiedBadgeButton";
 import { DisplayName } from "@/components/ui/DisplayName";
@@ -31,7 +30,6 @@ export function ProfileHeader({
   avatarUrl,
   bannerId,
   bannerUrl,
-  profileColors = null,
   hasActiveShow,
   entryShowId,
   userId,
@@ -56,8 +54,6 @@ export function ProfileHeader({
   avatarUrl: string | null | undefined;
   bannerId: string;
   bannerUrl: string | null | undefined;
-  /** Their own two colours behind the profile, while they have Premium. */
-  profileColors?: string[] | null;
   hasActiveShow: boolean;
   entryShowId: string | null;
   userId: string;
@@ -77,12 +73,11 @@ export function ProfileHeader({
   cosmetics?: { is_premium?: boolean | null; name_font?: string | null; name_glow?: string | null; avatar_decoration?: string | null } | null;
 }) {
   const isPremium = !!cosmetics?.is_premium;
-  const profileBg = profileBackground({ profile_colors: profileColors, is_premium: isPremium });
   return (
     // Redefining the two accent variables here re-tints every bg-accent /
     // text-accent below it and nothing else — the bottom nav and feed are not
     // descendants, so the viewer's own chrome stays Hypefy lime.
-    <div style={{ ...accentVars(accentId), background: profileBg ?? undefined }}>
+    <div style={accentVars(accentId)}>
       {/* Relative wrapper, not the banner itself: ProfileBanner carries the
           caller's margins, and the pencil has to sit inside those. */}
       <div className="relative mx-2 mt-2">
