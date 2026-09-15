@@ -85,6 +85,18 @@ select:focus-visible {
   outline: none;
 }
 
+/* On phones, no scrollbars anywhere: the thin line that appeared on the right
+   while scrolling. Apps don't show one. Desktop keeps them, since there a
+   mouse user may need to grab one. */
+@media (pointer: coarse) {
+  * {
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Hide scrollbars for horizontal scrollers (Shows row, etc.) */
 .no-scrollbar {
   -ms-overflow-style: none;
