@@ -46,6 +46,12 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: android-actions/setup-android@v3
+        with:
+          # The action's default also installs the legacy "tools" package,
+          # which newer sdkmanagers no longer have — every build failed here
+          # from 2026-09-12. Gradle fetches the platform and build tools it
+          # needs by itself.
+          packages: platform-tools
 
       # Copies web assets and plugin registrations into the native project.
       # Required even though the shell loads a remote URL: the plugin wiring
