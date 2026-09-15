@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // Which build the page's code came from, so an open app can notice a newer
+  // release and reload into it (src/lib/app-version.ts).
+  env: {
+    NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA ?? "dev",
+  },
   experimental: {
     // Keep a page you just left for 30s, so going back to it — Home, then
     // Messages, then Home again — is instant instead of a fresh trip to the

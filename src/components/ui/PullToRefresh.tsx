@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { reloadIfNewBuild } from "@/lib/app-version";
 import { useRouter } from "next/navigation";
 import { HypefyMark } from "@/components/HypefyMark";
 
@@ -49,6 +50,8 @@ export function PullToRefresh({
         // Gate the spinner on the caller's own fetch completing.
         Promise.resolve(onRefresh()).finally(() => setTimeout(release, 250));
       } else {
+        // Pulling to refresh also picks up a new release of the app itself.
+        void reloadIfNewBuild();
         router.refresh();
         // router.refresh() has no completion callback — release after a beat
         setTimeout(release, 1200);

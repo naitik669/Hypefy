@@ -7,6 +7,7 @@ import { StatusBar, Style } from "@capacitor/status-bar";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { isNative, isAndroidApp, safeNative } from "@/lib/native";
 import { closeTopOverlay } from "@/lib/overlay-stack";
+import { reloadIfNewBuild } from "@/lib/app-version";
 import { createClient } from "@/lib/supabase/client";
 import { isAuthCallbackUrl, completeNativeSignIn } from "@/lib/native-auth";
 
@@ -185,7 +186,11 @@ export function NativeShell() {
       }
       const away = awaySince.current === null ? 0 : Date.now() - awaySince.current;
       awaySince.current = null;
-      if (shouldRefreshOnResume(away)) router.refresh();
+      // A new release since this page loaded: reload into it. Otherwise
+      // refresh only after a long absence.
+      void reloadIfNewBuild().then((reloaded) => {
+        if (!reloaded && shouldRefreshOnResume(away)) router.refresh();
+      });
     }).then((handle) => { remove = () => void handle.remove(); });
 
     return () => remove?.();

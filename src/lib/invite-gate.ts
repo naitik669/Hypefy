@@ -32,6 +32,7 @@ export const GATE_MAX_AGE = 60 * 60 * 24 * 30;
 const OPEN_PATHS = [
   "/gate",
   "/api/gate",
+  "/api/version",
   "/auth/callback",
 
   // The front door.
