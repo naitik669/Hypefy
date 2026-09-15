@@ -3,24 +3,25 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Palette, Sparkles, Type, Frame, Smartphone, MessageCircle } from "lucide-react";
+import { Bell, Check, Loader2, LockOpen, Palette, Sparkles, Type, X } from "lucide-react";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { useToast } from "@/components/ui/ToastProvider";
+import { PremiumHero } from "@/components/billing/PremiumHero";
 import { isNative } from "@/lib/native";
-import { formatInr, PLANS, PREMIUM_PERKS, TRIAL_DAYS, type PlanId } from "@/lib/billing/plans";
+import { safeBack } from "@/lib/safe-back";
+import { formatInr, PLANS, TRIAL_DAYS, type PlanId } from "@/lib/billing/plans";
 import { subscribe } from "@/lib/billing/checkout";
-
-const PERK_ICONS = [VerifiedStar, Type, Frame, MessageCircle, Palette, Smartphone] as const;
 
 const noop = () => () => {};
 
 /**
- * The paywall, pitched as an invitation: Premium leads with a free trial,
- * and "just the badge" sits below for anyone who only wants that.
+ * The paywall. It leads with exactly how the free trial works — what unlocks
+ * today, when you'll be reminded, when money happens — because a subscription
+ * that explains itself doesn't feel like a trap. Then two plans and one button.
  *
- * Inside the Android app nothing can be bought — Play only allows its own
- * billing for digital items — so the buttons give way to a plain note and
- * nothing points anywhere else to pay.
+ * The Day 5 reminder is real: remind_trials_ending() (0080) sends it.
+ * Inside the Android app nothing can be bought (Play only allows its own
+ * billing for digital items), so the button gives way to a plain note.
  */
 export function PremiumPlans({
   configured,
@@ -36,17 +37,23 @@ export function PremiumPlans({
   const router = useRouter();
   const toast = useToast();
   const native = useSyncExternalStore(noop, isNative, () => false);
-  const [busy, setBusy] = useState<PlanId | null>(null);
+  const [plan, setPlan] = useState<PlanId>("premium");
+  const [busy, setBusy] = useState(false);
 
   const premium = PLANS.premium;
   const verified = PLANS.verified;
-  const trial = premium.trial && trialEligible;
+  const trial = trialEligible && plan === "premium";
+  const reminderDay = TRIAL_DAYS - 2;
 
-  async function start(plan: PlanId) {
+  async function start() {
     if (busy) return;
-    setBusy(plan);
-    const result = await subscribe(plan, plan === "premium" ? premium.name : verified.name);
-    setBusy(null);
+    if (!configured) {
+      toast("Payments are coming soon", "plain");
+      return;
+    }
+    setBusy(true);
+    const result = await subscribe(plan, PLANS[plan].name);
+    setBusy(false);
     if (result.ok) {
       toast(plan === "premium" ? "Welcome to Premium" : "You're verified", "success");
       router.push("/settings/subscription");
@@ -58,131 +65,204 @@ export function PremiumPlans({
     }
   }
 
-  const buyable = configured && !native;
+  const title = hasPremium
+    ? "You’re Premium"
+    : trial
+      ? `How your ${TRIAL_DAYS}-day free trial works`
+      : plan === "premium"
+        ? "Hypefy Premium"
+        : "Just the badge";
 
   return (
-    <div className="flex flex-col gap-5 px-4 pb-12 pt-4">
-      {/* Hero */}
-      <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(120%_90%_at_50%_0%,rgba(56,151,240,0.28),transparent_60%),radial-gradient(80%_60%_at_100%_100%,rgba(163,230,53,0.14),transparent_70%)] bg-elevated px-5 pb-6 pt-8 text-center">
-        <div className="mx-auto flex h-20 w-20 items-center justify-center">
-          <VerifiedStar className="h-20 w-20 text-verified drop-shadow-[0_0_24px_rgba(56,151,240,0.55)]" />
-        </div>
-        <h2 className="mt-4 text-2xl font-black tracking-tight">Hypefy Premium</h2>
-        <p className="mx-auto mt-1.5 max-w-[30ch] text-sm text-muted">
-          The badge, your own style, and chats that look like yours.
-        </p>
+    <div className="relative mx-auto flex min-h-[calc(100dvh-84px)] w-full max-w-[480px] flex-col pb-8">
+      <div className="relative">
+        <PremiumHero />
+        <button
+          type="button"
+          onClick={() => safeBack(router)}
+          aria-label="Close"
+          className="absolute left-4 top-[calc(0.75rem+var(--sat))] flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition active:scale-95"
+        >
+          <X size={20} />
+        </button>
+      </div>
 
-        <p className="mt-4 text-sm">
-          <span className="text-2xl font-black tabular-nums">{formatInr(premium.pricePaise)}</span>
-          <span className="text-muted">/month</span>
-        </p>
+      <div className="-mt-2 flex flex-1 flex-col px-6">
+        <h1 className="text-center text-[26px] font-extrabold leading-[1.15] tracking-tight [text-wrap:balance]">{title}</h1>
+
+        {hasPremium ? (
+          <p className="mt-2 text-center text-sm text-muted">Your badge, frames, bubbles and themes are on.</p>
+        ) : trial ? (
+          <ol className="mx-auto mt-7 flex w-full max-w-[320px] flex-col">
+            <Step state="done" icon={<Check size={14} strokeWidth={3} />} title="Account ready" sub="You’re all set." />
+            <Step state="now" icon={<LockOpen size={14} strokeWidth={2.5} />} title="Today: everything unlocks" sub="Badge, frames, bubbles and themes." />
+            <Step icon={<Bell size={13} strokeWidth={2.5} />} title={`Day ${reminderDay}: a reminder`} sub="We’ll let you know before it ends." />
+            <Step last icon={<Sparkles size={13} strokeWidth={2.5} />} title={`Day ${TRIAL_DAYS}: trial ends`} sub={`${formatInr(premium.pricePaise)}/month after. Cancel anytime before.`} />
+          </ol>
+        ) : plan === "premium" ? (
+          <ul className="mx-auto mt-7 flex w-full max-w-[320px] flex-col gap-4">
+            <Perk icon={<VerifiedStar className="h-4 w-4 text-verified" />} text="The blue badge" />
+            <Perk icon={<Type size={15} />} text="Name styles and frames" />
+            <Perk icon={<Palette size={15} />} text="Bubbles and chat themes" />
+          </ul>
+        ) : (
+          <div className="mx-auto mt-7 flex w-full max-w-[320px] items-center gap-3">
+            <VerifiedStar className="h-10 w-10 shrink-0 text-verified" />
+            <p className="text-sm text-muted">The blue star next to your name, everywhere on Hypefy.</p>
+          </div>
+        )}
+
+        <div className="flex-1" />
 
         {hasPremium ? (
           <Link
             href="/settings/subscription"
-            className="mt-5 flex items-center justify-center gap-2 rounded-2xl bg-white/10 py-3.5 text-sm font-bold"
+            className="mt-8 flex h-14 items-center justify-center rounded-full bg-surface text-[15px] font-bold transition active:scale-[0.98]"
           >
-            <Check size={16} /> You have Premium · Manage
+            Manage your plan
           </Link>
-        ) : buyable ? (
-          <>
-            <button
-              type="button"
-              onClick={() => start("premium")}
-              disabled={!!busy}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-accent py-3.5 text-sm font-extrabold text-accent-ink transition active:scale-[0.98] disabled:opacity-60"
-            >
-              {busy === "premium" ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-              {trial ? `Start your ${TRIAL_DAYS}-day free trial` : "Get Premium"}
-            </button>
-            <p className="mt-2.5 text-[11px] leading-snug text-faint">
-              {trial
-                ? `Free for ${TRIAL_DAYS} days, then ${formatInr(premium.pricePaise)}/month. Cancel anytime, no charge before day ${TRIAL_DAYS}.`
-                : `${formatInr(premium.pricePaise)}/month, renews monthly. Cancel anytime in Settings.`}
-            </p>
-          </>
         ) : (
-          <p className="mt-5 rounded-2xl bg-white/[0.06] px-4 py-3 text-sm text-muted">
-            {native ? "Premium isn't available in the app yet." : "Premium is coming soon."}
-          </p>
-        )}
-      </section>
-
-      {/* What's included */}
-      <section>
-        <p className="mb-2 px-1 text-xs font-bold uppercase tracking-widest text-faint">What you get</p>
-        <ul className="overflow-hidden rounded-2xl border border-border bg-elevated divide-y divide-border/70">
-          {PREMIUM_PERKS.map((perk, i) => {
-            const Icon = PERK_ICONS[i];
-            return (
-              <li key={perk.title} className="flex items-center gap-3 px-3 py-3.5">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-surface">
-                  {i === 0 ? (
-                    <VerifiedStar className="h-5 w-5 text-verified" />
-                  ) : (
-                    <Icon size={18} className="text-foreground" />
-                  )}
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold">{perk.title}</span>
-                  <span className="block text-xs text-muted">{perk.sub}</span>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-
-      {/* Just the badge */}
-      {!hasPremium && (
-        <section className="rounded-2xl border border-border bg-elevated p-4">
-          <div className="flex items-center gap-3">
-            <VerifiedStar className="h-9 w-9 shrink-0 text-verified" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold">Just the badge</p>
-              <p className="text-xs text-muted">
-                <span className="tabular-nums">{formatInr(verified.pricePaise)}</span>/month · the blue star, nothing else
-              </p>
+          <>
+            <div className="mt-8 flex flex-col gap-3" role="radiogroup" aria-label="Plan">
+              <PlanCard
+                selected={plan === "premium"}
+                onSelect={() => setPlan("premium")}
+                badge="Most popular"
+                name="Premium"
+                note={trialEligible ? `${TRIAL_DAYS} days free` : "Everything"}
+                price={formatInr(premium.pricePaise)}
+              />
+              <PlanCard
+                selected={plan === "verified"}
+                onSelect={() => setPlan("verified")}
+                name="Just the badge"
+                note={hasVerified ? "Active" : "Verified"}
+                price={formatInr(verified.pricePaise)}
+                disabled={hasVerified}
+              />
             </div>
-            {hasVerified ? (
-              <span className="flex items-center gap-1 rounded-full bg-verified/15 px-2.5 py-1 text-xs font-bold text-verified">
-                <Check size={12} /> Active
-              </span>
-            ) : buyable ? (
+
+            {native ? (
+              <p className="mt-5 rounded-full bg-surface py-4 text-center text-sm text-muted">Premium isn’t available in the app yet.</p>
+            ) : (
               <button
                 type="button"
-                onClick={() => start("verified")}
-                disabled={!!busy}
-                className="flex h-9 items-center gap-1.5 rounded-xl bg-white/10 px-3.5 text-xs font-bold transition active:scale-95 disabled:opacity-60"
+                onClick={start}
+                disabled={busy || (plan === "verified" && hasVerified)}
+                className="mt-5 flex h-14 items-center justify-center gap-2 rounded-full bg-accent text-[15px] font-extrabold text-accent-ink transition active:scale-[0.98] disabled:opacity-50"
               >
-                {busy === "verified" && <Loader2 size={13} className="animate-spin" />}
-                Get Verified
+                {busy && <Loader2 size={18} className="animate-spin" />}
+                {trial ? "Start free trial" : plan === "premium" ? "Get Premium" : "Get Verified"}
               </button>
-            ) : null}
-          </div>
-          {hasVerified && buyable && (
-            <p className="mt-3 text-[11px] leading-snug text-faint">
-              Moving up to Premium? Cancel Verified in Settings so you aren&apos;t charged for both.
+            )}
+
+            <p className="mt-3 text-center text-xs text-muted">
+              {trial
+                ? `₹0 today · then ${formatInr(premium.pricePaise)}/month · cancel anytime`
+                : `${formatInr(PLANS[plan].pricePaise)}/month · cancel anytime`}
             </p>
-          )}
-        </section>
-      )}
-
-      <Link
-        href="/marketplace"
-        className="flex items-center justify-between rounded-2xl border border-border bg-elevated px-4 py-3 text-sm"
-      >
-        <span>
-          <span className="block font-bold">Marketplace</span>
-          <span className="block text-xs text-muted">Frames, bubbles and themes to keep</span>
-        </span>
-        <span aria-hidden className="text-faint">›</span>
-      </Link>
-
-      <p className="px-1 text-center text-[11px] leading-snug text-faint">
-        By subscribing you agree to the{" "}
-        <Link href="/terms#paid" className="underline hover:text-muted">paid features terms</Link>.
-      </p>
+            <p className="mt-1 text-center text-[11px] text-faint">
+              <Link href="/terms#paid" className="underline-offset-2 hover:underline">
+                Terms
+              </Link>
+            </p>
+          </>
+        )}
+      </div>
     </div>
+  );
+}
+
+function Step({
+  icon,
+  title,
+  sub,
+  state = "later",
+  last = false,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  sub: string;
+  state?: "done" | "now" | "later";
+  last?: boolean;
+}) {
+  const dot =
+    state === "done"
+      ? "bg-accent text-accent-ink"
+      : state === "now"
+        ? "bg-accent/15 text-accent ring-4 ring-accent/10"
+        : "bg-surface text-muted";
+  return (
+    <li className="flex gap-4">
+      <div className="flex flex-col items-center">
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${dot}`}>{icon}</span>
+        {!last && <span className={`w-0.5 flex-1 ${state === "done" ? "bg-accent/60" : "bg-border"}`} />}
+      </div>
+      <div className={last ? "pt-1" : "pb-5 pt-1"}>
+        <p className={`text-[15px] font-bold leading-tight ${state === "done" ? "text-muted line-through decoration-2" : ""}`}>{title}</p>
+        <p className="mt-1 text-[13px] leading-snug text-muted">{sub}</p>
+      </div>
+    </li>
+  );
+}
+
+function Perk({ icon, text }: { icon: React.ReactNode; text: string }) {
+  return (
+    <li className="flex items-center gap-3 text-[15px] font-semibold">
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-foreground">{icon}</span>
+      {text}
+    </li>
+  );
+}
+
+function PlanCard({
+  selected,
+  onSelect,
+  name,
+  note,
+  price,
+  badge,
+  disabled = false,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  name: string;
+  note: string;
+  price: string;
+  badge?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      disabled={disabled}
+      className={`relative flex items-center gap-3 rounded-3xl border-2 px-5 py-4 text-left transition active:scale-[0.99] disabled:opacity-60 ${
+        selected ? "border-accent bg-accent/[0.06]" : "border-border bg-surface"
+      }`}
+    >
+      {badge && (
+        <span className="absolute -top-2.5 left-5 rounded-full bg-accent px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-accent-ink">
+          {badge}
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block text-[16px] font-bold">{name}</span>
+        <span className={`block text-[13px] ${selected ? "text-accent" : "text-muted"}`}>{note}</span>
+      </span>
+      <span className="text-right">
+        <span className="text-[17px] font-extrabold tabular-nums">{price}</span>
+        <span className="text-[13px] text-muted">/mo</span>
+      </span>
+      <span
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
+          selected ? "border-accent bg-accent text-accent-ink" : "border-faint"
+        }`}
+      >
+        {selected && <Check size={14} strokeWidth={3} />}
+      </span>
+    </button>
   );
 }

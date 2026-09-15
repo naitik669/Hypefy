@@ -97,4 +97,19 @@ describe("notifHref — every combination that exists in production", () => {
       ),
     ).toBe("/settings/security");
   });
+
+  it("a trial reminder opens your subscription, where you can cancel", () => {
+    expect(
+      notifHref(
+        n({
+          type: "trial_reminder",
+          target_type: null,
+          target_id: null,
+          actor_id: null,
+          actor: null,
+          body: "Your free trial ends in 2 days.",
+        }),
+      ),
+    ).toBe("/settings/subscription");
+  });
 });

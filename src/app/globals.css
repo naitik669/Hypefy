@@ -1270,3 +1270,6 @@ html[data-splash="off"] #hypefy-splash {
 @media (prefers-reduced-motion: reduce) {
   .hy-anim, .hy-anim * { animation: none !important; }
 }
+
+/* Premium hero: things drifting gently in orbit. */
+@keyframes ph-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, CheckCheck, Loader2, Trash2, UserPlus, ShieldAlert } from "lucide-react";
+import { Bell, CheckCheck, Loader2, Trash2, UserPlus, ShieldAlert, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -80,6 +80,7 @@ const NEVER_GROUP = new Set([
   // Every sign-in is its own event. Collapsing two into "1 other" hides the
   // one you didn't make, which is the entire point of the alert.
   "security_alert",
+  "trial_reminder",
 ]);
 
 function timeAgo(iso: string) {
@@ -111,6 +112,8 @@ export function notifHref(n: Notif): string {
   // A security alert has no actor and no target — it is about the account
   // itself, so it opens the page where you can act on it.
   if (n.type === "security_alert") return "/settings/security";
+  // About your own plan, from Hypefy rather than a person.
+  if (n.type === "trial_reminder") return "/settings/subscription";
 
   // A reaction to your Diary opens the Diary page, where yours is. It used to
   // open your profile, back when the same note was a status bubble there —
@@ -622,7 +625,11 @@ function NotifRow({ group: g, index = 0, following = false, onClear, onResolveRe
         }}
       >
         <div className="relative shrink-0">
-          {g.type === "security_alert" ? (
+          {g.type === "trial_reminder" ? (
+            <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-accent/15 text-accent">
+              <Sparkles size={22} />
+            </span>
+          ) : g.type === "security_alert" ? (
             // No actor: nobody did this to you, it happened to your account.
             // A face here would be a stranger's initial next to "New sign-in",
             // which reads as an accusation of the wrong person.
@@ -657,13 +664,13 @@ function NotifRow({ group: g, index = 0, following = false, onClear, onResolveRe
           )}
         </div>
         <p className="min-w-0 flex-1 text-sm leading-snug">
-          {g.type !== "security_alert" && (
+          {g.type !== "security_alert" && g.type !== "trial_reminder" && (
             <>
               <span className="font-semibold">{actorName}</span>{" "}
             </>
           )}
           <span
-            className={g.type === "security_alert" ? "font-semibold" : "text-muted"}
+            className={g.type === "security_alert" || g.type === "trial_reminder" ? "font-semibold" : "text-muted"}
           >
             {g.body}
           </span>{" "}

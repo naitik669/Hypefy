@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { PremiumPlans } from "@/components/billing/PremiumPlans";
 import { razorpayEnv } from "@/lib/billing/razorpay";
 import { isLive } from "@/lib/billing/plans";
@@ -20,14 +19,11 @@ export default async function PremiumPage() {
   const live = (subs ?? []).filter((s) => isLive(s.status));
 
   return (
-    <>
-      <PageHeader title="Premium" showBack />
-      <PremiumPlans
-        configured={!!razorpayEnv()}
-        trialEligible={eligible === true}
-        hasPremium={live.some((s) => s.plan === "premium")}
-        hasVerified={live.some((s) => s.plan === "verified")}
-      />
-    </>
+    <PremiumPlans
+      configured={!!razorpayEnv()}
+      trialEligible={eligible === true}
+      hasPremium={live.some((s) => s.plan === "premium")}
+      hasVerified={live.some((s) => s.plan === "verified")}
+    />
   );
 }
