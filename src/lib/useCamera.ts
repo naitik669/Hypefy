@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { NORMAL, type PhotoFilter } from "@/lib/photo-filters";
+import { cropRect, pickMainBackCamera, renderPhoto, takeStill } from "@/lib/photo-capture";
 
 export type FacingMode = "user" | "environment";
 
@@ -58,9 +60,8 @@ export async function widestZoom(stream: MediaStream) {
  * Headless camera. Owns the MediaStream, facing mode, readiness and the
  * permission error; renders nothing.
  *
- * Extracted from LiveCamera so the creator can draw its own chrome — a top
- * bar, a right rail, a mode switcher — over the same viewfinder. LiveCamera
- * keeps its original API and its own shutter, so /shows/add is untouched.
+ * Shared by the creator (/create) and the Show camera (LiveCamera), which
+ * each draw their own chrome over the same viewfinder.
  *
  * `audio` is opt-in: Shows capture a still and must not light the mic
  * indicator, while recording a Shot needs sound.
@@ -77,6 +78,8 @@ export function useCamera({
 } = {}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  /** Bumped per start, so a slow start that loses a race stops its own stream. */
+  const attempt = useRef(0);
   const [facing, setFacing] = useState<FacingMode>(facingDefault);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +88,7 @@ export function useCamera({
 
   const start = useCallback(
     async (mode: FacingMode) => {
+      const mine = ++attempt.current;
       // Always stop the previous stream first — leaving it running keeps the
       // camera light on and some devices refuse a second stream entirely.
       if (streamRef.current) {
@@ -100,11 +104,34 @@ export function useCamera({
         return;
       }
 
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: videoConstraints(mode, portrait, isPhone()),
+      const phone = isPhone();
+      const ask = (deviceId?: string) =>
+        navigator.mediaDevices.getUserMedia({
+          video: deviceId
+            ? { ...videoConstraints(mode, portrait, phone), facingMode: undefined, deviceId: { exact: deviceId } }
+            : videoConstraints(mode, portrait, phone),
           audio,
         });
+
+      try {
+        let stream = await ask();
+
+        // On a phone with several back lenses, make sure it's the main one.
+        // Labels are only readable once permission is granted, i.e. now.
+        if (phone && mode === "environment") {
+          const devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+          const current = stream.getVideoTracks()[0]?.getSettings().deviceId;
+          const main = pickMainBackCamera(devices, current);
+          if (main) {
+            stream.getTracks().forEach((t) => t.stop());
+            stream = await ask(main).catch(() => ask());
+          }
+        }
+
+        if (mine !== attempt.current) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
         streamRef.current = stream;
         void widestZoom(stream);
         if (videoRef.current) {
@@ -119,6 +146,7 @@ export function useCamera({
           };
         }
       } catch (err) {
+        if (mine !== attempt.current) return;
         // NotAllowedError is a refusal; anything else is usually hardware
         // already in use, which needs different advice.
         const denied =
@@ -137,6 +165,7 @@ export function useCamera({
   useEffect(() => {
     void start(facing);
     return () => {
+      attempt.current++;
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
@@ -148,37 +177,48 @@ export function useCamera({
   );
 
   /**
-   * Grab the current frame as a JPEG. The canvas is counter-mirrored for the
-   * selfie camera so the saved file matches what the subject saw rather than
-   * arriving flipped.
+   * Take a photo as a JPEG: a full-resolution still where the browser can,
+   * else the preview frame. Cropped to the 9:16 viewfinder (or left whole
+   * when the stream is landscape and shown whole), counter-mirrored for the
+   * selfie camera so the file matches what the subject saw, and filtered.
    */
   const capturePhoto = useCallback(
-    (name = `capture-${Date.now()}.jpg`) =>
-      new Promise<File | null>((resolve) => {
-        const video = videoRef.current;
-        if (!video || !ready) return resolve(null);
+    async (name = `capture-${Date.now()}.jpg`, filter: PhotoFilter = NORMAL): Promise<File | null> => {
+      const video = videoRef.current;
+      const track = streamRef.current?.getVideoTracks()[0];
+      if (!video || !ready || !video.videoWidth) return null;
 
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return resolve(null);
+      const landscape = video.videoWidth > video.videoHeight;
+      const aspect = landscape ? video.videoWidth / video.videoHeight : 9 / 16;
+      const mirror = facing === "user";
 
-        if (facing === "user") {
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
-        }
-        ctx.drawImage(video, 0, 0);
-
-        canvas.toBlob(
-          (blob) =>
-            resolve(blob ? new File([blob], name, { type: "image/jpeg" }) : null),
-          "image/jpeg",
-          0.92,
-        );
-      }),
+      const still = track ? await takeStill(track, !landscape) : null;
+      const blob = still
+        ? await renderPhoto(still, still.width, still.height, { aspect, mirror, filter })
+        : await renderPhoto(video, video.videoWidth, video.videoHeight, { aspect, mirror, filter });
+      still?.close();
+      return blob ? new File([blob], name, { type: "image/jpeg" }) : null;
+    },
     [facing, ready],
   );
+
+  /** A small square of the current frame, for the filter thumbnails. */
+  const snapshot = useCallback((px = 112): string | null => {
+    const video = videoRef.current;
+    if (!video?.videoWidth) return null;
+    const crop = cropRect(video.videoWidth, video.videoHeight, 1);
+    const canvas = document.createElement("canvas");
+    canvas.width = px;
+    canvas.height = px;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    if (facing === "user") {
+      ctx.translate(px, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, px, px);
+    return canvas.toDataURL("image/jpeg", 0.8);
+  }, [facing]);
 
   return {
     videoRef,
@@ -189,6 +229,7 @@ export function useCamera({
     error,
     retry: () => start(facing),
     capturePhoto,
+    snapshot,
     /** Front camera is shown mirrored so it behaves like a mirror. */
     mirrored: facing === "user",
     size,

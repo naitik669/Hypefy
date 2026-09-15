@@ -51,6 +51,8 @@ export default function AddShowPage() {
   const [pending, startTransition] = useTransition();
   const [track, setTrack] = useState<Track | null>(null);
   const [trackPickerOpen, setTrackPickerOpen] = useState(false);
+  // The filter carousel spans the bottom; the gallery buttons step aside.
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Post-share state
   const [posts, setPosts] = useState<PostOption[]>([]);
@@ -352,9 +354,10 @@ export default function AddShowPage() {
           </div>
 
           <div className="flex-1 overflow-hidden">
-            <LiveCamera onCapture={onCapture} />
+            <LiveCamera onCapture={onCapture} onFiltersOpenChange={setFiltersOpen} />
           </div>
 
+          {!filtersOpen && (<>
           <div className="absolute bottom-10 left-8 z-10 flex flex-col items-center gap-3">
             <button type="button" aria-label="Pick from gallery" onClick={() => galleryRef.current?.click()}
               className="flex h-12 w-12 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm">
@@ -370,6 +373,7 @@ export default function AddShowPage() {
             <span className="flex h-12 items-center text-xs font-medium text-white/60">Gallery</span>
             <span className="flex h-12 items-center text-xs font-medium text-white/60">Share Post</span>
           </div>
+          </>)}
         </>
       )}
 

@@ -18,6 +18,12 @@ import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { haptics } from "@/lib/haptics";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { ShotPreview } from "@/components/create/ShotPreview";
+import {
+  FilterCarousel,
+  FilterRailButton,
+  useFilterState,
+  viewfinderFilter,
+} from "@/components/camera/FilterCarousel";
 import type { Track } from "@/lib/music";
 
 export type CreateMode = "post" | "shot" | "show" | "live";
@@ -75,6 +81,10 @@ export function CreateScreen({
   const wantsAudio = mode === "shot";
 
   const cam = useCamera({ portrait: true, audio: wantsAudio });
+  // Filters are for photos, so Show mode only: a Shot records the raw stream.
+  const filters = useFilterState();
+  const filtering = mode === "show" && filters.open;
+  const look = viewfinderFilter(filters.selected);
   const stream = cam.streamRef.current;
 
   const rec = useVideoRecorder({
@@ -95,7 +105,7 @@ export function CreateScreen({
   async function onShutter() {
     haptics.tap();
     if (mode === "show") {
-      const photo = await cam.capturePhoto(`show-${Date.now()}.jpg`);
+      const photo = await cam.capturePhoto(`show-${Date.now()}.jpg`, filters.selected);
       if (photo) setCaptured(photo);
       return;
     }
@@ -146,17 +156,23 @@ export function CreateScreen({
       */}
       {wantsCamera ? (
         <div className="absolute inset-0 flex items-center justify-center">
-          <video
-            ref={cam.videoRef}
-            autoPlay
-            playsInline
-            muted
-            // A landscape stream (a phone that didn't rotate it) is shown
-            // whole rather than cut down to its middle third.
-            className={`aspect-[9/16] max-h-full w-full ${cam.isLandscape ? "object-contain" : "object-cover"} ${
-              cam.mirrored ? "[transform:scaleX(-1)]" : ""
-            }`}
-          />
+          <div className="relative aspect-[9/16] max-h-full w-full overflow-hidden">
+            <video
+              ref={cam.videoRef}
+              autoPlay
+              playsInline
+              muted
+              // A landscape stream (a phone that didn't rotate it) is shown
+              // whole rather than cut down to its middle third.
+              className={`h-full w-full ${cam.isLandscape ? "object-contain" : "object-cover"} ${
+                cam.mirrored ? "[transform:scaleX(-1)]" : ""
+              }`}
+              style={{ filter: look.filter }}
+            />
+            {look.tint && (
+              <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: look.tint }} />
+            )}
+          </div>
         </div>
       ) : (
         <div className="absolute inset-0 bg-gradient-to-b from-elevated to-black" />
@@ -219,15 +235,29 @@ export function CreateScreen({
               caption={`${maxSeconds}s`}
             />
           )}
-          {/* Effects are not built yet; the control is present but says so
-              rather than pretending to do something. */}
-          <RailButton label="Effects — coming soon" icon={Sparkles} disabled />
+          {mode === "show" ? (
+            <FilterRailButton open={filters.open} onClick={() => filters.toggle(cam.snapshot)} />
+          ) : (
+            // Video effects are not built yet; the control says so rather
+            // than pretending to do something.
+            <RailButton label="Effects — coming soon" icon={Sparkles} disabled />
+          )}
         </div>
       )}
 
       {/* ── Bottom: capture row, then the mode switcher ─────────── */}
       <div className="relative z-10 mt-auto flex flex-col gap-5 pb-[max(0.75rem,var(--sab))]">
-        {mode === "live" ? (
+        {filtering ? (
+          <FilterCarousel
+            selected={filters.selected}
+            onSelect={filters.select}
+            favorites={filters.favorites}
+            onToggleFavorite={filters.toggleFavorite}
+            onShutter={onShutter}
+            disabled={!cam.ready}
+            thumb={filters.thumb}
+          />
+        ) : mode === "live" ? (
           <p className="px-8 pb-4 text-center text-sm text-white/70">
             Going live isn&rsquo;t ready yet. It&rsquo;ll show up here when it is.
           </p>
@@ -307,6 +337,7 @@ export function CreateScreen({
               onClick={() => {
                 haptics.select();
                 setMode(m.id);
+                if (m.id !== "show") filters.close();
               }}
               aria-pressed={mode === m.id}
               className={`rounded-pill px-4 py-2 text-sm font-bold transition ${

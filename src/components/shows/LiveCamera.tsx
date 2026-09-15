@@ -1,122 +1,75 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { RefreshCw, AlertCircle } from "lucide-react";
-import { isPhone, videoConstraints, widestZoom } from "@/lib/useCamera";
-
-type FacingMode = "user" | "environment";
+import { useCamera } from "@/lib/useCamera";
+import { haptics } from "@/lib/haptics";
+import {
+  FilterCarousel,
+  FilterRailButton,
+  useFilterState,
+  viewfinderFilter,
+} from "@/components/camera/FilterCarousel";
 
 /**
  * LiveCamera — real-time camera viewfinder for the Shows creator.
  *
- * Opens front camera by default. Flip button switches to back.
- * The large shutter circle captures the current frame and returns
- * it as a JPEG File via `onCapture`.
+ * Opens the front camera. The right rail flips the camera and opens filters;
+ * with filters open, the shutter sits among them. The capture is a
+ * full-resolution still where the phone allows it, cropped to the 9:16
+ * frame you saw and filtered, returned as a JPEG File via `onCapture`.
  */
 export function LiveCamera({
   onCapture,
+  onFiltersOpenChange,
 }: {
   onCapture: (file: File) => void;
+  /** So the page can clear its own bottom-left buttons out of the carousel's way. */
+  onFiltersOpenChange?: (open: boolean) => void;
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const [facing, setFacing] = useState<FacingMode>("user");
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { videoRef, ready, error, retry, flip, capturePhoto, snapshot, mirrored, isLandscape } = useCamera({
+    facingDefault: "user",
+    portrait: true,
+    audio: false,
+  });
+  const filters = useFilterState();
+  const look = viewfinderFilter(filters.selected);
 
-  const startCamera = useCallback(async (mode: FacingMode) => {
-    // Stop any running stream first
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    setReady(false);
-    setError(null);
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setError("Camera not supported on this device.");
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        // Portrait on desktop; uncropped on a phone (see videoConstraints).
-        video: videoConstraints(mode, true, isPhone()),
-        audio: false,
-      });
-      streamRef.current = stream;
-      void widestZoom(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => setReady(true);
-      }
-    } catch {
-      setError(
-        "Camera access denied. Tap the camera icon in your browser's address bar to allow it.",
-      );
-    }
-  }, []);
-
-  // Start / restart camera when facingMode changes
   useEffect(() => {
-    startCamera(facing);
-    return () => {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-    };
-  }, [facing, startCamera]);
+    onFiltersOpenChange?.(filters.open);
+  }, [filters.open, onFiltersOpenChange]);
 
-  function capture() {
-    const video = videoRef.current;
-    if (!video || !ready) return;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // Mirror the canvas for front camera so the saved image isn't flipped
-    if (facing === "user") {
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
-    }
-    ctx.drawImage(video, 0, 0);
-
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return;
-        onCapture(new File([blob], `show-${Date.now()}.jpg`, { type: "image/jpeg" }));
-      },
-      "image/jpeg",
-      0.92,
-    );
+  async function capture() {
+    haptics.tap();
+    const file = await capturePhoto(`show-${Date.now()}.jpg`, filters.selected);
+    if (file) onCapture(file);
   }
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-black">
-      {/* Live preview — mirror front camera in CSS so it feels like a mirror.
-          Letterboxed to 9:16 for the same reason as the Shot viewfinder: a
-          phone screen is ~20:9 and no camera is, so covering it edge to edge
-          crops the width and shows you a tighter frame than you are about to
-          capture. */}
+      {/* Live preview, letterboxed to the 9:16 the photo is saved at. The
+          front camera is mirrored so it feels like a mirror. */}
       <div className="flex h-full w-full items-center justify-center">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className={`aspect-[9/16] max-h-full w-full object-cover ${facing === "user" ? "[transform:scaleX(-1)]" : ""}`}
-        />
+        <div className="relative aspect-[9/16] max-h-full w-full overflow-hidden">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className={`h-full w-full ${isLandscape ? "object-contain" : "object-cover"} ${mirrored ? "[transform:scaleX(-1)]" : ""}`}
+            style={{ filter: look.filter }}
+          />
+          {look.tint && <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: look.tint }} />}
+        </div>
       </div>
 
-      {/* Error overlay */}
       {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/90 px-8 text-center">
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-black/90 px-8 text-center">
           <AlertCircle size={40} className="text-danger" />
           <p className="text-sm text-white/80">{error}</p>
           <button
             type="button"
-            onClick={() => startCamera(facing)}
+            onClick={retry}
             className="rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-ink"
           >
             Retry
@@ -124,27 +77,44 @@ export function LiveCamera({
         </div>
       )}
 
-      {/* Flip camera button — top-right */}
-      <button
-        type="button"
-        aria-label="Flip camera"
-        onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
-        className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-transform active:scale-95"
-      >
-        <RefreshCw size={22} />
-      </button>
+      {/* Right rail, middle of the screen */}
+      <div className="absolute right-3 top-1/2 z-10 flex -translate-y-1/2 flex-col items-center gap-1 rounded-pill bg-black/35 py-3 backdrop-blur-sm">
+        <button
+          type="button"
+          aria-label="Flip camera"
+          onClick={flip}
+          className="flex w-14 flex-col items-center gap-0.5 py-2 text-white transition active:scale-90"
+        >
+          <RefreshCw size={22} />
+          <span className="text-[10px] font-bold">Flip</span>
+        </button>
+        <FilterRailButton open={filters.open} onClick={() => filters.toggle(snapshot)} />
+      </div>
 
-      {/* Shutter button — bottom-center */}
-      <button
-        type="button"
-        aria-label="Take photo"
-        onClick={capture}
-        disabled={!ready}
-        className="absolute bottom-10 left-1/2 z-10 -translate-x-1/2 flex h-[76px] w-[76px] items-center justify-center rounded-full border-4 border-white bg-white/25 backdrop-blur-sm transition-transform active:scale-90 disabled:opacity-40"
-      >
-        {/* Inner circle */}
-        <div className="h-14 w-14 rounded-full bg-white/80" />
-      </button>
+      {/* Bottom: the plain shutter, or the shutter among the filters */}
+      <div className="absolute inset-x-0 bottom-8 z-10 flex justify-center">
+        {filters.open ? (
+          <FilterCarousel
+            selected={filters.selected}
+            onSelect={filters.select}
+            favorites={filters.favorites}
+            onToggleFavorite={filters.toggleFavorite}
+            onShutter={capture}
+            disabled={!ready}
+            thumb={filters.thumb}
+          />
+        ) : (
+          <button
+            type="button"
+            aria-label="Take photo"
+            onClick={capture}
+            disabled={!ready}
+            className="mb-2 flex h-[76px] w-[76px] items-center justify-center rounded-full border-4 border-white bg-white/25 backdrop-blur-sm transition-transform active:scale-90 disabled:opacity-40"
+          >
+            <div className="h-14 w-14 rounded-full bg-white/80" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
