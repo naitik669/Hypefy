@@ -3,13 +3,19 @@
 import { useId } from "react";
 
 /**
- * A decoration on an avatar.
+ * How far a frame may reach past the photo, as a share of the photo's size,
+ * on every side. The photo is the 0–100 square of the drawing; frames draw
+ * anywhere in −REACH…100+REACH.
+ */
+const REACH = 50;
+
+/**
+ * A decoration on an avatar: a ring and accents around it.
  *
- * Drawn over the photo in the photo's own 100×100 square: the photo keeps
- * its full size and its place in the layout, and nothing reaches past it.
- * Rings sit right at the edge and are thick enough to read at feed size;
- * accents (a crown, a star, hearts) are drawn inside the square rather than
- * poking out, so there is nothing to trim.
+ * The photo keeps its full size and the avatar keeps its exact place in the
+ * layout: the frame is an overlay that is allowed to reach past the photo
+ * (up to half its size on each side), the way decorations do on Discord.
+ * Nothing around the avatar moves.
  *
  * `id` null renders the avatar alone, so call sites can pass whatever the
  * wearer currently has without a branch.
@@ -25,10 +31,16 @@ export function AvatarFrame({
 }) {
   const uid = useId().replace(/:/g, "");
   if (!id) return <>{children}</>;
+  const pad = (size * REACH) / 100;
   return (
     <span className="relative inline-block shrink-0 align-middle" style={{ width: size, height: size }}>
       {children}
-      <svg aria-hidden viewBox="0 0 100 100" className="pointer-events-none absolute inset-0 h-full w-full">
+      <svg
+        aria-hidden
+        viewBox={`${-REACH} ${-REACH} ${100 + 2 * REACH} ${100 + 2 * REACH}`}
+        className="pointer-events-none absolute"
+        style={{ left: -pad, top: -pad, width: size + 2 * pad, height: size + 2 * pad, overflow: "visible" }}
+      >
         <Frame id={id} uid={uid} />
       </svg>
     </span>
@@ -36,23 +48,23 @@ export function AvatarFrame({
 }
 
 /**
- * A ring whose outer edge is the photo's edge. The avatar is a squircle with
- * 30% corners, so a stroke of width `w` centred `w/2` in keeps that shape.
+ * A ring hugging the photo from just outside. The avatar is a squircle with
+ * 30% corners; the ring follows it, its inner edge overlapping the photo by
+ * a hair so no background shows between them.
  */
-function Ring({ w, stroke, opacity, filter }: { w: number; stroke: string; opacity?: number; filter?: string }) {
-  const i = w / 2;
+function Ring({ w, stroke, opacity }: { w: number; stroke: string; opacity?: number }) {
+  const o = w / 2 - 1; // centre line, outside the photo's edge
   return (
     <rect
-      x={i}
-      y={i}
-      width={100 - w}
-      height={100 - w}
-      rx={30 - i}
+      x={-o}
+      y={-o}
+      width={100 + 2 * o}
+      height={100 + 2 * o}
+      rx={30 + o}
       fill="none"
       stroke={stroke}
       strokeWidth={w}
       strokeOpacity={opacity}
-      filter={filter}
     />
   );
 }
@@ -90,31 +102,33 @@ function Frame({ id, uid }: { id: string; uid: string }) {
               <stop offset="1" stopColor="#ff9a3c" />
             </linearGradient>
           </defs>
-          <Ring w={7} stroke={`url(#h${uid})`} />
-          <rect x="7.5" y="7.5" width="85" height="85" rx="22.5" fill="none" stroke="#ffd000" strokeOpacity="0.45" strokeWidth="2" className="hy-anim motion-safe:animate-pulse" />
+          <Ring w={14} stroke="#ffd000" opacity={0.18} />
+          <Ring w={6} stroke={`url(#h${uid})`} />
+          <ellipse cx="50" cy="-12" rx="30" ry="7" fill="none" stroke={`url(#h${uid})`} strokeWidth="4" className="hy-anim motion-safe:animate-pulse" />
         </>
       );
     case "deco-sparkle":
       return (
         <>
           <Ring w={4.5} stroke="#ffffff" opacity={0.9} />
-          <path d={spark(80, 20, 11)} fill="#ffffff" />
-          <path d={spark(66, 11, 4)} fill="#bfe3ff" />
-          <path d={spark(20, 80, 8)} fill="#ffffff" />
-          <path d={spark(33, 90, 3)} fill="#bfe3ff" />
+          <path d={spark(98, 2, 14)} fill="#ffffff" />
+          <path d={spark(80, -12, 5)} fill="#bfe3ff" />
+          <path d={spark(2, 98, 11)} fill="#ffffff" />
+          <path d={spark(-12, 80, 4)} fill="#bfe3ff" />
+          <circle cx="112" cy="30" r="2.5" fill="#ffffff" />
         </>
       );
     case "deco-neon":
       return (
         <>
           <defs>
-            <filter id={`n${uid}`} x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="2.5" />
+            <filter id={`n${uid}`} x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="3" />
             </filter>
           </defs>
-          <rect x="5" y="5" width="90" height="90" rx="25" fill="none" stroke="#a3e635" strokeWidth="5" filter={`url(#n${uid})`} />
-          <rect x="5" y="5" width="90" height="90" rx="25" fill="none" stroke="#e7ffc2" strokeWidth="2.5" />
-          <Ring w={2} stroke="#3897f0" opacity={0.9} />
+          <rect x="-3" y="-3" width="106" height="106" rx="33" fill="none" stroke="#a3e635" strokeWidth="6" filter={`url(#n${uid})`} />
+          <rect x="-3" y="-3" width="106" height="106" rx="33" fill="none" stroke="#e7ffc2" strokeWidth="2.5" />
+          <rect x="-9" y="-9" width="118" height="118" rx="38" fill="none" stroke="#3897f0" strokeOpacity="0.85" strokeWidth="2" />
         </>
       );
     case "deco-flames":
@@ -129,11 +143,11 @@ function Frame({ id, uid }: { id: string; uid: string }) {
           </defs>
           <Ring w={4.5} stroke="#ff7a1a" />
           {[
-            [20, 97, 0.8], [35, 99, 1.05], [50, 100, 1.3], [65, 99, 1.05], [80, 97, 0.8],
+            [-4, 86, 0.9], [12, 106, 1.1], [32, 110, 1.35], [50, 112, 1.6], [68, 110, 1.35], [88, 106, 1.1], [104, 86, 0.9],
           ].map(([x, y, s], i) => (
             <path
               key={i}
-              d={`M${x} ${y} C${x - 7 * s} ${y - 6 * s} ${x - 3 * s} ${y - 14 * s} ${x} ${y - 20 * s} C${x + 1 * s} ${y - 13 * s} ${x + 8 * s} ${y - 9 * s} ${x} ${y}Z`}
+              d={`M${x} ${y} C${x - 8 * s} ${y - 7 * s} ${x - 3 * s} ${y - 16 * s} ${x} ${y - 23 * s} C${x + 1 * s} ${y - 15 * s} ${x + 9 * s} ${y - 10 * s} ${x} ${y}Z`}
               fill={`url(#f${uid})`}
             />
           ))}
@@ -149,11 +163,11 @@ function Frame({ id, uid }: { id: string; uid: string }) {
             </linearGradient>
           </defs>
           <Ring w={4.5} stroke="#f5c542" />
-          <g transform="rotate(-24 24 22)">
-            <path d="M8 32 L10 12 L18 22 L24 6 L30 22 L38 12 L40 32 Z" fill={`url(#c${uid})`} stroke="#8a5a00" strokeWidth="1.4" strokeLinejoin="round" />
-            <circle cx="24" cy="27" r="2.5" fill="#ff4f7b" />
-            <circle cx="15" cy="28" r="1.6" fill="#3897f0" />
-            <circle cx="33" cy="28" r="1.6" fill="#3897f0" />
+          <g transform="rotate(-22 14 4)">
+            <path d="M-10 18 L-7 -8 L4 6 L14 -14 L24 6 L35 -8 L38 18 Z" fill={`url(#c${uid})`} stroke="#8a5a00" strokeWidth="1.5" strokeLinejoin="round" />
+            <circle cx="14" cy="11" r="3" fill="#ff4f7b" />
+            <circle cx="2" cy="12" r="2" fill="#3897f0" />
+            <circle cx="26" cy="12" r="2" fill="#3897f0" />
           </g>
         </>
       );
@@ -161,9 +175,10 @@ function Frame({ id, uid }: { id: string; uid: string }) {
       return (
         <>
           <Ring w={4.5} stroke="#ff7ab8" />
-          <path d={heart(78, 20, 18)} fill="#ff4fa3" />
-          <path d={heart(90, 36, 8)} fill="#ff9ad5" />
-          <path d={heart(20, 80, 14)} fill="#ff4fa3" />
+          <path d={heart(96, 2, 24)} fill="#ff4fa3" />
+          <path d={heart(114, 26, 11)} fill="#ff9ad5" />
+          <path d={heart(2, 98, 18)} fill="#ff4fa3" />
+          <path d={heart(-14, 78, 9)} fill="#ff9ad5" />
         </>
       );
     case "deco-holo":
@@ -178,16 +193,16 @@ function Frame({ id, uid }: { id: string; uid: string }) {
               <stop offset="1" stopColor="#fde68a" />
             </linearGradient>
           </defs>
-          <Ring w={8} stroke={`url(#o${uid})`} />
+          <Ring w={9} stroke={`url(#o${uid})`} />
         </>
       );
     case "deco-8bit":
       return (
         <g shapeRendering="crispEdges">
-          <Ring w={7} stroke="#052e16" />
-          <Ring w={4} stroke="#22c55e" />
-          {[[12, 12], [82, 12], [12, 82], [82, 82]].map(([x, y]) => (
-            <rect key={`${x}${y}`} x={x} y={y} width="6" height="6" fill="#86efac" />
+          <Ring w={9} stroke="#052e16" />
+          <Ring w={5} stroke="#22c55e" />
+          {[[-9, -9], [101, -9], [-9, 101], [101, 101]].map(([x, y]) => (
+            <rect key={`${x}${y}`} x={x} y={y} width="8" height="8" fill="#86efac" />
           ))}
         </g>
       );
@@ -196,10 +211,10 @@ function Frame({ id, uid }: { id: string; uid: string }) {
         <>
           <Ring w={5} stroke="#fde047" />
           <path
-            d="M80 6 L66 30 L76 30 L68 48 L90 20 L79 20 L88 6 Z"
+            d="M104 -22 L84 12 L98 12 L86 40 L118 0 L102 0 L114 -22 Z"
             fill="#fde047"
             stroke="#713f12"
-            strokeWidth="1.4"
+            strokeWidth="1.5"
             strokeLinejoin="round"
           />
         </>
@@ -208,17 +223,17 @@ function Frame({ id, uid }: { id: string; uid: string }) {
       return (
         <>
           <Ring w={4.5} stroke="#fb7185" />
-          <ellipse cx="78" cy="18" rx="11" ry="6" transform="rotate(-40 78 18)" fill="#fda4af" />
-          <ellipse cx="88" cy="31" rx="6" ry="3.5" transform="rotate(20 88 31)" fill="#fb7185" />
-          <ellipse cx="22" cy="82" rx="10" ry="5.5" transform="rotate(-40 22 82)" fill="#fb7185" />
-          <ellipse cx="12" cy="69" rx="5" ry="3" transform="rotate(30 12 69)" fill="#fda4af" />
+          <ellipse cx="96" cy="2" rx="15" ry="8" transform="rotate(-40 96 2)" fill="#fda4af" />
+          <ellipse cx="112" cy="20" rx="8" ry="4.5" transform="rotate(20 112 20)" fill="#fb7185" />
+          <ellipse cx="4" cy="98" rx="14" ry="7.5" transform="rotate(-40 4 98)" fill="#fb7185" />
+          <ellipse cx="-12" cy="80" rx="7" ry="4" transform="rotate(30 -12 80)" fill="#fda4af" />
         </>
       );
     case "deco-hypestar":
       return (
         <>
           <Ring w={5.5} stroke="#ffd000" />
-          <path d={star(78, 22, 13)} fill="#ffd000" stroke="#5c4300" strokeWidth="1.4" strokeLinejoin="round" />
+          <path d={star(96, 4, 18)} fill="#ffd000" stroke="#5c4300" strokeWidth="1.5" strokeLinejoin="round" />
         </>
       );
     case "deco-gilded":
@@ -232,8 +247,8 @@ function Frame({ id, uid }: { id: string; uid: string }) {
               <stop offset="1" stopColor="#a8781a" />
             </linearGradient>
           </defs>
-          <Ring w={9} stroke={`url(#g${uid})`} />
-          <rect x="9" y="9" width="82" height="82" rx="21" fill="none" stroke="#5c4300" strokeOpacity="0.55" strokeWidth="1" />
+          <Ring w={10} stroke={`url(#g${uid})`} />
+          <rect x="-1" y="-1" width="102" height="102" rx="31" fill="none" stroke="#5c4300" strokeOpacity="0.5" strokeWidth="1" />
         </>
       );
     default:
