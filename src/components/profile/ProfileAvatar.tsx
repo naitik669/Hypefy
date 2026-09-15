@@ -10,7 +10,7 @@ const LONG_PRESS_MS = 450;
 
 /**
  * Profile avatar with story-ring + gesture handling:
- *  - tap, active Show  → opens the Show (with accent ring shown)
+ *  - tap, active Show  → opens the Show (no ring is drawn)
  *  - tap, no Show       → opens the profile card
  *  - press & hold       → always opens the profile card
  *

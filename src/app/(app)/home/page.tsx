@@ -405,6 +405,7 @@ export default async function HomePage() {
         avatarUrl: (myProfile as any).avatar_url ?? null,
         hasActiveShow: (myShows?.length ?? 0) > 0,
         showId: myShows?.[0]?.id as string | undefined, // entry = oldest
+        latestShowId: myShows?.[myShows.length - 1]?.id as string | undefined,
       }
     : undefined;
 
@@ -416,6 +417,7 @@ export default async function HomePage() {
       name: string;
       hue: number;
       avatar_url: string | null;
+      latestId: string;
       allIds: string[];
     }
   >();
@@ -429,6 +431,7 @@ export default async function HomePage() {
         name: p?.display_name ?? p?.username ?? "User",
         hue: p?.avatar_hue ?? 280,
         avatar_url: p?.avatar_url ?? null,
+        latestId: s.id, // newest first, so the first one seen is the latest
         allIds: [s.id],
       });
     } else {

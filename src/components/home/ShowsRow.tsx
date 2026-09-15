@@ -10,6 +10,8 @@ export type Show = {
   name: string;
   hue: number;
   seen: boolean;
+  /** Their newest active Show: watched-on-this-device is remembered against it, so a new Show brings the ring back. */
+  latestId: string;
   avatar_url?: string | null;
 };
 
@@ -19,6 +21,7 @@ type CurrentUser = {
   avatarUrl?: string | null;
   hasActiveShow: boolean;
   showId?: string; // entry show to watch your own
+  latestShowId?: string;
 };
 
 const STORAGE_KEY = "hypefy_seen_shows";
@@ -48,9 +51,9 @@ export function ShowsRow({
     setSeenIds(readSeen());
   }, []);
 
-  function handleShowTap(id: string) {
+  function handleShowTap(id: string, latestId: string) {
     setSeenIds((prev) => {
-      const next = new Set([...prev, id]);
+      const next = new Set([...prev, latestId]);
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
       } catch {}
@@ -60,12 +63,13 @@ export function ShowsRow({
   }
 
   // Unseen first (left), seen shift to the right
-  const unseen = shows.filter((s) => !seenIds.has(s.id) && !s.seen);
-  const seen   = shows.filter((s) =>  seenIds.has(s.id) ||  s.seen);
+  const unseen = shows.filter((s) => !seenIds.has(s.latestId) && !s.seen);
+  const seen   = shows.filter((s) =>  seenIds.has(s.latestId) ||  s.seen);
   const sorted = [...unseen, ...seen];
 
   // Whether the current user has already watched their own active show
-  const ownShowSeen = !!(currentUser?.showId && seenIds.has(currentUser.showId));
+  const ownLatest = currentUser?.latestShowId ?? currentUser?.showId;
+  const ownShowSeen = !!(ownLatest && seenIds.has(ownLatest));
 
   return (
     <div className="no-scrollbar flex gap-4 overflow-x-auto px-4 py-4">
@@ -78,7 +82,7 @@ export function ShowsRow({
             onClick={() => {
               if (currentUser?.hasActiveShow && currentUser.showId) {
                 // Use handleShowTap so the seenId is recorded → ring disappears
-                handleShowTap(currentUser.showId);
+                handleShowTap(currentUser.showId, ownLatest ?? currentUser.showId);
               } else {
                 router.push("/shows/add");
               }
@@ -121,12 +125,12 @@ export function ShowsRow({
 
       {/* ── Sorted shows (unseen first, seen right) ── */}
       {sorted.map((s) => {
-        const isSeen = seenIds.has(s.id) || s.seen;
+        const isSeen = seenIds.has(s.latestId) || s.seen;
         return (
           <button
             key={s.id}
             type="button"
-            onClick={() => handleShowTap(s.id)}
+            onClick={() => handleShowTap(s.id, s.latestId)}
             className="flex w-16 shrink-0 flex-col items-center gap-1.5 active:opacity-70"
           >
             {isSeen ? (
