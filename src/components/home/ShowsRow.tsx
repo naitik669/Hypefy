@@ -24,12 +24,19 @@ type CurrentUser = {
   latestShowId?: string;
 };
 
-const STORAGE_KEY = "hypefy_seen_shows";
+/**
+ * Shows this account has opened on this device. Per account: the app lets
+ * you switch accounts, and one shared list marked every Show the other
+ * account had watched as watched on this one too.
+ */
+const LEGACY_KEY = "hypefy_seen_shows";
+const storageKey = (viewerId: string) => `hypefy_seen_shows:${viewerId}`;
 
-function readSeen(): Set<string> {
+function readSeen(viewerId: string): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
-    return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]"));
+    localStorage.removeItem(LEGACY_KEY);
+    return new Set(JSON.parse(localStorage.getItem(storageKey(viewerId)) ?? "[]"));
   } catch {
     return new Set();
   }
@@ -38,9 +45,11 @@ function readSeen(): Set<string> {
 export function ShowsRow({
   shows,
   currentUser,
+  viewerId,
 }: {
   shows: Show[];
   currentUser?: CurrentUser;
+  viewerId: string;
 }) {
   const router = useRouter();
   // Persisted across navigation via localStorage (resolved after mount to
@@ -48,14 +57,14 @@ export function ShowsRow({
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    setSeenIds(readSeen());
-  }, []);
+    setSeenIds(readSeen(viewerId));
+  }, [viewerId]);
 
   function handleShowTap(id: string, latestId: string) {
     setSeenIds((prev) => {
       const next = new Set([...prev, latestId]);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
+        localStorage.setItem(storageKey(viewerId), JSON.stringify([...next].slice(-300)));
       } catch {}
       return next;
     });

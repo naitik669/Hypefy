@@ -449,7 +449,7 @@ export default async function HomePage() {
     <>
       <TopBar />
       <PullToRefresh>
-        <ShowsRow shows={shows} currentUser={currentUserForRow} />
+        <ShowsRow shows={shows} currentUser={currentUserForRow} viewerId={user.id} />
 
         {/* Shows are the least-understood thing in the app — 6 views against
             168 hypes. The row itself never says what it is or that it
