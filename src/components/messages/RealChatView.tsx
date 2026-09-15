@@ -1306,7 +1306,7 @@ export function RealChatView({
   return (
     <div className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
       {/* Header */}
-      <header className="flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-2 border-b border-border/60 chrome-bar px-2 pt-[env(safe-area-inset-top)]">
+      <header className="flex h-[calc(3.5rem+var(--sat))] items-center gap-2 border-b border-border/60 chrome-bar px-2 pt-[var(--sat)]">
         <button type="button" onClick={() => safeBack(router, "/messages")} aria-label="Back"
           className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5">
           <ChevronLeft size={24} />
@@ -1832,7 +1832,7 @@ export function RealChatView({
       </div>
 
       {/* Composer */}
-      <div className="border-t border-border/60 bg-background px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+8px)]">
+      <div className="border-t border-border/60 bg-background px-3 py-2 pb-[calc(var(--sab)+8px)]">
 
         {/* ── GIF picker panel — slides in just above the input row ── */}
         {gifPickerOpen && !voiceMode && (

@@ -265,7 +265,7 @@ export function ShowcaseEditor({
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 mx-auto max-w-[480px] border-t border-border bg-background/95 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur-xl">
+      <div className="fixed inset-x-0 bottom-0 mx-auto max-w-[480px] border-t border-border bg-background/95 px-4 pb-[calc(var(--sab)+12px)] pt-3 backdrop-blur-xl">
         <button
           type="button"
           onClick={create}

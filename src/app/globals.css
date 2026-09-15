@@ -44,6 +44,22 @@
   content < in-app notifier 150 < sheets/modals/menus 200 < confirm 210 < call 230
 */
 
+/* Safe areas: the space under the status bar and above the gesture bar.
+   Use var(--sat) / var(--sab), never env(safe-area-inset-*) directly.
+
+   In the Android app, Capacitor writes --safe-area-inset-* onto <html> in the
+   same step that lays the web view out, so it always agrees with where the
+   page actually sits. env() is the WebView's own copy of the same number, and
+   older WebViews don't refresh it when the layout changes after launch — the
+   status bar starts over the page and is moved above it moments later, and a
+   stale env() then padded the header for a status bar it was already below.
+   That was the top bar sitting low, some launches and not others. On the
+   website Capacitor is absent and these fall back to env(). */
+:root {
+  --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+
 html {
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;

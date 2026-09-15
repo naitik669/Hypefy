@@ -166,7 +166,7 @@ export function ShotPreview({
         className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/85 to-transparent"
       />
 
-      <div className="relative z-10 flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
+      <div className="relative z-10 flex items-center justify-between px-4 pt-[max(1rem,var(--sat))]">
         <button
           type="button"
           onClick={onBack}
@@ -183,7 +183,7 @@ export function ShotPreview({
         )}
       </div>
 
-      <div className="relative z-10 mt-auto flex flex-col gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="relative z-10 mt-auto flex flex-col gap-3 px-4 pb-[max(1rem,var(--sab))]">
         {(tooBig || badType) && (
           <p className="rounded-lg bg-danger/15 px-3 py-2 text-xs text-danger">
             {tooBig

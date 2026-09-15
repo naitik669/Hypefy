@@ -18,7 +18,7 @@ import { haptics } from "@/lib/haptics";
 import { folderFill, makeFolder, nextFolderColor, toFolder, type Folder } from "@/lib/folders";
 import { FOLDER_ITEM_COLS, folderItem, itemKey, type SavedItem } from "@/lib/saved";
 
-const HEADER = "sticky top-0 z-20 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-1 px-2 pt-[env(safe-area-inset-top)] transition-colors";
+const HEADER = "sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center gap-1 px-2 pt-[var(--sat)] transition-colors";
 const ICON_BTN = "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5";
 const GLOW = "radial-gradient(75% 70% at 50% 0%, #000 10%, transparent 72%)";
 const PILL = "flex h-9 items-center gap-1.5 rounded-pill bg-elevated px-3 text-xs font-bold ring-1 ring-border transition-colors active:bg-white/10 disabled:opacity-40";

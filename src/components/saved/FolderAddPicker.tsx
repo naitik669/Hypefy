@@ -130,7 +130,7 @@ function Picker({
 
   return (
     <div className="fixed inset-0 z-[150] mx-auto flex max-w-[480px] flex-col bg-background">
-      <header className="flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-center gap-2 border-b border-border/60 px-4 pt-[env(safe-area-inset-top)]">
+      <header className="flex h-[calc(3.5rem+var(--sat))] shrink-0 items-center gap-2 border-b border-border/60 px-4 pt-[var(--sat)]">
         <p className="min-w-0 flex-1 truncate text-[17px] font-extrabold tracking-tight">Add to {folderName}</p>
         <button
           type="button"
@@ -141,7 +141,7 @@ function Picker({
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)] pt-1">
+      <div className="flex-1 overflow-y-auto pb-[var(--sab)] pt-1">
         {items.length === 0 && all ? (
           <EmptyState icon={Bookmark} title="Nothing saved yet" text="Save a post or Shot first, then add it here." variant="compact" />
         ) : (

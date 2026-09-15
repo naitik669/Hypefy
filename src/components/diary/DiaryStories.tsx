@@ -145,7 +145,7 @@ export function DiaryStories({
       style={{ background: diaryTheme(entry.color, entry.hue).screen }}
     >
       {/* Progress: one segment per Diary. */}
-      <div className="flex gap-1 px-3 pt-[max(env(safe-area-inset-top),12px)]" aria-hidden>
+      <div className="flex gap-1 px-3 pt-[max(var(--sat),12px)]" aria-hidden>
         {list.map((d, i) => (
           <span key={d.userId} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/20">
             <span
@@ -220,7 +220,7 @@ export function DiaryStories({
 
       <div
         key={entry.userId}
-        className="px-3 pb-[max(env(safe-area-inset-bottom),12px)]"
+        className="px-3 pb-[max(var(--sab),12px)]"
       >
         <DiaryResponder
           entry={entry}

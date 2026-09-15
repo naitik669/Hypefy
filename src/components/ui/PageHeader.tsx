@@ -22,7 +22,7 @@ export function PageHeader({
   const router = useRouter();
 
   return (
-    <header className="sticky top-0 z-20 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-1 border-b border-border/60 chrome-bar px-2 pt-[env(safe-area-inset-top)]">
+    <header className="sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center gap-1 border-b border-border/60 chrome-bar px-2 pt-[var(--sat)]">
       {showBack ? (
         <button
           type="button"

@@ -887,7 +887,7 @@ function ReelCard({
         type="button"
         onClick={onBack}
         aria-label="Go back"
-        className="absolute left-3 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
+        className="absolute left-3 top-[calc(1rem+var(--sat))] z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
       >
         <ChevronLeft size={22} />
       </button>
@@ -897,7 +897,7 @@ function ReelCard({
         type="button"
         onClick={onToggleMute}
         aria-label={muted ? "Unmute" : "Mute"}
-        className="absolute right-3 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
+        className="absolute right-3 top-[calc(1rem+var(--sat))] z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
       >
         {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
       </button>

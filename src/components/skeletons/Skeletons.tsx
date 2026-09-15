@@ -29,7 +29,7 @@ export function ReelSkeleton() {
 /** Static header bar skeleton (matches TopBar height/layout). */
 export function HeaderSkeleton({ centerWordmark = false }: { centerWordmark?: boolean }) {
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-border/60 chrome-bar px-4">
+    <header className="sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center pt-[var(--sat)] justify-between border-b border-border/60 chrome-bar px-4">
       <SkeletonCircle size={32} />
       {centerWordmark ? (
         <span className="text-xl font-extrabold tracking-tight text-foreground/90">
@@ -153,7 +153,7 @@ export function PostDetailSkeleton() {
 export function SearchSkeleton() {
   return (
     <>
-      <div className="sticky top-0 z-20 border-b border-border/60 chrome-bar px-4 py-3">
+      <div className="sticky top-0 z-20 border-b border-border/60 chrome-bar px-4 pb-3 pt-[calc(0.75rem+var(--sat))]">
         <Skeleton className="h-11 w-full" rounded="rounded-pill" />
       </div>
       <div className="flex flex-col pt-1">

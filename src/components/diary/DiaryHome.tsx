@@ -32,7 +32,7 @@ const NONE: DiaryReaction[] = [];
 
 /** The first screen, exactly: all of the window between the header and the tab bar. */
 const SPOTLIGHT_HEIGHT =
-  "calc(100dvh - 3.5rem - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom))";
+  "calc(100dvh - 3.5rem - 72px - var(--sat) - var(--sab))";
 
 /**
  * Spotlight — the screen of pages, one tap from Messages.

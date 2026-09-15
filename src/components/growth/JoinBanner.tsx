@@ -7,7 +7,7 @@ import Link from "next/link";
  */
 export function JoinBanner() {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/90 px-4 py-3 backdrop-blur-md pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/90 px-4 py-3 backdrop-blur-md pb-[calc(0.75rem+var(--sab))]">
       <div className="mx-auto flex w-full max-w-md items-center gap-3">
         <p className="min-w-0 flex-1 text-sm">
           <span className="font-extrabold tracking-tight">Hypefy<span className="text-accent">.</span></span>{" "}

@@ -54,7 +54,7 @@ export function MessagesHeader({
   // but painted in the page's own colour so it never announces itself; the list
   // simply slides under it.
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center justify-between bg-background px-4">
+    <header className="sticky top-0 z-20 flex h-[calc(4rem+var(--sat))] items-center justify-between bg-background px-4 pt-[var(--sat)]">
       {/* No `truncate` and no `leading-none`: together they clipped the word.
           truncate sets overflow:hidden, leading-none sets line-height to the
           font size, and "Messages" has a descender — so the tail of the g was

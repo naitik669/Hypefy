@@ -188,7 +188,7 @@ export function BottomSheet({
         }}
         role="dialog"
         aria-modal="true"
-        className="animate-rise w-full max-w-[480px] max-h-[85dvh] overflow-y-auto rounded-t-3xl border-t border-border bg-elevated pb-[calc(env(safe-area-inset-bottom)+12px)]"
+        className="animate-rise w-full max-w-[480px] max-h-[85dvh] overflow-y-auto rounded-t-3xl border-t border-border bg-elevated pb-[calc(var(--sab)+12px)]"
         onClick={(e) => e.stopPropagation()}
         onTouchStart={onDragStart}
         onTouchMove={onDragMove}

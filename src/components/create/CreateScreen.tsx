@@ -175,7 +175,7 @@ export function CreateScreen({
       )}
 
       {/* ── Top bar ─────────────────────────────────────────────── */}
-      <div className="relative z-10 flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
+      <div className="relative z-10 flex items-center justify-between px-4 pt-[max(1rem,var(--sat))]">
         <button
           type="button"
           onClick={close}
@@ -224,7 +224,7 @@ export function CreateScreen({
       )}
 
       {/* ── Bottom: capture row, then the mode switcher ─────────── */}
-      <div className="relative z-10 mt-auto flex flex-col gap-5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="relative z-10 mt-auto flex flex-col gap-5 pb-[max(0.75rem,var(--sab))]">
         {mode === "live" ? (
           <p className="px-8 pb-4 text-center text-sm text-white/70">
             Going live isn&rsquo;t ready yet. It&rsquo;ll show up here when it is.
