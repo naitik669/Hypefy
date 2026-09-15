@@ -21,6 +21,7 @@ import { SignOutButton } from "@/components/SignOutButton";
 import { AccountSwitcher } from "@/components/settings/AccountSwitcher";
 import { InviteRow } from "@/components/growth/InviteButton";
 import { SettingsCard, SettingsRow } from "@/components/settings/SettingsCard";
+import { PremiumSettingsRow } from "@/components/billing/PremiumSettingsRow";
 
 const ITEMS = [
   {
@@ -131,6 +132,8 @@ export default async function SettingsPage() {
           </p>
           <AccountSwitcher />
         </section>
+
+        <PremiumSettingsRow />
 
         <SettingsCard title="General">
           {ITEMS.map((item) => (

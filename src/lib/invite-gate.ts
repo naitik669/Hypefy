@@ -68,6 +68,9 @@ const OPEN_PATHS = [
   "/api/mfa/recover",
   "/api/push",
   "/api/oneshot/reap",
+  // Razorpay's servers carry no gate cookie. The route checks its own
+  // signature, so opening it lets nothing else in.
+  "/api/billing/webhook",
 
   // The legal pages are public by obligation, not convenience. Google's
   // OAuth consent screen, both app stores, and the DPDP Act all require a

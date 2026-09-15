@@ -87,6 +87,8 @@ export async function updateSession(request: NextRequest) {
     "/notifications",
     "/search",
     "/settings",
+    "/premium",
+    "/shop",
   ];
   const { pathname } = request.nextUrl;
   const isProtected =

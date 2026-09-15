@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { accentVars } from "@/lib/profile-accent";
 import { BannerEditMenu } from "@/components/profile/BannerEditMenu";
 import { FollowStats } from "@/components/profile/FollowStats";
-import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { VerifiedBadgeButton } from "@/components/billing/VerifiedBadgeButton";
 import { HyperStar } from "@/components/ui/HyperStar";
 import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { AnthemChip } from "@/components/profile/AnthemChip";
@@ -130,10 +131,18 @@ export function ProfileHeader({
           <span className="flex items-center gap-1 text-base font-bold leading-tight">
             {name}
             {verified && (
-              <VerifiedStar className="h-4 w-4 shrink-0 text-verified" />
+              <VerifiedBadgeButton name={name} isOwn={currentUserId === userId} />
             )}
             {isHyper && <HyperStar className="h-4 w-4 shrink-0" />}
             {isMutualHyper && <MutualHyperBadge />}
+            {!verified && currentUserId === userId && (
+              <Link
+                href="/premium"
+                className="ml-1 rounded-full border border-verified/30 px-2 py-0.5 text-[11px] font-bold text-verified transition-colors hover:bg-verified/10"
+              >
+                Get verified
+              </Link>
+            )}
           </span>
           {username && <p className="mt-0.5 text-sm text-muted">@{username}</p>}
           <AnthemChip
