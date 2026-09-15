@@ -3,7 +3,6 @@ import Link from "next/link";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { accentVars } from "@/lib/profile-accent";
-import { BannerEditMenu } from "@/components/profile/BannerEditMenu";
 import { FollowStats } from "@/components/profile/FollowStats";
 import { VerifiedBadgeButton } from "@/components/billing/VerifiedBadgeButton";
 import { DisplayName } from "@/components/ui/DisplayName";
@@ -88,7 +87,6 @@ export function ProfileHeader({
           isPremium={isPremium}
           className="rounded-card"
         />
-        {currentUserId === userId && <BannerEditMenu userId={userId} />}
       </div>
 
       <div className="px-4">

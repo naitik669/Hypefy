@@ -43,7 +43,6 @@ export type Decoration = { id: string; label: string; tier: Tier; pricePaise?: n
 export const DECORATIONS: Decoration[] = [
   { id: "deco-halo", label: "Halo", tier: "premium" },
   { id: "deco-sparkle", label: "Sparkle", tier: "premium" },
-  { id: "deco-neon", label: "Neon", tier: "premium" },
   { id: "deco-flames", label: "Flames", tier: "shop", pricePaise: 4900 },
   { id: "deco-crown", label: "Crown", tier: "shop", pricePaise: 4900 },
   { id: "deco-hearts", label: "Hearts", tier: "shop", pricePaise: 4900 },

@@ -97,7 +97,7 @@ describe("the Marketplace page", () => {
     await render();
     await click(button("Frames")!);
     const names = [...host.querySelectorAll("li")].map((li) => li.textContent);
-    expect(names.length).toBe(12);
+    expect(names.length).toBe(11);
     expect(names.some((n) => n?.includes("Crown"))).toBe(true);
     expect(names.some((n) => n?.includes("Pond"))).toBe(false);
   });

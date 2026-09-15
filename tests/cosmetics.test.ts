@@ -14,13 +14,13 @@ const { bannerGradient, BANNERS } = await import("@/lib/profile");
  */
 
 describe("who gets styled", () => {
-  const styled = { name_font: "font-script", name_glow: "glow-blue", avatar_decoration: "deco-neon" };
+  const styled = { name_font: "font-script", name_glow: "glow-blue", avatar_decoration: "deco-halo" };
 
   it("styles a Premium member's name and avatar", () => {
     const s = nameStyle({ ...styled, is_premium: true });
     expect(s?.fontFamily).toBeTruthy();
     expect(s?.textShadow).toContain("#3897f0");
-    expect(visibleDecoration({ ...styled, is_premium: true })).toBe("deco-neon");
+    expect(visibleDecoration({ ...styled, is_premium: true })).toBe("deco-halo");
   });
 
   it("never changes the name's size, whichever font", () => {
@@ -62,6 +62,10 @@ describe("the catalogue", () => {
   const seeded = new Map<string, { kind: string; tier: string }>();
   for (const m of sql.matchAll(/\('([a-z0-9-]+)',\s*'([a-z_]+)',\s*'(free|premium|shop)'/g)) {
     seeded.set(m[1], { kind: m[2], tier: m[3] });
+  }
+  // Retired later: 0081 deletes these rows.
+  for (const m of readFileSync("supabase/migrations/0081_remove_neon_frame.sql", "utf8").matchAll(/id = '([a-z0-9-]+)'/g)) {
+    seeded.delete(m[1]);
   }
 
   const inCode: [string, string, string][] = [
