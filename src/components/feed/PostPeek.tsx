@@ -10,6 +10,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { DisplayName } from "@/components/ui/DisplayName";
 import { HypeParticles } from "@/components/feed/HypeParticles";
+import { HypeBreak } from "@/components/feed/HypeBreak";
 import { visibleDecoration } from "@/lib/cosmetics";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { FollowButton } from "@/components/profile/FollowButton";
@@ -98,6 +99,13 @@ export function PostPeek({
   /** Replays the burst on the icon that was just turned on. */
   const [hypeBurst, setHypeBurst] = useState(0);
   const [saveBurst, setSaveBurst] = useState(0);
+  /** Taking a hype back snaps the star in two, as on the feed. */
+  const [broke, setBroke] = useState(false);
+  useEffect(() => {
+    if (!broke) return;
+    const id = setTimeout(() => setBroke(false), 520);
+    return () => clearTimeout(id);
+  }, [broke]);
   const root = useRef<HTMLDivElement>(null);
   /** The big star over the photo on a double-tap, replayed each time. */
   const [burst, setBurst] = useState(0);
@@ -307,7 +315,8 @@ export function PostPeek({
               active={hyped}
               activeClass="text-hype"
               onClick={() => {
-                if (!hyped) setHypeBurst((n) => n + 1);
+                if (hyped) setBroke(true);
+                else setHypeBurst((n) => n + 1);
                 onHype();
               }}
             >
@@ -316,10 +325,11 @@ export function PostPeek({
                   key={hypeBurst}
                   size={23}
                   strokeWidth={2.2}
-                  className={`${hypeBurst ? "animate-hype-burst" : ""} transition-colors ${hyped ? "text-hype" : ""}`}
+                  className={`${broke ? "animate-hype-crack" : hypeBurst ? "animate-hype-burst" : ""} transition-colors ${hyped ? "text-hype" : ""}`}
                   fill={hyped ? "currentColor" : "none"}
                 />
-                {hyped && hypeBurst > 0 && <HypeParticles key={hypeBurst} size={9} />}
+                {hyped && hypeBurst > 0 && !broke && <HypeParticles key={hypeBurst} size={9} />}
+                {broke && <HypeBreak size={23} />}
               </span>
             </PeekAction>
 
