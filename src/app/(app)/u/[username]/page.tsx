@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -143,7 +144,7 @@ export default async function PublicProfilePage({
   const entryShowId = (!isLocked && activeShows?.[0]?.id) || null;
 
   return (
-    <>
+    <PullToRefresh>
       <ProfileHeader
         name={name}
         username={profile.username}
@@ -231,6 +232,6 @@ export default async function PublicProfilePage({
       )}
 
       {!currentUser && <JoinBanner />}
-    </>
+    </PullToRefresh>
   );
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Settings, BarChart3, Bookmark } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, hueFromId } from "@/lib/profile";
@@ -61,7 +62,7 @@ export default async function ProfilePage() {
   const bannerId = profile?.bannerId ?? "lime-pulse";
 
   return (
-    <>
+    <PullToRefresh>
       <ProfileHeader
         name={name}
         username={profile?.username ?? null}
@@ -129,6 +130,6 @@ export default async function ProfilePage() {
 
       {/* Tabs: Posts | Shots | Saved */}
       <ProfileTabs userId={user.id} />
-    </>
+    </PullToRefresh>
   );
 }

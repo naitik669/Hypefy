@@ -47,6 +47,7 @@ export function PullToRefresh({
       setPull(48); // hold the spinner visible
       const release = () => { setRefreshing(false); setPull(0); };
       if (onRefresh) {
+        void reloadIfNewBuild();
         // Gate the spinner on the caller's own fetch completing.
         Promise.resolve(onRefresh()).finally(() => setTimeout(release, 250));
       } else {
