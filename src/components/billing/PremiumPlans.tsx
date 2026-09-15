@@ -13,14 +13,14 @@ import { subscribe } from "@/lib/billing/checkout";
 
 const noop = () => () => {};
 
-/** What Premium adds, row by row. `free` is whether a free account has it. */
-const ROWS: { icon: React.ReactNode; name: string; sub: string; free: boolean }[] = [
-  { icon: <VerifiedStar className="h-[18px] w-[18px] text-verified" />, name: "Verified badge", sub: "The blue star", free: false },
-  { icon: <Type size={17} />, name: "Name styles", sub: "Fonts and glows", free: false },
-  { icon: <Frame size={17} />, name: "Avatar frames", sub: "On every post and chat", free: false },
-  { icon: <MessageCircle size={17} />, name: "Chat bubbles", sub: "Your look in every chat", free: false },
-  { icon: <Palette size={17} />, name: "Chat themes", sub: "Every theme, not a few", free: true },
-  { icon: <ImageIcon size={17} />, name: "Profile banners", sub: "Premium banners", free: false },
+/** The two plans side by side, row by row. `verified` is whether the ₹99 plan has it; Premium has them all. */
+const ROWS: { icon: React.ReactNode; name: string; sub: string; verified: boolean }[] = [
+  { icon: <VerifiedStar className="h-[18px] w-[18px] text-verified" />, name: "Verified badge", sub: "The blue star", verified: true },
+  { icon: <Type size={17} />, name: "Name styles", sub: "Fonts and glows", verified: false },
+  { icon: <Frame size={17} />, name: "Avatar frames", sub: "On every post and chat", verified: false },
+  { icon: <MessageCircle size={17} />, name: "Chat bubbles", sub: "Your look in every chat", verified: false },
+  { icon: <Palette size={17} />, name: "Chat themes", sub: "Pond, Galaxy and more", verified: false },
+  { icon: <ImageIcon size={17} />, name: "Profile banners", sub: "Premium banners", verified: false },
 ];
 
 /**
@@ -111,12 +111,18 @@ export function PremiumPlans({
         <div className="mt-5 [@media(max-height:760px)]:mt-3">
           <div className="flex items-center gap-3 px-1 pb-1">
             <span className="flex-1 text-[12px] text-muted">What you get</span>
-            <span className="w-14 text-center text-[12px] font-semibold text-muted">Free</span>
-            <span className="w-[72px] rounded-full bg-accent/15 py-1 text-center text-[12px] font-bold text-accent">Premium</span>
+            <span className="flex w-16 flex-col items-center leading-tight">
+              <span className="text-[11px] text-muted">Badge</span>
+              <span className="text-[14px] font-extrabold tabular-nums">{formatInr(verified.pricePaise)}</span>
+            </span>
+            <span className="flex w-[76px] flex-col items-center rounded-2xl bg-accent/15 py-1 leading-tight">
+              <span className="text-[11px] font-semibold text-accent">Premium</span>
+              <span className="text-[14px] font-extrabold tabular-nums text-accent">{formatInr(premium.pricePaise)}</span>
+            </span>
           </div>
           <ul className="flex flex-col">
             {ROWS.map((r) => (
-              <li key={r.name} className="flex items-center gap-3 px-1 py-[7px]">
+              <li key={r.name} className="flex items-center gap-3 px-1 py-[7px] [@media(max-height:760px)]:py-[5px]">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-foreground">
                   {r.icon}
                 </span>
@@ -124,10 +130,10 @@ export function PremiumPlans({
                   <span className="block text-[15px] font-semibold leading-tight">{r.name}</span>
                   <span className="block truncate text-[12px] text-muted [@media(max-height:760px)]:hidden">{r.sub}</span>
                 </span>
-                <span className="flex w-14 justify-center">
-                  {r.free ? <Yes /> : <No />}
+                <span className="flex w-16 justify-center">
+                  {r.verified ? <Yes /> : <No />}
                 </span>
-                <span className="flex w-[72px] justify-center">
+                <span className="flex w-[76px] justify-center">
                   <Yes />
                 </span>
               </li>
