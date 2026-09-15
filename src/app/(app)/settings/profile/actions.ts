@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { sanitizeInterests } from "@/lib/profile";
+import { isHexColor, sanitizeInterests } from "@/lib/profile";
 import { ACCENTS, DEFAULT_ACCENT_ID } from "@/lib/profile-accent";
 
 export type UpdateProfileInput = {
@@ -16,6 +16,8 @@ export type UpdateProfileInput = {
   avatarUrl?: string | null;
   bannerId?: string | null;
   bannerUrl?: string | null;
+  /** [top, bottom] hex colours for your own background — Premium. */
+  bannerColors?: string[] | null;
 };
 
 export async function updateProfile(
@@ -52,6 +54,14 @@ export async function updateProfile(
       avatar_url: input.avatarUrl ?? null,
       banner_id: input.bannerId ?? null,
       banner_url: input.bannerUrl ?? null,
+      // Two hex colours or nothing. The database checks the shape too, and a
+      // trigger refuses them outright without Premium.
+      banner_colors:
+        Array.isArray(input.bannerColors) &&
+        input.bannerColors.length === 2 &&
+        input.bannerColors.every(isHexColor)
+          ? input.bannerColors
+          : null,
     })
     .eq("id", user.id);
 

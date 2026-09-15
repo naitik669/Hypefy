@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { BannerPicker } from "@/components/profile/BannerPicker";
+import { GradientPicker } from "@/components/profile/GradientPicker";
 import { ImageCropper } from "@/components/post/ImageCropper";
 import { PROFILE_TAGS, DEFAULT_BANNER_ID } from "@/lib/profile";
 import { InterestPills } from "@/components/profile/InterestPills";
@@ -32,6 +33,7 @@ export function EditProfileForm({
     profileTags: string[];
     interests: string[];
     accentId: string | null;
+    bannerColors?: string[] | null;
     /** Premium members can upload a GIF banner. */
     isPremium?: boolean;
   };
@@ -52,6 +54,7 @@ export function EditProfileForm({
   const [tags, setTags] = useState<string[]>(initial.profileTags);
   const [interests, setInterests] = useState<string[]>(initial.interests);
   const [accentId, setAccentId] = useState<string | null>(initial.accentId);
+  const [bannerColors, setBannerColors] = useState<string[] | null>(initial.bannerColors ?? null);
 
   const [uStatus, setUStatus] = useState<UsernameStatus>("idle");
   const [uploading, setUploading] = useState(false);
@@ -222,6 +225,7 @@ export function EditProfileForm({
         avatarUrl,
         bannerId,
         bannerUrl,
+        bannerColors,
       });
       if ("error" in res) {
         setError(res.error);
@@ -240,6 +244,7 @@ export function EditProfileForm({
         <ProfileBanner
           bannerId={bannerId}
           bannerUrl={bannerUrl}
+          bannerColors={bannerColors}
           isPremium={isPremium}
           className=""
         />
@@ -363,7 +368,13 @@ export function EditProfileForm({
         <p className="-mt-1 mb-3 text-xs text-muted">
           {isPremium ? "Premium: GIF banners play on your profile." : "GIF banners come with Premium."}
         </p>
-        {!bannerUrl && <BannerPicker value={bannerId} onChange={setBannerId} />}
+        {!bannerUrl && (
+          <>
+            <GradientPicker value={bannerColors} onChange={setBannerColors} isPremium={isPremium} />
+            {/* The presets stay: a gradient is one more choice, not the only one. */}
+            {!bannerColors && <div className="mt-3"><BannerPicker value={bannerId} onChange={setBannerId} /></div>}
+          </>
+        )}
       </Field>
 
       {/* Display name */}

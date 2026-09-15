@@ -30,6 +30,7 @@ export function ProfileHeader({
   avatarUrl,
   bannerId,
   bannerUrl,
+  bannerColors = null,
   hasActiveShow,
   entryShowId,
   userId,
@@ -54,6 +55,8 @@ export function ProfileHeader({
   avatarUrl: string | null | undefined;
   bannerId: string;
   bannerUrl: string | null | undefined;
+  /** Their own two colours, drawn while they have Premium. */
+  bannerColors?: string[] | null;
   hasActiveShow: boolean;
   entryShowId: string | null;
   userId: string;
@@ -84,6 +87,7 @@ export function ProfileHeader({
         <ProfileBanner
           bannerId={bannerId}
           bannerUrl={bannerUrl}
+          bannerColors={bannerColors}
           isPremium={isPremium}
           className="rounded-card"
         />

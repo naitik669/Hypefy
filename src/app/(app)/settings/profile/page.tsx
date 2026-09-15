@@ -33,6 +33,7 @@ export default async function EditProfilePage() {
           interests: profile?.interests ?? [],
           accentId: profile?.accentId ?? null,
           isPremium: profile?.isPremium ?? false,
+          bannerColors: profile?.bannerColors ?? null,
         }}
       />
     </>
