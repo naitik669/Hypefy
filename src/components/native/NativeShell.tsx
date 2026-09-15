@@ -58,16 +58,14 @@ export function NativeShell() {
   useEffect(() => {
     if (!isNative()) return;
     void safeNative(async () => {
-      // Stop the WebView drawing underneath the status bar.
+      // No StatusBar.setOverlaysWebView() here, deliberately. Whether the page
+      // sits under the status bar is decided once, natively, before the page
+      // loads (capacitor.config.ts), and headers pad by --sat for whatever
+      // was decided. Flipping it from here, after the page had loaded, moved
+      // the page down below the status bar without Android always re-sending
+      // the insets — so --sat kept the status bar's height and the header
+      // was pushed down twice, on the launches where hydration won that race.
       //
-      // This is the root cause of headers being clipped, and it is global:
-      // every page was affected, including ones with no header of their own.
-      // Padding each header with env(safe-area-inset-top) only patches the
-      // ones you remember, and sticky headers still slide under the clock as
-      // soon as the page scrolls. Letting Android reserve the space instead
-      // fixes every screen at once and needs no CSS.
-      await StatusBar.setOverlaysWebView({ overlay: false });
-
       // Style.Dark means dark *background* with light content — the opposite
       // of how the name reads, and the right one for our near-black chrome.
       await StatusBar.setStyle({ style: Style.Dark });
