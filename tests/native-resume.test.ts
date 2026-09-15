@@ -73,3 +73,12 @@ describe("returning to the app", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("moving below the status bar", () => {
+  it("zeroes the header gap only when the page really moved", async () => {
+    const { movedBelowStatusBar } = await import("@/components/native/NativeShell");
+    expect(movedBelowStatusBar(800, 764, 36)).toBe(true);
+    expect(movedBelowStatusBar(800, 800, 36)).toBe(false); // already below, or edge-to-edge
+    expect(movedBelowStatusBar(800, 764, 0)).toBe(false);
+  });
+});

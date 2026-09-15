@@ -25,6 +25,48 @@ import { isAuthCallbackUrl, completeNativeSignIn } from "@/lib/native-auth";
  */
 const ROOT_ROUTES = ["/home", "/messages", "/shots", "/profile"];
 
+/**
+ * Move the page out from under the status bar, and make sure the headers
+ * know it.
+ *
+ * Headers pad by --sat, which Capacitor sets to the status bar's height while
+ * the page is under it. After the move Android doesn't always tell Capacitor
+ * again, so --sat could keep that height and the header sat one status bar
+ * too low — some launches, not others. When the page really did move (it
+ * got shorter by about that height), --sat is set to 0 here, as it should be.
+ */
+async function moveBelowStatusBar() {
+  const before = window.innerHeight;
+  const sat = readSat();
+  await StatusBar.setOverlaysWebView({ overlay: false });
+  if (sat < 1) return;
+  await new Promise<void>((resolve) => {
+    const done = () => {
+      window.removeEventListener("resize", done);
+      resolve();
+    };
+    window.addEventListener("resize", done);
+    setTimeout(done, 600);
+  });
+  if (movedBelowStatusBar(before, window.innerHeight, sat)) {
+    document.documentElement.style.setProperty("--sat", "0px");
+  }
+}
+
+/** The page lost about the status bar's height: it's now below the bar. */
+export function movedBelowStatusBar(before: number, after: number, sat: number): boolean {
+  return sat >= 1 && Math.abs(before - after - sat) <= 3;
+}
+
+function readSat(): number {
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;visibility:hidden;height:var(--sat)";
+  document.body.appendChild(probe);
+  const px = probe.getBoundingClientRect().height;
+  probe.remove();
+  return px;
+}
+
 /** Away this long and the screen is refreshed on return; less, and it is left alone. */
 export const STALE_AFTER_MS = 30 * 60_000;
 
@@ -58,13 +100,9 @@ export function NativeShell() {
   useEffect(() => {
     if (!isNative()) return;
     void safeNative(async () => {
-      // No StatusBar.setOverlaysWebView() here, deliberately. Whether the page
-      // sits under the status bar is decided once, natively, before the page
-      // loads (capacitor.config.ts), and headers pad by --sat for whatever
-      // was decided. Flipping it from here, after the page had loaded, moved
-      // the page down below the status bar without Android always re-sending
-      // the insets — so --sat kept the status bar's height and the header
-      // was pushed down twice, on the launches where hydration won that race.
+      // Keep the page below the status bar, as the whole app is laid out for.
+      await moveBelowStatusBar();
+
       //
       // Style.Dark means dark *background* with light content — the opposite
       // of how the name reads, and the right one for our near-black chrome.

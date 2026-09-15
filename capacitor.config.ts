@@ -25,12 +25,12 @@ const config: CapacitorConfig = {
     limitsNavigationsToAppBoundDomains: false,
   },
   plugins: {
-    // Start with the page below the status bar, decided here before the page
-    // loads and never changed afterwards. (NativeShell used to flip it after
-    // launch, which left --sat holding the status bar's height on some
-    // launches: the header sat low by exactly that much.) Takes effect from
-    // the next native build; older builds keep the page under the status bar
-    // and pad by --sat, which is equally right.
+    // Start with the page below the status bar. The plugin's default is to
+    // lay the page under it, and NativeShell then moved it out a moment after
+    // launch — a layout change mid-launch that older WebViews reported late,
+    // so some launches padded the header for a status bar it was already
+    // below. Takes effect from the next native build; until then the CSS
+    // safe-area variables (see globals.css) keep the header right.
     StatusBar: {
       overlaysWebView: false,
       style: "DARK",
