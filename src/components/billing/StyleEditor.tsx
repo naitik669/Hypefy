@@ -263,7 +263,7 @@ export function StyleEditor({ me: initial, owned }: { me: Me; owned: string[] })
           </button>
           <button
             type="button"
-            onClick={() => router.push(tryOn.tier === "premium" ? "/premium" : "/shop")}
+            onClick={() => router.push(tryOn.tier === "premium" ? "/premium" : "/marketplace")}
             className="h-9 shrink-0 rounded-xl bg-accent px-3.5 text-xs font-extrabold text-accent-ink"
           >
             {tryOn.tier === "premium" ? "Get Premium" : tryOn.pricePaise ? `Buy · ${formatInr(tryOn.pricePaise)}` : "Shop"}

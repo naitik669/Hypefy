@@ -39,9 +39,9 @@ const ITEMS = [
     icon: Sparkles,
   },
   {
-    href: "/shop",
-    label: "Shop",
-    sub: "Decorations and chat themes to keep",
+    href: "/marketplace",
+    label: "Marketplace",
+    sub: "Frames, bubbles, themes and more",
     icon: ShoppingBag,
   },
   {

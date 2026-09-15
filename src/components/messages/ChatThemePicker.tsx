@@ -43,7 +43,7 @@ export function ChatThemePicker({
     if (busy || id === current) return;
     if (theme && !unlocked(theme)) {
       onClose();
-      router.push(theme.tier === "premium" ? "/premium" : "/shop");
+      router.push(theme.tier === "premium" ? "/premium" : "/marketplace");
       return;
     }
     setBusy(id ?? "none");

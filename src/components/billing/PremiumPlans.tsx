@@ -169,12 +169,12 @@ export function PremiumPlans({
       )}
 
       <Link
-        href="/shop"
+        href="/marketplace"
         className="flex items-center justify-between rounded-2xl border border-border bg-elevated px-4 py-3 text-sm"
       >
         <span>
-          <span className="block font-bold">Shop</span>
-          <span className="block text-xs text-muted">Decorations and chat themes to keep, Premium or not</span>
+          <span className="block font-bold">Marketplace</span>
+          <span className="block text-xs text-muted">Frames, bubbles and themes to keep</span>
         </span>
         <span aria-hidden className="text-faint">›</span>
       </Link>

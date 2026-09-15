@@ -2,12 +2,17 @@
 
 import { useId } from "react";
 
+/** How much of the box the photo keeps when a frame is on (the frame's viewBox puts it at 20–120 of 140). */
+const PHOTO_SCALE = 100 / 140;
+
 /**
  * A decoration around an avatar.
  *
- * Drawn as an overlay a little larger than the avatar, so the frame sits
- * around the squircle without changing the avatar's size or the layout
- * around it. The viewBox is 140 units with the avatar filling 20–120.
+ * The frame lives inside the avatar's own footprint: the photo shrinks a
+ * little and the frame fills the space around it. It used to be drawn 20%
+ * outside the avatar on every side, which made a decorated avatar read as a
+ * much bigger one in the feed, profiles and chats, and crowded its
+ * neighbours. Now a decorated avatar takes exactly the room a plain one does.
  *
  * `id` null renders the avatar alone, so call sites can pass whatever the
  * wearer currently has without a branch.
@@ -23,15 +28,19 @@ export function AvatarFrame({
 }) {
   const uid = useId().replace(/:/g, "");
   if (!id) return <>{children}</>;
-  const pad = size * 0.2;
   return (
-    <span className="relative inline-block shrink-0" style={{ width: size, height: size }}>
-      {children}
+    <span className="relative inline-block shrink-0 align-middle" style={{ width: size, height: size }}>
+      <span
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ transform: `scale(${PHOTO_SCALE})` }}
+      >
+        {children}
+      </span>
       <svg
         aria-hidden
         viewBox="0 0 140 140"
-        className="pointer-events-none absolute"
-        style={{ left: -pad, top: -pad, width: size + pad * 2, height: size + pad * 2, overflow: "visible" }}
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        style={{ overflow: "visible" }}
       >
         <Frame id={id} uid={uid} />
       </svg>
