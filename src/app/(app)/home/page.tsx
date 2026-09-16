@@ -442,14 +442,31 @@ export default async function HomePage() {
   // Seen only when EVERY active show from that user has a server-side view
   // Open at the oldest Show you haven't watched yet, so a new Show isn't
   // behind ones you've already seen; all watched, start from the beginning.
-  const shows = [...byUser.values()].map(({ allIds, ...v }) => {
+  const showEntries = [...byUser.entries()].map(([userId, { allIds, ...v }]) => {
     const oldestFirst = [...allIds].reverse();
     return {
-      ...v,
-      id: oldestFirst.find((id) => !viewedShowIds.has(id)) ?? v.id,
-      seen: allIds.every((id) => viewedShowIds.has(id)),
+      userId,
+      show: {
+        ...v,
+        id: oldestFirst.find((id) => !viewedShowIds.has(id)) ?? v.id,
+        seen: allIds.every((id) => viewedShowIds.has(id)),
+      },
     };
   });
+  const shows = showEntries.map((e) => e.show);
+
+  /**
+   * Whose face in the feed opens a Show rather than a profile, and which one.
+   *
+   * The row above already knows who has one live; this hands the same answer
+   * to the cards below it, at the same entry point — the oldest you have not
+   * watched — so tapping someone's face on a post and tapping their ring in
+   * the row land in the same place.
+   */
+  const showByUser: Record<string, string> = Object.fromEntries(
+    showEntries.map((e) => [e.userId, e.show.id]),
+  );
+  if (currentUserForRow?.showId) showByUser[user.id] = currentUserForRow.showId;
 
   return (
     <>
@@ -489,6 +506,7 @@ export default async function HomePage() {
           hyperIds={hyperIds}
           mutualHyperIds={mutualHyperIds}
           blockedIds={[...blockedIds]}
+          showByUser={showByUser}
           adCountry={adCountry}
           adPersonalised={adPersonalised}
         />

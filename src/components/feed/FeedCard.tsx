@@ -117,9 +117,18 @@ export function FeedCard({
   initialIsHyper,
   initialIsMutualHyper,
   focusCommentId = null,
+  showId,
 }: {
   post: FeedPost;
   currentUserId: string;
+  /**
+   * The author's live Show, if they have one.
+   *
+   * Their face then opens it instead of their profile — the same rule the
+   * profile page's own avatar follows, and the same entry point the ring at
+   * the top of the feed uses.
+   */
+  showId?: string;
   /** Hyper status resolved by the parent (FeedList) — skips a per-card query.
    *  Undefined for standalone cards (post page, profile viewer), which self-fetch. */
   initialIsHyper?: boolean;
@@ -392,7 +401,6 @@ export function FeedCard({
   const [editOpen, setEditOpen] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
-  const [avatarZoomOpen, setAvatarZoomOpen] = useState(false);
   const [liveCaption, setLiveCaption] = useState(post.caption);
   const [liveBody, setLiveBody] = useState(post.body);
   const [isHyper, setIsHyper] = useState(initialIsHyper ?? false);
@@ -625,14 +633,13 @@ export function FeedCard({
       )}
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <button
-          type="button"
-          aria-label={`View ${name}'s photo`}
-          onClick={() => {
-            if (profile?.avatar_url) setAvatarZoomOpen(true);
-            else window.location.href = profileHref;
-          }}
-          className="shrink-0 active:scale-95 transition-transform"
+        {/* Their face takes you to them: their Show while one is live,
+            otherwise their profile. It used to open their avatar full-screen,
+            which is a photo of a person where you expected the person. */}
+        <Link
+          href={showId ? `/shows/${showId}` : profileHref}
+          aria-label={showId ? `Watch ${name}'s Show` : `${name}'s profile`}
+          className="shrink-0 transition-transform active:scale-95"
         >
           <AvatarFrame id={profile ? visibleDecoration(profile) : null} size={40}>
             <Avatar
@@ -642,7 +649,7 @@ export function FeedCard({
               src={profile?.avatar_url ?? undefined}
             />
           </AvatarFrame>
-        </button>
+        </Link>
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <Link
             href={profileHref}
@@ -983,13 +990,6 @@ export function FeedCard({
 
       {zoomOpen && images[imgIdx] && (
         <ZoomViewer src={images[imgIdx]} onClose={() => setZoomOpen(false)} />
-      )}
-
-      {avatarZoomOpen && profile?.avatar_url && (
-        <ZoomViewer
-          src={profile.avatar_url}
-          onClose={() => setAvatarZoomOpen(false)}
-        />
       )}
 
       <PostActionsSheet

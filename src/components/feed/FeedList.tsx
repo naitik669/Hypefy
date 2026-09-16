@@ -57,6 +57,7 @@ export function FeedList({
   hyperIds = [],
   mutualHyperIds = [],
   blockedIds = [],
+  showByUser = {},
   adCountry = null,
   adPersonalised = false,
 }: {
@@ -69,6 +70,8 @@ export function FeedList({
   hyperIds?: string[];
   mutualHyperIds?: string[];
   blockedIds?: string[];
+  /** Authors with a live Show, and the one to open: see home/page.tsx. */
+  showByUser?: Record<string, string>;
   /** The reader's country, resolved on the server. Null means unknown. */
   adCountry?: string | null;
   /** Confirmed 18+. Computed server-side from date_of_birth; null is a no. */
@@ -350,7 +353,11 @@ export function FeedList({
               // reusing 480px makes the scroll anchor jump as it resolves.
               className="[content-visibility:auto] [contain-intrinsic-size:auto_560px]"
             >
-              <ShotFeedCard shot={item.shot} currentUserId={currentUserId} />
+              <ShotFeedCard
+                shot={item.shot}
+                currentUserId={currentUserId}
+                showId={showByUser[item.shot.user_id]}
+              />
             </Reveal>
           ) : (
             <Reveal
@@ -364,6 +371,7 @@ export function FeedList({
                 currentUserId={currentUserId}
                 initialIsHyper={hyperSet.has(item.post.user_id)}
                 initialIsMutualHyper={mutualHyperSet.has(item.post.user_id)}
+                showId={showByUser[item.post.user_id]}
               />
             </Reveal>
           )

@@ -131,9 +131,12 @@ function autoplayUnwelcome(): boolean {
 export function ShotFeedCard({
   shot,
   currentUserId,
+  showId,
 }: {
   shot: ShotCard;
   currentUserId?: string;
+  /** The author's live Show, if they have one — their face opens it. */
+  showId?: string;
 }) {
   const supabase = createClient();
   const name =
@@ -473,7 +476,11 @@ export function ShotFeedCard({
           the same timestamp. A Shot is a post you can watch, so its card is a
           post's card — what marks it as one is on the video itself. */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <Link href={profileHref} className="shrink-0 transition-transform active:scale-95">
+        <Link
+          href={showId ? `/shows/${showId}` : profileHref}
+          aria-label={showId ? `Watch ${name}'s Show` : `${name}'s profile`}
+          className="shrink-0 transition-transform active:scale-95"
+        >
           <AvatarFrame id={profile ? visibleDecoration(profile) : null} size={40}>
             <Avatar
               name={name}
