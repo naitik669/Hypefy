@@ -3,14 +3,20 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  Flame,
+  Camera,
+  Cpu,
+  GameController,
   Hash,
-  Play,
+  Lightning,
+  MusicNotes,
+  PaintBrush,
   SlidersHorizontal,
-  Sparkles,
+  Smiley,
+  Sparkle,
+  TrendUp,
   Users,
-  type LucideIcon,
-} from "lucide-react";
+  type Icon,
+} from "@phosphor-icons/react";
 import { FloatingMenu } from "@/components/ui/FloatingMenu";
 
 /**
@@ -18,23 +24,39 @@ import { FloatingMenu } from "@/components/ui/FloatingMenu";
  * beside the search bar.
  *
  * Two groups, because they are two different questions. "Browse" is how to
- * look — the ranked feed, what is blowing up, only Shots, people, tags — and
- * "Topics" is what to look at. As one flat row of chips the difference was
- * invisible: "Shots" and "Football" sat side by side as if they were the same
- * kind of thing.
+ * look — the ranked feed, what is trending, only Shots, people, tags — and
+ * "Topics" is what to look at.
  *
- * Each row carries a dot, empty until it is the one you are on. The button
- * gets the same dot while anything but For You is chosen, so a filtered
- * Discover says so without a label squeezing the search bar.
+ * Quiet on purpose. It first shipped with lime tiles behind every icon, a lime
+ * wash on the button and a glow on every dot, which is three ways of shouting
+ * about a menu. Selection is now said once, by a radio on the right; the row
+ * you are on is lifted a shade, and everything else is monochrome.
  */
 
-export const BROWSE: { id: string; icon: LucideIcon }[] = [
-  { id: "For You", icon: Sparkles },
-  { id: "Blowing Up", icon: Flame },
-  { id: "Shots", icon: Play },
+export const BROWSE: { id: string; icon: Icon }[] = [
+  { id: "For You", icon: Sparkle },
+  { id: "Blowing Up", icon: TrendUp },
+  // The tab bar's own mark for a Shot, so the two never disagree.
+  { id: "Shots", icon: Lightning },
   { id: "People", icon: Users },
   { id: "Tags", icon: Hash },
 ];
+
+/** Discover's topics (see CATEGORY_DEFS on the page), each with its own mark. */
+const TOPIC_ICONS: Record<string, Icon> = {
+  Technology: Cpu,
+  Gaming: GameController,
+  "Art & Design": PaintBrush,
+  Photography: Camera,
+  Music: MusicNotes,
+  Memes: Smiley,
+};
+
+/**
+ * The one colour in the menu: a calm green for "this one", in place of the
+ * brand lime, which at dot size and with a glow read as neon.
+ */
+const ON = "#34C759";
 
 export function DiscoverFilter({
   value,
@@ -80,17 +102,18 @@ export function DiscoverFilter({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={filtered ? `Filter: ${value}` : "Filter"}
-        className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border transition-colors ${
-          open || filtered
-            ? "border-accent/40 bg-accent/10 text-foreground"
-            : "border-border bg-surface text-muted"
+        className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-surface transition-colors ${
+          open ? "border-white/25 text-foreground" : "border-border text-muted"
         }`}
       >
-        <SlidersHorizontal size={18} />
+        <SlidersHorizontal size={19} weight="regular" />
         {filtered && (
+          // Ringed in the button's own colour so it sits on the corner
+          // cleanly instead of floating over the border.
           <span
             aria-hidden
-            className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent shadow-[0_0_8px_rgba(163,230,53,0.7)]"
+            className="absolute right-[7px] top-[7px] h-2 w-2 rounded-full ring-2 ring-surface"
+            style={{ backgroundColor: ON }}
           />
         )}
       </button>
@@ -103,7 +126,7 @@ export function DiscoverFilter({
             onClose={() => setOpen(false)}
             origin="top-right"
             zIndex={220}
-            className="fixed w-[248px] !rounded-[22px]"
+            className="fixed w-[236px] !rounded-[20px]"
             style={{
               top: anchor?.top ?? 0,
               right: anchor?.right ?? 16,
@@ -116,7 +139,7 @@ export function DiscoverFilter({
                   <Row
                     key={b.id}
                     label={b.id}
-                    icon={<b.icon size={15} />}
+                    Glyph={b.icon}
                     on={value === b.id}
                     onClick={() => pick(b.id)}
                   />
@@ -124,20 +147,20 @@ export function DiscoverFilter({
               </Group>
 
               {topics.length > 0 && (
-                <Group title="Topics">
-                  {topics.map((t) => (
-                    <Row
-                      key={t}
-                      label={t}
-                      // The topic's own initial: ten identical glyphs down a
-                      // list tell you nothing, and a letter is something the
-                      // eye can find again next time.
-                      icon={<span className="text-[13px] font-extrabold">{t.charAt(0)}</span>}
-                      on={value === t}
-                      onClick={() => pick(t)}
-                    />
-                  ))}
-                </Group>
+                <>
+                  <div aria-hidden className="mx-2.5 my-1.5 h-px bg-border/70" />
+                  <Group title="Topics">
+                    {topics.map((t) => (
+                      <Row
+                        key={t}
+                        label={t}
+                        Glyph={TOPIC_ICONS[t] ?? Hash}
+                        on={value === t}
+                        onClick={() => pick(t)}
+                      />
+                    ))}
+                  </Group>
+                </>
               )}
             </div>
           </FloatingMenu>,
@@ -149,8 +172,8 @@ export function DiscoverFilter({
 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div role="group" aria-label={title} className="pt-2 first:pt-1">
-      <p className="px-2.5 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-faint">
+    <div role="group" aria-label={title} className="pt-1">
+      <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold tracking-wide text-faint">
         {title}
       </p>
       <div className="flex flex-col">{children}</div>
@@ -160,12 +183,12 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 
 function Row({
   label,
-  icon,
+  Glyph,
   on,
   onClick,
 }: {
   label: string;
-  icon: React.ReactNode;
+  Glyph: Icon;
   on: boolean;
   onClick: () => void;
 }) {
@@ -175,27 +198,26 @@ function Row({
       role="menuitemradio"
       aria-checked={on}
       onClick={onClick}
-      className={`flex h-11 w-full items-center gap-3 rounded-[14px] px-2.5 text-left text-sm transition-colors active:scale-[0.99] ${
-        on ? "bg-white/[0.05] font-semibold text-foreground" : "text-foreground/85 hover:bg-white/[0.03]"
+      className={`flex h-10 w-full items-center gap-3 rounded-xl px-2.5 text-left text-[14px] transition-colors ${
+        on
+          ? "bg-white/[0.06] font-medium text-foreground"
+          : "text-foreground/80 hover:bg-white/[0.03] active:bg-white/[0.05]"
       }`}
     >
-      <span
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] transition-colors ${
-          on ? "bg-accent/15 text-accent" : "bg-surface text-muted"
-        }`}
-      >
-        {icon}
-      </span>
+      <Glyph
+        size={18}
+        weight={on ? "fill" : "regular"}
+        className={`shrink-0 ${on ? "text-foreground" : "text-muted"}`}
+      />
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      {/* Empty until it is the one you are on, then filled green. */}
+      {/* A radio: an empty ring, or the same ring with a dot in it. */}
       <span
         aria-hidden
-        className={`h-2.5 w-2.5 shrink-0 rounded-full transition-all ${
-          on
-            ? "bg-accent shadow-[0_0_8px_rgba(163,230,53,0.7)]"
-            : "border border-white/20"
-        }`}
-      />
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors"
+        style={{ borderColor: on ? ON : "rgba(255,255,255,0.22)" }}
+      >
+        {on && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: ON }} />}
+      </span>
     </button>
   );
 }
