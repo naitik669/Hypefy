@@ -184,7 +184,7 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
    * from here, which is what stops a run of quick swipes from measuring every
    * one of them from the tab you started on and landing you two short.
    */
-  const [standing, setStanding] = useState<{ tab: TabPath; startX: number } | null>(null);
+  const [standing, setStanding] = useState<{ tab: TabPath; startX: number; route: string[] } | null>(null);
   /** Held after the finger lifts, while the pages finish their travel. */
   const holding = useRef(false);
 
@@ -197,7 +197,13 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
   // Once the route arrives the stand-in is no longer standing in for
   // anything — read that off the pathname rather than clearing it in an
   // effect, so there is never a frame with both on screen.
-  const standIn = standing && standing.tab !== pathname ? standing : null;
+  //
+  // Or once anything else takes us somewhere: the stand-in only stands in
+  // while we are on the page the swipes started from or a tab they passed
+  // through. If some other navigation lands first (a back, a link) the
+  // placeholder for a tab we never reached must not sit over it until the
+  // handoff timer gives up.
+  const standIn = standing && standing.tab !== pathname && standing.route.includes(pathname) ? standing : null;
   const here = standIn?.tab ?? pathname;
   const index = tabIndex(here);
   const enabled = index >= 0;
@@ -421,7 +427,7 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
       // stays until the route commits under it.
       paint(dx.current, SETTLE);
       setIncoming(null);
-      setStanding({ tab: dest, startX });
+      setStanding({ tab: dest, startX, route: [...(standIn?.route ?? [pathname]), dest] });
       router.push(dest);
       return;
     }

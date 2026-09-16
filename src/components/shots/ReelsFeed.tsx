@@ -20,6 +20,7 @@ import { hypeResult } from "@/lib/supabase/typed";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { scheduleUndoable } from "@/lib/undoable";
+import { lockAxis } from "@/components/layout/SwipeNav";
 import { safeBack } from "@/lib/safe-back";
 import { spliceFeed, SHOT_AD_OPTS } from "@/lib/feed-mix";
 import { noteAdShown } from "@/lib/ads";
@@ -66,6 +67,30 @@ export const PINCH_MAX = 4;
  * shrinking it past the screen exposes bars where the video used to be,
  * which reads as something broken rather than as zooming out.
  */
+/**
+ * What a released swipe on the reel does. Only a vertical gesture counts: a
+ * sideways one is the tab swipe's, and reading the downward dip of a sideways
+ * thumb as "pull down to leave Shots" is what sent a swipe towards Profile
+ * back to Messages instead.
+ */
+export function reelSwipeOutcome(g: {
+  axis: null | "x" | "y";
+  dy: number;
+  height: number;
+  elapsed: number;
+  first: boolean;
+}): "next" | "prev" | "leave" | "stay" {
+  if (g.axis !== "y") return "stay";
+  const velocity = Math.abs(g.dy) / Math.max(1, g.elapsed); // px per ms
+  // Distance OR speed. Distance alone ignored quick flicks, which are the
+  // most common way people move through a reels feed; a fast 30px flick
+  // read as a tap and did nothing.
+  const committed = Math.abs(g.dy) > g.height * 0.18 || velocity > 0.45;
+  if (!committed) return "stay"; // springs back via the transition
+  if (g.dy < 0) return "next";
+  return g.first ? "leave" : "prev";
+}
+
 export function clampPinch(
   startScale: number,
   startDist: number,
@@ -133,6 +158,11 @@ export function ReelsFeed({
     setSheetOpen(false);
   }, [activeIdx]);
   const swipeTouchStartY = useRef(0);
+  const swipeTouchStartX = useRef(0);
+  /** Which way this touch is going, once it is clear. Sideways belongs to the
+   *  tab swipe: the reel must not move, and above all must not read the dip
+   *  of a sideways thumb as "pull down to leave Shots". */
+  const swipeAxis = useRef<null | "x" | "y">(null);
   /** Live finger offset in px, null when no finger is down. Doubles as the
    *  "is dragging" flag, which is what decides whether the transform
    *  animates: following a finger must be instant, settling must not. */
@@ -186,6 +216,8 @@ export function ReelsFeed({
     // triggered it — so the flag is still false here. Count the fingers.
     if (e.touches.length !== 1) return;
     swipeTouchStartY.current = e.touches[0].clientY;
+    swipeTouchStartX.current = e.touches[0].clientX;
+    swipeAxis.current = null;
     swipeStartedAt.current = Date.now();
     setDrag(0);
   }
@@ -206,6 +238,14 @@ export function ReelsFeed({
       return;
     }
     let dy = e.touches[0].clientY - swipeTouchStartY.current;
+    if (swipeAxis.current === null) {
+      swipeAxis.current = lockAxis(e.touches[0].clientX - swipeTouchStartX.current, dy);
+      if (swipeAxis.current === null) return;
+    }
+    if (swipeAxis.current === "x") {
+      setDrag(null);
+      return;
+    }
 
     // Resist at the ends so pulling past the last reel feels like a boundary
     // rather than a broken screen. Downward at index 0 stays free, because
@@ -220,25 +260,17 @@ export function ReelsFeed({
     if (sheetOpen) return;
     const dy = drag ?? 0;
     setDrag(null);
-
-    const height = stageRef.current?.clientHeight ?? 1;
-    const elapsed = Math.max(1, Date.now() - swipeStartedAt.current);
-    const velocity = Math.abs(dy) / elapsed; // px per ms
-
-    // Distance OR speed. Distance alone ignored quick flicks, which are the
-    // most common way people move through a reels feed; a fast 30px flick
-    // read as a tap and did nothing.
-    const committed = Math.abs(dy) > height * 0.18 || velocity > 0.45;
-    if (!committed) return; // springs back via the transition
-
-    if (dy < 0) {
-      setActiveIdx((i) => Math.min(i + 1, items.length - 1));
-    } else if (activeIdx === 0) {
-      // Pulling down on the first reel leaves Shots.
-      safeBack(router);
-    } else {
-      setActiveIdx((i) => i - 1);
-    }
+    const outcome = reelSwipeOutcome({
+      axis: swipeAxis.current,
+      dy,
+      height: stageRef.current?.clientHeight ?? 1,
+      elapsed: Date.now() - swipeStartedAt.current,
+      first: activeIdx === 0,
+    });
+    if (outcome === "next") setActiveIdx((i) => Math.min(i + 1, items.length - 1));
+    else if (outcome === "prev") setActiveIdx((i) => i - 1);
+    // Pulling down on the first reel leaves Shots.
+    else if (outcome === "leave") safeBack(router);
   }
 
   return (

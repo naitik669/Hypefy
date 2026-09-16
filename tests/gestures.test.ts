@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { gestureBlocked } from "@/components/layout/SwipeNav";
-import { clampPinch, PINCH_MAX } from "@/components/shots/ReelsFeed";
+import { clampPinch, PINCH_MAX, reelSwipeOutcome } from "@/components/shots/ReelsFeed";
 import { clampZoom, ZOOM_MAX, ZOOM_MIN } from "@/components/feed/FeedCard";
 import { autoplayAllowed } from "@/components/feed/ShotFeedCard";
 
@@ -120,5 +120,27 @@ describe("autoplayAllowed", () => {
     expect(
       autoplayAllowed({ effectiveType: "3g" }),
     ).toBe(true);
+  });
+});
+
+describe("reelSwipeOutcome", () => {
+  const base = { height: 700, elapsed: 400, first: true };
+
+  it("a sideways swipe on the first reel never leaves Shots, however far it dips", () => {
+    // The bug: swiping left towards Profile dipped downward, read as
+    // "pull down to leave", went back to Messages.
+    expect(reelSwipeOutcome({ ...base, axis: "x", dy: 300 })).toBe("stay");
+    expect(reelSwipeOutcome({ ...base, axis: "x", dy: 40, elapsed: 30 })).toBe("stay");
+    expect(reelSwipeOutcome({ ...base, axis: null, dy: 300 })).toBe("stay");
+  });
+
+  it("a real pull down on the first reel still leaves", () => {
+    expect(reelSwipeOutcome({ ...base, axis: "y", dy: 300 })).toBe("leave");
+  });
+
+  it("moves between reels on a vertical swipe", () => {
+    expect(reelSwipeOutcome({ ...base, axis: "y", dy: -300 })).toBe("next");
+    expect(reelSwipeOutcome({ ...base, first: false, axis: "y", dy: 300 })).toBe("prev");
+    expect(reelSwipeOutcome({ ...base, axis: "y", dy: -20 })).toBe("stay");
   });
 });

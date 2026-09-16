@@ -10,8 +10,9 @@ import { createRoot, type Root } from "react-dom/client";
  */
 
 const push = vi.hoisted(() => vi.fn());
+const nav = vi.hoisted(() => ({ path: "/home" }));
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/home",
+  usePathname: () => nav.path,
   useRouter: () => ({ push, back() {}, replace() {} }),
 }));
 
@@ -21,6 +22,7 @@ let host: HTMLDivElement;
 beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   push.mockReset();
+  nav.path = "/home";
   Object.defineProperty(window, "innerWidth", { value: 400, configurable: true });
   host = document.createElement("div");
   document.body.appendChild(host);
@@ -159,6 +161,19 @@ describe("directional lock", () => {
     expect(page().style.transform).toBe("");
     expect(document.documentElement.style.overflowY).toBe("");
     await touch("touchend", 240, 200);
+  });
+});
+
+describe("another navigation landing first", () => {
+  it("drops the placeholder for a tab the swipe never reached", async () => {
+    await swipeToNext();
+    expect(push).toHaveBeenCalledWith("/messages");
+    expect(standIn()?.dataset.standin).toBe("/messages");
+    // Something else wins: a back from the page, say, lands on Discover.
+    nav.path = "/discover";
+    const { SwipeNav } = await import("@/components/layout/SwipeNav");
+    await act(async () => root.render(createElement(SwipeNav, null, createElement("p", { id: "feed" }, "the feed"))));
+    expect(standIn()).toBeNull();
   });
 });
 });
