@@ -62,15 +62,18 @@ afterEach(async () => {
 describe("the folder", () => {
   const album = { caption: "Golden hour walk", items: [photo(1), photo(2), video(1), photo(3), photo(4), photo(5)] };
 
-  it("shows three in the deck, the rest as +N, and the caption with the count", async () => {
+  it("shows three in the deck, the rest as +N over a darkened photo, and the caption", async () => {
     const { MediaFolder } = await import("@/components/messages/MediaFolder");
     await act(async () => root.render(createElement(MediaFolder, { album, mine: false, onOpen: () => {} })));
     const folder = host.querySelector("[data-media-folder]")!;
     expect(folder.querySelectorAll("img, video")).toHaveLength(3);
     expect(folder.textContent).toContain("+3");
     expect(folder.textContent).toContain("Golden hour walk");
-    expect(folder.textContent).toContain("6");
-    expect(host.querySelector("[data-more]")).toBeTruthy();
+    // Nothing else on the front: no count, no icons.
+    expect(folder.textContent).toBe("+3Golden hour walk");
+    // Dimmed, not blurred.
+    expect(host.querySelector("[data-more]")!.className).toContain("bg-black/35");
+    expect(folder.querySelector("[class*='blur-']")).toBeNull();
   });
 
   it("blurs through the glass, with nothing above it that would switch the blur off", async () => {
@@ -87,17 +90,71 @@ describe("the folder", () => {
     expect(glass.style.background).toContain("163, 230, 53");
   });
 
-  it("opens the viewer at the first item, and the viewer steps through all of them", async () => {
-    const { MediaFolder, AlbumViewer } = await import("@/components/messages/MediaFolder");
+  it("opens the viewer at the first item", async () => {
+    const { MediaFolder } = await import("@/components/messages/MediaFolder");
     const onOpen = vi.fn();
     await act(async () => root.render(createElement(MediaFolder, { album, mine: false, onOpen })));
     await act(async () => (host.querySelector("[data-media-folder]") as HTMLButtonElement).click());
     expect(onOpen).toHaveBeenCalledWith(0);
-
-    await act(async () => root.render(createElement(AlbumViewer, { album, start: 0, onClose: () => {} })));
-    const dialog = document.querySelector('[role="dialog"]')!;
-    expect(dialog.textContent).toContain("1 / 6");
-    expect(dialog.querySelectorAll("img, video")).toHaveLength(6);
-    expect(dialog.textContent).toContain("Golden hour walk");
   });
 });
+
+describe("the viewer", () => {
+  const album = { caption: "Golden hour walk", items: [photo(1), photo(2), photo(3)] };
+
+  const pointer = (type: string, x: number, y: number, id = 1) => {
+    const e = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y });
+    Object.defineProperty(e, "pointerId", { value: id });
+    return e;
+  };
+  const drag = async (el: Element, from: [number, number], to: [number, number]) => {
+    await act(async () => void el.dispatchEvent(pointer("pointerdown", ...from)));
+    await act(async () => void el.dispatchEvent(pointer("pointermove", (from[0] + to[0]) / 2, (from[1] + to[1]) / 2)));
+    await act(async () => void el.dispatchEvent(pointer("pointermove", ...to)));
+    await act(async () => void el.dispatchEvent(pointer("pointerup", ...to)));
+  };
+
+  async function open(onClose = () => {}) {
+    const { AlbumViewer } = await import("@/components/messages/MediaFolder");
+    await act(async () =>
+      root.render(
+        createElement(AlbumViewer, { album, start: 0, onClose, sender: { name: "Maya", hue: 120 }, sentAt: "Today, 9:41" }),
+      ),
+    );
+    return document.querySelector('[role="dialog"]')!;
+  }
+
+  it("says who sent it and when, where you are, and the caption", async () => {
+    const dialog = await open();
+    expect(dialog.textContent).toContain("Maya");
+    expect(dialog.textContent).toContain("Today, 9:41");
+    expect(dialog.textContent).toContain("1 / 3");
+    expect(dialog.textContent).toContain("Golden hour walk");
+  });
+
+  it("swipes to the next photo and back, and holds still at the ends", async () => {
+    const dialog = await open();
+    await drag(dialog, [300, 400], [120, 405]);
+    expect(dialog.textContent).toContain("2 / 3");
+    await drag(dialog, [100, 400], [300, 400]);
+    expect(dialog.textContent).toContain("1 / 3");
+    await drag(dialog, [100, 400], [300, 400]);
+    expect(dialog.textContent).toContain("1 / 3");
+  });
+
+  it("a small sideways nudge stays on the same photo", async () => {
+    const dialog = await open();
+    vi.spyOn(performance, "now").mockReturnValueOnce(0).mockReturnValue(1000);
+    await drag(dialog, [300, 400], [270, 400]);
+    vi.restoreAllMocks();
+    expect(dialog.textContent).toContain("1 / 3");
+  });
+
+  it("swiping down closes it", async () => {
+    const onClose = vi.fn();
+    const dialog = await open(onClose);
+    await drag(dialog, [200, 300], [205, 520]);
+    expect(onClose).toHaveBeenCalled();
+  });
+});
+

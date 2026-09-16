@@ -40,11 +40,14 @@ export function fitWithin(
  * Anything that fails to decode is passed through too — the upload will say
  * what is wrong with it better than a silent failure here.
  */
-export async function shrinkForComment(file: File): Promise<Blob> {
+export async function shrinkForComment(
+  file: File,
+  maxEdge = COMMENT_PHOTO_MAX_EDGE,
+): Promise<Blob> {
   if (file.type === "image/gif") return file;
   try {
     const bitmap = await createImageBitmap(file);
-    const out = fitWithin(bitmap.width, bitmap.height);
+    const out = fitWithin(bitmap.width, bitmap.height, maxEdge);
     if (out.w === bitmap.width && out.h === bitmap.height && file.size < 800_000) {
       bitmap.close();
       return file;

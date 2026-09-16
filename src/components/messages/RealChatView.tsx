@@ -47,6 +47,7 @@ import {
   parseAlbum,
   type Album,
 } from "@/lib/chat-album";
+import { uploadAlbumFiles, type AlbumFile } from "@/lib/chat-album-upload";
 
 type PostPreview = {
   id: string;
@@ -324,10 +325,10 @@ export function RealChatView({
   // Two or more photos/videos picked at once travel as one folder message;
   // while staged, the composer's text is the folder's caption.
   const [albumDraft, setAlbumDraft] = useState<{ file: File; preview: string; type: "image" | "video" }[]>([]);
-  const [albumView, setAlbumView] = useState<{ album: Album; start: number } | null>(null);
+  const [albumView, setAlbumView] = useState<{ album: Album; start: number; senderId: string; at: string } | null>(null);
   // A sending folder's files, by its temp id, kept until they are uploaded so
   // a failed upload can be retried.
-  const albumFiles = useRef(new Map<string, { file: File; type: "image" | "video" }[]>());
+  const albumFiles = useRef(new Map<string, AlbumFile[]>());
   const pickMode = useRef<"media" | "oneshot" | "document">("media");
   const [uploading, setUploading] = useState(false);
   // Local-only, per-mount reveal state for OneShot bubbles: which message ids
@@ -1251,7 +1252,7 @@ export function RealChatView({
    *  upload itself never finished. */
   async function deliverAlbum(
     tempId: string,
-    files: { file: File; type: "image" | "video" }[],
+    files: AlbumFile[],
     caption: string,
     replyId: string | null,
   ) {
@@ -1259,19 +1260,8 @@ export function RealChatView({
       setMessages((p) => p.map((m) => (m.id === tempId ? { ...m, ...patch } : m)));
     mark({ _status: "pending" });
 
-    const stamp = Date.now();
-    const uploads = await Promise.all(
-      files.map(async (x, i) => {
-        const ext = x.file.name.split(".").pop() ?? (x.type === "video" ? "mp4" : "jpg");
-        const path = `${currentUserId}/${stamp}-${i}.${ext}`;
-        const { error } = await supabase.storage
-          .from("chat-media")
-          .upload(path, x.file, { contentType: x.file.type });
-        if (error) return null;
-        return { url: supabase.storage.from("chat-media").getPublicUrl(path).data.publicUrl, type: x.type };
-      }),
-    );
-    if (uploads.some((u) => !u)) {
+    const uploads = await uploadAlbumFiles(files, supabase.storage.from("chat-media"), currentUserId);
+    if (!uploads) {
       mark({ _status: "failed" });
       showToast("Photos didn't upload. Tap Retry.");
       return;
@@ -1279,7 +1269,7 @@ export function RealChatView({
 
     // The real body goes on before the send, so the realtime echo can find
     // this message by it; the picture keeps drawing from the device.
-    const body = encodeAlbum({ caption, items: uploads as Album["items"] });
+    const body = encodeAlbum({ caption, items: uploads });
     mark({ body });
     albumFiles.current.delete(tempId);
 
@@ -1842,7 +1832,7 @@ export function RealChatView({
                           <MediaFolder
                             album={parseAlbum(m._preview ?? m.body)!}
                             mine={mine}
-                            onOpen={(start) => setAlbumView({ album: parseAlbum(m._preview ?? m.body)!, start })}
+                            onOpen={(start) => setAlbumView({ album: parseAlbum(m._preview ?? m.body)!, start, senderId: m.sender_id, at: m.created_at })}
                           />
                           {starBurstId === m.id && (
                             <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
@@ -2304,7 +2294,19 @@ export function RealChatView({
 
 
       {albumView && (
-        <AlbumViewer album={albumView.album} start={albumView.start} onClose={() => setAlbumView(null)} />
+        <AlbumViewer
+          album={albumView.album}
+          start={albumView.start}
+          onClose={() => setAlbumView(null)}
+          sender={
+            albumView.senderId === currentUserId
+              ? { name: "You" }
+              : isGroup
+                ? { name: senderName(albumView.senderId), hue: members?.[albumView.senderId]?.hue }
+                : { name: other.name, hue: other.hue, avatarUrl: other.avatarUrl }
+          }
+          sentAt={`${dayLabel(albumView.at)}, ${timeLabel(albumView.at)}`}
+        />
       )}
 
       {/* Long-press context menu (reactions + actions), anchored to the message */}
