@@ -1,3 +1,4 @@
+import { ViewTransition } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MessagesHeader } from "@/components/messages/MessagesHeader";
@@ -190,7 +191,10 @@ export default async function MessagesPage() {
   }
 
   return (
-    <>
+    // Holds still under a chat as it slides in over the inbox (globals.css),
+    // instead of vanishing the moment the chat's route takes over.
+    <ViewTransition exit="dm-under" default="none">
+      <div>
       <MessagesHeader
         currentUserId={user.id}
         name={(me as any)?.display_name ?? (me as any)?.username ?? "You"}
@@ -201,6 +205,7 @@ export default async function MessagesPage() {
       <PullToRefresh>
         <MessagesInbox rows={rows} currentUserId={user.id} pages={pages} renderedAt={renderStamp()} />
       </PullToRefresh>
-    </>
+      </div>
+    </ViewTransition>
   );
 }

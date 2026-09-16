@@ -48,6 +48,8 @@ import {
   type AlbumItem,
 } from "@/lib/chat-album";
 import { uploadAlbumFiles, type AlbumFile } from "@/lib/chat-album-upload";
+import { setThreadHint } from "@/lib/thread-hints";
+import { leaveChatAnimated } from "@/lib/leave-chat";
 
 type PostPreview = {
   id: string;
@@ -342,6 +344,12 @@ export function RealChatView({
   // the file against that intent, since one hidden <input> serves all three.
   // The paperclip's sheet: camera, this chat's photos, your gallery.
   const [pickerOpen, setPickerOpen] = useState(false);
+  // So the next time this chat opens, its header is there from the first frame.
+  useEffect(() => {
+    setThreadHint(conversationId, group
+      ? { name: group.title, hue: 210, isGroup: true, memberCount: group.memberCount }
+      : { name: other.name, hue: other.hue, avatarUrl: other.avatarUrl ?? null });
+  }, [conversationId, group, other.name, other.hue, other.avatarUrl]);
   const [attachMenu, setAttachMenu] = useState(false);
   const pickerApi = useRef<MediaPickerApi>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
@@ -1495,10 +1503,10 @@ export function RealChatView({
   }
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
+    <div data-chat-view className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
       {/* Header */}
       <header className="flex h-[calc(3.5rem+var(--sat))] items-center gap-2 border-b border-border/60 chrome-bar px-2 pt-[var(--sat)]">
-        <button type="button" onClick={() => safeBack(router, "/messages")} aria-label="Back"
+        <button type="button" onClick={() => leaveChatAnimated(() => safeBack(router, "/messages"))} aria-label="Back"
           className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-white/5">
           <ChevronLeft size={24} />
         </button>

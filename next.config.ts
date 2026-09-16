@@ -17,6 +17,8 @@ const nextConfig: NextConfig = {
     staleTimes: {
       dynamic: 30,
     },
+    // Lets a chat slide in over the inbox and back out (messages/[threadId]/layout.tsx).
+    viewTransition: true,
   },
   images: {
     // Allow next/image to optimise user media served from Supabase storage.

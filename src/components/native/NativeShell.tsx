@@ -7,6 +7,7 @@ import { StatusBar, Style } from "@capacitor/status-bar";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { isNative, isAndroidApp, safeNative } from "@/lib/native";
 import { closeTopOverlay } from "@/lib/overlay-stack";
+import { CHAT_PATH, leaveChatAnimated } from "@/lib/leave-chat";
 import { reloadIfNewBuild } from "@/lib/app-version";
 import { createClient } from "@/lib/supabase/client";
 import { isAuthCallbackUrl, completeNativeSignIn } from "@/lib/native-auth";
@@ -133,6 +134,11 @@ export function NativeShell() {
       // is what every other Android app does.
       if (!canGoBack || ROOT_ROUTES.includes(pathnameRef.current)) {
         void App.exitApp();
+        return;
+      }
+      // Out of a chat, the chat slides away like the on-screen back button.
+      if (CHAT_PATH.test(pathnameRef.current)) {
+        leaveChatAnimated(() => router.back());
         return;
       }
       router.back();

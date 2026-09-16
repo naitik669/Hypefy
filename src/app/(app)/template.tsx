@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
+
+/** A chat, and anything inside one: these slide in instead (see the
+ *  chat's layout), and a fade here would hide them for its first frames. */
+const CHAT = /^\/messages\/[0-9a-f-]{36}(\/|$)/;
 
 /**
  * Per-navigation wrapper for the signed-in app. Next.js re-mounts `template`
@@ -15,7 +20,8 @@ import { useState } from "react";
  * sticky CTAs rendered inside the page. Clearing the class avoids that.
  */
 export default function AppTemplate({ children }: { children: React.ReactNode }) {
-  const [entering, setEntering] = useState(true);
+  const pathname = usePathname();
+  const [entering, setEntering] = useState(() => !CHAT.test(pathname));
 
   return (
     <div
