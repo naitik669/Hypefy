@@ -22,6 +22,7 @@ import {
   type SortId,
 } from "@/lib/marketplace";
 import { findFont, findGlow, nameStyle } from "@/lib/cosmetics";
+import { withGlowRoom } from "@/components/ui/DisplayName";
 import { Nameplate } from "@/components/ui/Nameplate";
 import { findBubbleStyle } from "@/lib/bubble-styles";
 import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
@@ -237,7 +238,7 @@ function Dock({
   const frame = item.category === "frame" ? item.id : null;
   const style =
     item.category === "name"
-      ? nameStyle({ name_font: findFont(item.id)?.id ?? null, name_glow: findGlow(item.id)?.id ?? null, is_premium: true })
+      ? withGlowRoom(nameStyle({ name_font: findFont(item.id)?.id ?? null, name_glow: findGlow(item.id)?.id ?? null, is_premium: true }))
       : undefined;
   const bubble = item.category === "bubble" ? findBubbleStyle(item.id) : null;
   const theme = item.category === "theme" ? findChatTheme(item.id) : null;

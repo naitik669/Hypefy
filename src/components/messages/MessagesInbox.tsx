@@ -680,14 +680,14 @@ export function MessagesInbox({
           <div className="relative min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
               <p
-                className={`min-w-0 truncate text-sm ${
+                className={`flex min-w-0 items-center text-sm ${
                   unread ? "font-bold text-foreground" : "font-semibold"
                 }`}
               >
-                <DisplayName name={r.name} profile={r.cosmetics} />
-                {r.verified && <VerifiedStar className="ml-1 inline-block h-3.5 w-3.5 align-[-2px] text-verified" />}
+                <DisplayName name={r.name} profile={r.cosmetics} className="min-w-0 truncate" />
+                {r.verified && <VerifiedStar className="ml-1 h-3.5 w-3.5 shrink-0 text-verified" />}
                 {r.isGroup && (
-                  <span className="ml-1.5 text-xs font-normal text-faint">
+                  <span className="ml-1.5 shrink-0 whitespace-nowrap text-xs font-normal text-faint">
                     · {r.memberCount}
                   </span>
                 )}

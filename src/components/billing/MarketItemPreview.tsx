@@ -7,6 +7,7 @@ import { PreviewBubbles } from "@/components/messages/ChatThemePicker";
 import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
 import { findBubbleStyle } from "@/lib/bubble-styles";
 import { findFont, findGlow, nameStyle } from "@/lib/cosmetics";
+import { withGlowRoom } from "@/components/ui/DisplayName";
 import { NameplateRow } from "@/components/ui/Nameplate";
 import type { MarketItem } from "@/lib/marketplace";
 
@@ -63,7 +64,7 @@ export function MarketItemPreview({ item, me, large = false }: { item: MarketIte
     case "name": {
       const font = findFont(item.id);
       const glow = findGlow(item.id);
-      const style = nameStyle({ name_font: font?.id ?? null, name_glow: glow?.id ?? null, is_premium: true });
+      const style = withGlowRoom(nameStyle({ name_font: font?.id ?? null, name_glow: glow?.id ?? null, is_premium: true }));
       const first = me.name.split(" ")[0] || "You";
       return (
         <Stage>

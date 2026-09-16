@@ -414,8 +414,8 @@ function Identity({
       <div
         className={`flex items-center gap-1 ${centred ? "justify-center" : ""}`}
       >
-        <h2 className="truncate text-lg font-extrabold tracking-tight">
-          <DisplayName name={data.name} profile={data.cosmetics} />
+        <h2 className="flex min-w-0 text-lg font-extrabold tracking-tight">
+          <DisplayName name={data.name} profile={data.cosmetics} className="min-w-0 truncate" />
         </h2>
         {data.verified && (
           <VerifiedStar className="h-[15px] w-[15px] shrink-0" />

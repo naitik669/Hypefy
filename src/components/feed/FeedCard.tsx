@@ -653,9 +653,9 @@ export function FeedCard({
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <Link
             href={profileHref}
-            className="truncate text-sm font-semibold hover:underline"
+            className="flex min-w-0 text-sm font-semibold hover:underline"
           >
-            <DisplayName name={name} profile={profile} />
+            <DisplayName name={name} profile={profile} className="min-w-0 truncate" />
           </Link>
           {profile?.is_verified && (
             <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />

@@ -12,6 +12,7 @@ import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { DECORATIONS, NAME_FONTS, NAME_GLOWS, NAME_SIZE_ADJUST, nameStyle, type Tier } from "@/lib/cosmetics";
+import { withGlowRoom } from "@/components/ui/DisplayName";
 import { NAMEPLATES } from "@/lib/nameplates";
 import { NameplateRow } from "@/components/ui/Nameplate";
 import { BUBBLE_STYLES, findBubbleStyle } from "@/lib/bubble-styles";
@@ -112,7 +113,7 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
               {dirty && <span className="mb-1 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-muted">Preview</span>}
             </div>
             <p className="mt-3 flex items-center gap-1.5 text-lg font-bold leading-tight">
-              <span className="truncate" style={nameStyle(view)}>{name}</span>
+              <span className="truncate" style={withGlowRoom(nameStyle(view))}>{name}</span>
               {me.is_verified && <VerifiedStar className="h-4 w-4 shrink-0 text-verified" />}
             </p>
             {me.username && <p className="text-[13px] text-muted">@{me.username}</p>}
