@@ -127,6 +127,7 @@ const KIND_VERB: Record<string, string> = {
   voice: "sent a voice note",
   oneshot: "sent a view once photo",
   document: "sent a document",
+  album: "sent photos",
 };
 
 function cap(s: string) {

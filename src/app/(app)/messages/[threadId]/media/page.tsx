@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ConversationMedia, type MediaItem } from "@/components/messages/ConversationMedia";
+import { parseAlbum } from "@/lib/chat-album";
 
 /**
  * Everything shared in one conversation.
@@ -38,14 +39,25 @@ export default async function ConversationMediaPage({
     .from("messages")
     .select("id, kind, body, metadata, sender_id, created_at")
     .eq("conversation_id", threadId)
-    .in("kind", ["image", "video", "gif", "document", "voice"])
+    .in("kind", ["image", "video", "gif", "document", "voice", "album"])
     .eq("is_unsent", false)
     .order("created_at", { ascending: false })
     .limit(200);
 
-  const items: MediaItem[] = (data ?? []).map((m: Record<string, unknown>) => {
+  const items: MediaItem[] = (data ?? []).flatMap((m: Record<string, unknown>): MediaItem[] => {
+    // A folder of photos shows each of them, not the folder.
+    if (m.kind === "album") {
+      return (parseAlbum(m.body as string)?.items ?? []).map((it, i) => ({
+        id: `${m.id as string}-${i}`,
+        kind: it.type,
+        url: it.url,
+        name: null,
+        mine: (m.sender_id as string) === user.id,
+        at: m.created_at as string,
+      }));
+    }
     const meta = (m.metadata ?? {}) as Record<string, unknown>;
-    return {
+    return [{
       id: m.id as string,
       kind: m.kind as MediaItem["kind"],
       // Media messages carry their URL in the body; documents keep a filename
@@ -54,7 +66,7 @@ export default async function ConversationMediaPage({
       name: (meta.name as string) ?? null,
       mine: (m.sender_id as string) === user.id,
       at: m.created_at as string,
-    };
+    }];
   });
 
   return (

@@ -98,7 +98,7 @@ export default async function ConversationInfoPage({
     .from("messages")
     .select("id", { count: "exact", head: true })
     .eq("conversation_id", threadId)
-    .in("kind", ["image", "video", "gif", "document", "voice"]);
+    .in("kind", ["image", "video", "gif", "document", "voice", "album"]);
 
   return (
     <ConversationInfo

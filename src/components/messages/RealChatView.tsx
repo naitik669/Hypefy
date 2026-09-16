@@ -37,6 +37,16 @@ import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { DisplayName } from "@/components/ui/DisplayName";
 import { visibleDecoration } from "@/lib/cosmetics";
+import { MediaFolder, AlbumViewer } from "@/components/messages/MediaFolder";
+import {
+  ALBUM_CAPTION_MAX,
+  ALBUM_CAPTION_WARN,
+  ALBUM_MAX_ITEMS,
+  albumSnippet,
+  encodeAlbum,
+  parseAlbum,
+  type Album,
+} from "@/lib/chat-album";
 
 type PostPreview = {
   id: string;
@@ -117,6 +127,7 @@ function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null 
     case "shot": return "Shot";
     case "post": return "Post";
     case "oneshot": return "Photo";
+    case "album": return albumSnippet(m.body);
     case "page_reply": return m.body ? `Page reply: ${m.body}` : "Page reply";
     case "document": {
       try { return JSON.parse(m.body ?? "")?.name ?? "Document"; } catch { return "Document"; }
@@ -306,6 +317,10 @@ export function RealChatView({
   // Which attachment sheet option was chosen — read by pickFile to validate
   // the file against that intent, since one hidden <input> serves all three.
   const [attachMenu, setAttachMenu] = useState(false);
+  // Two or more photos/videos picked at once travel as one folder message;
+  // while staged, the composer's text is the folder's caption.
+  const [albumDraft, setAlbumDraft] = useState<{ file: File; preview: string; type: "image" | "video" }[]>([]);
+  const [albumView, setAlbumView] = useState<{ album: Album; start: number } | null>(null);
   const pickMode = useRef<"media" | "oneshot" | "document">("media");
   const [uploading, setUploading] = useState(false);
   // Local-only, per-mount reveal state for OneShot bubbles: which message ids
@@ -1091,12 +1106,18 @@ export function RealChatView({
   /** Handle file input change — validate against the chosen mode, build a
    *  preview, and stage the attachment. */
   function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const files = [...(e.target.files ?? [])];
+    const file = files[0];
     e.target.value = ""; // reset so the same file can be re-picked
     if (!file) return;
     setGifPickerOpen(false);
 
     const mode = pickMode.current;
+    if (mode === "media" && files.length > 1) {
+      stageAlbum(files);
+      return;
+    }
+    clearAlbumDraft();
     const isVideo = file.type.startsWith("video/");
     const isImage = file.type.startsWith("image/");
 
@@ -1139,6 +1160,104 @@ export function RealChatView({
     });
   }
 
+  function clearAlbumDraft() {
+    setAlbumDraft((d) => {
+      d.forEach((x) => URL.revokeObjectURL(x.preview));
+      return [];
+    });
+  }
+
+  /** Stage several photos/videos as one folder, dropping what can't be sent. */
+  function stageAlbum(files: File[]) {
+    const ok: { file: File; preview: string; type: "image" | "video" }[] = [];
+    let skipped = 0;
+    for (const file of files) {
+      const isVideo = file.type.startsWith("video/");
+      const isImage = file.type.startsWith("image/");
+      const maxMb = isVideo ? 50 : 10;
+      if ((!isVideo && !isImage) || file.size > maxMb * 1024 * 1024) { skipped++; continue; }
+      if (ok.length === ALBUM_MAX_ITEMS) { skipped++; continue; }
+      ok.push({ file, preview: URL.createObjectURL(file), type: isVideo ? "video" : "image" });
+    }
+    if (skipped) {
+      showToast(files.length > ALBUM_MAX_ITEMS && ok.length === ALBUM_MAX_ITEMS
+        ? `Up to ${ALBUM_MAX_ITEMS} at a time. The rest weren't added.`
+        : "Some files were too large or not photos or videos.");
+    }
+    if (attachment?.preview) URL.revokeObjectURL(attachment.preview);
+    setAttachment(null);
+    clearAlbumDraft();
+    if (ok.length === 0) return;
+    if (ok.length === 1) {
+      setAttachment({ file: ok[0].file, preview: ok[0].preview, type: ok[0].type, viewOnce: false });
+      return;
+    }
+    setAlbumDraft(ok);
+    setText((t) => t.slice(0, ALBUM_CAPTION_MAX));
+    composerRef.current?.focus();
+  }
+
+  function removeFromAlbum(index: number) {
+    const rest = albumDraft.filter((_, i) => i !== index);
+    URL.revokeObjectURL(albumDraft[index].preview);
+    if (rest.length === 1) {
+      // One left is just a photo or video again.
+      setAttachment({ file: rest[0].file, preview: rest[0].preview, type: rest[0].type, viewOnce: false });
+      setAlbumDraft([]);
+      return;
+    }
+    setAlbumDraft(rest);
+  }
+
+  /** Upload every staged item, then send them as one folder message. */
+  async function sendAlbum() {
+    if (albumDraft.length < 2 || uploading) return;
+    setUploading(true);
+    const stamp = Date.now();
+    const uploads = await Promise.all(
+      albumDraft.map(async (x, i) => {
+        const ext = x.file.name.split(".").pop() ?? (x.type === "video" ? "mp4" : "jpg");
+        const path = `${currentUserId}/${stamp}-${i}.${ext}`;
+        const { error } = await supabase.storage
+          .from("chat-media")
+          .upload(path, x.file, { contentType: x.file.type });
+        if (error) return null;
+        return { url: supabase.storage.from("chat-media").getPublicUrl(path).data.publicUrl, type: x.type };
+      }),
+    );
+    if (uploads.some((u) => !u)) {
+      showToast("Upload failed. Try again.");
+      setUploading(false);
+      return;
+    }
+
+    const body = encodeAlbum({ caption: text, items: uploads as Album["items"] });
+    const replyId = replyTo?.id ?? null;
+    setReplyTo(null);
+    setText("");
+    clearAlbumDraft();
+
+    const tempId = `temp-${Date.now()}`;
+    setMessages((p) => [...p, {
+      id: tempId, body, sender_id: currentUserId, kind: "album",
+      post_id: null, reply_to_id: replyId, is_unsent: false,
+      created_at: new Date().toISOString(), _status: "pending",
+    }]);
+
+    const { data, error } = await supabase.rpc("send_message", {
+      p_conversation_id: conversationId, p_body: body, p_kind: "album",
+      p_post_id: undefined, p_reply_to_id: replyId ?? undefined,
+    });
+    if (error || !data) {
+      setMessages((p) => p.map((m) => m.id === tempId ? { ...m, _status: "failed" as const } : m));
+      showToast("Couldn't send. Try again.");
+    } else {
+      const real = data as ChatMsg;
+      setMessages((p) => p.some((m) => m.id === real.id) ? p.filter((m) => m.id !== tempId) : p.map((m) => m.id === tempId ? { ...m, ...real, _status: undefined } : m));
+    }
+    setUploading(false);
+  }
+
   /** Open the OS picker for one of the sheet's options. */
   function openPicker(mode: "media" | "oneshot" | "document") {
     pickMode.current = mode;
@@ -1147,6 +1266,8 @@ export function RealChatView({
     if (!input) return;
     input.accept =
       mode === "document" ? DOC_ACCEPT : mode === "oneshot" ? "image/*" : "image/*,video/*";
+    // Photo or video lets you pick several, which then go as one folder.
+    input.multiple = mode === "media";
     input.click();
   }
 
@@ -1670,6 +1791,27 @@ export function RealChatView({
                             </span>
                           )}
                         </div>
+                      ) : m.kind === "album" && parseAlbum(m.body) ? (
+                        /* Several photos and videos sent together — the folder */
+                        <div
+                          onPointerDown={(e) => onPressStart(m, e)}
+                          onPointerUp={onPressEnd}
+                          onPointerMove={onPressEnd}
+                          onPointerLeave={onPressEnd}
+                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          className="relative"
+                        >
+                          <MediaFolder
+                            album={parseAlbum(m.body)!}
+                            mine={mine}
+                            onOpen={(start) => setAlbumView({ album: parseAlbum(m.body)!, start })}
+                          />
+                          {starBurstId === m.id && (
+                            <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                              <Star size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
+                            </span>
+                          )}
+                        </div>
                       ) : m.kind === "video" && m.body ? (
                         /* Video bubble — player with time+status overlay */
                         <div
@@ -1779,7 +1921,7 @@ export function RealChatView({
 
                       {/* External time+status — for voice, document, post, and shot cards.
                           Plain text, gif, image, and video bubbles embed the time+tick inside themselves. */}
-                      {(m.kind === "voice" || m.kind === "document" || m.kind === "page_reply" || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
+                      {(m.kind === "voice" || m.kind === "document" || m.kind === "album" || m.kind === "page_reply" || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
                         (showTime || (mine && m._status === "failed")) && (
                         <div className={`flex items-center gap-1 px-1 pt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
                           {showTime && (
@@ -1910,6 +2052,45 @@ export function RealChatView({
           </div>
         )}
 
+        {/* ── Folder being put together ── */}
+        {albumDraft.length > 1 && !voiceMode && (
+          <div className="mb-2 rounded-xl border border-border/60 bg-surface p-2" data-album-draft>
+            <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+              {albumDraft.map((x, i) => (
+                <div key={x.preview} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-elevated">
+                  {x.type === "image" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={x.preview} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <video src={x.preview} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeFromAlbum(i)}
+                    aria-label={`Remove item ${i + 1}`}
+                    className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white"
+                  >
+                    <X size={11} strokeWidth={2.75} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-1.5 flex items-center justify-between px-0.5 text-[10px] text-faint">
+              <span>{albumDraft.length} in one folder · caption below</span>
+              <span className="flex items-center gap-2">
+                {text.length >= ALBUM_CAPTION_WARN && (
+                  <span className={`tabular-nums ${text.length >= ALBUM_CAPTION_MAX ? "text-danger" : ""}`}>
+                    {ALBUM_CAPTION_MAX - text.length}
+                  </span>
+                )}
+                <button type="button" onClick={clearAlbumDraft} className="font-semibold text-muted hover:text-foreground">
+                  Clear
+                </button>
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* ── Reply-to banner ── */}
         {replyTo && !voiceMode && (
           <div className="mb-2 flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 text-xs">
@@ -2008,8 +2189,9 @@ export function RealChatView({
                 onChange={(e) => { setText(e.target.value); setDmCursor(e.target.selectionStart ?? 0); if (e.target.value) emitTyping(); }}
                 onSelect={(e) => setDmCursor((e.target as HTMLInputElement).selectionStart ?? 0)}
                 onBlur={() => setTimeout(resetPicker, 150)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-                placeholder="Message…"
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (albumDraft.length > 1 ? sendAlbum() : send())}
+                placeholder={albumDraft.length > 1 ? "Add a caption…" : "Message…"}
+                maxLength={albumDraft.length > 1 ? ALBUM_CAPTION_MAX : undefined}
                 className="h-11 w-full rounded-2xl bg-surface px-4 text-sm outline-none placeholder:text-faint focus:border-white/25"
               />
               <SuggestionDropdown suggestions={pickerSuggestions} onSelect={(s) => {
@@ -2021,7 +2203,7 @@ export function RealChatView({
             </div>
 
             {/* GIF toggle — only when no text and no attachment */}
-            {!text.trim() && !attachment && (
+            {!text.trim() && !attachment && albumDraft.length < 2 && (
               <button
                 type="button"
                 onClick={() => setGifPickerOpen((v) => !v)}
@@ -2037,7 +2219,7 @@ export function RealChatView({
             )}
 
             {/* Mic — only when no text and no attachment */}
-            {!text.trim() && !attachment && (
+            {!text.trim() && !attachment && albumDraft.length < 2 && (
               <button
                 type="button"
                 onClick={() => { setGifPickerOpen(false); setVoiceMode(true); }}
@@ -2049,10 +2231,10 @@ export function RealChatView({
             )}
 
             {/* Send — text (takes priority) or attachment */}
-            {(text.trim() || attachment) && (
+            {(text.trim() || attachment || albumDraft.length > 1) && (
               <button
                 type="button"
-                onClick={text.trim() ? send : sendAttachment}
+                onClick={albumDraft.length > 1 ? sendAlbum : text.trim() ? send : sendAttachment}
                 disabled={sending || uploading}
                 aria-label="Send"
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"
@@ -2082,6 +2264,10 @@ export function RealChatView({
         />
       </div>
 
+
+      {albumView && (
+        <AlbumViewer album={albumView.album} start={albumView.start} onClose={() => setAlbumView(null)} />
+      )}
 
       {/* Long-press context menu (reactions + actions), anchored to the message */}
       {menu && (() => {
