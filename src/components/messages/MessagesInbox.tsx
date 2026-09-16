@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { setThreadHint } from "@/lib/thread-hints";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -622,13 +621,6 @@ export function MessagesInbox({
               suppressClick.current = false;
               return;
             }
-            setThreadHint(r.id, {
-              name: r.name,
-              hue: r.hue,
-              avatarUrl: r.avatarUrl ?? null,
-              isGroup: r.isGroup,
-              memberCount: r.memberCount,
-            });
             setReadIds((prev) => {
               const next = new Set(prev).add(r.id);
               try {

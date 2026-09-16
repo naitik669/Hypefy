@@ -48,7 +48,6 @@ import {
   type AlbumItem,
 } from "@/lib/chat-album";
 import { uploadAlbumFiles, type AlbumFile } from "@/lib/chat-album-upload";
-import { setThreadHint } from "@/lib/thread-hints";
 import { leaveChatAnimated } from "@/lib/leave-chat";
 
 type PostPreview = {
@@ -344,12 +343,6 @@ export function RealChatView({
   // the file against that intent, since one hidden <input> serves all three.
   // The paperclip's sheet: camera, this chat's photos, your gallery.
   const [pickerOpen, setPickerOpen] = useState(false);
-  // So the next time this chat opens, its header is there from the first frame.
-  useEffect(() => {
-    setThreadHint(conversationId, group
-      ? { name: group.title, hue: 210, isGroup: true, memberCount: group.memberCount }
-      : { name: other.name, hue: other.hue, avatarUrl: other.avatarUrl ?? null });
-  }, [conversationId, group, other.name, other.hue, other.avatarUrl]);
   const [attachMenu, setAttachMenu] = useState(false);
   const pickerApi = useRef<MediaPickerApi>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
