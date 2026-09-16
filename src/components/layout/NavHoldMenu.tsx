@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
 import { haptics } from "@/lib/haptics";
+import { useOverlayBackButton } from "@/lib/overlay-stack";
 
 /** Hold before the stack appears. Matches AccountSwitchPad. */
 const HOLD_MS = 320;
@@ -245,6 +246,24 @@ export function NavHoldMenu({
   }, []);
 
   useEffect(() => clearHold, [clearHold]);
+
+  /**
+   * Counted as an overlay for as long as it is up.
+   *
+   * Two things follow from it, and the first is why the app was still live
+   * behind the share card. A veil stops the page being TOUCHED, but React
+   * routes events through the component tree rather than the DOM one, so a
+   * finger on a portalled veil still reaches the handlers of everything this
+   * menu is rendered inside — and the menu the share button raises is
+   * rendered inside SwipeNav. Sliding the thumb sideways to pick a face was
+   * also a sideways drag on the page, which slid the feed under the card and,
+   * far enough, changed tab. SwipeNav abandons a drag the moment an overlay
+   * appears; it just had to be told this is one.
+   *
+   * The second is Android's back button, which now closes the menu instead of
+   * navigating the page away underneath it.
+   */
+  useOverlayBackButton(open, close);
 
   /**
    * Hold the page still while the stack is up.

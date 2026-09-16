@@ -12,7 +12,10 @@ import { createRoot, type Root } from "react-dom/client";
 const rpc = vi.hoisted(() => vi.fn());
 const toast = vi.hoisted(() => vi.fn());
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push() {} }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push() {} }),
+  usePathname: () => "/home",
+}));
 vi.mock("@/components/ui/ToastProvider", () => ({ useToast: () => toast }));
 vi.mock("@/lib/haptics", () => ({
   haptics: { tap() {}, select() {}, success() {} },
@@ -148,13 +151,22 @@ describe("holding share", () => {
   });
 
   it("takes every touch while it is up, so nothing behind it can be used", async () => {
+    const { overlayCount } = await import("@/lib/overlay-stack");
     await hold();
     const veil = document.querySelector("[data-hold-veil]") as HTMLElement;
     expect(veil).toBeTruthy();
     // Scrolling the feed underneath is off too, not just tapping it.
     expect(veil.style.touchAction).toBe("none");
+    // And the app is told something is open. A veil only stops what the DOM
+    // sends; React sends a portalled veil's events up the component tree as
+    // well, which is how sliding to a face was also dragging the feed
+    // sideways underneath it. Everything that watches this — SwipeNav, the
+    // Android back button — stands down while the count is up.
+    expect(overlayCount()).toBe(1);
+
     await pointer(veil, "pointerdown", 200, 700);
     expect(tiles()).toHaveLength(0);
+    expect(overlayCount()).toBe(0);
   });
 
   it("sends nothing when the thumb lifts away from every face", async () => {
@@ -172,5 +184,59 @@ describe("holding share", () => {
     await act(async () => void host.querySelector("button")!.click());
     expect(openSheet).toHaveBeenCalledTimes(1);
     expect(tiles()).toHaveLength(0);
+  });
+});
+
+/**
+ * The share button lives inside the feed, which is inside SwipeNav — and a
+ * portalled veil does not stop a React event reaching it. This is the case
+ * that made the app feel live behind the card: the sideways slide onto a face
+ * was also a sideways drag on the page.
+ */
+describe("holding share, inside the swipeable feed", () => {
+  it("does not drag the page sideways while the faces are up", async () => {
+    await act(async () => root.unmount());
+    const { SwipeNav } = await import("@/components/layout/SwipeNav");
+    const { ShareButton } = await import("@/components/feed/QuickShare");
+    root = createRoot(host);
+    await act(async () =>
+      root.render(
+        createElement(
+          SwipeNav,
+          null,
+          createElement("div", { id: "feed" }, "the feed"),
+          createElement(ShareButton, {
+            postId: "p1",
+            onOpenSheet: openSheet,
+            children: createElement("span", null, "share"),
+          }),
+        ),
+      ),
+    );
+
+    const page = document.getElementById("feed")!.parentElement as HTMLElement;
+    const share = host.querySelector('[aria-label="Share"]')!.parentElement as HTMLElement;
+
+    function touch(type: string, x: number, y: number) {
+      const e = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(e, "touches", {
+        value: type === "touchend" ? [] : [{ clientX: x, clientY: y }],
+      });
+      return act(async () => void share.dispatchEvent(e));
+    }
+
+    // A finger produces both: the hold is pointer events, the page's own
+    // swipe is touch events, and both reach their handlers.
+    await touch("touchstart", 300, 400);
+    await pointer(share, "pointerdown", 300, 400);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    expect(document.querySelector("[data-hold-veil]")).toBeTruthy();
+
+    // Now slide sideways, the way you would to reach a face.
+    await touch("touchmove", 280, 400);
+    await touch("touchmove", 160, 400);
+    expect(page.style.transform).toBe("");
   });
 });
