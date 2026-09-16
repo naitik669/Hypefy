@@ -50,12 +50,19 @@ type Preview = { thumb: string | null; caption: string | null; username: string 
 const THIN_CONNECTIONS = 8;
 
 /**
+ * The height of the bottom of the sheet, in both of its states: the row of
+ * options, and sending. One number, so switching between them cannot move
+ * anything above.
+ */
+const FOOT = "h-[82px]";
+
+/**
  * Send to.
  *
  * Laid out as faces, not rows. Picking who gets something is recognising
  * people, and a face is recognised at a glance where a row of names and
- * handles has to be read — so it is four across, as many as fit before the
- * list needs scrolling, with what you are sending named at the top.
+ * handles has to be read — so it is three across and large, on a sheet that
+ * opens most of the way up, with what you are sending named at the top.
  *
  * The bottom of the sheet is one of two things, never both. With nobody
  * picked it is everything else you can do with the post, in a row that
@@ -429,8 +436,12 @@ export function ShareSheet({
       </button>
     </div>
   ) : sent.size > 0 ? (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
+    // The same height as the row of options it replaces, so picking someone
+    // changes what is at the bottom and not where the bottom is. The first
+    // version stacked names, a message box and a full-width button — twice
+    // the height of the options — and the whole grid jumped when it arrived.
+    <div key="send" className={`${FOOT} animate-fade-swap flex flex-col justify-center gap-2`}>
+      <div className="flex h-6 items-center gap-2">
         <div className="flex">
           {picked.slice(0, 3).map((f, i) => (
             <span
@@ -455,30 +466,37 @@ export function ShareSheet({
           {pickedNames.length > 2 && ` and ${pickedNames.length - 2} more`}
         </p>
       </div>
-      <input
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder="Add a message…"
-        maxLength={500}
-        className="h-11 w-full rounded-2xl bg-surface px-3.5 text-sm outline-none placeholder:text-faint"
-      />
-      <button
-        type="button"
-        onClick={() => void sendToSelected()}
-        disabled={sendingDm}
-        className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-accent text-sm font-extrabold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-60"
-      >
-        {sendingDm ? (
-          <><Loader2 size={16} className="animate-spin" /> Sending…</>
-        ) : dmDone ? (
-          <><Check size={16} /> Sent</>
-        ) : (
-          <>Send to {sent.size} <Plane size={15} weight="fill" /></>
-        )}
-      </button>
+      <div className="flex items-center gap-2">
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Add a message…"
+          maxLength={500}
+          className="h-11 min-w-0 flex-1 rounded-2xl bg-surface px-3.5 text-sm outline-none placeholder:text-faint"
+        />
+        <button
+          type="button"
+          onClick={() => void sendToSelected()}
+          disabled={sendingDm}
+          aria-label={`Send to ${sent.size}`}
+          className="flex h-11 shrink-0 items-center gap-2 rounded-2xl bg-accent pl-4 pr-2 text-sm font-extrabold text-accent-ink transition-transform active:scale-[0.97] disabled:opacity-60"
+        >
+          {sendingDm ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : dmDone ? (
+            <Check size={16} />
+          ) : (
+            <Plane size={15} weight="fill" />
+          )}
+          {dmDone ? "Sent" : "Send"}
+          <span className="flex h-7 min-w-7 items-center justify-center rounded-[10px] bg-black/15 px-1.5 text-[13px] tabular-nums">
+            {sent.size}
+          </span>
+        </button>
+      </div>
     </div>
   ) : (
-    <div className="no-scrollbar -mx-5 flex gap-3 overflow-x-auto px-5">
+    <div key="actions" className={`${FOOT} animate-fade-swap no-scrollbar -mx-5 flex items-start gap-3 overflow-x-auto px-5`}>
       <Action label={copied ? "Copied" : "Copy link"} done={copied} onClick={() => void copyLink()}>
         {copied ? <Check size={19} /> : <Link2 size={19} />}
       </Action>
@@ -516,7 +534,7 @@ export function ShareSheet({
   );
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Send to" size="half" footer={footer}>
+    <BottomSheet open={open} onClose={onClose} title="Send to" size="tall" footer={footer}>
       {picking ? (
         <div className="pb-2">
           <p className="mb-3 text-center text-[13px] text-muted">
@@ -609,11 +627,11 @@ export function ShareSheet({
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-4 gap-x-1.5 gap-y-3.5 pb-2">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="flex flex-col items-center gap-1.5">
-                  <div className="skeleton h-[52px] w-[52px] rounded-[30%]" />
-                  <div className="skeleton h-2.5 w-10 rounded" />
+            <div className="grid grid-cols-3 gap-x-2 gap-y-5 pb-2 pt-1">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} className="flex flex-col items-center gap-2">
+                  <div className="skeleton h-[76px] w-[76px] rounded-[30%]" />
+                  <div className="skeleton h-3 w-14 rounded" />
                 </div>
               ))}
             </div>
@@ -624,7 +642,7 @@ export function ShareSheet({
                 : "Nobody by that name."}
             </p>
           ) : (
-            <div className="grid grid-cols-4 gap-x-1.5 gap-y-3.5 pb-2">
+            <div className="grid grid-cols-3 gap-x-2 gap-y-5 pb-2 pt-1">
               {filtered.map((f, i) => {
                 const name = f.display_name ?? f.username ?? "User";
                 const selected = sent.has(f.id);
@@ -637,7 +655,7 @@ export function ShareSheet({
                 return (
                   <div key={f.id} className="contents">
                     {startsAcquaintances && (
-                      <p className="col-span-4 pt-1 text-[11px] font-semibold text-faint">
+                      <p className="col-span-3 pt-1 text-[11px] font-semibold text-faint">
                         You&rsquo;ve interacted with
                       </p>
                     )}
@@ -645,7 +663,7 @@ export function ShareSheet({
                       type="button"
                       onClick={() => toggleSend(f.id)}
                       aria-pressed={selected}
-                      className="flex min-w-0 flex-col items-center gap-1.5 transition-transform active:scale-95"
+                      className="flex min-w-0 flex-col items-center gap-2 transition-transform active:scale-95"
                     >
                       <span
                         className={`relative rounded-[30%] transition-shadow ${
@@ -654,15 +672,15 @@ export function ShareSheet({
                             : ""
                         }`}
                       >
-                        <Avatar name={name} hue={f.avatar_hue ?? 280} size={52} src={f.avatar_url ?? undefined} />
+                        <Avatar name={name} hue={f.avatar_hue ?? 280} size={76} src={f.avatar_url ?? undefined} />
                         {selected && (
-                          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-ink ring-2 ring-elevated">
-                            <Check size={11} strokeWidth={3.4} />
+                          <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-ink ring-2 ring-elevated">
+                            <Check size={13} strokeWidth={3.4} />
                           </span>
                         )}
                       </span>
                       <span
-                        className={`w-full truncate text-center text-[11.5px] ${
+                        className={`w-full truncate text-center text-[13px] ${
                           sent.size > 0 && !selected ? "text-muted" : "text-foreground"
                         }`}
                       >

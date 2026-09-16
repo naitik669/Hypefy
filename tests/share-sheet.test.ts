@@ -4,7 +4,7 @@ import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 /**
- * Send to: faces four across, what you are sending named at the top, and a
+ * Send to: large faces three across, what you are sending named at the top, and a
  * bottom that is either everything else you can do or sending — never both.
  */
 
@@ -106,7 +106,7 @@ describe("Send to", () => {
     for (const label of ["Copy link", "Repost", "Add to Show", "WhatsApp", "More"]) {
       expect(text).toContain(label);
     }
-    expect(text).not.toContain("Send to");
+    expect(footer().querySelector('[aria-label^="Send to"]')).toBeNull();
   });
 
   it("turns the bottom into sending as soon as anyone is picked, for as many as you like", async () => {
@@ -114,7 +114,7 @@ describe("Send to", () => {
     await tap(face("Ada"));
     expect(face("Maya").getAttribute("aria-pressed")).toBe("true");
     const text = footer().textContent ?? "";
-    expect(text).toContain("Send to 2");
+    expect(footer().querySelector('[aria-label="Send to 2"]')).toBeTruthy();
     expect(text).toContain("Maya, Ada");
     // The options step aside rather than sharing the space.
     expect(text).not.toContain("Copy link");
@@ -129,7 +129,7 @@ describe("Send to", () => {
       set.call(input, "you have to see this");
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    const send = [...footer().querySelectorAll("button")].find((b) => b.textContent?.includes("Send to"))!;
+    const send = footer().querySelector('[aria-label^="Send to"]') as HTMLButtonElement;
     await tap(send);
 
     const sends = rpc.mock.calls.filter(([fn]) => fn === "send_message").map(([, args]) => args);
@@ -141,9 +141,19 @@ describe("Send to", () => {
     expect(notes[0]).toMatchObject({ p_body: "you have to see this" });
   });
 
+  it("keeps the bottom the same height when picking swaps options for sending", async () => {
+    const before = footer().firstElementChild!.className;
+    await tap(face("Maya"));
+    const after = footer().firstElementChild!.className;
+    // One height for both, so the grid above does not jump when you pick.
+    const height = (c: string) => c.match(/h-\[\d+px\]/)?.[0];
+    expect(height(before)).toBeTruthy();
+    expect(height(after)).toBe(height(before));
+  });
+
   it("sends no message when none was written", async () => {
     await tap(face("Maya"));
-    const send = [...footer().querySelectorAll("button")].find((b) => b.textContent?.includes("Send to"))!;
+    const send = footer().querySelector('[aria-label^="Send to"]') as HTMLButtonElement;
     await tap(send);
     const kinds = rpc.mock.calls.filter(([fn]) => fn === "send_message").map(([, a]) => a.p_kind);
     expect(kinds).toEqual(["post"]);

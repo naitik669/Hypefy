@@ -70,8 +70,12 @@ export function BottomSheet({
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
-  /** "half" opens at half the screen and goes to the top; see `heights`. */
-  size?: "content" | "half";
+  /**
+   * "half" opens at half the screen and goes to the top; "tall" opens at 80%
+   * for a sheet that is mostly the thing you came to pick from — the share
+   * sheet's faces. See `heights`.
+   */
+  size?: "content" | "half" | "tall";
   /**
    * Something that belongs at the bottom of the sheet rather than at the
    * bottom of its contents — a composer, a confirm bar.
@@ -133,17 +137,18 @@ export function BottomSheet({
    * A thread that opened at the height of its three comments, and again at
    * the height of its thirty, is a different surface every time you tap.
    */
-  const heights =
-    size === "half"
-      ? {
-          height:
-            screenH == null
-              ? expanded
-                ? "94dvh"
-                : "50dvh"
-              : `${screenH * (expanded ? 0.94 : 0.5)}px`,
-        }
-      : { maxHeight: expanded ? "95dvh" : "85dvh" };
+  const rest = size === "tall" ? 0.8 : 0.5;
+  const detents = size !== "content";
+  const heights = detents
+    ? {
+        height:
+          screenH == null
+            ? expanded
+              ? "94dvh"
+              : `${rest * 100}dvh`
+            : `${screenH * (expanded ? 0.94 : rest)}px`,
+      }
+    : { maxHeight: expanded ? "95dvh" : "85dvh" };
 
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const veilRef = useRef<HTMLDivElement | null>(null);
@@ -153,8 +158,8 @@ export function BottomSheet({
   const stops = useCallback(() => {
     const screen =
       screenH ?? (typeof window === "undefined" ? 800 : window.innerHeight);
-    return { rest: screen * 0.5, top: screen * 0.94 };
-  }, [screenH]);
+    return { rest: screen * rest, top: screen * 0.94 };
+  }, [screenH, rest]);
 
   const trapRef = useFocusTrap<HTMLDivElement>(mounted && open);
 
@@ -193,7 +198,7 @@ export function BottomSheet({
   const canGrow = useCallback(() => {
     // A half sheet always has the top to go to, whether or not the thread in
     // it is long enough to scroll.
-    if (size === "half") return true;
+    if (detents) return true;
     const body = scrollRef.current;
     return !!body && body.scrollHeight > body.clientHeight + 8;
   }, [size]);
@@ -209,7 +214,7 @@ export function BottomSheet({
       const raw = y - d.startY;
       d.raw = raw;
 
-      if (size === "half") {
+      if (detents) {
         // The top edge follows the finger: the sheet GROWS on the way up and
         // shrinks on the way down, rather than sliding as one piece. It used
         // to rubber-band 48px and then refuse to move, which is what made a
@@ -254,7 +259,7 @@ export function BottomSheet({
     const ms = reducedMotion() ? 0 : SETTLE_MS;
     const far = dismissAt(sheetRef.current?.offsetHeight ?? 0);
 
-    if (size === "half") {
+    if (detents) {
       const { rest, top } = stops();
       const el = sheetRef.current;
       // Below its resting height it is on its way out.
