@@ -11,17 +11,34 @@ export default async function ThreadPage({
 }) {
   const { threadId } = await params;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/signin");
 
-  // Membership + participants (RLS already blocks non-members)
-  const [{ data: members }, { data: conv }] = await Promise.all([
+  // Everything the chat needs, in one round of requests rather than three in
+  // a row. The inbox stays on screen until this page is ready (there is no
+  // loading.tsx; see layout.tsx), so this wait is the whole wait to open a
+  // chat. RLS limits every query to the reader's own conversations, so
+  // fetching before the user check exposes nothing.
+  const [
+    { data: { user } },
+    { data: members },
+    { data: conv },
+    { data: latestMsgs },
+  ] = await Promise.all([
+    supabase.auth.getUser(),
     supabase
       .from("conversation_members")
       .select("user_id, role, last_read_at, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, hide_read_receipts, is_verified, is_premium, name_font, name_glow, avatar_decoration, bubble_style)")
       .eq("conversation_id", threadId),
     supabase.from("conversations").select("type, title, avatar_url, theme").eq("id", threadId).maybeSingle(),
+    // Latest 30 messages with post + shot previews and their reactions
+    // (newest-first for the limit, reversed to chronological below).
+    supabase
+      .from("messages")
+      .select("id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(username, display_name, avatar_hue)), shot:shots(id, media_url, caption, profiles(username, display_name, avatar_hue)), reactions:message_reactions(message_id, user_id, emoji)")
+      .eq("conversation_id", threadId)
+      .order("created_at", { ascending: false })
+      .limit(30),
   ]);
+  if (!user) redirect("/signin");
 
   if (!members || members.length === 0) notFound();
   const me = members.find((m: any) => m.user_id === user.id);
@@ -68,31 +85,21 @@ export default async function ThreadPage({
       }
     : null;
 
-  // Latest 30 messages with post + shot previews (newest-first for the limit,
-  // then reversed to chronological order for rendering).
-  const { data: latestMsgs } = await supabase
-    .from("messages")
-    .select("id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(username, display_name, avatar_hue)), shot:shots(id, media_url, caption, profiles(username, display_name, avatar_hue))")
-    .eq("conversation_id", threadId)
-    .order("created_at", { ascending: false })
-    .limit(30);
   const rawMsgs = (latestMsgs ?? []).slice().reverse();
 
   const profOf = (x: any) => { const p = one<any>(x); return p ? one<any>(p.profiles) : null; };
 
   const messages = (rawMsgs ?? []).map((m: any) => ({
     ...m,
+    reactions: undefined,
     post: m.post ? { ...one(m.post), profiles: undefined } : null,
     postProfile: m.post ? profOf(m.post) : null,
     shot: m.shot ? { ...one(m.shot), profiles: undefined } : null,
     shotProfile: m.shot ? profOf(m.shot) : null,
   }));
 
-  // Reactions for these messages
-  const msgIds = messages.map((m: any) => m.id);
-  const { data: reactRows } = msgIds.length
-    ? await supabase.from("message_reactions").select("message_id, user_id, emoji").in("message_id", msgIds)
-    : { data: [] as any[] };
+  // Reactions came embedded with their messages.
+  const reactRows = (rawMsgs ?? []).flatMap((m: any) => m.reactions ?? []);
 
   // Everyone else's read state — drives the "Seen" double-tick.
   //
