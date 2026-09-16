@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
@@ -448,9 +448,6 @@ export function RealChatView({
   const [hasMore, setHasMore] = useState(initialMessages.length >= MSG_PAGE);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const loadingOlderRef = useRef(false);
-  // scrollHeight captured right before a prepend, so the layout effect can
-  // restore the viewport to the same message (no jump).
-  const prependRestore = useRef<number | null>(null);
   // Set while a prepend is in flight so the auto-scroll effect knows this
   // messages change is older history, not a new message at the end.
   const justPrepended = useRef(false);
@@ -518,16 +515,6 @@ export function RealChatView({
     return "sent";
   }
 
-  // Restore the viewport after older messages are prepended, before paint,
-  // so the message the user was reading stays put instead of jumping.
-  useLayoutEffect(() => {
-    const container = scrollContainerRef.current;
-    if (prependRestore.current != null && container) {
-      container.scrollTop = container.scrollHeight - prependRestore.current;
-      prependRestore.current = null;
-    }
-  }, [messages]);
-
   useEffect(() => {
     if (firstUnreadIndex === null) return; // not resolved yet — see mark-as-read effect below
 
@@ -554,36 +541,16 @@ export function RealChatView({
       return;
     }
 
-    // Initial landing. Pin to the unread divider (if any) or the bottom.
-    // Media (images, GIFs, videos, shared post/shot cards) loads async and
-    // grows the layout downward — a single pin lands on a not-yet-grown
-    // layout (i.e. near the top), so we re-pin across a few frames and on
-    // every media load until things settle.
+    // Initial landing. The list scrolls from the bottom, so it is already on
+    // the newest message; the only move left is up to an unread divider,
+    // and only when that divider is above what is on screen.
     const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const pin = () => {
-      const divider = unreadDividerRef.current;
-      if (divider) divider.scrollIntoView({ behavior: "auto", block: "center" });
-      else container.scrollTop = container.scrollHeight;
-    };
-
-    pin();
-    const raf = requestAnimationFrame(pin);
-    const media = Array.from(container.querySelectorAll("img, video"));
-    media.forEach((m) => { m.addEventListener("load", pin); m.addEventListener("loadeddata", pin); });
-    const settle = setTimeout(() => {
-      pin();
-      initialScrollDone.current = true;
-      prevLastIdRef.current = messages[messages.length - 1]?.id ?? null;
-      media.forEach((m) => { m.removeEventListener("load", pin); m.removeEventListener("loadeddata", pin); });
-    }, 600);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(settle);
-      media.forEach((m) => { m.removeEventListener("load", pin); m.removeEventListener("loadeddata", pin); });
-    };
+    const divider = unreadDividerRef.current;
+    if (container && divider && divider.getBoundingClientRect().top < container.getBoundingClientRect().top) {
+      divider.scrollIntoView({ behavior: "auto", block: "center" });
+    }
+    initialScrollDone.current = true;
+    prevLastIdRef.current = messages[messages.length - 1]?.id ?? null;
   }, [messages, firstUnreadIndex]);
 
   // Close the long-press menu on Escape.
@@ -660,9 +627,6 @@ export function RealChatView({
     loadingOlderRef.current = true;
     setLoadingOlder(true);
 
-    const container = scrollContainerRef.current;
-    const prevHeight = container ? container.scrollHeight : 0;
-
     const { data, error } = await supabase
       .from("messages")
       .select(MSG_SELECT)
@@ -683,7 +647,6 @@ export function RealChatView({
     if (older.length > 0) {
       // Older history should appear instantly (no entrance animation).
       older.forEach((o) => seenAtLoadRef.current.add(o.id));
-      prependRestore.current = prevHeight; // layout effect restores position
       justPrepended.current = true; // auto-scroll effect skips this change
       setMessages((prev) => {
         const existing = new Set(prev.map((p) => p.id));
@@ -712,8 +675,12 @@ export function RealChatView({
   // Track scroll position: load older near the top, remember near-bottom.
   function onMessagesScroll(e: React.UIEvent<HTMLDivElement>) {
     const el = e.currentTarget;
-    nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
-    if (initialScrollDone.current && el.scrollTop < 200 && hasMore && !loadingOlderRef.current) {
+    // In a column-reverse scroller the offset counts from the bottom (0 at
+    // the newest message, negative going up in current browsers).
+    const fromBottom = Math.abs(el.scrollTop);
+    nearBottomRef.current = fromBottom < 150;
+    const fromTop = el.scrollHeight - el.clientHeight - fromBottom;
+    if (initialScrollDone.current && fromTop < 200 && hasMore && !loadingOlderRef.current) {
       loadOlder();
     }
   }
@@ -1598,15 +1565,25 @@ export function RealChatView({
         </div>
       </header>
 
-      {/* Messages — clicking here closes the GIF picker */}
+      {/* Messages — clicking here closes the GIF picker.
+          Scrolls from the bottom (column-reverse), so a chat opens on its
+          newest message from the first frame. It used to open wherever the
+          top of the list fell and then get scrolled down by script, again
+          each time a photo above loaded: a visible slide from the middle.
+          Content growing above (media, older history) now leaves the view
+          where it is, with nothing to correct. */}
       <div
         ref={scrollContainerRef}
         onScroll={onMessagesScroll}
-        className="relative isolate flex-1 overflow-y-auto px-4 py-4"
+        data-chat-scroll
+        className="relative isolate flex flex-1 flex-col-reverse overflow-y-auto px-4 py-4"
         style={theme ? { background: theme.background } : undefined}
         onClick={() => { if (gifPickerOpen) setGifPickerOpen(false); }}
       >
         {theme?.ambient && <ChatAmbient kind={theme.ambient} />}
+        {/* shrink-0: allowed to shrink, it would stop at the scroller's height
+            and spill the wrong way, opening at the top again. */}
+        <div className="flex min-h-full shrink-0 flex-col">
         {/* Older-history loader — appears at the top while a chunk loads in */}
         {loadingOlder && (
           <div className="flex justify-center py-2">
@@ -1614,7 +1591,7 @@ export function RealChatView({
           </div>
         )}
         {messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
             {isGroup ? (
               <span className="flex h-16 w-16 items-center justify-center rounded-[30%]"
                 style={{ background: "linear-gradient(140deg, hsl(210 70% 52%), hsl(260 65% 42%))" }}>
@@ -2059,6 +2036,7 @@ export function RealChatView({
             <div ref={endRef} />
           </div>
         )}
+        </div>
       </div>
 
       {/* Composer */}
