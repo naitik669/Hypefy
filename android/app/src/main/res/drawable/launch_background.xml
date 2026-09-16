@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The launch screen, and the window behind the WebView for as long as the page
+  takes to arrive. Drawn as a layer rather than pointing a theme straight at
+  splash.png, because a bitmap set as a window background is stretched to the
+  screen: on a tall phone that pulled the mark out of shape. Here the colour
+  fills the window and the mark is centred at its own size.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/hypefy_black" />
+    <item>
+        <bitmap android:src="@drawable/splash" android:gravity="center" />
+    </item>
+</layer-list>

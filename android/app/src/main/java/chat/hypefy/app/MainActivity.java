@@ -1,5 +1,6 @@
 package chat.hypefy.app;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.webkit.WebView;
 
@@ -17,5 +18,11 @@ public class MainActivity extends BridgeActivity {
         WebView webView = getBridge().getWebView();
         webView.setVerticalScrollBarEnabled(false);
         webView.setHorizontalScrollBarEnabled(false);
+
+        // Transparent until the page paints, so what shows through the whole
+        // launch is the window's own Hypefy artwork (AppTheme.NoActionBar)
+        // rather than the WebView's default blank sheet. Every page of the app
+        // paints an opaque background over it, so nothing shows through after.
+        webView.setBackgroundColor(Color.TRANSPARENT);
     }
 }

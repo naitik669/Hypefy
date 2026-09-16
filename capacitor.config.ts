@@ -19,6 +19,15 @@ const config: CapacitorConfig = {
   server: {
     url: "https://app.hypefy.chat",
     cleartext: false,
+    // Launch straight into the feed. "/" is a router: it asks Supabase who
+    // you are, reads your profile, and answers with a redirect to /home —
+    // a whole extra request before the app can even start loading, paid on
+    // every cold start. Signed out, /home sends you to the landing instead.
+    appStartPath: "/home",
+    // A local, branded page when the site can't be reached, in place of the
+    // WebView's own error screen. It is the same offline.html the service
+    // worker serves on the web, copied into the app by `npx cap copy`.
+    errorPath: "offline.html",
   },
   ios: {
     // Allow the WKWebView to reach getUserMedia (calls, shots, voice notes).
@@ -36,8 +45,13 @@ const config: CapacitorConfig = {
       style: "DARK",
       backgroundColor: "#0a0a0a",
     },
+    // The launch artwork is also the window's background (styles.xml), so
+    // when the splash goes the same mark is still behind the WebView until
+    // the page paints. That gap used to be black, and a black screen is what
+    // makes a launch feel slow even when it isn't.
     SplashScreen: {
       launchShowDuration: 800,
+      launchFadeOutDuration: 200,
       backgroundColor: "#0a0a0a",
       showSpinner: false,
     },

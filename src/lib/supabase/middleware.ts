@@ -97,7 +97,10 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    // Straight to the landing rather than through "/", which only works out
+    // where to send a signed-out visitor and answers with this same page —
+    // one server render and one round trip, on the slowest moment there is.
+    url.pathname = "/onboarding";
     const redirectResponse = NextResponse.redirect(url);
     // Carry over any refreshed cookies so we never drop the session on redirect.
     supabaseResponse.cookies.getAll().forEach((c) => {

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hypefy's own near-black. Same value as --background in globals.css and
+         the theme colour in the web manifest, so the launch screen, the status
+         bar and the page are one colour with no seam. -->
+    <color name="hypefy_black">#0A0A0A</color>
+</resources>

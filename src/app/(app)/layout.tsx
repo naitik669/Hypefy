@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { readSessionId, deviceLabel } from "@/lib/login-alert";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profile";
@@ -43,7 +44,14 @@ export default async function AppLayout({
     );
   }
 
-  const profile = await getProfile(supabase);
+  // Asked together, not one after the other. The badge's count doesn't
+  // depend on the profile, and waiting for the profile first put a second
+  // database round trip in front of the first byte of every page — most
+  // visibly on a cold app launch, where it is the whole shell that waits.
+  const [profile, { data: unreadCount }] = await Promise.all([
+    getProfile(supabase),
+    supabase.rpc("unread_dm_count"),
+  ]);
 
   // No date of birth on file means we never actually asked — the Google button
   // on the sign-in page ran no age check at all, and the signup path could lose
@@ -102,7 +110,6 @@ export default async function AppLayout({
   // at the LATEST message per conversation, skip muted, skip conversations
   // where you spoke last — verified to return the same number for every
   // existing user before it replaced this.
-  const { data: unreadCount } = await supabase.rpc("unread_dm_count");
   const initialUnreadMsgs = (unreadCount as number | null) ?? 0;
 
   // First sighting of this session id raises a "new sign-in" alert; every
@@ -114,14 +121,21 @@ export default async function AppLayout({
   // insert — would break signing in, for everybody. The cost of doing it here
   // is that a session which authenticates and never loads a page raises no
   // alert, which is the moment it also cannot do anything.
+  // Written after the response, not before it: nobody is waiting to read it,
+  // and on a cold launch it was a database write standing between the reader
+  // and the first thing they see. after() still runs on a redirect, so a
+  // session that only ever lands on /setup-profile is recorded the same.
   const {
     data: { session },
   } = await supabase.auth.getSession();
   const sessionId = readSessionId(session?.access_token);
+  const userAgent = (await headers()).get("user-agent");
   if (sessionId) {
-    await supabase.rpc("record_login_session", {
-      p_session_id: sessionId,
-      p_label: deviceLabel((await headers()).get("user-agent")),
+    after(async () => {
+      await supabase.rpc("record_login_session", {
+        p_session_id: sessionId,
+        p_label: deviceLabel(userAgent),
+      });
     });
   }
 

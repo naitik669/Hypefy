@@ -135,6 +135,22 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Supabase's origin, for a connection opened while the page is still parsing.
+ *
+ * The first thing the app does once it runs is talk to Supabase — the session,
+ * then the realtime socket — and on a cold app launch that means paying for
+ * DNS, TCP and TLS at the exact moment the reader is waiting for the screen.
+ * Starting the handshake early costs nothing and takes it off that path.
+ */
+const SUPABASE_ORIGIN = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").origin;
+  } catch {
+    return null;
+  }
+})();
+
 export const viewport: Viewport = {
   themeColor: "#0a0a0a",
   width: "device-width",
@@ -155,6 +171,11 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className={`${jakarta.variable} ${NAME_FONT_VARIABLES} h-full antialiased`}>
+      {SUPABASE_ORIGIN && (
+        <head>
+          <link rel="preconnect" href={SUPABASE_ORIGIN} crossOrigin="" />
+        </head>
+      )}
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {/* The opening splash is removed for now, at request. Everything it
             needed is still here and unreferenced — SPLASH_BOOT, SPLASH_FACTS,
