@@ -138,6 +138,10 @@ export function ShareButton({
     <NavHoldMenu
       actions={actions}
       label="Send to"
+      // A card just above the button, left edge under its left edge. A column
+      // would cover the post you are sharing, and drawn inside the feed it
+      // would sit under the veil and be blurred along with the page.
+      layout="row"
       // The feed scrolls under this button, unlike the nav bar it borrows the
       // gesture from, so the page keeps its own touches until the stack opens.
       touchAction="pan-y"

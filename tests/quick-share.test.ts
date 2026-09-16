@@ -48,11 +48,11 @@ beforeEach(async () => {
   root = createRoot(host);
   await act(async () =>
     root.render(
-      createElement(
-        ShareButton,
-        { postId: "p1", onOpenSheet: openSheet },
-        createElement("span", null, "share"),
-      ),
+      createElement(ShareButton, {
+        postId: "p1",
+        onOpenSheet: openSheet,
+        children: createElement("span", null, "share"),
+      }),
     ),
   );
 });
@@ -76,47 +76,65 @@ function pointer(el: HTMLElement, type: string, x = 50, y = 400) {
  * which reads real geometry, because a thumb has no hover — would have
  * nothing to test against. Give the pieces the positions a phone would.
  */
-function place(el: Element, top: number, height = 48) {
+function place(el: Element, box: { top: number; left: number; width: number; height: number }) {
   el.getBoundingClientRect = () =>
     ({
-      top,
-      bottom: top + height,
-      left: 20,
-      right: 68,
-      width: 48,
-      height,
-      x: 20,
-      y: top,
+      top: box.top,
+      bottom: box.top + box.height,
+      left: box.left,
+      right: box.left + box.width,
+      width: box.width,
+      height: box.height,
+      x: box.left,
+      y: box.top,
       toJSON: () => ({}),
     }) as DOMRect;
 }
 
-/** Hold long enough for the stack to rise, with the button 400px down. */
+/**
+ * Hold long enough for the card to rise, with the button 400px down, and give
+ * the card and its faces the positions a phone would lay out: one row, left to
+ * right, just above the button.
+ */
 async function hold() {
-  place(trigger(), 400, 40);
+  place(trigger(), { top: 400, left: 20, width: 40, height: 40 });
   await pointer(trigger(), "pointerdown");
   await act(async () => {
     await vi.advanceTimersByTimeAsync(400);
   });
-  // Nearest the thumb is the bottom of the column, so tile 0 sits lowest.
-  tiles().forEach((t, i) => place(t, 340 - i * 60));
+  const card = document.querySelector('[role="listbox"]');
+  if (card) place(card, { top: 340, left: 20, width: 220, height: 52 });
+  tiles().forEach((t, i) =>
+    place(t, { top: 344, left: 26 + i * 52, width: 44, height: 44 }),
+  );
 }
 
 describe("holding share", () => {
-  it("raises the people you send to most, as faces", async () => {
+  it("raises the people you send to most, as faces, in one card", async () => {
     await hold();
     expect(tiles()).toHaveLength(2);
-    // Faces, not glyphs: each tile carries the person, and their name is the
-    // label that slides out under the thumb rather than a caption on every one.
-    expect(document.body.textContent).toContain("Maya");
-    expect(document.body.textContent).toContain("Leo");
+    // Over the page, not inside the post: drawn in the feed it would sit
+    // under the veil and be blurred along with everything else.
+    const card = document.querySelector('[role="listbox"]')!;
+    expect(card.closest("article, [data-feed-card]")).toBeNull();
+    expect(host.contains(card)).toBe(false);
+    // Left corner above the button, running right — not centred on it, and
+    // not off the screen: the trigger was placed at x=20.
+    expect((card.parentElement as HTMLElement).style.left).toBe("20px");
+    // Faces and nothing else. The name belongs to whichever one the thumb is
+    // on, not to a caption under every tile.
+    expect(card.textContent).not.toContain("Maya");
+    expect(tiles()[0].querySelector("[aria-hidden], img, span")).toBeTruthy();
   });
 
   it("sends to whoever the thumb was on when it lifted", async () => {
     await hold();
-    // The thumb comes to rest on the nearest face and lifts there.
-    await pointer(trigger(), "pointermove", 44, 360);
-    await pointer(trigger(), "pointerup", 44, 360);
+    // The thumb comes to rest on the first face and lifts there.
+    await pointer(trigger(), "pointermove", 48, 366);
+    // The one under the thumb is marked, and named.
+    expect(tiles()[0].getAttribute("aria-selected")).toBe("true");
+    expect(document.body.textContent).toContain("Maya");
+    await pointer(trigger(), "pointerup", 48, 366);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
@@ -131,8 +149,9 @@ describe("holding share", () => {
 
   it("sends nothing when the thumb lifts away from every face", async () => {
     await hold();
-    await pointer(trigger(), "pointermove", 44, 120);
-    await pointer(trigger(), "pointerup", 44, 120);
+    // Well clear of the card: nothing is under the thumb to send to.
+    await pointer(trigger(), "pointermove", 48, 120);
+    await pointer(trigger(), "pointerup", 48, 120);
     expect(rpc.mock.calls.some(([fn]) => fn === "send_message")).toBe(false);
     expect(tiles()).toHaveLength(0);
   });

@@ -101,12 +101,21 @@ export function NavHoldMenu({
    * "stack" climbs straight up from a tab on the edge of the bar. "arc" fans
    * across the top of the trigger and is for the CENTRE button, which is the
    * one place with room on both sides — a column there would rise out of the
-   * middle of the screen and cover the thing you are creating from. The
-   * mechanics below are shared on purpose: the hold, the pointer capture, the
-   * detach fallback and the commit were all hard-won once, and a second
+   * middle of the screen and cover the thing you are creating from.
+   *
+   * "row" lays the options along one card just above the trigger, starting at
+   * its left edge. It is for a trigger in the PAGE rather than the bar: a
+   * column there covers the very post you are sharing, and — because a feed
+   * card is its own stacking context — anything drawn in place ends up under
+   * the veil and gets blurred along with the page. A row is portalled to the
+   * body and placed from the trigger's measured position, so it sits over
+   * everything, unblurred, wherever the button happens to be.
+   *
+   * The mechanics below are shared on purpose: the hold, the pointer capture,
+   * the detach fallback and the commit were all hard-won once, and a second
    * component would have re-earned the same bugs.
    */
-  layout?: "stack" | "arc";
+  layout?: "stack" | "arc" | "row";
   /**
    * What the browser may do with a touch that starts on the trigger.
    *
@@ -153,6 +162,15 @@ export function NavHoldMenu({
    * the page has been scrolled to.
    */
   const [openDir, setOpenDir] = useState<"up" | "down">("up");
+  /**
+   * Where a row card sits on the screen, measured when the hold completes.
+   *
+   * A row is portalled, so it cannot be positioned relative to the trigger in
+   * CSS. Left edge under the trigger's left edge, pulled back from the screen
+   * edge if the card would overhang, and dropped below the trigger when there
+   * is no room above it.
+   */
+  const [rowPos, setRowPos] = useState<{ left: number; top: number } | null>(null);
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startY = useRef(0);
@@ -181,7 +199,9 @@ export function NavHoldMenu({
   // below (hit-testing, the stagger, commit) indexes into THIS list, so they
   // cannot disagree.
   const ordered =
-    layout === "arc" || openDir === "down" ? actions : [...actions].reverse();
+    layout === "arc" || layout === "row" || openDir === "down"
+      ? actions
+      : [...actions].reverse();
 
   /**
    * Where each arc tile sits, relative to the trigger's centre.
@@ -264,6 +284,19 @@ export function NavHoldMenu({
     if (!stack) return null;
     const els = stack.querySelectorAll<HTMLElement>('[role="option"]');
 
+    if (layout === "row") {
+      // Along the card, and only while the thumb is near it: X alone would
+      // mean a small move down — or no move at all — landing on whichever
+      // face happens to be above the button, and sending to them.
+      const band = stack.getBoundingClientRect();
+      if (y < band.top - 48 || y > band.bottom + 48) return null;
+      for (let i = 0; i < els.length; i++) {
+        const r = els[i].getBoundingClientRect();
+        if (x >= r.left - 5 && x <= r.right + 5) return i;
+      }
+      return null;
+    }
+
     if (layout === "arc") {
       // Nearest centre wins, not containment. Tiles on an arc have gaps
       // between them, and a thumb travelling from one to the next crosses
@@ -331,9 +364,21 @@ export function NavHoldMenu({
         setLabelSide(
           box.left + box.width / 2 < window.innerWidth / 2 ? "right" : "left"
         );
-        // 48px tile + 12px gap each, and a little air above the last one.
-        const needed = ready.length * 60 + 24;
-        setOpenDir(box.top < needed ? "down" : "up");
+        if (layout === "row") {
+          // Tile, gap, and the card's own padding — enough to keep the whole
+          // card on screen without measuring something that isn't drawn yet.
+          const CARD_H = 92;
+          const width = ready.length * 44 + (ready.length - 1) * 8 + 20;
+          const above = box.top - CARD_H - 10;
+          setRowPos({
+            left: Math.max(8, Math.min(box.left, window.innerWidth - width - 8)),
+            top: above >= 8 ? above : box.bottom + 10,
+          });
+        } else {
+          // 48px tile + 12px gap each, and a little air above the last one.
+          const needed = ready.length * 60 + 24;
+          setOpenDir(box.top < needed ? "down" : "up");
+        }
       }
       setOpen(true);
       setActiveIdx(null);
@@ -380,9 +425,103 @@ export function NavHoldMenu({
     // committing nothing.
     commit(activeIdx);
   }
+  /**
+   * A row, drawn over the page rather than inside it.
+   *
+   * Both halves go to the body: the veil first, then the card, so the card is
+   * above it and stays sharp — drawn in place, the feed card's own stacking
+   * context capped the tiles below the veil and blurred the very faces being
+   * chosen.
+   */
+  const rowMenu =
+    open && layout === "row" && typeof document !== "undefined"
+      ? createPortal(
+          <>
+            <div
+              className="animate-switch-veil fixed inset-0 z-[200] bg-black/55 backdrop-blur-[2px]"
+              aria-hidden
+              onPointerDown={detached ? close : undefined}
+            />
+            <div
+              className="fixed z-[201] flex flex-col items-start gap-1.5"
+              style={{ left: rowPos?.left ?? 8, top: rowPos?.top ?? 8, opacity: rowPos ? 1 : 0 }}
+            >
+              <div
+                ref={stackRef}
+                role="listbox"
+                aria-label={label}
+                className="flex items-center gap-2 rounded-3xl border border-white/10 bg-elevated/95 px-2.5 py-2.5 shadow-2xl backdrop-blur-xl"
+              >
+                {ordered.map((action, i) => {
+                  const active = i === activeIdx;
+                  const Icon = action.icon;
+                  return (
+                    <div
+                      key={action.key ?? action.href ?? action.label}
+                      role="option"
+                      aria-selected={active}
+                      onPointerEnter={detached ? () => setActiveIdx(i) : undefined}
+                      onPointerDown={
+                        detached
+                          ? (e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              close();
+                              run(action);
+                            }
+                          : undefined
+                      }
+                      className={`transition-transform duration-200 ease-out ${
+                        active ? "-translate-y-1 scale-110" : "scale-100"
+                      }`}
+                      style={{
+                        // Out of the button, left to right, the way the row
+                        // itself reads.
+                        animation: `switch-rise 240ms cubic-bezier(0.16,1,0.3,1) ${i * 34}ms backwards`,
+                      }}
+                    >
+                      <span
+                        className={`flex h-11 w-11 items-center justify-center overflow-hidden rounded-[15px] border-2 transition-[background-color,border-color,color] duration-200 ${
+                          active
+                            ? "border-accent bg-accent/15 text-accent"
+                            : "border-transparent bg-surface/80 text-foreground"
+                        }`}
+                      >
+                        {action.avatar ? (
+                          <Avatar
+                            name={action.avatar.name}
+                            hue={action.avatar.hue}
+                            src={action.avatar.src ?? undefined}
+                            size={38}
+                            className="rounded-[11px]"
+                          />
+                        ) : Icon ? (
+                          <Icon size={20} />
+                        ) : null}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* One line for whichever face is under the thumb. Always
+                  rendered, so the card does not shift as it changes. */}
+              <span
+                aria-hidden
+                className="ml-1.5 max-w-[60vw] truncate rounded-lg bg-elevated px-2 py-0.5 text-[12px] font-bold text-foreground shadow-lg ring-1 ring-border transition-opacity duration-150"
+                style={{ opacity: activeIdx === null ? 0 : 1 }}
+              >
+                {activeIdx === null ? " " : ordered[activeIdx].label}
+              </span>
+            </div>
+          </>,
+          document.body,
+        )
+      : null;
+
   return (
     <div className="relative flex items-center justify-center">
-      {open && (
+      {rowMenu}
+      {open && layout !== "row" && (
         <>
           {/* Portalled because the nav carries backdrop-blur, which makes it
               the containing block for fixed children — rendered in place this
