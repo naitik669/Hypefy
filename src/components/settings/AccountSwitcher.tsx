@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Plus, X, Loader2 } from "lucide-react";
+import { Check, Plus, X, Loader2, ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -19,6 +19,13 @@ export function AccountSwitcher() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [switching, setSwitching] = useState<string | null>(null);
   const [confirmForget, setConfirmForget] = useState<SavedAccount | null>(null);
+  /**
+   * Settings opens on the account you are actually using. Every other account
+   * this phone has signed into is one tap away rather than stacked above the
+   * settings themselves — five cards deep, the page was a list of accounts
+   * with the settings somewhere below it.
+   */
+  const [showAll, setShowAll] = useState(false);
 
   // On mount: save current session into localStorage so it shows in the list
   useEffect(() => {
@@ -73,15 +80,16 @@ export function AccountSwitcher() {
     setAccounts(getSavedAccounts());
   }
 
-  return (
-    <div className="flex flex-col gap-2">
-      {/* Saved accounts list */}
-      {accounts.map((account) => {
-        const isCurrent = account.userId === currentUserId;
-        const name = account.displayName ?? account.username ?? account.email;
-        const isSwitching = switching === account.userId;
+  const active = accounts.find((a) => a.userId === currentUserId) ?? null;
+  const others = accounts.filter((a) => a !== active);
 
-        return (
+  /** One saved account, as a card. */
+  function card(account: SavedAccount) {
+    const isCurrent = account.userId === currentUserId;
+    const name = account.displayName ?? account.username ?? account.email;
+    const isSwitching = switching === account.userId;
+
+    return (
           <div
             key={account.userId}
             className={`flex items-center gap-3 rounded-2xl border px-3 py-3 transition-colors ${
@@ -133,19 +141,49 @@ export function AccountSwitcher() {
                 </button>
               </div>
             )}
-          </div>
-        );
-      })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* The account you are on. */}
+      {active && card(active)}
+
+      {/* Everything else this phone has signed into, behind one tap. */}
+      {others.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          aria-expanded={showAll}
+          className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-3 py-3 text-sm font-semibold transition-colors hover:border-accent/40"
+        >
+          <span className="flex-1 text-left">Switch account</span>
+          <span className="text-xs font-semibold text-muted tabular-nums">
+            {others.length} saved
+          </span>
+          <ChevronDown
+            size={18}
+            className={`text-faint transition-transform ${showAll ? "rotate-180" : ""}`}
+          />
+        </button>
+      )}
+
+      {showAll && others.map(card)}
 
       {/* Add account — routes through the real sign-in/sign-up flow, same
-          as other apps, instead of a cramped inline form */}
-      <Link
-        href="/signin?add=1"
-        className="flex items-center gap-2 rounded-2xl border border-dashed border-border px-3 py-3 text-sm text-muted transition-colors hover:border-accent/40 hover:text-foreground"
-      >
-        <Plus size={18} />
-        Add account
-      </Link>
+          as other apps, instead of a cramped inline form. It keeps company
+          with the other accounts: both are jobs you come here to do at once,
+          and neither needs to sit over the settings the rest of the time. */}
+      {(showAll || others.length === 0) && (
+        <Link
+          href="/signin?add=1"
+          className="flex items-center gap-2 rounded-2xl border border-dashed border-border px-3 py-3 text-sm text-muted transition-colors hover:border-accent/40 hover:text-foreground"
+        >
+          <Plus size={18} />
+          Add account
+        </Link>
+      )}
 
       {/* The × sits a few pixels from "Switch" and used to fire on the first
           tap. Getting the account back means signing in with the password
