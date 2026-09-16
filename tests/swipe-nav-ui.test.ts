@@ -34,12 +34,13 @@ afterEach(async () => {
 });
 
 const page = () => document.getElementById("feed")!.parentElement as HTMLElement;
-function touch(type: string, x: number, y = 300, on?: HTMLElement) {
+async function touch(type: string, x: number, y = 300, on?: HTMLElement) {
   const e = new Event(type, { bubbles: true, cancelable: true });
   const pts = type === "touchend" ? [] : [{ clientX: x, clientY: y }];
   Object.defineProperty(e, "touches", { value: pts });
   const target = on ?? document.getElementById("feed")!;
-  return act(async () => void target.dispatchEvent(e));
+  await act(async () => void target.dispatchEvent(e));
+  return e;
 }
 
 /** A full swipe towards the next tab, on the page or on whatever stands in. */
@@ -134,4 +135,30 @@ describe("SwipeNav", () => {
     await touch("touchmove", 206, 150);
     expect(page().style.transform).toBe("");
   });
+
+describe("directional lock", () => {
+  it("a sideways swipe only moves sideways: the page cannot scroll under it", async () => {
+    await touch("touchstart", 300, 300);
+    const first = await touch("touchmove", 294, 301);
+    // Already clearly sideways, so the browser is kept from starting a scroll.
+    expect(first.defaultPrevented).toBe(true);
+    const wobble = await touch("touchmove", 200, 318);
+    expect(wobble.defaultPrevented).toBe(true);
+    expect(page().style.transform).toBe("translate3d(-100px,0,0)");
+    expect(document.documentElement.style.overflowY).toBe("hidden");
+    await touch("touchend", 200, 318);
+    expect(document.documentElement.style.overflowY).toBe("");
+  });
+
+  it("a vertical swipe only scrolls: sideways drift never moves the tab", async () => {
+    await touch("touchstart", 300, 300);
+    const move = await touch("touchmove", 303, 280);
+    expect(move.defaultPrevented).toBe(false);
+    const drift = await touch("touchmove", 240, 200);
+    expect(drift.defaultPrevented).toBe(false);
+    expect(page().style.transform).toBe("");
+    expect(document.documentElement.style.overflowY).toBe("");
+    await touch("touchend", 240, 200);
+  });
+});
 });

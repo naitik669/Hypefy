@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   lockAxis,
+  holdScroll,
   swipeOutcome,
   inHorizontalScroller,
   gestureBlocked,
@@ -33,6 +34,16 @@ describe("lockAxis", () => {
     expect(lockAxis(30, 25)).toBe("y");
     // Only once it is decisively sideways do we take it.
     expect(lockAxis(30, 15)).toBe("x");
+  });
+});
+
+describe("holdScroll", () => {
+  it("holds the browser back only from a move that is already clearly sideways", () => {
+    expect(holdScroll(5, 1)).toBe(true);
+    expect(holdScroll(-4, 0)).toBe(true);
+    expect(holdScroll(3, 3)).toBe(false);
+    expect(holdScroll(1, 6)).toBe(false);
+    expect(holdScroll(0, 0)).toBe(false);
   });
 });
 

@@ -43,6 +43,31 @@ export function lockAxis(
   return Math.abs(ddx) > Math.abs(ddy) * 1.4 ? "x" : "y";
 }
 
+/**
+ * Should the browser be kept from scrolling on this move, before the axis is
+ * decided?
+ *
+ * The page lets the browser pan vertically (touch-action: pan-y), and React's
+ * touch handlers are passive, so they can't stop it. Left alone, a sideways
+ * swipe that wobbles a few pixels up or down also scrolls the page under the
+ * finger: the post drifts up and down while the tab slides. The browser takes
+ * its cue from the first moves it is allowed to act on, so a move that is
+ * already clearly sideways is held back from it while the axis settles.
+ * Anything else is left to scroll, since stealing a scroll is worse than
+ * missing a swipe.
+ */
+export function holdScroll(ddx: number, ddy: number): boolean {
+  return Math.abs(ddx) > 0 && Math.abs(ddx) > Math.abs(ddy) * 1.4;
+}
+
+/** Keep the page from scrolling while a sideways swipe owns the finger. */
+function freezePageScroll(): () => void {
+  const els = [document.documentElement, document.body];
+  const before = els.map((el) => el.style.overflowY);
+  els.forEach((el) => (el.style.overflowY = "hidden"));
+  return () => els.forEach((el, i) => (el.style.overflowY = before[i]));
+}
+
 /** What a released horizontal drag should do. */
 export function swipeOutcome(g: {
   dx: number;
@@ -258,6 +283,54 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     }, HANDOFF_MS);
     return () => window.clearTimeout(t);
   }, [standIn]);
+
+  // Directional lock. Once a gesture is sideways it only moves sideways: the
+  // browser's own vertical scroll is cancelled for the rest of that touch,
+  // and the page is frozen in case a scroll had already begun. A gesture that
+  // starts vertical is the browser's, and pan-y already keeps it vertical.
+  // Native and non-passive, because React's touch listeners cannot cancel.
+  useEffect(() => {
+    if (!enabled) return;
+    const targets = [page.current, standEl.current].filter(Boolean) as HTMLDivElement[];
+    let unfreeze: (() => void) | null = null;
+    const release = () => {
+      unfreeze?.();
+      unfreeze = null;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (ignore.current || e.touches.length !== 1 || axis.current === "y") return;
+      const t = e.touches[0];
+      const ddx = t.clientX - start.current.x;
+      const ddy = t.clientY - start.current.y;
+      if (axis.current === null) {
+        const locked = lockAxis(ddx, ddy);
+        if (locked === "y") {
+          axis.current = "y";
+          return;
+        }
+        if (locked === "x") {
+          axis.current = "x";
+          if (!unfreeze) unfreeze = freezePageScroll();
+        } else if (!holdScroll(ddx, ddy)) {
+          return;
+        }
+      }
+      if (e.cancelable) e.preventDefault();
+    };
+    for (const el of targets) {
+      el.addEventListener("touchmove", onMove, { passive: false });
+      el.addEventListener("touchend", release);
+      el.addEventListener("touchcancel", release);
+    }
+    return () => {
+      release();
+      for (const el of targets) {
+        el.removeEventListener("touchmove", onMove);
+        el.removeEventListener("touchend", release);
+        el.removeEventListener("touchcancel", release);
+      }
+    };
+  }, [enabled, standIn]);
 
   if (!enabled) return <>{children}</>;
 
