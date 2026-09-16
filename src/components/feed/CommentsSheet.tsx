@@ -26,7 +26,6 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { Avatar } from "@/components/ui/Avatar";
-import { DisplayName } from "@/components/ui/DisplayName";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { visibleDecoration } from "@/lib/cosmetics";
@@ -1110,8 +1109,12 @@ const Row = memo(function Row({
             onLongPress(node, threadId, e.clientX, e.clientY);
           }}
         >
-          <div className="flex items-center gap-1.5">
-            <DisplayName name={name} profile={node.profiles} className="text-sm font-semibold" />
+          <div className="flex min-w-0 items-center gap-1.5">
+            {/* Plainly, whatever the author wears elsewhere. A thread is a
+                column of names a line apart, and six display faces and a set
+                of glows down the side of it turns reading who said what into
+                work. The badge still shows; the font does not. */}
+            <span className="truncate text-sm font-semibold">{name}</span>
             {node.profiles?.is_verified && <VerifiedStar className="h-3 w-3 shrink-0 text-verified" />}
             <span className="text-xs text-faint">
               · {timeAgoShort(node.created_at)}

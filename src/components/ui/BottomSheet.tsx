@@ -108,6 +108,23 @@ export function BottomSheet({
   const [expanded, setExpanded] = useState(false);
 
   /**
+   * The screen, watched.
+   *
+   * A half sheet is sized in pixels rather than dvh once it is up, because
+   * the drag works in pixels and the two have to agree to the pixel — a
+   * height React thinks is "50dvh" and a height the finger left at 406px are
+   * the same number until something re-renders. Re-read when the screen
+   * changes, which is a rotation or the keyboard.
+   */
+  const [screenH, setScreenH] = useState<number | null>(null);
+  useEffect(() => {
+    const read = () => setScreenH(window.innerHeight);
+    read();
+    window.addEventListener("resize", read);
+    return () => window.removeEventListener("resize", read);
+  }, []);
+
+  /**
    * The two heights a sheet rests at.
    *
    * "content" is the default: as tall as what is in it, up to 85% of the
@@ -118,12 +135,26 @@ export function BottomSheet({
    */
   const heights =
     size === "half"
-      ? { height: expanded ? "94dvh" : "50dvh" }
+      ? {
+          height:
+            screenH == null
+              ? expanded
+                ? "94dvh"
+                : "50dvh"
+              : `${screenH * (expanded ? 0.94 : 0.5)}px`,
+        }
       : { maxHeight: expanded ? "95dvh" : "85dvh" };
 
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const veilRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  /** The same two heights, in pixels, for a drag to work against. */
+  const stops = useCallback(() => {
+    const screen =
+      screenH ?? (typeof window === "undefined" ? 800 : window.innerHeight);
+    return { rest: screen * 0.5, top: screen * 0.94 };
+  }, [screenH]);
 
   const trapRef = useFocusTrap<HTMLDivElement>(mounted && open);
 
@@ -152,6 +183,8 @@ export function BottomSheet({
     dy: 0,
     /** How far the finger actually travelled, which is what decides. */
     raw: 0,
+    /** The height a half sheet has been dragged to. */
+    h: 0,
     /** Started on the handle, which can be dragged whatever the scroll is at. */
     handle: false,
   });
@@ -166,7 +199,7 @@ export function BottomSheet({
   }, [size]);
 
   const begin = useCallback((y: number, handle: boolean) => {
-    drag.current = { active: true, startY: y, startT: Date.now(), dy: 0, raw: 0, handle };
+    drag.current = { active: true, startY: y, startT: Date.now(), dy: 0, raw: 0, h: 0, handle };
   }, []);
 
   const moveTo = useCallback(
@@ -174,18 +207,38 @@ export function BottomSheet({
       const d = drag.current;
       if (!d.active) return;
       const raw = y - d.startY;
-      // Up: it gives a little, and gives more when growing is possible —
-      // that pull IS the gesture that makes it taller, so it has to be
-      // visible while the finger is still down.
+      d.raw = raw;
+
+      if (size === "half") {
+        // The top edge follows the finger: the sheet GROWS on the way up and
+        // shrinks on the way down, rather than sliding as one piece. It used
+        // to rubber-band 48px and then refuse to move, which is what made a
+        // pull upwards feel stuck — the finger kept going and the sheet did
+        // not. Only below its resting height does it start to slide, which
+        // is the movement that means "away".
+        const { rest, top } = stops();
+        const want = (expanded ? top : rest) - raw;
+        const el = sheetRef.current;
+        d.h = Math.min(Math.max(want, rest), top);
+        d.dy = Math.max(0, rest - want);
+        if (el) {
+          el.style.transition = "none";
+          el.style.height = `${d.h}px`;
+        }
+        place(d.dy);
+        return;
+      }
+
+      // Up: a sheet that is only as tall as its contents has nowhere to grow
+      // to, so the pull is resisted and springs back.
       const dy =
         raw < 0
           ? Math.max(raw * (canGrow() && !expanded ? 0.55 : 0.2), -PEEK_PX)
           : raw;
-      d.raw = raw;
       d.dy = dy;
       place(dy);
     },
-    [canGrow, expanded, place],
+    [canGrow, expanded, place, size, stops],
   );
 
   const end = useCallback(() => {
@@ -200,6 +253,40 @@ export function BottomSheet({
     const flung = speed > FLING && Math.abs(raw) > 40;
     const ms = reducedMotion() ? 0 : SETTLE_MS;
     const far = dismissAt(sheetRef.current?.offsetHeight ?? 0);
+
+    if (size === "half") {
+      const { rest, top } = stops();
+      const el = sheetRef.current;
+      // Below its resting height it is on its way out.
+      if (d.dy > 0 && (d.dy > far || (flung && d.dy > 40))) {
+        onClose();
+        return;
+      }
+      // A flick is an instruction, whatever distance it covered: up goes to
+      // the top, down goes one step down. Anything slower is a choice
+      // between the two heights, settled by whichever it is nearer — so the
+      // sheet ends where the finger left it, near enough.
+      const grew = flung
+        ? raw < 0
+        : (d.h || rest) > (rest + top) / 2;
+      if (flung && raw > 0 && !expanded) {
+        onClose();
+        return;
+      }
+      setExpanded(grew);
+      if (el) {
+        el.style.transition = ms
+          ? `height ${ms}ms ${EASE}, transform ${ms}ms ${EASE}`
+          : "none";
+        // The same number React renders for this state, so the two cannot
+        // disagree — and nothing is cleared afterwards: clearing a style
+        // React owns leaves it with nothing to re-apply, which dropped the
+        // sheet to the height of its own contents.
+        el.style.height = `${grew ? top : rest}px`;
+        el.style.transform = "translate3d(0,0,0)";
+      }
+      return;
+    }
 
     if (raw > 0 && (raw > far || flung)) {
       // One step down per drag: a tall sheet comes back to its resting
@@ -218,7 +305,7 @@ export function BottomSheet({
       setExpanded(true);
     }
     place(0, ms);
-  }, [canGrow, expanded, onClose, place]);
+  }, [canGrow, expanded, onClose, place, size, stops]);
 
   /* --- Where a drag may start --------------------------------------------- */
   /** A body touch waiting to find out which way it is going. */

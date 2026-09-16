@@ -210,16 +210,40 @@ describe("a sheet you read in", () => {
     Object.defineProperty(sheet()!, "offsetHeight", { value: 406, configurable: true });
   }
 
+  // Sized in pixels once it is up, so the drag and the render agree to the
+  // pixel; jsdom's window is 768 tall.
+  const px = (fraction: number) => `${window.innerHeight * fraction}px`;
+
   it("opens at half the screen, whatever is in it", async () => {
     await half();
-    expect(sheet()!.style.height).toBe("50dvh");
+    expect(sheet()!.style.height).toBe(px(0.5));
     expect(sheet()!.style.maxHeight).toBe("");
   });
 
-  it("goes to the top when pulled up, with nothing to scroll", async () => {
+  it("goes to the top when taken most of the way there", async () => {
     await half();
-    await drag(handle(), -70);
-    expect(sheet()!.style.height).toBe("94dvh");
+    await drag(handle(), -250);
+    expect(sheet()!.style.height).toBe(px(0.94));
+  });
+
+  it("goes to the top on a flick, however short", async () => {
+    await half();
+    // No pause before letting go: a flick is an instruction, not a distance.
+    await touch(handle(), "touchstart", 300);
+    for (let i = 1; i <= 4; i++) await touch(handle(), "touchmove", 300 - i * 15);
+    await touch(handle(), "touchend", 240);
+    expect(sheet()!.style.height).toBe(px(0.94));
+  });
+
+  it("comes back to where it rests when the pull up is a small one", async () => {
+    await half();
+    // It follows the finger the whole way — it used to give 48px and then
+    // stop dead, which is what "stuck" was — and settles back on release.
+    await touch(handle(), "touchstart", 300);
+    await touch(handle(), "touchmove", 260);
+    expect(sheet()!.style.height).toBe(`${window.innerHeight * 0.5 + 40}px`);
+    await touch(handle(), "touchend", 260);
+    expect(sheet()!.style.height).toBe(px(0.5));
   });
 
   it("takes a real pull to send away — a quarter of the screen", async () => {
