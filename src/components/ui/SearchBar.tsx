@@ -35,7 +35,7 @@ export function SearchBar({
     return (
       <Link
         href={href}
-        className="flex h-11 items-center gap-2 rounded-pill border border-border bg-surface px-4 text-sm text-faint"
+        className="flex h-11 items-center gap-2 rounded-2xl border border-border bg-surface px-4 text-sm text-faint"
       >
         <Search size={18} className="text-muted" />
         {placeholder}
@@ -44,7 +44,7 @@ export function SearchBar({
   }
 
   return (
-    <div className="flex h-11 items-center gap-2 rounded-pill border border-border bg-surface px-4 focus-within:border-white/25">
+    <div className="flex h-11 items-center gap-2 rounded-2xl border border-border bg-surface px-4 focus-within:border-white/25">
       <Search size={18} className="text-muted" />
       <input
         autoFocus={autoFocus}

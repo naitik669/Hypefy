@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Zap, MessageCircle, Play, Compass, Hash, SlidersHorizontal, Check } from "lucide-react";
+import { Zap, MessageCircle, Play, Compass, Hash } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchBar } from "@/components/ui/SearchBar";
-import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DiscoverFilter } from "@/components/discover/DiscoverFilter";
 import { ShotPreview } from "@/components/shots/ShotPreview";
 import { UserSuggestionCard } from "@/components/discover/UserSuggestionCard";
 import { PinFeed, type Pin } from "@/components/discover/PinFeed";
@@ -33,8 +33,6 @@ type Person = {
   is_verified?: boolean | null;
 };
 type Tag = { tag: string; count: number };
-
-const FIXED = ["For You", "Blowing Up", "Shots", "People", "Tags"] as const;
 
 /**
  * Discover, laid out like Pinterest.
@@ -80,10 +78,7 @@ export function DiscoverView({
   categoryRails?: { label: string; posts: Pin[] }[];
   tags: Tag[];
 }) {
-  const chips = [...FIXED, ...categoryRails.map((c) => c.label)];
   const [cat, setCat] = useState<string>("For You");
-  const [filterOpen, setFilterOpen] = useState(false);
-  const filtered = cat !== "For You";
 
   const everythingEmpty =
     rankedPosts.length === 0 && trendingShots.length === 0 && people.length === 0;
@@ -115,43 +110,12 @@ export function DiscoverView({
         <div className="min-w-0 flex-1">
           <SearchBar placeholder="Search people, posts, #tags" href="/search" />
         </div>
-        <button
-          type="button"
-          onClick={() => setFilterOpen(true)}
-          aria-label={filtered ? `Filter: ${cat}` : "Filter"}
-          className={`flex h-11 shrink-0 items-center gap-1.5 rounded-pill border px-3 text-sm font-semibold transition-colors ${
-            filtered
-              ? "border-accent bg-accent text-accent-ink"
-              : "border-border bg-surface text-muted"
-          }`}
-        >
-          <SlidersHorizontal size={17} />
-          {/* The name only when it is not the default, so the button is a
-              button most of the time and an answer when it matters. */}
-          {filtered && <span className="max-w-[92px] truncate">{cat}</span>}
-        </button>
+        <DiscoverFilter
+          value={cat}
+          topics={categoryRails.map((c) => c.label)}
+          onChange={setCat}
+        />
       </div>
-
-      <BottomSheet open={filterOpen} onClose={() => setFilterOpen(false)} title="Show me">
-        <div className="flex flex-wrap gap-2 pb-2 pt-1">
-          {chips.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => {
-                setCat(c);
-                setFilterOpen(false);
-              }}
-              className={`flex items-center gap-1.5 rounded-pill px-3.5 py-2 text-sm font-semibold transition-colors ${
-                cat === c ? "bg-accent text-accent-ink" : "bg-surface text-muted"
-              }`}
-            >
-              {cat === c && <Check size={14} />}
-              {c}
-            </button>
-          ))}
-        </div>
-      </BottomSheet>
 
       <div key={cat} className="animate-fade-swap pb-6">
         {cat === "For You" && (
