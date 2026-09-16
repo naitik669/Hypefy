@@ -86,6 +86,10 @@ export type ChatMsg = {
   /** Client-only: the OneShot's private storage path, kept so a failed send
    *  can be retried without re-uploading. Never comes back from the server. */
   _storagePath?: string;
+  /** Client-only, folders: the album drawn from this device's files while
+   *  it uploads, so nothing reloads when the real URLs arrive. */
+  _preview?: string;
+  _caption?: string;
 };
 
 type MsgStatus = "pending" | "sent" | "seen" | "failed";
@@ -321,6 +325,9 @@ export function RealChatView({
   // while staged, the composer's text is the folder's caption.
   const [albumDraft, setAlbumDraft] = useState<{ file: File; preview: string; type: "image" | "video" }[]>([]);
   const [albumView, setAlbumView] = useState<{ album: Album; start: number } | null>(null);
+  // A sending folder's files, by its temp id, kept until they are uploaded so
+  // a failed upload can be retried.
+  const albumFiles = useRef(new Map<string, { file: File; type: "image" | "video" }[]>());
   const pickMode = useRef<"media" | "oneshot" | "document">("media");
   const [uploading, setUploading] = useState(false);
   // Local-only, per-mount reveal state for OneShot bubbles: which message ids
@@ -728,7 +735,7 @@ export function RealChatView({
               const tempIdx = prev.findIndex((x) => x.id.startsWith("temp-") && x.kind === m.kind && x.body === m.body);
               if (tempIdx !== -1) {
                 const copy = [...prev];
-                copy[tempIdx] = { ...m, post: null };
+                copy[tempIdx] = { ...m, post: null, _preview: prev[tempIdx]._preview };
                 return copy;
               }
             }
@@ -984,6 +991,11 @@ export function RealChatView({
    * storage path is carried on the optimistic message for exactly this.
    */
   async function retrySend(failed: ChatMsg) {
+    const files = albumFiles.current.get(failed.id);
+    if (failed.kind === "album" && files) {
+      void deliverAlbum(failed.id, files, failed._caption ?? "", failed.reply_to_id);
+      return;
+    }
     // A OneShot has no body by design — the image is private.
     if (!failed.body && failed.kind !== "oneshot") return;
     setMessages((p) => p.map((m) => (m.id === failed.id ? { ...m, _status: "pending" as const } : m)));
@@ -1209,13 +1221,47 @@ export function RealChatView({
     setAlbumDraft(rest);
   }
 
-  /** Upload every staged item, then send them as one folder message. */
-  async function sendAlbum() {
-    if (albumDraft.length < 2 || uploading) return;
-    setUploading(true);
+  /** Send the staged folder. It lands in the thread straight away, drawn
+   *  from the files on this device with the sending dots, and the composer
+   *  is free again at once — the upload runs behind the message, not in the
+   *  text box. */
+  function sendAlbum() {
+    if (albumDraft.length < 2) return;
+    const files = albumDraft.map(({ file, type }) => ({ file, type }));
+    const caption = text;
+    const replyId = replyTo?.id ?? null;
+    const tempId = `temp-${Date.now()}`;
+    const local = encodeAlbum({ caption, items: albumDraft.map((x) => ({ url: x.preview, type: x.type })) });
+    setMessages((p) => [...p, {
+      id: tempId, body: local, sender_id: currentUserId, kind: "album",
+      post_id: null, reply_to_id: replyId, is_unsent: false,
+      created_at: new Date().toISOString(), _status: "pending",
+      _preview: local, _caption: caption,
+    }]);
+    albumFiles.current.set(tempId, files);
+    // The object URLs now belong to the message on screen, so they are not
+    // revoked here.
+    setAlbumDraft([]);
+    setText("");
+    setReplyTo(null);
+    void deliverAlbum(tempId, files, caption, replyId);
+  }
+
+  /** Upload a folder's files, then send it. Also what a retry runs when the
+   *  upload itself never finished. */
+  async function deliverAlbum(
+    tempId: string,
+    files: { file: File; type: "image" | "video" }[],
+    caption: string,
+    replyId: string | null,
+  ) {
+    const mark = (patch: Partial<ChatMsg>) =>
+      setMessages((p) => p.map((m) => (m.id === tempId ? { ...m, ...patch } : m)));
+    mark({ _status: "pending" });
+
     const stamp = Date.now();
     const uploads = await Promise.all(
-      albumDraft.map(async (x, i) => {
+      files.map(async (x, i) => {
         const ext = x.file.name.split(".").pop() ?? (x.type === "video" ? "mp4" : "jpg");
         const path = `${currentUserId}/${stamp}-${i}.${ext}`;
         const { error } = await supabase.storage
@@ -1226,36 +1272,28 @@ export function RealChatView({
       }),
     );
     if (uploads.some((u) => !u)) {
-      showToast("Upload failed. Try again.");
-      setUploading(false);
+      mark({ _status: "failed" });
+      showToast("Photos didn't upload. Tap Retry.");
       return;
     }
 
-    const body = encodeAlbum({ caption: text, items: uploads as Album["items"] });
-    const replyId = replyTo?.id ?? null;
-    setReplyTo(null);
-    setText("");
-    clearAlbumDraft();
-
-    const tempId = `temp-${Date.now()}`;
-    setMessages((p) => [...p, {
-      id: tempId, body, sender_id: currentUserId, kind: "album",
-      post_id: null, reply_to_id: replyId, is_unsent: false,
-      created_at: new Date().toISOString(), _status: "pending",
-    }]);
+    // The real body goes on before the send, so the realtime echo can find
+    // this message by it; the picture keeps drawing from the device.
+    const body = encodeAlbum({ caption, items: uploads as Album["items"] });
+    mark({ body });
+    albumFiles.current.delete(tempId);
 
     const { data, error } = await supabase.rpc("send_message", {
       p_conversation_id: conversationId, p_body: body, p_kind: "album",
       p_post_id: undefined, p_reply_to_id: replyId ?? undefined,
     });
     if (error || !data) {
-      setMessages((p) => p.map((m) => m.id === tempId ? { ...m, _status: "failed" as const } : m));
+      mark({ _status: "failed" });
       showToast("Couldn't send. Try again.");
-    } else {
-      const real = data as ChatMsg;
-      setMessages((p) => p.some((m) => m.id === real.id) ? p.filter((m) => m.id !== tempId) : p.map((m) => m.id === tempId ? { ...m, ...real, _status: undefined } : m));
+      return;
     }
-    setUploading(false);
+    const real = data as ChatMsg;
+    setMessages((p) => p.some((m) => m.id === real.id) ? p.filter((m) => m.id !== tempId) : p.map((m) => m.id === tempId ? { ...m, ...real, _status: undefined } : m));
   }
 
   /** Open the OS picker for one of the sheet's options. */
@@ -1791,7 +1829,7 @@ export function RealChatView({
                             </span>
                           )}
                         </div>
-                      ) : m.kind === "album" && parseAlbum(m.body) ? (
+                      ) : m.kind === "album" && parseAlbum(m._preview ?? m.body) ? (
                         /* Several photos and videos sent together — the folder */
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
@@ -1802,9 +1840,9 @@ export function RealChatView({
                           className="relative"
                         >
                           <MediaFolder
-                            album={parseAlbum(m.body)!}
+                            album={parseAlbum(m._preview ?? m.body)!}
                             mine={mine}
-                            onOpen={(start) => setAlbumView({ album: parseAlbum(m.body)!, start })}
+                            onOpen={(start) => setAlbumView({ album: parseAlbum(m._preview ?? m.body)!, start })}
                           />
                           {starBurstId === m.id && (
                             <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
@@ -1922,7 +1960,7 @@ export function RealChatView({
                       {/* External time+status — for voice, document, post, and shot cards.
                           Plain text, gif, image, and video bubbles embed the time+tick inside themselves. */}
                       {(m.kind === "voice" || m.kind === "document" || m.kind === "album" || m.kind === "page_reply" || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
-                        (showTime || (mine && m._status === "failed")) && (
+                        (showTime || (mine && (m._status === "failed" || (m.kind === "album" && m._status === "pending")))) && (
                         <div className={`flex items-center gap-1 px-1 pt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
                           {showTime && (
                             <span className="text-[10px] text-faint">{timeLabel(m.created_at)}</span>
