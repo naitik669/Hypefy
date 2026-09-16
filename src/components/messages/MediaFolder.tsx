@@ -48,10 +48,13 @@ export function MediaFolder({
   album,
   mine,
   onOpen,
+  editing = false,
 }: {
   album: Album;
   mine: boolean;
   onOpen: (index: number) => void;
+  /** The caption is being edited in the composer: show it live, with a caret. */
+  editing?: boolean;
 }) {
   const { items, caption } = album;
   // The front card is the first item; the ones behind it follow.
@@ -111,9 +114,15 @@ export function MediaFolder({
         <svg className="pointer-events-none absolute inset-0 overflow-visible" viewBox={`0 0 ${W} ${GLASS_H}`} aria-hidden="true">
           <path d={RIM_PATH} fill="none" strokeWidth={1} stroke={mine ? "rgba(217,249,157,0.35)" : "rgba(255,255,255,0.16)"} />
         </svg>
-        {caption && (
-          <span className="absolute inset-x-[11px] bottom-[9px] line-clamp-2 text-[12.5px] font-semibold leading-[1.2] text-white">
+        {(caption || editing) && (
+          <span
+            data-folder-caption
+            className="absolute inset-x-[11px] bottom-[9px] line-clamp-2 text-[12.5px] font-semibold leading-[1.2] text-white"
+          >
             {caption}
+            {editing && (
+              <span aria-hidden="true" className="animate-caret ml-px inline-block h-[13px] w-[1.5px] translate-y-[2px] rounded-full bg-white" />
+            )}
           </span>
         )}
       </span>

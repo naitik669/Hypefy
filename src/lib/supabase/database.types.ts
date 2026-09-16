@@ -2409,6 +2409,10 @@ export type Database = {
       is_comment_image: { Args: { p_url: string }; Returns: boolean }
       deny_follow_request: { Args: { p_requester: string }; Returns: undefined }
       disconnect_spotify: { Args: never; Returns: undefined }
+      edit_album_caption: {
+        Args: { p_caption: string; p_message_id: string }
+        Returns: string
+      }
       edit_message: {
         Args: { p_body: string; p_message_id: string }
         Returns: undefined

@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Image as ImageIcon } from "lucide-react";
+import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Image as ImageIcon } from "lucide-react";
 import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
@@ -122,6 +122,15 @@ export function everyoneHasRead(readers: Reader[], createdAt: string): boolean {
 }
 
 /** Short human snippet for quoting a message — never a raw URL. */
+/** A folder as drawn: the photos from this device while it has them, so they
+ *  never reload, and the caption as it now stands, which an edit may change. */
+function albumOf(m: ChatMsg): Album | null {
+  const shown = parseAlbum(m._preview ?? m.body);
+  if (!shown) return null;
+  const current = m._preview ? parseAlbum(m.body) : shown;
+  return { ...shown, caption: current?.caption ?? shown.caption };
+}
+
 function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null }): string {
   if (m.is_unsent) return "Unsent message";
   switch (m.kind) {
@@ -1402,10 +1411,17 @@ export function RealChatView({
   function startEdit(m: ChatMsg) {
     setEditing(m);
     setReplyTo(null);
-    setText(m.body ?? "");
+    setText(m.kind === "album" ? albumOf(m)?.caption ?? "" : m.body ?? "");
+    requestAnimationFrame(() => {
+      const el = composerRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
   }
 
   async function saveEdit() {
+    if (editing?.kind === "album") return saveCaption(editing);
     if (!editing || !text.trim()) return;
     const id = editing.id;
     const newBody = text.trim();
@@ -1414,6 +1430,25 @@ export function RealChatView({
     setText("");
     const { error } = await supabase.rpc("edit_message", { p_message_id: id, p_body: newBody });
     if (error) showToast("Couldn't edit message");
+  }
+
+  /** A folder's caption, which may be cleared. Only the caption changes on
+   *  the server; the photos stay what was sent. */
+  async function saveCaption(m: ChatMsg) {
+    const caption = text.trim().slice(0, ALBUM_CAPTION_MAX);
+    const album = parseAlbum(m.body);
+    setEditing(null);
+    setText("");
+    if (!album || caption === album.caption) return;
+    const before = messages.find((x) => x.id === m.id);
+    setMessages((p) => p.map((x) => (x.id === m.id ? { ...x, body: encodeAlbum({ ...album, caption }), edited_at: new Date().toISOString() } : x)));
+    const { data, error } = await supabase.rpc("edit_album_caption", { p_message_id: m.id, p_caption: caption });
+    if (error) {
+      if (before) setMessages((p) => p.map((x) => (x.id === m.id ? before : x)));
+      showToast("Couldn't change the caption");
+    } else if (typeof data === "string") {
+      setMessages((p) => p.map((x) => (x.id === m.id ? { ...x, body: data } : x)));
+    }
   }
 
   async function submitReport(reason: string) {
@@ -1819,7 +1854,7 @@ export function RealChatView({
                             </span>
                           )}
                         </div>
-                      ) : m.kind === "album" && parseAlbum(m._preview ?? m.body) ? (
+                      ) : m.kind === "album" && albumOf(m) ? (
                         /* Several photos and videos sent together — the folder */
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
@@ -1830,9 +1865,10 @@ export function RealChatView({
                           className="relative"
                         >
                           <MediaFolder
-                            album={parseAlbum(m._preview ?? m.body)!}
+                            album={editing?.id === m.id ? { ...albumOf(m)!, caption: text } : albumOf(m)!}
                             mine={mine}
-                            onOpen={(start) => setAlbumView({ album: parseAlbum(m._preview ?? m.body)!, start, senderId: m.sender_id, at: m.created_at })}
+                            editing={editing?.id === m.id}
+                            onOpen={(start) => setAlbumView({ album: albumOf(m)!, start, senderId: m.sender_id, at: m.created_at })}
                           />
                           {starBurstId === m.id && (
                             <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
@@ -2139,7 +2175,7 @@ export function RealChatView({
           <div className="mb-2 flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-xs">
             <Pencil size={13} className="shrink-0 text-accent" />
             <span className="min-w-0 flex-1 truncate text-muted">
-              Editing: <span className="text-foreground">{editing.body}</span>
+              {editing.kind === "album" ? "Editing caption" : <>Editing: <span className="text-foreground">{editing.body}</span></>}
             </span>
             <button onClick={() => { setEditing(null); setText(""); }} className="text-faint hover:text-muted"><X size={14} /></button>
           </div>
@@ -2218,8 +2254,8 @@ export function RealChatView({
                 onSelect={(e) => setDmCursor((e.target as HTMLInputElement).selectionStart ?? 0)}
                 onBlur={() => setTimeout(resetPicker, 150)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (albumDraft.length > 1 ? sendAlbum() : send())}
-                placeholder={albumDraft.length > 1 ? "Add a caption…" : "Message…"}
-                maxLength={albumDraft.length > 1 ? ALBUM_CAPTION_MAX : undefined}
+                placeholder={albumDraft.length > 1 || editing?.kind === "album" ? "Add a caption…" : "Message…"}
+                maxLength={albumDraft.length > 1 || editing?.kind === "album" ? ALBUM_CAPTION_MAX : undefined}
                 className="h-11 w-full rounded-2xl bg-surface px-4 text-sm outline-none placeholder:text-faint focus:border-white/25"
               />
               <SuggestionDropdown suggestions={pickerSuggestions} onSelect={(s) => {
@@ -2231,7 +2267,7 @@ export function RealChatView({
             </div>
 
             {/* GIF toggle — only when no text and no attachment */}
-            {!text.trim() && !attachment && albumDraft.length < 2 && (
+            {!text.trim() && !attachment && albumDraft.length < 2 && !editing && (
               <button
                 type="button"
                 onClick={() => setGifPickerOpen((v) => !v)}
@@ -2247,7 +2283,7 @@ export function RealChatView({
             )}
 
             {/* Mic — only when no text and no attachment */}
-            {!text.trim() && !attachment && albumDraft.length < 2 && (
+            {!text.trim() && !attachment && albumDraft.length < 2 && !editing && (
               <button
                 type="button"
                 onClick={() => { setGifPickerOpen(false); setVoiceMode(true); }}
@@ -2259,12 +2295,12 @@ export function RealChatView({
             )}
 
             {/* Send — text (takes priority) or attachment */}
-            {(text.trim() || attachment || albumDraft.length > 1) && (
+            {(text.trim() || attachment || albumDraft.length > 1 || editing) && (
               <button
                 type="button"
-                onClick={albumDraft.length > 1 ? sendAlbum : text.trim() ? send : sendAttachment}
+                onClick={editing ? send : albumDraft.length > 1 ? sendAlbum : text.trim() ? send : sendAttachment}
                 disabled={sending || uploading}
-                aria-label="Send"
+                aria-label={editing ? "Save changes" : "Send"}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"
               >
                 {uploading ? (
@@ -2275,7 +2311,7 @@ export function RealChatView({
                     ))}
                   </span>
                 ) : (
-                  <Plane size={18} weight="fill" />
+                  editing ? <Check size={20} strokeWidth={2.75} /> : <Plane size={18} weight="fill" />
                 )}
               </button>
             )}
@@ -2343,9 +2379,12 @@ export function RealChatView({
                   {!menu.msg.is_unsent && (
                     <CtxItem icon={<Plane size={17} weight="bold" />} label="Forward" onClick={() => { setForwardMsg(menu.msg); setMenu(null); }} />
                   )}
-                  {menu.msg.body && <CtxItem icon={<Copy size={17} />} label="Copy" onClick={() => { copy(menu.msg); setMenu(null); }} />}
+                  {menu.msg.body && menu.msg.kind !== "album" && <CtxItem icon={<Copy size={17} />} label="Copy" onClick={() => { copy(menu.msg); setMenu(null); }} />}
                   {menu.msg.sender_id === currentUserId && menu.msg.kind === "text" && !menu.msg.is_unsent && (
                     <CtxItem icon={<Pencil size={17} />} label="Edit" onClick={() => { startEdit(menu.msg); setMenu(null); }} />
+                  )}
+                  {menu.msg.sender_id === currentUserId && menu.msg.kind === "album" && !menu.msg.is_unsent && !menu.msg.id.startsWith("temp-") && (
+                    <CtxItem icon={<Pencil size={17} />} label="Edit caption" onClick={() => { startEdit(menu.msg); setMenu(null); }} />
                   )}
                   {mine ? (
                     <CtxItem danger icon={<Trash2 size={17} />} label="Unsend" onClick={() => { unsend(menu.msg); setMenu(null); }} />

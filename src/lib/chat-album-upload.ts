@@ -10,6 +10,12 @@ import type { AlbumItem } from "@/lib/chat-album";
  * once over mobile data is what left folders stuck on the sending dots, one
  * or two photos arriving a minute apart. Two go up at a time, each with a
  * time limit, so a folder always ends — sent, or failed with Retry.
+ *
+ * Every file is read into memory before it goes. Android's WebView streams a
+ * picked File from its content provider at upload time, and for some gallery
+ * files that read fails: the request's preflight goes out and the upload
+ * itself never does, every time, Retry included. Bytes already in memory
+ * don't depend on the provider any more.
  */
 
 /** Long edge a chat photo is shrunk to. Full screen on a phone, no more. */
@@ -25,6 +31,17 @@ type Bucket = {
   upload: (path: string, body: Blob, opts: { contentType: string }) => Promise<{ error: unknown }>;
   getPublicUrl: (path: string) => { data: { publicUrl: string } };
 };
+
+/** The file's bytes, now. FileReader where Blob.arrayBuffer is missing. */
+function readBytes(blob: Blob): Promise<ArrayBuffer> {
+  if (typeof blob.arrayBuffer === "function") return blob.arrayBuffer();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+}
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | "timeout"> {
   return new Promise((resolve, reject) => {
@@ -53,9 +70,10 @@ export async function uploadAlbumFiles(
   async function one(entry: AlbumFile, i: number) {
     if (entry.url) return;
     try {
-      const body =
+      const picked =
         entry.type === "image" ? await shrinkForComment(entry.file, ALBUM_PHOTO_MAX_EDGE) : entry.file;
-      const contentType = body.type || entry.file.type;
+      const contentType = picked.type || entry.file.type;
+      const body = new Blob([await readBytes(picked)], { type: contentType });
       const ext =
         entry.type === "video"
           ? entry.file.name.split(".").pop() || "mp4"

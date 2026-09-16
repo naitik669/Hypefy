@@ -141,5 +141,42 @@ describe("sending a folder", () => {
     expect(host.querySelector('[aria-label="Sending"]')).toBeNull();
     // Still drawn from the device, so nothing reloads.
     expect(host.querySelector("[data-media-folder] img")!.getAttribute("src")).toMatch(/^blob:/);
+
+    // Hold it: Edit caption puts the caption in the composer, with a caret
+    // on the folder, and Send becomes a tick that saves.
+    await act(async () => {
+      host.querySelector("[data-media-folder]")!.parentElement!
+        .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    });
+    const edit = [...document.querySelectorAll("button")].find((b) => b.textContent === "Edit caption")!;
+    expect(edit).toBeTruthy();
+    await act(async () => edit.click());
+
+    const composer = host.querySelector('input[placeholder="Add a caption…"]') as HTMLInputElement;
+    expect(composer).toBeTruthy();
+    expect(host.querySelector("[data-folder-caption] .animate-caret")).toBeTruthy();
+    const save = host.querySelector('[aria-label="Save changes"]') as HTMLButtonElement;
+    expect(save).toBeTruthy();
+    expect(host.querySelector('[aria-label="Record voice note"]')).toBeNull();
+
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      set.call(composer, "Golden hour");
+      composer.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(host.querySelector("[data-folder-caption]")!.textContent).toBe("Golden hour");
+
+    rpc.mockImplementation(async (fn: string, args: { p_caption: string }) =>
+      fn === "edit_album_caption"
+        ? { data: JSON.stringify({ caption: args.p_caption, items: [{ url: "https://cdn/x", type: "image" }] }), error: null }
+        : { data: null, error: null },
+    );
+    await act(async () => (host.querySelector('[aria-label="Save changes"]') as HTMLButtonElement).click());
+    const edited = rpc.mock.calls.find(([fn]) => fn === "edit_album_caption")!;
+    expect(edited[1]).toMatchObject({ p_message_id: "m1", p_caption: "Golden hour" });
+    expect(host.querySelector("[data-folder-caption]")!.textContent).toBe("Golden hour");
+    expect(host.querySelector(".animate-caret")).toBeNull();
+    // Photos still from the device after the edit.
+    expect(host.querySelector("[data-media-folder] img")!.getAttribute("src")).toMatch(/^blob:/);
   });
 });
