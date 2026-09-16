@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
@@ -23,7 +23,19 @@ export type HoldAction = {
   /** Ignored when `avatar` is set. One of the two is required. */
   icon?: IconType;
   label: string;
-  href: string;
+  /** Where choosing this goes. Omitted when `onSelect` does the work. */
+  href?: string;
+  /**
+   * Chosen without going anywhere — sending a post to someone, say.
+   *
+   * Takes precedence over `href`. It exists because the same hold-and-slide
+   * is worth having outside the nav bar: the share button uses this menu so
+   * that holding it behaves exactly like holding a tab, rather than being a
+   * second gesture that looks similar and works differently.
+   */
+  onSelect?: () => void;
+  /** Distinguishes two options that share a label and have no href. */
+  key?: string;
   /**
    * Renders a person in the tile instead of a glyph.
    *
@@ -78,6 +90,7 @@ export function NavHoldMenu({
   actions,
   label,
   layout = "stack",
+  touchAction = "none",
   onArm,
   children,
 }: {
@@ -94,6 +107,17 @@ export function NavHoldMenu({
    * component would have re-earned the same bugs.
    */
   layout?: "stack" | "arc";
+  /**
+   * What the browser may do with a touch that starts on the trigger.
+   *
+   * "none" is right for the nav bar, which never scrolls: it is read at
+   * touchstart, so it cannot be switched on once the hold completes — by then
+   * the browser has reserved the gesture for panning. A trigger inside the
+   * feed cannot take that: it would leave a strip of the page that does not
+   * scroll. Those pass "pan-y" and the menu blocks scrolling itself, but only
+   * while it is open (see the effect below).
+   */
+  touchAction?: "none" | "pan-y";
   /** Names the stack for assistive tech, e.g. "Home shortcuts". */
   label: string;
   /**
@@ -120,6 +144,15 @@ export function NavHoldMenu({
    * nothing.
    */
   const [labelSide, setLabelSide] = useState<"left" | "right">("right");
+  /**
+   * Which way the stack unfurls.
+   *
+   * Up, unless there is not enough room above the trigger — a share button
+   * halfway up the feed has the whole column hanging off the top of the
+   * screen. Measured when the hold completes, because it depends on where
+   * the page has been scrolled to.
+   */
+  const [openDir, setOpenDir] = useState<"up" | "down">("up");
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startY = useRef(0);
@@ -128,13 +161,27 @@ export function NavHoldMenu({
   const didHold = useRef(false);
   const stackRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * The current options, readable from inside the hold timer.
+   *
+   * That timer is created when the tab is touched and fires a third of a
+   * second later, so the `actions` it closes over are the ones from before
+   * onArm fetched anything — which is why a menu whose contents are loaded on
+   * demand never opened on the FIRST hold, only on the second, once a
+   * previous press had already left them in state.
+   */
+  const actionsRef = useRef(actions);
+  useLayoutEffect(() => {
+    actionsRef.current = actions;
+  }, [actions]);
 
   // Bottom-of-column is nearest the thumb, so a stack's visual order is the
   // reverse of the caller's priority order. An arc has no near end — every
   // tile is one flick away — so it reads left to right instead. Everything
   // below (hit-testing, the stagger, commit) indexes into THIS list, so they
   // cannot disagree.
-  const ordered = layout === "arc" ? actions : [...actions].reverse();
+  const ordered =
+    layout === "arc" || openDir === "down" ? actions : [...actions].reverse();
 
   /**
    * Where each arc tile sits, relative to the trigger's centre.
@@ -174,6 +221,22 @@ export function NavHoldMenu({
   }, []);
 
   useEffect(() => clearHold, [clearHold]);
+
+  /**
+   * Hold the page still while the stack is up.
+   *
+   * Only for triggers that let the page scroll at rest: with touch-action
+   * "pan-y" the browser would take the upward slide as a scroll and cancel
+   * the pointer mid-choice. The listener has to be non-passive, which React's
+   * own onTouchMove is not, so it is attached by hand — and only while open,
+   * so nothing else on the page is affected.
+   */
+  useEffect(() => {
+    if (!open || touchAction === "none") return;
+    const stop = (e: TouchEvent) => e.preventDefault();
+    document.addEventListener("touchmove", stop, { passive: false });
+    return () => document.removeEventListener("touchmove", stop);
+  }, [open, touchAction]);
 
   // Escape and the Android back button both dismiss before doing anything else.
   useEffect(() => {
@@ -232,12 +295,18 @@ export function NavHoldMenu({
     return null;
   }
 
+  /** Do whatever this option is: send it somewhere, or go somewhere. */
+  function run(action: HoldAction) {
+    haptics.tap();
+    if (action.onSelect) action.onSelect();
+    else if (action.href) router.push(action.href);
+  }
+
   /** Close, and act on the row the thumb was resting on. null just closes. */
   function commit(idx: number | null) {
     close();
     if (idx === null) return;
-    haptics.tap();
-    router.push(ordered[idx].href);
+    run(ordered[idx]);
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -254,13 +323,17 @@ export function NavHoldMenu({
       // Nothing to raise — let the press behave like a plain tap rather than
       // flashing up an empty panel. The chat stack loads asynchronously, so
       // this is a real state, not a defensive nicety.
-      if (actions.length === 0) return;
+      const ready = actionsRef.current;
+      if (ready.length === 0) return;
       didHold.current = true;
       const box = triggerRef.current?.getBoundingClientRect();
       if (box) {
         setLabelSide(
           box.left + box.width / 2 < window.innerWidth / 2 ? "right" : "left"
         );
+        // 48px tile + 12px gap each, and a little air above the last one.
+        const needed = ready.length * 60 + 24;
+        setOpenDir(box.top < needed ? "down" : "up");
       }
       setOpen(true);
       setActiveIdx(null);
@@ -339,7 +412,11 @@ export function NavHoldMenu({
                   // placed from there, so the fan is symmetric about the
                   // button no matter how wide the bar is.
                   "absolute left-1/2 top-1/2 z-50 h-0 w-0"
-                : "absolute bottom-[calc(100%+14px)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3"
+                : `absolute left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3 ${
+                    openDir === "down"
+                      ? "top-[calc(100%+14px)]"
+                      : "bottom-[calc(100%+14px)]"
+                  }`
             }
             role="listbox"
             aria-label={label}
@@ -354,7 +431,7 @@ export function NavHoldMenu({
               const Icon = action.icon;
               return (
                 <div
-                  key={action.href}
+                  key={action.key ?? action.href ?? action.label}
                   role="option"
                   aria-selected={active}
                   onPointerEnter={detached ? () => setActiveIdx(i) : undefined}
@@ -364,7 +441,7 @@ export function NavHoldMenu({
                           e.preventDefault();
                           e.stopPropagation();
                           close();
-                          router.push(action.href);
+                          run(action);
                         }
                       : undefined
                   }
@@ -596,7 +673,7 @@ export function NavHoldMenu({
         // A long-press on a link or image also raises the WebView's own
         // callout, which cancels the pointer too; hence the rest.
         style={{
-          touchAction: "none",
+          touchAction,
           userSelect: "none",
           WebkitUserSelect: "none",
           WebkitTouchCallout: "none",
