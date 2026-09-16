@@ -121,7 +121,9 @@ export function everyoneHasRead(readers: Reader[], createdAt: string): boolean {
   return counted.every((r) => !!r.lastReadAt && createdAt <= r.lastReadAt);
 }
 
-/** Short human snippet for quoting a message — never a raw URL. */
+/** Width of a photo or video in the thread. */
+const MEDIA_W = 280;
+
 /** A folder as drawn: the photos from this device while it has them, so they
  *  never reload, and the caption as it now stands, which an edit may change. */
 function albumOf(m: ChatMsg): Album | null {
@@ -131,6 +133,7 @@ function albumOf(m: ChatMsg): Album | null {
   return { ...shown, caption: current?.caption ?? shown.caption };
 }
 
+/** Short human snippet for quoting a message — never a raw URL. */
 function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null }): string {
   if (m.is_unsent) return "Unsent message";
   switch (m.kind) {
@@ -1833,7 +1836,7 @@ export function RealChatView({
                           onPointerLeave={onPressEnd}
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
                           className="relative overflow-hidden rounded-2xl"
-                          style={{ maxWidth: 240 }}
+                          style={{ width: m.kind === "image" ? MEDIA_W : undefined, maxWidth: MEDIA_W }}
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={m.body} alt={m.kind === "gif" ? "GIF" : ""} className="w-full rounded-2xl object-cover" />
@@ -1885,7 +1888,7 @@ export function RealChatView({
                           onPointerLeave={onPressEnd}
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
                           className="relative overflow-hidden rounded-2xl bg-black"
-                          style={{ maxWidth: 240 }}
+                          style={{ width: MEDIA_W, maxWidth: "100%" }}
                         >
                           <video src={m.body} className="w-full rounded-2xl" controls playsInline preload="metadata" />
                           <span className="absolute bottom-1.5 right-2 flex items-center gap-[3px] rounded-full bg-black/60 px-1.5 py-[3px] backdrop-blur-sm">

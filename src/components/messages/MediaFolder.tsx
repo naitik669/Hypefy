@@ -17,23 +17,44 @@ import { albumCount, type Album, type AlbumItem } from "@/lib/chat-album";
  * backdrop root, and the blur would then see nothing at all.
  */
 
-const W = 152;
-const H = 172;
-const GLASS_H = 64;
-/** Tab and body as one silhouette, so the blur follows the folder. */
-const GLASS_PATH =
-  "M0 12 Q0 0 12 0 H44 Q50 0 54 5 L58 10 Q60 13 65 13 H138 Q152 13 152 27 V50 Q152 64 138 64 H14 Q0 64 0 50 Z";
-const RIM_PATH =
-  "M0.5 12 Q0.5 0.5 12 0.5 H44 Q49.7 0.5 53.6 5.3 L57.6 10.3 Q59.7 13.5 65 13.5 H138 Q151.5 13.5 151.5 27 V50 Q151.5 63.5 138 63.5 H14 Q0.5 63.5 0.5 50 Z";
+/** The folder is drawn at this size; the numbers below are at 1x. */
+const SCALE = 1.3;
+const px = (n: number) => Math.round(n * SCALE * 10) / 10;
+const scalePath = (d: string) => d.replace(/-?\d+(\.\d+)?/g, (n) => String(px(Number(n))));
 
-const CARD_W = 82;
-const CARD_H = 128;
+const W = px(152);
+const H = px(172);
+const GLASS_H = px(64);
+/** Tab and body as one silhouette, so the blur follows the folder. */
+const GLASS_PATH = scalePath(
+  "M0 12 Q0 0 12 0 H44 Q50 0 54 5 L58 10 Q60 13 65 13 H138 Q152 13 152 27 V50 Q152 64 138 64 H14 Q0 64 0 50 Z",
+);
+const RIM_PATH = scalePath(
+  "M0.4 12 Q0.4 0.4 12 0.4 H44 Q49.7 0.4 53.6 5.3 L57.6 10.3 Q59.7 13.4 65 13.4 H138 Q151.6 13.4 151.6 27 V50 Q151.6 63.6 138 63.6 H14 Q0.4 63.6 0.4 50 Z",
+);
+
+const CARD_W = px(82);
+const CARD_H = px(128);
 /** Back to front: left offset, top offset, lean. */
 const DECK = [
-  { left: 6, top: 16, rotate: 2 },
-  { left: 24, top: 10, rotate: 7 },
-  { left: 42, top: 4, rotate: 12 },
+  { left: px(6), top: px(16), rotate: 2 },
+  { left: px(24), top: px(10), rotate: 7 },
+  { left: px(42), top: px(4), rotate: 12 },
 ];
+
+/** Frosted, not see-through: the photos behind only tint it. */
+const GLASS = {
+  received: {
+    fill: "linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0) 40%), rgba(34,34,34,0.82)",
+    rim: "rgba(255,255,255,0.12)",
+    text: "text-white",
+  },
+  sent: {
+    fill: "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 40%), rgba(163,230,53,0.9)",
+    rim: "rgba(236,252,203,0.55)",
+    text: "text-accent-ink",
+  },
+};
 
 function Thumb({ item }: { item: AlbumItem }) {
   return item.type === "video" ? (
@@ -60,6 +81,7 @@ export function MediaFolder({
   // The front card is the first item; the ones behind it follow.
   const deck = items.slice(0, 3).reverse();
   const hidden = items.length - deck.length;
+  const look = mine ? GLASS.sent : GLASS.received;
 
   return (
     <button
@@ -76,7 +98,7 @@ export function MediaFolder({
         return (
           <span
             key={`${item.url}-${i}`}
-            className="absolute overflow-hidden rounded-[12px] bg-surface shadow-[0_4px_14px_rgba(0,0,0,0.35)]"
+            className="absolute overflow-hidden rounded-[15px] bg-surface shadow-[0_4px_14px_rgba(0,0,0,0.35)]"
             style={{
               width: CARD_W,
               height: CARD_H,
@@ -90,8 +112,8 @@ export function MediaFolder({
             {front && hidden > 0 && (
               <span
                 data-more
-                className="absolute inset-x-0 top-0 grid place-items-center bg-black/35 text-lg font-semibold text-white"
-                style={{ height: H - GLASS_H - pos.top + 6 }}
+                className="absolute inset-x-0 top-0 grid place-items-center bg-black/35 text-2xl font-semibold text-white"
+                style={{ height: H - GLASS_H - pos.top + px(6) }}
               >
                 +{hidden}
               </span>
@@ -106,22 +128,22 @@ export function MediaFolder({
           className="absolute inset-0"
           style={{
             clipPath: `path("${GLASS_PATH}")`,
-            background: mine ? "rgba(163,230,53,0.3)" : "rgba(255,255,255,0.08)",
-            WebkitBackdropFilter: "blur(14px) saturate(160%)",
-            backdropFilter: "blur(14px) saturate(160%)",
+            background: look.fill,
+            WebkitBackdropFilter: "blur(18px) saturate(160%)",
+            backdropFilter: "blur(18px) saturate(160%)",
           }}
         />
         <svg className="pointer-events-none absolute inset-0 overflow-visible" viewBox={`0 0 ${W} ${GLASS_H}`} aria-hidden="true">
-          <path d={RIM_PATH} fill="none" strokeWidth={1} stroke={mine ? "rgba(217,249,157,0.35)" : "rgba(255,255,255,0.16)"} />
+          <path d={RIM_PATH} fill="none" strokeWidth={1} stroke={look.rim} />
         </svg>
         {(caption || editing) && (
           <span
             data-folder-caption
-            className="absolute inset-x-[11px] bottom-[9px] line-clamp-2 text-[12.5px] font-semibold leading-[1.2] text-white"
+            className={`absolute inset-x-[14px] bottom-[12px] line-clamp-2 text-[15px] font-semibold leading-[1.2] ${look.text}`}
           >
             {caption}
             {editing && (
-              <span aria-hidden="true" className="animate-caret ml-px inline-block h-[13px] w-[1.5px] translate-y-[2px] rounded-full bg-white" />
+              <span aria-hidden="true" className={`animate-caret ml-px inline-block h-[16px] w-[2px] translate-y-[3px] rounded-full ${mine ? "bg-accent-ink" : "bg-white"}`} />
             )}
           </span>
         )}

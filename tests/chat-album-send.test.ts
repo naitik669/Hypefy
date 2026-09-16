@@ -46,6 +46,8 @@ beforeEach(() => {
   URL.createObjectURL = vi.fn((f: Blob) => `blob:${(f as File).name}`);
   URL.revokeObjectURL = vi.fn();
   Element.prototype.scrollIntoView = vi.fn();
+  // jsdom can't decode photos; the upload then sends the file as picked.
+  vi.stubGlobal("Image", undefined);
   window.matchMedia ??= (() => ({ matches: false, addEventListener() {}, removeEventListener() {} })) as never;
   (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver ??= class {
     observe() {}
