@@ -6,7 +6,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Plane } from "@/components/ui/Plane";
 import { CameraCapture, type Captured } from "@/components/messages/CameraCapture";
 import { ALBUM_CAPTION_MAX, ALBUM_MAX_ITEMS, type AlbumItem } from "@/lib/chat-album";
-import { cameraPermission, cameraSupported, openCamera, stopStream } from "@/lib/camera";
+import { cameraLikelyAllowed, cameraSupported, openCamera, stopStream } from "@/lib/camera";
 
 /** Something you can send from the picker: a file from this device, or a
  *  photo already in the chat (which needs no upload). */
@@ -178,6 +178,11 @@ export function MediaPicker({
             <Images size={24} className="text-accent" />
             Gallery
           </button>
+          {entries.length === 0 && (
+            <p className="col-span-2 flex items-center px-4 text-[13px] leading-snug text-muted" data-picker-empty>
+              Photos and videos shared in this chat show up here. Tap Gallery for the rest of your phone.
+            </p>
+          )}
           {entries.map((e) => {
             const at = selected.indexOf(e.key);
             return (
@@ -212,11 +217,6 @@ export function MediaPicker({
             );
           })}
         </div>
-        {entries.length === 0 && (
-          <p className="px-2 pb-4 pt-5 text-center text-[13px] leading-snug text-muted">
-            Photos you share here show up in this grid. Tap Gallery for the rest of your phone.
-          </p>
-        )}
         <input
           ref={galleryRef}
           type="file"
@@ -237,8 +237,9 @@ export function MediaPicker({
 }
 
 /**
- * The top-left tile. Live once the camera is allowed; before that a plain
- * camera, so opening the sheet never pops a permission prompt on its own.
+ * The top-left tile. Live once the camera has been allowed (see
+ * cameraLikelyAllowed); before that a plain camera, so opening the sheet
+ * never pops a permission prompt on its own.
  */
 function LiveTile({ active, onOpen }: { active: boolean; onOpen: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -249,7 +250,7 @@ function LiveTile({ active, onOpen }: { active: boolean; onOpen: () => void }) {
     let stream: MediaStream | null = null;
     let cancelled = false;
     (async () => {
-      if ((await cameraPermission()) !== "granted" || cancelled) return;
+      if (!(await cameraLikelyAllowed()) || cancelled) return;
       try {
         stream = await openCamera("environment", false);
         if (cancelled) return stopStream(stream);

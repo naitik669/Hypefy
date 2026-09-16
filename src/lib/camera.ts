@@ -30,9 +30,47 @@ export async function cameraPermission(): Promise<"granted" | "denied" | "prompt
   }
 }
 
+const ALLOWED_KEY = "hypefy:camera-allowed";
+
+function remember(allowed: boolean) {
+  try {
+    localStorage.setItem(ALLOWED_KEY, allowed ? "1" : "0");
+  } catch {
+    /* private mode: the tile just stays a plain camera */
+  }
+}
+
+/**
+ * Whether opening the camera now would go straight to a picture, without a
+ * prompt. The Permissions API answers that in a browser, but Android's
+ * WebView always says "prompt" for the camera even once the app holds the
+ * permission, so there it falls back to whether the camera opened last time.
+ */
+export async function cameraLikelyAllowed(): Promise<boolean> {
+  const state = await cameraPermission();
+  if (state === "granted") return true;
+  if (state === "denied") return false;
+  try {
+    return localStorage.getItem(ALLOWED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 /** Open the camera, with the microphone when asked for and allowed. A refused
  *  microphone still gives a camera, so photos keep working. */
 export async function openCamera(facing: Facing, withAudio: boolean): Promise<MediaStream> {
+  try {
+    const stream = await requestCamera(facing, withAudio);
+    remember(true);
+    return stream;
+  } catch (e) {
+    if ((e as DOMException)?.name === "NotAllowedError") remember(false);
+    throw e;
+  }
+}
+
+async function requestCamera(facing: Facing, withAudio: boolean): Promise<MediaStream> {
   const video: MediaTrackConstraints = {
     facingMode: facing,
     width: { ideal: 1920 },
