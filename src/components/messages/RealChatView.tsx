@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check } from "lucide-react";
+import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Image as ImageIcon } from "lucide-react";
 import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
@@ -38,7 +38,7 @@ import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { DisplayName } from "@/components/ui/DisplayName";
 import { visibleDecoration } from "@/lib/cosmetics";
 import { MediaFolder, AlbumViewer } from "@/components/messages/MediaFolder";
-import { MediaPicker, type PickEntry } from "@/components/messages/MediaPicker";
+import { MediaPicker, type MediaPickerApi, type PickEntry } from "@/components/messages/MediaPicker";
 import {
   ALBUM_CAPTION_MAX,
   albumSnippet,
@@ -182,6 +182,27 @@ const DOC_MIMES = [
 /** Extensions too — some platforms' file pickers match on those, not mime. */
 const DOC_ACCEPT = `${DOC_MIMES.join(",")},.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip`;
 
+/** The paperclip's hold menu, in priority order. A tap opens the picker
+ *  sheet; holding offers each kind directly.
+ *
+ *  Labels only — no descriptions. Every label already says what it does,
+ *  and the one row that genuinely needs a caveat (View once) gets it at
+ *  the point of sending, in the composer preview. */
+const ATTACH_OPTIONS: {
+  mode: "camera" | "media" | "oneshot" | "document" | "gif";
+  icon: React.ReactNode;
+  label: string;
+}[] = [
+  { mode: "camera", icon: <Camera size={16} />, label: "Camera" },
+  { mode: "media", icon: <ImageIcon size={16} />, label: "Photo or video" },
+  { mode: "oneshot", icon: <Eye size={16} />, label: "View once" },
+  { mode: "document", icon: <FileText size={16} />, label: "Document" },
+  { mode: "gif", icon: <span className="text-[9px] font-black tracking-wider">GIF</span>, label: "GIF" },
+];
+
+/** How long the paperclip is held before its menu opens instead. */
+const ATTACH_HOLD_MS = 400;
+
 /** "2.4 MB" / "812 KB" — for document bubbles. */
 function fileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -321,6 +342,10 @@ export function RealChatView({
   // the file against that intent, since one hidden <input> serves all three.
   // The paperclip's sheet: camera, this chat's photos, your gallery.
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [attachMenu, setAttachMenu] = useState(false);
+  const pickerApi = useRef<MediaPickerApi>(null);
+  const mediaInputRef = useRef<HTMLInputElement>(null);
+  const attachHold = useRef<{ timer: ReturnType<typeof setTimeout> | null; opened: boolean }>({ timer: null, opened: false });
   const [albumView, setAlbumView] = useState<{ album: Album; start: number; senderId: string; at: string } | null>(null);
   // A sending folder's files, by its temp id, kept until they are uploaded so
   // a failed upload can be retried.
@@ -1268,6 +1293,11 @@ export function RealChatView({
   }
 
   /** Open the OS picker for one of the sheet's options. */
+  function cancelAttachHold() {
+    const h = attachHold.current;
+    if (h.timer) { clearTimeout(h.timer); h.timer = null; }
+  }
+
   function openPicker(mode: "oneshot" | "document") {
     pickMode.current = mode;
     const input = fileInputRef.current;
@@ -2117,21 +2147,86 @@ export function RealChatView({
           /* ── Text / GIF / attachment composer ── */
           <div className="flex items-center gap-1.5">
 
-            {/* Attachment button — opens the picker sheet: camera, this
-                chat's photos, the gallery, and tabs for files, GIFs and
-                View once. */}
-            <button
-              type="button"
-              onClick={() => { setGifPickerOpen(false); setPickerOpen(true); }}
-              aria-label="Attach"
-              aria-haspopup="dialog"
-              aria-expanded={pickerOpen}
-              className={`flex h-11 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-90 ${
-                pickerOpen || attachment ? "text-accent" : "text-muted hover:bg-surface hover:text-foreground"
-              }`}
-            >
-              <Paperclip size={19} />
-            </button>
+            {/* Attachment button. A tap opens the picker sheet (camera, this
+                chat's photos, the gallery); holding it, or a right-click,
+                opens the quick menu of each kind instead. relative, so the
+                menu anchors to the clip itself. */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onPointerDown={() => {
+                  const h = attachHold.current;
+                  h.opened = false;
+                  if (h.timer) clearTimeout(h.timer);
+                  h.timer = setTimeout(() => {
+                    h.opened = true;
+                    h.timer = null;
+                    haptics.tap();
+                    setGifPickerOpen(false);
+                    setAttachMenu(true);
+                  }, ATTACH_HOLD_MS);
+                }}
+                onPointerUp={cancelAttachHold}
+                onPointerLeave={cancelAttachHold}
+                onPointerCancel={cancelAttachHold}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  attachHold.current.opened = true;
+                  setAttachMenu(true);
+                }}
+                onClick={() => {
+                  // The press that opened the menu doesn't also open the sheet.
+                  if (attachHold.current.opened) { attachHold.current.opened = false; return; }
+                  setGifPickerOpen(false);
+                  if (attachMenu) { setAttachMenu(false); return; }
+                  setPickerOpen(true);
+                }}
+                aria-label="Attach"
+                aria-haspopup="dialog"
+                aria-expanded={pickerOpen || attachMenu}
+                className={`flex h-11 w-10 select-none items-center justify-center rounded-full transition active:scale-90 ${
+                  pickerOpen || attachMenu || attachment ? "text-accent" : "text-muted hover:bg-surface hover:text-foreground"
+                }`}
+                style={{ WebkitTouchCallout: "none" }}
+              >
+                <Paperclip size={19} className={`transition-transform duration-200 ${attachMenu ? "rotate-45" : ""}`} />
+              </button>
+
+              <FloatingMenu
+                open={attachMenu}
+                onClose={() => setAttachMenu(false)}
+                origin="bottom-left"
+                exitMs={130}
+                bare
+                className="absolute bottom-[calc(100%+10px)] left-0 flex w-[190px] flex-col gap-1.5"
+              >
+                {ATTACH_OPTIONS.map((o, i) => (
+                  <button
+                    key={o.label}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setAttachMenu(false);
+                      if (o.mode === "gif") setGifPickerOpen(true);
+                      else if (o.mode === "camera") pickerApi.current?.openCamera();
+                      else if (o.mode === "media") mediaInputRef.current?.click();
+                      else openPicker(o.mode);
+                    }}
+                    // Staggered bottom-up: the tile nearest the clip appears
+                    // first, so the stack reads as rising out of the button.
+                    style={{ animationDelay: `${(ATTACH_OPTIONS.length - 1 - i) * 45}ms` }}
+                    className="attach-tile animate-row-in group flex items-stretch overflow-hidden rounded-xl border border-border bg-elevated text-left shadow-[0_6px_16px_rgba(0,0,0,0.4)] transition-colors hover:bg-border"
+                  >
+                    <span className="flex w-9 shrink-0 items-center justify-center border-r border-white/[0.08] text-muted transition-colors group-hover:text-accent">
+                      {o.icon}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate px-2.5 py-[9px] text-[13px] font-medium text-foreground">
+                      {o.label}
+                    </span>
+                  </button>
+                ))}
+              </FloatingMenu>
+            </div>
 
             {/* Text input */}
             <div className="relative flex-1">
@@ -2226,6 +2321,24 @@ export function RealChatView({
         onGif={() => setGifPickerOpen(true)}
         onViewOnce={() => openPicker("oneshot")}
         onRejected={(msg) => showToast(msg)}
+        apiRef={pickerApi}
+      />
+      {/* Photo or video from the hold menu: several at once, then the
+          picker opens with them picked, for a caption and Send. */}
+      <input
+        ref={mediaInputRef}
+        type="file"
+        accept="image/*,video/*"
+        multiple
+        className="hidden"
+        data-attach-media-input
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])];
+          e.target.value = "";
+          if (!files.length) return;
+          pickerApi.current?.addFiles(files);
+          setPickerOpen(true);
+        }}
       />
 
       {albumView && (

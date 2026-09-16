@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Camera, Eye, FileText, Images } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Plane } from "@/components/ui/Plane";
 import { CameraCapture, type Captured } from "@/components/messages/CameraCapture";
 import { ALBUM_CAPTION_MAX, ALBUM_MAX_ITEMS, type AlbumItem } from "@/lib/chat-album";
 import { cameraLikelyAllowed, cameraSupported, openCamera, stopStream } from "@/lib/camera";
+
+/** What the chat can ask of the picker from outside it: the paperclip's
+ *  hold menu opens the camera directly, or adds gallery picks. */
+export type MediaPickerApi = { addFiles: (files: File[]) => void; openCamera: () => void };
 
 /** Something you can send from the picker: a file from this device, or a
  *  photo already in the chat (which needs no upload). */
@@ -40,6 +44,7 @@ export function MediaPicker({
   onGif,
   onViewOnce,
   onRejected,
+  apiRef,
 }: {
   open: boolean;
   onClose: () => void;
@@ -51,6 +56,7 @@ export function MediaPicker({
   onViewOnce: () => void;
   /** Some picked files couldn't be added; says why. */
   onRejected: (message: string) => void;
+  apiRef?: React.Ref<MediaPickerApi>;
 }) {
   const [picked, setPicked] = useState<PickEntry[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -115,6 +121,8 @@ export function MediaPicker({
     setCamera(false);
     finish([{ key: `cam-${Date.now()}`, type: shot.type, preview: shot.preview, file: shot.file }], text);
   }
+
+  useImperativeHandle(apiRef, () => ({ addFiles, openCamera: () => setCamera(true) }));
 
   const count = selected.length;
 

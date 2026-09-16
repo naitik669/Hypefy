@@ -180,3 +180,51 @@ describe("sending a folder", () => {
     expect(host.querySelector("[data-media-folder] img")!.getAttribute("src")).toMatch(/^blob:/);
   });
 });
+
+describe("the paperclip", () => {
+  async function renderChat() {
+    const { RealChatView } = await import("@/components/messages/RealChatView");
+    await act(async () =>
+      root.render(
+        createElement(RealChatView, {
+          conversationId: "c1",
+          currentUserId: "me",
+          other: { id: "u2", name: "Maya", username: "maya", hue: 120 },
+          initialMessages: [],
+        }),
+      ),
+    );
+    return host.querySelector('[aria-label="Attach"]') as HTMLButtonElement;
+  }
+  const press = (el: Element, type: string) =>
+    el.dispatchEvent(Object.assign(new MouseEvent(type, { bubbles: true }), { pointerId: 1 }));
+
+  it("opens the picker on a tap", async () => {
+    const clip = await renderChat();
+    await act(async () => { press(clip, "pointerdown"); press(clip, "pointerup"); clip.click(); });
+    expect(document.querySelector("[data-picker-grid]")).toBeTruthy();
+    expect(document.querySelector('[role="menuitem"]')).toBeNull();
+  });
+
+  it("opens the quick menu when held, and the release doesn't open the picker too", async () => {
+    const clip = await renderChat();
+    await act(async () => { press(clip, "pointerdown"); await new Promise((r) => setTimeout(r, 450)); });
+    await act(async () => { press(clip, "pointerup"); clip.click(); });
+    const items = [...document.querySelectorAll('[role="menuitem"]')].map((b) => b.lastElementChild?.textContent);
+    expect(items).toEqual(["Camera", "Photo or video", "View once", "Document", "GIF"]);
+    expect(document.querySelector("[data-picker-grid]")).toBeNull();
+  });
+
+  it("Photo or video from the menu lands in the picker, already picked", async () => {
+    const clip = await renderChat();
+    await act(async () => { clip.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })); });
+    const input = host.querySelector("[data-attach-media-input]") as HTMLInputElement;
+    const click = vi.spyOn(input, "click").mockImplementation(() => {});
+    await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find((b) => b.lastElementChild?.textContent === "Photo or video") as HTMLElement).click());
+    expect(click).toHaveBeenCalled();
+    Object.defineProperty(input, "files", { value: [new File(["a"], "a.jpg", { type: "image/jpeg" }), new File(["b"], "b.jpg", { type: "image/jpeg" })], configurable: true });
+    await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+    expect(document.querySelectorAll('[data-picker-grid] [aria-pressed="true"]')).toHaveLength(2);
+    expect(document.querySelector('[aria-label="Send 2"]')).toBeTruthy();
+  });
+});
