@@ -8,42 +8,61 @@ import { albumCount, type Album, type AlbumItem } from "@/lib/chat-album";
 
 /**
  * Photos and videos sent together, drawn as a folder: a deck of up to three
- * in its left corner, each leaning a little further right, and a frosted
- * glass front carrying the caption. Grey glass when received, lime when sent.
+ * standing up out of its left corner, each leaning a little further right,
+ * and a low frosted glass front carrying the caption. The tab carries the
+ * count. Grey glass when received, lime glass when sent.
  *
- * The photos run down BEHIND the glass so its blur has colour to pick up.
+ * The photos dip BEHIND the glass so its blur has colour to pick up.
  * Nothing above the glass may carry filter, opacity or a mask — each makes a
  * backdrop root, and the blur would then see nothing at all.
  */
 
-const W = 156;
-const H = 162;
-const GLASS_H = 80;
+const W = 152;
+const H = 172;
+const GLASS_H = 64;
 /** Tab and body as one silhouette, so blur and tint follow the folder. */
 const GLASS_PATH =
-  "M0 12 Q0 0 12 0 H48 Q54 0 58 5 L62 11 Q64 14 69 14 H140 Q156 14 156 30 V64 Q156 80 140 80 H16 Q0 80 0 64 Z";
+  "M0 12 Q0 0 12 0 H44 Q50 0 54 5 L58 10 Q60 13 65 13 H138 Q152 13 152 27 V50 Q152 64 138 64 H14 Q0 64 0 50 Z";
 const RIM_PATH =
-  "M0.5 12 Q0.5 0.5 12 0.5 H48 Q53.6 0.5 57.6 5.3 L61.6 11.3 Q63.7 14.5 69 14.5 H140 Q155.5 14.5 155.5 30 V64 Q155.5 79.5 140 79.5 H16 Q0.5 79.5 0.5 64 Z";
+  "M0.5 12 Q0.5 0.5 12 0.5 H44 Q49.7 0.5 53.6 5.3 L57.6 10.3 Q59.7 13.5 65 13.5 H138 Q151.5 13.5 151.5 27 V50 Q151.5 63.5 138 63.5 H14 Q0.5 63.5 0.5 50 Z";
 
+const CARD_W = 82;
+const CARD_H = 128;
 /** Back to front: left offset, top offset, lean. */
 const DECK = [
-  { left: 7, top: 12, rotate: 3 },
-  { left: 16, top: 9, rotate: 9 },
-  { left: 26, top: 5, rotate: 15 },
+  { left: 6, top: 16, rotate: 2 },
+  { left: 24, top: 10, rotate: 7 },
+  { left: 42, top: 4, rotate: 12 },
 ];
 
-function Thumb({ item }: { item: AlbumItem }) {
+const GLASS = {
+  received: {
+    fill: "linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.02) 55%), rgba(38,38,38,0.4)",
+    rim: "rgba(255,255,255,0.32)",
+  },
+  sent: {
+    fill: "linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.02) 55%), rgba(163,230,53,0.52)",
+    rim: "rgba(217,249,157,0.7)",
+  },
+};
+
+function Thumb({ item, blurred }: { item: AlbumItem; blurred?: boolean }) {
+  // Blurred behind "+N": scaled up a touch so the soft edge stays inside.
+  const cls = `h-full w-full object-cover ${blurred ? "scale-110 blur-[5px]" : ""}`;
   return item.type === "video" ? (
-    <video
-      src={`${item.url}#t=0.1`}
-      muted
-      playsInline
-      preload="metadata"
-      className="pointer-events-none h-full w-full object-cover"
-    />
+    <video src={`${item.url}#t=0.1`} muted playsInline preload="metadata" className={`pointer-events-none ${cls}`} />
   ) : (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={item.url} alt="" loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover" />
+    <img src={item.url} alt="" loading="lazy" decoding="async" draggable={false} className={cls} />
+  );
+}
+
+function StackGlyph() {
+  return (
+    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round" aria-hidden="true">
+      <rect x="7" y="3" width="14" height="14" rx="3" />
+      <path d="M3 8v10a3 3 0 0 0 3 3h10" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -61,6 +80,7 @@ export function MediaFolder({
   const deck = items.slice(0, 3).reverse();
   const hidden = items.length - deck.length;
   const count = albumCount(items);
+  const look = mine ? GLASS.sent : GLASS.received;
 
   return (
     <button
@@ -74,26 +94,31 @@ export function MediaFolder({
       {deck.map((item, i) => {
         const pos = DECK[i + (3 - deck.length)];
         const front = i === deck.length - 1;
+        const more = front && hidden > 0;
         return (
           <span
             key={`${item.url}-${i}`}
-            className="absolute overflow-hidden rounded-[13px] bg-surface shadow-[0_8px_18px_rgba(0,0,0,0.45),0_0_0_1px_rgba(255,255,255,0.07)]"
+            className="absolute overflow-hidden rounded-[12px] bg-surface shadow-[0_6px_16px_rgba(0,0,0,0.4)] ring-1 ring-inset ring-white/10"
             style={{
-              width: 84,
-              height: 124,
+              width: CARD_W,
+              height: CARD_H,
               left: pos.left,
               top: pos.top,
               transform: `rotate(${pos.rotate}deg)`,
               transformOrigin: "0% 100%",
             }}
           >
-            <Thumb item={item} />
-            {front && hidden > 0 && (
-              <span className="absolute inset-x-0 top-0 grid h-[76px] place-items-center bg-gradient-to-b from-black/5 to-black/40 text-xl font-extrabold tracking-tight text-white">
+            <Thumb item={item} blurred={more} />
+            {more && (
+              <span
+                data-more
+                className="absolute inset-x-0 top-0 grid place-items-center bg-black/30 text-[22px] font-extrabold tracking-tight text-white"
+                style={{ height: H - GLASS_H - pos.top + 6 }}
+              >
                 +{hidden}
               </span>
             )}
-            {front && item.type === "video" && (
+            {front && !more && item.type === "video" && (
               <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-black/55">
                 <svg width="8" height="8" viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
                   <path d="M7 4v16l13-8z" />
@@ -106,46 +131,28 @@ export function MediaFolder({
 
       <span className="absolute bottom-0 left-0 z-[3] block" style={{ width: W, height: GLASS_H }}>
         {/* The shadow is a sibling beneath the glass, never a filter above it. */}
-        <span
-          className="absolute rounded-[16px] bg-black/35"
-          style={{ inset: "20px 5px -7px", filter: "blur(11px)" }}
-        />
+        <span className="absolute rounded-[16px] bg-black/30" style={{ inset: "18px 6px -6px", filter: "blur(10px)" }} />
         <span
           data-glass
           className="absolute inset-0"
           style={{
             clipPath: `path("${GLASS_PATH}")`,
-            background: mine
-              ? "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0) 45%), rgba(163,230,53,0.72)"
-              : "linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 45%), rgba(46,46,46,0.55)",
-            WebkitBackdropFilter: "blur(14px) saturate(160%)",
-            backdropFilter: "blur(14px) saturate(160%)",
+            background: look.fill,
+            WebkitBackdropFilter: "blur(12px) saturate(180%)",
+            backdropFilter: "blur(12px) saturate(180%)",
           }}
         />
         <svg className="pointer-events-none absolute inset-0 overflow-visible" viewBox={`0 0 ${W} ${GLASS_H}`} aria-hidden="true">
-          <path
-            d={RIM_PATH}
-            fill="none"
-            strokeWidth={1}
-            stroke={mine ? "rgba(236,252,203,0.75)" : "rgba(255,255,255,0.3)"}
-          />
+          <path d={RIM_PATH} fill="none" strokeWidth={1} stroke={look.rim} />
         </svg>
-        <span className="absolute inset-x-[11px] bottom-[9px] block">
-          {caption && (
-            <span
-              className={`line-clamp-2 block text-[12.5px] font-bold leading-tight tracking-[-0.01em] ${
-                mine ? "text-accent-ink" : "text-white"
-              }`}
-            >
-              {caption}
-            </span>
-          )}
-          <span
-            className={`mt-0.5 block ${caption ? "text-[10px]" : "text-[12.5px] font-bold"} ${
-              mine ? (caption ? "text-accent-ink/60" : "text-accent-ink") : caption ? "text-white/70" : "text-white"
-            }`}
-          >
-            {count}
+        {/* The tab carries the count, so the front is free for the caption. */}
+        <span className="absolute left-[11px] top-[2px] flex h-[10px] items-center gap-[3px] text-[9px] font-bold tabular-nums leading-none text-white/85">
+          <StackGlyph />
+          {items.length}
+        </span>
+        <span className="absolute inset-x-[11px] bottom-[9px] top-[17px] flex items-end">
+          <span className="line-clamp-2 text-[12.5px] font-bold leading-[1.2] tracking-[-0.01em] text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.35)]">
+            {caption || count}
           </span>
         </span>
       </span>

@@ -69,7 +69,8 @@ describe("the folder", () => {
     expect(folder.querySelectorAll("img, video")).toHaveLength(3);
     expect(folder.textContent).toContain("+3");
     expect(folder.textContent).toContain("Golden hour walk");
-    expect(folder.textContent).toContain("5 photos · 1 video");
+    expect(folder.textContent).toContain("6");
+    expect(host.querySelector("[data-more]")).toBeTruthy();
   });
 
   it("blurs through the glass, with nothing above it that would switch the blur off", async () => {
