@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { reloadIfNewBuild } from "@/lib/app-version";
 import { useRouter } from "next/navigation";
+import { lockAxis } from "@/components/layout/SwipeNav";
 import { HypefyMark } from "@/components/HypefyMark";
 
 const THRESHOLD = 70;
@@ -25,15 +26,29 @@ export function PullToRefresh({
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const startY = useRef<number | null>(null);
+  const startX = useRef(0);
+  /** Which way this gesture is going, once it is clear. A sideways swipe
+   *  between tabs never pulls, however much the thumb dips on the way. */
+  const axis = useRef<null | "x" | "y">(null);
 
   function onTouchStart(e: React.TouchEvent) {
+    axis.current = null;
     if (window.scrollY > 2 || refreshing) return;
     startY.current = e.touches[0].clientY;
+    startX.current = e.touches[0].clientX;
   }
 
   function onTouchMove(e: React.TouchEvent) {
     if (startY.current === null || refreshing) return;
     const dy = e.touches[0].clientY - startY.current;
+    if (axis.current === null) {
+      axis.current = lockAxis(e.touches[0].clientX - startX.current, dy);
+      if (axis.current === null) return;
+    }
+    if (axis.current === "x") {
+      if (pull) setPull(0);
+      return;
+    }
     if (dy <= 0 || window.scrollY > 2) { setPull(0); return; }
     // Rubber-band: diminishing returns past the threshold
     setPull(Math.min(dy * 0.55, MAX_PULL));
