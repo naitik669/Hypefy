@@ -211,12 +211,14 @@ export function PinFeed({
 
   return (
     <>
-      {/* 8px gutters rather than 12: at three across, every pixel of gutter
-          comes out of three pictures, and 8 is what the three-across search
-          grid already uses. */}
-      <div className="flex items-start gap-2 px-2">
+      {/* 4px gutters and a 10px corner. At three across a tile is about 120px
+          wide, and a 16px radius on that took a visible bite out of every
+          corner while 8px gaps took another from every side — the grid was
+          mostly frame. Still curved, because that is Hypefy's hand; just a
+          touch, so the pictures get the room. */}
+      <div className="flex items-start gap-1 px-1">
         {columns.map((col, c) => (
-          <div key={c} className="flex min-w-0 flex-1 flex-col gap-2">
+          <div key={c} className="flex min-w-0 flex-1 flex-col gap-1">
             {col.map((t) =>
               t.kind === "shot" ? (
                 <ShotTile key={`shot-${t.item.id}`} shot={t.item} />
@@ -229,7 +231,7 @@ export function PinFeed({
             {loading && (
               <div
                 aria-hidden
-                className="skeleton w-full rounded-2xl"
+                className="skeleton w-full rounded-[10px]"
                 style={{ aspectRatio: ["3 / 4", "1 / 1", "4 / 5"][c % 3] }}
               />
             )}
@@ -308,7 +310,7 @@ function PinTile({ pin, currentUserId }: { pin: Pin; currentUserId: string }) {
       <Link href={`/p/${pin.id}`} className="block">
         {img ? (
           <div
-            className="overflow-hidden rounded-2xl bg-surface"
+            className="overflow-hidden rounded-[10px] bg-surface"
             style={{ aspectRatio: String(clampRatio(pin.aspect_ratio)) }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -324,7 +326,7 @@ function PinTile({ pin, currentUserId }: { pin: Pin; currentUserId: string }) {
           // A post with no picture still earns a pin: its words, set large on
           // the author's colour, so it reads as a card rather than a hole.
           <div
-            className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl p-3"
+            className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-[10px] p-3"
             style={{
               background: `linear-gradient(150deg, hsl(${hue} 55% 26%), hsl(${hue} 40% 12%))`,
             }}
@@ -349,7 +351,7 @@ function ShotTile({ shot }: { shot: ShotPin }) {
     <Link
       href={`/shots/${shot.id}`}
       aria-label={shot.caption ? `Shot: ${shot.caption}` : "Shot"}
-      className="relative block aspect-[9/16] overflow-hidden rounded-2xl bg-black"
+      className="relative block aspect-[9/16] overflow-hidden rounded-[10px] bg-black"
     >
 <ShotPreview
         id={shot.id}

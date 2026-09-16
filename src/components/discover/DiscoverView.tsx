@@ -144,7 +144,7 @@ export function DiscoverView({
         {cat === "Shots" &&
           (trendingShots.length > 0 ? (
             <Section title="Shots">
-              <div className="grid grid-cols-3 gap-3 px-4">
+              <div className="grid grid-cols-3 gap-1 px-1">
                 {trendingShots.map((s) => (
                   <ShotTile key={s.id} shot={s} />
                 ))}
@@ -253,7 +253,7 @@ function ShotTile({ shot }: { shot: Shot }) {
   return (
     <Link
       href={`/shots/${shot.id}`}
-      className="relative block aspect-[9/16] overflow-hidden rounded-2xl bg-black"
+      className="relative block aspect-[9/16] overflow-hidden rounded-[10px] bg-black"
     >
 <ShotPreview
         id={shot.id}

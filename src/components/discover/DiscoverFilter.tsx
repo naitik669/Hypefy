@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Camera,
@@ -17,7 +17,7 @@ import {
   Users,
   type Icon,
 } from "@phosphor-icons/react";
-import { FloatingMenu } from "@/components/ui/FloatingMenu";
+import { useOverlayBackButton } from "@/lib/overlay-stack";
 
 /**
  * What Discover is showing, chosen from a list that drops out of the button
@@ -53,10 +53,10 @@ const TOPIC_ICONS: Record<string, Icon> = {
 };
 
 /**
- * The one colour in the menu: a calm green for "this one", in place of the
- * brand lime, which at dot size and with a glow read as neon.
+ * The one colour in the menu: Hypefy's own, for "this one". It is the glow
+ * that read as neon, not the lime — at dot size, flat, it is just the brand.
  */
-const ON = "#34C759";
+const ON = "var(--color-accent)";
 
 export function DiscoverFilter({
   value,
@@ -81,6 +81,18 @@ export function DiscoverFilter({
   const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
   const filtered = value !== "For You";
 
+  const close = () => setOpen(false);
+  // Android's back button closes it before it navigates anywhere.
+  useOverlayBackButton(open, close);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
   useLayoutEffect(() => {
     if (!open) return;
     const box = buttonRef.current?.getBoundingClientRect();
@@ -98,6 +110,11 @@ export function DiscoverFilter({
       <button
         ref={buttonRef}
         type="button"
+        // While the list is up, the catch-all below covers this button too,
+        // so a second tap here lands on the catch-all and closes the list —
+        // it never reaches this handler. The old menu closed on the PRESS and
+        // vanished before the click, which then fell through to this button
+        // and opened the list straight back up.
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -121,19 +138,28 @@ export function DiscoverFilter({
       {open &&
         typeof document !== "undefined" &&
         createPortal(
-          <FloatingMenu
-            open
-            onClose={() => setOpen(false)}
-            origin="top-right"
-            zIndex={220}
-            className="fixed w-[236px] !rounded-[20px]"
-            style={{
-              top: anchor?.top ?? 0,
-              right: anchor?.right ?? 16,
-              opacity: anchor ? 1 : 0,
-            }}
-          >
-            <div className="max-h-[62vh] overflow-y-auto overscroll-contain px-1.5 pb-1">
+          <>
+            {/* Anything outside the list closes it, and that tap is spent
+                closing it — on the click, not the press, so the catch-all is
+                still there when the click lands and nothing underneath (a
+                post, the filter button) acts on the same tap. */}
+            <div
+              aria-hidden
+              className="fixed inset-0 z-[219]"
+              style={{ touchAction: "none" }}
+              onClick={close}
+            />
+            <div
+              role="menu"
+              aria-label="Filter Discover"
+              className="animate-menu-pop fixed z-[220] w-[236px] origin-top-right overflow-hidden rounded-[20px] border border-border bg-elevated/95 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+              style={{
+                top: anchor?.top ?? 0,
+                right: anchor?.right ?? 16,
+                opacity: anchor ? 1 : 0,
+              }}
+            >
+            <div className="max-h-[62vh] overflow-y-auto overscroll-contain px-1.5 py-1.5">
               <Group title="Browse">
                 {BROWSE.map((b) => (
                   <Row
@@ -163,7 +189,8 @@ export function DiscoverFilter({
                 </>
               )}
             </div>
-          </FloatingMenu>,
+            </div>
+          </>,
           document.body,
         )}
     </>
