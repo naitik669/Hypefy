@@ -142,17 +142,25 @@ function pageWidth(): number {
 export function SwipeNav({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const index = tabIndex(pathname);
-  const enabled = index >= 0;
 
   const page = useRef<HTMLDivElement>(null);
+  const standEl = useRef<HTMLDivElement>(null);
   const incomingEl = useRef<HTMLDivElement>(null);
   /** The tab being pulled in and the edge it comes from. Set once per
    *  direction, not per frame. */
   const [incoming, setIncoming] = useState<
     { tab: TabPath; side: "left" | "right"; from: string } | null
   >(null);
-  /** Held after the finger lifts, until the new route takes over. */
+  /**
+   * The tab we have pushed and are still waiting for, drawn as its skeleton.
+   *
+   * It is not a picture of where we are going — it IS where we are, until the
+   * route catches up. Swipe again before it does and the next tab is counted
+   * from here, which is what stops a run of quick swipes from measuring every
+   * one of them from the tab you started on and landing you two short.
+   */
+  const [standing, setStanding] = useState<{ tab: TabPath; startX: number } | null>(null);
+  /** Held after the finger lifts, while the pages finish their travel. */
   const holding = useRef(false);
 
   const start = useRef({ x: 0, y: 0, t: 0 });
@@ -160,14 +168,24 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
   const axis = useRef<null | "x" | "y">(null);
   const ignore = useRef(false);
   const dx = useRef(0);
-  /** Set while a committed swipe waits for its page: which way it went. */
-  const leaving = useRef<-1 | 1 | 0>(0);
 
+  // Once the route arrives the stand-in is no longer standing in for
+  // anything — read that off the pathname rather than clearing it in an
+  // effect, so there is never a frame with both on screen.
+  const standIn = standing && standing.tab !== pathname ? standing : null;
+  const here = standIn?.tab ?? pathname;
+  const index = tabIndex(here);
+  const enabled = index >= 0;
   const canPrev = index > 0;
   const canNext = index >= 0 && index < TABS.length - 1;
 
+  /** The surface the finger is moving: the stand-in if there is one. */
+  function baseEl(): HTMLDivElement | null {
+    return standEl.current ?? page.current;
+  }
+
   function paint(x: number, transition = "none") {
-    const el = page.current;
+    const el = baseEl();
     if (el) {
       el.style.transition = transition;
       el.style.transform = x ? `translate3d(${x}px,0,0)` : "";
@@ -183,48 +201,63 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // The incoming page belongs to the route it was pulled from. When the new
-  // one commits it is no longer incoming, it IS the page — read that off the
-  // pathname rather than clearing it in an effect, so there is never a frame
-  // where both are on screen.
-  const inbound = incoming && incoming.from === pathname ? incoming : null;
-
-  // The route committed. The skeleton the finger pulled in is already exactly
-  // where this page belongs, so the real one simply takes its place: no second
-  // animation, nothing to cross-fade.
+  // The real page, against whatever is standing in for it.
+  //
+  // While a stand-in is up the page is parked off-screen behind it, and
+  // hidden: a run of quick swipes pushes more than one route, so an earlier
+  // one can arrive and sit at rest under the tab you are actually heading
+  // for, and its sticky header would paint straight over the top.
+  //
+  // When the stand-in goes, the page is already exactly where it belongs, so
+  // it simply takes its place: no second animation, nothing to cross-fade.
   useLayoutEffect(() => {
-    leaving.current = 0;
+    const el = page.current;
+    if (!el) return;
+    if (standIn) {
+      // Not before it has finished travelling, or it would vanish instead of
+      // sliding out and leave the edge it was covering bare.
+      const t = window.setTimeout(() => {
+        if (page.current) page.current.style.visibility = "hidden";
+      }, 300);
+      return () => window.clearTimeout(t);
+    }
     holding.current = false;
     dx.current = 0;
-    const el = page.current;
-    if (el) {
-      el.style.transition = "none";
-      el.style.transform = "";
-      el.style.opacity = "";
-    }
-  }, [pathname]);
+    el.style.visibility = "";
+    el.style.transition = "none";
+    el.style.transform = "";
+    el.style.opacity = "";
+  }, [standIn, pathname]);
 
-  // Put the page that just mounted where the finger already is, before the
-  // browser paints it — otherwise it would appear at rest for one frame,
-  // covering the screen, and then jump out to the edge.
+  // The stand-in takes over mid-travel from the page it replaces: it mounts
+  // exactly where that one had got to, then carries on into place.
   useLayoutEffect(() => {
-    if (inbound) paint(dx.current);
-  }, [inbound]);
+    const el = standEl.current;
+    if (!standIn || !el) return;
+    el.style.transition = "none";
+    el.style.transform = `translate3d(${standIn.startX}px,0,0)`;
+    void el.offsetWidth; // lay the start out before moving from it
+    el.style.transition = SETTLE;
+    el.style.transform = "";
+  }, [standIn]);
 
-  // A push that never commits — an error, or a redirect back to where we
-  // already are — would otherwise leave the destination's skeleton over the
-  // app for good.
+  // A push that never commits — an error, or a redirect straight back — would
+  // otherwise leave a skeleton over the app for good.
   useEffect(() => {
-    if (!inbound) return;
+    if (!standIn) return;
     const t = window.setTimeout(() => {
-      if (!holding.current) return;
       holding.current = false;
       dx.current = 0;
-      paint(0, SETTLE);
+      setStanding(null);
       setIncoming(null);
+      const el = page.current;
+      if (el) {
+        el.style.transition = SETTLE;
+        el.style.transform = "";
+      }
     }, HANDOFF_MS);
     return () => window.clearTimeout(t);
-  }, [inbound]);
+  }, [standIn]);
 
   if (!enabled) return <>{children}</>;
 
@@ -234,6 +267,13 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     start.current = { x: t.clientX, y: t.clientY, t: Date.now() };
     axis.current = null;
     dx.current = 0;
+    // A swipe landing on top of the last one: put the pages where they were
+    // heading so this drag starts from rest rather than from mid-flight.
+    if (holding.current) {
+      holding.current = false;
+      paint(0);
+      setIncoming(null);
+    }
     // A sheet on top of the page means the page is not what is being
     // touched. Sheets portal to <body>, so they escape this element in the
     // DOM — but React routes events through the COMPONENT tree, and the
@@ -271,7 +311,7 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     const x = atEdge ? ddx * 0.25 : ddx;
     // Mount the destination once per direction, not per frame.
     const dest = atEdge ? null : (TABS[toNext ? index + 1 : index - 1] as TabPath);
-    const want = dest ? { tab: dest, side: toNext ? ("right" as const) : ("left" as const), from: pathname } : null;
+    const want = dest ? { tab: dest, side: toNext ? ("right" as const) : ("left" as const), from: here } : null;
     if (want?.tab !== incoming?.tab || want?.side !== incoming?.side) setIncoming(want);
     dx.current = x;
     paint(x);
@@ -296,14 +336,20 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     if (outcome !== "stay") {
       haptics.tap();
       const dir = outcome === "next" ? 1 : -1;
-      leaving.current = dir;
-      // Both pages carry on the rest of the way — this one out, the next one
-      // into place — and the next one stays there until the route commits
-      // under it.
+      const dest = TABS[index + dir] as TabPath;
+      const w = pageWidth();
+      // Where the tab coming in has got to. It hands that position to the
+      // stand-in, which carries on from there — so the swap between the two
+      // is invisible even in the middle of the movement.
+      const startX = dx.current + (dir === 1 ? w : -w);
       holding.current = true;
-      dx.current = -dir * pageWidth();
+      dx.current = -dir * w;
+      // This page carries on out; what replaces it is the destination, and it
+      // stays until the route commits under it.
       paint(dx.current, SETTLE);
-      router.push(TABS[index + dir]);
+      setIncoming(null);
+      setStanding({ tab: dest, startX });
+      router.push(dest);
       return;
     }
 
@@ -315,8 +361,33 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     }, 280);
   }
 
+  const inbound = incoming && incoming.from === here ? incoming : null;
+
   return (
     <>
+      {/* The tab we are on while its route is still on its way. It takes the
+          finger as the page itself would, so a second swipe carries on from
+          here instead of from a page that is already off-screen. */}
+      {standIn && (
+        <div className="fixed inset-0 z-10 flex justify-center overflow-hidden">
+          <div
+            ref={standEl}
+            data-standin={standIn.tab}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            onTouchCancel={() => {
+              axis.current = null;
+              dx.current = 0;
+              paint(0, SETTLE);
+            }}
+            className="h-full w-full max-w-[480px] overflow-hidden bg-background pb-[84px]"
+            style={{ touchAction: "pan-y" }}
+          >
+            <TabSkeleton tab={standIn.tab} />
+          </div>
+        </div>
+      )}
       {/* The tab being pulled in, travelling with the finger. Below the bottom
           nav (z-30), which stays put through the whole movement. */}
       {inbound && (
@@ -325,7 +396,12 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
           className="pointer-events-none fixed inset-0 z-20 flex justify-center overflow-hidden"
         >
           <div
-            ref={incomingEl}
+            // Placed the moment React attaches it, so it never shows for a
+            // frame at rest — covering the screen — before jumping to the edge.
+            ref={(el) => {
+              incomingEl.current = el;
+              if (el) paint(dx.current);
+            }}
             data-side={inbound.side}
             data-incoming-tab={inbound.tab}
             className="h-full w-full max-w-[480px] overflow-hidden bg-background pb-[84px]"

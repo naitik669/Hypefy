@@ -34,12 +34,22 @@ afterEach(async () => {
 });
 
 const page = () => document.getElementById("feed")!.parentElement as HTMLElement;
-function touch(type: string, x: number, y = 300) {
+function touch(type: string, x: number, y = 300, on?: HTMLElement) {
   const e = new Event(type, { bubbles: true, cancelable: true });
   const pts = type === "touchend" ? [] : [{ clientX: x, clientY: y }];
   Object.defineProperty(e, "touches", { value: pts });
-  return act(async () => void document.getElementById("feed")!.dispatchEvent(e));
+  const target = on ?? document.getElementById("feed")!;
+  return act(async () => void target.dispatchEvent(e));
 }
+
+/** A full swipe towards the next tab, on the page or on whatever stands in. */
+async function swipeToNext(on?: HTMLElement) {
+  await touch("touchstart", 380, 300, on);
+  await touch("touchmove", 360, 300, on);
+  await touch("touchmove", 200, 300, on);
+  await touch("touchend", 200, 300, on);
+}
+const standIn = () => document.querySelector("[data-standin]") as HTMLElement | null;
 
 describe("SwipeNav", () => {
   it("moves the page with the finger and names the tab you are heading to", async () => {
@@ -82,6 +92,28 @@ describe("SwipeNav", () => {
     await touch("touchmove", 200);
     await touch("touchend", 200);
     expect(push).toHaveBeenCalledWith("/messages");
+  });
+
+  it("counts each swipe of a quick run from the last one, not from where the run began", async () => {
+    // The route never commits here — which is exactly the case that broke.
+    // Three quick swipes towards Profile used to measure all three from Home
+    // and push Messages every time, so that is where you ended up.
+    await swipeToNext();
+    expect(push).toHaveBeenLastCalledWith("/messages");
+    expect(standIn()?.dataset.standin).toBe("/messages");
+
+    await swipeToNext(standIn()!);
+    expect(push).toHaveBeenLastCalledWith("/shots");
+
+    await swipeToNext(standIn()!);
+    expect(push).toHaveBeenLastCalledWith("/profile");
+    expect(standIn()?.dataset.standin).toBe("/profile");
+  });
+
+  it("stops at the last tab however many more swipes it gets", async () => {
+    for (let i = 0; i < 5; i++) await swipeToNext(standIn() ?? undefined);
+    expect(push).toHaveBeenLastCalledWith("/profile");
+    expect(push).toHaveBeenCalledTimes(3);
   });
 
   it("springs back from a short one, and names the tab to the left when you pull right", async () => {
