@@ -140,3 +140,46 @@ describe("a bottom sheet", () => {
     expect(sheet()).toBeNull();
   });
 });
+
+/**
+ * A composer belongs to the sheet, not to the end of its contents. Sticky
+ * inside the scroller left it a safe-area's height off the floor with the
+ * thread running through the gap underneath — which is what you saw through
+ * the row you were typing into.
+ */
+describe("a sheet with a footer", () => {
+  beforeEach(async () => {
+    const { BottomSheet } = await import("@/components/ui/BottomSheet");
+    await act(async () =>
+      root.render(
+        createElement(BottomSheet, {
+          open: true,
+          onClose,
+          title: "Comments",
+          footer: createElement("input", { placeholder: "Add a comment..." }),
+          children: createElement("p", null, "a thread"),
+        }),
+      ),
+    );
+  });
+
+  it("sits under the scrolling part, not inside it", () => {
+    const footer = document.querySelector("[data-sheet-footer]") as HTMLElement;
+    expect(footer).toBeTruthy();
+    expect(footer.querySelector("input")).toBeTruthy();
+    // A sibling of the scroller: nothing can pass behind it.
+    const scroller = footer.previousElementSibling as HTMLElement;
+    expect(scroller.className).toContain("overflow-y-auto");
+    expect(scroller.contains(footer)).toBe(false);
+    expect(footer.className).not.toContain("sticky");
+  });
+
+  it("owns the floor, and the phone's own inset with it", () => {
+    const footer = document.querySelector("[data-sheet-footer]") as HTMLElement;
+    const scroller = footer.previousElementSibling as HTMLElement;
+    expect(footer.className).toContain("pb-[calc(var(--sab)+10px)]");
+    // Which the scrolling part above it therefore must not also pay for.
+    expect(scroller.className).not.toContain("var(--sab)");
+    expect(footer.className).toContain("bg-elevated");
+  });
+});

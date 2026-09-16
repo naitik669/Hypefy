@@ -51,11 +51,23 @@ export function BottomSheet({
   onClose,
   title,
   children,
+  footer,
 }: {
   open: boolean;
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
+  /**
+   * Something that belongs at the bottom of the sheet rather than at the
+   * bottom of its contents — a composer, a confirm bar.
+   *
+   * It is a sibling of the scrolling part, not `position: sticky` inside it.
+   * Sticky is bounded by its container's content box, so the scroller's own
+   * bottom padding held the composer a safe-area's height off the floor and
+   * the thread scrolled through the gap underneath it. A row you type into
+   * should not have anything moving behind it.
+   */
+  footer?: React.ReactNode;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -420,11 +432,24 @@ export function BottomSheet({
 
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[calc(var(--sab)+12px)]"
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 ${
+            // With a footer below it, the floor — and the phone's own bottom
+            // inset — belong to the footer.
+            footer ? "pb-2" : "pb-[calc(var(--sab)+12px)]"
+          }`}
           {...bodyTouch}
         >
           {children}
         </div>
+
+        {footer && (
+          <div
+            data-sheet-footer=""
+            className="shrink-0 border-t border-border bg-elevated px-5 pb-[calc(var(--sab)+10px)] pt-2"
+          >
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body,

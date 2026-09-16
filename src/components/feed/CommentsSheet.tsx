@@ -541,6 +541,14 @@ export function CommentsSheet({
       <BottomSheet
         open={open}
         onClose={onClose}
+        footer={
+          <Composer
+            replyTo={replyTo}
+            currentUserId={currentUserId}
+            onCancelReply={() => setReplyTo(null)}
+            onSubmit={submit}
+          />
+        }
         title={`Comments · ${total ?? items.length}`}
       >
         {loading ? (
@@ -582,12 +590,6 @@ export function CommentsSheet({
           </div>
         )}
 
-        <Composer
-          replyTo={replyTo}
-          currentUserId={currentUserId}
-          onCancelReply={() => setReplyTo(null)}
-          onSubmit={submit}
-        />
       </BottomSheet>
 
       {reportTarget && currentUserId && (
@@ -789,7 +791,9 @@ function Composer({
   }
 
   return (
-    <div className="sticky bottom-0 -mx-5 border-t border-border bg-elevated px-5 pb-3 pt-2">
+    // The sheet's footer slot puts this at the floor and gives it its
+    // background; here it is only the row itself.
+    <div>
       {gifOpen && (
         <div className="mb-2">
           <GifPicker onSelect={sendGif} />
