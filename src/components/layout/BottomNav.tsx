@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { haptics } from "@/lib/haptics";
 import { NavHoldMenu, type HoldAction } from "@/components/layout/NavHoldMenu";
 import { ChatHoldMenu } from "@/components/layout/ChatHoldMenu";
-import { Search, Settings, Bookmark, Bell } from "lucide-react";
+import { Search, Settings, Bookmark, ShoppingBag } from "lucide-react";
 
 /**
  * Shortcuts behind a hold on Home.
@@ -30,7 +30,12 @@ import { Search, Settings, Bookmark, Bell } from "lucide-react";
  */
 const HOME_SHORTCUTS: HoldAction[] = [
   { icon: Search, label: "Search", href: "/search" },
-  { icon: Bell, label: "Activity", href: "/notifications" },
+  // Marketplace took Activity's place. Activity has the bell in the top bar,
+  // with the unread count on it, so it was the entry here that already had a
+  // permanent one — the same reason Discover came out. The Marketplace had no
+  // route from the nav at all: you reached it through Settings, or from a
+  // link inside Your style.
+  { icon: ShoppingBag, label: "Marketplace", href: "/marketplace" },
   { icon: Bookmark, label: "Saved", href: "/saved" },
   // Discover was here and came out: it has the compass in the top bar AND a
   // right-swipe from the feed, so it was the one entry with two other ways in.
