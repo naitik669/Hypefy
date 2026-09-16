@@ -20,7 +20,7 @@ vi.mock("@/lib/supabase/client", () => ({
 
 const ME = {
   id: "u1", display_name: "Naitik", username: "craziematez", avatar_url: null, avatar_hue: 150,
-  banner_id: "lime-pulse", banner_url: null, profile_colors: null, is_premium: false, is_verified: false,
+  banner_id: "lime-pulse", banner_url: null, is_premium: false, is_verified: false,
   name_font: null, name_glow: null, avatar_decoration: null, bubble_style: null, nameplate: null,
 };
 
@@ -53,6 +53,13 @@ describe("Your style", () => {
     expect(button("Crown")).toBeTruthy();
     expect(button("Halo")).toBeFalsy();
     expect(button("Flames")).toBeFalsy();
+  });
+
+  it("has no banners and no colours — the banner comes from your gallery", async () => {
+    await render({ premium: true });
+    for (const gone of ["Banners", "Colours"]) {
+      expect([...host.querySelectorAll("button")].some((b) => b.textContent?.trim() === gone)).toBe(false);
+    }
   });
 
   it("shows Premium items to Premium members", async () => {

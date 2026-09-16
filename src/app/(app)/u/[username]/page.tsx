@@ -13,7 +13,7 @@ import { FollowButton } from "@/components/profile/FollowButton";
 import { MessageButton } from "@/components/profile/MessageButton";
 import { HyperFavoriteButton } from "@/components/profile/HyperFavoriteButton";
 import { SignOutButton } from "@/components/SignOutButton";
-import { hueFromId, profileBackground } from "@/lib/profile";
+import { hueFromId } from "@/lib/profile";
 import { Lock } from "lucide-react";
 
 async function fetchStats(supabase: any, userId: string) {
@@ -145,17 +145,6 @@ export default async function PublicProfilePage({
 
   return (
     <PullToRefresh>
-      {/* Their own colours, over the whole profile (Premium). */}
-      <div
-        className="min-h-dvh"
-        style={{
-          background:
-            profileBackground({
-              profile_colors: (profile as { profile_colors?: string[] | null }).profile_colors,
-              is_premium: (profile as { is_premium?: boolean | null }).is_premium,
-            }) ?? undefined,
-        }}
-      >
       <ProfileHeader
         name={name}
         username={profile.username}
@@ -243,7 +232,6 @@ export default async function PublicProfilePage({
       )}
 
       {!currentUser && <JoinBanner />}
-      </div>
     </PullToRefresh>
   );
 }

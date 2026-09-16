@@ -22,8 +22,6 @@ export type Profile = {
   avatarHue: number | null;
   bannerId: string | null;
   bannerUrl: string | null;
-  /** Two hex colours mixed into your own background — Premium. */
-  profileColors: string[] | null;
   anthem: unknown;
   interests: string[];
   /** Profile-surface accent; see ./profile-accent.ts. */
@@ -86,39 +84,9 @@ export const BANNERS: Banner[] = [
 
 export const DEFAULT_BANNER_ID = "lime-pulse";
 
-/** A colour someone picked: #rrggbb only, so it can go straight into CSS. */
-export function isHexColor(v: unknown): v is string {
-  return typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
-}
-
-/**
- * The background someone mixed themselves, top colour to bottom, or null.
- * Premium draws it; without Premium the profile falls back to its preset.
- */
-export function customGradient(colors: unknown, isPremium = false): string | null {
-  if (!isPremium || !Array.isArray(colors) || colors.length !== 2) return null;
-  const [top, bottom] = colors;
-  if (!isHexColor(top) || !isHexColor(bottom)) return null;
-  return `linear-gradient(160deg, ${top} 0%, ${bottom} 100%)`;
-}
-
 /** An uploaded banner that is a GIF — animated banners come with Premium. */
 export function isGifBanner(url: string | null | undefined): boolean {
   return !!url && /\.gif(\?|#|$)/i.test(url);
-}
-
-/**
- * The wash behind someone's whole profile — their own two colours, while
- * they have Premium. Null means the app's own background, as before.
- *
- * It covers the whole profile — banner, name, buttons, posts — as the
- * background of the page wrapper, so nothing paints over it and it stretches
- * however long the profile is.
- */
-export function profileBackground(
-  p: { profile_colors?: unknown; is_premium?: boolean | null },
-): string | null {
-  return customGradient(p.profile_colors, !!p.is_premium);
 }
 
 /** The preset gradient for a banner id, or the default for an unknown one. */
@@ -197,7 +165,6 @@ function mapProfile(row: any): Profile {
     avatarHue: row.avatar_hue,
     bannerId: row.banner_id,
     bannerUrl: row.banner_url,
-    profileColors: (row.profile_colors as string[] | null) ?? null,
     anthem: row.anthem ?? null,
     interests: row.interests ?? [],
     accentId: (row as { accent_id?: string | null }).accent_id ?? null,

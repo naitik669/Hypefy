@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Settings, BarChart3, Bookmark } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getProfile, hueFromId, profileBackground } from "@/lib/profile";
+import { getProfile, hueFromId } from "@/lib/profile";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
 import { ShowcaseRail } from "@/components/showcase/ShowcaseRail";
@@ -63,11 +63,6 @@ export default async function ProfilePage() {
 
   return (
     <PullToRefresh>
-      {/* Their own colours, over the whole profile (Premium). */}
-      <div
-        className="min-h-dvh"
-        style={{ background: profileBackground({ profile_colors: profile?.profileColors, is_premium: profile?.isPremium }) ?? undefined }}
-      >
       <ProfileHeader
         name={name}
         username={profile?.username ?? null}
@@ -135,7 +130,6 @@ export default async function ProfilePage() {
 
       {/* Tabs: Posts | Shots | Saved */}
       <ProfileTabs userId={user.id} />
-      </div>
     </PullToRefresh>
   );
 }

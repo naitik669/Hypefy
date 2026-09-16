@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronRight, ImageIcon, Loader2, ShoppingBag } from "lucide-react";
+import { Check, ChevronRight, Loader2, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Avatar } from "@/components/ui/Avatar";
@@ -11,8 +11,6 @@ import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
-import { BANNERS, profileBackground } from "@/lib/profile";
-import { GradientPicker } from "@/components/profile/GradientPicker";
 import { DECORATIONS, NAME_FONTS, NAME_GLOWS, NAME_SIZE_ADJUST, nameStyle, type Tier } from "@/lib/cosmetics";
 import { NAMEPLATES } from "@/lib/nameplates";
 import { NameplateRow } from "@/components/ui/Nameplate";
@@ -27,7 +25,6 @@ export type StyleMe = {
   avatar_hue: number | null;
   banner_id: string | null;
   banner_url: string | null;
-  profile_colors: string[] | null;
   is_premium: boolean;
   is_verified: boolean;
   name_font: string | null;
@@ -37,17 +34,16 @@ export type StyleMe = {
   nameplate: string | null;
 };
 
-type Look = Pick<StyleMe, "name_font" | "name_glow" | "avatar_decoration" | "bubble_style" | "nameplate" | "banner_id" | "banner_url" | "profile_colors">;
-const FIELDS = ["avatar_decoration", "name_font", "name_glow", "bubble_style", "nameplate", "banner_id", "banner_url", "profile_colors"] as const;
+// The banner is not here: it comes from your own gallery, in Edit profile.
+type Look = Pick<StyleMe, "name_font" | "name_glow" | "avatar_decoration" | "bubble_style" | "nameplate">;
+const FIELDS = ["avatar_decoration", "name_font", "name_glow", "bubble_style", "nameplate"] as const;
 
-type Tab = "frames" | "names" | "bubbles" | "nameplates" | "banners" | "colors";
+type Tab = "frames" | "names" | "bubbles" | "nameplates";
 const TABS: { id: Tab; label: string }[] = [
   { id: "frames", label: "Frames" },
   { id: "names", label: "Names" },
   { id: "bubbles", label: "Bubbles" },
   { id: "nameplates", label: "Nameplates" },
-  { id: "banners", label: "Banners" },
-  { id: "colors", label: "Colours" },
 ];
 
 /**
@@ -70,22 +66,14 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
     avatar_decoration: me.avatar_decoration,
     bubble_style: me.bubble_style,
     nameplate: me.nameplate,
-    banner_id: me.banner_id,
-    banner_url: me.banner_url,
-    profile_colors: me.profile_colors,
   };
   const [saved, setSaved] = useState<Look>(initial);
   const [draft, setDraft] = useState<Look>(() => withWorn(initial, wear, has));
   const [tab, setTab] = useState<Tab>(() => tabFor(wear));
   const [saving, setSaving] = useState(false);
 
-  const changed = FIELDS.filter((f) =>
-    f === "profile_colors"
-      ? (draft.profile_colors ?? []).join() !== (saved.profile_colors ?? []).join()
-      : draft[f] !== saved[f],
-  );
-  // A banner swap touches two columns; count it once.
-  const changeCount = changed.filter((f) => f !== "banner_url" || !changed.includes("banner_id")).length;
+  const changed = FIELDS.filter((f) => draft[f] !== saved[f]);
+  const changeCount = changed.length;
   const dirty = changeCount > 0;
   const set = (patch: Partial<Look>) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -112,11 +100,8 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
     <div className="flex flex-col gap-6 px-4 pb-16 pt-3">
       {/* Your card, as others will see it */}
       <section className="flex flex-col gap-3">
-        <div
-          className="overflow-hidden rounded-3xl border border-white/[0.07] bg-elevated"
-          style={{ background: profileBackground({ profile_colors: draft.profile_colors, is_premium: premium }) ?? undefined }}
-        >
-          <ProfileBanner bannerId={draft.banner_id} bannerUrl={draft.banner_url} isPremium={premium} />
+        <div className="overflow-hidden rounded-3xl border border-white/[0.07] bg-elevated">
+          <ProfileBanner bannerId={me.banner_id} bannerUrl={me.banner_url} isPremium={premium} />
           <div className="px-5 pb-5">
             <div className="-mt-9 flex items-end justify-between">
               <span className="rounded-[26px] bg-elevated p-1">
@@ -266,35 +251,6 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
           </div>
         )}
 
-        {tab === "colors" && (
-          <GradientPicker
-            value={draft.profile_colors}
-            onChange={(next) => set({ profile_colors: next })}
-            isPremium={premium}
-          />
-        )}
-
-        {tab === "banners" && (
-          <Shelf wide>
-            {me.banner_url && (
-              <Tile on={!!draft.banner_url} label="Your photo" onClick={() => set({ banner_id: me.banner_id, banner_url: me.banner_url })}>
-                <span className="flex h-10 w-full items-center justify-center rounded-lg bg-background text-muted">
-                  <ImageIcon size={16} />
-                </span>
-              </Tile>
-            )}
-            {BANNERS.map((b) => (
-              <Tile
-                key={b.id}
-                on={!draft.banner_url && draft.banner_id === b.id}
-                label={b.label}
-                onClick={() => set({ banner_id: b.id, banner_url: null })}
-              >
-                <span className="block h-10 w-full rounded-lg" style={{ background: b.gradient }} />
-              </Tile>
-            ))}
-          </Shelf>
-        )}
       </section>
 
       <Link

@@ -7,9 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { BannerPicker } from "@/components/profile/BannerPicker";
-import { GradientPicker } from "@/components/profile/GradientPicker";
 import { ImageCropper } from "@/components/post/ImageCropper";
-import { PROFILE_TAGS, DEFAULT_BANNER_ID, profileBackground } from "@/lib/profile";
+import { PROFILE_TAGS, DEFAULT_BANNER_ID } from "@/lib/profile";
 import { InterestPills } from "@/components/profile/InterestPills";
 import { AccentPicker } from "@/components/profile/AccentPicker";
 import { updateProfile } from "@/app/(app)/settings/profile/actions";
@@ -33,7 +32,6 @@ export function EditProfileForm({
     profileTags: string[];
     interests: string[];
     accentId: string | null;
-    profileColors?: string[] | null;
     /** Premium members can upload a GIF banner. */
     isPremium?: boolean;
   };
@@ -54,7 +52,6 @@ export function EditProfileForm({
   const [tags, setTags] = useState<string[]>(initial.profileTags);
   const [interests, setInterests] = useState<string[]>(initial.interests);
   const [accentId, setAccentId] = useState<string | null>(initial.accentId);
-  const [profileColors, setProfileColors] = useState<string[] | null>(initial.profileColors ?? null);
 
   const [uStatus, setUStatus] = useState<UsernameStatus>("idle");
   const [uploading, setUploading] = useState(false);
@@ -225,7 +222,6 @@ export function EditProfileForm({
         avatarUrl,
         bannerId,
         bannerUrl,
-        profileColors,
       });
       if ("error" in res) {
         setError(res.error);
@@ -240,10 +236,7 @@ export function EditProfileForm({
   return (
     <div className="flex flex-col gap-6 px-5 pb-32 pt-4">
       {/* Banner + avatar preview */}
-      <div
-        className="overflow-hidden rounded-2xl border border-border"
-        style={{ background: profileBackground({ profile_colors: profileColors, is_premium: isPremium }) ?? undefined }}
-      >
+      <div className="overflow-hidden rounded-2xl border border-border">
         <ProfileBanner
           bannerId={bannerId}
           bannerUrl={bannerUrl}
@@ -371,11 +364,6 @@ export function EditProfileForm({
           {isPremium ? "Premium: GIF banners play on your profile." : "GIF banners come with Premium."}
         </p>
         {!bannerUrl && <BannerPicker value={bannerId} onChange={setBannerId} />}
-      </Field>
-
-      {/* The background behind the whole profile, not the banner. */}
-      <Field label="Profile colours">
-        <GradientPicker value={profileColors} onChange={setProfileColors} isPremium={isPremium} />
       </Field>
 
       {/* Display name */}

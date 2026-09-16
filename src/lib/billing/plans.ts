@@ -29,7 +29,7 @@ export const PREMIUM_PERKS = [
   { title: "Your name, your font", sub: "Six name styles and a glow in your colour" },
   { title: "Avatar decorations", sub: "Frames that sit around your photo" },
   { title: "Premium chat themes", sub: "Pond, Sakura, Galaxy, Sunset — both of you see them" },
-  { title: "Profile themes", sub: "Banners you can't get anywhere else" },
+  { title: "Animated banner", sub: "A GIF from your gallery, playing on your profile" },
   { title: "Custom app icon", sub: "Coming with the next app update" },
 ] as const;
 

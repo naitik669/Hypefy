@@ -18,7 +18,7 @@ export default async function StylePage({
   const [{ data: me }, { data: owned }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, display_name, username, avatar_url, avatar_hue, banner_id, banner_url, profile_colors, is_premium, is_verified, name_font, name_glow, avatar_decoration, bubble_style, nameplate")
+      .select("id, display_name, username, avatar_url, avatar_hue, banner_id, banner_url, is_premium, is_verified, name_font, name_glow, avatar_decoration, bubble_style, nameplate")
       .eq("id", user.id)
       .maybeSingle(),
     supabase.from("purchases").select("product_id").eq("user_id", user.id),
