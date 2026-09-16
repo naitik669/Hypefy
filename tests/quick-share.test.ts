@@ -147,6 +147,16 @@ describe("holding share", () => {
     expect(tiles()).toHaveLength(0);
   });
 
+  it("takes every touch while it is up, so nothing behind it can be used", async () => {
+    await hold();
+    const veil = document.querySelector("[data-hold-veil]") as HTMLElement;
+    expect(veil).toBeTruthy();
+    // Scrolling the feed underneath is off too, not just tapping it.
+    expect(veil.style.touchAction).toBe("none");
+    await pointer(veil, "pointerdown", 200, 700);
+    expect(tiles()).toHaveLength(0);
+  });
+
   it("sends nothing when the thumb lifts away from every face", async () => {
     await hold();
     // Well clear of the card: nothing is under the thumb to send to.

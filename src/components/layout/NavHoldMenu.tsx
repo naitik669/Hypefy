@@ -167,10 +167,14 @@ export function NavHoldMenu({
    *
    * A row is portalled, so it cannot be positioned relative to the trigger in
    * CSS. Left edge under the trigger's left edge, pulled back from the screen
-   * edge if the card would overhang, and dropped below the trigger when there
-   * is no room above it.
+   * edge if the card would overhang. "top" is the distance from whichever edge
+   * the card hangs off: normally the viewport's bottom, so the card's own
+   * bottom lands just above the button whatever height it turns out to be, and
+   * the top when there is no room above.
    */
-  const [rowPos, setRowPos] = useState<{ left: number; top: number } | null>(null);
+  const [rowPos, setRowPos] = useState<
+    { left: number; top: number; below: boolean } | null
+  >(null);
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startY = useRef(0);
@@ -365,14 +369,16 @@ export function NavHoldMenu({
           box.left + box.width / 2 < window.innerWidth / 2 ? "right" : "left"
         );
         if (layout === "row") {
-          // Tile, gap, and the card's own padding — enough to keep the whole
-          // card on screen without measuring something that isn't drawn yet.
-          const CARD_H = 92;
-          const width = ready.length * 44 + (ready.length - 1) * 8 + 20;
-          const above = box.top - CARD_H - 10;
+          // Tile, gap and the card's own padding: enough to keep it on screen
+          // without measuring something that has not been drawn yet.
+          const width = ready.length * 40 + (ready.length - 1) * 6 + 12;
+          // Card, its name line, and the 8px it stands off the button.
+          const CARD_H = 76;
+          const below = box.top < CARD_H + 8;
           setRowPos({
             left: Math.max(8, Math.min(box.left, window.innerWidth - width - 8)),
-            top: above >= 8 ? above : box.bottom + 10,
+            top: below ? box.bottom + 8 : window.innerHeight - box.top + 8,
+            below,
           });
         } else {
           // 48px tile + 12px gap each, and a little air above the last one.
@@ -437,20 +443,49 @@ export function NavHoldMenu({
     open && layout === "row" && typeof document !== "undefined"
       ? createPortal(
           <>
+            {/* Takes every touch that is not on the card — nothing behind it
+                can be scrolled, tapped or held while this is up — and closes
+                on one. Lighter than the nav's veil and not blurred: this one
+                sits a finger's width from what you are sharing, and dimming
+                the post into the dark made the card feel like a different
+                screen rather than something the button opened. */}
             <div
-              className="animate-switch-veil fixed inset-0 z-[200] bg-black/55 backdrop-blur-[2px]"
+              data-hold-veil=""
+              className="animate-switch-veil fixed inset-0 z-[200] bg-black/25"
               aria-hidden
-              onPointerDown={detached ? close : undefined}
+              style={{ touchAction: "none" }}
+              onPointerDown={close}
             />
             <div
-              className="fixed z-[201] flex flex-col items-start gap-1.5"
-              style={{ left: rowPos?.left ?? 8, top: rowPos?.top ?? 8, opacity: rowPos ? 1 : 0 }}
+              className="fixed z-[201] flex flex-col items-start gap-1"
+              style={{
+                left: rowPos?.left ?? 8,
+                // Anchored by the edge nearest the button, so the gap between
+                // the two is the 8px below and nothing else — measuring the
+                // card's height to place its top left a hole the thumb had to
+                // cross.
+                ...(rowPos?.below
+                  ? { top: rowPos.top }
+                  : { bottom: rowPos ? rowPos.top : 8 }),
+                opacity: rowPos ? 1 : 0,
+              }}
             >
+              {/* Whichever face is under the thumb, named. Above the card, out
+                  of the way of the thumb; always rendered so nothing shifts as
+                  it changes. */}
+              <span
+                aria-hidden
+                className="ml-1 max-w-[60vw] truncate rounded-md bg-elevated px-1.5 py-0.5 text-[11px] font-bold text-foreground shadow-lg ring-1 ring-border transition-opacity duration-150"
+                style={{ opacity: activeIdx === null ? 0 : 1, order: rowPos?.below ? 2 : 0 }}
+              >
+                {activeIdx === null ? " " : ordered[activeIdx].label}
+              </span>
               <div
                 ref={stackRef}
                 role="listbox"
                 aria-label={label}
-                className="flex items-center gap-2 rounded-3xl border border-white/10 bg-elevated/95 px-2.5 py-2.5 shadow-2xl backdrop-blur-xl"
+                className="flex items-center gap-1.5 rounded-2xl border border-white/10 bg-elevated/95 px-1.5 py-1.5 shadow-2xl backdrop-blur-xl"
+                style={{ order: 1 }}
               >
                 {ordered.map((action, i) => {
                   const active = i === activeIdx;
@@ -472,7 +507,7 @@ export function NavHoldMenu({
                           : undefined
                       }
                       className={`transition-transform duration-200 ease-out ${
-                        active ? "-translate-y-1 scale-110" : "scale-100"
+                        active ? "-translate-y-0.5 scale-105" : "scale-100"
                       }`}
                       style={{
                         // Out of the button, left to right, the way the row
@@ -481,7 +516,7 @@ export function NavHoldMenu({
                       }}
                     >
                       <span
-                        className={`flex h-11 w-11 items-center justify-center overflow-hidden rounded-[15px] border-2 transition-[background-color,border-color,color] duration-200 ${
+                        className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-[13px] border-2 transition-[background-color,border-color,color] duration-200 ${
                           active
                             ? "border-accent bg-accent/15 text-accent"
                             : "border-transparent bg-surface/80 text-foreground"
@@ -492,8 +527,8 @@ export function NavHoldMenu({
                             name={action.avatar.name}
                             hue={action.avatar.hue}
                             src={action.avatar.src ?? undefined}
-                            size={38}
-                            className="rounded-[11px]"
+                            size={34}
+                            className="rounded-[9px]"
                           />
                         ) : Icon ? (
                           <Icon size={20} />
@@ -503,15 +538,6 @@ export function NavHoldMenu({
                   );
                 })}
               </div>
-              {/* One line for whichever face is under the thumb. Always
-                  rendered, so the card does not shift as it changes. */}
-              <span
-                aria-hidden
-                className="ml-1.5 max-w-[60vw] truncate rounded-lg bg-elevated px-2 py-0.5 text-[12px] font-bold text-foreground shadow-lg ring-1 ring-border transition-opacity duration-150"
-                style={{ opacity: activeIdx === null ? 0 : 1 }}
-              >
-                {activeIdx === null ? " " : ordered[activeIdx].label}
-              </span>
             </div>
           </>,
           document.body,
