@@ -18,6 +18,8 @@ export type PeekablePost = {
   user_id: string;
   caption: string | null;
   image: string | null;
+  /** The post's composed shape, so the peek opens at the right size. */
+  aspect_ratio: number | null;
   hype_count: number;
   comment_count: number;
   author: PeekAuthor | null;
@@ -204,6 +206,7 @@ export function GridPeek({
       {open && post.image && (
         <PostPeek
           src={post.image}
+          aspectRatio={post.aspect_ratio}
           postId={post.id}
           author={post.author}
           caption={post.caption}

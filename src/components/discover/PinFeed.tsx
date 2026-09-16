@@ -289,6 +289,7 @@ function PinTile({ pin, currentUserId }: { pin: Pin; currentUserId: string }) {
         user_id: pin.user_id,
         caption: text || null,
         image: img,
+        aspect_ratio: pin.aspect_ratio,
         hype_count: pin.hype_count,
         comment_count: pin.comment_count,
         author: pin.profiles

@@ -52,6 +52,7 @@ export function PostResultsGrid({
               user_id: p.user_id,
               caption: p.caption ?? p.body ?? null,
               image: img,
+              aspect_ratio: p.aspect_ratio ?? null,
               hype_count: p.hype_count ?? 0,
               comment_count: p.comment_count ?? 0,
               author: profile

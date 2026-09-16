@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Star, MessageCircle, Bookmark } from "lucide-react";
 import { Plane } from "@/components/ui/Plane";
+import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { createClient } from "@/lib/supabase/client";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { Avatar } from "@/components/ui/Avatar";
@@ -40,6 +41,36 @@ import { ShareButton } from "@/components/feed/QuickShare";
  */
 const ARM_MS = 420;
 
+/** The tallest the photo may be, so the card's own chrome always fits. */
+const PEEK_MAX_H = "58vh";
+
+/**
+ * The box the photo sits in: exactly its own shape.
+ *
+ * The height cap alone would letterbox a tall post — full width, 58vh high,
+ * black bars either side — so the same cap is applied to the width through the
+ * ratio. A 9:16 post then comes out narrower rather than padded, and every
+ * post is drawn at its true shape. Giving the box a size before the pixels
+ * arrive is also what stops the card growing mid-open.
+ */
+export function peekPhotoBox(ratio: number | null | undefined): {
+  aspectRatio: string;
+  maxHeight: string;
+  maxWidth: string;
+} {
+  const r = ratio && ratio > 0 ? ratio : 1;
+  return { aspectRatio: String(r), maxHeight: PEEK_MAX_H, maxWidth: `calc(${PEEK_MAX_H} * ${r})` };
+}
+
+/** The widest the card may be, so a tall photo takes the card in with it
+ *  instead of sitting in a strip of empty surface. */
+const PEEK_MAX_W = "440px";
+
+export function peekCardBox(ratio: number | null | undefined): { maxWidth: string } {
+  const r = ratio && ratio > 0 ? ratio : 1;
+  return { maxWidth: `min(${PEEK_MAX_W}, calc(${PEEK_MAX_H} * ${r}))` };
+}
+
 export type PeekAuthor = {
   id: string;
   name: string;
@@ -58,6 +89,7 @@ export type PeekAuthor = {
 
 export function PostPeek({
   src,
+  aspectRatio,
   postId,
   targetType = "post",
   author,
@@ -74,6 +106,9 @@ export function PostPeek({
   onClose,
 }: {
   src: string;
+  /** The post's composed shape (posts.aspect_ratio), so the box is right from
+   *  the first frame. Null falls back to a square, as the feed card does. */
+  aspectRatio?: number | null;
   /** What's being shared when the share button is held. */
   postId: string;
   targetType?: "post" | "shot";
@@ -224,6 +259,7 @@ export function PostPeek({
         className="flex max-h-[88vh] w-full max-w-[440px] flex-col overflow-hidden rounded-3xl bg-surface shadow-2xl ring-1 ring-white/10"
         onClick={swallow}
         style={{
+          ...peekCardBox(aspectRatio),
           // Rises from just under its resting size, which reads as the card
           // lifting rather than a new thing appearing.
           transform: shown ? "scale(1)" : "scale(0.92)",
@@ -282,16 +318,18 @@ export function PostPeek({
             lastTap.current = { at: now, x: e.clientX, y: e.clientY };
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={src}
-            alt=""
-            draggable={false}
-            /* object-contain is the real gain, not raw size. A feed card crops
-               to its composed aspect ratio with object-cover, so a wide or tall
-               post is showing you part of itself; this shows all of it. */
-            className="mx-auto max-h-[58vh] w-full object-contain"
-          />
+          {/* The box is the photo's own shape (see peekPhotoBox), so
+              object-cover crops nothing — you see the whole post, at the size
+              it will still be once the pixels land. */}
+          <div className="relative mx-auto w-full overflow-hidden" style={peekPhotoBox(aspectRatio)}>
+            <OptimizedImage
+              src={src}
+              alt={caption ?? "Post"}
+              sizes="(max-width: 480px) 100vw, 440px"
+              className="object-cover"
+              draggable={false}
+            />
+          </div>
           {burst > 0 && (
             <div key={burst} className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <Star

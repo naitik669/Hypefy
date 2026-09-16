@@ -948,6 +948,7 @@ export function FeedCard({
       {peekSrc && (
         <PostPeek
           src={peekSrc}
+          aspectRatio={post.aspect_ratio}
           postId={post.id}
           author={{
             id: post.user_id,
