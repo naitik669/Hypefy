@@ -50,7 +50,7 @@ const GLASS = {
     text: "text-white",
   },
   sent: {
-    fill: "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 40%), rgba(163,230,53,0.9)",
+    fill: "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 40%), rgba(163,230,53,0.8)",
     rim: "rgba(236,252,203,0.55)",
     text: "text-accent-ink",
   },
