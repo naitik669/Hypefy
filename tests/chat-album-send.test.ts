@@ -93,22 +93,21 @@ describe("sending a folder", () => {
       return { error: null };
     });
 
-    // Photo or video → pick two.
-    const input = host.querySelector('input[type="file"]') as HTMLInputElement;
-    const files = [new File(["a"], "a.jpg", { type: "image/jpeg" }), new File(["b"], "b.jpg", { type: "image/jpeg" })];
+    // The paperclip opens the picker; the Gallery tile adds two, already picked.
     await act(async () => {
       (host.querySelector('[aria-label="Attach"]') as HTMLButtonElement).click();
     });
-    await act(async () => {
-      [...document.querySelectorAll('[role="menuitem"]')]
-        .find((b) => b.textContent?.includes("Photo or video"))!
-        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
+    expect(document.querySelector("[data-camera-tile]")).toBeTruthy();
+    const input = document.querySelector("[data-gallery-input]") as HTMLInputElement;
+    const files = [new File(["a"], "a.jpg", { type: "image/jpeg" }), new File(["b"], "b.jpg", { type: "image/jpeg" })];
     Object.defineProperty(input, "files", { value: files, configurable: true });
     await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
-    expect(host.querySelector("[data-album-draft]")).toBeTruthy();
+    expect(document.querySelectorAll('[data-picker-grid] [aria-pressed="true"]')).toHaveLength(2);
+    // Picking swaps the tabs for a caption and a send button.
+    expect(document.querySelector("[data-picker-tabs]")).toBeNull();
 
-    await act(async () => (host.querySelector('[aria-label="Send"]') as HTMLButtonElement).click());
+    await act(async () => (document.querySelector('[aria-label="Send 2"]') as HTMLButtonElement).click());
+    await act(async () => { await new Promise((r) => setTimeout(r, 400)); });
 
     // In the thread already, drawn from the device, still sending.
     const folder = host.querySelector("[data-media-folder]")!;
@@ -116,7 +115,6 @@ describe("sending a folder", () => {
     expect(folder.querySelector("img")!.getAttribute("src")).toMatch(/^blob:/);
     expect(host.querySelector('[aria-label="Sending"]')).toBeTruthy();
     // The composer is not the one waiting.
-    expect(host.querySelector("[data-album-draft]")).toBeNull();
     expect(host.querySelector('[aria-label="Record voice note"]')).toBeTruthy();
     expect(rpc.mock.calls.some(([fn]) => fn === "send_message")).toBe(false);
 

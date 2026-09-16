@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Image as ImageIcon } from "lucide-react";
+import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check } from "lucide-react";
 import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
@@ -38,14 +38,14 @@ import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { DisplayName } from "@/components/ui/DisplayName";
 import { visibleDecoration } from "@/lib/cosmetics";
 import { MediaFolder, AlbumViewer } from "@/components/messages/MediaFolder";
+import { MediaPicker, type PickEntry } from "@/components/messages/MediaPicker";
 import {
   ALBUM_CAPTION_MAX,
-  ALBUM_CAPTION_WARN,
-  ALBUM_MAX_ITEMS,
   albumSnippet,
   encodeAlbum,
   parseAlbum,
   type Album,
+  type AlbumItem,
 } from "@/lib/chat-album";
 import { uploadAlbumFiles, type AlbumFile } from "@/lib/chat-album-upload";
 
@@ -90,6 +90,9 @@ export type ChatMsg = {
   /** Client-only, folders: the album drawn from this device's files while
    *  it uploads, so nothing reloads when the real URLs arrive. */
   _preview?: string;
+  /** Client-only, single photo or video: the file on this device, drawn
+   *  while it uploads and after, so the picture never reloads. */
+  _localUrl?: string;
   _caption?: string;
 };
 
@@ -178,23 +181,6 @@ const DOC_MIMES = [
 ];
 /** Extensions too — some platforms' file pickers match on those, not mime. */
 const DOC_ACCEPT = `${DOC_MIMES.join(",")},.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip`;
-
-/** Rows in the attachment chooser, in priority order.
- *
- *  Labels only — no descriptions. Every label already says what it does,
- *  and the one row that genuinely needs a caveat (View once) gets it at
- *  the point of sending, in the composer preview, where it is far harder
- *  to miss than a grey subtitle in a picker. */
-const ATTACH_OPTIONS: {
-  mode: "media" | "oneshot" | "document" | "gif";
-  icon: React.ReactNode;
-  label: string;
-}[] = [
-  { mode: "media", icon: <ImageIcon size={16} />, label: "Photo or video" },
-  { mode: "oneshot", icon: <Eye size={16} />, label: "View once" },
-  { mode: "document", icon: <FileText size={16} />, label: "Document" },
-  { mode: "gif", icon: <span className="text-[9px] font-black tracking-wider">GIF</span>, label: "GIF" },
-];
 
 /** "2.4 MB" / "812 KB" — for document bubbles. */
 function fileSize(bytes: number): string {
@@ -333,15 +319,13 @@ export function RealChatView({
   } | null>(null);
   // Which attachment sheet option was chosen — read by pickFile to validate
   // the file against that intent, since one hidden <input> serves all three.
-  const [attachMenu, setAttachMenu] = useState(false);
-  // Two or more photos/videos picked at once travel as one folder message;
-  // while staged, the composer's text is the folder's caption.
-  const [albumDraft, setAlbumDraft] = useState<{ file: File; preview: string; type: "image" | "video" }[]>([]);
+  // The paperclip's sheet: camera, this chat's photos, your gallery.
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [albumView, setAlbumView] = useState<{ album: Album; start: number; senderId: string; at: string } | null>(null);
   // A sending folder's files, by its temp id, kept until they are uploaded so
   // a failed upload can be retried.
   const albumFiles = useRef(new Map<string, AlbumFile[]>());
-  const pickMode = useRef<"media" | "oneshot" | "document">("media");
+  const pickMode = useRef<"oneshot" | "document">("document");
   const [uploading, setUploading] = useState(false);
   // Local-only, per-mount reveal state for OneShot bubbles: which message ids
   // the viewer has tapped to open. Not persisted — if they leave and come
@@ -748,7 +732,7 @@ export function RealChatView({
               const tempIdx = prev.findIndex((x) => x.id.startsWith("temp-") && x.kind === m.kind && x.body === m.body);
               if (tempIdx !== -1) {
                 const copy = [...prev];
-                copy[tempIdx] = { ...m, post: null, _preview: prev[tempIdx]._preview };
+                copy[tempIdx] = { ...m, post: null, _preview: prev[tempIdx]._preview, _localUrl: prev[tempIdx]._localUrl };
                 return copy;
               }
             }
@@ -1005,8 +989,8 @@ export function RealChatView({
    */
   async function retrySend(failed: ChatMsg) {
     const files = albumFiles.current.get(failed.id);
-    if (failed.kind === "album" && files) {
-      void deliverAlbum(failed.id, files, failed._caption ?? "", failed.reply_to_id);
+    if (files) {
+      void deliverMedia(failed.id, files, failed._caption ?? "", failed.reply_to_id);
       return;
     }
     // A OneShot has no body by design — the image is private.
@@ -1131,18 +1115,12 @@ export function RealChatView({
   /** Handle file input change — validate against the chosen mode, build a
    *  preview, and stage the attachment. */
   function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = [...(e.target.files ?? [])];
-    const file = files[0];
+    const file = e.target.files?.[0];
     e.target.value = ""; // reset so the same file can be re-picked
     if (!file) return;
     setGifPickerOpen(false);
 
     const mode = pickMode.current;
-    if (mode === "media" && files.length > 1) {
-      stageAlbum(files);
-      return;
-    }
-    clearAlbumDraft();
     const isVideo = file.type.startsWith("video/");
     const isImage = file.type.startsWith("image/");
 
@@ -1185,84 +1163,64 @@ export function RealChatView({
     });
   }
 
-  function clearAlbumDraft() {
-    setAlbumDraft((d) => {
-      d.forEach((x) => URL.revokeObjectURL(x.preview));
-      return [];
-    });
-  }
+  /** Recent photos and videos in this chat, newest first, for the picker. */
+  const chatMedia = useMemo(() => {
+    const seen = new Set<string>();
+    const out: AlbumItem[] = [];
+    for (let i = messages.length - 1; i >= 0 && out.length < 60; i--) {
+      const m = messages[i];
+      if (m.is_unsent || m.id.startsWith("temp-")) continue;
+      const items: AlbumItem[] =
+        m.kind === "album"
+          ? parseAlbum(m.body)?.items ?? []
+          : (m.kind === "image" || m.kind === "video") && m.body?.startsWith("http")
+            ? [{ url: m.body, type: m.kind }]
+            : [];
+      for (const it of items) {
+        if (seen.has(it.url)) continue;
+        seen.add(it.url);
+        out.push(it);
+      }
+    }
+    return out;
+  }, [messages]);
 
-  /** Stage several photos/videos as one folder, dropping what can't be sent. */
-  function stageAlbum(files: File[]) {
-    const ok: { file: File; preview: string; type: "image" | "video" }[] = [];
-    let skipped = 0;
-    for (const file of files) {
-      const isVideo = file.type.startsWith("video/");
-      const isImage = file.type.startsWith("image/");
-      const maxMb = isVideo ? 50 : 10;
-      if ((!isVideo && !isImage) || file.size > maxMb * 1024 * 1024) { skipped++; continue; }
-      if (ok.length === ALBUM_MAX_ITEMS) { skipped++; continue; }
-      ok.push({ file, preview: URL.createObjectURL(file), type: isVideo ? "video" : "image" });
-    }
-    if (skipped) {
-      showToast(files.length > ALBUM_MAX_ITEMS && ok.length === ALBUM_MAX_ITEMS
-        ? `Up to ${ALBUM_MAX_ITEMS} at a time. The rest weren't added.`
-        : "Some files were too large or not photos or videos.");
-    }
-    if (attachment?.preview) URL.revokeObjectURL(attachment.preview);
-    setAttachment(null);
-    clearAlbumDraft();
-    if (ok.length === 0) return;
-    if (ok.length === 1) {
-      setAttachment({ file: ok[0].file, preview: ok[0].preview, type: ok[0].type, viewOnce: false });
-      return;
-    }
-    setAlbumDraft(ok);
-    setText((t) => t.slice(0, ALBUM_CAPTION_MAX));
-    composerRef.current?.focus();
-  }
-
-  function removeFromAlbum(index: number) {
-    const rest = albumDraft.filter((_, i) => i !== index);
-    URL.revokeObjectURL(albumDraft[index].preview);
-    if (rest.length === 1) {
-      // One left is just a photo or video again.
-      setAttachment({ file: rest[0].file, preview: rest[0].preview, type: rest[0].type, viewOnce: false });
-      setAlbumDraft([]);
-      return;
-    }
-    setAlbumDraft(rest);
-  }
-
-  /** Send the staged folder. It lands in the thread straight away, drawn
-   *  from the files on this device with the sending dots, and the composer
-   *  is free again at once — the upload runs behind the message, not in the
-   *  text box. */
-  function sendAlbum() {
-    if (albumDraft.length < 2) return;
-    const files = albumDraft.map(({ file, type }) => ({ file, type }));
-    const caption = text;
+  /**
+   * Send what was chosen in the picker or taken with the camera. It lands in
+   * the thread straight away, drawn from this device with the sending dots,
+   * and uploads behind the message. Two or more go as a folder with the
+   * caption on it; one goes as a photo or video, with the caption as a
+   * message after it.
+   */
+  function sendMedia(entries: PickEntry[], caption: string) {
+    if (!entries.length) return;
     const replyId = replyTo?.id ?? null;
-    const tempId = `temp-${Date.now()}`;
-    const local = encodeAlbum({ caption, items: albumDraft.map((x) => ({ url: x.preview, type: x.type })) });
-    setMessages((p) => [...p, {
-      id: tempId, body: local, sender_id: currentUserId, kind: "album",
-      post_id: null, reply_to_id: replyId, is_unsent: false,
-      created_at: new Date().toISOString(), _status: "pending",
-      _preview: local, _caption: caption,
-    }]);
-    albumFiles.current.set(tempId, files);
-    // The object URLs now belong to the message on screen, so they are not
-    // revoked here.
-    setAlbumDraft([]);
-    setText("");
     setReplyTo(null);
-    void deliverAlbum(tempId, files, caption, replyId);
+    const tempId = `temp-${Date.now()}`;
+    const files: AlbumFile[] = entries.map((e) => ({ file: e.file, type: e.type, url: e.url }));
+    const now = new Date().toISOString();
+    if (entries.length > 1) {
+      const local = encodeAlbum({ caption, items: entries.map((e) => ({ url: e.url ?? e.preview, type: e.type })) });
+      setMessages((p) => [...p, {
+        id: tempId, body: local, sender_id: currentUserId, kind: "album",
+        post_id: null, reply_to_id: replyId, is_unsent: false,
+        created_at: now, _status: "pending", _preview: local, _caption: caption,
+      }]);
+    } else {
+      const e = entries[0];
+      setMessages((p) => [...p, {
+        id: tempId, body: e.url ?? e.preview, sender_id: currentUserId, kind: e.type,
+        post_id: null, reply_to_id: replyId, is_unsent: false,
+        created_at: now, _status: "pending", _localUrl: e.preview, _caption: caption,
+      }]);
+    }
+    albumFiles.current.set(tempId, files);
+    void deliverMedia(tempId, files, caption, replyId);
   }
 
-  /** Upload a folder's files, then send it. Also what a retry runs when the
-   *  upload itself never finished. */
-  async function deliverAlbum(
+  /** Upload what still needs uploading, then send. Also what Retry runs when
+   *  the upload never finished. */
+  async function deliverMedia(
     tempId: string,
     files: AlbumFile[],
     caption: string,
@@ -1275,18 +1233,20 @@ export function RealChatView({
     const uploads = await uploadAlbumFiles(files, supabase.storage.from("chat-media"), currentUserId);
     if (!uploads) {
       mark({ _status: "failed" });
-      showToast("Photos didn't upload. Tap Retry.");
+      showToast(files.length > 1 ? "Photos didn't upload. Tap Retry." : "Didn't upload. Tap Retry.");
       return;
     }
 
+    const single = uploads.length === 1;
+    const kind = single ? uploads[0].type : "album";
     // The real body goes on before the send, so the realtime echo can find
     // this message by it; the picture keeps drawing from the device.
-    const body = encodeAlbum({ caption, items: uploads });
+    const body = single ? uploads[0].url : encodeAlbum({ caption, items: uploads });
     mark({ body });
     albumFiles.current.delete(tempId);
 
     const { data, error } = await supabase.rpc("send_message", {
-      p_conversation_id: conversationId, p_body: body, p_kind: "album",
+      p_conversation_id: conversationId, p_body: body, p_kind: kind,
       p_post_id: undefined, p_reply_to_id: replyId ?? undefined,
     });
     if (error || !data) {
@@ -1296,18 +1256,23 @@ export function RealChatView({
     }
     const real = data as ChatMsg;
     setMessages((p) => p.some((m) => m.id === real.id) ? p.filter((m) => m.id !== tempId) : p.map((m) => m.id === tempId ? { ...m, ...real, _status: undefined } : m));
+
+    if (single && caption.trim()) {
+      const { data: note } = await supabase.rpc("send_message", {
+        p_conversation_id: conversationId, p_body: caption.trim(), p_kind: "text",
+        p_post_id: undefined, p_reply_to_id: undefined,
+      });
+      const n = note as ChatMsg | null;
+      if (n) setMessages((p) => (p.some((m) => m.id === n.id) ? p : [...p, n]));
+    }
   }
 
   /** Open the OS picker for one of the sheet's options. */
-  function openPicker(mode: "media" | "oneshot" | "document") {
+  function openPicker(mode: "oneshot" | "document") {
     pickMode.current = mode;
-    setAttachMenu(false);
     const input = fileInputRef.current;
     if (!input) return;
-    input.accept =
-      mode === "document" ? DOC_ACCEPT : mode === "oneshot" ? "image/*" : "image/*,video/*";
-    // Photo or video lets you pick several, which then go as one folder.
-    input.multiple = mode === "media";
+    input.accept = mode === "document" ? DOC_ACCEPT : "image/*";
     input.click();
   }
 
@@ -1839,7 +1804,7 @@ export function RealChatView({
                           style={{ width: m.kind === "image" ? MEDIA_W : undefined, maxWidth: MEDIA_W }}
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={m.body} alt={m.kind === "gif" ? "GIF" : ""} className="w-full rounded-2xl object-cover" />
+                          <img src={m._localUrl ?? m.body} alt={m.kind === "gif" ? "GIF" : ""} className="w-full rounded-2xl object-cover" />
                           {/* GIF badge */}
                           {m.kind === "gif" && (
                             <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white backdrop-blur-sm">
@@ -1890,7 +1855,7 @@ export function RealChatView({
                           className="relative overflow-hidden rounded-2xl bg-black"
                           style={{ width: MEDIA_W, maxWidth: "100%" }}
                         >
-                          <video src={m.body} className="w-full rounded-2xl" controls playsInline preload="metadata" />
+                          <video src={m._localUrl ?? m.body} className="w-full rounded-2xl" controls playsInline preload="metadata" />
                           <span className="absolute bottom-1.5 right-2 flex items-center gap-[3px] rounded-full bg-black/60 px-1.5 py-[3px] backdrop-blur-sm">
                             <span className="text-[9px] font-medium leading-none text-white/85">{timeLabel(m.created_at)}</span>
                             {mine && <MsgStatusTick status={getMsgStatus(m)} />}
@@ -2119,45 +2084,6 @@ export function RealChatView({
           </div>
         )}
 
-        {/* ── Folder being put together ── */}
-        {albumDraft.length > 1 && !voiceMode && (
-          <div className="mb-2 rounded-xl border border-border/60 bg-surface p-2" data-album-draft>
-            <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
-              {albumDraft.map((x, i) => (
-                <div key={x.preview} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-elevated">
-                  {x.type === "image" ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={x.preview} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <video src={x.preview} className="h-full w-full object-cover" muted playsInline preload="metadata" />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeFromAlbum(i)}
-                    aria-label={`Remove item ${i + 1}`}
-                    className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white"
-                  >
-                    <X size={11} strokeWidth={2.75} />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="mt-1.5 flex items-center justify-between px-0.5 text-[10px] text-faint">
-              <span>{albumDraft.length} in one folder · caption below</span>
-              <span className="flex items-center gap-2">
-                {text.length >= ALBUM_CAPTION_WARN && (
-                  <span className={`tabular-nums ${text.length >= ALBUM_CAPTION_MAX ? "text-danger" : ""}`}>
-                    {ALBUM_CAPTION_MAX - text.length}
-                  </span>
-                )}
-                <button type="button" onClick={clearAlbumDraft} className="font-semibold text-muted hover:text-foreground">
-                  Clear
-                </button>
-              </span>
-            </div>
-          </div>
-        )}
-
         {/* ── Reply-to banner ── */}
         {replyTo && !voiceMode && (
           <div className="mb-2 flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 text-xs">
@@ -2191,62 +2117,21 @@ export function RealChatView({
           /* ── Text / GIF / attachment composer ── */
           <div className="flex items-center gap-1.5">
 
-            {/* Attachment button — opens the type chooser rather than jumping
-                straight to the OS picker, so "view once" is a decision you make
-                up front instead of a toggle you have to notice afterwards.
-                relative, so the menu anchors to the clip itself. */}
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => { setGifPickerOpen(false); setAttachMenu((v) => !v); }}
-                aria-label="Attach"
-                aria-haspopup="menu"
-                aria-expanded={attachMenu}
-                className={`flex h-11 w-10 items-center justify-center rounded-full transition active:scale-90 ${
-                  attachMenu || attachment ? "text-accent" : "text-muted hover:bg-surface hover:text-foreground"
-                }`}
-              >
-                <Paperclip size={19} className={`transition-transform duration-200 ${attachMenu ? "rotate-45" : ""}`} />
-              </button>
-
-              <FloatingMenu
-                open={attachMenu}
-                onClose={() => setAttachMenu(false)}
-                origin="bottom-left"
-                exitMs={130}
-                bare
-                className="absolute bottom-[calc(100%+10px)] left-0 flex w-[190px] flex-col gap-1.5"
-              >
-                {ATTACH_OPTIONS.map((o, i) => (
-                  <button
-                    key={o.label}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      if (o.mode === "gif") { setAttachMenu(false); setGifPickerOpen(true); }
-                      else openPicker(o.mode);
-                    }}
-                    // Staggered bottom-up: the tile nearest the clip appears
-                    // first, so the stack reads as rising out of the button
-                    // rather than dropping onto it.
-                    style={{ animationDelay: `${(ATTACH_OPTIONS.length - 1 - i) * 45}ms` }}
-                    className="attach-tile animate-row-in group flex items-stretch overflow-hidden rounded-xl border border-border bg-elevated text-left shadow-[0_6px_16px_rgba(0,0,0,0.4)] transition-colors hover:bg-border"
-                  >
-                    {/* One surface, split by a hairline. The divider is a
-                        white overlay rather than border-border so it stays
-                        visible once the hover state lifts the tile TO
-                        border-border — same-colour-on-same-colour would
-                        make it vanish exactly when the row is focused. */}
-                    <span className="flex w-9 shrink-0 items-center justify-center border-r border-white/[0.08] text-muted transition-colors group-hover:text-accent">
-                      {o.icon}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate px-2.5 py-[9px] text-[13px] font-medium text-foreground">
-                      {o.label}
-                    </span>
-                  </button>
-                ))}
-              </FloatingMenu>
-            </div>
+            {/* Attachment button — opens the picker sheet: camera, this
+                chat's photos, the gallery, and tabs for files, GIFs and
+                View once. */}
+            <button
+              type="button"
+              onClick={() => { setGifPickerOpen(false); setPickerOpen(true); }}
+              aria-label="Attach"
+              aria-haspopup="dialog"
+              aria-expanded={pickerOpen}
+              className={`flex h-11 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-90 ${
+                pickerOpen || attachment ? "text-accent" : "text-muted hover:bg-surface hover:text-foreground"
+              }`}
+            >
+              <Paperclip size={19} />
+            </button>
 
             {/* Text input */}
             <div className="relative flex-1">
@@ -2256,9 +2141,9 @@ export function RealChatView({
                 onChange={(e) => { setText(e.target.value); setDmCursor(e.target.selectionStart ?? 0); if (e.target.value) emitTyping(); }}
                 onSelect={(e) => setDmCursor((e.target as HTMLInputElement).selectionStart ?? 0)}
                 onBlur={() => setTimeout(resetPicker, 150)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (albumDraft.length > 1 ? sendAlbum() : send())}
-                placeholder={albumDraft.length > 1 || editing?.kind === "album" ? "Add a caption…" : "Message…"}
-                maxLength={albumDraft.length > 1 || editing?.kind === "album" ? ALBUM_CAPTION_MAX : undefined}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
+                placeholder={editing?.kind === "album" ? "Add a caption…" : "Message…"}
+                maxLength={editing?.kind === "album" ? ALBUM_CAPTION_MAX : undefined}
                 className="h-11 w-full rounded-2xl bg-surface px-4 text-sm outline-none placeholder:text-faint focus:border-white/25"
               />
               <SuggestionDropdown suggestions={pickerSuggestions} onSelect={(s) => {
@@ -2270,7 +2155,7 @@ export function RealChatView({
             </div>
 
             {/* GIF toggle — only when no text and no attachment */}
-            {!text.trim() && !attachment && albumDraft.length < 2 && !editing && (
+            {!text.trim() && !attachment && !editing && (
               <button
                 type="button"
                 onClick={() => setGifPickerOpen((v) => !v)}
@@ -2286,7 +2171,7 @@ export function RealChatView({
             )}
 
             {/* Mic — only when no text and no attachment */}
-            {!text.trim() && !attachment && albumDraft.length < 2 && !editing && (
+            {!text.trim() && !attachment && !editing && (
               <button
                 type="button"
                 onClick={() => { setGifPickerOpen(false); setVoiceMode(true); }}
@@ -2298,10 +2183,10 @@ export function RealChatView({
             )}
 
             {/* Send — text (takes priority) or attachment */}
-            {(text.trim() || attachment || albumDraft.length > 1 || editing) && (
+            {(text.trim() || attachment || editing) && (
               <button
                 type="button"
-                onClick={editing ? send : albumDraft.length > 1 ? sendAlbum : text.trim() ? send : sendAttachment}
+                onClick={editing || text.trim() ? send : sendAttachment}
                 disabled={sending || uploading}
                 aria-label={editing ? "Save changes" : "Send"}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"
@@ -2331,6 +2216,17 @@ export function RealChatView({
         />
       </div>
 
+
+      <MediaPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        recents={chatMedia}
+        onSend={sendMedia}
+        onFile={() => openPicker("document")}
+        onGif={() => setGifPickerOpen(true)}
+        onViewOnce={() => openPicker("oneshot")}
+        onRejected={(msg) => showToast(msg)}
+      />
 
       {albumView && (
         <AlbumViewer

@@ -27,7 +27,8 @@ const PARALLEL = 2;
 export const UPLOAD_BASE_MS = 45_000;
 const MS_PER_KB = 60;
 
-export type AlbumFile = { file: File; type: "image" | "video"; url?: string };
+/** A file to upload, or a photo already uploaded (url set, no file). */
+export type AlbumFile = { file?: File; type: "image" | "video"; url?: string };
 
 type Bucket = {
   upload: (path: string, body: Blob, opts: { contentType: string }) => Promise<{ error: unknown }>;
@@ -132,14 +133,15 @@ export async function uploadAlbumFiles(
   let next = 0;
 
   async function one(entry: AlbumFile, i: number) {
-    if (entry.url) return;
+    if (entry.url || !entry.file) return;
+    const file = entry.file;
     try {
-      const picked = entry.type === "image" ? await shrinkPhoto(entry.file) : entry.file;
-      const contentType = picked.type || entry.file.type || (entry.type === "video" ? "video/mp4" : "image/jpeg");
+      const picked = entry.type === "image" ? await shrinkPhoto(file) : file;
+      const contentType = picked.type || file.type || (entry.type === "video" ? "video/mp4" : "image/jpeg");
       const body = new Blob([await readBytes(picked)], { type: contentType });
       const ext =
         entry.type === "video"
-          ? entry.file.name.split(".").pop() || "mp4"
+          ? file.name.split(".").pop() || "mp4"
           : contentType === "image/png" ? "png" : contentType === "image/gif" ? "gif" : contentType === "image/webp" ? "webp" : "jpg";
       const path = `${userId}/${stamp}-${i}.${ext}`;
       const res = await withTimeout(bucket.upload(path, body, { contentType }), uploadTimeout(body.size, baseTimeoutMs));
