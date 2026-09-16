@@ -938,6 +938,16 @@ html[data-dm-leave]::view-transition-old(root) {
     transform: translateX(100%);
   }
 }
+/* Shown only when a wait runs long: invisible for the first 0.4s, so a fast
+   page never flashes a loading state on its way in. */
+.loading-late {
+  animation: loading-late 200ms ease-out 400ms both;
+}
+@keyframes loading-late {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .skeleton {
   position: relative;
   overflow: hidden;

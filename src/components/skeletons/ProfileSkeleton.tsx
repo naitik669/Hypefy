@@ -1,63 +1,75 @@
+import { Bookmark, Grid3x3, Zap } from "lucide-react";
 import { Skeleton, SkeletonLine } from "@/components/ui/Skeleton";
+import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
 
-/** Shared profile-page skeleton (own profile + public /u/[username]). */
+/**
+ * A profile before it loads: your own and anyone's (/u/[username]).
+ *
+ * Sizes from ProfileHeader and ProfileTabs: the banner is mx-2 mt-2, 3:1 with
+ * the card radius; the face is 84px, rounded-[26px], lifted -mt-11 over it;
+ * stats are three columns beside it; the tab bar's labels are drawn for real,
+ * and the grid uses the grid's own classes so tiles land where posts will.
+ */
 export function ProfileSkeleton() {
   return (
     <>
-      {/* Banner */}
-      <Skeleton rounded="rounded-none" className="h-32 w-full" />
+      <div className="mx-2 mt-2">
+        <Skeleton rounded="rounded-card" className="aspect-[3/1] w-full" />
+      </div>
 
       <div className="px-4">
-        {/* Avatar + stats */}
         <div className="flex items-end gap-4">
-          <div className="-mt-11">
-            <Skeleton rounded="rounded-[26px]" className="h-[84px] w-[84px] ring-4 ring-background" />
+          {/* relative: the banner shimmer is positioned, and would paint over a
+              static wrapper, ring and all. */}
+          <div className="relative -mt-11 rounded-[26px] ring-4 ring-background">
+            <Skeleton rounded="rounded-[26px]" className="h-[84px] w-[84px]" />
           </div>
           <div className="flex flex-1 justify-around pb-1">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="flex flex-col items-center gap-1.5">
-                <SkeletonLine width={28} height={14} />
+                <SkeletonLine width={26} height={18} />
                 <SkeletonLine width={44} height={9} />
               </div>
             ))}
           </div>
         </div>
 
-        {/* Identity */}
         <div className="mt-3 flex flex-col gap-2">
-          <SkeletonLine width={140} height={14} />
-          <SkeletonLine width={90} height={10} />
-          <SkeletonLine width="75%" height={10} />
+          <SkeletonLine width={140} height={15} />
+          <SkeletonLine width={90} height={11} />
         </div>
 
-        {/* Tags */}
-        <div className="mt-3 flex gap-1.5">
-          <Skeleton rounded="rounded-lg" className="h-7 w-20" />
-          <Skeleton rounded="rounded-lg" className="h-7 w-16" />
-          <Skeleton rounded="rounded-lg" className="h-7 w-24" />
-        </div>
-
-        {/* Action buttons */}
-        <div className="mt-4 flex gap-2">
+        <div className="mt-3 flex gap-2">
           <Skeleton rounded="rounded-xl" className="h-10 flex-1" />
-          <Skeleton rounded="rounded-xl" className="h-10 w-24" />
+          <Skeleton rounded="rounded-xl" className="h-10 flex-1" />
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="mt-5 flex border-b border-border/60">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="flex flex-1 justify-center py-3">
-            <SkeletonLine width={48} height={12} />
+      <div className="mt-2">
+        <div className="flex border-y border-border">
+          {[
+            { key: "Posts", Icon: Grid3x3 },
+            { key: "Shots", Icon: Zap },
+            { key: "Saved", Icon: Bookmark },
+          ].map(({ key, Icon }, i) => (
+            <span
+              key={key}
+              className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 py-3 text-sm font-semibold ${
+                i === 0 ? "border-accent text-foreground" : "border-transparent text-muted"
+              }`}
+            >
+              <Icon size={16} />
+              {key}
+            </span>
+          ))}
+        </div>
+        <div className={`mt-3 ${GRID_WRAP}`}>
+          <div className={GRID}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} rounded="rounded-xl" className="h-full w-full" />
+            ))}
           </div>
-        ))}
-      </div>
-
-      {/* Grid */}
-      <div className="grid grid-cols-3 gap-1 p-1">
-        {Array.from({ length: 9 }).map((_, i) => (
-          <Skeleton key={i} rounded="rounded-md" className="aspect-square w-full" />
-        ))}
+        </div>
       </div>
     </>
   );

@@ -1,180 +1,153 @@
-import { Skeleton, SkeletonCircle, SkeletonLine } from "@/components/ui/Skeleton";
+import { ChevronLeft, Compass, Star } from "lucide-react";
+import { Skeleton, SkeletonLine } from "@/components/ui/Skeleton";
 
-/** Full-screen Shots (reels) skeleton — matches the ReelsFeed layout. */
-export function ReelSkeleton() {
-  return (
-    <div className="fixed inset-x-0 top-0 bottom-[72px] z-10 mx-auto max-w-[480px] overflow-hidden bg-black">
-      <Skeleton rounded="rounded-none" className="absolute inset-0" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent" />
+/*
+ * Loading shapes.
+ *
+ * Two rules, because a skeleton that is wrong is worse than none:
+ *
+ *  1. Everything that never changes is drawn for real: titles, icons, the
+ *     search box, tab labels. Only what the server is fetching shimmers. A
+ *     screen of grey bars where the header should be reads as the app being
+ *     slow; the real header reads as the app being there already.
+ *  2. Every size is copied from the component it stands in for, and says
+ *     where from, so the page lands without anything moving. When that
+ *     component changes, this has to change with it.
+ *
+ * Only pages that fetch on the server have one. Pages that draw their own
+ * loading rows (Activity, Search) don't, or you get two placeholders in a row.
+ */
 
-      {/* Right action rail */}
-      <div className="absolute bottom-24 right-3 flex flex-col items-center gap-5">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <SkeletonCircle key={i} size={32} />
-        ))}
-      </div>
-
-      {/* Author + caption */}
-      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-4 pr-16">
-        <div className="flex items-center gap-2.5">
-          <SkeletonCircle size={38} />
-          <SkeletonLine width={110} height={12} />
-        </div>
-        <SkeletonLine width="60%" height={10} />
-      </div>
-    </div>
-  );
+/** A face: Avatar is a squircle, rounded-[30%]. */
+export function AvatarSkeleton({ size }: { size: number }) {
+  return <Skeleton rounded="rounded-[30%]" className="shrink-0" style={{ width: size, height: size }} />;
 }
 
-/** Static header bar skeleton (matches TopBar height/layout). */
-export function HeaderSkeleton({ centerWordmark = false }: { centerWordmark?: boolean }) {
+/** PageHeader: back button, title. */
+export function PageHeaderStatic({ title, back = true }: { title: string; back?: boolean }) {
   return (
-    <header className="sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center pt-[var(--sat)] justify-between border-b border-border/60 chrome-bar px-4">
-      <SkeletonCircle size={32} />
-      {centerWordmark ? (
-        <span className="text-xl font-extrabold tracking-tight text-foreground/90">
-          Hypefy<span className="text-accent">.</span>
+    <header className="sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center gap-1 border-b border-border/60 chrome-bar px-2 pt-[var(--sat)]">
+      {back ? (
+        <span className="flex h-10 w-10 items-center justify-center text-foreground">
+          <ChevronLeft size={24} />
         </span>
       ) : (
-        <SkeletonLine width={96} height={16} />
+        <span className="w-2" />
       )}
-      <SkeletonCircle size={32} />
+      <h1 className="flex-1 truncate px-1 text-[17px] font-extrabold tracking-tight">{title}</h1>
     </header>
   );
 }
 
-/** Horizontal Shows row skeleton. */
+/** Home's TopBar: compass, the wordmark, the activity star. */
+export function HomeTopBarStatic() {
+  return (
+    <header className="sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center justify-between border-b border-border/60 chrome-bar px-4 pt-[var(--sat)]">
+      <div className="flex w-20 items-center">
+        <span className="flex h-10 w-10 items-center justify-center text-foreground">
+          <Compass size={22} strokeWidth={2.2} />
+        </span>
+      </div>
+      <span className="px-1.5 py-1">
+        <span className="relative text-xl font-extrabold tracking-tight">
+          Hypefy
+          <span className="absolute left-full top-0 text-accent">.</span>
+        </span>
+      </span>
+      <div className="flex w-20 justify-end">
+        <span className="flex h-9 w-9 items-center justify-center text-foreground">
+          <Star size={22} strokeWidth={2.2} />
+        </span>
+      </div>
+    </header>
+  );
+}
+
+/** ShowsRow: 65px squircle rings (56 avatar + 2 + 2.5 each side), label under. */
 export function ShowsRowSkeleton() {
   return (
-    <div className="no-scrollbar flex gap-4 overflow-x-auto px-4 py-4">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex shrink-0 flex-col items-center gap-1.5">
-          <SkeletonCircle size={62} />
-          <SkeletonLine width={42} height={9} />
+    <div className="no-scrollbar flex gap-4 overflow-hidden px-4 py-4">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+          <Skeleton rounded="rounded-[22px]" className="h-[65px] w-[65px]" />
+          <SkeletonLine width={40} height={9} className="mt-0.5" />
         </div>
       ))}
     </div>
   );
 }
 
-/**
- * A single feed post card skeleton.
- *
- * Every measurement here is copied from FeedCard rather than chosen, because
- * the only job of a skeleton is to put the real thing's furniture in the real
- * thing's place. It previously did not: a CIRCLE where the avatar is a
- * squircle, a full-bleed square where the media is inset by mx-4 and rounded,
- * border-border/60 against the card's /50, and a gap-4 action row against
- * gap-5. Everything jumped sideways the moment content arrived.
- *
- * If FeedCard's layout changes, this has to change with it — a skeleton that
- * has drifted is worse than none, because it animates confidently in the
- * wrong place.
- */
+/** FeedCard: author row px-4 py-3, 40px face, media mx-4 rounded-2xl, actions gap-5. */
 export function FeedCardSkeleton() {
   return (
     <div className="border-b border-border/50 pb-3">
-      {/* Author row — FeedCard: flex items-center gap-3 px-4 py-3 */}
       <div className="flex items-center gap-3 px-4 py-3">
-        {/* Avatar is a squircle (rounded-[30%]), not a circle. */}
-        <Skeleton rounded="rounded-[30%]" className="h-10 w-10 shrink-0" />
+        <AvatarSkeleton size={40} />
         <div className="flex flex-1 flex-col gap-1.5">
           <SkeletonLine width={120} height={11} />
-          <SkeletonLine width={72} height={9} />
+          <SkeletonLine width={64} height={9} />
         </div>
-        <SkeletonCircle size={24} />
       </div>
-      {/* Media — FeedCard: mx-4 rounded-2xl, aspect from the post itself.
-          Square is the same fallback the card uses when aspect_ratio is null. */}
-      <Skeleton rounded="rounded-2xl" className="mx-4 aspect-square" />
-      {/* Actions — FeedCard: gap-5, and the save icon pinned right. */}
+      <Skeleton rounded="rounded-2xl" className="mx-4 aspect-[4/5]" />
       <div className="flex items-center gap-5 px-4 pt-3">
-        <SkeletonCircle size={24} />
-        <SkeletonCircle size={24} />
-        <SkeletonCircle size={24} />
-        <div className="flex-1" />
-        <SkeletonCircle size={24} />
+        <SkeletonLine width={24} height={24} />
+        <SkeletonLine width={24} height={24} />
+        <SkeletonLine width={24} height={24} />
       </div>
-      {/* Caption — FeedCard: px-4 pt-2, clamped to two lines. */}
-      <div className="flex flex-col gap-1.5 px-4 pt-2">
-        <SkeletonLine width="80%" height={10} />
+      <div className="px-4 pt-2.5">
+        <SkeletonLine width="70%" height={10} />
+      </div>
+    </div>
+  );
+}
+
+/** A list row: face, name, preview line (Messages, Search). */
+export function ListRowSkeleton({ avatarSize = 52 }: { avatarSize?: number }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <AvatarSkeleton size={avatarSize} />
+      <div className="flex flex-1 flex-col gap-2">
+        <SkeletonLine width="38%" height={11} />
+        <SkeletonLine width="62%" height={10} />
+      </div>
+    </div>
+  );
+}
+
+/** ReelsFeed: black stage above the nav (bottom-[72px]), author and caption low. */
+export function ReelSkeleton() {
+  return (
+    <div className="fixed inset-x-0 top-0 bottom-[72px] z-10 mx-auto max-w-[480px] overflow-hidden bg-black">
+      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-4 pr-16">
+        <div className="flex items-center gap-2.5">
+          <AvatarSkeleton size={36} />
+          <SkeletonLine width={110} height={12} />
+        </div>
         <SkeletonLine width="55%" height={10} />
       </div>
     </div>
   );
 }
 
-/** Full-screen Show (story) skeleton — matches the ShowViewer layout. */
+/** ShowViewer: black, progress segments along the top. */
 export function ShowSkeleton() {
   return (
     <div className="fixed inset-0 z-30 mx-auto max-w-[480px] bg-black">
-      <Skeleton rounded="rounded-none" className="absolute inset-0" />
-      {/* Progress bars */}
-      <div className="absolute inset-x-0 top-0 flex gap-1 p-3">
+      <div className="absolute inset-x-0 top-0 flex gap-1 p-3 pt-[calc(var(--sat)+12px)]">
         {Array.from({ length: 3 }).map((_, i) => (
-          <SkeletonLine key={i} width="100%" height={3} />
+          <div key={i} className="h-[3px] flex-1 rounded-full bg-white/20" />
         ))}
-      </div>
-      {/* Author */}
-      <div className="absolute inset-x-0 top-7 flex items-center gap-2.5 p-4">
-        <SkeletonCircle size={36} />
-        <SkeletonLine width={110} height={11} />
       </div>
     </div>
   );
 }
 
-/** Generic app-shell skeleton (header + feed) — neutral route fallback. */
-export function AppShellSkeleton() {
-  return (
-    <>
-      <HeaderSkeleton centerWordmark />
-      <ShowsRowSkeleton />
-      <div className="flex flex-col">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <FeedCardSkeleton key={i} />
-        ))}
-      </div>
-    </>
-  );
-}
-
-/** Centered single-post (permalink) skeleton. */
+/** A post on its own page: PageHeader "Post", then the card. */
 export function PostDetailSkeleton() {
   return (
     <>
-      <HeaderSkeleton />
+      <PageHeaderStatic title="Post" />
       <FeedCardSkeleton />
     </>
-  );
-}
-
-/** Search page skeleton — search bar + result rows. */
-export function SearchSkeleton() {
-  return (
-    <>
-      <div className="sticky top-0 z-20 border-b border-border/60 chrome-bar px-4 pb-3 pt-[calc(0.75rem+var(--sat))]">
-        <Skeleton className="h-11 w-full" rounded="rounded-pill" />
-      </div>
-      <div className="flex flex-col pt-1">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <ListRowSkeleton key={i} avatarSize={46} />
-        ))}
-      </div>
-    </>
-  );
-}
-
-/** A conversation / list row skeleton (avatar + two lines). */
-export function ListRowSkeleton({ avatarSize = 52 }: { avatarSize?: number }) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <SkeletonCircle size={avatarSize} />
-      <div className="flex flex-1 flex-col gap-2">
-        <SkeletonLine width="40%" height={11} />
-        <SkeletonLine width="70%" height={10} />
-      </div>
-      <SkeletonLine width={28} height={9} />
-    </div>
   );
 }
