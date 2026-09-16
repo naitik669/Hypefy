@@ -59,8 +59,10 @@ function touch(el: Element, type: string, y: number) {
 async function drag(el: Element, dy: number) {
   await touch(el, "touchstart", 300);
   for (let i = 1; i <= 4; i++) await touch(el, "touchmove", 300 + (dy * i) / 4);
+  // Held before letting go: a quick release would be read as a throw, which
+  // has its own rule.
   await act(async () => {
-    await new Promise((r) => setTimeout(r, 260));
+    await new Promise((r) => setTimeout(r, 450));
   });
   await touch(el, "touchend", 300 + dy);
 }
@@ -181,5 +183,62 @@ describe("a sheet with a footer", () => {
     // Which the scrolling part above it therefore must not also pay for.
     expect(scroller.className).not.toContain("var(--sab)");
     expect(footer.className).toContain("bg-elevated");
+  });
+});
+
+/**
+ * A thread is something you settle into, so it has two places to rest: half
+ * the screen, and the top of it. A sheet that opened at the height of its
+ * three comments and again at the height of its thirty is a different
+ * surface every time you tap.
+ */
+describe("a sheet you read in", () => {
+  async function half() {
+    const { BottomSheet } = await import("@/components/ui/BottomSheet");
+    await act(async () =>
+      root.render(
+        createElement(BottomSheet, {
+          open: true,
+          onClose,
+          size: "half",
+          title: "Comments",
+          children: createElement("p", null, "a thread"),
+        }),
+      ),
+    );
+    // jsdom lays nothing out; give the sheet the height it would have.
+    Object.defineProperty(sheet()!, "offsetHeight", { value: 406, configurable: true });
+  }
+
+  it("opens at half the screen, whatever is in it", async () => {
+    await half();
+    expect(sheet()!.style.height).toBe("50dvh");
+    expect(sheet()!.style.maxHeight).toBe("");
+  });
+
+  it("goes to the top when pulled up, with nothing to scroll", async () => {
+    await half();
+    await drag(handle(), -70);
+    expect(sheet()!.style.height).toBe("94dvh");
+  });
+
+  it("takes a real pull to send away — a quarter of the screen", async () => {
+    await half();
+    // jsdom's window is 768 tall, so the threshold is 192: half the sheet's
+    // own height, capped at a quarter of the screen.
+    await drag(handle(), 150);
+    expect(onClose).not.toHaveBeenCalled();
+    await drag(handle(), 220);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the backdrop steady while it moves", async () => {
+    await half();
+    const veil = sheet()!.parentElement as HTMLElement;
+    await touch(handle(), "touchstart", 300);
+    await touch(handle(), "touchmove", 420);
+    // Dimming by the pixel made the whole screen flicker under the thumb.
+    expect(veil.style.opacity).not.toBe("");
+    expect(Number(veil.style.opacity)).toBe(1);
   });
 });

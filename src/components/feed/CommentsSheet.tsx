@@ -541,6 +541,9 @@ export function CommentsSheet({
       <BottomSheet
         open={open}
         onClose={onClose}
+        // Half the screen to read in, the top of it when pulled up — a thread
+        // is something you settle into, not a menu.
+        size="half"
         footer={
           <Composer
             replyTo={replyTo}

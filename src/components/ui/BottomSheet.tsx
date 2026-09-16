@@ -26,8 +26,20 @@ import { useOverlayBackButton } from "@/lib/overlay-stack";
  * whole subtree.
  */
 
-/** Past this, letting go takes it one step down: expanded → rest → closed. */
-const DISMISS_PX = 96;
+/**
+ * How far down a sheet has to be taken before letting go sends it one step
+ * down: expanded → resting → closed.
+ *
+ * A fraction of the screen rather than a fixed nudge, floored at half the
+ * sheet's own height so a short menu is not asked for a drag longer than it
+ * is tall. On a phone that is about a quarter of the screen: far enough that
+ * the sheet cannot be lost to a flick while reading.
+ */
+const DISMISS_SCREEN = 0.25;
+function dismissAt(sheetHeight: number): number {
+  const screen = typeof window === "undefined" ? 800 : window.innerHeight;
+  return Math.min(Math.max(sheetHeight * 0.5, 72), screen * DISMISS_SCREEN);
+}
 /** A throw beats the distance: px per ms. */
 const FLING = 0.55;
 /** Up this far and let go: it grows, if there is anything to grow for. */
@@ -52,11 +64,14 @@ export function BottomSheet({
   title,
   children,
   footer,
+  size = "content",
 }: {
   open: boolean;
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
+  /** "half" opens at half the screen and goes to the top; see `heights`. */
+  size?: "content" | "half";
   /**
    * Something that belongs at the bottom of the sheet rather than at the
    * bottom of its contents — a composer, a confirm bar.
@@ -92,6 +107,20 @@ export function BottomSheet({
   /** Taller than it rests, because it was pulled up. */
   const [expanded, setExpanded] = useState(false);
 
+  /**
+   * The two heights a sheet rests at.
+   *
+   * "content" is the default: as tall as what is in it, up to 85% of the
+   * screen. "half" is for a sheet you read in — comments — which opens at
+   * half the screen whatever is in it, and goes to the top when pulled up.
+   * A thread that opened at the height of its three comments, and again at
+   * the height of its thirty, is a different surface every time you tap.
+   */
+  const heights =
+    size === "half"
+      ? { height: expanded ? "94dvh" : "50dvh" }
+      : { maxHeight: expanded ? "95dvh" : "85dvh" };
+
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const veilRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -109,15 +138,10 @@ export function BottomSheet({
       el.style.transition = ms ? `transform ${ms}ms ${EASE}` : "none";
       el.style.transform = y ? `translate3d(0,${y}px,0)` : "translate3d(0,0,0)";
     }
-    const veil = veilRef.current;
-    if (veil) {
-      // The page behind comes back as the sheet leaves, so a half-drag shows
-      // you what letting go would give back.
-      const height = el?.offsetHeight || window.innerHeight;
-      const gone = Math.max(0, Math.min(1, y / height));
-      veil.style.transition = ms ? `opacity ${ms}ms ${EASE}` : "none";
-      veil.style.opacity = String(1 - gone * 0.85);
-    }
+    // The backdrop is deliberately NOT tied to the drag. Fading it by the
+    // pixel made the whole screen flicker as the sheet moved, and a surface
+    // whose brightness wobbles under your thumb reads as cheap. It fades once
+    // on the way in and once on the way out.
   }, []);
 
   const drag = useRef({
@@ -132,11 +156,14 @@ export function BottomSheet({
     handle: false,
   });
 
-  /** Is there more to read than the resting height shows? */
+  /** Is there anywhere taller to go? */
   const canGrow = useCallback(() => {
+    // A half sheet always has the top to go to, whether or not the thread in
+    // it is long enough to scroll.
+    if (size === "half") return true;
     const body = scrollRef.current;
     return !!body && body.scrollHeight > body.clientHeight + 8;
-  }, []);
+  }, [size]);
 
   const begin = useCallback((y: number, handle: boolean) => {
     drag.current = { active: true, startY: y, startT: Date.now(), dy: 0, raw: 0, handle };
@@ -172,12 +199,13 @@ export function BottomSheet({
     const speed = Math.abs(raw) / Math.max(1, Date.now() - d.startT);
     const flung = speed > FLING && Math.abs(raw) > 40;
     const ms = reducedMotion() ? 0 : SETTLE_MS;
+    const far = dismissAt(sheetRef.current?.offsetHeight ?? 0);
 
-    if (raw > 0 && (raw > DISMISS_PX || flung)) {
+    if (raw > 0 && (raw > far || flung)) {
       // One step down per drag: a tall sheet comes back to its resting
       // height first, so the thing you were reading is not lost to a gesture
       // that only meant "smaller".
-      if (expanded && !(flung && raw > DISMISS_PX * 2)) {
+      if (expanded && !(flung && raw > far * 2)) {
         setExpanded(false);
         place(0, ms);
         return;
@@ -402,7 +430,7 @@ export function BottomSheet({
         data-sheet=""
         data-expanded={expanded ? "" : undefined}
         className="flex w-full max-w-[480px] flex-col rounded-t-3xl border-t border-border bg-elevated"
-        style={{ maxHeight: expanded ? "95dvh" : "85dvh" }}
+        style={heights}
         onClick={(e) => e.stopPropagation()}
       >
         {/* The grab handle, and the title if there is one. Draggable whatever
