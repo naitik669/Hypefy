@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { SearchBar } from "@/components/ui/SearchBar";
 import { DiscoverView } from "@/components/discover/DiscoverView";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { tagAffinityFor } from "@/lib/feed-rank";
@@ -252,9 +251,8 @@ export default async function DiscoverPage() {
           PageHeader in the app without it. */}
       <PageHeader title="Discover" showBack />
       <PullToRefresh>
-        <div className="px-4 py-3">
-          <SearchBar placeholder="Search people, posts, #tags" href="/search" />
-        </div>
+        {/* Search lives inside DiscoverView now, on one row with the filter
+            that replaced the category chips. */}
         <DiscoverView
           currentUserId={user.id}
           rankedPosts={rankedPosts}

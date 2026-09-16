@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createClient } from "@/lib/supabase/client";
 import { GridPeek } from "@/components/feed/GridPeek";
 import { Play } from "lucide-react";
+import { ShotPreview } from "@/components/shots/ShotPreview";
 import { clampRatio, distribute, pinHeight } from "@/lib/masonry";
 import { mixShots, type Mixed } from "@/lib/discover-mix";
 
@@ -350,26 +351,13 @@ function ShotTile({ shot }: { shot: ShotPin }) {
       aria-label={shot.caption ? `Shot: ${shot.caption}` : "Shot"}
       className="relative block aspect-[9/16] overflow-hidden rounded-2xl bg-black"
     >
-      {shot.poster_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={shot.poster_url}
-          alt={shot.caption ?? "Shot"}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        // #t=0.1 forces a decoded frame; preload="metadata" alone is not
-        // obliged to produce one, and Safari does not.
-        <video
-          src={`${shot.media_url}#t=0.1`}
-          muted
-          playsInline
-          preload="metadata"
-          className="h-full w-full object-cover"
-        />
-      )}
+<ShotPreview
+        id={shot.id}
+        src={shot.media_url}
+        poster={shot.poster_url}
+        alt={shot.caption ?? "Shot"}
+        className="h-full w-full object-cover"
+      />
       <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm">
         <Play size={11} className="fill-white" />
       </span>

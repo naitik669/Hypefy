@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Zap, MessageCircle, Play, Compass, Hash } from "lucide-react";
+import { Zap, MessageCircle, Play, Compass, Hash, SlidersHorizontal, Check } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SearchBar } from "@/components/ui/SearchBar";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { ShotPreview } from "@/components/shots/ShotPreview";
 import { UserSuggestionCard } from "@/components/discover/UserSuggestionCard";
 import { PinFeed, type Pin } from "@/components/discover/PinFeed";
 import { formatCount } from "@/lib/format";
@@ -79,6 +82,8 @@ export function DiscoverView({
 }) {
   const chips = [...FIXED, ...categoryRails.map((c) => c.label)];
   const [cat, setCat] = useState<string>("For You");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filtered = cat !== "For You";
 
   const everythingEmpty =
     rankedPosts.length === 0 && trendingShots.length === 0 && people.length === 0;
@@ -102,28 +107,51 @@ export function DiscoverView({
 
   return (
     <>
-      {/* Chips — soft fade at the right edge hints there's more */}
-      <div className="sticky top-14 z-10 chrome-bar">
-        <div
-          className="no-scrollbar flex gap-2 overflow-x-auto px-4 py-2.5"
-          style={{
-            maskImage: "linear-gradient(to right, black 92%, transparent)",
-          }}
+{/* Search, and the categories behind one button beside it.
+          They used to be a scrolling row of chips under the search bar: ten
+          of them, most off the right edge, taking a band of every screen to
+          say what you are looking at — which is almost always "For You". */}
+      <div className="sticky top-14 z-10 chrome-bar flex items-center gap-2 px-4 py-2.5">
+        <div className="min-w-0 flex-1">
+          <SearchBar placeholder="Search people, posts, #tags" href="/search" />
+        </div>
+        <button
+          type="button"
+          onClick={() => setFilterOpen(true)}
+          aria-label={filtered ? `Filter: ${cat}` : "Filter"}
+          className={`flex h-11 shrink-0 items-center gap-1.5 rounded-pill border px-3 text-sm font-semibold transition-colors ${
+            filtered
+              ? "border-accent bg-accent text-accent-ink"
+              : "border-border bg-surface text-muted"
+          }`}
         >
+          <SlidersHorizontal size={17} />
+          {/* The name only when it is not the default, so the button is a
+              button most of the time and an answer when it matters. */}
+          {filtered && <span className="max-w-[92px] truncate">{cat}</span>}
+        </button>
+      </div>
+
+      <BottomSheet open={filterOpen} onClose={() => setFilterOpen(false)} title="Show me">
+        <div className="flex flex-wrap gap-2 pb-2 pt-1">
           {chips.map((c) => (
             <button
               key={c}
               type="button"
-              onClick={() => setCat(c)}
-              className={`shrink-0 rounded-pill px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+              onClick={() => {
+                setCat(c);
+                setFilterOpen(false);
+              }}
+              className={`flex items-center gap-1.5 rounded-pill px-3.5 py-2 text-sm font-semibold transition-colors ${
                 cat === c ? "bg-accent text-accent-ink" : "bg-surface text-muted"
               }`}
             >
+              {cat === c && <Check size={14} />}
               {c}
             </button>
           ))}
         </div>
-      </div>
+      </BottomSheet>
 
       <div key={cat} className="animate-fade-swap pb-6">
         {cat === "For You" && (
@@ -263,26 +291,13 @@ function ShotTile({ shot }: { shot: Shot }) {
       href={`/shots/${shot.id}`}
       className="relative block aspect-[9/16] overflow-hidden rounded-2xl bg-black"
     >
-      {shot.poster_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={shot.poster_url}
-          alt={shot.caption ?? "Shot"}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        // #t=0.1 forces a decoded frame; preload="metadata" alone is not
-        // obliged to produce one and Safari does not.
-        <video
-          src={`${shot.media_url}#t=0.1`}
-          muted
-          playsInline
-          preload="metadata"
-          className="h-full w-full object-cover"
-        />
-      )}
+<ShotPreview
+        id={shot.id}
+        src={shot.media_url}
+        poster={shot.poster_url}
+        alt={shot.caption ?? "Shot"}
+        className="h-full w-full object-cover"
+      />
       <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
         <Play size={9} className="fill-white" /> Shot
       </span>
