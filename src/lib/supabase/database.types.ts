@@ -271,6 +271,7 @@ export type Database = {
           deleted_at: string | null
           hype_count: number
           id: string
+          image_url: string | null
           parent_id: string | null
           post_id: string | null
           removal_reason: string | null
@@ -286,6 +287,7 @@ export type Database = {
           deleted_at?: string | null
           hype_count?: number
           id?: string
+          image_url?: string | null
           parent_id?: string | null
           post_id?: string | null
           removal_reason?: string | null
@@ -301,6 +303,7 @@ export type Database = {
           deleted_at?: string | null
           hype_count?: number
           id?: string
+          image_url?: string | null
           parent_id?: string | null
           post_id?: string | null
           removal_reason?: string | null
@@ -2378,20 +2381,16 @@ export type Database = {
       clear_mfa_recovery_codes: { Args: never; Returns: undefined }
       clear_note: { Args: never; Returns: undefined }
       clear_note_reaction: { Args: { p_owner: string }; Returns: undefined }
-      create_comment:
-        | {
-            Args: { p_body: string; p_owner_id?: string; p_post_id: string }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_body: string
-              p_owner_id?: string
-              p_parent_id?: string
-              p_post_id: string
-            }
-            Returns: string
-          }
+      create_comment: {
+        Args: {
+          p_body: string
+          p_image_url?: string
+          p_owner_id?: string
+          p_parent_id?: string
+          p_post_id: string
+        }
+        Returns: string
+      }
       create_group: {
         Args: { p_member_ids: string[]; p_title: string }
         Returns: string
@@ -2399,6 +2398,7 @@ export type Database = {
       create_shot_comment: {
         Args: {
           p_body: string
+          p_image_url?: string
           p_owner_id?: string
           p_parent_id?: string
           p_shot_id: string
@@ -2406,6 +2406,7 @@ export type Database = {
         Returns: string
       }
       decline_call: { Args: { p_call_id: string }; Returns: undefined }
+      is_comment_image: { Args: { p_url: string }; Returns: boolean }
       deny_follow_request: { Args: { p_requester: string }; Returns: undefined }
       disconnect_spotify: { Args: never; Returns: undefined }
       edit_message: {

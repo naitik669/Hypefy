@@ -9,7 +9,17 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { Star, Loader2, Flag, Check, ChevronDown, Trash2, CornerUpLeft, Copy } from "lucide-react";
+import {
+  Star,
+  Loader2,
+  Flag,
+  ChevronDown,
+  Trash2,
+  CornerUpLeft,
+  Copy,
+  Image as ImageIcon,
+  X,
+} from "lucide-react";
 import { Plane } from "@/components/ui/Plane";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -30,6 +40,10 @@ import {
 } from "@/components/ui/MentionHashtagPicker";
 import { useToast } from "@/components/ui/ToastProvider";
 import { scheduleUndoable } from "@/lib/undoable";
+import { isCommentPhotoType, uploadCommentPhoto } from "@/lib/comment-photo";
+import { RichPostText } from "@/components/ui/RichPostText";
+import { ExpandableText } from "@/components/ui/ExpandableText";
+import { timeAgoShort } from "@/lib/time";
 
 /** Comments per round trip. Was unbounded. */
 const PAGE = 100;
@@ -56,7 +70,23 @@ const FOCUS_MAX_PAGES = 10;
  *     they drifted apart — replies quietly had no delete.
  */
 
-const isGifBody = (body: string) => body.startsWith("https://");
+/**
+ * A body that is really a picture.
+ *
+ * GIFs have always been stored in the body, which was read as "starts with
+ * https://" — so a comment that was nothing but a link to a page rendered as
+ * a broken image, and you could not post a link at all. Now it has to look
+ * like an image: one of the GIF hosts the picker uses, or a URL ending in an
+ * image's extension. Photos do not come through here; they have a column.
+ */
+export function mediaBody(body: string): string | null {
+  const t = body.trim();
+  if (!t.startsWith("https://") || /\s/.test(t)) return null;
+  const isMedia =
+    /^https:\/\/(media[0-9]*\.tenor\.com|c\.tenor\.com|media[0-9]*\.giphy\.com|i\.giphy\.com)\//.test(t) ||
+    /\.(gif|png|jpe?g|webp)(\?|#|$)/i.test(t);
+  return isMedia ? t : null;
+}
 
 /* --- Types ---------------------------------------------------------------- */
 type Profile = {
@@ -75,6 +105,8 @@ type Node = {
   id: string;
   user_id: string;
   body: string;
+  /** A photo posted with the comment (0087), separate from the body. */
+  image_url: string | null;
   created_at: string;
   parent_id: string | null;
   hyped: boolean;
@@ -84,14 +116,6 @@ type Node = {
 };
 
 /* --- Helpers -------------------------------------------------------------- */
-function timeAgo(iso: string) {
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return "now";
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return `${Math.floor(s / 86400)}d`;
-}
-
 /**
  * Roots in posting order, with each root's replies attached.
  *
@@ -211,7 +235,7 @@ export function CommentsSheet({
       let q = supabase
         .from("comments")
         .select(
-          "id, user_id, body, created_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
+          "id, user_id, body, image_url, created_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
         )
         .eq(targetType === "shot" ? "shot_id" : "post_id", postId)
         .is("deleted_at", null)
@@ -247,6 +271,7 @@ export function CommentsSheet({
         id: c.id as string,
         user_id: c.user_id as string,
         body: c.body as string,
+        image_url: (c.image_url as string | null) ?? null,
         created_at: c.created_at as string,
         parent_id: (c.parent_id as string | null) ?? null,
         hyped: hyped.has(c.id as string),
@@ -446,7 +471,7 @@ export function CommentsSheet({
    * every failure.
    */
   const submit = useCallback(
-    async (body: string): Promise<boolean> => {
+    async (body: string, imageUrl?: string | null): Promise<boolean> => {
       const parentId = replyTo?.id;
       const { data, error } =
         targetType === "shot"
@@ -455,12 +480,14 @@ export function CommentsSheet({
               p_body: body,
               p_owner_id: postOwnerId,
               p_parent_id: parentId ?? undefined,
+              p_image_url: imageUrl ?? undefined,
             })
           : await supabase.rpc("create_comment", {
               p_post_id: postId,
               p_body: body,
               p_owner_id: postOwnerId,
               p_parent_id: parentId ?? undefined,
+              p_image_url: imageUrl ?? undefined,
             });
 
       if (error || !data) {
@@ -474,7 +501,7 @@ export function CommentsSheet({
       const { data: row } = await supabase
         .from("comments")
         .select(
-          "id, user_id, body, created_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
+          "id, user_id, body, image_url, created_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
         )
         .eq("id", data)
         .single();
@@ -487,6 +514,7 @@ export function CommentsSheet({
             id: r.id as string,
             user_id: r.user_id as string,
             body: r.body as string,
+            image_url: (r.image_url as string | null) ?? null,
             created_at: r.created_at as string,
             parent_id: (r.parent_id as string | null) ?? null,
             hyped: false,
@@ -531,10 +559,8 @@ export function CommentsSheet({
                 root={root}
                 replies={replies}
                 open={expanded.has(root.id)}
-                currentUserId={currentUserId}
                 onHype={hype}
                 onReply={startReply}
-                onReport={report}
                 onToggleReplies={toggleReplies}
                 onLongPress={longPress}
                 onZoom={zoom}
@@ -558,6 +584,7 @@ export function CommentsSheet({
 
         <Composer
           replyTo={replyTo}
+          currentUserId={currentUserId}
           onCancelReply={() => setReplyTo(null)}
           onSubmit={submit}
         />
@@ -619,7 +646,7 @@ export function CommentsSheet({
                 }}
               />
             )}
-            {!isGifBody(actionNode.body) && (
+            {!mediaBody(actionNode.body) && actionNode.body.trim() !== "" && (
               <MenuItem
                 icon={Copy}
                 label="Copy"
@@ -667,19 +694,54 @@ export function CommentsSheet({
  */
 function Composer({
   replyTo,
+  currentUserId,
   onCancelReply,
   onSubmit,
 }: {
   replyTo: { id: string; username: string } | null;
+  currentUserId?: string;
   onCancelReply: () => void;
-  onSubmit: (body: string) => Promise<boolean>;
+  onSubmit: (body: string, imageUrl?: string | null) => Promise<boolean>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
   const [cursor, setCursor] = useState(0);
   const [posting, setPosting] = useState(false);
   const [gifOpen, setGifOpen] = useState(false);
+  /** Chosen, not yet sent: shown as a thumbnail over the input. */
+  const [photo, setPhoto] = useState<{ file: File; preview: string } | null>(null);
+  const toast = useToast();
   const { suggestions, reset: resetPicker } = useMentionHashtag(text, cursor);
+
+  // The preview is an object URL; letting them pile up is a leak the length
+  // of the session.
+  useEffect(() => {
+    return () => {
+      if (photo) URL.revokeObjectURL(photo.preview);
+    };
+  }, [photo]);
+
+  function pick(file: File | undefined) {
+    if (!file) return;
+    if (!isCommentPhotoType(file.type)) {
+      toast("That kind of picture isn't supported", "error");
+      return;
+    }
+    setPhoto((prev) => {
+      if (prev) URL.revokeObjectURL(prev.preview);
+      return { file, preview: URL.createObjectURL(file) };
+    });
+    setGifOpen(false);
+    inputRef.current?.focus();
+  }
+
+  function clearPhoto() {
+    setPhoto((prev) => {
+      if (prev) URL.revokeObjectURL(prev.preview);
+      return null;
+    });
+  }
 
   // Starting a reply seeds the mention and focuses, so the next thing typed
   // is the reply itself.
@@ -692,13 +754,28 @@ function Composer({
 
   async function send() {
     const body = text.trim();
-    if (!body || posting) return;
+    // A photo on its own is a comment; so is text on its own.
+    if ((!body && !photo) || posting || !currentUserId) return;
     setPosting(true);
-    const ok = await onSubmit(body);
+
+    let imageUrl: string | null = null;
+    if (photo) {
+      imageUrl = await uploadCommentPhoto(photo.file, currentUserId);
+      if (!imageUrl) {
+        setPosting(false);
+        toast("Couldn't upload that picture", "error");
+        return;
+      }
+    }
+
+    const ok = await onSubmit(body, imageUrl);
     setPosting(false);
     // Only clear on success. Clearing regardless threw away what you wrote
     // every time the post failed, which is exactly when you want it back.
-    if (ok) setText("");
+    if (ok) {
+      setText("");
+      clearPhoto();
+    }
   }
 
   async function sendGif(url: string) {
@@ -739,7 +816,53 @@ function Composer({
         </div>
       )}
 
+      {/* What you are about to send with it. */}
+      {photo && (
+        <div className="mb-2 flex items-center gap-2">
+          <span className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photo.preview}
+              alt="Selected photo"
+              className="h-16 w-16 rounded-xl object-cover ring-1 ring-border"
+            />
+            <button
+              type="button"
+              onClick={clearPhoto}
+              aria-label="Remove photo"
+              className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-background text-foreground ring-1 ring-border"
+            >
+              <X size={12} />
+            </button>
+          </span>
+          <span className="text-xs text-muted">
+            Add something to say, or send it on its own.
+          </span>
+        </div>
+      )}
+
       <div className="flex items-center gap-2">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hidden"
+          onChange={(e) => {
+            pick(e.target.files?.[0]);
+            // So the same file can be picked again after removing it.
+            e.target.value = "";
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={!currentUserId}
+          aria-label="Add a photo"
+          className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface text-muted transition-colors hover:text-foreground disabled:opacity-40"
+        >
+          <ImageIcon size={17} />
+        </button>
+
         <button
           type="button"
           onClick={() => setGifOpen((v) => !v)}
@@ -769,7 +892,11 @@ function Composer({
               if (e.key === "Enter" && !e.shiftKey) void send();
             }}
             placeholder={
-              replyTo ? `Reply to @${replyTo.username}...` : "Add a comment..."
+              replyTo
+                ? `Reply to @${replyTo.username}...`
+                : photo
+                ? "Say something about it..."
+                : "Add a comment..."
             }
             className="h-10 w-full rounded-pill bg-surface px-4 text-sm outline-none placeholder:text-faint focus:border-white/25"
           />
@@ -791,7 +918,7 @@ function Composer({
         <button
           type="button"
           onClick={() => void send()}
-          disabled={!text.trim() || posting}
+          disabled={(!text.trim() && !photo) || posting}
           className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"
         >
           {posting ? (
@@ -806,10 +933,13 @@ function Composer({
 }
 
 /* --- Thread --------------------------------------------------------------- */
+/**
+ * Reporting is not here: it is one of the long-press menu's items, and the
+ * sheet calls it directly. A row only needs what a row offers.
+ */
 type RowHandlers = {
   onHype: (n: Node) => void;
   onReply: (threadId: string, username: string) => void;
-  onReport: (id: string) => void;
   onLongPress: (n: Node, threadId: string, x: number, y: number) => void;
   onZoom: (src: string) => void;
 };
@@ -818,7 +948,6 @@ const Thread = memo(function Thread({
   root,
   replies,
   open,
-  currentUserId,
   onToggleReplies,
   focusId,
   ...handlers
@@ -826,7 +955,6 @@ const Thread = memo(function Thread({
   root: Node;
   replies: Node[];
   open: boolean;
-  currentUserId: string;
   onToggleReplies: (id: string) => void;
   focusId?: string | null;
 } & RowHandlers) {
@@ -835,7 +963,6 @@ const Thread = memo(function Thread({
       <Row
         node={root}
         threadId={root.id}
-        currentUserId={currentUserId}
         focused={focusId === root.id}
         {...handlers}
       />
@@ -864,7 +991,6 @@ const Thread = memo(function Thread({
               node={r}
               threadId={root.id}
               compact
-              currentUserId={currentUserId}
               focused={focusId === r.id}
               {...handlers}
             />
@@ -883,25 +1009,21 @@ const Row = memo(function Row({
   node,
   threadId,
   compact = false,
-  currentUserId,
   focused = false,
   onHype,
   onReply,
-  onReport,
   onLongPress,
   onZoom,
 }: {
   node: Node;
   threadId: string;
   compact?: boolean;
-  currentUserId: string;
   /** This is the comment the URL asked for. */
   focused?: boolean;
 } & RowHandlers) {
   const name = node.profiles?.display_name ?? node.profiles?.username ?? "User";
   const username = node.profiles?.username;
   const hue = node.profiles?.avatar_hue ?? 280;
-  const isOwn = node.user_id === currentUserId;
   const size = compact ? 28 : 34;
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -985,23 +1107,42 @@ const Row = memo(function Row({
             <DisplayName name={name} profile={node.profiles} className="text-sm font-semibold" />
             {node.profiles?.is_verified && <VerifiedStar className="h-3 w-3 shrink-0 text-verified" />}
             <span className="text-xs text-faint">
-              · {timeAgo(node.created_at)}
+              · {timeAgoShort(node.created_at)}
             </span>
           </div>
 
-          {isGifBody(node.body) ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={node.body}
-              alt="GIF"
-              loading="lazy"
-              decoding="async"
-              className="mt-1 max-w-[180px] rounded-xl bg-surface"
-            />
-          ) : (
-            <p className="mt-0.5 text-sm break-words text-foreground/90">
-              {node.body}
-            </p>
+          {/* A photo, if there is one, then whatever was said about it.
+              GIFs still arrive in the body — see mediaBody — so both are
+              drawn the same way and both open full-screen. */}
+          {(node.image_url || mediaBody(node.body)) && (
+            <button
+              type="button"
+              onClick={() => onZoom(node.image_url ?? mediaBody(node.body)!)}
+              className="mt-1.5 block max-w-[240px] overflow-hidden rounded-xl bg-surface ring-1 ring-border transition active:scale-[0.99]"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={node.image_url ?? mediaBody(node.body)!}
+                alt={node.image_url ? "Photo in a comment" : "GIF"}
+                loading="lazy"
+                decoding="async"
+                className="max-h-[260px] w-auto object-cover"
+              />
+            </button>
+          )}
+
+          {!mediaBody(node.body) && node.body.trim() !== "" && (
+            <ExpandableText
+              className="mt-0.5 text-sm leading-snug text-foreground/90"
+              clampClass="line-clamp-4"
+            >
+              {/* Mentions and hashtags read as links here, as they do on a
+                  post. The composer has offered a mention picker all along;
+                  what it inserted then rendered as plain text. */}
+              <p className="break-words">
+                <RichPostText text={node.body} />
+              </p>
+            </ExpandableText>
           )}
         </div>
 
@@ -1027,22 +1168,16 @@ const Row = memo(function Row({
             </button>
           )}
 
-          {!isOwn && (
-            <button
-              type="button"
-              onClick={() => onReport(node.id)}
-              className={`flex items-center gap-0.5 text-xs font-medium ${
-                node.reported ? "text-accent" : "text-faint hover:text-muted"
-              }`}
-            >
-              {node.reported ? <Check size={11} /> : <Flag size={11} />}
-              {node.reported ? "Reported" : "Report"}
-            </button>
+          {node.reported && (
+            <span className="flex items-center gap-1 text-xs font-medium text-accent">
+              <Flag size={11} /> Reported
+            </span>
           )}
-          {/* Delete lives only in the long-press menu — a destructive action
-              should not sit one stray tap from Reply on every comment you
-              own. Replies get it too now, which the old duplicated markup
-              had quietly missed. */}
+          {/* Report and Delete both live in the long-press menu. Report was
+              a permanent button on every comment by someone else — the one
+              thing you rarely want, taking the same weight as Reply, on every
+              row of the thread. Once reported, the row says so and stops
+              offering it. */}
         </div>
       </div>
     </div>

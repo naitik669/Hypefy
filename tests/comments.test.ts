@@ -8,6 +8,7 @@ function node(id: string, parent: string | null = null): Node {
     id,
     user_id: "u1",
     body: id,
+    image_url: null,
     created_at: "2026-01-01T00:00:00Z",
     parent_id: parent,
     hyped: false,
