@@ -22,11 +22,19 @@ export type ShotCard = {
   created_at: string;
   hype_count?: number | null;
   comment_count?: number | null;
+  share_count?: number | null;
+  /** The same author fields a post carries, so a Shot's header can match it. */
   profiles: {
+    id?: string | null;
     display_name: string | null;
     username: string | null;
     avatar_hue: number | null;
     avatar_url: string | null;
+    is_verified?: boolean | null;
+    is_premium?: boolean | null;
+    name_font?: string | null;
+    name_glow?: string | null;
+    avatar_decoration?: string | null;
   } | null;
 };
 

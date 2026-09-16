@@ -2,17 +2,40 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Play, VolumeX, Volume2, Star, MessageCircle } from "lucide-react";
+import {
+  Play,
+  VolumeX,
+  Volume2,
+  Star,
+  MessageCircle,
+  Bookmark,
+  MoreHorizontal,
+  Flag,
+  Ban,
+  ChevronRight,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { ReportSheet } from "@/components/ui/ReportSheet";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Avatar } from "@/components/ui/Avatar";
+import { AvatarFrame } from "@/components/ui/AvatarFrame";
+import { DisplayName } from "@/components/ui/DisplayName";
+import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { ExpandableText } from "@/components/ui/ExpandableText";
+import { RichPostText } from "@/components/ui/RichPostText";
 import { Plane } from "@/components/ui/Plane";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
 import { ShareButton } from "@/components/feed/QuickShare";
 import { HypeBreak } from "@/components/feed/HypeBreak";
 import { HypeParticles } from "@/components/feed/HypeParticles";
+import { useToast } from "@/components/ui/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { hypeResult } from "@/lib/supabase/typed";
+import { visibleDecoration } from "@/lib/cosmetics";
 import { formatCount } from "@/lib/format";
+import { timeAgoShort } from "@/lib/time";
 import { haptics } from "@/lib/haptics";
 import {
   isMuted,
@@ -126,6 +149,17 @@ export function ShotFeedCard({
   const [commentCount, setCommentCount] = useState(shot.comment_count ?? 0);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [savePending, setSavePending] = useState(false);
+  const [saveBurst, setSaveBurst] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const showToast = useToast();
+  const router = useRouter();
+  const isOwn = !!currentUserId && currentUserId === shot.user_id;
+  const profile = shot.profiles ?? null;
+  const profileHref = username ? `/u/${username}` : "#";
 
   /** Mirrors the shared preference so this card re-renders when it changes. */
   const [muted, setMutedState] = useState(true);
@@ -169,6 +203,70 @@ export function ShotFeedCard({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [armed, currentUserId, shot.id]);
+
+  // And whether it is already saved, on the same terms: a post card is told
+  // this in FeedList's batch, which is keyed on post ids and cannot answer
+  // for a Shot.
+  useEffect(() => {
+    if (!armed || !currentUserId) return;
+    let live = true;
+    supabase
+      .from("saved_shots")
+      .select("shot_id")
+      .eq("user_id", currentUserId)
+      .eq("shot_id", shot.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (live) setSaved(!!data);
+      });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [armed, currentUserId, shot.id]);
+
+  async function blockAuthor() {
+    setConfirmBlock(false);
+    const { error } = await supabase.rpc("block_user", { p_blocked: shot.user_id });
+    if (error) {
+      showToast(error.message ?? "Couldn't block, try again", "error");
+      return;
+    }
+    haptics.success();
+    showToast("Blocked", "success");
+    // Their Shots should not still be in the feed after blocking them.
+    router.refresh();
+  }
+
+  async function toggleSave() {
+    if (savePending || !currentUserId) return;
+    const prev = saved;
+    setSavePending(true);
+    setSaved(!prev);
+    haptics.select();
+    if (!prev) {
+      setSaveBurst(true);
+      setTimeout(() => setSaveBurst(false), 380);
+    }
+    const { error } = prev
+      ? await supabase
+          .from("saved_shots")
+          .delete()
+          .eq("user_id", currentUserId)
+          .eq("shot_id", shot.id)
+      : await supabase
+          .from("saved_shots")
+          .insert({ user_id: currentUserId, shot_id: shot.id });
+    setSavePending(false);
+    // A unique violation means it is already saved, which is what was asked
+    // for. Anything else puts the bookmark back where it was.
+    if (error && !/duplicate|unique/i.test(error.message)) {
+      setSaved(prev);
+      showToast(prev ? "Couldn't unsave" : "Couldn't save", "error");
+    } else if (!prev) {
+      showToast("Saved", "success");
+    }
+  }
 
   async function toggleHype() {
     if (hypePending || !currentUserId) return;
@@ -370,24 +468,40 @@ export function ShotFeedCard({
 
   return (
     <article className="relative border-b border-border/50 pb-3">
-      {/* Header mirrors FeedCard's so a Shot reads as feed furniture rather
-          than as an interruption. */}
+      {/* The post card's header, to the pixel: the same avatar and frame, the
+          same name with whatever the author wears on it, the same badge and
+          the same timestamp. A Shot is a post you can watch, so its card is a
+          post's card — what marks it as one is on the video itself. */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <Avatar
-          name={name}
-          hue={shot.profiles?.avatar_hue ?? 280}
-          src={shot.profiles?.avatar_url ?? undefined}
-          size={40}
-        />
+        <Link href={profileHref} className="shrink-0 transition-transform active:scale-95">
+          <AvatarFrame id={profile ? visibleDecoration(profile) : null} size={40}>
+            <Avatar
+              name={name}
+              hue={profile?.avatar_hue ?? 280}
+              src={profile?.avatar_url ?? undefined}
+              size={40}
+            />
+          </AvatarFrame>
+        </Link>
         <div className="flex min-w-0 flex-1 items-center gap-1">
-          <span className="truncate text-sm font-semibold">{name}</span>
-          {username && (
-            <span className="truncate text-xs text-faint">@{username}</span>
+          <Link href={profileHref} className="truncate text-sm font-semibold hover:underline">
+            <DisplayName name={name} profile={profile} />
+          </Link>
+          {profile?.is_verified && (
+            <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />
           )}
+          <span className="ml-1 text-xs text-faint">
+            · {timeAgoShort(shot.created_at)}
+          </span>
         </div>
-        <span className="flex items-center gap-1 rounded-pill bg-surface px-2 py-0.5 text-[10px] font-black tracking-wide text-muted">
-          <Play size={9} fill="currentColor" /> SHOT
-        </span>
+        <button
+          type="button"
+          aria-label="More"
+          onClick={() => setMenuOpen(true)}
+          className="-mr-1 flex h-10 w-10 items-center justify-center rounded-full text-muted hover:bg-white/5"
+        >
+          <MoreHorizontal size={20} />
+        </button>
       </div>
 
       <Link
@@ -435,6 +549,12 @@ export function ShotFeedCard({
         {/* Scrim so the glyphs and counts stay legible on a bright frame */}
         <span className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 to-transparent" />
 
+        {/* What says this is a Shot. On the video rather than in the header,
+            where a post has its author and nothing else. */}
+        <span className="pointer-events-none absolute left-3 top-3 flex items-center gap-1 rounded-pill bg-black/50 px-2 py-1 text-[10px] font-black tracking-wide text-white backdrop-blur-sm">
+          <Play size={9} fill="currentColor" /> SHOT
+        </span>
+
         {/* The play affordance is for the paused state only — once it is
             moving, an overlaid play button is a lie about what tapping does. */}
         {!playing && (
@@ -480,72 +600,170 @@ export function ShotFeedCard({
         )}
       </Link>
 
-      {/* The same actions in the same order as a post card, so a Shot is
-          something you can respond to where you find it rather than a
-          trailer for the Shots tab. */}
-      <div className="flex items-center gap-1 px-3 pt-2">
-        <button
-          type="button"
-          onClick={toggleHype}
-          disabled={hypePending || !currentUserId}
-          aria-pressed={hyped}
-          aria-label={hyped ? "Remove hype" : "Hype"}
-          className={`flex h-10 items-center gap-1.5 rounded-full px-2 transition-colors active:scale-95 disabled:opacity-50 ${
-            hyped ? "text-hype" : "text-foreground hover:bg-white/5"
-          }`}
-        >
-          <span className="relative">
-            <Star
-              size={22}
-              strokeWidth={2.2}
-              className={
-                hypeBurst
-                  ? "animate-hype-burst"
-                  : hypeBreak
-                  ? "animate-hype-crack"
-                  : ""
-              }
-              fill={hyped ? "currentColor" : "none"}
-            />
-            {showParticles && <HypeParticles size={9} />}
-            {hypeBreak && <HypeBreak size={22} />}
-          </span>
-          {hypeCount > 0 && (
-            <span className="text-xs font-semibold tabular-nums">
+      {/* The post card's action row, to the same measurements: the same four
+          controls, the same spacing, the same counts, Save out on the right. */}
+      <div className="flex items-center justify-between px-4 pt-3">
+        <div className="flex items-center gap-5">
+          <button
+            type="button"
+            onClick={toggleHype}
+            disabled={hypePending || !currentUserId}
+            aria-pressed={hyped}
+            aria-label="Hype"
+            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-transform duration-150 active:scale-90 disabled:opacity-70"
+          >
+            <span className="relative">
+              <Star
+                size={23}
+                strokeWidth={2.2}
+                className={`${
+                  hypeBurst
+                    ? "animate-hype-burst"
+                    : hypeBreak
+                    ? "animate-hype-crack"
+                    : ""
+                } transition-colors ${hyped ? "text-hype" : "text-foreground"}`}
+                fill={hyped ? "currentColor" : "none"}
+              />
+              {showParticles && <HypeParticles size={9} />}
+              {hypeBreak && <HypeBreak size={23} />}
+            </span>
+            <span className={hyped ? "text-hype" : "text-foreground"}>
               {formatCount(hypeCount)}
             </span>
-          )}
-        </button>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setCommentsOpen(true)}
+            disabled={!currentUserId}
+            aria-label="Comments"
+            className="flex items-center gap-1.5 text-sm font-semibold text-foreground transition-transform duration-150 active:scale-90 disabled:opacity-70"
+          >
+            <MessageCircle size={22} strokeWidth={2.2} />
+            {formatCount(commentCount)}
+          </button>
+
+          <ShareButton
+            postId={shot.id}
+            targetType="shot"
+            onOpenSheet={() => setShareOpen(true)}
+            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 active:scale-90"
+          >
+            <Plane size={21} weight="bold" />
+            {(shot.share_count ?? 0) > 0 && formatCount(shot.share_count ?? 0)}
+          </ShareButton>
+        </div>
 
         <button
           type="button"
-          onClick={() => setCommentsOpen(true)}
-          disabled={!currentUserId}
-          aria-label="Comments"
-          className="flex h-10 items-center gap-1.5 rounded-full px-2 text-foreground transition-colors hover:bg-white/5 active:scale-95 disabled:opacity-50"
+          onClick={toggleSave}
+          disabled={savePending || !currentUserId}
+          aria-label="Save"
+          aria-pressed={saved}
+          className="text-foreground transition-transform duration-150 active:scale-90 disabled:opacity-70"
         >
-          <MessageCircle size={22} strokeWidth={2.2} />
-          {commentCount > 0 && (
-            <span className="text-xs font-semibold tabular-nums">
-              {formatCount(commentCount)}
-            </span>
-          )}
+          <Bookmark
+            size={21}
+            strokeWidth={2.2}
+            className={`${saveBurst ? "animate-hype-burst" : ""} transition-colors ${
+              saved ? "text-accent" : ""
+            }`}
+            fill={saved ? "currentColor" : "none"}
+          />
         </button>
-
-        <ShareButton
-          postId={shot.id}
-          targetType="shot"
-          onOpenSheet={() => setShareOpen(true)}
-          className="flex h-10 items-center justify-center rounded-full px-2 text-foreground transition-colors hover:bg-white/5 active:scale-95"
-        >
-          <Plane size={21} weight="bold" />
-        </ShareButton>
       </div>
 
+      {/* Caption, written the way a post's is: the author, then what they
+          said, clamped with a more / less toggle. */}
       {shot.caption && (
-        <p className="line-clamp-2 px-4 pt-1 text-sm leading-snug text-foreground/85">
-          {shot.caption}
-        </p>
+        <ExpandableText className="px-4 pt-2 text-sm leading-snug" clampClass="line-clamp-2">
+          <p>
+            <Link href={profileHref} className="font-semibold hover:underline">
+              {username ? `@${username}` : name}
+            </Link>{" "}
+            <RichPostText text={shot.caption} />
+          </p>
+        </ExpandableText>
+      )}
+
+      {/* What the ⋯ offers. Report and Block are the Shots viewer's own two
+          viewer actions; the owner's set — delete, showcase — lives there, so
+          this hands them straight to it rather than keeping a second copy of
+          a destructive flow in the feed. */}
+      <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Shot">
+        <div className="flex flex-col pb-2">
+          {isOwn ? (
+            <Link
+              href={`/shots/${shot.id}`}
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
+            >
+              <Play size={20} className="text-foreground" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">Open in Shots</span>
+                <span className="block text-xs text-muted">Delete, showcase and more</span>
+              </span>
+              <ChevronRight size={18} className="text-faint" />
+            </Link>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={!currentUserId}
+                onClick={() => {
+                  setMenuOpen(false);
+                  setReportOpen(true);
+                }}
+                className="flex items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5 disabled:opacity-50"
+              >
+                <Flag size={20} className="text-foreground" />
+                <span>
+                  <span className="block text-sm font-semibold">Report Shot</span>
+                  <span className="block text-xs text-muted">Tell us what&rsquo;s wrong with this</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={!currentUserId}
+                onClick={() => {
+                  setMenuOpen(false);
+                  setConfirmBlock(true);
+                }}
+                className="flex items-center gap-3 px-5 py-4 text-left text-danger transition-colors hover:bg-danger/10 disabled:opacity-50"
+              >
+                <Ban size={20} />
+                <span>
+                  <span className="block text-sm font-semibold">
+                    Block {username ? `@${username}` : name}
+                  </span>
+                  <span className="block text-xs opacity-70">You stop seeing each other</span>
+                </span>
+              </button>
+            </>
+          )}
+        </div>
+      </BottomSheet>
+
+      <ConfirmDialog
+        open={confirmBlock}
+        onClose={() => setConfirmBlock(false)}
+        onConfirm={blockAuthor}
+        icon={Ban}
+        title={`Block ${username ? `@${username}` : name}`}
+        body="Their Shots and posts disappear from your feeds, and yours from theirs. They aren't told."
+        confirmLabel="Block"
+      />
+
+      {currentUserId && reportOpen && (
+        <ReportSheet
+          open
+          onClose={() => setReportOpen(false)}
+          targetType="shot"
+          targetId={shot.id}
+          currentUserId={currentUserId}
+          onReported={() => showToast("Thanks — we'll take a look.", "success")}
+        />
       )}
 
       {currentUserId && (

@@ -16,6 +16,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ZoomViewer } from "@/components/ui/ZoomViewer";
 import { ExpandableText } from "@/components/ui/ExpandableText";
 import { RichPostText } from "@/components/ui/RichPostText";
+import { timeAgoShort } from "@/lib/time";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { FeedImpression } from "@/components/feed/FeedImpression";
 import { PostPeek } from "@/components/feed/PostPeek";
@@ -82,14 +83,6 @@ export type FeedPost = {
   /** Display name of the followed user whose repost surfaced this post. */
   _repostedBy?: string | null;
 };
-
-function timeAgo(iso: string) {
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return "now";
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return `${Math.floor(s / 86400)}d`;
-}
 
 /** Deduplicate and merge single/multi image fields */
 function getImages(post: FeedPost): string[] {
@@ -663,7 +656,7 @@ export function FeedCard({
           {isHyper && <HyperStar className="h-3.5 w-3.5 shrink-0" />}
           {isMutualHyper && <MutualHyperBadge />}
           <span className="ml-1 text-xs text-faint">
-            · {timeAgo(post.created_at)}
+            · {timeAgoShort(post.created_at)}
           </span>
         </div>
         {/* THREE DOTS -- fully functional */}
