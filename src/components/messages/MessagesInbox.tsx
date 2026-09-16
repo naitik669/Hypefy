@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import Link, { useLinkStatus } from "next/link";
+import Link from "next/link";
+import { setThreadHint } from "@/lib/thread-hints";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -115,12 +116,6 @@ function timeAgo(iso: string) {
   if (s < 3600) return `${Math.floor(s / 60)}m`;
   if (s < 86400) return `${Math.floor(s / 3600)}h`;
   return `${Math.floor(s / 86400)}d`;
-}
-
-/** The row stays pressed while its chat is on the way. */
-function OpeningShade() {
-  const { pending } = useLinkStatus();
-  return pending ? <span aria-hidden className="pointer-events-none absolute inset-0 bg-white/[0.06]" /> : null;
 }
 
 /** Human verbs for non-text message kinds — never show raw URLs. */
@@ -627,6 +622,13 @@ export function MessagesInbox({
               suppressClick.current = false;
               return;
             }
+            setThreadHint(r.id, {
+              name: r.name,
+              hue: r.hue,
+              avatarUrl: r.avatarUrl ?? null,
+              isGroup: r.isGroup,
+              memberCount: r.memberCount,
+            });
             setReadIds((prev) => {
               const next = new Set(prev).add(r.id);
               try {
@@ -652,7 +654,6 @@ export function MessagesInbox({
             pending ? "" : "px-4 py-3"
           }`}
         >
-          <OpeningShade />
           {/* Their nameplate, behind the row */}
           {!r.isGroup && r.cosmetics && (
             <Nameplate id={visibleNameplate(r.cosmetics)} className="inset-x-2 inset-y-1 rounded-2xl" />

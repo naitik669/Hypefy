@@ -1,15 +1,27 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { getThreadHint, setThreadHint } from "@/lib/thread-hints";
 import { CHAT_PATH, leaveChatAnimated } from "@/lib/leave-chat";
 
 /**
- * Leaving a chat slides it away, or simply goes back where the browser can't
- * animate it.
+ * Opening a chat shows its header from the first frame, and leaving slides
+ * the chat away, or simply goes back where the browser can't animate it.
  */
 
 afterEach(() => {
   delete (document as { startViewTransition?: unknown }).startViewTransition;
   delete document.documentElement.dataset.dmLeave;
+});
+
+describe("thread hints", () => {
+  it("remembers who a chat is with, newest kept", () => {
+    setThreadHint("c1", { name: "Maya", hue: 120, avatarUrl: "https://x/m.jpg" });
+    expect(getThreadHint("c1")).toMatchObject({ name: "Maya", avatarUrl: "https://x/m.jpg" });
+    expect(getThreadHint("nope")).toBeNull();
+    for (let i = 0; i < 70; i++) setThreadHint(`t${i}`, { name: `P${i}`, hue: 1 });
+    expect(getThreadHint("t69")).toBeTruthy();
+    expect(getThreadHint("c1")).toBeNull();
+  });
 });
 
 describe("leaving a chat", () => {
