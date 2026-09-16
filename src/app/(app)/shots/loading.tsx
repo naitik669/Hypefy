@@ -1,5 +1,5 @@
-import { ReelSkeleton } from "@/components/skeletons/Skeletons";
+import { TabSkeleton } from "@/components/skeletons/TabSkeleton";
 
-export default function ShotsLoading() {
-  return <ReelSkeleton />;
+export default function Loading() {
+  return <TabSkeleton tab="/shots" />;
 }

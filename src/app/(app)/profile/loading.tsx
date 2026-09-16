@@ -1,5 +1,5 @@
-import { ProfileSkeleton } from "@/components/skeletons/ProfileSkeleton";
+import { TabSkeleton } from "@/components/skeletons/TabSkeleton";
 
-export default function ProfileLoading() {
-  return <ProfileSkeleton />;
+export default function Loading() {
+  return <TabSkeleton tab="/profile" />;
 }

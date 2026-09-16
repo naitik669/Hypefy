@@ -1,9 +1,10 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { haptics } from "@/lib/haptics";
 import { overlayCount } from "@/lib/overlay-stack";
+import { TabSkeleton, type TabPath } from "@/components/skeletons/TabSkeleton";
 
 /**
  * Swipe sideways to move between the bottom-nav tabs.
@@ -112,26 +113,31 @@ export function gestureBlocked(
   return inHorizontalScroller(target);
 }
 
-/** What the destination is called, shown in the gap the finger opens. */
-const TAB_LABELS: Record<(typeof TABS)[number], string> = {
-  "/discover": "Discover",
-  "/home": "Home",
-  "/messages": "Messages",
-  "/shots": "Shots",
-  "/profile": "Profile",
-};
-
 const SETTLE = "transform 260ms cubic-bezier(0.16,1,0.3,1), opacity 260ms ease";
 
+/** Longest the incoming page waits for a route that never commits. */
+const HANDOFF_MS = 2500;
+
+/** The width the pages travel: the app's own column, not the whole desktop. */
+function pageWidth(): number {
+  if (typeof window === "undefined") return 1;
+  return Math.min(window.innerWidth || 1, 480);
+}
+
 /**
- * The page follows the finger sideways, and the gap it opens names where you
- * are going — "Messages ›" — rather than showing bare black. Let go past the
- * line and the page carries on out while the next one slides in from the
- * same side, as one movement; let go short of it and it springs back.
+ * Two pages move as one: the one you are on follows the finger out while the
+ * tab you are heading for follows it in, edge to edge, the way a phone's own
+ * tabs do.
  *
- * Every frame of the drag is written straight to the page's transform. The
- * old version set React state on each touchmove, which re-rendered this
- * wrapper for every pixel of the gesture.
+ * What comes in is the destination's own skeleton — the very component its
+ * loading.tsx renders — so when the route commits there is nothing to swap:
+ * the screen already under your finger simply fills in. It used to open a
+ * black gap with the tab's name written in it, a third screen belonging to
+ * neither side of the movement.
+ *
+ * Every frame of the drag is written straight to the transforms. The old
+ * version set React state on each touchmove, which re-rendered this wrapper
+ * for every pixel of the gesture.
  */
 export function SwipeNav({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -140,9 +146,14 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
   const enabled = index >= 0;
 
   const page = useRef<HTMLDivElement>(null);
-  const hintEl = useRef<HTMLDivElement>(null);
-  /** Where the finger is heading, once the gesture is ours. */
-  const [hint, setHint] = useState<{ label: string; side: "left" | "right" } | null>(null);
+  const incomingEl = useRef<HTMLDivElement>(null);
+  /** The tab being pulled in and the edge it comes from. Set once per
+   *  direction, not per frame. */
+  const [incoming, setIncoming] = useState<
+    { tab: TabPath; side: "left" | "right"; from: string } | null
+  >(null);
+  /** Held after the finger lifts, until the new route takes over. */
+  const holding = useRef(false);
 
   const start = useRef({ x: 0, y: 0, t: 0 });
   /** null = undecided, "x" = ours, "y" = the page's */
@@ -161,39 +172,59 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
       el.style.transition = transition;
       el.style.transform = x ? `translate3d(${x}px,0,0)` : "";
     }
-    const h = hintEl.current;
-    if (h) {
-      // Grows into view as the gap opens.
-      const w = window.innerWidth || 1;
-      const k = Math.min(1, Math.abs(x) / (w * COMMIT_RATIO));
-      h.style.transition = transition;
-      h.style.width = `${Math.abs(x)}px`;
-      h.style.opacity = String(k);
-      h.firstElementChild?.setAttribute("style", `transform: scale(${0.8 + 0.2 * k})`);
+    const inc = incomingEl.current;
+    if (inc) {
+      // A page width from wherever the finger has taken the current one, on
+      // the side it comes from: at rest exactly off-screen, at full travel
+      // exactly in place.
+      const from = inc.dataset.side === "right" ? pageWidth() : -pageWidth();
+      inc.style.transition = transition;
+      inc.style.transform = `translate3d(${x + from}px,0,0)`;
     }
   }
 
-  // The new page arrives: if a swipe brought us here, slide it in from the
-  // side the finger was pulling from. Before paint, so it never flashes in
-  // the middle first.
+  // The incoming page belongs to the route it was pulled from. When the new
+  // one commits it is no longer incoming, it IS the page — read that off the
+  // pathname rather than clearing it in an effect, so there is never a frame
+  // where both are on screen.
+  const inbound = incoming && incoming.from === pathname ? incoming : null;
+
+  // The route committed. The skeleton the finger pulled in is already exactly
+  // where this page belongs, so the real one simply takes its place: no second
+  // animation, nothing to cross-fade.
   useLayoutEffect(() => {
-    const dir = leaving.current;
     leaving.current = 0;
+    holding.current = false;
+    dx.current = 0;
     const el = page.current;
-    if (!el) return;
-    if (!dir) {
-      paint(0);
-      return;
+    if (el) {
+      el.style.transition = "none";
+      el.style.transform = "";
+      el.style.opacity = "";
     }
-    const w = window.innerWidth || 1;
-    el.style.transition = "none";
-    el.style.transform = `translate3d(${-dir * w * 0.35}px,0,0)`;
-    el.style.opacity = "0.4";
-    void el.offsetWidth; // lay the start out before moving from it
-    el.style.transition = SETTLE;
-    el.style.transform = "";
-    el.style.opacity = "";
   }, [pathname]);
+
+  // Put the page that just mounted where the finger already is, before the
+  // browser paints it — otherwise it would appear at rest for one frame,
+  // covering the screen, and then jump out to the edge.
+  useLayoutEffect(() => {
+    if (inbound) paint(dx.current);
+  }, [inbound]);
+
+  // A push that never commits — an error, or a redirect back to where we
+  // already are — would otherwise leave the destination's skeleton over the
+  // app for good.
+  useEffect(() => {
+    if (!inbound) return;
+    const t = window.setTimeout(() => {
+      if (!holding.current) return;
+      holding.current = false;
+      dx.current = 0;
+      paint(0, SETTLE);
+      setIncoming(null);
+    }, HANDOFF_MS);
+    return () => window.clearTimeout(t);
+  }, [inbound]);
 
   if (!enabled) return <>{children}</>;
 
@@ -238,10 +269,10 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     const toNext = ddx < 0;
     const atEdge = (ddx > 0 && !canPrev) || (toNext && !canNext);
     const x = atEdge ? ddx * 0.25 : ddx;
-    // Name the destination once per direction, not per frame.
-    const dest = atEdge ? null : TABS[toNext ? index + 1 : index - 1];
-    const want = dest ? { label: TAB_LABELS[dest], side: toNext ? ("right" as const) : ("left" as const) } : null;
-    if (want?.label !== hint?.label || want?.side !== hint?.side) setHint(want);
+    // Mount the destination once per direction, not per frame.
+    const dest = atEdge ? null : (TABS[toNext ? index + 1 : index - 1] as TabPath);
+    const want = dest ? { tab: dest, side: toNext ? ("right" as const) : ("left" as const), from: pathname } : null;
+    if (want?.tab !== incoming?.tab || want?.side !== incoming?.side) setIncoming(want);
     dx.current = x;
     paint(x);
   }
@@ -266,34 +297,43 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
       haptics.tap();
       const dir = outcome === "next" ? 1 : -1;
       leaving.current = dir;
-      // Carry the page the rest of the way out while the next one loads; it
-      // arrives from the same side (see the layout effect above).
-      paint(-dir * width, SETTLE);
+      // Both pages carry on the rest of the way — this one out, the next one
+      // into place — and the next one stays there until the route commits
+      // under it.
+      holding.current = true;
+      dx.current = -dir * pageWidth();
+      paint(dx.current, SETTLE);
       router.push(TABS[index + dir]);
       return;
     }
 
     dx.current = 0;
     paint(0, SETTLE);
+    // Let the destination slide back out before it stops being rendered.
+    window.setTimeout(() => {
+      if (!holding.current) setIncoming(null);
+    }, 280);
   }
 
   return (
     <>
-      {/* The gap the page leaves as it moves: where you are going. */}
-      <div
-        ref={hintEl}
-        aria-hidden
-        className="pointer-events-none fixed bottom-0 top-0 z-0 flex items-center justify-center"
-        style={{ [hint?.side === "left" ? "left" : "right"]: 0, width: 0, opacity: 0 }}
-      >
-        {hint && (
-          <span className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white/[0.07] px-3.5 py-2 text-sm font-bold text-foreground/85">
-            {hint.side === "left" && <span aria-hidden>‹</span>}
-            {hint.label}
-            {hint.side === "right" && <span aria-hidden>›</span>}
-          </span>
-        )}
-      </div>
+      {/* The tab being pulled in, travelling with the finger. Below the bottom
+          nav (z-30), which stays put through the whole movement. */}
+      {inbound && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-20 flex justify-center overflow-hidden"
+        >
+          <div
+            ref={incomingEl}
+            data-side={inbound.side}
+            data-incoming-tab={inbound.tab}
+            className="h-full w-full max-w-[480px] overflow-hidden bg-background pb-[84px]"
+          >
+            <TabSkeleton tab={inbound.tab} />
+          </div>
+        </div>
+      )}
       <div
         ref={page}
         onTouchStart={onTouchStart}

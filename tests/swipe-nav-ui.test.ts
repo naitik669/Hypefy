@@ -4,9 +4,9 @@ import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 /**
- * Swiping between tabs, as a finger does it: the page follows, the gap names
- * where you are going, a long enough swipe goes there, a short one springs
- * back.
+ * Swiping between tabs, as a finger does it: the page follows, the tab you
+ * are heading for comes in at its edge, a long enough swipe goes there, a
+ * short one springs back.
  */
 
 const push = vi.hoisted(() => vi.fn());
@@ -48,6 +48,32 @@ describe("SwipeNav", () => {
     await touch("touchmove", 180);
     expect(page().style.transform).toBe("translate3d(-120px,0,0)");
     expect(document.body.textContent).toContain("Messages");
+  });
+
+  it("brings the destination in at the edge of the page going out, no gap between them", async () => {
+    await touch("touchstart", 300);
+    await touch("touchmove", 280);
+    await touch("touchmove", 180);
+    const inbound = document.querySelector('[data-incoming-tab="/messages"]') as HTMLElement;
+    expect(inbound).toBeTruthy();
+    // The page is at -120; a 400-wide page starting off the right edge is at
+    // 400 - 120. The two edges touch, so nothing shows through between them.
+    expect(inbound.style.transform).toBe("translate3d(280px,0,0)");
+    // And what arrives is the real Messages screen taking shape, not a label
+    // on black: its header, with the title already in place.
+    expect(inbound.querySelector("header")?.textContent).toBe("Messages");
+  });
+
+  it("takes the destination away again when the swipe springs back", async () => {
+    await touch("touchstart", 100);
+    await touch("touchmove", 115);
+    await touch("touchmove", 130);
+    expect(document.querySelector('[data-incoming-tab="/discover"]')).toBeTruthy();
+    await touch("touchend", 130);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 320));
+    });
+    expect(document.querySelector("[data-incoming-tab]")).toBeNull();
   });
 
   it("goes to the next tab once the swipe is long enough", async () => {
