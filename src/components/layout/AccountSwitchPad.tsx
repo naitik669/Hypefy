@@ -58,10 +58,9 @@ export const REEL = {
   VISIBLE: 4,
   /** Room under the lowest face for the fade it sinks into. */
   PAD: 22,
-  /** How far faces are drawn above the reel before they are clipped, so the
-   *  top face's ring and lift are not cut off. Kept under the 6px of room a
-   *  face has above it, or the next face peeks in as a sliver. */
-  HEADROOM: 4,
+  /** Room above the reel where an arriving face fades in under the "+",
+   *  instead of being cut off at the reel's top edge. One face tall. */
+  HEADROOM: 60,
   /** Reel travel per px of thumb: 20px of thumb brings the next account. */
   RATIO: 3,
   /** Thumb travel past the end of the list that lands on "+". */
@@ -70,8 +69,10 @@ export const REEL = {
   GLIDE_AFTER_MS: 40,
 } as const;
 
-/** Faces sink into a fade at the bottom; the top edge has none. */
-const REEL_MASK = `linear-gradient(to top, transparent 0, #000 ${REEL.PAD + 4}px)`;
+/** Faces sink into a fade at the bottom. The top fade is per face, in paint(). */
+const REEL_MASK = `linear-gradient(to top, transparent 0, #000 ${
+  REEL.PAD + 4
+}px)`;
 
 /** Centre of account `i`, measured up from the reel's bottom edge. */
 export function reelCentre(i: number, scroll: number) {
@@ -180,6 +181,7 @@ export function AccountSwitchPad({
     const s = g.current;
     const h = reelHeight(s.n) + REEL.HEADROOM;
     const rest = REEL.PAD + REEL.PITCH / 2;
+    const top = reelCentre(Math.min(s.n, REEL.VISIBLE) - 1, 0);
     for (let i = 0; i < tileEls.current.length; i++) {
       const el = tileEls.current[i];
       if (!el) continue;
@@ -187,7 +189,13 @@ export function AccountSwitchPad({
       // A face sinking below its resting place shrinks a little as it fades.
       const scale = c < rest ? 0.85 + 0.15 * Math.max(0, c / rest) : 1;
       el.style.transform = `translate3d(0,${h - c - 24}px,0) scale(${scale})`;
-      el.style.visibility = c < -REEL.PITCH || c > h + REEL.PITCH ? "hidden" : "visible";
+      // Above the top face in view a face fades out under the "+": gone by the
+      // time it is one face higher, so the next account never peeks in at rest.
+      const fade =
+        c > top ? Math.max(0, 1 - (c - top) / (REEL.PITCH * 0.8)) : 1;
+      el.style.opacity = String(fade);
+      el.style.visibility =
+        fade === 0 || c < -REEL.PITCH ? "hidden" : "visible";
     }
   }, []);
 
@@ -204,7 +212,8 @@ export function AccountSwitchPad({
       if (!rect && !detached) {
         // No other accounts: only the "+", reached by sliding up to it.
         const addRect = addRef.current?.getBoundingClientRect();
-        const pick: Pick = addRect && s.thumbY < addRect.bottom + 12 ? "add" : null;
+        const pick: Pick =
+          addRect && s.thumbY < addRect.bottom + 12 ? "add" : null;
         if (pick !== s.active) {
           s.active = pick;
           setActive(pick);
@@ -244,7 +253,11 @@ export function AccountSwitchPad({
           for (let i = 0; i < s.n; i++) {
             const cy = rect.bottom - reelCentre(i, s.scroll);
             // Only faces wholly in view: not one peeking in at the top.
-            if (cy < rect.top + REEL.HEADROOM + 20 || cy > rect.bottom - REEL.PAD / 2) continue;
+            if (
+              cy < rect.top + REEL.HEADROOM + 20 ||
+              cy > rect.bottom - REEL.PAD / 2
+            )
+              continue;
             const d = Math.abs(cy - y);
             if (d < best) {
               best = d;
@@ -427,33 +440,39 @@ export function AccountSwitchPad({
             aria-label="Switch account"
           >
             {/* "+" is outside the reel, so the way to a new account is always
-                in the same place. */}
-            <Face
-              ref={addRef}
-              name="Add account"
-              active={active === "add"}
-              delay={Math.min(n, REEL.VISIBLE) * 38}
-              onPick={detached ? () => commit("add") : undefined}
-            >
-              <span
-                className={`flex h-12 w-12 items-center justify-center rounded-[16px] border-2 border-dashed transition-colors duration-200 ${
-                  active === "add"
-                    ? "border-accent bg-accent/15 text-accent"
-                    : "border-border bg-surface/95 text-muted"
-                }`}
+                in the same place. It sits over the reel, which reaches up
+                under it for faces fading in. */}
+            <div className="relative z-10">
+              <Face
+                ref={addRef}
+                name="Add account"
+                active={active === "add"}
+                delay={Math.min(n, REEL.VISIBLE) * 38}
+                onPick={detached ? () => commit("add") : undefined}
               >
-                <Plus size={22} weight="bold" aria-hidden />
-              </span>
-            </Face>
+                <span
+                  className={`flex h-12 w-12 items-center justify-center rounded-[16px] border-2 border-dashed transition-colors duration-200 ${
+                    active === "add"
+                      ? "border-accent bg-accent/15 text-accent"
+                      : "border-border bg-surface/95 text-muted"
+                  }`}
+                >
+                  <Plus size={22} weight="bold" aria-hidden />
+                </span>
+              </Face>
+            </div>
 
             {n > 0 && (
               <div className="relative w-12" style={{ height: reelH }}>
-                {/* Wider than the column so the name beside a face has room;
-                    the fade is at the bottom only, where faces sink away. */}
+                {/* Wider than the column so the name beside a face has room,
+                    and taller, so a face coming down fades in under the "+"
+                    rather than being cut off. Faces sinking out at the bottom
+                    fade through the mask. The reel itself takes no touches, or
+                    its headroom would cover the "+" when tapping. */}
                 <div
                   ref={reelRef}
                   data-switch-reel=""
-                  className="absolute bottom-0 right-[-16px] w-[75vw] max-w-[320px] overflow-hidden"
+                  className="pointer-events-none absolute bottom-0 right-[-16px] w-[75vw] max-w-[320px] overflow-hidden"
                   style={{
                     height: reelH + REEL.HEADROOM,
                     maskImage: REEL_MASK,
@@ -466,10 +485,12 @@ export function AccountSwitchPad({
                       ref={(el) => {
                         tileEls.current[i] = el;
                       }}
-                      className="absolute right-4 top-0 h-12 w-12"
+                      className="pointer-events-auto absolute right-4 top-0 h-12 w-12"
                       style={{
-                        transform: `translate3d(0,${reelH + REEL.HEADROOM - reelCentre(i, 0) - 24}px,0)`,
-                        visibility: i < REEL.VISIBLE + 1 ? "visible" : "hidden",
+                        transform: `translate3d(0,${
+                          reelH + REEL.HEADROOM - reelCentre(i, 0) - 24
+                        }px,0)`,
+                        visibility: i < REEL.VISIBLE ? "visible" : "hidden",
                       }}
                     >
                       <Face
@@ -484,7 +505,9 @@ export function AccountSwitchPad({
                           src={account.avatarUrl ?? undefined}
                           size={48}
                           className={`rounded-[16px] shadow-xl transition-all duration-200 ${
-                            active === i ? "ring-[3px] ring-accent" : "opacity-90 ring-1 ring-white/10"
+                            active === i
+                              ? "ring-[3px] ring-accent"
+                              : "opacity-90 ring-1 ring-white/10"
                           }`}
                         />
                       </Face>
@@ -596,7 +619,9 @@ function Face({
         <span
           className="block max-w-[42vw] truncate rounded-lg bg-background/90 px-2.5 py-1 text-[13px] font-bold whitespace-nowrap text-foreground shadow-lg ring-1 ring-border/70"
           style={{
-            transform: active ? "translate3d(0,0,0)" : "translate3d(calc(100% + 10px), 0, 0)",
+            transform: active
+              ? "translate3d(0,0,0)"
+              : "translate3d(calc(100% + 10px), 0, 0)",
             marginRight: 10,
             transition: "transform 260ms cubic-bezier(0.16,1,0.3,1)",
           }}
