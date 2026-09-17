@@ -131,6 +131,19 @@ describe("a bottom sheet", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("leaves a drag on a wheel inside it to the wheel", async () => {
+    // The birthday picker: a body with nothing to scroll, holding drums that do.
+    const drums = document.createElement("div");
+    drums.setAttribute("data-sheet-no-drag", "");
+    const drum = document.createElement("div");
+    drums.appendChild(drum);
+    body().appendChild(drums);
+    await drag(drum, 140);
+    await drag(drum, -140);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(sheet()!.style.transform).not.toContain("140");
+  });
+
   it("stays on screen while it leaves, then goes", async () => {
     await render(false);
     // Still mounted, on its way out.

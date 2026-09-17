@@ -301,7 +301,7 @@ export function DateOfBirthPicker({
                   "linear-gradient(var(--color-elevated) 2%, transparent 30%, transparent 70%, var(--color-elevated) 98%)",
               }}
             />
-            <div className="flex">
+            <div className="flex" data-sheet-no-drag>
               <WheelColumn options={months} value={m} onChange={setM} ariaLabel="Month" align="right" />
               <WheelColumn options={days} value={d} onChange={setD} ariaLabel="Day" />
               <WheelColumn options={years} value={y} onChange={setY} ariaLabel="Year" align="left" />

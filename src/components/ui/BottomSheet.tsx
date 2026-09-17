@@ -51,6 +51,21 @@ const SETTLE_MS = 260;
 const LEAVE_MS = 200;
 const EASE = "cubic-bezier(0.16,1,0.3,1)";
 
+/**
+ * Whether a touch at `target` belongs to something between it and the sheet
+ * body that scrolls vertically by itself (or opts out with data-sheet-no-drag).
+ */
+export function ownsVerticalDrag(target: Element | null, body: Element): boolean {
+  for (let el = target; el && el !== body; el = el.parentElement) {
+    if (el.hasAttribute("data-sheet-no-drag")) return true;
+    if (el.scrollHeight > el.clientHeight + 1) {
+      const oy = getComputedStyle(el).overflowY;
+      if (oy === "auto" || oy === "scroll") return true;
+    }
+  }
+  return false;
+}
+
 function reducedMotion(): boolean {
   return (
     typeof window !== "undefined" &&
@@ -336,6 +351,10 @@ export function BottomSheet({
       // travelled the body may have reached the top on its own, and the
       // gesture would turn into a dismiss in the middle of a scroll.
       const b = scrollRef.current;
+      // A drum or list inside the sheet that scrolls on its own owns its
+      // vertical drags: the date wheel sits in a body with nothing to scroll,
+      // so without this every turn of a wheel dragged the whole sheet.
+      if (b && ownsVerticalDrag(e.target as Element, b)) return;
       const atTop = (b?.scrollTop ?? 0) <= 0;
       const atBottom = !!b && b.scrollTop + b.clientHeight >= b.scrollHeight - 1;
       // From the top, a pull down is the sheet. From the bottom — or when
