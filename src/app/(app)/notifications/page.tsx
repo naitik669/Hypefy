@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, CheckCheck, Loader2, Trash2, UserPlus, ShieldAlert, Sparkles } from "lucide-react";
+import { Bell, CheckCheck, Loader2, Trash2, UserPlus, ShieldAlert, Sparkles, SlidersHorizontal, Trophy, BellOff } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -13,6 +13,9 @@ import { FollowButton } from "@/components/profile/FollowButton";
 import { haptics } from "@/lib/haptics";
 import { useToast } from "@/components/ui/ToastProvider";
 import { BLANK_POSTER } from "@/lib/blank-poster";
+import { TuneSheet } from "@/components/notifications/TuneSheet";
+import { InterestCard } from "@/components/notifications/InterestCard";
+import { levelOf, needsYou, sectionOf, spotlightDecision, type ActivityPrefs, type LevelKey } from "@/lib/activity-prefs";
 
 export type Notif = {
   id: string;
@@ -56,20 +59,39 @@ type Group = {
   actorId: string | null;
 };
 
-type Filter = "All" | "Hypes" | "Comments" | "Follows" | "Mentions";
 
-const FILTERS: Filter[] = ["All", "Hypes", "Comments", "Follows", "Mentions"];
+/** Kept when muting someone: not "activity", and not something to miss. */
+const MUTE_EXEMPT = new Set(["new_message", "dm_post_shared", "incoming_call", "missed_call", "follow_request", "security_alert"]);
 
-const TYPE_MAP: Record<Filter, string[]> = {
-  All: [],
-  Hypes: ["hype_post", "hype_shot", "hype_comment", "repost"],
-  Comments: ["comment_post", "comment_shot", "comment_reply"],
-  // follow_request and follow_accepted were missing, so filtering to Follows
-  // hid the only rows in the whole feed that need a decision from you — a
-  // pending request exists nowhere else in the app.
-  Follows: ["follow", "follow_request", "follow_accepted"],
-  Mentions: ["mention_post"],
-};
+/** Which Tune level a notification answers to, as the server decides it. */
+function levelKeyOf(type: string): LevelKey | null {
+  if (type.startsWith("hype_") || type === "repost") return "hypes";
+  if (type.startsWith("comment_")) return "comments";
+  if (type.startsWith("mention_")) return "mentions";
+  if (type === "follow" || type === "follow_accepted") return "follows";
+  if (type === "dm_post_shared") return "shares";
+  return null;
+}
+
+/**
+ * What Activity shows, given the Tune sheet. The server already keeps new
+ * rows out; this hides the ones that arrived before a change, so switching
+ * something off takes effect on screen at once. Spotlight pages wait for an
+ * answer: until then the newest one is only the example the question uses.
+ */
+export function shownNotifs(list: Notif[], prefs: ActivityPrefs): Notif[] {
+  const muted = new Set(prefs.muted ?? []);
+  const spotlight = spotlightDecision(prefs);
+  return list.filter((n) => {
+    if (n.actor_id && muted.has(n.actor_id) && !MUTE_EXEMPT.has(n.type)) return false;
+    if (n.type === "spotlight_page" && spotlight !== "yes") return false;
+    if (n.type === "milestone" && prefs.milestones === false) return false;
+    if (n.type === "show_posted" && prefs.shows_posted === false) return false;
+    if (n.type === "back_after" && prefs.back_after === false) return false;
+    const key = levelKeyOf(n.type);
+    return !key || levelOf(prefs, key) !== "off";
+  });
+}
 
 /** Types where bundling several rows into one loses information the user needs
  *  to act on individually — never collapse these. */
@@ -82,6 +104,8 @@ const NEVER_GROUP = new Set([
   // one you didn't make, which is the entire point of the alert.
   "security_alert",
   "trial_reminder",
+  // "Passed 100" and "passed 500" are two pieces of news.
+  "milestone",
 ]);
 
 function timeAgo(iso: string) {
@@ -120,6 +144,10 @@ export function notifHref(n: Notif): string {
   // open your profile, back when the same note was a status bubble there —
   // which is switched off, so that link now lands on nothing.
   if (n.type === "note_reaction") return "/messages/diary";
+
+  // Opens Spotlight on that friend's page.
+  if (n.type === "spotlight_page")
+    return n.target_id ? `/messages/spotlight?page=${n.target_id}` : "/messages/spotlight";
 
   if (
     n.type === "follow" || n.type === "referral_joined" ||
@@ -225,7 +253,11 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [filter, setFilter] = useState<Filter>("All");
+  /** The Tune sheet's choices, mirrored so the screen matches the server. */
+  const [prefs, setPrefs] = useState<ActivityPrefs>({});
+  const [tuneOpen, setTuneOpen] = useState(false);
+  /** Answered the Spotlight question on this visit: keeps the card, with Undo. */
+  const [answered, setAnswered] = useState<"yes" | "no" | null>(null);
   /** Actors I already follow — decides whether a follow row offers "Follow
    *  back" or just says who followed me. */
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
@@ -306,12 +338,16 @@ export default function NotificationsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
 
-    const { data } = await supabase
-      .from("notifications")
-      .select("id, type, target_type, target_id, actor_id, body, is_read, created_at, actor:actor_id(display_name, username, avatar_hue, avatar_url)")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(PAGE);
+    const [{ data }, { data: me }] = await Promise.all([
+      supabase
+        .from("notifications")
+        .select("id, type, target_type, target_id, actor_id, body, is_read, created_at, actor:actor_id(display_name, username, avatar_hue, avatar_url)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(PAGE),
+      supabase.from("profiles").select("notif_prefs").eq("id", user.id).maybeSingle(),
+    ]);
+    setPrefs(((me as { notif_prefs?: ActivityPrefs } | null)?.notif_prefs ?? {}) as ActivityPrefs);
 
     const mapped: Notif[] = (data ?? []).map((n: any) => ({
       ...n,
@@ -419,14 +455,57 @@ export default function NotificationsPage() {
     if (error) showToast("Couldn't mark everything read.");
   }
 
-  const allowed = TYPE_MAP[filter];
-  const visible = allowed.length === 0 ? notifs : notifs.filter((n) => allowed.includes(n.type));
+  const spotlight = spotlightDecision(prefs);
+  const visible = useMemo(() => shownNotifs(notifs, prefs), [notifs, prefs]);
   const groups = useMemo(() => groupNotifs(visible), [visible]);
-  // Unread first, under their own heading — the reference splits the list this
-  // way so what is actually new is not buried in a week of history.
-  const newGroups = groups.filter((g) => !g.isRead);
-  const earlierGroups = groups.filter((g) => g.isRead);
-  const split = newGroups.length > 0 && earlierGroups.length > 0;
+  // What needs an answer first, then the rest by when it happened.
+  const needs = groups.filter((g) => needsYou(g.type, g.isRead));
+  const rest = groups.filter((g) => !needsYou(g.type, g.isRead));
+  const sections = (["today", "week", "earlier"] as const).map((key) => ({
+    key,
+    label: key === "today" ? "Today" : key === "week" ? "This week" : "Earlier",
+    groups: rest.filter((g) => sectionOf(g.latestAt) === key),
+  }));
+  // The Spotlight question is asked with a real example, the newest such page,
+  // at the top of the first section there is (Today when there is one).
+  const askWith = notifs.find((n) => n.type === "spotlight_page") ?? null;
+  const showAsk = !!askWith && (spotlight === "ask" || answered !== null);
+  const askIn = sections.find((sec) => sec.groups.length)?.key ?? "today";
+
+  async function answerSpotlight(value: boolean | null) {
+    const before = prefs;
+    haptics.tap();
+    setAnswered(value === null ? null : value ? "yes" : "no");
+    setPrefs((p) => {
+      const next = { ...p };
+      if (value === null) delete next.spotlight_pages;
+      else next.spotlight_pages = value;
+      return next;
+    });
+    const { error } = await supabase.rpc("set_activity_pref", { p_key: "spotlight_pages", p_value: value as never });
+    if (error) {
+      setPrefs(before);
+      setAnswered(null);
+      showToast("Couldn't save that. Try again.");
+    }
+  }
+
+  async function muteActor(g: Group) {
+    const id = g.actorId;
+    if (!id) return;
+    haptics.tap();
+    const before = { notifs, prefs };
+    setNotifs((prev) => prev.filter((n) => n.actor_id !== id || MUTE_EXEMPT.has(n.type)));
+    setPrefs((p) => ({ ...p, muted: [...(p.muted ?? []).filter((m) => m !== id), id] }));
+    const { error } = await supabase.rpc("set_activity_mute", { p_user: id, p_on: true });
+    if (error) {
+      setNotifs(before.notifs);
+      setPrefs(before.prefs);
+      showToast("Couldn't mute. Try again.");
+      return;
+    }
+    showToast(`Muted ${actorSummary(g)}. Unmute in Tune.`);
+  }
 
   async function clearGroup(ids: string[]) {
     haptics.tap();
@@ -464,7 +543,7 @@ export default function NotificationsPage() {
         showBack
         right={
           <>
-            {newGroups.length > 0 && (
+            {groups.some((g) => !g.isRead) && (
               <button
                 type="button"
                 onClick={readAll}
@@ -475,6 +554,15 @@ export default function NotificationsPage() {
             )}
             {/* Follow requests outlive their notifications — clearing one used
                 to strand the request with nowhere left to answer it. */}
+            <button
+              type="button"
+              onClick={() => setTuneOpen(true)}
+              aria-label="Tune your Activity"
+              data-tune-button
+              className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground"
+            >
+              <SlidersHorizontal size={18} />
+            </button>
             <Link
               href="/requests"
               aria-label="Follow requests"
@@ -489,21 +577,6 @@ export default function NotificationsPage() {
       <PushNudge />
 
       <PullToRefresh onRefresh={() => load({ silent: true })}>
-      {/* Filter pills */}
-      <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-3 pt-3">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFilter(f)}
-            className={`shrink-0 rounded-pill px-4 py-1.5 text-sm font-semibold transition-colors ${
-              f === filter ? "bg-accent text-accent-ink" : "bg-surface text-muted"
-            }`}
-          >
-            {f}
-          </button>
-        ))}
-      </div>
 
       {loading ? (
         /* Shimmer skeleton rows shaped like real notifications */
@@ -518,36 +591,61 @@ export default function NotificationsPage() {
             </div>
           ))}
         </div>
-      ) : groups.length === 0 ? (
+      ) : groups.length === 0 && !showAsk ? (
         <EmptyState
           icon={Bell}
           title="Quiet for now"
           text="Hypes, replies, follows, and mentions will show up here."
         />
       ) : (
-        <div className="flex flex-col pb-4">
-          {split && <SectionLabel>New</SectionLabel>}
-          {newGroups.map((g, i) => (
-            <NotifRow
-              key={g.key}
-              group={g}
-              index={i}
-              following={!!g.actorId && followingIds.has(g.actorId)}
-              onClear={() => clearGroup(g.ids)}
-              onResolveRequest={(approve) => resolveRequest(g, approve)}
-            />
-          ))}
-          {split && <SectionLabel>Earlier</SectionLabel>}
-          {(split ? earlierGroups : groups).map((g, i) => (
-            <NotifRow
-              key={g.key}
-              group={g}
-              index={newGroups.length + i}
-              following={!!g.actorId && followingIds.has(g.actorId)}
-              onClear={() => clearGroup(g.ids)}
-              onResolveRequest={(approve) => resolveRequest(g, approve)}
-            />
-          ))}
+        <div className="flex flex-col pb-4 pt-1">
+          {needs.length > 0 && (
+            <>
+              <SectionLabel>Needs you</SectionLabel>
+              <div className="mx-3 overflow-hidden rounded-[18px] bg-surface" data-section="needs">
+                {needs.map((g, i) => (
+                  <NotifRow
+                    key={g.key}
+                    group={g}
+                    index={i}
+                    surface
+                    following={!!g.actorId && followingIds.has(g.actorId)}
+                    onClear={() => clearGroup(g.ids)}
+                    onResolveRequest={(approve) => resolveRequest(g, approve)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+          {sections.map((sec) => {
+            const withAsk = showAsk && sec.key === askIn;
+            if (!sec.groups.length && !withAsk) return null;
+            return (
+              <div key={sec.key} data-section={sec.key}>
+                <SectionLabel>{sec.label}</SectionLabel>
+                {withAsk && askWith && (
+                  <InterestCard
+                    actor={askWith.actor}
+                    href={notifHref(askWith)}
+                    answered={answered}
+                    onAnswer={(yes) => answerSpotlight(yes)}
+                    onUndo={() => answerSpotlight(null)}
+                  />
+                )}
+                {sec.groups.map((g, i) => (
+                  <NotifRow
+                    key={g.key}
+                    group={g}
+                    index={needs.length + i}
+                    following={!!g.actorId && followingIds.has(g.actorId)}
+                    onClear={() => clearGroup(g.ids)}
+                    onMute={g.actorId && g.actors.length === 1 && !MUTE_EXEMPT.has(g.type) ? () => muteActor(g) : undefined}
+                    onResolveRequest={(approve) => resolveRequest(g, approve)}
+                  />
+                ))}
+              </div>
+            );
+          })}
           {/* Infinite scroll sentinel */}
           <div ref={sentinelRef} className="py-2 flex justify-center">
             {loadingMore && <Loader2 size={18} className="animate-spin text-faint" />}
@@ -555,6 +653,8 @@ export default function NotificationsPage() {
         </div>
       )}
       </PullToRefresh>
+
+      <TuneSheet open={tuneOpen} onClose={() => setTuneOpen(false)} prefs={prefs} onChange={setPrefs} />
     </>
   );
 }
@@ -568,11 +668,32 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-const SWIPE_REVEAL = 80; // px of delete affordance revealed — matches the button's w-20
+const SWIPE_REVEAL = 80; // px per action revealed — matches each button's w-20
 const SWIPE_COMMIT = 110; // px drag distance that commits the clear
 
 /** One notification row (single or grouped). Swipe left to reveal + confirm clear. */
-function NotifRow({ group: g, index = 0, following = false, onClear, onResolveRequest }: { group: Group; index?: number; following?: boolean; onClear: () => void; onResolveRequest?: (approve: boolean) => void }) {
+function NotifRow({
+  group: g,
+  index = 0,
+  following = false,
+  surface = false,
+  onClear,
+  onMute,
+  onResolveRequest,
+}: {
+  group: Group;
+  index?: number;
+  following?: boolean;
+  /** Sits on a card rather than on the page. */
+  surface?: boolean;
+  onClear: () => void;
+  /** Mute this person in Activity: offered beside Clear. */
+  onMute?: () => void;
+  onResolveRequest?: (approve: boolean) => void;
+}) {
+  const reveal = onMute ? SWIPE_REVEAL * 2 : SWIPE_REVEAL;
+  // A full swipe clears; it has to travel past everything revealed first.
+  const commitAt = Math.max(SWIPE_COMMIT, reveal + 50);
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -587,18 +708,18 @@ function NotifRow({ group: g, index = 0, following = false, onClear, onResolveRe
   function onTouchMove(e: React.TouchEvent) {
     if (startX.current === null) return;
     const dx = e.touches[0].clientX - startX.current;
-    const next = Math.max(-SWIPE_COMMIT - 20, Math.min(0, startDragX.current + dx));
+    const next = Math.max(-commitAt - 20, Math.min(0, startDragX.current + dx));
     setDragX(next);
   }
   function onTouchEnd() {
     setDragging(false);
     startX.current = null;
-    if (dragX <= -SWIPE_COMMIT) {
+    if (dragX <= -commitAt) {
       setLeaving(true);
       setDragX(-400);
       setTimeout(onClear, 200);
     } else if (dragX <= -SWIPE_REVEAL / 2) {
-      setDragX(-SWIPE_REVEAL); // settle open
+      setDragX(-reveal); // settle open
     } else {
       setDragX(0); // spring back closed
     }
@@ -607,13 +728,26 @@ function NotifRow({ group: g, index = 0, following = false, onClear, onResolveRe
   const actorName = actorSummary(g);
   const showCluster = g.actors.length > 1;
   const isFollowType = g.type === "follow" || g.type === "follow_accepted";
+  /** Nobody did these: they are about your account or your work. */
+  const noActor = g.type === "security_alert" || g.type === "trial_reminder" || g.type === "milestone";
 
   return (
     <div
       className="animate-row-in relative overflow-hidden"
       style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
     >
-      {/* Delete affordance revealed behind the row */}
+      {/* Mute and clear, revealed behind the row */}
+      {onMute && (
+        <button
+          type="button"
+          aria-label="Mute notifications from this person"
+          onClick={() => { setLeaving(true); setDragX(-400); setTimeout(onMute, 200); }}
+          className="absolute inset-y-0 right-20 flex w-20 flex-col items-center justify-center gap-0.5 bg-elevated text-[11px] font-bold text-foreground"
+        >
+          <BellOff size={17} />
+          Mute
+        </button>
+      )}
       <button
         type="button"
         aria-label="Clear notification"
@@ -629,7 +763,7 @@ function NotifRow({ group: g, index = 0, following = false, onClear, onResolveRe
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         onClick={(e) => { if (dragX !== 0) e.preventDefault(); }}
-        className={`relative flex items-center gap-3 bg-background py-3 pl-4 pr-4 transition-colors hover:bg-white/[0.03] ${
+        className={`relative flex items-center gap-3 ${surface ? "bg-surface" : "bg-background"} py-3 pl-4 pr-4 transition-colors hover:bg-white/[0.03] ${
           !g.isRead ? "bg-accent/[0.04] before:absolute before:inset-y-1 before:left-0 before:w-[3px] before:rounded-r-full before:bg-accent before:content-['']" : ""
         }`}
         style={{
@@ -642,6 +776,10 @@ function NotifRow({ group: g, index = 0, following = false, onClear, onResolveRe
           {g.type === "trial_reminder" ? (
             <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-accent/15 text-accent">
               <Sparkles size={22} />
+            </span>
+          ) : g.type === "milestone" ? (
+            <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-accent/15 text-accent">
+              <Trophy size={21} />
             </span>
           ) : g.type === "security_alert" ? (
             // No actor: nobody did this to you, it happened to your account.
@@ -678,13 +816,13 @@ function NotifRow({ group: g, index = 0, following = false, onClear, onResolveRe
           )}
         </div>
         <p className="min-w-0 flex-1 text-sm leading-snug">
-          {g.type !== "security_alert" && g.type !== "trial_reminder" && (
+          {!noActor && (
             <>
               <span className="font-semibold">{actorName}</span>{" "}
             </>
           )}
           <span
-            className={g.type === "security_alert" || g.type === "trial_reminder" ? "font-semibold" : "text-muted"}
+            className={noActor ? "font-semibold" : "text-muted"}
           >
             {g.body}
           </span>{" "}
@@ -711,7 +849,7 @@ function NotifRow({ group: g, index = 0, following = false, onClear, onResolveRe
 
       {/* Private-account follow request — approve/deny inline */}
       {g.type === "follow_request" && onResolveRequest && (
-        <div className="flex gap-2 bg-background px-4 pb-3 pl-[68px]">
+        <div className={`flex gap-2 ${surface ? "bg-surface" : "bg-background"} px-4 pb-3 pl-[68px]`}>
           <button
             type="button"
             onClick={() => onResolveRequest(true)}

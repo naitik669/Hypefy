@@ -2307,6 +2307,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      set_activity_mute: {
+        Args: { p_on: boolean; p_user: string }
+        Returns: Json
+      }
+      set_activity_pref: {
+        Args: { p_key: string; p_value: Json }
+        Returns: Json
+      }
       set_chat_theme: {
         Args: { p_conversation_id: string; p_theme: string | null }
         Returns: undefined

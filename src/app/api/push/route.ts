@@ -44,6 +44,17 @@ function pushCopy(type: string, actor: string, body: string | null) {
       return { title: `💬 ${actor}`, body: body ?? "commented on your post" };
     case type === "follow":
       return { title: `${actor} started following you`, body: "Tap to see their profile" };
+    // From the Tune sheet's daily summary: no actor, just the count.
+    case type === "hype_summary":
+      return { title: "⭐ Your day on Hypefy", body: body ?? "Your hypes today" };
+    case type === "milestone":
+      return { title: "🏆 Milestone", body: body ?? "Your post passed a milestone" };
+    case type === "spotlight_page":
+      return { title: actor, body: "added a page to their Spotlight" };
+    case type === "show_posted":
+      return { title: actor, body: "posted a Show" };
+    case type === "back_after":
+      return { title: actor, body: body ?? "is back with a new post" };
     case type.startsWith("mention_"):
       return { title: `${actor} mentioned you`, body: body ?? "in a post" };
     default:
@@ -56,6 +67,8 @@ function pushUrl(n: { type: string; target_type: string | null; target_id: strin
   // devices out.
   if (n.type === "security_alert") return "/settings/security";
   if (n.type === "follow") return actorUsername ? `/u/${actorUsername}` : "/notifications";
+  if (n.type === "spotlight_page" && n.target_id) return `/messages/spotlight?page=${n.target_id}`;
+  if (n.target_type === "show" && n.target_id) return `/shows/${n.target_id}`;
   if (n.target_type === "post" && n.target_id) return `/p/${n.target_id}`;
   if (n.target_type === "shot" && n.target_id) return `/shots/${n.target_id}`;
   return "/notifications";
