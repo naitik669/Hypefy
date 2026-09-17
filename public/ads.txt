@@ -1,0 +1,4 @@
+# Authorised sellers of Hypefy ad inventory, for app.hypefy.chat, where the
+# ads render. Mirrors https://hypefy.chat/ads.txt, which declares this
+# subdomain.
+google.com, pub-8956774728473034, DIRECT, f08c47fec0942fa0
