@@ -75,12 +75,33 @@ let loopFrom: { id: string; start: number } | null = null;
  * stale rejection would mark a song that is playing as stopped.
  */
 let playSeq = 0;
+/** A play the browser refused, waiting for the next touch to try again. */
+let retryOnTouch: (() => void) | null = null;
 function startPlay(a: HTMLAudioElement) {
   const seq = ++playSeq;
-  a.play().catch(() => {
+  const id = playingId;
+  if (retryOnTouch) {
+    document.removeEventListener("pointerdown", retryOnTouch, true);
+    retryOnTouch = null;
+  }
+  a.play().catch((err: unknown) => {
     if (seq !== playSeq) return;
     playingId = null;
     emit();
+    // Opened without a tap first (a reload, a link from outside), the browser
+    // will not start sound on its own. The first touch anywhere on the page
+    // is allowed to, so the song starts then rather than never.
+    if ((err as { name?: string } | null)?.name !== "NotAllowedError" || typeof document === "undefined") return;
+    const retry = () => {
+      document.removeEventListener("pointerdown", retry, true);
+      if (retryOnTouch === retry) retryOnTouch = null;
+      if (seq !== playSeq || !id) return;
+      playingId = id;
+      emit();
+      startPlay(a);
+    };
+    retryOnTouch = retry;
+    document.addEventListener("pointerdown", retry, true);
   });
 }
 const listeners = new Set<() => void>();
@@ -225,6 +246,32 @@ export function ensurePreviewPlaying(track: Track, opts?: PlayOpts) {
   playingId = track.id;
   emit();
   startPlay(a);
+}
+
+/**
+ * Surfaces that play a song for as long as they are on screen — the page at
+ * the front of Spotlight, a page opened full screen over it. The newest claim
+ * plays. Releasing it pauses only if it is still the one playing, and hands
+ * the song back to the claim underneath, so closing a full-screen page does
+ * not leave the page behind it silent, and a card leaving late does not stop
+ * the song of the card that replaced it.
+ */
+type Claim = { track: Track; opts?: PlayOpts };
+const claims: Claim[] = [];
+export function claimPreview(track: Track, opts?: PlayOpts): () => void {
+  const claim: Claim = { track, opts };
+  claims.push(claim);
+  ensurePreviewPlaying(track, opts);
+  return () => {
+    const i = claims.indexOf(claim);
+    if (i < 0) return;
+    const wasTop = i === claims.length - 1;
+    claims.splice(i, 1);
+    if (!wasTop) return;
+    const under = claims[claims.length - 1];
+    if (under) ensurePreviewPlaying(under.track, under.opts);
+    else if (playingId === track.id) pausePreview();
+  };
 }
 
 /** Pause without clearing the source, so ensurePreviewPlaying can resume. */

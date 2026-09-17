@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Music, Plus, X } from "lucide-react";
-import { ensurePreviewPlaying, pausePreview, playPreview, useIsPlaying, type Track } from "@/lib/music";
+import { claimPreview, pausePreview, playPreview, useIsPlaying, type Track } from "@/lib/music";
 
 /** A Diary's song goes round again when it ends, wherever it is played. */
 const LOOP = { loop: true } as const;
@@ -59,8 +59,9 @@ export function DiaryDisc({
     if (!autoPlay || !t) return;
     // From the top each time: a page coming round again plays its song
     // afresh rather than picking up where it was cut off.
-    ensurePreviewPlaying(t, { ...LOOP, restart: true });
-    return () => pausePreview();
+    // A claim rather than play-then-pause: the page that replaces this one
+    // may start before this one lets go.
+    return claimPreview(t, { ...LOOP, restart: true });
   }, [autoPlay, songId]);
 
   const label = track

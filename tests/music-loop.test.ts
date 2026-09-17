@@ -88,3 +88,51 @@ describe("looping", () => {
     stopPreview();
   });
 });
+
+describe("pages that play while on screen", () => {
+  it("hands the song back to the page underneath when one closes", async () => {
+    const { claimPreview } = await import("@/lib/music");
+    const releaseDeck = claimPreview(track("deck"), { loop: true });
+    const releaseFull = claimPreview(track("full"), { loop: true });
+    expect(played.at(-1)!.src).toContain("full.mp3");
+    releaseFull();
+    expect(played.at(-1)!.src).toContain("deck.mp3");
+    releaseDeck();
+  });
+
+  it("a page letting go late does not stop the one that replaced it", async () => {
+    const { claimPreview } = await import("@/lib/music");
+    const releaseOld = claimPreview(track("old"), { loop: true });
+    const releaseNew = claimPreview(track("new"), { loop: true });
+    const count = played.length;
+    releaseOld();
+    expect(played.length).toBe(count);
+    expect(played.at(-1)!.src).toContain("new.mp3");
+    releaseNew();
+  });
+});
+
+describe("a song the browser will not start yet", () => {
+  it("starts on the next touch instead of never", async () => {
+    const { claimPreview } = await import("@/lib/music");
+    let refuse = true;
+    const attempts: string[] = [];
+    Object.defineProperty(HTMLMediaElement.prototype, "play", {
+      configurable: true,
+      value(this: HTMLMediaElement) {
+        attempts.push(this.src);
+        if (refuse) return Promise.reject(Object.assign(new Error("no"), { name: "NotAllowedError" }));
+        return Promise.resolve();
+      },
+    });
+    const release = claimPreview(track("opened-cold"), { loop: true });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(attempts).toHaveLength(1);
+    refuse = false;
+    document.dispatchEvent(new Event("pointerdown"));
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1]).toContain("opened-cold.mp3");
+    release();
+  });
+});

@@ -150,17 +150,29 @@ export function notifHref(n: Notif): string {
  * "Aman and 4 others hyped your post". Calls, DMs, and shares stay singleton
  * since each is individually actionable. Input must already be sorted newest
  * first; group order follows first-seen (= most recent) order.
+ *
+ * A group only spans GROUP_WINDOW_MS from its newest item. Follows all share
+ * one target (you), so without a window a follow today was summed with every
+ * follow ever: "Aman and 5 others followed you", the five from a month ago.
+ * Older ones start a group of their own further down.
  */
-function groupNotifs(list: Notif[]): Group[] {
+const GROUP_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export function groupNotifs(list: Notif[]): Group[] {
   const order: string[] = [];
+  /** The open group for each kind of notification: the newest one. */
   const byKey = new Map<string, Group & { seenActorIds: Set<string> }>();
+  const groups = new Map<string, Group & { seenActorIds: Set<string> }>();
 
   for (const n of list) {
     const groupable = !NEVER_GROUP.has(n.type) && n.target_id;
-    const key = groupable ? `${n.type}|${n.target_type}|${n.target_id}` : `solo-${n.id}`;
+    const kind = groupable ? `${n.type}|${n.target_type}|${n.target_id}` : `solo-${n.id}`;
 
-    let g = byKey.get(key);
+    let g = byKey.get(kind);
+    const at = new Date(n.created_at).getTime();
+    if (g && new Date(g.latestAt).getTime() - at > GROUP_WINDOW_MS) g = undefined;
     if (!g) {
+      const key = order.includes(kind) ? `${kind}#${n.id}` : kind;
       g = {
         key,
         type: n.type,
@@ -175,8 +187,9 @@ function groupNotifs(list: Notif[]): Group[] {
         actorId: n.actor_id ?? null,
         seenActorIds: new Set(),
       };
-      byKey.set(key, g);
+      byKey.set(kind, g);
       order.push(key);
+      groups.set(key, g);
     }
 
     g.ids.push(n.id);
@@ -192,7 +205,7 @@ function groupNotifs(list: Notif[]): Group[] {
   }
 
   return order.map((k) => {
-    const { seenActorIds: _drop, ...g } = byKey.get(k)!;
+    const { seenActorIds: _drop, ...g } = groups.get(k)!;
     return g;
   });
 }
