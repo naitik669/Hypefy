@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Television, Plus } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 type Board = {
   id: string;
@@ -134,7 +135,7 @@ export function ShowcaseRail({
                 b.coverIsVideo ? (
                   // #t=0.1 forces a decoded frame; preload="metadata" alone is
                   // not obliged to produce one and Safari does not.
-                  <video
+                  <video poster={BLANK_POSTER}
                     src={`${b.cover}#t=0.1`}
                     muted
                     playsInline

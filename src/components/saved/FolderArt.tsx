@@ -1,5 +1,6 @@
 import { Bookmark } from "lucide-react";
 import { folderFill, type Folder, type FolderCover } from "@/lib/folders";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 /**
  * One saved thing as a picture: its image, or for a Shot with no poster a
@@ -11,7 +12,7 @@ export function SavedThumb({ thumb, video, alt = "" }: { thumb: string | null; v
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={thumb} alt={alt} loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover" />;
   if (video)
-    return <video src={`${video}#t=0.1`} muted playsInline preload="metadata" className="h-full w-full object-cover" />;
+    return <video poster={BLANK_POSTER} src={`${video}#t=0.1`} muted playsInline preload="metadata" className="h-full w-full object-cover" />;
   return <span className="block h-full w-full bg-black/25" />;
 }
 

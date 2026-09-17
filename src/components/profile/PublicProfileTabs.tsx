@@ -7,6 +7,7 @@ import Link from "next/link";
 import { type FeedPost } from "@/components/feed/FeedCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 type Tab = "Posts" | "Shots" | "Saved";
 
@@ -196,7 +197,7 @@ export function PublicProfileTabs({
                   href={`/shots/${s.id}`}
                   className="relative block aspect-[3/4] overflow-hidden rounded-xl bg-surface"
                 >
-                  <video
+                  <video poster={BLANK_POSTER}
                     src={s.media_url}
                     className="h-full w-full object-cover"
                     muted

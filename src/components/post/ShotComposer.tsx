@@ -17,6 +17,7 @@ import type { Track } from "@/lib/music";
 // that exact drift — it just never reached this copy, because the two Shot
 // paths each kept their own number.
 import { MAX_SHOT_MB, ALLOWED_SHOT_TYPES, capturePoster } from "@/lib/video-poster";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 const MAX_SIZE_MB = MAX_SHOT_MB;
 const ALLOWED_TYPES = ALLOWED_SHOT_TYPES;
@@ -250,7 +251,7 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
             >
               {preview ? (
                 <>
-                  <video
+                  <video poster={BLANK_POSTER}
                     src={preview}
                     className="max-h-[60vh] w-full bg-black object-contain"
                     controls
@@ -334,7 +335,7 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
         {step === 1 && (
           <div className="relative mx-auto aspect-[9/16] w-full max-w-[320px] overflow-hidden rounded-2xl bg-black">
             {preview && (
-              <video
+              <video poster={BLANK_POSTER}
                 src={preview}
                 className="absolute inset-0 h-full w-full object-cover"
                 autoPlay

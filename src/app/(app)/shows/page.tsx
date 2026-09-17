@@ -4,6 +4,7 @@ import { Clapperboard, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 /**
  * Your Shows.
@@ -39,7 +40,7 @@ function Tile({ s, badge }: { s: Row; badge: string }) {
       href={`/shows/${s.id}`}
       className="relative aspect-[3/4] overflow-hidden rounded-xl bg-black"
     >
-      <video
+      <video poster={BLANK_POSTER}
         src={s.media_url}
         muted
         playsInline

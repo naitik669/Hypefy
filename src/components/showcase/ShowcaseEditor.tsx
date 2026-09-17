@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { haptics } from "@/lib/haptics";
 import { MAX_SHOW_MB } from "@/lib/video-poster";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 type Show = { id: string; media_url: string; caption: string | null };
 type Shot = {
@@ -304,7 +305,7 @@ function Tile({
       {isVideo ? (
         // #t=0.1 forces a decoded frame — preload="metadata" is not obliged
         // to produce one, and Safari does not.
-        <video
+        <video poster={BLANK_POSTER}
           src={`${thumb}#t=0.1`}
           muted
           playsInline

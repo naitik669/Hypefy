@@ -10,6 +10,7 @@ import {
   useFilterState,
   viewfinderFilter,
 } from "@/components/camera/FilterCarousel";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 /**
  * LiveCamera — real-time camera viewfinder for the Shows creator.
@@ -51,7 +52,7 @@ export function LiveCamera({
           front camera is mirrored so it feels like a mirror. */}
       <div className="flex h-full w-full items-center justify-center">
         <div className="relative aspect-[9/16] max-h-full w-full overflow-hidden">
-          <video
+          <video poster={BLANK_POSTER}
             ref={videoRef}
             autoPlay
             playsInline

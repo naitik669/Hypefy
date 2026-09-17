@@ -12,6 +12,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { haptics } from "@/lib/haptics";
 import { useToast } from "@/components/ui/ToastProvider";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 export type Notif = {
   id: string;
@@ -686,7 +687,7 @@ function NotifRow({ group: g, index = 0, following = false, onClear, onResolveRe
         {g.thumb && (
           <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface">
             {g.thumb.isVideo ? (
-              <video src={g.thumb.url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+              <video poster={BLANK_POSTER} src={g.thumb.url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={g.thumb.url} alt="" className="h-full w-full object-cover" />

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FileText, Images, Mic, Play } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ZoomViewer } from "@/components/ui/ZoomViewer";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 export type MediaItem = {
   id: string;
@@ -89,7 +90,7 @@ export function ConversationMedia({ items }: { items: MediaItem[] }) {
             >
               {i.kind === "video" ? (
                 <>
-                  <video src={i.url} preload="metadata" className="h-full w-full object-cover" />
+                  <video poster={BLANK_POSTER} src={i.url} preload="metadata" className="h-full w-full object-cover" />
                   <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
                     <Play size={22} className="text-white drop-shadow" fill="currentColor" />
                   </span>

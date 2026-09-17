@@ -28,6 +28,7 @@ import { useAdFill, useAdSlots } from "@/components/feed/useAdSlots";
 import { ShotAdCard } from "@/components/shots/ShotAdCard";
 import { FolderSheet } from "@/components/saved/FolderSheet";
 import { useLongPress } from "@/lib/useLongPress";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 type ReelProfile = {
   display_name: string | null;
@@ -830,7 +831,7 @@ function ReelCard({
       <video
         ref={videoRef}
         src={reel.media_url}
-        poster={reel.poster_url ?? undefined}
+        poster={reel.poster_url || BLANK_POSTER}
         className="absolute inset-0 h-full w-full bg-black object-cover"
         style={{
           transform: pinchScale === 1 ? undefined : `scale(${pinchScale})`,

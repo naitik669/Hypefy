@@ -25,6 +25,7 @@ import {
   viewfinderFilter,
 } from "@/components/camera/FilterCarousel";
 import type { Track } from "@/lib/music";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 export type CreateMode = "post" | "shot" | "show" | "live";
 
@@ -157,7 +158,7 @@ export function CreateScreen({
       {wantsCamera ? (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="relative aspect-[9/16] max-h-full w-full overflow-hidden">
-            <video
+            <video poster={BLANK_POSTER}
               ref={cam.videoRef}
               autoPlay
               playsInline

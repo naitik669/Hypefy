@@ -19,6 +19,7 @@ import {
   useMentionHashtag,
 } from "@/components/ui/MentionHashtagPicker";
 import type { Track } from "@/lib/music";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 /**
  * Preview and publish step for the camera-first creator.
@@ -143,7 +144,7 @@ export function ShotPreview({
   return (
     <div className="fixed inset-0 z-[200] flex flex-col bg-black">
       {isVideo ? (
-        <video
+        <video poster={BLANK_POSTER}
           src={url}
           className="absolute inset-0 h-full w-full object-contain"
           autoPlay

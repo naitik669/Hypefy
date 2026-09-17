@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { FoldersStrip } from "@/components/saved/FoldersStrip";
 import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 type Tab = "Posts" | "Shots" | "Saved";
 
@@ -258,7 +259,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
                         decodes no frame at all — a black tile with a play
                         badge on it. A media fragment makes the browser seek
                         there, which forces one. */}
-                    <video
+                    <video poster={BLANK_POSTER}
                       src={`${s.media_url}#t=0.1`}
                       className="h-full w-full object-cover"
                       muted
@@ -299,7 +300,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
                       href={`/shots/${s.id}`}
                       className="relative block h-full overflow-hidden rounded-xl bg-surface"
                     >
-                      <video
+                      <video poster={BLANK_POSTER}
                         src={s.media_url}
                         className="h-full w-full object-cover"
                         muted

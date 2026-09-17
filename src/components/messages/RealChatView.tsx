@@ -49,6 +49,7 @@ import {
 } from "@/lib/chat-album";
 import { uploadAlbumFiles, type AlbumFile } from "@/lib/chat-album-upload";
 import { leaveChatAnimated } from "@/lib/leave-chat";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 type PostPreview = {
   id: string;
@@ -1714,7 +1715,7 @@ export function RealChatView({
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
                           className="relative block w-40 overflow-hidden rounded-2xl border border-border bg-black"
                         >
-                          <video src={m.shot.media_url} className="aspect-[3/4] w-full object-cover" muted playsInline preload="metadata" />
+                          <video poster={BLANK_POSTER} src={m.shot.media_url} className="aspect-[3/4] w-full object-cover" muted playsInline preload="metadata" />
                           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
                           <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
                             <Play size={9} className="fill-white" /> Shot
@@ -1863,7 +1864,7 @@ export function RealChatView({
                           className="relative overflow-hidden rounded-2xl bg-black"
                           style={{ width: MEDIA_W, maxWidth: "100%" }}
                         >
-                          <video src={m._localUrl ?? m.body} className="w-full rounded-2xl" controls playsInline preload="metadata" />
+                          <video poster={BLANK_POSTER} src={m._localUrl ?? m.body} className="w-full rounded-2xl" controls playsInline preload="metadata" />
                           <span className="absolute bottom-1.5 right-2 flex items-center gap-[3px] rounded-full bg-black/60 px-1.5 py-[3px] backdrop-blur-sm">
                             <span className="text-[9px] font-medium leading-none text-white/85">{timeLabel(m.created_at)}</span>
                             {mine && <MsgStatusTick status={getMsgStatus(m)} />}
@@ -2051,7 +2052,7 @@ export function RealChatView({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={attachment.preview} alt="" className="h-16 w-16 rounded-lg object-cover" />
                 ) : attachment.type === "video" ? (
-                  <video src={attachment.preview} className="h-16 w-16 rounded-lg bg-black object-cover" muted playsInline preload="metadata" />
+                  <video poster={BLANK_POSTER} src={attachment.preview} className="h-16 w-16 rounded-lg bg-black object-cover" muted playsInline preload="metadata" />
                 ) : (
                   /* Documents have no visual preview — show the file glyph. */
                   <span className="flex h-16 w-16 items-center justify-center rounded-lg bg-elevated text-hashtag">

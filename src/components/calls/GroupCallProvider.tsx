@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { startRing, stopRing } from "@/lib/ringtone";
 import { Avatar } from "@/components/ui/Avatar";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 /**
  * Group calls — a mesh of peer connections (one per other participant), capped
@@ -583,7 +584,7 @@ function Tile({
   return (
     <div className="relative flex items-center justify-center overflow-hidden rounded-2xl bg-white/5">
       {showVideo ? (
-        <video
+        <video poster={BLANK_POSTER}
           ref={vid}
           autoPlay
           playsInline
@@ -593,7 +594,7 @@ function Tile({
       ) : (
         <>
           {/* audio still needs the element attached to play remote sound */}
-          <video
+          <video poster={BLANK_POSTER}
             ref={vid}
             autoPlay
             playsInline

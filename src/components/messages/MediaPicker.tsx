@@ -7,6 +7,7 @@ import { Plane } from "@/components/ui/Plane";
 import { CameraCapture, type Captured } from "@/components/messages/CameraCapture";
 import { ALBUM_CAPTION_MAX, ALBUM_MAX_ITEMS, type AlbumItem } from "@/lib/chat-album";
 import { cameraLikelyAllowed, cameraSupported, openCamera, stopStream } from "@/lib/camera";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 /** What the chat can ask of the picker from outside it: the paperclip's
  *  hold menu opens the camera directly, or adds gallery picks. */
@@ -203,7 +204,7 @@ export function MediaPicker({
                 className="relative overflow-hidden bg-surface"
               >
                 {e.type === "video" ? (
-                  <video src={`${e.preview}#t=0.1`} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" />
+                  <video poster={BLANK_POSTER} src={`${e.preview}#t=0.1`} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={e.preview} alt="" loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover" />
@@ -287,7 +288,7 @@ function LiveTile({ active, onOpen }: { active: boolean; onOpen: () => void }) {
       data-camera-tile
       className="relative row-span-2 overflow-hidden bg-black"
     >
-      <video ref={videoRef} muted playsInline autoPlay className={`h-full w-full object-cover ${live ? "" : "hidden"}`} />
+      <video poster={BLANK_POSTER} ref={videoRef} muted playsInline autoPlay className={`h-full w-full object-cover ${live ? "" : "hidden"}`} />
       {!live && (
         <span className="absolute inset-0 grid place-content-center justify-items-center gap-2 text-[12px] font-semibold text-white/80">
           <Camera size={28} />

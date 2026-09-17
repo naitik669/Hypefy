@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { autoplayAllowed } from "@/components/feed/ShotFeedCard";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 /**
  * A Shot playing where it sits, silently, in a tile.
@@ -138,7 +139,7 @@ export function ShotPreview({
       // #t=0.1 forces a decoded frame for tiles with no poster: preload
       // "metadata" alone is not obliged to produce one, and Safari does not.
       src={poster ? src : `${src}#t=0.1`}
-      poster={poster ?? undefined}
+      poster={poster || BLANK_POSTER}
       aria-label={alt}
       muted
       loop

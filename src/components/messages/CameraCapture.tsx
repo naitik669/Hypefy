@@ -15,6 +15,7 @@ import {
   stopStream,
   type Facing,
 } from "@/lib/camera";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 export type Captured = { file: File; type: "image" | "video"; preview: string };
 
@@ -188,7 +189,7 @@ export function CameraCapture({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={shot.preview} alt="" className="h-full w-full object-contain" />
             ) : (
-              <video src={shot.preview} autoPlay loop playsInline controls className="h-full w-full object-contain" />
+              <video poster={BLANK_POSTER} src={shot.preview} autoPlay loop playsInline controls className="h-full w-full object-contain" />
             )}
             <div className="absolute inset-x-0 top-0 flex items-center justify-between px-3 pt-[calc(var(--sat,0px)+10px)]">
               <button type="button" onClick={onClose} aria-label="Close" className="grid h-10 w-10 place-items-center rounded-full bg-black/45">
@@ -222,7 +223,7 @@ export function CameraCapture({
       ) : (
         <>
           <div className="relative min-h-0 flex-1 overflow-hidden">
-            <video
+            <video poster={BLANK_POSTER}
               ref={videoRef}
               muted
               playsInline

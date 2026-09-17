@@ -46,6 +46,7 @@ import {
   ownsAudio,
 } from "@/lib/shot-audio";
 import type { ShotCard } from "@/lib/feed-mix";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 /**
  * A Shot, sitting in the post feed.
@@ -533,7 +534,7 @@ export function ShotFeedCard({
         <video
           ref={videoRef}
           src={shot.media_url}
-          poster={shot.poster_url ?? undefined}
+          poster={shot.poster_url || BLANK_POSTER}
           // Bound to state, NOT hardcoded. React re-applies its props on
           // every render, so a literal `muted` here would quietly re-mute the
           // element the next time anything in this card re-rendered — the

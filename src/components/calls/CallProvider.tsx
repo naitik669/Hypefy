@@ -7,6 +7,7 @@ import { Phone, Video, Mic, MicOff, VideoOff, MessageCircle } from "lucide-react
 import { createClient } from "@/lib/supabase/client";
 import { startRing, stopRing } from "@/lib/ringtone";
 import { Avatar } from "@/components/ui/Avatar";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 type CallType = "audio" | "video";
 type Role = "caller" | "callee";
@@ -460,10 +461,10 @@ function CallUI({
 
   return (
     <div className="animate-page-enter fixed inset-0 z-[230] mx-auto flex max-w-[480px] flex-col items-center justify-between overflow-hidden bg-black px-6 py-14">
-      {showRemoteVideo && <video ref={remoteVid} autoPlay playsInline className="absolute inset-0 h-full w-full object-cover" />}
-      {call.type === "audio" && <video ref={remoteVid} autoPlay playsInline className="hidden" />}
+      {showRemoteVideo && <video poster={BLANK_POSTER} ref={remoteVid} autoPlay playsInline className="absolute inset-0 h-full w-full object-cover" />}
+      {call.type === "audio" && <video poster={BLANK_POSTER} ref={remoteVid} autoPlay playsInline className="hidden" />}
       {call.type === "video" && call.status === "connected" && (
-        <video ref={localVid} autoPlay playsInline muted
+        <video poster={BLANK_POSTER} ref={localVid} autoPlay playsInline muted
           className={`absolute right-4 top-14 z-10 h-40 w-28 rounded-2xl border border-white/15 object-cover shadow-xl ${camOff ? "hidden" : ""}`} />
       )}
 
