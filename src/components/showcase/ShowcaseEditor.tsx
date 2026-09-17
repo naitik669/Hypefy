@@ -179,7 +179,7 @@ export function ShowcaseEditor({
   ];
 
   return (
-    <div className="flex flex-col gap-5 px-4 pb-32 pt-4">
+    <div className="flex flex-col gap-5 px-4 pb-24 pt-4">
       <div>
         <label htmlFor="sc-title" className="text-xs font-semibold text-muted">
           Name
@@ -266,7 +266,9 @@ export function ShowcaseEditor({
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 mx-auto max-w-[480px] border-t border-border bg-background/95 px-4 pb-[calc(var(--sab)+12px)] pt-3 backdrop-blur-xl">
+      {/* Sits on the bottom nav (72px, which already clears the phone's own
+          bar), not at the screen's bottom edge, where the nav covered it. */}
+      <div className="fixed inset-x-0 bottom-[72px] z-20 mx-auto max-w-[480px] border-t border-border bg-background/95 px-4 pb-3 pt-3 backdrop-blur-xl">
         <button
           type="button"
           onClick={create}

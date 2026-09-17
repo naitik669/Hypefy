@@ -460,7 +460,8 @@ export function EditProfileForm({
       </Field>
 
       {/* Sticky save */}
-      <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[480px] bg-gradient-to-t from-background via-background to-transparent px-5 pb-7 pt-4">
+      {/* On the bottom nav (72px), not behind it at the screen edge. */}
+      <div className="fixed inset-x-0 bottom-[72px] z-20 mx-auto max-w-[480px] bg-gradient-to-t from-background via-background to-transparent px-5 pb-3 pt-4">
         {error && (
           <p className="mb-2 rounded-lg bg-danger/10 px-3 py-2 text-center text-xs text-danger">
             {error}
