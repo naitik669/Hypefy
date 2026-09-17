@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { CHAT_THEMES, bubbleCss, type ChatTheme } from "@/lib/chat-themes";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
+import { unlocked as isUnlocked } from "@/lib/marketplace";
 import { formatInr } from "@/lib/billing/plans";
 
 /**
@@ -37,7 +38,7 @@ export function ChatThemePicker({
   const [busy, setBusy] = useState<string | null>(null);
 
   const unlocked = (t: ChatTheme) =>
-    t.tier === "free" || (t.tier === "premium" ? isPremium : owned.includes(t.id));
+    isUnlocked(t.tier, t.id, owned, isPremium);
 
   async function pick(id: string | null, theme?: ChatTheme) {
     if (busy || id === current) return;

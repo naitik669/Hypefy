@@ -55,6 +55,10 @@ describe("filter and sort", () => {
     expect(isOwned(crown, ["deco-crown"], false)).toBe(true);
     expect(isOwned(halo, [], false)).toBe(false);
     expect(isOwned(halo, [], true)).toBe(true);
+    // Premium includes the Shop: a Premium member has the crown without buying it,
+    // and without Premium only a purchase unlocks it.
+    expect(isOwned(crown, [], true)).toBe(true);
+    expect(isOwned(crown, [], false)).toBe(false);
   });
 });
 

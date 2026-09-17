@@ -87,6 +87,16 @@ export function filterAndSort(items: MarketItem[], category: Category | "all", s
 
 /** Is it already yours? */
 export function isOwned(item: MarketItem, owned: string[], isPremium: boolean): boolean {
-  if (item.tier === "free") return true;
-  return item.tier === "premium" ? isPremium : owned.includes(item.id);
+  return unlocked(item.tier, item.id, owned, isPremium);
+}
+
+/**
+ * Whether someone may use an item. Mirrors owns_product (0090): free is
+ * everyone's; Premium unlocks Premium items AND the Shop; a Shop item bought
+ * outright stays yours without Premium.
+ */
+export function unlocked(tier: "free" | "premium" | "shop", id: string, owned: string[], isPremium: boolean): boolean {
+  if (tier === "free") return true;
+  if (tier === "premium") return isPremium;
+  return isPremium || owned.includes(id);
 }

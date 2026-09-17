@@ -13,6 +13,7 @@ import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { DECORATIONS, NAME_FONTS, NAME_GLOWS, NAME_SIZE_ADJUST, nameStyle, type Tier } from "@/lib/cosmetics";
 import { withGlowRoom } from "@/components/ui/DisplayName";
+import { unlocked } from "@/lib/marketplace";
 import { NAMEPLATES } from "@/lib/nameplates";
 import { NameplateRow } from "@/components/ui/Nameplate";
 import { BUBBLE_STYLES, findBubbleStyle } from "@/lib/bubble-styles";
@@ -59,7 +60,7 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
   const toast = useToast();
 
   const premium = me.is_premium;
-  const has = (id: string, tier: Tier) => tier === "free" || (tier === "premium" ? premium : owned.includes(id));
+  const has = (id: string, tier: Tier) => unlocked(tier, id, owned, premium);
 
   const initial: Look = {
     name_font: me.name_font,
