@@ -1193,7 +1193,8 @@ html[data-dm-leave]::view-transition-old(root) {
      stagger delay), so it cannot be switched off by class alone. Every
      hold menu uses it — the account switcher, the two nav stacks and the
      create fan — so the selector matches the role, not one label. */
-  [role="listbox"] > * {
+  [role="listbox"] > *,
+  [data-switch-rise] {
     animation: none !important;
   }
 }

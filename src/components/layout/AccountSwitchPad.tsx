@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "@phosphor-icons/react";
 import { Avatar } from "@/components/ui/Avatar";
@@ -27,12 +26,18 @@ import {
  *  - The trigger captures the pointer on long-press, so pointermove keeps
  *    arriving once the thumb has left the tab. Without capture the stack goes
  *    dead the moment the finger slides off a 48px target, which is instantly.
- *  - Hit-testing runs against measured rects rather than hover, because a
- *    finger produces no hover and elementFromPoint would land on the label or
- *    the veil as often as the tile.
+ *  - Hit-testing runs against the reel's measured rect rather than hover,
+ *    because a finger produces no hover.
  *  - Rows match on the Y axis alone. Thumbs arc sideways as they travel up —
  *    wrists rotate — so demanding X containment breaks the top of the stack
  *    for exactly the people reaching furthest.
+ *
+ * With more accounts than fit, the list is a reel. Pushing the thumb past the
+ * top face turns it: accounts further up come down into reach and the ones
+ * by the tab sink and fade out at the bottom. The reel follows the thumb and
+ * carries on a little when the thumb stops (a short glide), then settles on a
+ * face. Sliding back down to the tab turns it back. The "+" sits above the
+ * reel and never scrolls; it is reached by pushing on past the end of the list.
  *
  * A plain tap is untouched: if the hold never completes, the click falls
  * through to /profile as before.
@@ -42,19 +47,75 @@ import {
 const HOLD_MS = 320;
 /** Movement that cancels the hold — treat it as a scroll, not a press. */
 const CANCEL_SLOP_PX = 10;
-/**
- * Accounts shown at once. The stack grows upward from a tab at the bottom
- * of the screen, so an unbounded list runs off the top and the first
- * entries become unreachable. Four plus the "+" is about the tallest run a
- * thumb covers without the wrist leaving the phone.
- */
-const WINDOW = 4;
-/** How often the window advances while the thumb rests on an edge row. */
-const SCROLL_MS = 260;
 /** Username preview cap, so a long name cannot reach the screen edge. */
 const NAME_MAX = 14;
 
-type Row = { kind: "add" } | { kind: "account"; account: SavedAccount };
+/** Reel geometry, in px. */
+export const REEL = {
+  /** One face (48) plus the gap to the next. */
+  PITCH: 60,
+  /** Faces in view at once. */
+  VISIBLE: 4,
+  /** Room under the lowest face for the fade it sinks into. */
+  PAD: 22,
+  /** How far faces are drawn above the reel before they are clipped, so the
+   *  top face's ring and lift are not cut off. Kept under the 6px of room a
+   *  face has above it, or the next face peeks in as a sliver. */
+  HEADROOM: 4,
+  /** Reel travel per px of thumb: 20px of thumb brings the next account. */
+  RATIO: 3,
+  /** Thumb travel past the end of the list that lands on "+". */
+  ADD_PUSH: 28,
+  /** No move for this long and the reel glides on by itself. */
+  GLIDE_AFTER_MS: 40,
+} as const;
+
+/** Faces sink into a fade at the bottom; the top edge has none. */
+const REEL_MASK = `linear-gradient(to top, transparent 0, #000 ${REEL.PAD + 4}px)`;
+
+/** Centre of account `i`, measured up from the reel's bottom edge. */
+export function reelCentre(i: number, scroll: number) {
+  return REEL.PAD + REEL.PITCH / 2 + i * REEL.PITCH - scroll;
+}
+/** Height of the reel for `n` accounts. */
+export function reelHeight(n: number) {
+  return REEL.PAD + Math.min(n, REEL.VISIBLE) * REEL.PITCH;
+}
+/** Furthest the reel turns. */
+export function reelMax(n: number) {
+  return Math.max(0, (n - REEL.VISIBLE) * REEL.PITCH);
+}
+
+/**
+ * Turns the reel by a thumb movement above the engage line. `up` is px moved
+ * up (negative for down). Past the end of the list the movement is banked as
+ * push towards "+"; coming back down spends that push before the reel turns.
+ */
+export function turnReel(
+  state: { scroll: number; push: number },
+  up: number,
+  n: number
+): { scroll: number; push: number } {
+  const max = reelMax(n);
+  let { scroll, push } = state;
+  if (up > 0) {
+    const turn = Math.min(max - scroll, up * REEL.RATIO);
+    scroll += turn;
+    push += up - turn / REEL.RATIO;
+  } else if (up < 0) {
+    const spend = Math.min(push, -up);
+    push -= spend;
+    scroll = Math.max(0, scroll - (-up - spend) * REEL.RATIO);
+  }
+  return { scroll, push };
+}
+
+/** Where the reel starts turning: the centre of the top face in view. */
+function engageLine(rect: DOMRect, n: number) {
+  return rect.bottom - reelCentre(Math.min(n, REEL.VISIBLE) - 1, 0);
+}
+
+type Pick = "add" | number | null;
 
 export function AccountSwitchPad({
   currentUserId,
@@ -67,12 +128,8 @@ export function AccountSwitchPad({
   const toast = useToast();
 
   const [accounts, setAccounts] = useState<SavedAccount[]>([]);
-  /** Index of the first account in the visible window. */
-  const [offset, setOffset] = useState(0);
-  /** -1 back towards the tab, +1 further up the list, 0 parked. */
-  const [scrollDir, setScrollDir] = useState<-1 | 0 | 1>(0);
   const [open, setOpen] = useState(false);
-  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const [active, setActive] = useState<Pick>(null);
   const [switching, setSwitching] = useState<SavedAccount | null>(null);
   /** Pointer was taken away mid-gesture; the stack stays up and is tapped. */
   const [detached, setDetached] = useState(false);
@@ -82,32 +139,27 @@ export function AccountSwitchPad({
   const startX = useRef(0);
   /** Set once the hold completes, so the trailing click is swallowed. */
   const didHold = useRef(false);
-  const rowEls = useRef<(HTMLElement | null)[]>([]);
-  /** Last offset a tick was felt for, so haptics stay out of the updater. */
-  const lastFelt = useRef(0);
   const triggerRef = useRef<HTMLDivElement | null>(null);
+  const reelRef = useRef<HTMLDivElement | null>(null);
+  const addRef = useRef<HTMLDivElement | null>(null);
+  const tileEls = useRef<(HTMLDivElement | null)[]>([]);
 
-  // "+" is pinned above the window and never scrolls, so the way out of the
-  // list is always in the same place.
-  //
-  // The window is rendered in REVERSE: accounts[offset] sits nearest the
-  // thumb and later ones stack upward. The gesture starts at a tab on the
-  // bottom edge, so "further into the list" has to mean "further up" — the
-  // only direction with any room. Ordered the other way, the accounts you
-  // had not reached yet were hidden below the nav, where a thumb cannot go.
-  const visible = accounts.slice(offset, offset + WINDOW);
-  const rows: Row[] = [
-    { kind: "add" },
-    ...[...visible]
-      .reverse()
-      .map((account) => ({ kind: "account" as const, account })),
-  ];
-  /** More accounts further up the list, reached by moving the thumb up. */
-  const moreAbove = accounts.length - offset - WINDOW;
-  /** Accounts already passed, sitting back down towards the tab. */
-  const moreBelow = offset;
-
-  const stopScroll = useCallback(() => setScrollDir(0), []);
+  /**
+   * Per-frame gesture state. Kept out of React: the reel is written straight
+   * to the tiles' transforms every frame, and only a change of the face under
+   * the thumb re-renders.
+   */
+  const g = useRef({
+    scroll: 0,
+    push: 0,
+    /** Reel speed in px/ms, for the glide. */
+    vel: 0,
+    thumbY: 0,
+    lastMoveAt: 0,
+    lastFrameAt: 0,
+    active: null as Pick,
+    n: 0,
+  });
 
   const cancelHold = useCallback(() => {
     if (holdTimer.current) {
@@ -117,41 +169,101 @@ export function AccountSwitchPad({
   }, []);
 
   const close = useCallback(() => {
-    stopScroll();
     setOpen(false);
-    setActiveIdx(null);
+    setActive(null);
     setDetached(false);
-  }, [stopScroll]);
+  }, []);
 
-  // The walk lives in an effect keyed on direction rather than a timer built
-  // inside a pointer handler: a handler only runs when the finger MOVES, and
-  // resting still is precisely the gesture here — so the timer it created got
-  // stranded instead of ticking.
-  useEffect(() => {
-    if (scrollDir === 0) return;
-    const max = Math.max(0, accounts.length - WINDOW);
-    const id = setInterval(() => {
-      setOffset((o) => Math.max(0, Math.min(max, o + scrollDir)));
-    }, SCROLL_MS);
-    return () => clearInterval(id);
-  }, [scrollDir, accounts.length]);
+  useEffect(() => () => cancelHold(), [cancelHold]);
 
-  // A tick is worth feeling, but not from inside a state updater — those must
-  // be pure, and React is free to run them more than once.
-  useEffect(() => {
-    if (offset !== lastFelt.current) {
-      lastFelt.current = offset;
-      if (open) haptics.select();
+  const paint = useCallback(() => {
+    const s = g.current;
+    const h = reelHeight(s.n) + REEL.HEADROOM;
+    const rest = REEL.PAD + REEL.PITCH / 2;
+    for (let i = 0; i < tileEls.current.length; i++) {
+      const el = tileEls.current[i];
+      if (!el) continue;
+      const c = reelCentre(i, s.scroll);
+      // A face sinking below its resting place shrinks a little as it fades.
+      const scale = c < rest ? 0.85 + 0.15 * Math.max(0, c / rest) : 1;
+      el.style.transform = `translate3d(0,${h - c - 24}px,0) scale(${scale})`;
+      el.style.visibility = c < -REEL.PITCH || c > h + REEL.PITCH ? "hidden" : "visible";
     }
-  }, [offset, open]);
+  }, []);
 
-  useEffect(
-    () => () => {
-      cancelHold();
-      stopScroll();
-    },
-    [cancelHold, stopScroll]
-  );
+  // The frame loop: glide, the slide back down, settling on a face, and
+  // what the thumb is on. It runs for as long as the stack is up.
+  useEffect(() => {
+    if (!open) return;
+    let raf = 0;
+    const frame = (now: number) => {
+      const s = g.current;
+      const dt = Math.min(40, s.lastFrameAt ? now - s.lastFrameAt : 16);
+      s.lastFrameAt = now;
+      const rect = reelRef.current?.getBoundingClientRect();
+      if (!rect && !detached) {
+        // No other accounts: only the "+", reached by sliding up to it.
+        const addRect = addRef.current?.getBoundingClientRect();
+        const pick: Pick = addRect && s.thumbY < addRect.bottom + 12 ? "add" : null;
+        if (pick !== s.active) {
+          s.active = pick;
+          setActive(pick);
+          if (pick) haptics.select();
+        }
+      }
+      if (rect && !detached) {
+        const max = reelMax(s.n);
+        const line = engageLine(rect, s.n);
+        const still = now - s.lastMoveAt > REEL.GLIDE_AFTER_MS;
+
+        if (s.thumbY > rect.bottom + 8 && s.scroll > 0) {
+          // Back down by the tab: the reel runs back, faster the lower.
+          const depth = Math.min(1, (s.thumbY - rect.bottom - 8) / 50);
+          s.scroll = Math.max(0, s.scroll - (0.25 + 0.4 * depth) * dt);
+          s.vel = 0;
+          s.push = 0;
+        } else if (still && Math.abs(s.vel) > 0.02) {
+          // The glide: the reel carries on briefly after the thumb stops.
+          s.scroll = Math.max(0, Math.min(max, s.scroll + s.vel * dt));
+          if (s.scroll === 0 || s.scroll === max) s.vel = 0;
+          s.vel *= Math.pow(0.9, dt / 16);
+        } else if (still) {
+          s.vel = 0;
+          const to = Math.round(s.scroll / REEL.PITCH) * REEL.PITCH;
+          s.scroll += (to - s.scroll) * Math.min(1, dt / 90);
+          if (Math.abs(to - s.scroll) < 0.5) s.scroll = to;
+        }
+
+        let pick: Pick = null;
+        if (s.scroll >= max - 1 && s.push > REEL.ADD_PUSH) pick = "add";
+        else if (s.thumbY <= rect.bottom + 10) {
+          // Above the engage line the top face in view stays picked while
+          // the reel turns under it.
+          const y = Math.max(line, s.thumbY);
+          let best = Infinity;
+          for (let i = 0; i < s.n; i++) {
+            const cy = rect.bottom - reelCentre(i, s.scroll);
+            // Only faces wholly in view: not one peeking in at the top.
+            if (cy < rect.top + REEL.HEADROOM + 20 || cy > rect.bottom - REEL.PAD / 2) continue;
+            const d = Math.abs(cy - y);
+            if (d < best) {
+              best = d;
+              pick = i;
+            }
+          }
+        }
+        if (pick !== s.active) {
+          s.active = pick;
+          setActive(pick);
+          if (pick !== null) haptics.select();
+        }
+      }
+      paint();
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [open, detached, paint]);
 
   async function switchTo(account: SavedAccount) {
     setSwitching(account);
@@ -166,7 +278,6 @@ export function AccountSwitchPad({
       // that fails every time it is chosen.
       removeSavedAccount(account.userId);
       setAccounts(otherAccounts(currentUserId));
-      setOffset(0);
       setSwitching(null);
       toast("That account needs signing in again", "error");
       return;
@@ -178,15 +289,16 @@ export function AccountSwitchPad({
     window.location.href = "/home";
   }
 
-  function commit(row: Row | null) {
+  function commit(pick: Pick) {
     close();
-    if (!row) return;
-    if (row.kind === "add") {
+    if (pick === null) return;
+    if (pick === "add") {
       haptics.tap();
       router.push("/signin?add=1");
       return;
     }
-    void switchTo(row.account);
+    const account = accounts[pick];
+    if (account) void switchTo(account);
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -197,12 +309,23 @@ export function AccountSwitchPad({
 
     cancelHold();
     holdTimer.current = setTimeout(() => {
-      setAccounts(otherAccounts(currentUserId));
-      setOffset(0);
-      rowEls.current = [];
+      const list = otherAccounts(currentUserId);
+      setAccounts(list);
+      tileEls.current = [];
+      // Every opening starts from the accounts nearest the tab.
+      Object.assign(g.current, {
+        scroll: 0,
+        push: 0,
+        vel: 0,
+        thumbY: startY.current,
+        lastMoveAt: 0,
+        lastFrameAt: 0,
+        active: null,
+        n: list.length,
+      });
       didHold.current = true;
       setOpen(true);
-      setActiveIdx(null);
+      setActive(null);
       haptics.select();
 
       // Keep receiving moves after the thumb leaves the small tab.
@@ -223,40 +346,31 @@ export function AccountSwitchPad({
       return;
     }
 
-    let hit: number | null = null;
-    for (let i = 0; i < rowEls.current.length; i++) {
-      const el = rowEls.current[i];
-      if (!el) continue;
-      const r = el.getBoundingClientRect();
-      if (e.clientY >= r.top && e.clientY <= r.bottom) {
-        hit = i;
-        break;
-      }
+    const s = g.current;
+    const now = performance.now();
+    const prev = s.thumbY;
+    s.thumbY = e.clientY;
+    const rect = reelRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    // Only the part of the movement above the engage line turns the reel.
+    const line = engageLine(rect, s.n);
+    const up = Math.min(prev, line) - Math.min(e.clientY, line);
+    if (e.clientY > line) s.push = 0;
+    if (up !== 0) {
+      const before = s.scroll;
+      Object.assign(s, turnReel(s, up, s.n));
+      const dt = Math.max(1, now - s.lastMoveAt);
+      // Smoothed, so one jittery event does not decide how far it glides.
+      s.vel = s.vel * 0.5 + ((s.scroll - before) / Math.min(dt, 64)) * 0.5;
+    } else {
+      s.vel = 0;
     }
-
-    if (hit !== activeIdx) {
-      setActiveIdx(hit);
-      if (hit !== null) haptics.select();
-    }
-
-    // Edge scrolling. Resting on the account nearest the top walks the
-    // window up through the list; the one nearest the thumb walks it back
-    // down. The thumb never has to leave the screen or let go, which is the
-    // point — releasing is what commits.
-    //
-    // rows[0] is the pinned "+", so the first account is index 1.
-    const atTop = hit === 1;
-    const atBottom = hit === rows.length - 1 && rows.length > 1;
-    // Up the stack walks further into the list; back down returns.
-    const wantUp = atTop && moreAbove > 0;
-    const wantDown = atBottom && moreBelow > 0;
-
-    setScrollDir(wantUp ? 1 : wantDown ? -1 : 0);
+    s.lastMoveAt = now;
   }
 
   function onPointerUp(e: React.PointerEvent) {
     cancelHold();
-    stopScroll();
     try {
       triggerRef.current?.releasePointerCapture(e.pointerId);
     } catch {
@@ -268,8 +382,12 @@ export function AccountSwitchPad({
     // so a stray release must not commit or dismiss it.
     if (detached) return;
 
-    commit(activeIdx === null ? null : rows[activeIdx]);
+    commit(g.current.active);
   }
+
+  const nameOf = (a: SavedAccount) => a.username || a.displayName || a.email;
+  const n = accounts.length;
+  const reelH = reelHeight(n);
 
   return (
     <div className="relative flex items-center justify-center">
@@ -308,124 +426,73 @@ export function AccountSwitchPad({
             role="listbox"
             aria-label="Switch account"
           >
-            {rows.map((row, i) => {
-              const active = i === activeIdx;
-              const name =
-                row.kind === "account"
-                  ? row.account.username ||
-                    row.account.displayName ||
-                    row.account.email
-                  : "Add account";
+            {/* "+" is outside the reel, so the way to a new account is always
+                in the same place. */}
+            <Face
+              ref={addRef}
+              name="Add account"
+              active={active === "add"}
+              delay={Math.min(n, REEL.VISIBLE) * 38}
+              onPick={detached ? () => commit("add") : undefined}
+            >
+              <span
+                className={`flex h-12 w-12 items-center justify-center rounded-[16px] border-2 border-dashed transition-colors duration-200 ${
+                  active === "add"
+                    ? "border-accent bg-accent/15 text-accent"
+                    : "border-border bg-surface/95 text-muted"
+                }`}
+              >
+                <Plus size={22} weight="bold" aria-hidden />
+              </span>
+            </Face>
 
-              const rowEl = (
+            {n > 0 && (
+              <div className="relative w-12" style={{ height: reelH }}>
+                {/* Wider than the column so the name beside a face has room;
+                    the fade is at the bottom only, where faces sink away. */}
                 <div
-                  ref={(el) => {
-                    rowEls.current[i] = el;
-                  }}
-                  role="option"
-                  aria-selected={active}
-                  // Only wired while detached: during a live drag the
-                  // pointer is captured by the trigger, so these never fire.
-                  onPointerEnter={detached ? () => setActiveIdx(i) : undefined}
-                  onPointerDown={
-                    detached
-                      ? (e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          commit(row);
-                        }
-                      : undefined
-                  }
-                  className="relative flex items-center justify-end"
+                  ref={reelRef}
+                  data-switch-reel=""
+                  className="absolute bottom-0 right-[-16px] w-[75vw] max-w-[320px] overflow-hidden"
                   style={{
-                    // Stagger outwards from the thumb, so the stack unfurls
-                    // away from the finger rather than at it.
-                    animation: `switch-rise 260ms cubic-bezier(0.16,1,0.3,1) ${
-                      (rows.length - 1 - i) * 38
-                    }ms backwards`,
+                    height: reelH + REEL.HEADROOM,
+                    maskImage: REEL_MASK,
+                    WebkitMaskImage: REEL_MASK,
                   }}
                 >
-                  {/* Label sits to the LEFT, and only for the row under the
-                      thumb — labelling every row at once is a wall of text
-                      over the feed.
-
-                      It slides out from BEHIND the tile, right to left. The
-                      hiding is done by clipping rather than opacity: this
-                      wrapper's right edge lines up exactly with the tile's
-                      left edge, so a label parked underneath is invisible
-                      without ever being transparent, and the name reads as
-                      coming out from behind the photo instead of fading in
-                      beside it.
-
-                      Padding on three sides gives the shadow and ring room to
-                      land: overflow clips at the PADDING box, so only the
-                      un-padded right edge actually cuts. The padding costs
-                      nothing positionally — the right edge is pinned by
-                      right-full and the box simply grows leftward, while the
-                      symmetric vertical padding leaves it centred. */}
-                  <span className="pointer-events-none absolute right-full overflow-hidden py-2 pl-3">
-                    <span
-                      className="block max-w-[42vw] truncate rounded-lg bg-background/90 px-2.5 py-1 text-[13px] font-bold whitespace-nowrap text-foreground shadow-lg ring-1 ring-border/70"
+                  {accounts.map((account, i) => (
+                    <div
+                      key={account.userId}
+                      ref={(el) => {
+                        tileEls.current[i] = el;
+                      }}
+                      className="absolute right-4 top-0 h-12 w-12"
                       style={{
-                        // Parked: its own width plus the gap, which puts it
-                        // wholly past the clip edge and under the tile.
-                        transform: active
-                          ? "translate3d(0,0,0)"
-                          : "translate3d(calc(100% + 10px), 0, 0)",
-                        marginRight: 10,
-                        transition:
-                          "transform 260ms cubic-bezier(0.16,1,0.3,1)",
+                        transform: `translate3d(0,${reelH + REEL.HEADROOM - reelCentre(i, 0) - 24}px,0)`,
+                        visibility: i < REEL.VISIBLE + 1 ? "visible" : "hidden",
                       }}
                     >
-                      {truncateName(name)}
-                    </span>
-                  </span>
-
-                  <div
-                    className={`transition-transform duration-200 ease-out ${
-                      active ? "-translate-x-2.5 scale-110" : "scale-100"
-                    }`}
-                  >
-                    {row.kind === "add" ? (
-                      <span
-                        className={`flex h-12 w-12 items-center justify-center rounded-[16px] border-2 border-dashed transition-colors duration-200 ${
-                          active
-                            ? "border-accent bg-accent/15 text-accent"
-                            : "border-border bg-surface/95 text-muted"
-                        }`}
+                      <Face
+                        name={nameOf(account)}
+                        active={active === i}
+                        delay={i * 38}
+                        onPick={detached ? () => commit(i) : undefined}
                       >
-                        <Plus size={22} weight="bold" aria-hidden />
-                      </span>
-                    ) : (
-                      <Avatar
-                        name={
-                          row.account.displayName || row.account.email || "?"
-                        }
-                        hue={row.account.avatarHue ?? 200}
-                        src={row.account.avatarUrl ?? undefined}
-                        size={48}
-                        className={`rounded-[16px] shadow-xl transition-all duration-200 ${
-                          active
-                            ? "ring-[3px] ring-accent"
-                            : "opacity-90 ring-1 ring-white/10"
-                        }`}
-                      />
-                    )}
-                  </div>
+                        <Avatar
+                          name={account.displayName || account.email || "?"}
+                          hue={account.avatarHue ?? 200}
+                          src={account.avatarUrl ?? undefined}
+                          size={48}
+                          className={`rounded-[16px] shadow-xl transition-all duration-200 ${
+                            active === i ? "ring-[3px] ring-accent" : "opacity-90 ring-1 ring-white/10"
+                          }`}
+                        />
+                      </Face>
+                    </div>
+                  ))}
                 </div>
-              );
-
-              // The count sits directly under the pinned "+", which is where
-              // the accounts it stands for will appear as the window walks up.
-              return (
-                <Fragment key={row.kind === "add" ? "add" : row.account.userId}>
-                  {rowEl}
-                  {i === 0 && moreAbove > 0 && <MoreMarker n={moreAbove} />}
-                </Fragment>
-              );
-            })}
-
-            {moreBelow > 0 && <MoreMarker n={moreBelow} />}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -442,7 +509,8 @@ export function AccountSwitchPad({
           // what made it flash up and vanish. Fall back to tap-to-choose.
           if (open) {
             setDetached(true);
-            setActiveIdx(null);
+            setActive(null);
+            g.current.active = null;
           }
         }}
         onContextMenu={(e) => e.preventDefault()}
@@ -478,19 +546,73 @@ export function AccountSwitchPad({
 }
 
 /**
- * How many accounts lie beyond the window in that direction. Deliberately
- * not a hit target: resting the thumb on the edge row is what scrolls, and a
- * second mechanism for the same thing is one more thing to get wrong.
+ * One face in the stack, with its name sliding out from behind it while the
+ * thumb is on it.
  */
-function MoreMarker({ n }: { n: number }) {
-  if (n <= 0) return null;
+function Face({
+  ref,
+  name,
+  active,
+  delay,
+  onPick,
+  children,
+}: {
+  ref?: React.Ref<HTMLDivElement>;
+  name: string;
+  active: boolean;
+  delay: number;
+  /** Only while detached: during a live drag the trigger holds the pointer. */
+  onPick?: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <span
-      aria-hidden
-      className="rounded-full bg-surface/90 px-2 py-0.5 text-[10px] font-bold text-faint ring-1 ring-border/70"
+    <div
+      ref={ref}
+      role="option"
+      aria-selected={active}
+      data-switch-rise=""
+      onPointerDown={
+        onPick
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onPick();
+            }
+          : undefined
+      }
+      className="relative flex items-center justify-end"
+      style={{
+        // Stagger outwards from the thumb, so the stack unfurls away from
+        // the finger rather than at it.
+        animation: `switch-rise 260ms cubic-bezier(0.16,1,0.3,1) ${delay}ms backwards`,
+      }}
     >
-      +{n}
-    </span>
+      {/* Label sits to the LEFT, and only for the face under the thumb. It
+          slides out from BEHIND the tile, right to left: this wrapper's right
+          edge lines up with the tile's left edge and clips, so a parked label
+          is hidden without being transparent. Padding on three sides gives
+          the shadow and ring room — only the un-padded right edge cuts. */}
+      <span className="pointer-events-none absolute right-full overflow-hidden py-2 pl-3">
+        <span
+          className="block max-w-[42vw] truncate rounded-lg bg-background/90 px-2.5 py-1 text-[13px] font-bold whitespace-nowrap text-foreground shadow-lg ring-1 ring-border/70"
+          style={{
+            transform: active ? "translate3d(0,0,0)" : "translate3d(calc(100% + 10px), 0, 0)",
+            marginRight: 10,
+            transition: "transform 260ms cubic-bezier(0.16,1,0.3,1)",
+          }}
+        >
+          {truncateName(name)}
+        </span>
+      </span>
+
+      <div
+        className={`transition-transform duration-200 ease-out ${
+          active ? "-translate-x-2.5 scale-110" : "scale-100"
+        }`}
+      >
+        {children}
+      </div>
+    </div>
   );
 }
 
