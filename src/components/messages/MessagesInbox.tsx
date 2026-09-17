@@ -33,6 +33,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PresenceDot } from "@/components/presence/PresenceDot";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { removeChat, useRemovedChats } from "@/lib/chat-removal";
 import { useToast } from "@/components/ui/ToastProvider";
 
 export type InboxRow = {
@@ -213,13 +214,16 @@ export function MessagesInbox({
   // Conversations the user has opened — optimistically clear their unread state.
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
-  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+  const [declinedIds, setRemovedIds] = useState<Set<string>>(new Set());
+  // Chats deleted here or from inside the thread, including any still in
+  // their five seconds of Undo.
+  const deletedIds = useRemovedChats();
+  const removedIds = useMemo(() => new Set([...declinedIds, ...deletedIds]), [declinedIds, deletedIds]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const showToast = useToast();
   /** Conversation awaiting a block confirmation. */
   const [confirmBlockId, setConfirmBlockId] = useState<string | null>(null);
   /** Conversation awaiting a delete/leave confirmation. */
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   // Long-press action menu (pin / mute / delete) for a conversation row.
   const [menuRow, setMenuRow] = useState<InboxRow | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
@@ -298,21 +302,17 @@ export function MessagesInbox({
       "Couldn't update that chat."
     );
   }
-  async function deleteChat(id: string, isGroup: boolean) {
-    setActionBusy(true);
-    const { error } = await supabase.rpc("leave_conversation", {
-      p_conversation_id: id,
-    });
-    setActionBusy(false);
+  function deleteChat(r: InboxRow) {
     setMenuRow(null);
-    setConfirmDeleteId(null);
-    if (error) {
-      showToast(error.message ?? "Couldn't remove that chat.");
-      return;
-    }
-    setRemovedIds((p) => new Set(p).add(id));
-    showToast(isGroup ? "Left group" : "Chat removed");
-    router.refresh();
+    removeChat({
+      id: r.id,
+      isGroup: r.isGroup,
+      name: r.name,
+      thumb: { src: r.avatarUrl ?? null, name: r.name, hue: r.hue },
+      leave: () => supabase.rpc("leave_conversation", { p_conversation_id: r.id }),
+      toast: showToast,
+      onDone: () => router.refresh(),
+    });
   }
 
   // Seed readIds from sessionStorage so navigating to a thread and back doesn't
@@ -897,18 +897,12 @@ export function MessagesInbox({
               )}
               {menuRow.muted ? "Unmute" : "Mute"}
             </button>
-            {/* Confirmed now. The identical action inside the thread has
-                always had a dialog; reaching it by holding a row for 420ms
-                did not — so an accidental hold plus one mistap silently
-                removed a group you were in. */}
+            {/* One tap, with five seconds of Undo instead of a dialog: an
+                accidental hold plus a mistap is now one tap to put back. */}
             <button
               type="button"
               disabled={actionBusy}
-              onClick={() => {
-                const r = menuRow;
-                setMenuRow(null);
-                setConfirmDeleteId(r.id);
-              }}
+              onClick={() => deleteChat(menuRow)}
               className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-red-400 hover:bg-white/5 disabled:opacity-60"
             >
               {actionBusy ? (
@@ -921,29 +915,6 @@ export function MessagesInbox({
           </div>
         </BottomSheet>
       )}
-
-      {/* Same copy as the in-thread confirmation, so the two doors to this
-          action say the same thing. */}
-      <ConfirmDialog
-        open={confirmDeleteId !== null}
-        onClose={() => setConfirmDeleteId(null)}
-        onConfirm={() => {
-          const row = rows.find((r) => r.id === confirmDeleteId);
-          if (confirmDeleteId) void deleteChat(confirmDeleteId, !!row?.isGroup);
-        }}
-        icon={Trash2}
-        title={
-          rows.find((r) => r.id === confirmDeleteId)?.isGroup
-            ? "Leave this group"
-            : "Delete this chat"
-        }
-        body="The conversation disappears from your inbox. The other person keeps their copy."
-        confirmLabel={
-          rows.find((r) => r.id === confirmDeleteId)?.isGroup
-            ? "Leave"
-            : "Delete"
-        }
-      />
 
       <ConfirmDialog
         open={confirmBlockId !== null}

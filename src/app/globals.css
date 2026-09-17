@@ -649,6 +649,17 @@ html[data-dm-leave]::view-transition-old(root) {
   }
 }
 
+/* The Undo card's line, draining over the time Undo is offered. */
+@keyframes undo-drain {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+.undo-drain {
+  animation-name: undo-drain;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
 .animate-toast-drop {
   animation: toast-drop 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

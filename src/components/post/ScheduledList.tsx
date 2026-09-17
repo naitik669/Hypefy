@@ -5,6 +5,7 @@ import { CalendarClock, Trash2, ImageIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/ToastProvider";
+import { scheduleUndoable } from "@/lib/undoable";
 
 export type ScheduledPost = {
   id: string;
@@ -31,19 +32,33 @@ export function ScheduledList({ posts }: { posts: ScheduledPost[] }) {
   const supabase = createClient();
   const toast = useToast();
   const [list, setList] = useState(posts);
-  const [busy, setBusy] = useState<string | null>(null);
 
-  async function cancel(id: string) {
-    if (busy) return;
-    setBusy(id);
-    const prev = list;
+  /** Put a cancelled post back where it was: the list is soonest first. */
+  function putBack(post: ScheduledPost) {
+    setList((l) => [...l.filter((p) => p.id !== post.id), post].sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt)));
+  }
+
+  function cancel(id: string) {
+    const post = list.find((p) => p.id === id);
+    if (!post) return;
     setList((l) => l.filter((p) => p.id !== id));
-    const { error } = await supabase.from("scheduled_posts").delete().eq("id", id);
-    setBusy(null);
-    if (error) {
-      setList(prev);
-      toast("Couldn't cancel", "error");
-    }
+    // Held for five seconds so Undo can stop it.
+    const stop = scheduleUndoable(async () => {
+      const { error } = await supabase.from("scheduled_posts").delete().eq("id", id);
+      if (error) {
+        putBack(post);
+        toast("Couldn't cancel", "error");
+      }
+    });
+    toast("Scheduled post cancelled", "plain", {
+      label: "Undo",
+      detail: post.caption || post.body || "Post",
+      thumb: { src: post.image, name: post.caption || post.body || "Post" },
+      onClick: () => {
+        stop();
+        putBack(post);
+      },
+    });
   }
 
   if (list.length === 0) {
@@ -78,7 +93,6 @@ export function ScheduledList({ posts }: { posts: ScheduledPost[] }) {
           <button
             type="button"
             onClick={() => cancel(p.id)}
-            disabled={busy === p.id}
             aria-label="Cancel scheduled post"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
           >

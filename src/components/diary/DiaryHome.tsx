@@ -105,7 +105,21 @@ export function DiaryHome({
   // Opened from a page tapped in Messages: the deck starts on it.
   const others = useMemo(() => startFrom(storyOrder(entries, fresh), startAt), [entries, fresh, startAt]);
 
+  /** Your page as it was before you took it down, for Undo. */
+  const takenDown = useRef<{ entry: (typeof entries)[number]; onMine: typeof onMine } | null>(null);
+  function onRestore() {
+    const was = takenDown.current;
+    takenDown.current = null;
+    if (!was) return;
+    setOnMine(was.onMine);
+    setEntries((prev) => [was.entry, ...prev.filter((e) => !e.isSelf)]);
+  }
+
   function onSaved(draft: DiaryDraft) {
+    if (!draft) {
+      const entry = entries.find((e) => e.isSelf);
+      takenDown.current = entry ? { entry, onMine } : null;
+    }
     // A saved page is a new one: reactions and hypes were to the old one.
     setOnMine([]);
     setFlying(NONE);
@@ -251,6 +265,7 @@ export function DiaryHome({
         onClose={() => setEditing(false)}
         current={mine ? { text: mine.text, audience: mine.audience, track: mine.track, color: mine.color } : null}
         onSaved={onSaved}
+        onRestore={onRestore}
         me={me}
       />
       <DiaryArchiveSheet open={archiveOpen} onClose={() => setArchiveOpen(false)} hue={me.hue} />

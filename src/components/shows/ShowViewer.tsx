@@ -33,6 +33,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { hypeResult } from "@/lib/supabase/typed";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { safeBack } from "@/lib/safe-back";
+import { scheduleUndoable } from "@/lib/undoable";
 
 type ShowProfile = {
   display_name: string | null;
@@ -197,7 +198,6 @@ function ShowScreen({
     router.refresh();
   }
   const [viewersOpen, setViewersOpen] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionPending, setActionPending] = useState<
     "delete" | "showcase" | null
   >(null);
@@ -243,13 +243,13 @@ function ShowScreen({
   // timer (hold / menus / sheets), and stops when the screen unmounts.
   useEffect(() => {
     if (!showTrack) return;
-    if (paused || menuOpen || viewersOpen || confirmDelete) {
+    if (paused || menuOpen || viewersOpen) {
       pausePreview();
     } else {
       ensurePreviewPlaying(showTrack);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showTrack?.id, paused, menuOpen, viewersOpen, confirmDelete]);
+  }, [showTrack?.id, paused, menuOpen, viewersOpen]);
   useEffect(() => () => stopPreview(), []);
 
   const linkedPost = show.linked_post ?? null;
@@ -375,18 +375,32 @@ function ShowScreen({
     setTimeout(() => setReplyStatus("idle"), 2200);
   }
 
-  async function deleteShow() {
-    setActionPending("delete");
-    const { error } = await supabase.from("shows").delete().eq("id", show.id);
-    setActionPending(null);
-    if (error) {
-      // Previously silent: the sheet closed as if the Show were gone.
-      showToast("Couldn't delete that Show. Try again.");
-      return;
-    }
-    setConfirmDelete(false);
+  function deleteShow() {
+    // Deferred, not reversed: a Show is a hard-deleted row, so the only undo
+    // that tells the truth is one that stops the delete from happening. The
+    // viewer closes at once; the row goes in five seconds unless Undo.
     setMenuOpen(false);
     onClose();
+
+    const cancel = scheduleUndoable(async () => {
+      const { error } = await supabase.from("shows").delete().eq("id", show.id);
+      if (error) {
+        showToast("Couldn't delete that Show. Try again.");
+        return;
+      }
+      router.refresh();
+    });
+
+    const isVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(show.media_url ?? "");
+    showToast("Show deleted", "plain", {
+      label: "Undo",
+      detail: show.caption?.trim() || "Your Show",
+      thumb: { src: isVideo ? null : show.media_url ?? null, name: show.caption ?? "Show" },
+      onClick: () => {
+        cancel();
+        router.refresh();
+      },
+    });
   }
 
   async function toggleShowcase() {
@@ -412,7 +426,7 @@ function ShowScreen({
   }, [show.id]);
 
   useEffect(() => {
-    if (paused || menuOpen || viewersOpen || confirmDelete) return;
+    if (paused || menuOpen || viewersOpen) return;
     const lastP = progressRef.current;
     function tick(now: number) {
       if (startRef.current === 0) startRef.current = now - lastP * DURATION;
@@ -424,7 +438,7 @@ function ShowScreen({
     }
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [show.id, paused, menuOpen, viewersOpen, confirmDelete, onNext]);
+  }, [show.id, paused, menuOpen, viewersOpen, onNext]);
 
   function openLinkedPost() {
     if (!linkedPost) return;
@@ -756,21 +770,6 @@ function ShowScreen({
         />
       )}
 
-      {isOwner && (
-        <ConfirmDialog
-          open={confirmDelete}
-          onClose={() => {
-            setConfirmDelete(false);
-            setPaused(false);
-          }}
-          onConfirm={deleteShow}
-          icon={Trash2}
-          title="Delete this Show"
-          body="It disappears for everyone right away, along with its views and hypes."
-          confirmLabel="Delete Show"
-        />
-      )}
-
       {/* ── Reply + Hype bar (viewers only) ── */}
       {!menuOpen && !isOwner && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/70 to-transparent px-3 pb-6 pt-12">
@@ -985,17 +984,14 @@ function ShowScreen({
             <button
               type="button"
               disabled={actionPending !== null}
-              onClick={() => {
-                setMenuOpen(false);
-                setConfirmDelete(true);
-              }}
+              onClick={deleteShow}
               className="flex w-full items-center gap-3 px-5 py-4 text-left text-danger transition-colors hover:bg-danger/10 disabled:opacity-50"
             >
               <Trash2 size={20} />
               <div>
                 <p className="text-sm font-semibold">Delete Show</p>
                 <p className="text-xs opacity-70">
-                  Removes this Show permanently
+                  You get 5 seconds to undo
                 </p>
               </div>
             </button>

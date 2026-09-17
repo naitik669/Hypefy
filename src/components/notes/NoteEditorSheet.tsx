@@ -16,6 +16,8 @@ import {
   type StatusValue,
 } from "@/components/ui/StatusComposer";
 import { haptics } from "@/lib/haptics";
+import { scheduleUndoable } from "@/lib/undoable";
+import { useToast } from "@/components/ui/ToastProvider";
 
 // Notes store one 60-char string; the emoji rides at the front of it.
 const MAX = 60;
@@ -53,6 +55,7 @@ export function NoteEditorSheet({
   title?: string;
   subtitle?: string;
 }) {
+  const toast = useToast();
   const supabase = createClient();
   const [draft, setDraft] = useState<StatusValue>(() => splitStatus(current?.text ?? null));
   const [audience, setAudience] = useState<"mutual" | "close">(current?.audience ?? "mutual");
@@ -102,13 +105,28 @@ export function NoteEditorSheet({
     }
   }
 
-  async function clear() {
+  function clear() {
     if (busy) return;
-    setBusy(true);
-    await supabase.rpc("clear_note");
-    setBusy(false);
+    // Deferred so Undo can stop it: once clear_note runs the note is gone.
+    const was = current;
+    const cancel = scheduleUndoable(async () => {
+      const { error } = await supabase.rpc("clear_note");
+      if (error) {
+        toast("Couldn't remove your note. Try again.", "error");
+        onSaved(was);
+      }
+    });
     onSaved(null);
     onClose();
+    toast("Note removed", "plain", {
+      label: "Undo",
+      detail: was?.text?.trim() || "Your note",
+      thumb: { src: me?.avatarUrl ?? null, name: me?.name ?? "Note", hue: me?.hue ?? null },
+      onClick: () => {
+        cancel();
+        onSaved(was);
+      },
+    });
   }
 
   return (

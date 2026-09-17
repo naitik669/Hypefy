@@ -27,6 +27,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { removeChat } from "@/lib/chat-removal";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ChatThemePicker } from "@/components/messages/ChatThemePicker";
@@ -183,7 +184,6 @@ export function ConversationInfo({
       ?.value ?? null
   );
 
-  const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmAutoDelete, setConfirmAutoDelete] = useState<string | null>(null);
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<RosterMember | null>(null);
@@ -629,7 +629,18 @@ export function ConversationInfo({
           icon={isGroup ? <LogOut size={20} /> : <Trash2 size={20} />}
           label={isGroup ? "Leave group" : "Delete chat"}
           danger
-          onClick={() => setConfirmLeave(true)}
+          onClick={() => {
+            removeChat({
+              id: conversationId,
+              isGroup,
+              name: title,
+              thumb: { src: avatarUrl, name: title, hue: peer?.hue ?? null },
+              leave: () => supabase.rpc("leave_conversation", { p_conversation_id: conversationId }),
+              toast: showToast,
+              onDone: () => router.refresh(),
+            });
+            router.replace("/messages");
+          }}
         />
       </Section>
 
@@ -660,28 +671,6 @@ export function ConversationInfo({
         title={`Delete messages after ${confirmAutoDelete}?`}
         body="This applies to messages already in this chat, not just new ones. Anything older than that window is removed for everyone the next time the timer runs."
         confirmLabel="Turn on"
-      />
-
-      <ConfirmDialog
-        open={confirmLeave}
-        onClose={() => setConfirmLeave(false)}
-        onConfirm={async () => {
-          setConfirmLeave(false);
-          const okd = await run(
-            "leave",
-            () =>
-              supabase.rpc("leave_conversation", {
-                p_conversation_id: conversationId,
-              }) as unknown as Promise<{ error: unknown }>,
-            isGroup ? "Left group" : "Chat removed",
-            "Couldn't do that."
-          );
-          if (okd) router.replace("/messages");
-        }}
-        icon={isGroup ? LogOut : Trash2}
-        title={isGroup ? "Leave this group" : "Delete this chat"}
-        body="The conversation disappears from your inbox. The other person keeps their copy."
-        confirmLabel={isGroup ? "Leave" : "Delete"}
       />
 
       <ConfirmDialog

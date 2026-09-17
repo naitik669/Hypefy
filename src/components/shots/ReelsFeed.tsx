@@ -493,7 +493,6 @@ function ReelCard({
   const [ownerAction, setOwnerAction] = useState<"delete" | "showcase" | null>(
     null
   );
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleted, setDeleted] = useState(false);
 
   // Double-tap-to-Hype (animations mirror the feed: 380ms burst + 640ms particles)
@@ -704,6 +703,8 @@ function ReelCard({
 
     showToast("Shot deleted", "plain", {
       label: "Undo",
+      detail: reel.caption?.trim() || "Your Shot",
+      thumb: { src: reel.poster_url ?? null, name: reel.caption ?? "Shot" },
       onClick: () => {
         cancel();
         setDeleted(false);
@@ -1165,7 +1166,7 @@ function ReelCard({
             <button
               type="button"
               disabled={ownerAction !== null}
-              onClick={() => setConfirmDelete(true)}
+              onClick={deleteShot}
               className="flex w-full items-center gap-3 px-5 py-4 text-left text-danger transition-colors hover:bg-danger/10 disabled:opacity-50"
             >
               {ownerAction === "delete" ? (
@@ -1176,7 +1177,7 @@ function ReelCard({
               <div>
                 <p className="text-sm font-semibold">Delete Shot</p>
                 <p className="text-xs opacity-70">
-                  Removes this Shot permanently
+                  You get 5 seconds to undo
                 </p>
               </div>
             </button>
@@ -1193,18 +1194,6 @@ function ReelCard({
           </div>
         </>
       )}
-
-      {/* Deleting a Shot is irreversible and the menu row sat one tap away
-          from it. Posts have always confirmed; Shots never did. */}
-      <ConfirmDialog
-        open={confirmDelete}
-        onClose={() => setConfirmDelete(false)}
-        onConfirm={deleteShot}
-        icon={Trash2}
-        title="Delete this Shot"
-        body="It disappears from Shots and your profile, along with its hypes and comments. You get a few seconds to undo."
-        confirmLabel="Delete Shot"
-      />
 
       {/* Sheets */}
       {currentUserId && (

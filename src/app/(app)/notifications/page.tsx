@@ -13,6 +13,7 @@ import { FollowButton } from "@/components/profile/FollowButton";
 import { haptics } from "@/lib/haptics";
 import { useToast } from "@/components/ui/ToastProvider";
 import { BLANK_POSTER } from "@/lib/blank-poster";
+import { scheduleUndoable } from "@/lib/undoable";
 import { TuneSheet } from "@/components/notifications/TuneSheet";
 import { InterestCard } from "@/components/notifications/InterestCard";
 import { levelOf, needsYou, sectionOf, spotlightDecision, type ActivityPrefs, type LevelKey } from "@/lib/activity-prefs";
@@ -507,14 +508,31 @@ export default function NotificationsPage() {
     showToast(`Muted ${actorSummary(g)}. Unmute in Tune.`);
   }
 
-  async function clearGroup(ids: string[]) {
+  function clearGroup(g: Group) {
     haptics.tap();
+    const ids = g.ids;
+    const cleared = notifs.filter((n) => ids.includes(n.id));
     setNotifs((prev) => prev.filter((n) => !ids.includes(n.id)));
-    const { error } = await supabase.from("notifications").delete().in("id", ids);
-    if (error) {
-      // Extremely unlikely (RLS already verified), but don't silently lose data.
-      window.location.reload();
-    }
+    // Held for five seconds so Undo can stop it; a cleared row is deleted.
+    const cancel = scheduleUndoable(async () => {
+      const { error } = await supabase.from("notifications").delete().in("id", ids);
+      if (error) {
+        // Extremely unlikely (RLS already verified), but don't silently lose data.
+        window.location.reload();
+      }
+    });
+    const who = g.actors[0];
+    showToast("Notification cleared", "plain", {
+      label: "Undo",
+      detail: `${actorSummary(g)} ${g.body}`,
+      thumb: { src: who?.avatar_url ?? null, name: who?.display_name ?? who?.username ?? "Hypefy", hue: who?.avatar_hue ?? null },
+      onClick: () => {
+        cancel();
+        setNotifs((prev) =>
+          [...prev.filter((n) => !ids.includes(n.id)), ...cleared].sort((a, b) => b.created_at.localeCompare(a.created_at)),
+        );
+      },
+    });
   }
 
   // Approve/deny a private-account follow request straight from its row. The
@@ -610,7 +628,7 @@ export default function NotificationsPage() {
                     index={i}
                     surface
                     following={!!g.actorId && followingIds.has(g.actorId)}
-                    onClear={() => clearGroup(g.ids)}
+                    onClear={() => clearGroup(g)}
                     onResolveRequest={(approve) => resolveRequest(g, approve)}
                   />
                 ))}
@@ -638,7 +656,7 @@ export default function NotificationsPage() {
                     group={g}
                     index={needs.length + i}
                     following={!!g.actorId && followingIds.has(g.actorId)}
-                    onClear={() => clearGroup(g.ids)}
+                    onClear={() => clearGroup(g)}
                     onMute={g.actorId && g.actors.length === 1 && !MUTE_EXEMPT.has(g.type) ? () => muteActor(g) : undefined}
                     onResolveRequest={(approve) => resolveRequest(g, approve)}
                   />

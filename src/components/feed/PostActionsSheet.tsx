@@ -23,6 +23,8 @@ export function PostActionsSheet({
   postUsername,
   currentUserId,
   onDelete,
+  onRestore,
+  preview,
   onEdit,
   onHyperChange,
 }: {
@@ -33,6 +35,10 @@ export function PostActionsSheet({
   postUsername: string | null;
   currentUserId: string;
   onDelete?: () => void;
+  /** Undo was tapped: put the post back on screen. */
+  onRestore?: () => void;
+  /** For the Undo card: the post's first image and caption. */
+  preview?: { image?: string | null; caption?: string | null };
   onEdit?: () => void;
   onHyperChange?: () => void;
 }) {
@@ -46,7 +52,6 @@ export function PostActionsSheet({
   const [isHyper, setIsHyper] = useState(false);
   const [hyperPending, setHyperPending] = useState(false);
   const [showReport, setShowReport] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(false);
 
   // Fetch follow + Hyper state when opened
@@ -68,7 +73,7 @@ export function PostActionsSheet({
       .then(({ data }) => setIsHyper(!!data));
   }, [open, isOwn, currentUserId, postUserId, supabase]);
 
-  if (!open && !confirmDelete && !confirmBlock) return null;
+  if (!open && !confirmBlock) return null;
 
   async function toggleFollow() {
     if (followPending) return;
@@ -130,7 +135,6 @@ export function PostActionsSheet({
     // It cannot be done the other way round: posts are hard-deleted, so once
     // the DELETE has run there is nothing left to restore and an Undo button
     // would be a lie.
-    setConfirmDelete(false);
     onDelete?.();
     onClose();
 
@@ -148,9 +152,12 @@ export function PostActionsSheet({
 
     toast("Post deleted", "plain", {
       label: "Undo",
+      detail: preview?.caption?.trim() || "Your post",
+      thumb: { src: preview?.image ?? null, name: preview?.caption ?? "Post" },
       onClick: () => {
         cancel();
         // The card removed itself optimistically; this is what puts it back.
+        onRestore?.();
         router.refresh();
       },
     });
@@ -199,7 +206,7 @@ export function PostActionsSheet({
           <>
             <MenuDivider />
             <MenuItem icon={Pencil} label="Edit post" onClick={() => { onClose(); onEdit?.(); }} />
-            <MenuItem icon={Trash2} label="Delete post" danger onClick={() => { setConfirmDelete(true); onClose(); }} />
+            <MenuItem icon={Trash2} label="Delete post" danger onClick={deletePost} />
           </>
         )}
       </FloatingMenu>
@@ -212,16 +219,6 @@ export function PostActionsSheet({
         title={`Block @${postUsername ?? "user"}`}
         body="They won't be able to message or call you, and their posts vanish from your feeds. They aren't notified."
         confirmLabel="Block"
-      />
-
-      <ConfirmDialog
-        open={confirmDelete}
-        onClose={() => { setConfirmDelete(false); onClose(); }}
-        onConfirm={deletePost}
-        icon={Trash2}
-        title="Delete this post"
-        body="It disappears from every feed, along with its hypes and comments. You get a few seconds to undo."
-        confirmLabel="Delete post"
       />
 
       <ReportSheet

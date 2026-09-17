@@ -11,6 +11,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { DICE_POOL, EMOJI_STRIP, joinStatus } from "@/components/ui/StatusComposer";
 import { haptics } from "@/lib/haptics";
+import { scheduleUndoable } from "@/lib/undoable";
+import { useToast } from "@/components/ui/ToastProvider";
 import { type Track } from "@/lib/music";
 import { colorKey, diaryTheme, noteSize, pageColorGroups, type DiaryColor } from "@/components/diary/DiaryPage";
 import { DiscSleeve, SongLine } from "@/components/diary/DiaryDisc";
@@ -55,6 +57,7 @@ export type DiaryDraft = {
 export function DiaryComposer({
   current,
   onSaved,
+  onRestore,
   me,
   autoFocus = false,
   compact = false,
@@ -62,6 +65,8 @@ export function DiaryComposer({
   current: DiaryDraft;
   /** Called after a successful save (or take-down, with null). */
   onSaved: (d: DiaryDraft) => void;
+  /** Undo after taking the page down: put it back exactly as it was. */
+  onRestore?: () => void;
   me: { name: string; hue: number; avatarUrl: string | null };
   autoFocus?: boolean;
   /**
@@ -73,6 +78,7 @@ export function DiaryComposer({
   compact?: boolean;
 }) {
   const supabase = createClient();
+  const toast = useToast();
   const [text, setText] = useState(current?.text ?? "");
   const [audience, setAudience] = useState<Audience>(current?.audience ?? "mutual");
   const [track, setTrack] = useState<Track | null>(current?.track ?? null);
@@ -150,16 +156,29 @@ export function DiaryComposer({
     onSaved({ text: value, audience, track, color });
   }
 
-  async function remove() {
+  function remove() {
     if (busy) return;
-    setBusy(true);
-    const { error } = await supabase.rpc("clear_note");
-    setBusy(false);
-    if (error) {
-      setFailed(true);
-      return;
-    }
+    // Deferred, not reversed: clear_note deletes the page, and nothing can
+    // bring it back afterwards. It leaves the screen now and goes in five
+    // seconds unless Undo.
+    const words = text.trim();
+    const cancel = scheduleUndoable(async () => {
+      const { error } = await supabase.rpc("clear_note");
+      if (error) {
+        toast("Couldn't take your page down. Try again.", "error");
+        onRestore?.();
+      }
+    });
     onSaved(null);
+    toast("Page taken down", "plain", {
+      label: "Undo",
+      detail: words || "Your Spotlight page",
+      thumb: { src: me.avatarUrl, name: me.name, hue: me.hue },
+      onClick: () => {
+        cancel();
+        onRestore?.();
+      },
+    });
   }
 
   return (
@@ -379,12 +398,14 @@ export function DiaryEditor({
   onClose,
   current,
   onSaved,
+  onRestore,
   me,
 }: {
   open: boolean;
   onClose: () => void;
   current: DiaryDraft;
   onSaved: (d: DiaryDraft) => void;
+  onRestore?: () => void;
   me: { name: string; hue: number; avatarUrl: string | null };
 }) {
   const [opening, setOpening] = useState(0);
@@ -401,6 +422,7 @@ export function DiaryEditor({
           current={current}
           me={me}
           autoFocus={!current}
+          onRestore={onRestore}
           onSaved={(d) => {
             onSaved(d);
             onClose();

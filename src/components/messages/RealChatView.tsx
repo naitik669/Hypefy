@@ -18,11 +18,11 @@ import { GifPicker } from "@/components/messages/GifPicker";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { FloatingMenu, MenuItem, MenuDivider } from "@/components/ui/FloatingMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CaptureGuard } from "@/components/native/CaptureGuard";
 import { useKeyboardInset } from "@/lib/useKeyboardInset";
 import { useToast } from "@/components/ui/ToastProvider";
 import { scheduleUndoable } from "@/lib/undoable";
+import { removeChat } from "@/lib/chat-removal";
 import { presenceLabel } from "@/lib/presence";
 import { haptics } from "@/lib/haptics";
 import { PresenceDot } from "@/components/presence/PresenceDot";
@@ -411,17 +411,19 @@ export function RealChatView({
     setTimeout(() => router.push("/messages"), 600);
   }
 
-  const [confirmLeave, setConfirmLeave] = useState(false);
-
-  async function leaveConversation() {
-    const { error } = await supabase.rpc("leave_conversation", { p_conversation_id: conversationId });
-    setConfirmLeave(false);
-    if (error) {
-      showToast(isGroup ? "Couldn't leave group" : "Couldn't delete chat");
-      return;
-    }
-    showToast(isGroup ? "Left group" : "Chat deleted");
-    setTimeout(() => router.push("/messages"), 500);
+  function leaveConversation() {
+    // Back to the inbox at once; the chat stays out of it while Undo is
+    // offered, and goes for good after five seconds.
+    removeChat({
+      id: conversationId,
+      isGroup,
+      name: other.name,
+      thumb: { src: other.avatarUrl ?? null, name: other.name, hue: other.hue },
+      leave: () => supabase.rpc("leave_conversation", { p_conversation_id: conversationId }),
+      toast: showToast,
+      onDone: () => router.refresh(),
+    });
+    router.push("/messages");
   }
   function placeCall(type: "audio" | "video") {
     startCall({ conversationId, peerId: other.id, peerName: other.name, peerHue: other.hue, type });
@@ -1367,6 +1369,7 @@ export function RealChatView({
 
     showToast("Unsent", "plain", {
       label: "Undo",
+      detail: m.body?.trim() || "Your message",
       onClick: () => {
         cancel();
         // Restores the original row wholesale — body, metadata and all.
@@ -1547,7 +1550,7 @@ export function RealChatView({
             <MenuItem
               icon={LogOut}
               label={isGroup ? "Leave group" : "Delete chat"}
-              onClick={() => { setHeaderMenu(false); setConfirmLeave(true); }}
+              onClick={() => { setHeaderMenu(false); leaveConversation(); }}
             />
             <MenuDivider />
             {isGroup ? (
@@ -2457,20 +2460,6 @@ export function RealChatView({
         />
       )}
 
-      {/* Confirm leave / delete chat */}
-      <ConfirmDialog
-        open={confirmLeave}
-        onClose={() => setConfirmLeave(false)}
-        onConfirm={async () => { await leaveConversation(); }}
-        icon={LogOut}
-        title={isGroup ? "Leave this group" : "Delete this chat"}
-        body={
-          isGroup
-            ? "You'll stop receiving messages and the chat disappears from your inbox."
-            : "The conversation disappears from your inbox. The other person keeps their copy."
-        }
-        confirmLabel={isGroup ? "Leave group" : "Delete chat"}
-      />
     </div>
   );
 }

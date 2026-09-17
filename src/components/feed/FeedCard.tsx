@@ -1001,6 +1001,8 @@ export function FeedCard({
         currentUserId={uid}
         onHyperChange={() => syncHyperRef.current()}
         onDelete={() => setDeleted(true)}
+        onRestore={() => setDeleted(false)}
+        preview={{ image: images[0] ?? null, caption: liveCaption ?? liveBody ?? null }}
         onEdit={() => setEditOpen(true)}
       />
 
