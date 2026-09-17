@@ -2,7 +2,16 @@
 
 import { useEffect, useRef } from "react";
 import { Music, Pause, X, ArrowUpRight } from "lucide-react";
-import { type Track, playPreview, ensurePreviewPlaying, pausePreview, useIsPlaying } from "@/lib/music";
+import { type Track, playPreview, claimPreview, useIsPlaying } from "@/lib/music";
+
+/**
+ * How much of the chip has to be on screen for its song to play. The observer
+ * is told to report at 0 as well, because `isIntersecting` stays true for a
+ * chip that is only slightly in view — reading that alone restarted the song
+ * of the post you were scrolling AWAY from, and never stopped it until the
+ * chip had left the screen completely.
+ */
+const IN_VIEW = 0.6;
 
 /**
  * Compact playable song chip — artwork (spins while playing), title · artist,
@@ -24,27 +33,31 @@ export function TrackChip({
 }) {
   const playing = useIsPlaying(track.id);
   const rootRef = useRef<HTMLDivElement>(null);
-  const playingRef = useRef(playing);
-  playingRef.current = playing;
 
   useEffect(() => {
     if (!autoPlayInView) return;
     const el = rootRef.current;
     if (!el) return;
+    // A claim rather than play-and-pause: the post you scroll to starts its
+    // song before the one you left lets go, and letting go then stops only a
+    // song that is still this chip's. Otherwise the arriving post's song was
+    // cut off by the departing post's pause.
+    let release: (() => void) | null = null;
     const obs = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          ensurePreviewPlaying(track);
-        } else if (playingRef.current) {
-          pausePreview();
+        const inView = entry.isIntersecting && entry.intersectionRatio >= IN_VIEW;
+        if (inView && !release) release = claimPreview(track);
+        else if (!inView && release) {
+          release();
+          release = null;
         }
       },
-      { threshold: 0.6 },
+      { threshold: [0, IN_VIEW] },
     );
     obs.observe(el);
     return () => {
       obs.disconnect();
-      if (playingRef.current) pausePreview();
+      release?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPlayInView, track.id]);
