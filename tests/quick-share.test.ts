@@ -112,10 +112,22 @@ async function hold() {
   );
 }
 
+describe("rowLens", () => {
+  it("swells the face under the thumb most and its neighbours a little", async () => {
+    const { rowLens } = await import("@/components/layout/NavHoldMenu");
+    expect(rowLens(0)).toBe(1);
+    expect(rowLens(40)).toBeGreaterThan(0);
+    expect(rowLens(40)).toBeLessThan(rowLens(10));
+    expect(rowLens(200)).toBe(0);
+  });
+});
+
 describe("holding share", () => {
   it("raises the people you send to most, as faces, in one card", async () => {
     await hold();
-    expect(tiles()).toHaveLength(2);
+    // The two faces, then More for everyone and everything else.
+    expect(tiles()).toHaveLength(3);
+    expect(tiles()[2].getAttribute("aria-selected")).toBe("false");
     // Over the page, not inside the post: drawn in the feed it would sit
     // under the veil and be blurred along with everything else.
     const card = document.querySelector('[role="listbox"]')!;
@@ -123,7 +135,7 @@ describe("holding share", () => {
     expect(host.contains(card)).toBe(false);
     // Left corner above the button, running right — not centred on it, and
     // not off the screen: the trigger was placed at x=20.
-    expect((card.parentElement as HTMLElement).style.left).toBe("20px");
+    expect((card.closest(".fixed") as HTMLElement).style.left).toBe("20px");
     // Faces and nothing else. The name belongs to whichever one the thumb is
     // on, not to a caption under every tile.
     expect(card.textContent).not.toContain("Maya");
@@ -146,8 +158,31 @@ describe("holding share", () => {
     expect(sends).toHaveLength(1);
     expect(sends[0][1]).toMatchObject({ p_conversation_id: "c1", p_post_id: "p1", p_kind: "post" });
     expect(toast).toHaveBeenCalledWith(expect.stringContaining("Sent to"), "success");
-    // And it closes on release, as the nav stacks do.
+    // The pick lands visibly first: a check on the face, and the card says so.
+    expect(tiles()).toHaveLength(3);
+    expect(document.body.textContent).toContain("Sent to Maya");
+    // Then it goes.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
     expect(tiles()).toHaveLength(0);
+  });
+
+  it("opens the full sheet when the thumb lifts on More", async () => {
+    await hold();
+    await pointer(trigger(), "pointermove", 26 + 2 * 52 + 22, 366);
+    expect(tiles()[2].getAttribute("aria-selected")).toBe("true");
+    await pointer(trigger(), "pointerup", 26 + 2 * 52 + 22, 366);
+    expect(openSheet).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls.some(([fn]) => fn === "send_message")).toBe(false);
+    expect(tiles()).toHaveLength(0);
+  });
+
+  it("keeps the choice while the thumb crosses the gap between two faces", async () => {
+    await hold();
+    // Between Maya (26..70) and Leo (78..122): nearest wins, nothing drops.
+    await pointer(trigger(), "pointermove", 73, 366);
+    expect(tiles().some((t) => t.getAttribute("aria-selected") === "true")).toBe(true);
   });
 
   it("takes every touch while it is up, so nothing behind it can be used", async () => {
