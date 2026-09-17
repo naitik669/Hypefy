@@ -204,6 +204,29 @@ describe("holding share", () => {
     expect(overlayCount()).toBe(0);
   });
 
+  it("picks nobody while the thumb is still on the button, and sends nothing on release", async () => {
+    await hold();
+    // The card ends at y=392; the button is at 400..440. A thumb that has not
+    // moved up onto the card is not on a face, however close.
+    await pointer(trigger(), "pointermove", 48, 420);
+    expect(tiles().some((t) => t.getAttribute("aria-selected") === "true")).toBe(false);
+    await pointer(trigger(), "pointermove", 48, 400);
+    expect(tiles().some((t) => t.getAttribute("aria-selected") === "true")).toBe(false);
+    await pointer(trigger(), "pointerup", 48, 400);
+    expect(rpc.mock.calls.some(([fn]) => fn === "send_message")).toBe(false);
+    expect(tiles()).toHaveLength(0);
+  });
+
+  it("drops the pick when the thumb slides back off the card before letting go", async () => {
+    await hold();
+    await pointer(trigger(), "pointermove", 48, 366);
+    expect(tiles()[0].getAttribute("aria-selected")).toBe("true");
+    await pointer(trigger(), "pointermove", 48, 425);
+    expect(tiles()[0].getAttribute("aria-selected")).toBe("false");
+    await pointer(trigger(), "pointerup", 48, 425);
+    expect(rpc.mock.calls.some(([fn]) => fn === "send_message")).toBe(false);
+  });
+
   it("sends nothing when the thumb lifts away from every face", async () => {
     await hold();
     // Well clear of the card: nothing is under the thumb to send to.

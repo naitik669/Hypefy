@@ -76,6 +76,9 @@ export type HoldAction = {
 const ROW_TILE = 52;
 const ROW_GAP = 4;
 const ROW_PAD = 8;
+/** How far past the card's top and bottom edge the thumb still counts as on it. */
+export const ROW_SLACK_ABOVE = 20;
+export const ROW_SLACK_BELOW = 2;
 /** How long a confirmed pick stays on screen with its check. */
 const CONFIRM_MS = 420;
 /** Row triggers sit in a scrolling page, so a thumb gets a little more drift. */
@@ -349,14 +352,16 @@ export function NavHoldMenu({
     const els = stack.querySelectorAll<HTMLElement>('[role="option"]');
 
     if (layout === "row") {
-      // Along the card, and only while the thumb is near it: X alone would
-      // mean a small move down — or no move at all — landing on whichever
-      // face happens to be above the button, and sending to them. Within the
+      // Only while the thumb is ON the card. The card sits 8px above the
+      // share button, so any allowance below it reached back over the button
+      // itself: a hold that never moved picked the face above it, and letting
+      // go sent the post to someone you never touched. A little slack above
+      // the card for a thumb reaching past it, almost none below. Within the
       // card the nearest face wins, so crossing the gap between two never
       // drops the choice mid-slide.
       const band = stack.getBoundingClientRect();
-      if (y < band.top - 56 || y > band.bottom + 56) return null;
-      if (x < band.left - 24 || x > band.right + 24) return null;
+      if (y < band.top - ROW_SLACK_ABOVE || y > band.bottom + ROW_SLACK_BELOW) return null;
+      if (x < band.left - 8 || x > band.right + 8) return null;
       let best: number | null = null;
       let bestD = Infinity;
       for (let i = 0; i < els.length; i++) {
