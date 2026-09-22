@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, CheckCheck, Loader2, Trash2, UserPlus, ShieldAlert, Sparkles, SlidersHorizontal, Trophy, BellOff } from "lucide-react";
+import { CheckCheck, Loader2, Trash2, UserPlus, ShieldAlert, Sparkles, SlidersHorizontal, Trophy, BellOff } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PushNudge } from "@/components/pwa/PushNudge";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { EmptyScene, ctaClass } from "@/components/empty/EmptyScene";
+import { HelloArt } from "@/components/empty/scenes";
 import { Avatar } from "@/components/ui/Avatar";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { haptics } from "@/lib/haptics";
@@ -610,10 +611,19 @@ export default function NotificationsPage() {
           ))}
         </div>
       ) : groups.length === 0 && !showAsk ? (
-        <EmptyState
-          icon={Bell}
-          title="Quiet for now"
-          text="Hypes, replies, follows, and mentions will show up here."
+        <EmptyScene
+          art={<HelloArt />}
+          title="Hello? …hello?"
+          mark=""
+          text="Post something to get hypes."
+          // The phone buzzes and calls out first; the words wait for the
+          // first round of echoes.
+          timing={{ head: 2.7, sub: 2.85, cta: 3.5 }}
+          cta={
+            <Link href="/create/post" className={ctaClass}>
+              Make a post
+            </Link>
+          }
         />
       ) : (
         <div className="flex flex-col pb-4 pt-1">

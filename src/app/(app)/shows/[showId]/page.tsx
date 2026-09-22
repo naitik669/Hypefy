@@ -1,6 +1,6 @@
-import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ShowViewer } from "@/components/shows/ShowViewer";
+import { GoneScreen } from "@/components/empty/GoneScreen";
 
 export default async function ShowPage({
   params,
@@ -20,7 +20,7 @@ export default async function ShowPage({
     .eq("id", showId)
     .maybeSingle();
 
-  if (!target) notFound();
+  if (!target) return <GoneScreen kind="show" />;
 
   // 2. Fetch all active Shows from the same user.
   const nowIso = new Date().toISOString();
@@ -56,7 +56,8 @@ export default async function ShowPage({
       : null,
   }));
 
-  if (shows.length === 0) notFound();
+  // Found, but expired: the same "off air" screen rather than a bare 404.
+  if (shows.length === 0) return <GoneScreen kind="show" />;
 
   const startIdx = Math.max(
     shows.findIndex((s) => s.id === showId),

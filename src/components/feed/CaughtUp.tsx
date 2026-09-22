@@ -5,11 +5,17 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowUp, Compass, PlusCircle } from "lucide-react";
 import { haptics } from "@/lib/haptics";
+import { ctaClass } from "@/components/empty/EmptyScene";
+import { CompassTickArt } from "@/components/empty/scenes";
+import s from "@/components/empty/empty.module.css";
+
+const delay = (seconds: number) => ({ ["--d" as string]: `${seconds}s` }) as React.CSSProperties;
 
 /**
- * End-of-feed moment. Plays its entrance (badge springs in, ring and check
- * draw themselves) the first time it scrolls into view; tapping the badge
- * replays it, and Back to top does what it says.
+ * End-of-feed moment. The first time it scrolls into view the Discover
+ * compass pops up, spins to north and turns into the lime tick, then the
+ * words and buttons arrive in turn; tapping the badge replays the compass,
+ * and Back to top does what it says.
  */
 export function CaughtUp({ count = 0 }: { count?: number }) {
   const router = useRouter();
@@ -34,86 +40,75 @@ export function CaughtUp({ count = 0 }: { count?: number }) {
   }, []);
 
   return (
-    <div ref={ref} className="flex flex-col items-center gap-2.5 px-6 py-12 text-center">
-      <button
-        type="button"
-        aria-label="You're all caught up. Tap to replay"
-        onClick={() => {
-          haptics.tap();
-          setReplay((r) => r + 1);
-        }}
-        className="transition-transform active:scale-90"
-      >
-        {/* key re-mounts the SVG so the draw animation replays on tap */}
-        <span key={replay} className={seen ? "animate-caughtup-pop block" : "block opacity-0"}>
-          <svg width="52" height="52" viewBox="0 0 52 52" fill="none" aria-hidden>
-            <circle
-              cx="26" cy="26" r="20"
-              stroke="var(--color-accent, #a3e635)" strokeWidth="2.5" strokeLinecap="round"
-              className={seen ? "caughtup-ring" : undefined}
-              transform="rotate(-90 26 26)"
-            />
-            <path
-              d="M18 26.5l5.5 5.5L34 21"
-              stroke="var(--color-accent, #a3e635)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              className={seen ? "caughtup-check" : undefined}
-            />
-          </svg>
-        </span>
-      </button>
+    // Reserves its height before it's seen, so the scene mounting (which is
+    // what starts its animations) doesn't shift the page.
+    <div ref={ref} className="flex min-h-[300px] flex-col items-center gap-2 px-6 py-12 text-center">
+      {seen && (
+        <>
+          <button
+            type="button"
+            aria-label="You're all caught up. Tap to replay"
+            onClick={() => {
+              haptics.tap();
+              setReplay((r) => r + 1);
+            }}
+            className="transition-transform active:scale-90"
+          >
+            {/* key re-mounts the compass so it spins into the tick again */}
+            <span key={replay} className="block">
+              <CompassTickArt />
+            </span>
+          </button>
 
-      <div className={seen ? "animate-row-in" : "opacity-0"} style={{ animationDelay: "250ms" }}>
-        <p className="text-sm font-bold">You&apos;re all caught up</p>
-        {/* Says what was actually covered rather than just stopping. The feed
-            is deliberately allowed to run out — so the end has to read as an
-            achievement with somewhere to go, not as the app running dry. */}
-        <p className="mt-0.5 text-xs text-muted">
-          {count > 0
-            ? `That's all ${count} ${count === 1 ? "post" : "posts"} — nothing left unread.`
-            : "New posts land here as your circle gets loud."}
-        </p>
-      </div>
+          <h2 className={`${s.head} text-[17px] font-extrabold tracking-[-0.02em]`} style={delay(1.55)}>
+            You&apos;re all caught up<span className="text-accent">.</span>
+          </h2>
+          {/* Says what was actually covered rather than just stopping. The feed
+              is deliberately allowed to run out, so the end has to read as an
+              achievement with somewhere to go, not as the app running dry. */}
+          <p className={`${s.sub} text-[13px] text-muted`} style={delay(1.85)}>
+            {count > 0
+              ? `That's all ${count} ${count === 1 ? "post" : "posts"}. Nothing left unread.`
+              : "New posts land here as your circle gets loud."}
+          </p>
 
-      {/* Two real destinations. Discover has things this feed did not show
-          you, and composing is the only way the feed gets longer for
-          everyone else. */}
-      <div
-        className={`mt-2 flex items-center gap-2 ${seen ? "animate-row-in" : "opacity-0"}`}
-        style={{ animationDelay: "400ms" }}
-      >
-        <Link
-          href="/discover"
-          onClick={() => haptics.tap()}
-          className="flex items-center gap-1.5 rounded-pill bg-accent px-4 py-2 text-xs font-bold text-accent-ink transition-transform active:scale-95"
-        >
-          <Compass size={14} /> Discover more
-        </Link>
-        <Link
-          href="/create/post"
-          onClick={() => haptics.tap()}
-          className="flex items-center gap-1.5 rounded-pill border border-border px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-white/25 hover:text-foreground"
-        >
-          <PlusCircle size={14} /> Post
-        </Link>
-      </div>
+          {/* Two real destinations. Discover has things this feed did not show
+              you, and composing is the only way the feed gets longer for
+              everyone else. */}
+          <div className="mt-1.5 flex items-center gap-2">
+            <div className={`${s.cta} rounded-[14px]`} style={delay(2.15)}>
+              <Link href="/discover" onClick={() => haptics.tap()} className={ctaClass}>
+                <Compass size={15} /> Discover more
+              </Link>
+            </div>
+            <div className={s.pop} style={delay(2.3)}>
+              <Link
+                href="/create/post"
+                onClick={() => haptics.tap()}
+                className="inline-flex items-center gap-1.5 rounded-[14px] border border-border px-5 py-2.5 text-sm font-bold text-muted transition-colors hover:border-white/25 hover:text-foreground"
+              >
+                <PlusCircle size={15} /> Post
+              </Link>
+            </div>
+          </div>
 
-      <button
-        type="button"
-        onClick={() => {
-          haptics.tap();
-          window.scrollTo({ top: 0, behavior: "smooth" });
-          // Re-runs the server query; FeedList's initialPosts-sync effect
-          // picks up the fresh page, so this lands on a genuinely current
-          // feed, not just the top of the stale one.
-          router.refresh();
-        }}
-        className={`mt-1 flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-faint transition-colors hover:text-foreground ${
-          seen ? "animate-row-in" : "opacity-0"
-        }`}
-        style={{ animationDelay: "520ms" }}
-      >
-        <ArrowUp size={13} /> Back to top
-      </button>
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              window.scrollTo({ top: 0, behavior: "smooth" });
+              // Re-runs the server query; FeedList's initialPosts-sync effect
+              // picks up the fresh page, so this lands on a genuinely current
+              // feed, not just the top of the stale one.
+              router.refresh();
+            }}
+            className={`${s.sub} mt-1 flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-faint transition-colors hover:text-foreground`}
+            style={delay(2.5)}
+          >
+            <ArrowUp size={13} /> Back to top
+          </button>
+        </>
+      )}
     </div>
   );
 }

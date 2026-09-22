@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Search,
-  MessageCircle,
   Users,
   Check,
   Ban,
@@ -30,7 +29,7 @@ import { visibleDecoration } from "@/lib/cosmetics";
 import { visibleNameplate } from "@/lib/nameplates";
 import { Nameplate } from "@/components/ui/Nameplate";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { EmptyInbox } from "@/components/messages/EmptyInbox";
 import { PresenceDot } from "@/components/presence/PresenceDot";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { removeChat, useRemovedChats } from "@/lib/chat-removal";
@@ -573,13 +572,7 @@ export function MessagesInbox({
         {/* Spotlight floats here even with no conversations, so a new account
             whose mutuals have written a page can still read it. */}
         <FloatingPages pages={pages} />
-        <EmptyState
-          icon={MessageCircle}
-          title="It's quiet in here"
-          text="Slide into a DM or rally a group chat."
-          ctaLabel="New message"
-          ctaHref="/messages/new"
-        />
+        <EmptyInbox currentUserId={currentUserId} />
       </>
     );
   }

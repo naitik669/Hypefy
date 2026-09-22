@@ -1,15 +1,38 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Grid3x3, Zap, Bookmark, PlusCircle, Copy } from "lucide-react";
+import { Grid3x3, Zap, Bookmark, Copy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { type FeedPost } from "@/components/feed/FeedCard";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { EmptyScene, ctaClass } from "@/components/empty/EmptyScene";
+import {
+  CanvasArt,
+  ClapperArt,
+  ConeArt,
+  CurtainsArt,
+  FrameArt,
+  LockerArt,
+} from "@/components/empty/scenes";
+import { FollowButton } from "@/components/profile/FollowButton";
 import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 
 type Tab = "Posts" | "Shots" | "Saved";
+
+/** Someone else's empty profile gets one of three scenes, always the same one
+ *  for the same person, so it reads as theirs rather than random. */
+const OTHER_EMPTY = [
+  { art: <CanvasArt />, title: "Blank canvas" },
+  { art: <CurtainsArt />, title: "Curtains closed" },
+  { art: <ConeArt />, title: "Still setting up" },
+];
+
+function sceneFor(userId: string) {
+  let h = 0;
+  for (let i = 0; i < userId.length; i++) h = (h * 31 + userId.charCodeAt(i)) | 0;
+  return OTHER_EMPTY[Math.abs(h) % OTHER_EMPTY.length];
+}
 
 function getThumb(post: any): string | null {
   if (post.image_urls?.length) return post.image_urls[0];
@@ -28,10 +51,16 @@ export function PublicProfileTabs({
   userId,
   isOwn,
   currentUserId,
+  name = "They",
+  initialFollowing = false,
+  initialRequested = false,
 }: {
   userId: string;
   isOwn: boolean;
   currentUserId: string | null;
+  name?: string;
+  initialFollowing?: boolean;
+  initialRequested?: boolean;
 }) {
   const tabs: Tab[] = isOwn ? ["Posts", "Shots", "Saved"] : ["Posts", "Shots"];
   const [tab, setTab] = useState<Tab>("Posts");
@@ -124,19 +153,49 @@ export function PublicProfileTabs({
           </div>
         ) : tab === "Posts" || (tab === "Saved" && isOwn) ? (
           activePosts.length === 0 ? (
-            <EmptyState
-              icon={PlusCircle}
-              title={
-                tab === "Saved" ? "Nothing saved yet" : "Nothing posted yet"
-              }
-              text={
-                tab === "Saved"
-                  ? "Stash the posts you'll want back."
-                  : "When they post, it lands here."
-              }
-              ctaLabel={isOwn && tab === "Posts" ? "Create Post" : undefined}
-              ctaHref={isOwn && tab === "Posts" ? "/create/post" : undefined}
-            />
+            tab === "Saved" ? (
+              <EmptyScene
+                art={<LockerArt />}
+                title="Locker's empty"
+                text="Tap the bookmark on any post to stash it."
+                timing={{ head: 1.1, sub: 1.45, cta: 1.8 }}
+                cta={
+                  <Link href="/discover" className={ctaClass}>
+                    Find something to save
+                  </Link>
+                }
+              />
+            ) : isOwn ? (
+              <EmptyScene
+                art={<FrameArt />}
+                title="Blank wall"
+                text="Hang your first post."
+                cta={
+                  <Link href="/create/post" className={ctaClass}>
+                    Create a post
+                  </Link>
+                }
+              />
+            ) : (
+              <EmptyScene
+                art={sceneFor(userId).art}
+                title={sceneFor(userId).title}
+                text={`${name} hasn't posted yet.`}
+                // Following is the one useful thing to do here; once you
+                // already do, there's nothing to ask.
+                cta={
+                  currentUserId && !initialFollowing ? (
+                    <FollowButton
+                      targetUserId={userId}
+                      initialFollowing={initialFollowing}
+                      initialRequested={initialRequested}
+                      variant="cta"
+                      followLabel={`Follow ${name}`}
+                    />
+                  ) : undefined
+                }
+              />
+            )
           ) : (
             <>
               {/* Three columns, but portrait posts take two rows — see
@@ -182,12 +241,18 @@ export function PublicProfileTabs({
           )
         ) : tab === "Shots" ? (
           shots.length === 0 ? (
-            <EmptyState
-              icon={Zap}
+            <EmptyScene
+              art={<ClapperArt />}
               title="No Shots fired"
-              text="Short videos, big energy, none yet."
-              ctaLabel={isOwn ? "Add Shot" : undefined}
-              ctaHref={isOwn ? "/create/shot" : undefined}
+              text={isOwn ? "Lights, camera, you." : `${name} hasn't posted a Shot yet.`}
+              timing={{ head: 1.2, sub: 1.55, cta: 1.9 }}
+              cta={
+                isOwn ? (
+                  <Link href="/create/shot" className={ctaClass}>
+                    Record a Shot
+                  </Link>
+                ) : undefined
+              }
             />
           ) : (
             <div className="grid grid-cols-3 gap-1.5 px-1.5">

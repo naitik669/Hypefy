@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Grid3x3, Zap, Bookmark, PlusCircle, Video, Play } from "lucide-react";
+import { Grid3x3, Zap, Bookmark, Play } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { EmptyScene, SceneLine, ctaClass } from "@/components/empty/EmptyScene";
+import { ClapperArt, FrameArt, LockerArt } from "@/components/empty/scenes";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { FoldersStrip } from "@/components/saved/FoldersStrip";
 import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
@@ -213,13 +214,24 @@ export function ProfileTabs({ userId }: { userId: string }) {
           (posts === null ? (
             <GridSkeleton />
           ) : posts.length === 0 ? (
-            <EmptyState
-              icon={PlusCircle}
-              title="Nothing posted yet"
-              text="Your posts live here. Make some noise."
-              ctaLabel="Create Post"
-              ctaHref="/create/post"
-            />
+            <EmptyScene
+              art={<FrameArt />}
+              title="Blank wall"
+              text="Hang your first post."
+              cta={
+                <Link href="/create/post" className={ctaClass}>
+                  Create a post
+                </Link>
+              }
+            >
+              <SceneLine at={2.05} className="mt-0.5 text-[12.5px] text-muted">
+                For inspiration,{" "}
+                <Link href="/discover" className="font-extrabold text-foreground underline decoration-2 underline-offset-[3px]">
+                  explore
+                </Link>{" "}
+                more.
+              </SceneLine>
+            </EmptyScene>
           ) : (
             <div>
               <div className={GRID_WRAP}>
@@ -238,12 +250,17 @@ export function ProfileTabs({ userId }: { userId: string }) {
           (shots === null ? (
             <GridSkeleton />
           ) : shots.length === 0 ? (
-            <EmptyState
-              icon={Video}
+            <EmptyScene
+              art={<ClapperArt />}
               title="No Shots fired"
-              text="Short videos, big energy. Post your first."
-              ctaLabel="Add Shot"
-              ctaHref="/create/shot"
+              text="Lights, camera, you."
+              // The words wait for the board to settle level.
+              timing={{ head: 1.2, sub: 1.55, cta: 1.9 }}
+              cta={
+                <Link href="/create/shot" className={ctaClass}>
+                  Record a Shot
+                </Link>
+              }
             />
           ) : (
             <div>
@@ -281,10 +298,16 @@ export function ProfileTabs({ userId }: { userId: string }) {
           (saved === null || savedShots === null ? (
             <GridSkeleton />
           ) : saved.length === 0 && savedShots.length === 0 ? (
-            <EmptyState
-              icon={Bookmark}
-              title="Nothing saved yet"
-              text="Stash the posts and Shots you'll want back."
+            <EmptyScene
+              art={<LockerArt />}
+              title="Locker's empty"
+              text="Tap the bookmark on any post to stash it."
+              timing={{ head: 1.1, sub: 1.45, cta: 1.8 }}
+              cta={
+                <Link href="/discover" className={ctaClass}>
+                  Find something to save
+                </Link>
+              }
             />
           ) : (
             <>

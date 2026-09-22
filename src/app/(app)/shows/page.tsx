@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Clapperboard, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { EmptyScene, ctaClass } from "@/components/empty/EmptyScene";
+import { TvArt } from "@/components/empty/scenes";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 
 /**
@@ -97,12 +98,15 @@ export default async function ShowsPage() {
       />
 
       {live.length === 0 && kept.length === 0 ? (
-        <EmptyState
-          icon={Clapperboard}
-          title="No Shows yet"
-          text="A Show is a short clip that disappears after 24 hours — unless you keep it."
-          ctaLabel="Add a Show"
-          ctaHref="/shows/add"
+        <EmptyScene
+          art={<TvArt />}
+          title="Nothing on tonight"
+          text="Post a Show, it's gone in 24h."
+          cta={
+            <Link href="/shows/add" className={ctaClass}>
+              Post a Show
+            </Link>
+          }
         />
       ) : (
         <div className="px-4 pb-10 pt-3">

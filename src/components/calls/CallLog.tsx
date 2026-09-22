@@ -2,7 +2,9 @@
 
 import { Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
-import { EmptyState } from "@/components/ui/EmptyState";
+import Link from "next/link";
+import { EmptyScene, ctaClass } from "@/components/empty/EmptyScene";
+import { WalkieArt } from "@/components/empty/scenes";
 import { useCallControls } from "@/components/calls/CallProvider";
 
 export type CallEntry = {
@@ -45,10 +47,18 @@ export function CallLog({ entries }: { entries: CallEntry[] }) {
 
   if (entries.length === 0) {
     return (
-      <EmptyState
-        icon={Phone}
-        title="No calls yet"
-        text="Voice and video calls you make or receive show up here."
+      <EmptyScene
+        art={<WalkieArt />}
+        title="Anyone out there"
+        mark="?"
+        text="Start a call. Over."
+        // The words wait for the red light.
+        timing={{ head: 1.2, sub: 1.55, cta: 1.9 }}
+        cta={
+          <Link href="/messages/new" className={ctaClass}>
+            Start a call
+          </Link>
+        }
       />
     );
   }

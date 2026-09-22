@@ -9,7 +9,7 @@ const SITE = "https://app.hypefy.chat";
 
 /** Native-share (clipboard fallback) of the user's profile link.
  *  Carries ?ref=<username> so signups from it credit the inviter. */
-async function shareProfile(username: string | null) {
+export async function shareProfile(username: string | null) {
   haptics.tap();
   // No username means no ?ref, which means the invite is uncredited — while
   // the row above it is still counting "friends joined from your link". Send

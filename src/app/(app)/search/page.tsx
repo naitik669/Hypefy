@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, SearchX, Hash } from "lucide-react";
+import { ChevronLeft, Hash } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { FilterPills } from "@/components/ui/FilterPills";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { EmptyScene, ghostCtaClass } from "@/components/empty/EmptyScene";
+import { FishingArt } from "@/components/empty/scenes";
 import { Avatar } from "@/components/ui/Avatar";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { type FeedPost } from "@/components/feed/FeedCard";
@@ -346,10 +347,24 @@ export default function SearchPage() {
       )}
 
       {!isPending && searched && !hasResults && (
-        <EmptyState
-          icon={SearchX}
-          title="Nothing turned up"
-          text="Try a different name, post, or #tag."
+        <EmptyScene
+          art={<FishingArt />}
+          title="Nothing's biting"
+          text="Try another name or #tag."
+          animateCta={false}
+          className="px-6 pb-14 pt-6"
+          cta={
+            <button
+              type="button"
+              className={ghostCtaClass}
+              onClick={() => {
+                setQuery("");
+                runSearch("");
+              }}
+            >
+              Clear search
+            </button>
+          }
         />
       )}
 

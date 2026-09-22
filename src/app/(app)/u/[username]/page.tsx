@@ -228,6 +228,9 @@ export default async function PublicProfilePage({
           userId={profile.id}
           isOwn={isOwn}
           currentUserId={currentUser?.id ?? null}
+          name={name}
+          initialFollowing={isFollowing}
+          initialRequested={isRequested}
         />
       )}
 

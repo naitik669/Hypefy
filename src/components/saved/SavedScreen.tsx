@@ -6,6 +6,9 @@ import { ArrowDownUp, Bookmark, BookmarkMinus, ChevronLeft, FolderPlus, Loader2,
 import { createClient } from "@/lib/supabase/client";
 import { safeBack } from "@/lib/safe-back";
 import { EmptyState } from "@/components/ui/EmptyState";
+import Link from "next/link";
+import { EmptyScene, ctaClass } from "@/components/empty/EmptyScene";
+import { LockerArt } from "@/components/empty/scenes";
 import { useToast } from "@/components/ui/ToastProvider";
 import { FolderShelf } from "@/components/saved/FolderShelf";
 import { SavedGrid } from "@/components/saved/SavedGrid";
@@ -354,10 +357,16 @@ export function SavedScreen({
           )}
         </div>
       ) : nothing ? (
-        <EmptyState
-          icon={Bookmark}
-          title="Nothing saved yet"
-          text="Tap the bookmark on any post or Shot to keep it here. Hold it to put it in a folder."
+        <EmptyScene
+          art={<LockerArt />}
+          title="Locker's empty"
+          text="Tap the bookmark on any post or Shot to stash it. Hold it to put it in a folder."
+          timing={{ head: 1.1, sub: 1.45, cta: 1.8 }}
+          cta={
+            <Link href="/discover" className={ctaClass}>
+              Find something to save
+            </Link>
+          }
         />
       ) : (
         <>

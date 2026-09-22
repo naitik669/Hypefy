@@ -1,8 +1,8 @@
 import { cache } from "react";
-import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { ReelsFeed } from "@/components/shots/ReelsFeed";
+import { GoneScreen } from "@/components/empty/GoneScreen";
 import { getAdContext } from "@/lib/ads-server";
 
 const SELECT =
@@ -62,7 +62,8 @@ export default async function ShotPage({
   } = await supabase.auth.getUser();
 
   const target = await getShot(shotId);
-  if (!target) notFound();
+  // Deleted or taken down: say so, rather than the app-wide 404.
+  if (!target) return <GoneScreen kind="shot" />;
 
   const [{ data: rest }, adContext] = await Promise.all([
     supabase
