@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { GridPeek } from "@/components/feed/GridPeek";
+import { CaughtUp } from "@/components/feed/CaughtUp";
 import { Play } from "lucide-react";
 import { ShotPreview } from "@/components/shots/ShotPreview";
 import { clampRatio, distribute, pinHeight } from "@/lib/masonry";
@@ -256,9 +257,7 @@ export function PinFeed({
           ) : (
             !more &&
             tiles.length > 0 && (
-              <p className="pt-6 text-center text-xs text-faint">
-                You&apos;ve seen everything for now
-              </p>
+              <CaughtUp count={all.length} where="discover" />
             )
           )}
         </>

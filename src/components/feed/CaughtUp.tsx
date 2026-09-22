@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowUp, Compass, PlusCircle } from "lucide-react";
+import { ArrowUp, Compass, PlusCircle, RotateCw } from "lucide-react";
 import { haptics } from "@/lib/haptics";
 import { ctaClass } from "@/components/empty/EmptyScene";
 import { CompassTickArt } from "@/components/empty/scenes";
@@ -17,11 +17,27 @@ const delay = (seconds: number) => ({ ["--d" as string]: `${seconds}s` }) as Rea
  * words and buttons arrive in turn; tapping the badge replays the compass,
  * and Back to top does what it says.
  */
-export function CaughtUp({ count = 0 }: { count?: number }) {
+export function CaughtUp({
+  count = 0,
+  where = "home",
+}: {
+  count?: number;
+  /** On Discover the way on is fresh finds, so Refresh replaces Discover more. */
+  where?: "home" | "discover";
+}) {
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
   const [seen, setSeen] = useState(false);
   const [replay, setReplay] = useState(0);
+  const onDiscover = where === "discover";
+
+  function refresh() {
+    haptics.tap();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Re-runs the server query, so this lands on a genuinely current feed,
+    // not just the top of the stale one.
+    router.refresh();
+  }
 
   useEffect(() => {
     const el = ref.current;
@@ -67,7 +83,9 @@ export function CaughtUp({ count = 0 }: { count?: number }) {
               is deliberately allowed to run out, so the end has to read as an
               achievement with somewhere to go, not as the app running dry. */}
           <p className={`${s.sub} text-[13px] text-muted`} style={delay(1.85)}>
-            {count > 0
+            {onDiscover
+              ? "You've seen everything for now. Refresh for fresh finds."
+              : count > 0
               ? `That's all ${count} ${count === 1 ? "post" : "posts"}. Nothing left unread.`
               : "New posts land here as your circle gets loud."}
           </p>
@@ -77,9 +95,15 @@ export function CaughtUp({ count = 0 }: { count?: number }) {
               everyone else. */}
           <div className="mt-1.5 flex items-center gap-2">
             <div className={`${s.cta} rounded-[14px]`} style={delay(2.15)}>
-              <Link href="/discover" onClick={() => haptics.tap()} className={ctaClass}>
-                <Compass size={15} /> Discover more
-              </Link>
+              {onDiscover ? (
+                <button type="button" onClick={refresh} className={ctaClass}>
+                  <RotateCw size={15} /> Refresh
+                </button>
+              ) : (
+                <Link href="/discover" onClick={() => haptics.tap()} className={ctaClass}>
+                  <Compass size={15} /> Discover more
+                </Link>
+              )}
             </div>
             <div className={s.pop} style={delay(2.3)}>
               <Link
@@ -95,12 +119,11 @@ export function CaughtUp({ count = 0 }: { count?: number }) {
           <button
             type="button"
             onClick={() => {
-              haptics.tap();
-              window.scrollTo({ top: 0, behavior: "smooth" });
-              // Re-runs the server query; FeedList's initialPosts-sync effect
-              // picks up the fresh page, so this lands on a genuinely current
-              // feed, not just the top of the stale one.
-              router.refresh();
+              if (onDiscover) {
+                // Refresh already reloads; this one just goes back up.
+                haptics.tap();
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              } else refresh();
             }}
             className={`${s.sub} mt-1 flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-faint transition-colors hover:text-foreground`}
             style={delay(2.5)}

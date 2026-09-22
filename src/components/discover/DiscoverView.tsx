@@ -120,7 +120,10 @@ export function DiscoverView({
       <div key={cat} className="animate-fade-swap pb-6">
         {cat === "For You" && (
           <div className="pt-2">
+            {/* Keyed on the page it starts from, so Refresh at the end of the
+                feed starts it over on whatever is new rather than staying "done". */}
             <PinFeed
+              key={`${feedCursor ?? ""}:${rankedPosts[0]?.id ?? ""}`}
               posts={rankedPosts}
               shots={feedShots}
               currentUserId={currentUserId}
