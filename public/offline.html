@@ -25,41 +25,36 @@
         padding: 24px;
         gap: 14px;
       }
-      .mark {
-        width: 64px; height: 64px;
-        display: flex; align-items: center; justify-content: center;
-        border-radius: 20px;
-        background: #141414;
-        border: 1px solid #2a2a2a;
-        animation: float 3.2s ease-in-out infinite;
+      .mark { width: 96px; height: 96px; }
+      .mark rect.h { fill: #fff; }
+      .mark rect.dot { fill: #a3e635; }
+      h1 {
+        font-size: 26px; font-weight: 800; letter-spacing: -0.01em;
+        text-transform: uppercase; margin-top: 14px; line-height: 1.2;
       }
-      @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
-      .wordmark { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-top: 4px; }
-      .dot { color: #a3e635; }
-      h1 { font-size: 20px; font-weight: 800; margin-top: 8px; }
-      p { font-size: 14px; color: #8a8a8a; max-width: 300px; line-height: 1.5; }
+      .dot-ink { color: #a3e635; }
+      p { font-size: 14px; color: #8a8a8a; max-width: 280px; line-height: 1.5; margin-top: 2px; }
       button {
-        margin-top: 10px;
+        margin-top: 12px;
         appearance: none; border: none; cursor: pointer;
         background: #a3e635; color: #0a0a0a;
-        font-weight: 700; font-size: 15px;
-        padding: 13px 26px; border-radius: 100px;
+        font-weight: 800; font-size: 15px;
+        padding: 13px 28px; border-radius: 16px;
         transition: transform 0.15s ease;
       }
       button:active { transform: scale(0.96); }
-      @media (prefers-reduced-motion: reduce) { .mark { animation: none; } }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <div class="mark" aria-hidden="true">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" fill="#a3e635" />
-        </svg>
-      </div>
-      <div class="wordmark">Hypefy<span class="dot">.</span></div>
-      <h1>You're offline</h1>
-      <p>Looks like you've lost connection. Check your network and we'll get you back to the hype.</p>
+      <svg class="mark" aria-hidden="true" viewBox="0 0 40 40">
+        <rect class="h" x="4" y="5.8" width="7" height="28.4" />
+        <rect class="h" x="21.8" y="5.8" width="6.8" height="28.4" />
+        <rect class="h" x="4" y="16.8" width="24.6" height="5.8" />
+        <rect class="dot" x="31.4" y="29.6" width="4.6" height="4.6" />
+      </svg>
+      <h1>Oops!!! seems like you are offline<span class="dot-ink">.</span></h1>
+      <p>Wifi's out. Everything else is fine.</p>
       <button onclick="location.reload()">Try again</button>
     </div>
   </body>

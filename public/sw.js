@@ -6,7 +6,9 @@
  * thing cached is a fully self-contained static `offline.html`, served purely
  * as a fallback when a navigation fails because the device is offline.
  */
-const OFFLINE_CACHE = "hypefy-offline-v1";
+// Bump whenever offline.html changes: a new name is what makes installed
+// workers update and re-cache it (the activate step drops the old one).
+const OFFLINE_CACHE = "hypefy-offline-v2";
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {
