@@ -16,6 +16,7 @@
         -webkit-font-smoothing: antialiased;
       }
       .wrap {
+        position: relative;
         min-height: 100%;
         display: flex;
         flex-direction: column;
@@ -24,13 +25,35 @@
         text-align: center;
         padding: 24px;
         gap: 14px;
+        overflow: hidden;
       }
-      .mark { width: 96px; height: 96px; }
-      .mark rect.h { fill: #fff; }
-      .mark rect.dot { fill: #a3e635; }
+
+      /* The lost UFO: grey only, so the headline and button still lead. It sits
+         in the flow above the mark rather than at a fixed spot, so it never
+         runs into the copy on a short screen. */
+      .ufo { width: min(72vw, 280px); height: auto; margin-bottom: -6px; overflow: visible; }
+      .drift { animation: drift 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+      @keyframes drift {
+        0%, 100% { transform: translate(0, 0) rotate(-8deg); }
+        50% { transform: translate(6px, -8px) rotate(-3deg); }
+      }
+      .blink { animation: blink 2.4s ease-in-out infinite; }
+      .blink:nth-of-type(2) { animation-delay: 0.4s; }
+      .blink:nth-of-type(3) { animation-delay: 0.8s; }
+      .blink:nth-of-type(4) { animation-delay: 1.2s; }
+      @keyframes blink { 0%, 100% { fill: #333; } 50% { fill: #4a4a4a; } }
+
+      /* A few faint stars scattered around the edges. */
+      .star { position: absolute; width: 9px; height: 9px; pointer-events: none; }
+      .star::before, .star::after { content: ""; position: absolute; background: #333; border-radius: 1px; }
+      .star::before { left: 3.7px; top: 0; width: 1.6px; height: 9px; }
+      .star::after { top: 3.7px; left: 0; width: 9px; height: 1.6px; }
+      .dust { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #333; pointer-events: none; }
+
+      .mark { width: 72px; height: 72px; }
       h1 {
         font-size: 26px; font-weight: 800; letter-spacing: -0.01em;
-        text-transform: uppercase; margin-top: 14px; line-height: 1.2;
+        text-transform: uppercase; margin-top: 10px; line-height: 1.2;
       }
       .dot-ink { color: #a3e635; }
       p { font-size: 14px; color: #8a8a8a; max-width: 280px; line-height: 1.5; margin-top: 2px; }
@@ -43,15 +66,45 @@
         transition: transform 0.15s ease;
       }
       button:active { transform: scale(0.96); }
+      @media (prefers-reduced-motion: reduce) { .drift, .blink { animation: none; } }
     </style>
   </head>
   <body>
     <div class="wrap">
+      <span class="star" style="top: 11%; left: 12%"></span>
+      <span class="star" style="top: 20%; right: 14%"></span>
+      <span class="star" style="bottom: 18%; left: 16%"></span>
+      <span class="star" style="bottom: 11%; right: 12%"></span>
+      <span class="dust" style="top: 8%; right: 30%"></span>
+      <span class="dust" style="top: 48%; left: 7%"></span>
+      <span class="dust" style="top: 55%; right: 8%"></span>
+
+      <svg class="ufo" viewBox="0 0 240 150" aria-hidden="true">
+        <g class="drift">
+          <!-- dome -->
+          <path d="M79 72 A41 38 0 0 1 161 72 Z" fill="#1c1c1c" stroke="#333" stroke-width="2.4" />
+          <path d="M98 48 Q108 38 122 37" stroke="#333" stroke-width="3.5" stroke-linecap="round" fill="none" />
+          <!-- antenna -->
+          <path d="M120 33 V18" stroke="#333" stroke-width="3" stroke-linecap="round" />
+          <circle cx="120" cy="15" r="4.8" fill="#333" />
+          <!-- saucer -->
+          <ellipse cx="120" cy="84" rx="101" ry="24" fill="#262626" />
+          <ellipse cx="120" cy="77" rx="101" ry="12" fill="#333" />
+          <!-- lights -->
+          <circle class="blink" cx="58" cy="91" r="5.4" fill="#333" />
+          <circle class="blink" cx="96" cy="97" r="5.4" fill="#333" />
+          <circle class="blink" cx="144" cy="97" r="5.4" fill="#333" />
+          <circle class="blink" cx="182" cy="91" r="5.4" fill="#333" />
+        </g>
+        <!-- lost -->
+        <text x="206" y="34" font-family="system-ui, sans-serif" font-weight="800" font-size="38" fill="#333">?</text>
+      </svg>
+
       <svg class="mark" aria-hidden="true" viewBox="0 0 40 40">
-        <rect class="h" x="4" y="5.8" width="7" height="28.4" />
-        <rect class="h" x="21.8" y="5.8" width="6.8" height="28.4" />
-        <rect class="h" x="4" y="16.8" width="24.6" height="5.8" />
-        <rect class="dot" x="31.4" y="29.6" width="4.6" height="4.6" />
+        <rect fill="#fff" x="4" y="5.8" width="7" height="28.4" />
+        <rect fill="#fff" x="21.8" y="5.8" width="6.8" height="28.4" />
+        <rect fill="#fff" x="4" y="16.8" width="24.6" height="5.8" />
+        <rect fill="#a3e635" x="31.4" y="29.6" width="4.6" height="4.6" />
       </svg>
       <h1>Oops!!! seems like you are offline<span class="dot-ink">.</span></h1>
       <p>The wifi ghosted you, not us.</p>

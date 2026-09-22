@@ -8,7 +8,7 @@
  */
 // Bump whenever offline.html changes: a new name is what makes installed
 // workers update and re-cache it (the activate step drops the old one).
-const OFFLINE_CACHE = "hypefy-offline-v3";
+const OFFLINE_CACHE = "hypefy-offline-v4";
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {
