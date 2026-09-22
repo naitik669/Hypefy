@@ -41,10 +41,18 @@ const PAUSES: { key: PauseChoice; label: string }[] = [
   { key: "week", label: "A week" },
 ];
 
+const LEVEL_ORDER: Level[] = ["all", "highlights", "off"];
+const LEVEL_LABEL: Record<Level, string> = { all: "All", highlights: "Highlights", off: "Off" };
+
 /**
  * Tune your Activity: what shows on the Activity screen and what pings the
  * phone. Every change is one key, saved as it is made, and put back if the
  * save fails.
+ *
+ * Shapes follow the rest of the app: rounded at roughly a third of the
+ * shorter side (see ProfileStatusBubble's note on this), not the full pills
+ * this sheet used to reach for. A pill is its own family of shape and read
+ * as foreign next to every squircle elsewhere in Hypefy.
  */
 export function TuneSheet({
   open,
@@ -143,8 +151,8 @@ export function TuneSheet({
               type="button"
               aria-pressed={on}
               onClick={() => choosePause(p.key)}
-              className={`rounded-full border px-3 py-1.5 text-[13px] font-bold transition-colors ${
-                on ? "border-accent bg-accent/10 text-accent" : "border-border text-foreground"
+              className={`rounded-[10px] px-3 py-1.5 text-[13px] font-bold transition-colors ${
+                on ? "bg-accent text-accent-ink" : "bg-surface text-foreground"
               }`}
             >
               {p.label}
@@ -153,49 +161,32 @@ export function TuneSheet({
         })}
       </div>
       {paused && (
-        <p className="mt-2 flex items-center gap-2 text-xs text-muted" data-paused>
-          No pings until {formatPause(paused)}.
+        <div className="mt-2 flex items-center justify-between gap-2 rounded-[10px] bg-accent/10 px-3 py-2 text-xs text-accent" data-paused>
+          <span>No pings until {formatPause(paused)}.</span>
           <button
             type="button"
             onClick={() => {
               setPause(null);
               void save({ paused_until: null });
             }}
-            className="font-bold text-accent"
+            className="shrink-0 font-bold"
           >
             Resume
           </button>
-        </p>
+        </div>
       )}
 
       <Section>Show me</Section>
       <div className="flex flex-col">
-        {LEVELS.map((row) => {
-          const level = levelOf(prefs, row.key[0]);
-          return (
-            <div key={row.label} className="flex items-center gap-3 py-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">{row.label}</p>
-                {row.sub && <p className="text-[11px] text-muted">{row.sub}</p>}
-              </div>
-              <div className="flex rounded-full bg-background p-0.5" role="group" aria-label={row.label}>
-                {(["all", "highlights", "off"] as Level[]).map((l) => (
-                  <button
-                    key={l}
-                    type="button"
-                    aria-pressed={level === l}
-                    onClick={() => level !== l && setLevel(row.key, l)}
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold capitalize transition-colors ${
-                      level === l ? "bg-foreground text-background" : "text-muted"
-                    }`}
-                  >
-                    {l === "all" ? "All" : l === "off" ? "Off" : "Highlights"}
-                  </button>
-                ))}
-              </div>
+        {LEVELS.map((row) => (
+          <div key={row.label} className="flex items-center gap-3 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">{row.label}</p>
+              {row.sub && <p className="text-[11px] text-muted">{row.sub}</p>}
             </div>
-          );
-        })}
+            <LevelControl label={row.label} level={levelOf(prefs, row.key[0])} onChange={(l) => setLevel(row.key, l)} />
+          </div>
+        ))}
       </div>
 
       <Section>
@@ -234,7 +225,7 @@ export function TuneSheet({
               <button
                 type="button"
                 onClick={() => unmute(m.id)}
-                className="rounded-full bg-surface px-3 py-1.5 text-xs font-bold text-foreground"
+                className="rounded-[10px] bg-surface px-3 py-1.5 text-xs font-bold text-foreground"
               >
                 Unmute
               </button>
@@ -247,7 +238,38 @@ export function TuneSheet({
 }
 
 function Section({ children }: { children: React.ReactNode }) {
-  return <p className="pb-1.5 pt-5 text-[11px] font-bold uppercase tracking-[0.08em] text-faint">{children}</p>;
+  return <p className="pb-1.5 pt-4 text-[11px] font-bold uppercase tracking-[0.08em] text-faint">{children}</p>;
+}
+
+/**
+ * All / Highlights / Off as one squircle track with a sliding fill, instead
+ * of three separate pill buttons — the same three choices, read as one
+ * control rather than a row of individual buttons.
+ */
+function LevelControl({ label, level, onChange }: { label: string; level: Level; onChange: (next: Level) => void }) {
+  const index = LEVEL_ORDER.indexOf(level);
+  return (
+    <div className="relative flex w-[156px] shrink-0 rounded-[10px] bg-surface p-[3px]" role="group" aria-label={label}>
+      <span
+        aria-hidden
+        className="absolute inset-y-[3px] rounded-[7px] bg-foreground transition-transform duration-200 ease-out"
+        style={{ width: "calc((100% - 6px) / 3)", transform: `translateX(${index * 100}%)` }}
+      />
+      {LEVEL_ORDER.map((l) => (
+        <button
+          key={l}
+          type="button"
+          aria-pressed={level === l}
+          onClick={() => level !== l && onChange(l)}
+          className={`relative z-10 flex-1 py-1.5 text-center text-[10px] font-bold whitespace-nowrap transition-colors ${
+            level === l ? "text-background" : "text-muted"
+          }`}
+        >
+          {LEVEL_LABEL[l]}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function Switch({ label, sub, checked, onChange }: { label: string; sub: string; checked: boolean; onChange: (next: boolean) => void }) {
@@ -263,9 +285,9 @@ function Switch({ label, sub, checked, onChange }: { label: string; sub: string;
         <span className="block text-sm font-semibold">{label}</span>
         <span className="block text-[11px] text-muted">{sub}</span>
       </span>
-      <span className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors ${checked ? "bg-accent" : "bg-border"}`}>
+      <span className={`relative h-[22px] w-[38px] shrink-0 rounded-[7px] transition-colors ${checked ? "bg-accent" : "bg-border"}`}>
         <span
-          className={`absolute top-[3px] h-4 w-4 rounded-full transition-transform ${
+          className={`absolute top-[3px] h-4 w-4 rounded-[5px] transition-transform ${
             checked ? "translate-x-[19px] bg-accent-ink" : "translate-x-[3px] bg-white"
           }`}
         />
