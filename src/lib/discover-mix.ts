@@ -12,6 +12,39 @@
  * clumps two videos together and never goes too long without one.
  */
 
+/** Deterministic PRNG, so one seed gives one order. */
+function rng(seed: number) {
+  let t = seed + 0x6d2b79f5;
+  return () => {
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Turns the feed over without throwing the ranking away.
+ *
+ * Discover's order is a pure function of the pool, so asking the server again
+ * returns the same posts in the same order — which is why Refresh appeared to
+ * do nothing at all. This shuffles within bands of `band` posts: the best
+ * still come first, but not in the order you just scrolled past. Seed 0 is
+ * the ranking untouched, so a first load is never shuffled.
+ */
+export function reshuffle<T>(list: T[], seed: number, band = 12): T[] {
+  if (!seed) return list;
+  const next = [...list];
+  const rand = rng(seed);
+  for (let start = 0; start < next.length; start += band) {
+    const end = Math.min(start + band, next.length);
+    for (let i = end - 1; i > start; i--) {
+      const j = start + Math.floor(rand() * (i - start + 1));
+      [next[i], next[j]] = [next[j], next[i]];
+    }
+  }
+  return next;
+}
+
 export type Mixed<P, S> = { kind: "post"; item: P } | { kind: "shot"; item: S };
 
 const MIN_GAP = 3;

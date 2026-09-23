@@ -36,6 +36,7 @@ import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { formatCount } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
+import { feedRatio } from "@/lib/aspect";
 import { useToast } from "@/components/ui/ToastProvider";
 import { TrackChip } from "@/components/music/TrackChip";
 import { MusicMuteButton } from "@/components/music/MusicMuteButton";
@@ -711,15 +712,16 @@ export function FeedCard({
             style={{ transform: `translateX(-${imgIdx * 100}%)` }}
           >
             {images.map((src, i) => (
-              // Frame the post in the shape it was composed at. This was
-              // hardcoded to aspect-square, so a 3:4 or 16:9 post — already
-              // cropped to that shape on upload — got cropped a second time
-              // back to a square here, and the picker in the composer had no
-              // visible effect at all.
+              // Frame the post in the shape it was composed at, within the
+              // shapes the feed draws (see feedRatio). This was hardcoded to
+              // aspect-square, so a 3:4 or 16:9 post got cropped a second time
+              // back to a square and the composer's picker did nothing; then it
+              // honoured the stored ratio exactly, and a 0.4 screenshot took
+              // two and a half screens on its own.
               <div
                 key={i}
                 className="relative w-full shrink-0 select-none"
-                style={{ aspectRatio: String(post.aspect_ratio ?? 1) }}
+                style={{ aspectRatio: String(feedRatio(post.aspect_ratio)) }}
               >
                 <OptimizedImage
                   src={src}

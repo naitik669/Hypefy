@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Zap, MessageCircle, Play, Compass, Hash } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -10,6 +11,7 @@ import { ShotPreview } from "@/components/shots/ShotPreview";
 import { UserSuggestionCard } from "@/components/discover/UserSuggestionCard";
 import { PinFeed, type Pin } from "@/components/discover/PinFeed";
 import { formatCount } from "@/lib/format";
+import { reshuffle } from "@/lib/discover-mix";
 
 type Shot = {
   id: string;
@@ -78,7 +80,19 @@ export function DiscoverView({
   categoryRails?: { label: string; posts: Pin[] }[];
   tags: Tag[];
 }) {
+  const router = useRouter();
   const [cat, setCat] = useState<string>("For You");
+  /** Bumped by Refresh at the end of the feed. Also the shuffle seed: asking
+   *  the server again returns the same ranking, so without this the feed came
+   *  back in exactly the order you had just scrolled through. */
+  const [refreshCount, setRefreshCount] = useState(0);
+  const feed = useMemo(() => reshuffle(rankedPosts, refreshCount), [rankedPosts, refreshCount]);
+
+  function refreshFeed() {
+    setRefreshCount((n) => n + 1);
+    // Still asks the server, so anything posted since actually arrives.
+    router.refresh();
+  }
 
   const everythingEmpty =
     rankedPosts.length === 0 && trendingShots.length === 0 && people.length === 0;
@@ -120,14 +134,15 @@ export function DiscoverView({
       <div key={cat} className="animate-fade-swap pb-6">
         {cat === "For You" && (
           <div className="pt-2">
-            {/* Keyed on the page it starts from, so Refresh at the end of the
-                feed starts it over on whatever is new rather than staying "done". */}
+            {/* Keyed on the page it starts from and on the refresh, so Refresh
+                starts the feed over rather than staying "done" at the bottom. */}
             <PinFeed
-              key={`${feedCursor ?? ""}:${rankedPosts[0]?.id ?? ""}`}
-              posts={rankedPosts}
+              key={`${feedCursor ?? ""}:${rankedPosts[0]?.id ?? ""}:${refreshCount}`}
+              posts={feed}
               shots={feedShots}
               currentUserId={currentUserId}
               endless={{ cursor: feedCursor, blockedIds }}
+              onRefresh={refreshFeed}
             />
           </div>
         )}

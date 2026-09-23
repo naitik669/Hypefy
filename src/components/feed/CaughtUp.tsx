@@ -20,10 +20,14 @@ const delay = (seconds: number) => ({ ["--d" as string]: `${seconds}s` }) as Rea
 export function CaughtUp({
   count = 0,
   where = "home",
+  onRefresh,
 }: {
   count?: number;
   /** On Discover the way on is fresh finds, so Refresh replaces Discover more. */
   where?: "home" | "discover";
+  /** Discover hands its own refresh down: asking the server again returns the
+   *  same ranking, so the feed has to turn itself over as well. */
+  onRefresh?: () => void;
 }) {
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
@@ -34,6 +38,10 @@ export function CaughtUp({
   function refresh() {
     haptics.tap();
     window.scrollTo({ top: 0, behavior: "smooth" });
+    if (onRefresh) {
+      onRefresh();
+      return;
+    }
     // Re-runs the server query, so this lands on a genuinely current feed,
     // not just the top of the stale one.
     router.refresh();

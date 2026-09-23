@@ -80,11 +80,14 @@ export function PinFeed({
   shots = NO_SHOTS,
   currentUserId,
   endless,
+  onRefresh,
 }: {
   posts: Pin[];
   /** Scattered through the posts, in a fixed pseudo-random pattern. */
   shots?: ShotPin[];
   currentUserId: string;
+  /** Passed through to the end-of-feed card's Refresh. */
+  onRefresh?: () => void;
   /** Keep going past `posts`, fetching older ones, until there are none. */
   endless?: { cursor: string | null; blockedIds: string[] };
 }) {
@@ -257,7 +260,7 @@ export function PinFeed({
           ) : (
             !more &&
             tiles.length > 0 && (
-              <CaughtUp count={all.length} where="discover" />
+              <CaughtUp count={all.length} where="discover" onRefresh={onRefresh} />
             )
           )}
         </>
