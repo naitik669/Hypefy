@@ -49,6 +49,7 @@ const entry = (over: Partial<DiaryEntry>): DiaryEntry => ({
   avatarUrl: null,
   track: null,
   color: null,
+  imageUrl: null,
   ...over,
 });
 

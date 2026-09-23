@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { PagePhoto } from "@/components/diary/PagePhoto";
 import { createPortal } from "react-dom";
 import { Star, X } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
@@ -192,9 +193,12 @@ export function DiaryStories({
           setHeld(false);
         }}
       >
+        {entry.imageUrl && (
+          <PagePhoto url={entry.imageUrl} className="mb-4 w-[min(78vw,420px)] rounded-3xl" />
+        )}
         <p
           className="relative break-words font-extrabold leading-[1.04] tracking-[-0.025em]"
-          style={{ fontSize: screenSize(entry.text) }}
+          style={{ fontSize: entry.imageUrl ? Math.min(screenSize(entry.text), 30) : screenSize(entry.text) }}
         >
           {entry.text}
         </p>

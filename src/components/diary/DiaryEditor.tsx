@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Dices, Loader2, MoreHorizontal, Palette, Star } from "lucide-react";
+import { Camera, Dices, Loader2, MoreHorizontal, Palette, Star, X } from "lucide-react";
 import { EmojiPicker } from "@/components/ui/EmojiPicker";
 import { ColorPager } from "@/components/ui/ColorPager";
 import { quickRow, recentEmoji, rememberEmoji } from "@/lib/emoji";
@@ -9,6 +9,8 @@ import { createClient } from "@/lib/supabase/client";
 import { CenterModal } from "@/components/ui/CenterModal";
 import { Avatar } from "@/components/ui/Avatar";
 import { TrackPicker } from "@/components/music/TrackPicker";
+import { PagePhotoPicker } from "@/components/diary/PagePhotoPicker";
+import { PagePhoto } from "@/components/diary/PagePhoto";
 import { DICE_POOL, EMOJI_STRIP, joinStatus } from "@/components/ui/StatusComposer";
 import { haptics } from "@/lib/haptics";
 import { scheduleUndoable } from "@/lib/undoable";
@@ -41,6 +43,8 @@ export type DiaryDraft = {
   audience: "mutual" | "close";
   track: Track | null;
   color: string | null;
+  /** A square photo above the words, once uploaded. */
+  imageUrl: string | null;
 } | null;
 
 /**
@@ -81,6 +85,45 @@ export function DiaryComposer({
   const toast = useToast();
   const [text, setText] = useState(current?.text ?? "");
   const [audience, setAudience] = useState<Audience>(current?.audience ?? "mutual");
+  const [photoOpen, setPhotoOpen] = useState(false);
+  /** The picture, shown from the file while it uploads so the card fills in
+   *  at once; the url is what the page is saved with. */
+  const [photo, setPhoto] = useState<{ preview: string; url: string | null } | null>(
+    current?.imageUrl ? { preview: current.imageUrl, url: current.imageUrl } : null
+  );
+  const [uploading, setUploading] = useState(false);
+
+  async function addPhoto(blob: Blob) {
+    const preview = URL.createObjectURL(blob);
+    setPhoto({ preview, url: null });
+    setUploading(true);
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth.user?.id;
+    if (!uid) {
+      setUploading(false);
+      return;
+    }
+    // The folder is the writer's id, which is what the bucket's delete policy
+    // is written against (migration 0093).
+    const path = `${uid}/${Date.now()}.jpg`;
+    const { error } = await supabase.storage
+      .from("page-media")
+      .upload(path, blob, { contentType: "image/jpeg", upsert: false });
+    setUploading(false);
+    if (error) {
+      toast("Couldn't add that photo. Try again.", "error");
+      URL.revokeObjectURL(preview);
+      setPhoto(null);
+      return;
+    }
+    const { data } = supabase.storage.from("page-media").getPublicUrl(path);
+    setPhoto({ preview, url: data.publicUrl });
+  }
+
+  function dropPhoto() {
+    if (photo?.preview && photo.preview !== photo.url) URL.revokeObjectURL(photo.preview);
+    setPhoto(null);
+  }
   const [track, setTrack] = useState<Track | null>(current?.track ?? null);
   const [color, setColor] = useState<DiaryColor>(colorKey(current?.color));
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -138,7 +181,8 @@ export function DiaryComposer({
 
   async function post() {
     const value = text.trim().slice(0, MAX);
-    if (!value || busy) return;
+    // A picture on its own is a page; words on their own always were.
+    if ((!value && !photo) || busy || uploading) return;
     setBusy(true);
     setFailed(false);
     const { error } = await supabase.rpc("set_note", {
@@ -146,6 +190,7 @@ export function DiaryComposer({
       p_audience: audience,
       ...(track ? { p_track: track } : {}),
       p_color: color,
+      ...(photo?.url ? { p_image_url: photo.url } : {}),
     });
     setBusy(false);
     if (error) {
@@ -153,7 +198,7 @@ export function DiaryComposer({
       return;
     }
     haptics.tap();
-    onSaved({ text: value, audience, track, color });
+    onSaved({ text: value, audience, track, color, imageUrl: photo?.url ?? null });
   }
 
   function remove() {
@@ -228,14 +273,48 @@ export function DiaryComposer({
                 onClick={(e) => {
                   e.stopPropagation();
                   setEngaged(true);
+                  setPhotoOpen(true);
+                }}
+                aria-label="Add a photo"
+                className={`${engaged ? "ml-auto" : ""} flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] text-white/75 transition-colors hover:bg-white/[0.12] hover:text-white`}
+              >
+                <Camera size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEngaged(true);
                   roll();
                 }}
                 aria-label="Write something random"
-                className={`${engaged ? "ml-auto" : ""} flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] text-white/75 transition-colors hover:bg-white/[0.12] hover:text-white`}
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] text-white/75 transition-colors hover:bg-white/[0.12] hover:text-white`}
               >
                 <Dices size={15} />
               </button>
             </div>
+
+            {photo && (
+              <div className="relative mt-3">
+                <PagePhoto url={photo.preview} />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    dropPhoto();
+                  }}
+                  aria-label="Remove photo"
+                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm"
+                >
+                  <X size={14} />
+                </button>
+                {uploading && (
+                  <span className="absolute inset-x-2 bottom-2 rounded-lg bg-black/55 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
+                    Adding…
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* The words, at the size the card will show them. */}
             <textarea
@@ -374,6 +453,7 @@ export function DiaryComposer({
       </div>
 
       <TrackPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={setTrack} />
+      <PagePhotoPicker open={photoOpen} onClose={() => setPhotoOpen(false)} onPicked={(b) => void addPhoto(b)} />
       <EmojiPicker
         open={!!emojiFrom}
         anchor={emojiFrom}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { PagePhoto } from "@/components/diary/PagePhoto";
 import Link from "next/link";
 import { Maximize2, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
@@ -103,12 +104,18 @@ export function FriendDiaryCard({
           </button>
         </header>
 
+        {entry.imageUrl && (
+          <button type="button" onClick={onOpen} aria-label="Open this page" className="mt-2 block w-full">
+            <PagePhoto url={entry.imageUrl} />
+          </button>
+        )}
+
         {/* The words, in the middle of what is left. */}
         <div className="flex min-h-0 flex-1 flex-col justify-center py-2" onClick={onOpen}>
           <p
             className="cursor-pointer break-words font-extrabold leading-[1.06] tracking-[-0.02em] text-white"
             // As big as the card can take: "HDB" fills it, a sentence fits.
-            style={{ fontSize: fillSize(entry.text, big ? 250 : 280) }}
+            style={{ fontSize: fillSize(entry.text, entry.imageUrl ? (big ? 140 : 150) : big ? 250 : 280) }}
           >
             {entry.text}
           </p>

@@ -31,6 +31,8 @@ export type DiaryEntry = {
   track: Track | null;
   /** The page colour they picked (a DIARY_COLORS key), or null for the default. */
   color: string | null;
+  /** A square picture above the words, or null for a page of words alone. */
+  imageUrl: string | null;
 };
 
 /** Shape get_notes() returns. Kept loose: the RPC's typing is generated. */
@@ -46,6 +48,7 @@ type NoteRow = {
   avatar_url: string | null;
   track: unknown;
   color?: string | null;
+  image_url?: string | null;
 };
 
 function asTrack(v: unknown): Track | null {
@@ -72,6 +75,7 @@ export function toDiaryEntries(rows: NoteRow[] | null | undefined): DiaryEntry[]
     avatarUrl: r.avatar_url,
     track: asTrack(r.track),
     color: r.color ?? null,
+    imageUrl: r.image_url ?? null,
   }));
 }
 

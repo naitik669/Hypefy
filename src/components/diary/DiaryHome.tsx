@@ -139,6 +139,7 @@ export function DiaryHome({
           avatarUrl: me.avatarUrl,
           track: draft.track,
           color: draft.color,
+          imageUrl: draft.imageUrl,
         },
         ...rest,
       ];
@@ -276,7 +277,11 @@ export function DiaryHome({
       <DiaryEditor
         open={editing}
         onClose={() => setEditing(false)}
-        current={mine ? { text: mine.text, audience: mine.audience, track: mine.track, color: mine.color } : null}
+        current={
+          mine
+            ? { text: mine.text, audience: mine.audience, track: mine.track, color: mine.color, imageUrl: mine.imageUrl }
+            : null
+        }
         onSaved={onSaved}
         onRestore={onRestore}
         me={me}

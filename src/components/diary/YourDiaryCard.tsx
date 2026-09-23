@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PagePhoto } from "@/components/diary/PagePhoto";
 import Link from "next/link";
 import { Palette, PenLine, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
@@ -84,12 +85,16 @@ export function YourDiaryCard({
           </div>
         )}
 
-        <p
-          className="mt-3 break-words font-extrabold leading-[1.08] tracking-[-0.02em] text-white"
-          style={{ fontSize: fillSize(entry.text, 280) }}
-        >
-          {entry.text}
-        </p>
+        {entry.imageUrl && <PagePhoto url={entry.imageUrl} className="mt-3" />}
+
+        {entry.text && (
+          <p
+            className="mt-3 break-words font-extrabold leading-[1.08] tracking-[-0.02em] text-white"
+            style={{ fontSize: fillSize(entry.text, entry.imageUrl ? 150 : 280) }}
+          >
+            {entry.text}
+          </p>
+        )}
 
         {entry.track && (
           <div className="mt-2">
