@@ -113,7 +113,9 @@ export function FloatingPages({
   const entering = useRef(false);
   const entered = useRef(false);
   const enterTimer = useRef<number | undefined>(undefined);
-  const width = top ? 104 : 64;
+  // The empty card is the deck it is inviting you to start, so it is drawn
+  // at the size of one rather than as a small square tile.
+  const width = top ? 104 : 92;
   // Where it starts: just past the right edge, unseen, for its entrance. The
   // effect below takes over from here; these never change, so React does not
   // fight the transform and opacity set there.
@@ -307,7 +309,7 @@ export function FloatingPages({
       style={{
         right: "calc(max(0px, (100vw - 480px) / 2) + 14px)",
         width,
-        height: top ? 132 : 84,
+        height: top ? 132 : 122,
         transform: resting.transform,
         opacity: resting.opacity,
         // Up and down still scroll the inbox from the card; sideways is the deck's.
@@ -402,11 +404,33 @@ export function FloatingPages({
           <span className="mt-auto line-clamp-3 break-words text-[11px] font-extrabold leading-tight">{mine.text}</span>
         </span>
       ) : (
-        <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-[14px] border-[1.5px] border-dashed border-white/25 bg-background/80 text-[10px] font-bold text-muted backdrop-blur-md">
-          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-elevated text-foreground">
-            <Plus size={15} strokeWidth={2.6} />
+        /* Nobody's page is up, including yours. Drawn as the deck it is about
+           to become: two blank pages behind a front one, which fan apart as
+           it arrives, then the + and the tag land. It was a 64×84 square with
+           a grey + and the word "Page" — the same size as a real card but
+           without the tilt or the stack, so it read as a disabled tile rather
+           than an invitation. */
+        /* The lean and the slow breath live on this wrapper: the card itself
+             carries the slide-in transform, and the two would fight. */
+        <span className="animate-page-lean absolute inset-0">
+          <span
+            aria-hidden
+            className="animate-page-fan-b absolute inset-0 rounded-[16px] bg-[#131313] shadow-[inset_0_1px_0_#ffffff12]"
+          />
+          <span
+            aria-hidden
+            className="animate-page-fan-a absolute inset-0 rounded-[16px] bg-[#171717] shadow-[inset_0_1px_0_#ffffff14]"
+          />
+          <span className="absolute inset-0 overflow-hidden rounded-[16px] bg-background/85 backdrop-blur-md">
+            <span className="absolute inset-[7px] rounded-[11px] border-[1.5px] border-dashed border-white/[0.18]" />
+            <span className="animate-page-pop absolute left-1/2 top-1/2 -ml-[17px] -mt-[17px] flex h-[34px] w-[34px] items-center justify-center rounded-xl bg-accent text-accent-ink">
+              <Plus size={17} strokeWidth={2.8} />
+            </span>
+            <span aria-hidden className="absolute bottom-0 left-0 h-[2px] w-full bg-accent/80" />
           </span>
-          Page
+          <span className="animate-page-tag absolute right-1 top-2 whitespace-nowrap rounded-lg bg-accent px-1.5 py-[3px] text-[9px] font-extrabold text-accent-ink">
+            Add your page
+          </span>
         </span>
       )}
     </Link>

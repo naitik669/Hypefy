@@ -611,6 +611,11 @@ html[data-dm-leave]::view-transition-old(root) {
   .animate-fade-swap,
   .animate-img-in,
   .animate-caughtup-pop,
+  .animate-page-lean,
+  .animate-page-fan-a,
+  .animate-page-fan-b,
+  .animate-page-pop,
+  .animate-page-tag,
   .animate-rise {
     animation: none;
     opacity: 1;
@@ -620,6 +625,52 @@ html[data-dm-leave]::view-transition-old(root) {
     animation: none;
     stroke-dashoffset: 0;
   }
+}
+
+/* The empty Spotlight card: the two pages behind it fan apart as it lands,
+   the + drops in, and the tag clips onto the corner. */
+@keyframes page-lean {
+  0% { transform: rotate(-6deg); }
+  50% { transform: rotate(-4.6deg) translateY(-2px); }
+  100% { transform: rotate(-6deg); }
+}
+@keyframes page-fan-a {
+  from { transform: translate(0, 0) rotate(0deg); }
+  to { transform: translate(6px, 4px) rotate(5deg); }
+}
+@keyframes page-fan-b {
+  from { transform: translate(0, 0) rotate(0deg); }
+  to { transform: translate(-7px, 7px) rotate(-8deg); }
+}
+@keyframes page-pop {
+  0% { opacity: 0; transform: scale(0.3) rotate(-25deg); }
+  65% { opacity: 1; transform: scale(1.15) rotate(6deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes page-tag {
+  0% { opacity: 0; transform: rotate(-12deg) scale(0.7); }
+  70% { opacity: 1; transform: rotate(6deg) scale(1.06); }
+  100% { opacity: 1; transform: rotate(3deg) scale(1); }
+}
+
+.animate-page-lean {
+  transform: rotate(-6deg);
+  animation: page-lean 4.2s ease-in-out 1.4s infinite;
+}
+.animate-page-fan-a {
+  animation: page-fan-a 0.52s cubic-bezier(0.34, 1.3, 0.64, 1) 0.5s both;
+}
+.animate-page-fan-b {
+  animation: page-fan-b 0.56s cubic-bezier(0.34, 1.3, 0.64, 1) 0.56s both;
+}
+.animate-page-pop {
+  opacity: 0;
+  animation: page-pop 0.52s cubic-bezier(0.34, 1.5, 0.64, 1) 0.66s forwards;
+}
+.animate-page-tag {
+  opacity: 0;
+  transform-origin: 0 50%;
+  animation: page-tag 0.54s cubic-bezier(0.34, 1.5, 0.64, 1) 0.88s forwards;
 }
 
 @keyframes rise {
