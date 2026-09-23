@@ -17,7 +17,7 @@ import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { DisplayName } from "@/components/ui/DisplayName";
-import { ZoomViewer } from "@/components/ui/ZoomViewer";
+import { AvatarPreview } from "@/components/ui/AvatarPreview";
 import { bannerGradient } from "@/lib/profile";
 import {
   CARD_LAYOUTS,
@@ -217,7 +217,12 @@ export function ProfileCard({
       </div>
 
       {photoOpen && data.avatarUrl && (
-        <ZoomViewer src={data.avatarUrl} onClose={() => setPhotoOpen(false)} />
+        <AvatarPreview
+          src={data.avatarUrl}
+          name={data.name}
+          handle={data.username}
+          onClose={() => setPhotoOpen(false)}
+        />
       )}
     </div>,
     document.body
