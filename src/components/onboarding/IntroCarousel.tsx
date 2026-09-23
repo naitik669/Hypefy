@@ -2,9 +2,9 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowRight, Star, MessageCircle, Play, Compass, Bell } from "lucide-react";
 import { Plane } from "@/components/ui/Plane";
+import { IntroFinale } from "@/components/onboarding/IntroFinale";
 import { Avatar } from "@/components/ui/Avatar";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 
@@ -42,8 +42,10 @@ function revealStyle(active: boolean, order: number): React.CSSProperties {
 }
 
 export function IntroCarousel() {
-  const router = useRouter();
   const [index, setIndex] = useState(0);
+  // The last slide hands over to the finale, which is where sign-up is asked
+  // for; the carousel itself never sends anyone to the form.
+  const [finale, setFinale] = useState(false);
   const startX = useRef<number | null>(null);
   const wheelLock = useRef(false);
   const isLast = index === SLIDES.length - 1;
@@ -53,7 +55,7 @@ export function IntroCarousel() {
   }
 
   function advance() {
-    if (isLast) router.push("/signup");
+    if (isLast) setFinale(true);
     else goTo(index + 1);
   }
 
@@ -79,6 +81,8 @@ export function IntroCarousel() {
       wheelLock.current = false;
     }, 650);
   }
+
+  if (finale) return <IntroFinale />;
 
   return (
     <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] select-none flex-col overflow-hidden bg-background">

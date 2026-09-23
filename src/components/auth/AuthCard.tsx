@@ -65,6 +65,12 @@ export function AuthCard({ mode }: { mode: Mode }) {
       setNotice("That email is already registered. Sign in to continue.");
     }
     if (params.get("add") === "1") setAddMode(true);
+    // Arrived from the intro's "Continue with Google": the age and consent
+    // answers are still required before Google can create the account, so
+    // say why this form is in the way.
+    if (mode === "signup" && params.get("via") === "google") {
+      setNotice("Add your date of birth and accept the terms, then continue with Google.");
+    }
   }, [mode]);
 
   // Age from the entered date of birth (null if unset/invalid).
