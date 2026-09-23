@@ -10,57 +10,36 @@
  *    the failure people remember, and on a wide screen more than one card can
  *    clear the play threshold at once.
  *
- * Kept in sessionStorage rather than localStorage on purpose: a preference
- * about sound belongs to this sitting. Coming back tomorrow to a phone that
- * starts talking is exactly the surprise this is trying to avoid.
+ * The mute itself is not kept here: it is the app's one sound preference, in
+ * lib/sound, shared with song previews. Muting a Shot in the feed silences
+ * the song on the next post, which is what muting a feed means. What does
+ * live here is the rest: who is allowed to be audible.
  */
 
-const KEY = "hypefy.shots.muted";
+import { isMuted as soundMuted, setMuted as setSoundMuted, subscribeSound } from "@/lib/sound";
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
-/**
- * Default UNMUTED. Whether sound actually happens is a separate question the
- * browser answers — see `attemptWithSound` in ShotFeedCard. A card that is
- * refused falls back to muted and says so, rather than silently not playing.
- */
-let muted = false;
-let hydrated = false;
-
-function hydrate() {
-  if (hydrated || typeof window === "undefined") return;
-  hydrated = true;
-  try {
-    const raw = sessionStorage.getItem(KEY);
-    if (raw !== null) muted = raw === "1";
-  } catch {
-    /* private mode — the in-memory default stands */
-  }
-}
-
+/** Default UNMUTED. Whether sound actually happens is a separate question the
+ *  browser answers — see `attemptWithSound` in ShotFeedCard. A card that is
+ *  refused falls back to muted and says so, rather than silently not playing. */
 export function isMuted(): boolean {
-  hydrate();
-  return muted;
+  return soundMuted();
 }
 
 export function setMuted(next: boolean) {
-  hydrate();
-  if (muted === next) return;
-  muted = next;
-  try {
-    sessionStorage.setItem(KEY, next ? "1" : "0");
-  } catch {
-    /* nothing to do; the choice still holds for this page */
-  }
-  listeners.forEach((fn) => fn());
+  setSoundMuted(next);
 }
 
-/** Fires on both the mute preference and a change of audio owner. */
+/** Fires on the mute preference, a change of audio owner, or the song
+ *  previews' own speaker being tapped — they are the same switch now. */
 export function subscribe(fn: Listener): () => void {
   listeners.add(fn);
+  const stopSound = subscribeSound(fn);
   return () => {
     listeners.delete(fn);
+    stopSound();
   };
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
+import { isMuted, toggleMuted, subscribeSound } from "@/lib/sound";
 import { spotifyPlay, spotifyPause } from "@/lib/spotify-player";
 
 /** A song attached to a note/post/show/profile — shaped by /api/music. */
@@ -106,11 +107,13 @@ function startPlay(a: HTMLAudioElement) {
 }
 const listeners = new Set<() => void>();
 
-const MUTE_KEY = "hypefy_music_muted";
-let musicMuted = false;
-try {
-  musicMuted = typeof window !== "undefined" && localStorage.getItem(MUTE_KEY) === "1";
-} catch { /* storage unavailable */ }
+// Mute is shared with Shots — see lib/sound. Muting a video in the feed has
+// to silence the song on the next post, and the chip's speaker has to work
+// the other way round.
+subscribeSound(() => {
+  if (audio) audio.muted = isMuted();
+  emit();
+});
 
 function emit() {
   listeners.forEach((l) => l());
@@ -120,7 +123,7 @@ function ensureAudio(): HTMLAudioElement {
   if (!audio) {
     audio = new Audio();
     audio.preload = "none";
-    audio.muted = musicMuted;
+    audio.muted = isMuted();
     const clear = () => {
       // A looping track that just ran out goes round again instead. "pause"
       // fires before "ended" at the end of a track; whichever comes first
@@ -176,7 +179,7 @@ function setLoop(track: Track, opts?: PlayOpts) {
 }
 
 function applyMute(a: HTMLAudioElement, opts?: PlayOpts) {
-  a.muted = opts?.audible ? false : musicMuted;
+  a.muted = opts?.audible ? false : isMuted();
 }
 
 export function playPreview(track: Track, opts?: PlayOpts) {
@@ -281,18 +284,15 @@ export function pausePreview() {
   if (playingId) { playingId = null; emit(); }
 }
 
-/** Global music mute — one tap silences every preview surface, persisted. */
+/** One tap silences every song preview AND every Shot in the feed. */
 export function toggleMusicMuted() {
-  musicMuted = !musicMuted;
-  if (audio) audio.muted = musicMuted;
-  try { localStorage.setItem(MUTE_KEY, musicMuted ? "1" : "0"); } catch {}
-  emit();
+  toggleMuted();
 }
 
 export function useMusicMuted(): boolean {
   return useSyncExternalStore(
     subscribe,
-    () => musicMuted,
+    () => isMuted(),
     () => false,
   );
 }

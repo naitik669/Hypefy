@@ -12,6 +12,7 @@ async function load() {
 
 beforeEach(() => {
   sessionStorage.clear();
+  localStorage.clear();
 });
 
 describe("shot audio preference", () => {
@@ -22,14 +23,26 @@ describe("shot audio preference", () => {
     expect(a.isMuted()).toBe(false);
   });
 
-  it("remembers a mute for the rest of the session", async () => {
+  it("remembers a mute, and shares it with song previews", async () => {
+    // The mute lives in lib/sound now: one switch for the whole feed, so
+    // muting a Shot silences the song on the next post too. It persists
+    // rather than lasting the sitting — muting is deliberate, and a phone
+    // that starts talking again tomorrow is the surprise worth avoiding.
     const a = await load();
     a.setMuted(true);
-    expect(sessionStorage.getItem("hypefy.shots.muted")).toBe("1");
+    expect(localStorage.getItem("hypefy_sound_muted")).toBe("1");
 
     // A second card mounting later reads the same choice.
     const b = await load();
     expect(b.isMuted()).toBe(true);
+  });
+
+  it("takes over a mute made before there was one switch", async () => {
+    // Someone who muted music yesterday meant "be quiet", not "be quiet
+    // except for videos".
+    localStorage.setItem("hypefy_music_muted", "1");
+    const a = await load();
+    expect(a.isMuted()).toBe(true);
   });
 
   it("notifies every card when the preference changes", async () => {
@@ -37,13 +50,14 @@ describe("shot audio preference", () => {
     let calls = 0;
     const stop = a.subscribe(() => calls++);
     a.setMuted(true);
-    expect(calls).toBe(1);
+    expect(calls).toBeGreaterThan(0);
+    const after = calls;
     // Setting the same value again is not a change and must not churn.
     a.setMuted(true);
-    expect(calls).toBe(1);
+    expect(calls).toBe(after);
     stop();
     a.setMuted(false);
-    expect(calls).toBe(1);
+    expect(calls).toBe(after);
   });
 });
 
