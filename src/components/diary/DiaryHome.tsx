@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Archive } from "lucide-react";
+import { Archive, ChevronDown } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DiaryComposer, DiaryEditor, type DiaryDraft } from "@/components/diary/DiaryEditor";
 import { DiscSleeve } from "@/components/diary/DiaryDisc";
@@ -235,6 +235,19 @@ export function DiaryHome({
               onOpen={(i) => setStoryAt(i)}
             />
           )}
+          {/* Under the spotlight, a line about what happens next. The screen
+              was the card and then nothing: no reason to scroll when there
+              were pages below, and no explanation when there were not. */}
+          <p className="mt-4 flex flex-col items-center gap-1 text-center text-[11px] font-semibold text-faint">
+            {alone ? (
+              "Nobody else has written today — theirs land here"
+            ) : (
+              <>
+                <ChevronDown size={14} className="animate-page-nudge" />
+                Every page, below
+              </>
+            )}
+          </p>
         </section>
 
         {/* ── Every page, one to a row ── */}

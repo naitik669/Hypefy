@@ -611,6 +611,7 @@ html[data-dm-leave]::view-transition-old(root) {
   .animate-fade-swap,
   .animate-img-in,
   .animate-caughtup-pop,
+  .animate-page-nudge,
   .animate-page-lean,
   .animate-page-fan-a,
   .animate-page-fan-b,
@@ -629,6 +630,13 @@ html[data-dm-leave]::view-transition-old(root) {
 
 /* The empty Spotlight card: the two pages behind it fan apart as it lands,
    the + drops in, and the tag clips onto the corner. */
+/* The little chevron under Spotlight, saying there is more below. */
+@keyframes page-nudge {
+  0%, 100% { transform: translateY(0); opacity: 0.7; }
+  50% { transform: translateY(3px); opacity: 1; }
+}
+.animate-page-nudge { animation: page-nudge 1.8s ease-in-out infinite; }
+
 @keyframes page-lean {
   0% { transform: rotate(-6deg); }
   50% { transform: rotate(-4.6deg) translateY(-2px); }
