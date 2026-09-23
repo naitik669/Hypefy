@@ -1037,6 +1037,7 @@ export type Database = {
           color: string | null
           created_at: string
           expires_at: string
+          image_url: string | null
           text: string
           track: Json | null
           user_id: string
@@ -1046,6 +1047,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           expires_at?: string
+          image_url?: string | null
           text: string
           track?: Json | null
           user_id: string
@@ -1055,6 +1057,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           expires_at?: string
+          image_url?: string | null
           text?: string
           track?: Json | null
           user_id?: string
@@ -2457,6 +2460,7 @@ export type Database = {
           color: string | null
           ended_how: string
           id: string | null
+          image_url: string | null
           text: string
           track: Json | null
           written_at: string
@@ -2490,6 +2494,7 @@ export type Database = {
           avatar_url: string
           created_at: string
           display_name: string
+          image_url: string | null
           is_self: boolean
           text: string
           track: Json
@@ -2667,7 +2672,13 @@ export type Database = {
         Returns: undefined
       }
       set_note: {
-        Args: { p_audience?: string; p_color?: string; p_text: string; p_track?: Json }
+        Args: {
+          p_audience?: string
+          p_color?: string
+          p_image_url?: string
+          p_text: string
+          p_track?: Json
+        }
         Returns: {
           audience: string
           color: string | null

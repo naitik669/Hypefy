@@ -1,8 +1,7 @@
 -- Photos on a page.
 --
--- A page was words, a colour and a song. It can now carry one picture, shown
--- above the words on the card (see DiaryPage). Square by default, like every
--- other picture the app crops for itself.
+-- A page was words, a colour and a song. It can now carry one square picture,
+-- shown above the words on the card (see PagePhoto).
 --
 -- The picture lives in its own bucket rather than post-images: pages expire
 -- after 24 hours and their pictures should be as throwaway as they are, so
@@ -42,11 +41,16 @@ create policy "page-media: own delete" on storage.objects
   );
 
 -- ── writing a page ────────────────────────────────────────────────────────
--- A page with a picture may have no words: the picture is the page then.
-create or replace function public.set_note(
+-- p_image_url is added after p_color, which is the shape already deployed
+-- (0073 gave set_note its colour). Postgres will not rename an existing
+-- parameter, so the old four-argument version is dropped first — every caller
+-- passes its arguments by name, so nothing has to change but this.
+drop function if exists public.set_note(text, text, jsonb, text);
+create function public.set_note(
   p_text text,
   p_audience text default 'mutual'::text,
   p_track jsonb default null,
+  p_color text default null,
   p_image_url text default null
 )
 returns notes
@@ -58,6 +62,7 @@ declare v_note public.notes;
 begin
   if (select auth.uid()) is null then raise exception 'Not authenticated'; end if;
   if coalesce(p_audience,'mutual') not in ('mutual','close') then raise exception 'Invalid audience'; end if;
+  -- A picture on its own is a page; words on their own always were.
   if char_length(trim(coalesce(p_text,''))) = 0 and coalesce(p_image_url,'') = '' then
     raise exception 'Note is empty';
   end if;
@@ -67,19 +72,21 @@ begin
     or p_track->>'title' is null
     or p_track->>'preview' is null
   ) then raise exception 'Invalid track'; end if;
+  if p_color is not null and p_color !~ '^[a-z]{2,16}$' then raise exception 'Invalid color'; end if;
   -- Only a picture this project stores, so a page cannot carry a link to
   -- somewhere else dressed up as its own photo.
   if p_image_url is not null and p_image_url !~ '^https://[a-z0-9-]+\.supabase\.co/storage/v1/object/public/page-media/' then
     raise exception 'Invalid image';
   end if;
 
-  insert into public.notes (user_id, text, audience, track, image_url, created_at, expires_at)
+  insert into public.notes (user_id, text, audience, track, color, image_url, created_at, expires_at)
   values ((select auth.uid()), left(trim(coalesce(p_text,'')), 60), coalesce(p_audience,'mutual'),
-          p_track, p_image_url, now(), now() + interval '24 hours')
+          p_track, p_color, p_image_url, now(), now() + interval '24 hours')
   on conflict (user_id) do update
     set text = excluded.text,
         audience = excluded.audience,
         track = excluded.track,
+        color = coalesce(excluded.color, public.notes.color),
         image_url = excluded.image_url,
         created_at = now(),
         expires_at = now() + interval '24 hours'
@@ -87,8 +94,8 @@ begin
   return v_note;
 end; $function$;
 
-revoke all on function public.set_note(text, text, jsonb, text) from public, anon;
-grant execute on function public.set_note(text, text, jsonb, text) to authenticated, service_role;
+revoke all on function public.set_note(text, text, jsonb, text, text) from public, anon;
+grant execute on function public.set_note(text, text, jsonb, text, text) to authenticated, service_role;
 
 -- ── reading pages ─────────────────────────────────────────────────────────
 drop function if exists public.get_notes();
