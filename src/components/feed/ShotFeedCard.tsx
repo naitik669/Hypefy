@@ -13,6 +13,8 @@ import {
   Flag,
   Ban,
   ChevronRight,
+  Link2,
+  Share2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -240,6 +242,15 @@ export function ShotFeedCard({
     showToast("Blocked", "success");
     // Their Shots should not still be in the feed after blocking them.
     router.refresh();
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/shots/${shot.id}`);
+      showToast("Link copied");
+    } catch {
+      showToast("Couldn't copy that link", "error");
+    }
   }
 
   async function toggleSave() {
@@ -695,26 +706,72 @@ export function ShotFeedCard({
         </ExpandableText>
       )}
 
-      {/* What the ⋯ offers. Report and Block are the Shots viewer's own two
-          viewer actions; the owner's set — delete, showcase — lives there, so
-          this hands them straight to it rather than keeping a second copy of
-          a destructive flow in the feed. */}
+      {/* What the ⋯ offers. Everything a post's menu offers that makes sense
+          for a Shot — share, copy link, save — plus Report and Block for
+          someone else's. The owner's destructive set (delete, showcase) still
+          lives in the Shots viewer rather than being duplicated here. */}
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Shot">
         <div className="flex flex-col pb-2">
-          {isOwn ? (
-            <Link
-              href={`/shots/${shot.id}`}
-              onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
-            >
-              <Play size={20} className="text-foreground" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold">Open in Shots</span>
-                <span className="block text-xs text-muted">Delete, showcase and more</span>
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              setShareOpen(true);
+            }}
+            className="flex items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
+          >
+            <Share2 size={20} className="text-foreground" />
+            <span>
+              <span className="block text-sm font-semibold">Share</span>
+              <span className="block text-xs text-muted">Send it to someone, or anywhere else</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              void copyLink();
+            }}
+            className="flex items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
+          >
+            <Link2 size={20} className="text-foreground" />
+            <span>
+              <span className="block text-sm font-semibold">Copy link</span>
+              <span className="block text-xs text-muted">A link straight to this Shot</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={!currentUserId}
+            onClick={() => {
+              setMenuOpen(false);
+              void toggleSave();
+            }}
+            className="flex items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5 disabled:opacity-50"
+          >
+            <Bookmark size={20} className={saved ? "text-accent" : "text-foreground"} fill={saved ? "currentColor" : "none"} />
+            <span>
+              <span className="block text-sm font-semibold">{saved ? "Saved" : "Save"}</span>
+              <span className="block text-xs text-muted">
+                {saved ? "Remove it from your saved Shots" : "Keep it in your saved Shots"}
               </span>
-              <ChevronRight size={18} className="text-faint" />
-            </Link>
-          ) : (
+            </span>
+          </button>
+          <Link
+            href={`/shots/${shot.id}`}
+            onClick={() => setMenuOpen(false)}
+            className="flex items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
+          >
+            <Play size={20} className="text-foreground" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">Open in Shots</span>
+              <span className="block text-xs text-muted">
+                {isOwn ? "Delete, showcase and more" : "Watch it full screen"}
+              </span>
+            </span>
+            <ChevronRight size={18} className="text-faint" />
+          </Link>
+          {!isOwn && (
             <>
               <button
                 type="button"

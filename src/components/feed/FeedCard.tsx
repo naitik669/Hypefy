@@ -161,6 +161,8 @@ export function FeedCard({
 
   const [imgIdx, setImgIdx] = useState(0);
   // JS-controlled swipe: one image per gesture, no native scroll momentum
+  /** The card itself, so an attached song plays with the post. */
+  const cardRef = useRef<HTMLElement>(null);
   const galleryTouchStartX = useRef(0);
   const galleryTouchStartY = useRef(0);
   /** When the finger landed, and whether it has since moved like a scroll. */
@@ -617,7 +619,7 @@ export function FeedCard({
   if (deleted) return null;
 
   return (
-    <article className="relative border-b border-border/50 pb-3">
+    <article ref={cardRef} className="relative border-b border-border/50 pb-3">
       {/* Telemetry only — records that this card was actually on screen.
           Nothing reads it yet; it exists so there is history to rank with
           later. Skips the author's own posts. */}
@@ -905,7 +907,9 @@ export function FeedCard({
           The speaker toggle mutes music globally (persisted). */}
       {postTrack && (
         <div className="flex items-center gap-1.5 px-4 pt-2">
-          <TrackChip track={postTrack} autoPlayInView />
+          {/* Watches the card, not itself: the song is the post's, so it
+              starts when the post is what you are looking at. */}
+          <TrackChip track={postTrack} autoPlayInView watch={cardRef} />
           <MusicMuteButton />
         </div>
       )}

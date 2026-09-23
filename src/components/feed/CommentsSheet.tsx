@@ -25,6 +25,7 @@ import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
 import { ReportSheet } from "@/components/ui/ReportSheet";
+import Link from "next/link";
 import { Avatar } from "@/components/ui/Avatar";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
@@ -1062,13 +1063,12 @@ const Row = memo(function Row({
         focused ? "-mx-2 rounded-xl bg-accent/[0.09] px-2 py-2 ring-1 ring-accent/30" : ""
       }`}
     >
-      <button
-        type="button"
-        aria-label={`View ${name}'s photo`}
-        onClick={() => {
-          const src = node.profiles?.avatar_url;
-          if (src) onZoom(src);
-        }}
+      {/* Their face takes you to them. It used to open the photo full
+          screen, which is a picture of a person where you expected the
+          person — the same fix the feed card's header already had. */}
+      <Link
+        href={node.profiles?.username ? `/u/${node.profiles.username}` : "#"}
+        aria-label={`${name}'s profile`}
         className="shrink-0 transition-transform active:scale-95"
       >
         <AvatarFrame id={node.profiles ? visibleDecoration(node.profiles) : null} size={size}>
@@ -1079,7 +1079,7 @@ const Row = memo(function Row({
             src={node.profiles?.avatar_url ?? undefined}
           />
         </AvatarFrame>
-      </button>
+      </Link>
 
       <div className="min-w-0 flex-1">
         <div
