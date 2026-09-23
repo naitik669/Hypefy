@@ -36,9 +36,3 @@ export function saveSeen(seen: Set<string>) {
   }
 }
 
-/** How many seen posts count as "has actually used the feed". */
-export const USED_THE_FEED = 25;
-
-export function hasUsedTheFeed(): boolean {
-  return loadSeen().size >= USED_THE_FEED;
-}

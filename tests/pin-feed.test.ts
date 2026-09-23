@@ -72,6 +72,10 @@ vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: unknown }) =>
     createElement("a", { href, ...rest }, children as never),
 }));
+// The end of the feed renders CaughtUp, which asks for the router.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: () => {}, push: () => {} }),
+}));
 // The hold-to-peek wrapper is its own tested component; here it only has to
 // render its children.
 vi.mock("@/components/feed/GridPeek", () => ({

@@ -42,6 +42,12 @@ export function CaughtUp({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // Without an observer there is no way to know when this scrolls into
+    // view, so show it rather than leaving the end of the feed blank.
+    if (typeof IntersectionObserver === "undefined") {
+      setSeen(true);
+      return;
+    }
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -56,11 +62,14 @@ export function CaughtUp({
   }, []);
 
   return (
-    // Reserves its height before it's seen, so the scene mounting (which is
-    // what starts its animations) doesn't shift the page.
-    <div ref={ref} className="flex min-h-[300px] flex-col items-center gap-2 px-6 py-12 text-center">
-      {seen && (
-        <>
+    <div ref={ref}>
+      {/* Always in the page, so it takes its space and can be read; hidden
+          until it scrolls into view, and re-mounted at that moment so the
+          scene plays from its start rather than part-way through. */}
+      <div
+        key={seen ? "in" : "out"}
+        className={`flex flex-col items-center gap-2 px-6 py-12 text-center ${seen ? "" : "invisible"}`}
+      >
           <button
             type="button"
             aria-label="You're all caught up. Tap to replay"
@@ -130,8 +139,7 @@ export function CaughtUp({
           >
             <ArrowUp size={13} /> Back to top
           </button>
-        </>
-      )}
+      </div>
     </div>
   );
 }

@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/TopBar";
 import { ShowsRow } from "@/components/home/ShowsRow";
 import { FeedList } from "@/components/feed/FeedList";
-import { InterestNudge } from "@/components/feed/InterestNudge";
 import { FeatureHint } from "@/components/ui/FeatureHint";
 import { Clock } from "lucide-react";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
@@ -484,10 +483,6 @@ export default async function HomePage() {
           text="Tap a ring to watch. Yours vanishes after a day — your posts stay put."
         />
 
-        {/* Self-gating client component: it costs the server nothing and
-            renders only for an account that has actually used the feed and
-            still has no interests. */}
-        <InterestNudge />
         <UploadProgressBar />
 
         {/* Always the feed — FeedList renders the warm-up prompt at the END
