@@ -103,12 +103,16 @@ export function DiaryComposer({
       setUploading(false);
       return;
     }
+    // A photo from the camera is a JPEG; one from the library is whatever it
+    // already was, and the bucket takes JPEG, PNG or WebP (migration 0093).
+    const type = /^image\/(jpeg|png|webp)$/.test(blob.type) ? blob.type : "image/jpeg";
+    const ext = type.slice(6).replace("jpeg", "jpg");
     // The folder is the writer's id, which is what the bucket's delete policy
-    // is written against (migration 0093).
-    const path = `${uid}/${Date.now()}.jpg`;
+    // is written against.
+    const path = `${uid}/${Date.now()}.${ext}`;
     const { error } = await supabase.storage
       .from("page-media")
-      .upload(path, blob, { contentType: "image/jpeg", upsert: false });
+      .upload(path, blob, { contentType: type, upsert: false });
     setUploading(false);
     if (error) {
       toast("Couldn't add that photo. Try again.", "error");
