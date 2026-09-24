@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { MessagesHeader } from "@/components/messages/MessagesHeader";
 import { MessagesInbox, type InboxRow } from "@/components/messages/MessagesInbox";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
-import { toDiaryEntries } from "@/lib/diary";
+import { pageText, toDiaryEntries } from "@/lib/diary";
 
 /** When this inbox was drawn, so the page can tell a fresh one from one kept in memory. */
 const renderStamp = () => Date.now();
@@ -100,7 +100,7 @@ export default async function MessagesPage() {
       .filter(Boolean) as string[];
     if (peerIds.length > 0) {
       const { data: peerNotes } = await supabase.rpc("get_notes_for", { p_user_ids: peerIds });
-      (peerNotes ?? []).forEach((n: any) => noteByUser.set(n.user_id, n.text));
+      (peerNotes ?? []).forEach((n: any) => noteByUser.set(n.user_id, pageText(n.text)));
     }
 
     // One row per conversation from get_inbox_summary — already the newest

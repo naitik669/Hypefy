@@ -18,6 +18,15 @@ import type { Track } from "@/lib/music";
 
 export const DIARY_HOURS = 24;
 
+/**
+ * A page as a line of text, for places that can only show words — the
+ * status bubble on a profile, the line under a chat in the inbox. A page can
+ * be just a photo, and an empty bubble reads as broken.
+ */
+export function pageText(text: string | null | undefined): string {
+  return text?.trim() ? text : "📷 Photo";
+}
+
 export type DiaryEntry = {
   userId: string;
   text: string;

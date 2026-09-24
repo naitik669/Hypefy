@@ -14,6 +14,7 @@ import { MessageButton } from "@/components/profile/MessageButton";
 import { HyperFavoriteButton } from "@/components/profile/HyperFavoriteButton";
 import { SignOutButton } from "@/components/SignOutButton";
 import { hueFromId } from "@/lib/profile";
+import { pageText } from "@/lib/diary";
 import { Lock } from "lucide-react";
 
 async function fetchStats(supabase: any, userId: string) {
@@ -118,11 +119,11 @@ export default async function PublicProfilePage({
         .eq("user_id", profile.id)
         .gt("expires_at", new Date().toISOString())
         .maybeSingle();
-      if (myNote) note = { text: (myNote as any).text, audience: (myNote as any).audience, track: (myNote as any).track, createdAt: (myNote as any).created_at };
+      if (myNote) note = { text: pageText((myNote as any).text), audience: (myNote as any).audience, track: (myNote as any).track, createdAt: (myNote as any).created_at };
     } else if (currentUser) {
       const { data: notes } = await supabase.rpc("get_notes_for", { p_user_ids: [profile.id] });
       const row = (notes ?? [])[0] as any;
-      if (row) note = { text: row.text, audience: row.audience, track: row.track, createdAt: row.created_at };
+      if (row) note = { text: pageText(row.text), audience: row.audience, track: row.track, createdAt: row.created_at };
     }
   }
 

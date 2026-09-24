@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { diaryTheme, fillSize } from "@/components/diary/DiaryPage";
-import { cycleDeck, loadSeen, storyOrder, unseen, type DiaryEntry } from "@/lib/diary";
+import { cycleDeck, loadSeen, pageText, storyOrder, unseen, type DiaryEntry } from "@/lib/diary";
 
 /** How much of the card shows at the right edge while it is peeking. */
 export const PEEK_PX = 30;
@@ -261,7 +261,7 @@ export function FloatingPages({
   const newCount = others.filter((e) => fresh.has(e.userId)).length;
   const href = top ? `/messages/spotlight?page=${encodeURIComponent(top.userId)}` : "/messages/spotlight";
   const label = top
-    ? `${top.name.split(" ")[0]}'s page: ${top.text}. Open Spotlight${newCount ? `, ${newCount} new` : ""}${order.length > 1 ? ". Swipe for the next page" : ""}`
+    ? `${top.name.split(" ")[0]}'s page: ${pageText(top.text)}. Open Spotlight${newCount ? `, ${newCount} new` : ""}${order.length > 1 ? ". Swipe for the next page" : ""}`
     : mine
       ? "Your page. Open Spotlight"
       : "Write your page in Spotlight";
@@ -365,13 +365,15 @@ export function FloatingPages({
                     boxShadow: theme.shadow,
                   }}
                 >
-                  <span className="flex min-w-0 items-center gap-1">
+                  {/* A photo page shows its photo, as in the spotlight. */}
+                  {e.imageUrl && <PhotoFill url={e.imageUrl} />}
+                  <span className="relative flex min-w-0 items-center gap-1">
                     <Avatar name={e.name} hue={e.hue} size={18} src={e.avatarUrl ?? undefined} className="rounded-md" />
                     <span className="truncate text-[10px] font-bold">{e.name.split(" ")[0]}</span>
                     {isNew && <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-accent" />}
                   </span>
                   <span
-                    className="mt-auto break-words font-extrabold leading-[1.04] tracking-[-0.02em]"
+                    className="relative mt-auto break-words font-extrabold leading-[1.04] tracking-[-0.02em]"
                     style={{
                       // Sized for the ~72px inside the card's padding.
                       fontSize: Math.min(32, fillSize(e.text, 70)),
@@ -400,8 +402,9 @@ export function FloatingPages({
           className="absolute inset-0 flex flex-col overflow-hidden rounded-[14px] p-1.5 text-white"
           style={{ background: diaryTheme(mine.color, mine.hue).background, transform: "rotate(-3deg)" }}
         >
-          <span className="text-[9px] font-bold text-white/70">You</span>
-          <span className="mt-auto line-clamp-3 break-words text-[11px] font-extrabold leading-tight">{mine.text}</span>
+          {mine.imageUrl && <PhotoFill url={mine.imageUrl} />}
+          <span className="relative text-[9px] font-bold text-white/70">You</span>
+          <span className="relative mt-auto line-clamp-3 break-words text-[11px] font-extrabold leading-tight">{mine.text}</span>
         </span>
       ) : (
         /* Nobody's page is up, including yours. Drawn as the deck it is about
@@ -434,5 +437,19 @@ export function FloatingPages({
         </span>
       )}
     </Link>
+  );
+}
+
+/** A page's photo filling its little card, shaded so the name and words read. */
+function PhotoFill({ url }: { url: string }) {
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" />
+      <span
+        aria-hidden
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,.45),transparent_40%,transparent_55%,rgba(0,0,0,.6))]"
+      />
+    </>
   );
 }

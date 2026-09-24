@@ -3,6 +3,7 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Settings, BarChart3, Bookmark } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, hueFromId } from "@/lib/profile";
+import { pageText } from "@/lib/diary";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
 import { ShowcaseRail } from "@/components/showcase/ShowcaseRail";
@@ -52,7 +53,7 @@ export default async function ProfilePage() {
 
   const entryShowId = activeShowsRes.data?.[0]?.id ?? null;
   const myNote = myNoteRes.data
-    ? { text: (myNoteRes.data as any).text, audience: (myNoteRes.data as any).audience, track: (myNoteRes.data as any).track, createdAt: (myNoteRes.data as any).created_at }
+    ? { text: pageText((myNoteRes.data as any).text), audience: (myNoteRes.data as any).audience, track: (myNoteRes.data as any).track, createdAt: (myNoteRes.data as any).created_at }
     : null;
 
   const name = profile?.displayName || "Hypefy User";
