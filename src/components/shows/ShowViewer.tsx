@@ -18,7 +18,7 @@ import {
   Flag,
   Ban,
 } from "lucide-react";
-import { Plane } from "@/components/ui/Plane";
+import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ShowViewersSheet } from "@/components/shows/ShowViewersSheet";
@@ -839,12 +839,12 @@ function ShowScreen({
                 e.stopPropagation();
                 sendReply();
               }}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-ink transition-transform active:scale-90 disabled:opacity-40"
+              className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-accent text-accent-ink transition-transform active:scale-90 disabled:opacity-40"
             >
               {sendingReply ? (
                 <Loader2 size={18} className="animate-spin" />
               ) : (
-                <Plane size={18} weight="fill" />
+                <SendIcon size={18} weight="fill" />
               )}
             </button>
           </div>

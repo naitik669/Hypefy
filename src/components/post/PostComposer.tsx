@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Image as ImageIcon, X, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
-import { Plane } from "@/components/ui/Plane";
+import { SendIcon } from "@/components/ui/ShareIcon";
 import Link from "next/link";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
 import { TopicSuggestions } from "@/components/post/TopicSuggestions";
@@ -249,7 +249,7 @@ export function PostComposer({
       disabled={!canPost || submitted}
       className={`flex h-12 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-40 ${className}`}
     >
-      {willSchedule ? <CalendarClock size={17} /> : <Plane size={17} weight="fill" />}
+      {willSchedule ? <CalendarClock size={17} /> : <SendIcon size={17} weight="fill" />}
       {submitted
         ? willSchedule
           ? "Scheduling…"

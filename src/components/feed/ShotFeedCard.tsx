@@ -26,7 +26,7 @@ import { DisplayName } from "@/components/ui/DisplayName";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { ExpandableText } from "@/components/ui/ExpandableText";
 import { RichPostText } from "@/components/ui/RichPostText";
-import { Plane } from "@/components/ui/Plane";
+import { ShareIcon } from "@/components/ui/ShareIcon";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
 import { ShareButton } from "@/components/feed/QuickShare";
@@ -669,7 +669,7 @@ export function ShotFeedCard({
             onOpenSheet={() => setShareOpen(true)}
             className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 active:scale-90"
           >
-            <Plane size={21} weight="bold" />
+            <ShareIcon size={21} weight="bold" />
             {(shot.share_count ?? 0) > 0 && formatCount(shot.share_count ?? 0)}
           </ShareButton>
         </div>

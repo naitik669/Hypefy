@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, UserPlus, ChevronRight } from "lucide-react";
-import { Plane } from "@/components/ui/Plane";
+import { ShareIcon } from "@/components/ui/ShareIcon";
 import { haptics } from "@/lib/haptics";
 
 const SITE = "https://app.hypefy.chat";
@@ -49,7 +49,7 @@ export function InviteIconButton({ username }: { username: string | null }) {
       {copied ? (
         <Check size={18} className="text-accent" />
       ) : (
-        <Plane size={18} weight="bold" />
+        <ShareIcon size={18} weight="bold" />
       )}
     </button>
   );

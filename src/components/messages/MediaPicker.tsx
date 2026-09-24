@@ -3,7 +3,7 @@
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Camera, Eye, FileText, Images } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-import { Plane } from "@/components/ui/Plane";
+import { SendIcon } from "@/components/ui/ShareIcon";
 import { CameraCapture, type Captured } from "@/components/messages/CameraCapture";
 import { ALBUM_CAPTION_MAX, ALBUM_MAX_ITEMS, type AlbumItem } from "@/lib/chat-album";
 import { cameraLikelyAllowed, cameraSupported, openCamera, stopStream } from "@/lib/camera";
@@ -164,9 +164,9 @@ export function MediaPicker({
         type="button"
         onClick={sendSelected}
         aria-label={`Send ${count}`}
-        className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-accent-ink active:scale-90"
+        className="relative grid h-11 w-11 shrink-0 place-items-center rounded-[14px] bg-accent text-accent-ink active:scale-90"
       >
-        <Plane size={18} weight="fill" />
+        <SendIcon size={18} weight="fill" />
         <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-white px-1 text-[10px] font-extrabold text-black">
           {count}
         </span>

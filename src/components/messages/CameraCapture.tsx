@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Camera, RefreshCw, RotateCcw, X } from "lucide-react";
-import { Plane } from "@/components/ui/Plane";
+import { SendIcon } from "@/components/ui/ShareIcon";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import {
   HOLD_TO_RECORD_MS,
@@ -214,9 +214,9 @@ export function CameraCapture({
               type="button"
               onClick={send}
               aria-label={shot.type === "video" ? "Send video" : "Send photo"}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-accent-ink active:scale-90"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-[14px] bg-accent text-accent-ink active:scale-90"
             >
-              <Plane size={18} weight="fill" />
+              <SendIcon size={18} weight="fill" />
             </button>
           </div>
         </>

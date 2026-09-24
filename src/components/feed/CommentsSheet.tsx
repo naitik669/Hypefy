@@ -20,7 +20,7 @@ import {
   Image as ImageIcon,
   X,
 } from "lucide-react";
-import { Plane } from "@/components/ui/Plane";
+import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
@@ -926,12 +926,12 @@ function Composer({
           type="button"
           onClick={() => void send()}
           disabled={(!text.trim() && !photo) || posting}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"
+          className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"
         >
           {posting ? (
             <Loader2 size={16} className="animate-spin" />
           ) : (
-            <Plane size={16} weight="fill" />
+            <SendIcon size={16} weight="fill" />
           )}
         </button>
       </div>

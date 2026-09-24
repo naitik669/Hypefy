@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play, Trash2, Loader2 } from "lucide-react";
-import { Plane } from "@/components/ui/Plane";
+import { SendIcon } from "@/components/ui/ShareIcon";
 
 type Status = "idle" | "recording" | "paused" | "sending";
 
@@ -267,11 +267,11 @@ export function VoiceRecorder({ onSend, onCancel, onStatusChange }: Props) {
         onClick={sendVoice}
         disabled={isSending || elapsed === 0}
         aria-label="Send voice note"
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"
       >
         {isSending
           ? <Loader2 size={18} className="animate-spin" />
-          : <Plane size={18} weight="fill" />
+          : <SendIcon size={18} weight="fill" />
         }
       </button>
     </div>

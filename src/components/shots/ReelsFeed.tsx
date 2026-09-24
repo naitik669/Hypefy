@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Star, MessageCircle, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban } from "lucide-react";
-import { Plane } from "@/components/ui/Plane";
+import { ShareIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
@@ -985,7 +985,7 @@ function ReelCard({
           onOpenSheet={() => setShareOpen(true)}
           className="flex flex-col items-center gap-1 transition-transform active:scale-90"
         >
-          <Plane size={29} weight="bold" className="text-white" />
+          <ShareIcon size={29} weight="bold" className="text-white" />
           <span className="text-xs font-semibold tabular-nums text-white drop-shadow">Share</span>
         </ShareButton>
 

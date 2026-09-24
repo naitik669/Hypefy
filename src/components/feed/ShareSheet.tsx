@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { one } from "@/lib/supabase/typed";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
-import { Plane } from "@/components/ui/Plane";
+import { SendIcon } from "@/components/ui/ShareIcon";
 import { useToast } from "@/components/ui/ToastProvider";
 
 type Friend = {
@@ -486,7 +486,7 @@ export function ShareSheet({
           ) : dmDone ? (
             <Check size={16} />
           ) : (
-            <Plane size={15} weight="fill" />
+            <SendIcon size={15} weight="fill" />
           )}
           {dmDone ? "Sent" : "Send"}
           <span className="flex h-7 min-w-7 items-center justify-center rounded-[10px] bg-black/15 px-1.5 text-[13px] tabular-nums">

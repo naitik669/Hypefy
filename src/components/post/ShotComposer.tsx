@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Video, X, Loader2, Link2, Check, ChevronRight, ChevronLeft, Music } from "lucide-react";
-import { Plane } from "@/components/ui/Plane";
+import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
@@ -162,7 +162,7 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
         <PageHeader title="Shot posted" />
         <div className="flex flex-col items-center justify-center gap-6 px-6 py-16 text-center">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-accent/20">
-            <Plane size={36} weight="fill" className="text-accent" />
+            <SendIcon size={36} weight="fill" className="text-accent" />
           </div>
           <div>
             <h2 className="text-2xl font-extrabold">Shot posted!</h2>
@@ -211,7 +211,7 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
         </>
       ) : (
         <>
-          <Plane size={17} weight="fill" /> Post Shot
+          <SendIcon size={17} weight="fill" /> Post Shot
         </>
       )}
     </button>

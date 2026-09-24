@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
 import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Image as ImageIcon } from "lucide-react";
-import { Plane } from "@/components/ui/Plane";
+import { SendIcon, ShareIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { useGroupCall } from "@/components/calls/GroupCallProvider";
@@ -2254,7 +2254,7 @@ export function RealChatView({
                 type="button"
                 onClick={() => { setGifPickerOpen(false); setVoiceMode(true); }}
                 aria-label="Record voice note"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface text-muted transition hover:bg-elevated hover:text-foreground active:scale-90"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-surface text-muted transition hover:bg-elevated hover:text-foreground active:scale-90"
               >
                 <Mic size={20} />
               </button>
@@ -2267,7 +2267,7 @@ export function RealChatView({
                 onClick={editing || text.trim() ? send : sendAttachment}
                 disabled={sending || uploading}
                 aria-label={editing ? "Save changes" : "Send"}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"
               >
                 {uploading ? (
                   <span className="flex gap-[3px]">
@@ -2277,7 +2277,7 @@ export function RealChatView({
                     ))}
                   </span>
                 ) : (
-                  editing ? <Check size={20} strokeWidth={2.75} /> : <Plane size={18} weight="fill" />
+                  editing ? <Check size={20} strokeWidth={2.75} /> : <SendIcon size={20} weight="fill" />
                 )}
               </button>
             )}
@@ -2372,7 +2372,7 @@ export function RealChatView({
                 <div className={`w-44 overflow-hidden rounded-2xl bg-elevated p-1 shadow-xl ring-1 ring-border ${mine ? "ml-auto" : ""}`}>
                   <CtxItem icon={<Reply size={17} />} label="Reply" onClick={() => { setReplyTo(menu.msg); setMenu(null); }} />
                   {!menu.msg.is_unsent && (
-                    <CtxItem icon={<Plane size={17} weight="bold" />} label="Forward" onClick={() => { setForwardMsg(menu.msg); setMenu(null); }} />
+                    <CtxItem icon={<ShareIcon size={17} weight="bold" />} label="Forward" onClick={() => { setForwardMsg(menu.msg); setMenu(null); }} />
                   )}
                   {menu.msg.body && menu.msg.kind !== "album" && <CtxItem icon={<Copy size={17} />} label="Copy" onClick={() => { copy(menu.msg); setMenu(null); }} />}
                   {menu.msg.sender_id === currentUserId && menu.msg.kind === "text" && !menu.msg.is_unsent && (

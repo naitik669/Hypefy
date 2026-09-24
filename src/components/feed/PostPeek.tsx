@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Star, MessageCircle, Bookmark } from "lucide-react";
-import { Plane } from "@/components/ui/Plane";
+import { ShareIcon } from "@/components/ui/ShareIcon";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { createClient } from "@/lib/supabase/client";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
@@ -381,7 +381,7 @@ export function PostPeek({
               onOpenSheet={onShare}
               className="flex items-center gap-1.5 text-sm font-semibold text-foreground transition-transform duration-150 active:scale-90"
             >
-              <Plane size={21} weight="bold" />
+              <ShareIcon size={21} weight="bold" />
             </ShareButton>
           </div>
 
