@@ -318,3 +318,45 @@ export function ConeArt() {
     </svg>
   );
 }
+
+/** Unread, all read: an envelope flies in, its flap shuts, a lime tick stamps on. */
+export function EnvelopeArt() {
+  return (
+    <svg className={s.art} viewBox="0 0 160 120" aria-hidden>
+      <g className={s.envIn}>
+        <g className={s.envBob}>
+          <rect x="30" y="34" width="100" height="68" rx="8" fill={G2} stroke={G3} strokeWidth="2.5" />
+          <path d="M34 98 L70 66 M126 98 L90 66" stroke={G3} strokeWidth="2.5" strokeLinecap="round" />
+          <path className={s.envFlap} d="M32 38 L80 74 L128 38" fill={G1} stroke={G3} strokeWidth="2.5" strokeLinejoin="round" />
+          <g className={s.envTick}>
+            <circle cx="118" cy="32" r="16" fill="#a3e635" />
+            <path d="M110 32 l6 6 l10 -12" stroke="#0f1405" strokeWidth="3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </g>
+        </g>
+      </g>
+    </svg>
+  );
+}
+
+/** Requests, none: the door shudders under two knocks, and "knock?" echoes off into nothing. */
+export function KnockArt() {
+  return (
+    <svg className={s.art} viewBox="0 0 160 120" aria-hidden>
+      <g className={s.subject}>
+        <g className={s.doorShake}>
+          <rect x="44" y="10" width="62" height="100" rx="6" fill={G2} stroke={G3} strokeWidth="2.5" />
+          <rect x="54" y="22" width="42" height="30" rx="3" fill={G1} stroke={G3} strokeWidth="2" />
+          <circle cx="95" cy="66" r="4" fill={G5} />
+        </g>
+        <rect x="36" y="108" width="78" height="8" rx="3" fill={G1} stroke={G3} strokeWidth="2" />
+        {/* The impact, flashing at the door's edge on each knock. */}
+        <g className={s.knockHit} stroke={G4} strokeWidth="2.4" strokeLinecap="round">
+          <path d="M110 50 l7 -4 M111 60 h8 M110 70 l7 4" />
+        </g>
+      </g>
+      <text className={s.knock1} x="120" y="40" fontFamily="inherit" fontWeight="800" fontSize="13" fill="#666">knock?</text>
+      <text className={s.knock2} x="124" y="60" fontFamily="inherit" fontWeight="800" fontSize="11" fill={G4}>knock?</text>
+      <text className={s.knock3} x="126" y="78" fontFamily="inherit" fontWeight="800" fontSize="9" fill="#383838">knock?</text>
+    </svg>
+  );
+}

@@ -30,6 +30,8 @@ import { visibleNameplate } from "@/lib/nameplates";
 import { Nameplate } from "@/components/ui/Nameplate";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyInbox } from "@/components/messages/EmptyInbox";
+import { EmptyScene } from "@/components/empty/EmptyScene";
+import { EnvelopeArt, KnockArt } from "@/components/empty/scenes";
 import { PresenceDot } from "@/components/presence/PresenceDot";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { removeChat, useRemovedChats } from "@/lib/chat-removal";
@@ -808,13 +810,14 @@ export function MessagesInbox({
 
       {/* List */}
       {filtered.length === 0 ? (
-        <p className="px-4 py-12 text-center text-sm text-faint">
-          {tab === "requests"
-            ? "No requests, your door is clear."
-            : tab === "unread"
-            ? "All caught up. Zero noise. 🎉"
-            : "Nobody by that name."}
-        </p>
+        // An empty tab gets its scene; an empty search, on any tab, just says so.
+        !q.trim() && tab === "unread" ? (
+          <EmptyScene art={<EnvelopeArt />} title="Inbox zero" text="Every chat's read. Go outside, or start something." />
+        ) : !q.trim() && tab === "requests" ? (
+          <EmptyScene art={<KnockArt />} title="Door's clear" text="No requests. When someone new knocks, they wait here." />
+        ) : (
+          <p className="px-4 py-12 text-center text-sm text-faint">Nobody by that name.</p>
+        )
       ) : (
         // Room at the foot, so the last chats can scroll up clear of the
         // floating Spotlight card rather than ending underneath it.
