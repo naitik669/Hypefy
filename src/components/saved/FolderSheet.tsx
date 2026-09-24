@@ -26,23 +26,36 @@ export function FolderSheet({
   target,
   userId,
   onSaved,
+  startMaking = false,
 }: {
   open: boolean;
   onClose: () => void;
   target: SavedTarget;
   userId: string;
   onSaved?: () => void;
+  /** Open on the new-folder form — for New folder in the save menus. */
+  startMaking?: boolean;
 }) {
   return (
     <BottomSheet open={open} onClose={onClose} title="Save to">
       {/* Mounted only while open, so each opening starts clean and reads
           the folders as they are now. */}
-      {open && <FolderList target={target} userId={userId} onSaved={onSaved} />}
+      {open && <FolderList target={target} userId={userId} onSaved={onSaved} startMaking={startMaking} />}
     </BottomSheet>
   );
 }
 
-function FolderList({ target, userId, onSaved }: { target: SavedTarget; userId: string; onSaved?: () => void }) {
+function FolderList({
+  target,
+  userId,
+  onSaved,
+  startMaking,
+}: {
+  target: SavedTarget;
+  userId: string;
+  onSaved?: () => void;
+  startMaking: boolean;
+}) {
   const supabase = createClient();
   const toast = useToast();
   const [folders, setFolders] = useState<Folder[] | null>(null);
@@ -68,7 +81,7 @@ function FolderList({ target, userId, onSaved }: { target: SavedTarget; userId: 
       const all = (list.data ?? []).map(toFolder);
       setFolders(all);
       setInside(new Set((mine.data ?? []).map((r) => r.collection_id)));
-      setMaking(all.length === 0);
+      setMaking(startMaking || all.length === 0);
     })();
     return () => {
       gone = true;

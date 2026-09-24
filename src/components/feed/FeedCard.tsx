@@ -43,8 +43,7 @@ import { MusicMuteButton } from "@/components/music/MusicMuteButton";
 import { parseTrack } from "@/lib/music";
 import { hypeResult } from "@/lib/supabase/typed";
 import { PollBlock, parsePoll } from "@/components/feed/PollBlock";
-import { FolderSheet } from "@/components/saved/FolderSheet";
-import { useLongPress } from "@/lib/useLongPress";
+import { useSaveMenus } from "@/components/saved/SaveMenus";
 
 export type FeedPost = {
   id: string;
@@ -385,12 +384,18 @@ export function FeedCard({
     e.preventDefault();
   }
   const showToast = useToast();
-  // Holding the bookmark files the post in folders; a tap still just saves.
-  const [foldersOpen, setFoldersOpen] = useState(false);
-  const holdSave = useLongPress(() => {
-    if (!uid) return showToast("Sign in to save");
-    haptics.select();
-    setFoldersOpen(true);
+  // The bookmark: a tap saves and drops down the folders, a hold fans them
+  // out, and the very first save explains the hold (see useSaveMenus).
+  const saveButton = useRef<HTMLButtonElement>(null);
+  const saveMenus = useSaveMenus({
+    button: saveButton,
+    target: { post: post.id },
+    userId: uid,
+    saved,
+    setSaved,
+    persist: persistSave,
+    onSignedOut: () => showToast("Sign in to save"),
+    iconSize: 21,
   });
   // A ?comment= link opens the sheet itself — landing on the post with the
   // comments closed is the same dead end the notification already had.
@@ -582,39 +587,36 @@ export function FeedCard({
     lastTapRef.current = { at: now, x, y };
   }
 
-  async function toggleSave() {
-    if (savePending) return;
-    if (!uid) {
-      showToast("Sign in to save");
-      return;
-    }
+  /** Save or unsave for real; resolves whether it worked. No success toast:
+   *  the bookmark filling in, and the menu over it, say so. */
+  async function persistSave(next: boolean): Promise<boolean> {
+    if (savePending || !uid) return false;
     const prev = saved;
     setSavePending(true);
-    setSaved(!prev);
+    setSaved(next);
     haptics.select();
-    if (!prev) {
+    if (next) {
       setSaveBurst(true);
       setTimeout(() => setSaveBurst(false), 360);
-      const { error } = await supabase
-        .from("saved_posts")
-        .insert({ user_id: uid, post_id: post.id });
-      if (error) {
-        setSaved(prev);
-        if (!/duplicate|unique/i.test(error.message))
-          showToast("Couldn't save", "error");
-      } else showToast("Saved", "success");
-    } else {
-      const { error } = await supabase
-        .from("saved_posts")
-        .delete()
-        .eq("user_id", uid)
-        .eq("post_id", post.id);
-      if (error) {
-        setSaved(prev);
-        showToast("Couldn't unsave", "error");
-      } else showToast("Removed");
     }
+    const { error } = next
+      ? await supabase.from("saved_posts").insert({ user_id: uid, post_id: post.id })
+      : await supabase.from("saved_posts").delete().eq("user_id", uid).eq("post_id", post.id);
     setSavePending(false);
+    // Already saved is what a save wanted.
+    if (error && !(next && /duplicate|unique/i.test(error.message))) {
+      setSaved(prev);
+      showToast(next ? "Couldn't save" : "Couldn't unsave", "error");
+      return false;
+    }
+    return true;
+  }
+
+  /** The plain toggle, for the full-screen peek, which has no room for menus. */
+  async function toggleSave() {
+    if (!uid) return showToast("Sign in to save");
+    const next = !saved;
+    if (await persistSave(next)) showToast(next ? "Saved" : "Removed", next ? "success" : undefined);
   }
 
   if (deleted) return null;
@@ -853,11 +855,13 @@ export function FeedCard({
 
         <button
           type="button"
-          {...holdSave}
-          onClick={toggleSave}
-          disabled={savePending}
-          aria-label="Save"
-          className="text-foreground transition-transform duration-150 active:scale-90 disabled:opacity-70"
+          ref={saveButton}
+          {...saveMenus.handlers}
+          aria-label={saved ? "Saved. Tap for folders, hold to file" : "Save"}
+          aria-haspopup="menu"
+          className="text-foreground transition-transform duration-150 active:scale-90"
+          // A press that starts here is a tap or a hold-and-slide, never a scroll.
+          style={{ touchAction: "none", WebkitTouchCallout: "none" }}
         >
           <Bookmark
             size={21}
@@ -930,15 +934,7 @@ export function FeedCard({
         focusCommentId={focusId}
       />
 
-      {uid && (
-        <FolderSheet
-          open={foldersOpen}
-          onClose={() => setFoldersOpen(false)}
-          target={{ post: post.id }}
-          userId={uid}
-          onSaved={() => setSaved(true)}
-        />
-      )}
+      {saveMenus.overlays}
 
       <ShareSheet
         open={shareOpen}

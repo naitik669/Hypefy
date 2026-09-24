@@ -26,7 +26,7 @@ import { spliceFeed, SHOT_AD_OPTS } from "@/lib/feed-mix";
 import { noteAdShown } from "@/lib/ads";
 import { useAdFill, useAdSlots } from "@/components/feed/useAdSlots";
 import { ShotAdCard } from "@/components/shots/ShotAdCard";
-import { FolderSheet } from "@/components/saved/FolderSheet";
+import { useSaveMenus } from "@/components/saved/SaveMenus";
 import { useLongPress } from "@/lib/useLongPress";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 
@@ -459,12 +459,18 @@ function ReelCard({
 
   const [saved, setSaved] = useState(false);
   const [savePending, setSavePending] = useState(false);
-  // Holding Save files the Shot in folders; a tap still just saves.
-  const [foldersOpen, setFoldersOpen] = useState(false);
-  const holdSave = useLongPress(() => {
-    if (!currentUserId) return;
-    haptics.select();
-    setFoldersOpen(true);
+  // Save: a tap saves and drops down the folders, a hold fans them out, and
+  // the very first save explains the hold (see useSaveMenus).
+  const saveButton = useRef<HTMLButtonElement>(null);
+  const saveMenus = useSaveMenus({
+    button: saveButton,
+    target: { shot: reel.id },
+    userId: currentUserId,
+    saved,
+    setSaved,
+    persist: persistSave,
+    onSignedOut: () => showToast("Sign in to save"),
+    iconSize: 30,
   });
 
   // Owner controls
@@ -639,9 +645,11 @@ function ReelCard({
     }
   }
 
-  async function toggleSave() {
-    if (savePending || !currentUserId) return;
+  /** Save or unsave for real; resolves whether it worked. */
+  async function persistSave(next: boolean): Promise<boolean> {
+    if (savePending || !currentUserId) return false;
     const prev = saved;
+    if (next === prev) return true;
     setSavePending(true);
     setSaved(!prev);
     haptics.select();
@@ -668,7 +676,9 @@ function ReelCard({
       showToast(
         prev ? "Couldn't unsave that Shot." : "Couldn't save that Shot."
       );
+      return false;
     }
+    return true;
   }
 
   function deleteShot() {
@@ -979,13 +989,23 @@ function ReelCard({
           <span className="text-xs font-semibold tabular-nums text-white drop-shadow">Share</span>
         </ShareButton>
 
-        <RailButton label="Save" onClick={toggleSave} disabled={savePending} hold={holdSave}>
+        <button
+          type="button"
+          ref={saveButton}
+          {...saveMenus.handlers}
+          aria-label={saved ? "Saved. Tap for folders, hold to file" : "Save"}
+          aria-haspopup="menu"
+          className="flex flex-col items-center gap-1 transition-transform active:scale-90"
+          // A press that starts here is a tap or a hold-and-slide, never a swipe.
+          style={{ touchAction: "none", WebkitTouchCallout: "none" }}
+        >
           <Bookmark
             size={30}
             className={saved ? "text-accent" : "text-white"}
             fill={saved ? "currentColor" : "none"}
           />
-        </RailButton>
+          <span className="text-xs font-semibold tabular-nums text-white drop-shadow">Save</span>
+        </button>
 
         {/* Was `{isOwner && …}`, so a viewer watching someone else's Shot had
             no menu at all — no report, no block, no way out. Shots are the
@@ -1213,13 +1233,7 @@ function ReelCard({
             targetType="shot"
             postId={reel.id}
           />
-          <FolderSheet
-            open={foldersOpen}
-            onClose={() => setFoldersOpen(false)}
-            target={{ shot: reel.id }}
-            userId={currentUserId}
-            onSaved={() => setSaved(true)}
-          />
+          {saveMenus.overlays}
         </>
       )}
     </section>
