@@ -161,7 +161,7 @@ export function PageReplyEmbed({
     </div>
   ) : (
     <div
-      className={`relative w-[200px] overflow-hidden rounded-[22px] p-3.5 ${emoji ? "pb-7" : "pb-4"} text-left transition-transform active:scale-[0.98] ${
+      className={`relative w-[200px] overflow-hidden rounded-[22px] p-3.5 pb-4 text-left transition-transform active:scale-[0.98] ${
         mine ? "rotate-[1.5deg]" : "-rotate-[1.5deg]"
       } ${over ? "saturate-[0.55]" : ""}`}
       style={{ background: theme.background, boxShadow: theme.shadow }}
@@ -208,7 +208,7 @@ export function PageReplyEmbed({
     <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
       <span className="mb-1.5 px-1 text-[11px] font-semibold text-muted">{what}</span>
 
-      <div className={`relative ${emoji ? "mb-5" : ""}`}>
+      <div className={`relative ${emoji ? "mb-2" : ""}`}>
         {over ? (
           <div aria-label={`Page: ${pageText(page.text)} (ended)`}>{card}</div>
         ) : (
@@ -222,10 +222,10 @@ export function PageReplyEmbed({
           // tilted away from the card, with a shadow under it. The tilt is on
           // the inner span, because the pop it lands with animates transform.
           <span
-            className={`animate-react-pop pointer-events-none absolute -bottom-6 ${mine ? "-left-5" : "-right-5"}`}
+            className={`animate-react-pop pointer-events-none absolute -bottom-1 ${mine ? "-left-5" : "-right-5"}`}
           >
             <span
-              className={`block text-[46px] leading-none drop-shadow-[0_5px_7px_rgb(0_0_0/0.55)] ${
+              className={`block text-[46px] leading-none [filter:drop-shadow(0_10px_12px_rgb(0_0_0/0.85))_drop-shadow(0_2px_3px_rgb(0_0_0/0.6))] ${
                 mine ? "-rotate-[14deg]" : "rotate-[14deg]"
               }`}
             >
