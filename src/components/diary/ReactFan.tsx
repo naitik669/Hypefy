@@ -244,7 +244,7 @@ export function ReactFan({
                     big ? "h-[52px] w-[52px] text-[28px]" : "h-12 w-12 text-[26px]"
                   } ${
                     on
-                      ? "-translate-y-2 scale-[1.4] bg-white/[0.3] duration-300 ease-[cubic-bezier(0.34,1.9,0.5,1)]"
+                      ? "z-10 -translate-y-2 scale-[1.4] bg-white/[0.3] duration-300 ease-[cubic-bezier(0.34,1.9,0.5,1)]"
                       : "bg-white/[0.16] duration-150 ease-out"
                   }`}
                   style={
