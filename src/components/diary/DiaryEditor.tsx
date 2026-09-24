@@ -186,7 +186,7 @@ export function DiaryComposer({
   async function post() {
     const value = text.trim().slice(0, MAX);
     // A picture on its own is a page; words on their own always were.
-    if ((!value && !photo) || busy || uploading) return;
+    if ((!value && !photo?.url) || busy || uploading) return;
     setBusy(true);
     setFailed(false);
     const { error } = await supabase.rpc("set_note", {
@@ -333,7 +333,7 @@ export function DiaryComposer({
               }}
               rows={engaged ? 3 : 2}
               onFocus={() => setEngaged(true)}
-              placeholder="What's on your mind today?"
+              placeholder={photo ? "Say something about it (optional)" : "What's on your mind today?"}
               aria-label="Your page"
               className="mt-auto w-full resize-none bg-transparent pt-3 font-extrabold leading-[1.08] tracking-[-0.02em] text-white outline-none placeholder:text-white/25"
               style={{ fontSize: Math.min(Math.round(size * 1.1), 46) }}
@@ -436,7 +436,8 @@ export function DiaryComposer({
               <button
                 type="button"
                 onClick={post}
-                disabled={!text.trim() || busy}
+                // A photo on its own is enough; the words are optional then.
+                disabled={(!text.trim() && !photo?.url) || busy || uploading}
                 className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-accent text-sm font-extrabold text-accent-ink transition-transform active:scale-[0.98] disabled:opacity-40"
               >
                 {busy ? <Loader2 size={16} className="animate-spin" /> : current ? "Update" : "Post"}
