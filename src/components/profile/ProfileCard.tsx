@@ -11,7 +11,10 @@ import {
   Download,
   Share2,
   Image as ImageIcon,
+  LayoutGrid,
+  Users,
 } from "lucide-react";
+import { FollowButton } from "@/components/profile/FollowButton";
 import { createClient } from "@/lib/supabase/client";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { AvatarImg } from "@/components/ui/AvatarImg";
@@ -53,6 +56,9 @@ export type ProfileCardData = {
 
 type Pane = "card" | "edit" | "qr";
 
+/** Whether the person looking follows the card's owner. Null on your own card, or signed out. */
+type Follow = { following: boolean; requested: boolean } | null;
+
 /**
  * The card behind an expanded avatar.
  *
@@ -74,6 +80,7 @@ export function ProfileCard({
   const [theme, setTheme] = useState<string>(DEFAULT_THEME);
   const [loading, setLoading] = useState(true);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [follow, setFollow] = useState<Follow>(null);
 
   useOverlayBackButton(true, onClose);
 
@@ -86,7 +93,7 @@ export function ProfileCard({
   }, []);
 
   const load = useCallback(async () => {
-    const [linkRes, profRes] = await Promise.all([
+    const [linkRes, profRes, userRes] = await Promise.all([
       supabase
         .from("profile_links")
         .select("id, label, url, position")
@@ -97,7 +104,23 @@ export function ProfileCard({
         .select("card_layout, card_theme")
         .eq("id", data.userId)
         .single(),
+      supabase.auth.getUser(),
     ]);
+
+    // The Follow on the card: only on someone else's, and only signed in.
+    const viewer = userRes.data.user?.id;
+    if (viewer && viewer !== data.userId) {
+      const [f, r] = await Promise.all([
+        supabase.from("follows").select("id").eq("follower_id", viewer).eq("following_id", data.userId).maybeSingle(),
+        supabase
+          .from("follow_requests")
+          .select("target_id")
+          .eq("requester_id", viewer)
+          .eq("target_id", data.userId)
+          .maybeSingle(),
+      ]);
+      setFollow({ following: !!f.data, requested: !!r.data });
+    }
 
     setLinks((linkRes.data as ProfileLink[] | null) ?? []);
 
@@ -155,14 +178,24 @@ export function ProfileCard({
       <div className="relative z-10 flex flex-1 items-start justify-center overflow-y-auto px-5 pb-10">
         <div className="w-full max-w-[380px]">
           {pane === "card" && (
-            <CardFace
-              data={data}
-              links={links}
-              layout={layout}
-              gradient={gradient}
-              loading={loading}
-              onPhoto={() => setPhotoOpen(true)}
-            />
+            layout === "photo" ? (
+              <PhotoCardFace
+                data={data}
+                links={links}
+                gradient={gradient}
+                loading={loading}
+                follow={follow}
+                onPhoto={() => setPhotoOpen(true)}
+              />
+            ) : (
+              <CardFace
+                data={data}
+                links={links}
+                layout={layout}
+                gradient={gradient}
+                loading={loading}
+              />
+            )
           )}
 
           {pane === "qr" && (
@@ -283,68 +316,135 @@ function ShareAction({ url, name }: { url: string; name: string }) {
   );
 }
 
-/** The card itself — what a screenshot captures. */
+/**
+ * The photo layout: the photo fills the top of the card and melts into it,
+ * then the name with its seal, a line of bio, and a row of what matters at a
+ * glance — followers, posts — with Follow at its end. With no photo the top
+ * is their colour and initial, so the card keeps its shape.
+ */
+function PhotoCardFace({
+  data,
+  links,
+  gradient,
+  loading,
+  follow,
+  onPhoto,
+}: {
+  data: ProfileCardData;
+  links: ProfileLink[];
+  gradient: string;
+  loading: boolean;
+  follow: Follow;
+  onPhoto: () => void;
+}) {
+  // Faded out at the foot with a mask rather than a colour, so the top melts
+  // into whichever card theme is behind it.
+  const melt = "[mask-image:linear-gradient(180deg,#000_58%,transparent)]";
+  return (
+    <div
+      className="animate-rise overflow-hidden rounded-[28px] border border-white/10 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)]"
+      style={{ background: gradient }}
+    >
+      {data.avatarUrl ? (
+        <button type="button" onClick={onPhoto} aria-label="View photo" className="block aspect-square w-full">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={data.avatarUrl} alt="" className={`h-full w-full object-cover ${melt}`} />
+        </button>
+      ) : (
+        <div
+          aria-hidden
+          className={`flex aspect-square w-full items-center justify-center text-[120px] font-extrabold text-white/90 ${melt}`}
+          style={{
+            background: `linear-gradient(140deg, hsl(${data.hue} 75% 52%), hsl(${(data.hue + 50) % 360} 70% 38%))`,
+          }}
+        >
+          {data.name.trim()[0]?.toUpperCase() ?? "?"}
+        </div>
+      )}
+
+      <div className="relative -mt-16 flex flex-col gap-3 px-5 pb-5">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h2 className="flex min-w-0 text-[26px] font-extrabold leading-tight tracking-tight">
+              <DisplayName name={data.name} profile={data.cosmetics} className="min-w-0 truncate" />
+            </h2>
+            {data.verified && <VerifiedStar className="h-5 w-5 shrink-0 text-verified" />}
+          </div>
+          {data.username && <p className="text-sm text-foreground/55">@{data.username}</p>}
+        </div>
+
+        {data.bio && <p className="line-clamp-3 text-sm leading-relaxed text-foreground/70">{data.bio}</p>}
+
+        {data.tags.length > 0 && <Tags tags={data.tags} centred={false} />}
+
+        <div className="flex items-center gap-4 text-sm">
+          <span className="flex items-center gap-1.5" aria-label={`${data.stats.followers} followers`}>
+            <Users size={15} className="text-foreground/50" aria-hidden />
+            <b className="font-extrabold tabular-nums">{data.stats.followers.toLocaleString()}</b>
+          </span>
+          <span className="flex items-center gap-1.5" aria-label={`${data.stats.posts} posts`}>
+            <LayoutGrid size={15} className="text-foreground/50" aria-hidden />
+            <b className="font-extrabold tabular-nums">{data.stats.posts.toLocaleString()}</b>
+          </span>
+          {follow && (
+            <FollowButton
+              targetUserId={data.userId}
+              targetUsername={data.username}
+              initialFollowing={follow.following}
+              initialRequested={follow.requested}
+              variant="inline"
+              followLabel="Follow +"
+              className="ml-auto h-9 px-5 text-[13px]"
+            />
+          )}
+        </div>
+
+        {!loading && <Links links={links} />}
+      </div>
+    </div>
+  );
+}
+
+/** The card itself — what a screenshot captures. The centred and aligned layouts; the photo one is PhotoCardFace. */
 function CardFace({
   data,
   links,
   layout,
   gradient,
   loading,
-  onPhoto,
 }: {
   data: ProfileCardData;
   links: ProfileLink[];
   layout: CardLayout;
   gradient: string;
   loading: boolean;
-  onPhoto: () => void;
 }) {
   const centred = layout === "centred";
-  const photoLed = layout === "photo";
 
   return (
     <div
       className="animate-rise overflow-hidden rounded-[28px] border border-white/10 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)]"
       style={{ background: gradient }}
     >
-      {photoLed && data.avatarUrl && (
-        <button
-          type="button"
-          onClick={onPhoto}
-          aria-label="View photo"
-          className="block h-44 w-full"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={data.avatarUrl}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        </button>
-      )}
-
       <div
         className={`flex flex-col gap-3 p-6 ${
           centred ? "items-center text-center" : "items-start text-left"
         }`}
       >
-        {!photoLed && (
-          <div
-            className={`flex w-full gap-3 ${
-              centred ? "flex-col items-center" : "items-center"
-            }`}
-          >
-            <AvatarImg
-              url={data.avatarUrl}
-              name={data.name}
-              hue={data.hue}
-              size={centred ? 76 : 56}
-              className="rounded-[22px]"
-            />
-            <Identity data={data} centred={centred} />
-          </div>
-        )}
-        {photoLed && <Identity data={data} centred={false} />}
+        <div
+          className={`flex w-full gap-3 ${
+            centred ? "flex-col items-center" : "items-center"
+          }`}
+        >
+          <AvatarImg
+            url={data.avatarUrl}
+            name={data.name}
+            hue={data.hue}
+            size={centred ? 76 : 56}
+            className="rounded-[22px]"
+          />
+          <Identity data={data} centred={centred} />
+        </div>
 
         {data.bio && (
           <p className="text-sm leading-relaxed text-foreground/80">
@@ -352,22 +452,7 @@ function CardFace({
           </p>
         )}
 
-        {data.tags.length > 0 && (
-          <div
-            className={`flex flex-wrap gap-1.5 ${
-              centred ? "justify-center" : ""
-            }`}
-          >
-            {data.tags.map((t) => (
-              <span
-                key={t}
-                className="rounded-pill border border-white/15 bg-black/25 px-2.5 py-1 text-[11px] font-semibold text-foreground/85"
-              >
-                {t}
-              </span>
-            ))}
-          </div>
-        )}
+        {data.tags.length > 0 && <Tags tags={data.tags} centred={centred} />}
 
         <div
           className={`flex gap-4 text-xs ${centred ? "justify-center" : ""}`}
@@ -377,32 +462,48 @@ function CardFace({
           <Stat n={data.stats.following} label="Following" />
         </div>
 
-        {/* Link buttons — the reason the card exists rather than the header. */}
-        {!loading && links.length > 0 && (
-          <div className="mt-1 flex w-full flex-col gap-2">
-            {links.map((l) => {
-              const href = safeHref(l.url);
-              if (!href) return null;
-              return (
-                <a
-                  key={l.id}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer nofollow ugc"
-                  className="flex w-full flex-col items-center rounded-xl border border-white/15 bg-black/30 px-4 py-2.5 text-center transition active:scale-[0.99] hover:bg-black/45"
-                >
-                  <span className="text-sm font-bold text-foreground">
-                    {l.label}
-                  </span>
-                  <span className="mt-0.5 truncate text-[10px] text-foreground/50">
-                    {prettyUrl(href)}
-                  </span>
-                </a>
-              );
-            })}
-          </div>
-        )}
+        {!loading && <Links links={links} />}
       </div>
+    </div>
+  );
+}
+
+function Tags({ tags, centred }: { tags: string[]; centred: boolean }) {
+  return (
+    <div className={`flex flex-wrap gap-1.5 ${centred ? "justify-center" : ""}`}>
+      {tags.map((t) => (
+        <span
+          key={t}
+          className="rounded-pill border border-white/15 bg-black/25 px-2.5 py-1 text-[11px] font-semibold text-foreground/85"
+        >
+          {t}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Link buttons — the reason the card exists rather than the header. */
+function Links({ links }: { links: ProfileLink[] }) {
+  if (links.length === 0) return null;
+  return (
+    <div className="mt-1 flex w-full flex-col gap-2">
+      {links.map((l) => {
+        const href = safeHref(l.url);
+        if (!href) return null;
+        return (
+          <a
+            key={l.id}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer nofollow ugc"
+            className="flex w-full flex-col items-center rounded-xl border border-white/15 bg-black/30 px-4 py-2.5 text-center transition active:scale-[0.99] hover:bg-black/45"
+          >
+            <span className="text-sm font-bold text-foreground">{l.label}</span>
+            <span className="mt-0.5 truncate text-[10px] text-foreground/50">{prettyUrl(href)}</span>
+          </a>
+        );
+      })}
     </div>
   );
 }
@@ -423,7 +524,7 @@ function Identity({
           <DisplayName name={data.name} profile={data.cosmetics} className="min-w-0 truncate" />
         </h2>
         {data.verified && (
-          <VerifiedStar className="h-[15px] w-[15px] shrink-0" />
+          <VerifiedStar className="h-[15px] w-[15px] shrink-0 text-verified" />
         )}
       </div>
       {data.username && (

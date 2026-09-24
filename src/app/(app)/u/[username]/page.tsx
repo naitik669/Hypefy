@@ -51,7 +51,9 @@ export async function generateMetadata({
   const name = profile.display_name ?? profile.username ?? "User";
   const title = `${name} (@${profile.username})`;
   const description = profile.bio ?? `Follow ${name} on Hypefy, where your personality lives.`;
-  const image = (profile as any).avatar_url as string | null;
+  // The image is opengraph-image.tsx beside this page: the profile card,
+  // drawn for link previews. It used to be the bare avatar, which most apps
+  // showed as a small square that said nothing about the person.
   return {
     title,
     description,
@@ -59,13 +61,11 @@ export async function generateMetadata({
       title: `${title} · Hypefy`,
       description,
       type: "profile",
-      ...(image ? { images: [{ url: image }] } : {}),
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title: `${title} · Hypefy`,
       description,
-      ...(image ? { images: [image] } : {}),
     },
   };
 }

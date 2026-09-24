@@ -16,7 +16,7 @@ export const CARD_LAYOUTS: { id: CardLayout; label: string; hint: string }[] = [
   { id: "photo", label: "Photo", hint: "Photo fills the top, details below" },
 ];
 
-export const DEFAULT_LAYOUT: CardLayout = "centred";
+export const DEFAULT_LAYOUT: CardLayout = "photo";
 export const DEFAULT_THEME = "lime-pulse";
 
 /** Card themes reuse the profile banner gradients, so the two never drift. */
