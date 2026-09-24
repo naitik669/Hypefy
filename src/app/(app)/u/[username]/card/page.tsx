@@ -33,10 +33,14 @@ async function fetchStats(
 
 export default async function ProfileCardRoute({
   params,
+  searchParams,
 }: {
   params: Promise<{ username: string }>;
+  searchParams: Promise<{ edit?: string }>;
 }) {
   const { username } = await params;
+  // ?edit=1 opens on the editor: Edit profile's "Profile card" row links here.
+  const { edit } = await searchParams;
   const supabase = await createClient();
 
   const { data: profile } = await supabase
@@ -54,6 +58,7 @@ export default async function ProfileCardRoute({
 
   return (
     <ProfileCardPage
+      startEditing={edit === "1"}
       data={{
         accentId: (profile.accent_id as string) ?? null,
         userId: profile.id as string,

@@ -59,12 +59,15 @@ type Pane = "card" | "edit" | "qr";
 export function ProfileCard({
   data,
   onClose,
+  startEditing = false,
 }: {
   data: ProfileCardData;
   onClose: () => void;
+  /** Open on the editor — from Edit profile's "Profile card" row. Your own card only. */
+  startEditing?: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
-  const [pane, setPane] = useState<Pane>("card");
+  const [pane, setPane] = useState<Pane>(startEditing && data.isOwn ? "edit" : "card");
   const [links, setLinks] = useState<ProfileLink[]>([]);
   const [layout, setLayout] = useState<CardLayout>(DEFAULT_LAYOUT);
   const [theme, setTheme] = useState<string>(DEFAULT_THEME);
@@ -206,6 +209,19 @@ export function ProfileCard({
 
           {pane === "card" && (
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {/* On your own card, customising is the thing you came to do,
+                  so it leads, in lime. It was a grey pill in the middle of
+                  the row, and nobody found it. */}
+              {data.isOwn && (
+                <button
+                  type="button"
+                  onClick={() => setPane("edit")}
+                  className="flex items-center gap-1.5 rounded-pill bg-accent px-4 py-2 text-xs font-extrabold text-accent-ink transition active:scale-95"
+                >
+                  <Pencil size={14} />
+                  Customise card
+                </button>
+              )}
               <Action
                 icon={QrCode}
                 label="QR code"
@@ -216,13 +232,6 @@ export function ProfileCard({
                   icon={ImageIcon}
                   label="View photo"
                   onClick={() => setPhotoOpen(true)}
-                />
-              )}
-              {data.isOwn && (
-                <Action
-                  icon={Pencil}
-                  label="Edit card"
-                  onClick={() => setPane("edit")}
                 />
               )}
               <ShareAction url={url} name={data.name} />

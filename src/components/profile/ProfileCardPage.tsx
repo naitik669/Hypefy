@@ -13,8 +13,8 @@ import { safeBack } from "@/lib/safe-back";
  * from a shared link means the card IS the first history entry and back would
  * otherwise leave the person entirely.
  */
-export function ProfileCardPage({ data }: { data: ProfileCardData }) {
+export function ProfileCardPage({ data, startEditing = false }: { data: ProfileCardData; startEditing?: boolean }) {
   const router = useRouter();
   const fallback = data.username ? `/u/${data.username}` : "/home";
-  return <ProfileCard data={data} onClose={() => safeBack(router, fallback)} />;
+  return <ProfileCard data={data} startEditing={startEditing} onClose={() => safeBack(router, fallback)} />;
 }
