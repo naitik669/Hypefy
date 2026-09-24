@@ -8,12 +8,17 @@ import { BANNERS } from "@/lib/profile";
  * card that needs an account defeats the QR on it.
  */
 
-export type CardLayout = "centred" | "aligned" | "photo";
+export type CardLayout = "photo" | "framed" | "poster" | "pass" | "banner" | "centred" | "aligned";
 
+/** In the order Edit card offers them; the first is the default. */
 export const CARD_LAYOUTS: { id: CardLayout; label: string; hint: string }[] = [
+  { id: "photo", label: "Photo", hint: "Photo melts into the top of the card" },
+  { id: "framed", label: "Framed", hint: "Photo in a rounded frame, card around it" },
+  { id: "poster", label: "Poster", hint: "Photo fills the card, details on glass" },
+  { id: "pass", label: "Pass", hint: "A member pass with your QR as its stub" },
+  { id: "banner", label: "Banner", hint: "Banner across the top, big squircle photo" },
   { id: "centred", label: "Centred", hint: "Avatar on top, everything stacked" },
   { id: "aligned", label: "Aligned", hint: "Avatar beside the name, text left" },
-  { id: "photo", label: "Photo", hint: "Photo fills the top, details below" },
 ];
 
 export const DEFAULT_LAYOUT: CardLayout = "photo";
@@ -23,7 +28,7 @@ export const DEFAULT_THEME = "lime-pulse";
 export const CARD_THEMES = BANNERS;
 
 export function isCardLayout(v: unknown): v is CardLayout {
-  return v === "centred" || v === "aligned" || v === "photo";
+  return CARD_LAYOUTS.some((l) => l.id === v);
 }
 
 /** Hard cap, matching the profile_links_limit trigger in the database. */
