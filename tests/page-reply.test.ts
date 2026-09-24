@@ -33,8 +33,17 @@ describe("pageSnapshot", () => {
       color: "plum",
       hue: 330,
       writtenAt: "2026-09-11T10:00:00Z",
+      imageUrl: null,
       track: { title: "Kho Gaye Hum Kahan", artist: "Prateek Kuhad", artwork: "cover.jpg" },
     });
+  });
+
+  it("keeps the page's photo, and only a real https address", async () => {
+    const { pageSnapshot } = await import("@/components/diary/PageReplyEmbed");
+    const url = "https://x.supabase.co/storage/v1/object/public/page-media/u/1.jpg";
+    expect(pageSnapshot({ page: { text: "", image_url: url } })?.imageUrl).toBe(url);
+    expect(pageSnapshot({ page: { text: "", image_url: "javascript:alert(1)" } })?.imageUrl).toBeNull();
+    expect(pageSnapshot({ page: { text: "", image_url: 5 } })?.imageUrl).toBeNull();
   });
 
   it("gives nothing for a message that carries no page, or a broken one", async () => {
@@ -42,7 +51,7 @@ describe("pageSnapshot", () => {
     expect(pageSnapshot(null)).toBeNull();
     expect(pageSnapshot({})).toBeNull();
     expect(pageSnapshot({ page: { text: 3 } })).toBeNull();
-    expect(pageSnapshot({ page: { text: "hi" } })).toEqual({ text: "hi", color: null, hue: 280, writtenAt: null, track: null });
+    expect(pageSnapshot({ page: { text: "hi" } })).toEqual({ text: "hi", color: null, hue: 280, writtenAt: null, imageUrl: null, track: null });
   });
 });
 
