@@ -199,7 +199,7 @@ export function ReactFan({
           e.preventDefault();
           if (!pressed.current) openFan(true); // a right-click; a long touch is the hold's
         }}
-        className={`flex shrink-0 select-none items-center justify-center rounded-full leading-none transition-[transform,background-color] duration-150 ${
+        className={`flex shrink-0 select-none items-center justify-center rounded-full leading-none transition-[scale,background-color] duration-150 ${
           big ? "h-12 w-12 text-[24px]" : "h-10 w-10 text-[20px]"
         } ${open ? "scale-90 bg-white/25" : "bg-white/[0.12] hover:bg-white/[0.18]"}`}
         style={{ touchAction: "none", WebkitTouchCallout: "none" }}
@@ -237,11 +237,16 @@ export function ReactFan({
                   onPointerEnter={detached ? () => setActive(i) : undefined}
                   // A see-through, frosted disc, no ring: it keeps each emoji
                   // clear over any page colour without boxing it in. The one
-                  // under the finger says so by growing and lifting, a little
-                  // brighter behind.
-                  className={`absolute flex items-center justify-center rounded-full leading-none backdrop-blur-md transition-[transform,background-color] duration-150 shadow-[0_10px_22px_-10px_rgb(0_0_0/0.6)] ${
+                  // under the finger says so by popping up — a springy
+                  // overshoot past its size, then settling — lifted and a
+                  // little brighter behind. Leaving, it just shrinks back.
+                  className={`absolute flex items-center justify-center rounded-full leading-none backdrop-blur-md transition-[scale,translate,background-color] shadow-[0_10px_22px_-10px_rgb(0_0_0/0.6)] ${
                     big ? "h-[52px] w-[52px] text-[28px]" : "h-12 w-12 text-[26px]"
-                  } ${on ? "-translate-y-2 scale-[1.4] bg-white/[0.3]" : "bg-white/[0.16]"}`}
+                  } ${
+                    on
+                      ? "-translate-y-2 scale-[1.4] bg-white/[0.3] duration-300 ease-[cubic-bezier(0.34,1.9,0.5,1)]"
+                      : "bg-white/[0.16] duration-150 ease-out"
+                  }`}
                   style={
                     {
                       left: s.x,

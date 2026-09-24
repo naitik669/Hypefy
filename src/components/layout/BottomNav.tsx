@@ -171,7 +171,7 @@ export function BottomNav({
             href="/messages"
             aria-label="Messages"
             onClick={() => haptics.tap()}
-            className={`relative flex h-12 w-12 flex-col items-center justify-center gap-1 transition-[color,transform] duration-200 active:scale-90 ${
+            className={`relative flex h-12 w-12 flex-col items-center justify-center gap-1 transition-[color,scale] duration-200 active:scale-90 ${
               messagesActive ? "text-foreground" : "text-faint hover:text-muted"
             }`}
           >
@@ -283,7 +283,7 @@ function NavItem({
       href={href}
       aria-label={label}
       onClick={() => haptics.tap()}
-      className={`flex h-12 w-12 flex-col items-center justify-center gap-1 transition-[color,transform] duration-200 active:scale-90 ${
+      className={`flex h-12 w-12 flex-col items-center justify-center gap-1 transition-[color,scale] duration-200 active:scale-90 ${
         active ? "text-foreground" : "text-faint hover:text-muted"
       }`}
     >
