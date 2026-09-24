@@ -54,6 +54,9 @@ export function FriendDiaryCard({
   const theme = diaryTheme(entry.color, entry.hue);
   const big = shape === "spotlight";
   const first = entry.name.split(" ")[0];
+  // In the deck a photo page is the photo: it fills the card edge to edge,
+  // with the name above it and the words on a dark label at its foot.
+  const bleed = big && !!entry.imageUrl;
 
   return (
     <article
@@ -63,10 +66,26 @@ export function FriendDiaryCard({
       className="relative flex flex-col overflow-hidden rounded-[28px]"
       style={{ height: big ? CARD_H : undefined, background: theme.background, boxShadow: theme.shadow }}
     >
-      <div className={`flex min-h-0 flex-1 flex-col px-4 pt-3.5 ${big ? "pb-2.5" : "gap-3 pb-3"}`}>
+      {bleed && (
+        <button type="button" onClick={onOpen} aria-label="Open this page" className="absolute inset-0 block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={entry.imageUrl!} alt="" draggable={false} className="h-full w-full object-cover" />
+          {/* Shade at the top and foot, so the name and the reply row read
+              on any photo, however bright. */}
+          <span
+            aria-hidden
+            className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,.5),transparent_28%,transparent_52%,rgba(0,0,0,.75))]"
+          />
+        </button>
+      )}
+      {/* Over a photo this layer lets taps through to it, except where
+          there is something to press. */}
+      <div
+        className={`relative flex min-h-0 flex-1 flex-col px-4 pt-3.5 ${big ? "pb-2.5" : "gap-3 pb-3"} ${bleed ? "pointer-events-none" : ""}`}
+      >
         {/* Who, and how long it has left — one block on the left; opening it
             full-screen on the right. */}
-        <header className="flex items-center gap-2.5">
+        <header className="pointer-events-auto flex items-center gap-2.5">
           <Link href={entry.username ? `/u/${entry.username}` : "#"} className="flex min-w-0 items-center gap-2.5">
             <span ref={avatar} className="shrink-0 rounded-full">
               <Avatar name={entry.name} hue={entry.hue} size={34} src={entry.avatarUrl ?? undefined} />
@@ -104,25 +123,40 @@ export function FriendDiaryCard({
           </button>
         </header>
 
-        {entry.imageUrl ? (
+        {bleed ? (
+          (entry.text || entry.track) && (
+            <div
+              onClick={onOpen}
+              className="pointer-events-auto mt-auto cursor-pointer rounded-2xl bg-black/55 px-3 py-2.5 backdrop-blur-md"
+            >
+              {entry.text && (
+                <p className="line-clamp-2 break-words text-[17px] font-extrabold leading-[1.1] tracking-[-0.02em] text-white">
+                  {entry.text}
+                </p>
+              )}
+              {entry.track && (
+                <div className={entry.text ? "mt-1.5" : ""}>
+                  <SongLine track={entry.track} />
+                </div>
+              )}
+            </div>
+          )
+        ) : entry.imageUrl ? (
           <>
-            {/* In the spotlight the card is a fixed height, so the picture
-                takes whatever height the header, words and song leave and
-                stays square by narrowing. Sized by width there, it was taller
-                than the card and the words and reply bar landed on top of it. */}
+            {/* In the list the card grows to fit: the photo, then the words. */}
             <button
               type="button"
               onClick={onOpen}
               aria-label="Open this page"
-              className={`mt-2 flex w-full justify-center ${big ? "min-h-0 flex-1" : ""}`}
+              className="mt-2 block w-full"
             >
-              <PagePhoto url={entry.imageUrl} fit={big ? "height" : "width"} />
+              <PagePhoto url={entry.imageUrl} />
             </button>
             {entry.text && (
               <p
                 onClick={onOpen}
                 className="my-2 cursor-pointer break-words font-extrabold leading-[1.06] tracking-[-0.02em] text-white line-clamp-2"
-                style={{ fontSize: fillSize(entry.text, big ? 110 : 150) }}
+                style={{ fontSize: fillSize(entry.text, 150) }}
               >
                 {entry.text}
               </p>
@@ -141,18 +175,20 @@ export function FriendDiaryCard({
           </div>
         )}
 
-        {entry.track && <SongLine track={entry.track} />}
+        {!bleed && entry.track && <SongLine track={entry.track} />}
       </div>
 
-      <DiaryResponder
-        entry={entry}
-        mine={mine}
-        onReacted={onReacted}
-        hyped={hyped}
-        onHyped={onHyped}
-        target={() => avatar.current}
-        stage={() => card.current}
-      />
+      <div className="relative">
+        <DiaryResponder
+          entry={entry}
+          mine={mine}
+          onReacted={onReacted}
+          hyped={hyped}
+          onHyped={onHyped}
+          target={() => avatar.current}
+          stage={() => card.current}
+        />
+      </div>
 
       <span
         aria-hidden

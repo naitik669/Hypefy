@@ -11,27 +11,21 @@
  * and weight they have on a page with no picture at all, so a photo page and
  * a written page read as the same thing.
  *
- * `fit="height"` is for a card whose height is fixed, like the one in the
- * spotlight deck: there the picture takes the height that is left rather than
- * the full width, and stays square by getting narrower. Sized by width in a
- * fixed-height card, a square photo was taller than the card itself and the
- * words and the reply bar ended up on top of it.
+ * The spotlight deck does not use this: there a photo page fills the whole
+ * card (see FriendDiaryCard).
  */
 export function PagePhoto({
   url,
   alt = "",
-  fit = "width",
   className = "",
 }: {
   url: string;
   /** Empty by default: the words under it are the caption. */
   alt?: string;
-  fit?: "width" | "height";
   className?: string;
 }) {
-  const size = fit === "height" ? "h-full max-w-full" : "w-full";
   return (
-    <div className={`relative aspect-square overflow-hidden rounded-2xl bg-black/25 ${size} ${className}`}>
+    <div className={`relative aspect-square overflow-hidden rounded-2xl bg-black/25 w-full ${className}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
