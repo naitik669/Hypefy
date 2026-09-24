@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { reactionSummary, type DiaryReaction } from "@/lib/diary";
 
@@ -92,8 +93,10 @@ export function byPerson(reactions: DiaryReaction[]) {
 }
 
 /**
- * The tab on your page: the faces of the first few who reacted and the
- * emoji they sent. Nothing at all when nobody has — no "no reactions yet".
+ * The strip at the foot of your page: the faces of the first few who
+ * reacted, who they are in words — "Riya and 2 others" — and what they sent,
+ * with an arrow to the full list. It reads as a line rather than a row of
+ * tiny icons. Nothing at all when nobody has reacted — no "no reactions yet".
  */
 export function ReactionsTab({
   reactions,
@@ -107,6 +110,9 @@ export function ReactionsTab({
   if (reactions.length === 0) return null;
   const people = byPerson(reactions);
   const tally = reactionSummary(reactions).slice(0, 3);
+  const lead = people[0].name.split(" ")[0];
+  const others = people.length - 1;
+  const who = others === 0 ? lead : `${lead} and ${others} other${others === 1 ? "" : "s"}`;
   return (
     <button
       type="button"
@@ -115,17 +121,28 @@ export function ReactionsTab({
         onOpen();
       }}
       aria-label={`Reactions from ${people.length} ${people.length === 1 ? "person" : "people"}`}
-      className={`flex items-center gap-1.5 rounded-full bg-black/35 py-1 pl-1 pr-2.5 text-[12px] font-bold text-white backdrop-blur-sm transition-colors hover:bg-black/50 ${className}`}
+      className={`group flex w-full items-center gap-2.5 text-left ${className}`}
     >
-      <span className="flex -space-x-1.5">
-        {people.slice(0, 3).map((p) => (
-          <span key={p.userId} className="rounded-full ring-2 ring-black/40">
-            <Avatar name={p.name} hue={p.hue} size={20} src={p.avatarUrl ?? undefined} />
+      <span className="flex shrink-0">
+        {people.slice(0, 3).map((p, i) => (
+          <span key={p.userId} className={`rounded-[30%] ring-2 ring-black/25 ${i > 0 ? "-ml-2" : ""}`}>
+            <Avatar name={p.name} hue={p.hue} size={28} src={p.avatarUrl ?? undefined} />
           </span>
         ))}
       </span>
-      <span className="tabular-nums">{tally.map((t) => t.emoji).join("")}</span>
-      <span className="tabular-nums text-white/70">{people.length}</span>
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className="block truncate text-[13px] font-bold text-white">{who}</span>
+        <span className="mt-0.5 block truncate text-xs text-white/60">
+          reacted{" "}
+          {/* Full colour: the grey of "reacted" would wash the emoji out too. */}
+          <span className="tracking-[0.15em] text-white">{tally.map((t) => t.emoji).join("")}</span>
+        </span>
+      </span>
+      <ChevronRight
+        size={17}
+        aria-hidden
+        className="shrink-0 text-white/40 transition-transform group-hover:translate-x-0.5 group-hover:text-white/70"
+      />
     </button>
   );
 }

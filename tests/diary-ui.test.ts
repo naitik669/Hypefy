@@ -484,10 +484,11 @@ describe("DiaryHome", () => {
     const floating = () => [...host.querySelectorAll(".page-float")].map((f) => f.textContent);
     expect(new Set(floating())).toEqual(new Set(["❤️", "😂", "⭐"]));
 
-    // The tab: faces and emoji, no words; it opens who sent what in a sheet
-    // over half the screen, like comments.
+    // The strip: faces, who in words, and what they sent; it opens who sent
+    // what in a sheet over half the screen, like comments.
     const tab = button("Reactions from 2 people")!;
-    expect(tab.textContent).toContain("2");
+    expect(tab.textContent).toContain("Riya and 1 other");
+    expect(tab.textContent).toMatch(/reacted.*⭐/);
     await click(tab);
     const sheet = document.querySelector('[role="dialog"]')!;
     expect(sheet.textContent).toContain("Reactions");

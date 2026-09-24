@@ -13,8 +13,9 @@ import { ReactionsTab, byPerson } from "@/components/diary/PageReactions";
 import { reactionSummary, type DiaryEntry, type DiaryReaction } from "@/lib/diary";
 
 /**
- * Your page, as your circle sees it. If anyone reacted or hyped it, a small
- * tab at its foot shows their faces and emoji; tap it for who sent what.
+ * Your page, as your circle sees it. If anyone reacted or hyped it, a strip
+ * across its foot, ruled off from the page, says who and with what; tap it
+ * for who sent what.
  * If nobody has, there is nothing there at all.
  *
  * The palette in its corner recolours it on the spot — same words, same 24
@@ -103,7 +104,7 @@ export function YourDiaryCard({
         )}
 
         {reactions.length > 0 && (
-          <div className="mt-3">
+          <div className="-mx-4 -mb-4 mt-4 border-t border-white/10 px-4 pb-4 pt-3">
             <ReactionsTab reactions={reactions} onOpen={() => setShowWho(true)} />
           </div>
         )}
