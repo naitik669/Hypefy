@@ -104,22 +104,42 @@ export function FriendDiaryCard({
           </button>
         </header>
 
-        {entry.imageUrl && (
-          <button type="button" onClick={onOpen} aria-label="Open this page" className="mt-2 block w-full">
-            <PagePhoto url={entry.imageUrl} />
-          </button>
+        {entry.imageUrl ? (
+          <>
+            {/* In the spotlight the card is a fixed height, so the picture
+                takes whatever height the header, words and song leave and
+                stays square by narrowing. Sized by width there, it was taller
+                than the card and the words and reply bar landed on top of it. */}
+            <button
+              type="button"
+              onClick={onOpen}
+              aria-label="Open this page"
+              className={`mt-2 flex w-full justify-center ${big ? "min-h-0 flex-1" : ""}`}
+            >
+              <PagePhoto url={entry.imageUrl} fit={big ? "height" : "width"} />
+            </button>
+            {entry.text && (
+              <p
+                onClick={onOpen}
+                className="my-2 cursor-pointer break-words font-extrabold leading-[1.06] tracking-[-0.02em] text-white line-clamp-2"
+                style={{ fontSize: fillSize(entry.text, big ? 110 : 150) }}
+              >
+                {entry.text}
+              </p>
+            )}
+          </>
+        ) : (
+          /* The words, in the middle of what is left. */
+          <div className="flex min-h-0 flex-1 flex-col justify-center py-2" onClick={onOpen}>
+            <p
+              className="cursor-pointer break-words font-extrabold leading-[1.06] tracking-[-0.02em] text-white"
+              // As big as the card can take: "HDB" fills it, a sentence fits.
+              style={{ fontSize: fillSize(entry.text, big ? 250 : 280) }}
+            >
+              {entry.text}
+            </p>
+          </div>
         )}
-
-        {/* The words, in the middle of what is left. */}
-        <div className="flex min-h-0 flex-1 flex-col justify-center py-2" onClick={onOpen}>
-          <p
-            className="cursor-pointer break-words font-extrabold leading-[1.06] tracking-[-0.02em] text-white"
-            // As big as the card can take: "HDB" fills it, a sentence fits.
-            style={{ fontSize: fillSize(entry.text, entry.imageUrl ? (big ? 140 : 150) : big ? 250 : 280) }}
-          >
-            {entry.text}
-          </p>
-        </div>
 
         {entry.track && <SongLine track={entry.track} />}
       </div>

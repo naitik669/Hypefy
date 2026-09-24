@@ -40,6 +40,7 @@ export function PagePhotoPicker({
   useEffect(() => {
     if (!open || !cameraSupported()) return;
     let dropped = false;
+    let bound: HTMLVideoElement | null = null;
     openCamera(facing, false)
       .then((s) => {
         if (dropped) {
@@ -47,12 +48,19 @@ export function PagePhotoPicker({
           return;
         }
         stream.current = s;
-        if (video.current) {
-          video.current.srcObject = s;
-          void video.current.play().catch(() => {});
-        }
+        const v = video.current;
         setFailed(false);
-        setReady(true);
+        if (!v) return;
+        bound = v;
+        // The shutter waits for the video to be playing, not just for the
+        // stream to open. On Android the first frames of a fresh stream come
+        // through black, and a picture taken then was uploaded as a black
+        // square.
+        v.onplaying = () => {
+          if (!dropped) setReady(true);
+        };
+        v.srcObject = s;
+        void v.play().catch(() => {});
       })
       .catch(() => {
         if (dropped) return;
@@ -61,15 +69,31 @@ export function PagePhotoPicker({
       });
     return () => {
       dropped = true;
+      if (bound) bound.onplaying = null;
       stopStream(stream.current);
       stream.current = null;
+      setReady(false);
     };
   }, [open, facing]);
 
-  function shoot() {
+  /** True when a frame is still the camera warming up: every sampled pixel
+   *  near black. A real dark room still has noise well above this. */
+  function looksBlank(ctx: CanvasRenderingContext2D, side: number): boolean {
+    const step = Math.max(1, Math.floor(side / 24));
+    const { data } = ctx.getImageData(0, 0, side, side);
+    for (let y = 0; y < side; y += step) {
+      for (let x = 0; x < side; x += step) {
+        const i = (y * side + x) * 4;
+        if (data[i] > 8 || data[i + 1] > 8 || data[i + 2] > 8) return false;
+      }
+    }
+    return true;
+  }
+
+  function shoot(attempt = 0) {
     const v = video.current;
-    if (!v || !ready) return;
-    haptics.tap();
+    if (!v || !ready || v.readyState < 2 || !v.videoWidth) return;
+    if (attempt === 0) haptics.tap();
 
     // The square the preview showed, and nothing else: the preview is
     // object-cover in a square box, so the middle square of the frame is
@@ -87,6 +111,11 @@ export function PagePhotoPicker({
       ctx.scale(-1, 1);
     }
     ctx.drawImage(v, (v.videoWidth - side) / 2, (v.videoHeight - side) / 2, side, side, 0, 0, side, side);
+    // Still warming up: try the next frame rather than keep a black square.
+    if (looksBlank(ctx, side)) {
+      if (attempt < 20) requestAnimationFrame(() => shoot(attempt + 1));
+      return;
+    }
     canvas.toBlob(
       (blob) => {
         if (!blob) return;
@@ -130,7 +159,7 @@ export function PagePhotoPicker({
 
           <button
             type="button"
-            onClick={shoot}
+            onClick={() => shoot()}
             disabled={!ready}
             aria-label="Take photo"
             className="flex h-[62px] w-[62px] items-center justify-center rounded-full border-[3px] border-foreground transition-transform active:scale-90 disabled:opacity-40"
