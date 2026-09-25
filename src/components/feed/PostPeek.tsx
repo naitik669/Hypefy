@@ -13,7 +13,7 @@ import { DisplayName } from "@/components/ui/DisplayName";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { HypeBreak } from "@/components/feed/HypeBreak";
 import { visibleDecoration } from "@/lib/cosmetics";
-import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { formatCount } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
@@ -283,7 +283,7 @@ export function PostPeek({
               <p className="flex min-w-0 items-center gap-1 text-[15px] font-semibold">
                 <DisplayName name={author.name} profile={author.cosmetics} className="truncate" />
                 {author.verified && (
-                  <VerifiedStar className="h-3.5 w-3.5 shrink-0" />
+                  <VerifiedBadge className="h-3.5 w-3.5 shrink-0" />
                 )}
               </p>
               {author.username && (

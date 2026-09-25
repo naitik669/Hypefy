@@ -30,7 +30,7 @@ import { HypeBreak } from "@/components/feed/HypeBreak";
 import { HypeProofLine } from "@/components/hype/HypeProofLine";
 import { HypedBySheet } from "@/components/hype/HypedBySheet";
 import type { HypeProof } from "@/lib/hype-proof";
-import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { DisplayName } from "@/components/ui/DisplayName";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { visibleDecoration } from "@/lib/cosmetics";
@@ -670,7 +670,7 @@ export function FeedCard({
             <DisplayName name={name} profile={profile} className="min-w-0 truncate" />
           </Link>
           {profile?.is_verified && (
-            <VerifiedStar className="h-3.5 w-3.5 shrink-0" />
+            <VerifiedBadge className="h-3.5 w-3.5 shrink-0" userId={post.user_id} />
           )}
           {isHyper && <HyperStar className="h-3.5 w-3.5 shrink-0" />}
           {isMutualHyper && <MutualHyperBadge />}

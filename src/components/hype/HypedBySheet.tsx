@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
-import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { createClient } from "@/lib/supabase/client";
 import { formatCount } from "@/lib/format";
 import type { HypeTarget } from "@/lib/hype-proof";
@@ -191,7 +191,7 @@ function HypedByList({
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5 text-sm font-bold leading-tight">
                 <span className="truncate">{r.name ?? r.username}</span>
-                {r.is_verified && <VerifiedStar className="h-3.5 w-3.5 shrink-0" />}
+                {r.is_verified && <VerifiedBadge className="h-3.5 w-3.5 shrink-0" userId={r.id} />}
               </span>
               <span className="block truncate text-xs text-muted">
                 @{r.username}

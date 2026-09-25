@@ -23,7 +23,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Avatar } from "@/components/ui/Avatar";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { DisplayName } from "@/components/ui/DisplayName";
-import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { ExpandableText } from "@/components/ui/ExpandableText";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { ShareIcon } from "@/components/ui/ShareIcon";
@@ -514,7 +514,7 @@ export function ShotFeedCard({
             <DisplayName name={name} profile={profile} className="min-w-0 truncate" />
           </Link>
           {profile?.is_verified && (
-            <VerifiedStar className="h-3.5 w-3.5 shrink-0" />
+            <VerifiedBadge className="h-3.5 w-3.5 shrink-0" userId={shot.user_id} />
           )}
           <span className="ml-1 text-xs text-faint">
             · {timeAgoShort(shot.created_at)}

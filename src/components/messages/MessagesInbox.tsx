@@ -24,7 +24,7 @@ import { isEmojiReply } from "@/components/diary/PageReplyEmbed";
 import { Avatar } from "@/components/ui/Avatar";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { DisplayName } from "@/components/ui/DisplayName";
-import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { visibleDecoration } from "@/lib/cosmetics";
 import { visibleNameplate } from "@/lib/nameplates";
 import { Nameplate } from "@/components/ui/Nameplate";
@@ -673,7 +673,7 @@ export function MessagesInbox({
                 }`}
               >
                 <DisplayName name={r.name} profile={r.cosmetics} className="min-w-0 truncate" />
-                {r.verified && <VerifiedStar className="ml-1 h-3.5 w-3.5 shrink-0" />}
+                {r.verified && <VerifiedBadge className="ml-1 h-3.5 w-3.5 shrink-0" />}
                 {r.isGroup && (
                   <span className="ml-1.5 shrink-0 whitespace-nowrap text-xs font-normal text-faint">
                     · {r.memberCount}

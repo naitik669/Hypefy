@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/ui/Avatar";
-import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 
 /**
  * The public face of Hypefy.
@@ -170,7 +170,7 @@ export default async function ExplorePage() {
                         {u.display_name ?? u.username}
                       </span>
                       {u.is_verified && (
-                        <VerifiedStar className="h-3.5 w-3.5 shrink-0" />
+                        <VerifiedBadge className="h-3.5 w-3.5 shrink-0" />
                       )}
                     </div>
                     <p className="truncate text-xs text-faint">

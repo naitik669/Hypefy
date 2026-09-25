@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Avatar } from "@/components/ui/Avatar";
-import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import type { SuggestedUser } from "@/lib/mock-discover";
 
 export function UserSuggestionCard({
@@ -63,7 +63,7 @@ export function UserSuggestionCard({
         >
           <span className="truncate text-sm font-semibold">{user.name}</span>
           {user.verified && (
-            <VerifiedStar className="h-5 w-5 shrink-0" />
+            <VerifiedBadge className="h-5 w-5 shrink-0" />
           )}
         </Link>
         <p className="truncate text-xs text-muted">{user.handle}</p>

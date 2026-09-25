@@ -39,7 +39,7 @@ import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
 import { ChatAmbient } from "@/components/messages/ChatAmbient";
 import { resolveBubble } from "@/lib/bubble-styles";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
-import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { DisplayName } from "@/components/ui/DisplayName";
 import { visibleDecoration } from "@/lib/cosmetics";
 import { MediaFolder, AlbumViewer } from "@/components/messages/MediaFolder";
@@ -1541,7 +1541,7 @@ export function RealChatView({
             <div className="min-w-0">
               <p className="flex min-w-0 items-center gap-1 text-sm font-semibold">
                 <DisplayName name={other.name} profile={other.cosmetics} className="truncate" />
-                {other.verified && <VerifiedStar className="h-3.5 w-3.5 shrink-0" />}
+                {other.verified && <VerifiedBadge className="h-3.5 w-3.5 shrink-0" />}
               </p>
               {(() => {
                 const pres = presenceLabel(otherLastSeen);
