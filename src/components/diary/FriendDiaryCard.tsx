@@ -130,21 +130,20 @@ export function FriendDiaryCard({
         </header>
 
         {bleed ? (
+          /* The words sit straight on the photo — no panel, so the picture
+             keeps the whole card — and the song is a frosted squircle above
+             the reply bar, sized to its own text. */
           (entry.text || entry.track) && (
-            <div
-              onClick={onOpen}
-              className="pointer-events-auto mt-auto cursor-pointer rounded-2xl bg-black/55 px-3 py-2.5 backdrop-blur-md"
-            >
+            <div onClick={onOpen} className="pointer-events-auto mt-auto flex cursor-pointer flex-col items-start gap-2">
               {entry.text && (
-                <p className="line-clamp-2 break-words text-[17px] font-extrabold leading-[1.1] tracking-[-0.02em] text-white">
+                <p
+                  className="line-clamp-3 break-words font-extrabold leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_2px_12px_rgb(0_0_0/0.55)]"
+                  style={{ fontSize: fillSize(entry.text, 150) }}
+                >
                   {entry.text}
                 </p>
               )}
-              {entry.track && (
-                <div className={entry.text ? "mt-1.5" : ""}>
-                  <SongLine track={entry.track} />
-                </div>
-              )}
+              {entry.track && <SongLine track={entry.track} glass />}
             </div>
           )
         ) : entry.imageUrl ? (
