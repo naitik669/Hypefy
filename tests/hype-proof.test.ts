@@ -53,8 +53,10 @@ describe("the hype line", () => {
     expect(said?.names).toEqual(["Aman", "Craziematez"]);
   });
 
-  it("puts you first when you hyped it too, which doubles as the receipt", () => {
-    expect(say(proofSentence([AMAN, CRAZIE], 11, true))).toBe("You, Aman & 9 others hyped this");
+  it("never names the viewer — the filled gold star already said that", () => {
+    // You hyped it and so did two friends. Naming "You" would spend one of
+    // only two slots restating what the star beside the count already shows.
+    expect(say(proofSentence([AMAN, CRAZIE], 11))).toBe("Aman, Craziematez & 9 others hyped this");
   });
 
   it("says one other, singular, when exactly one is left", () => {

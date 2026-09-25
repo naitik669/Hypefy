@@ -22,18 +22,16 @@ import { proofSentence, type Previewer } from "@/lib/hype-proof";
 export function HypeProofLine({
   previewers,
   total,
-  youHyped = false,
   onOpen,
   glass = false,
 }: {
   previewers: Previewer[];
   /** The post's own hype_count — already loaded, never re-counted. */
   total: number;
-  youHyped?: boolean;
   onOpen: () => void;
   glass?: boolean;
 }) {
-  const said = proofSentence(previewers, total, youHyped);
+  const said = proofSentence(previewers, total);
   if (!said) return null;
 
   // Three faces read as a group; two names is the most anyone reads without

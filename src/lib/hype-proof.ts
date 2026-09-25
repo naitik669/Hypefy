@@ -86,17 +86,19 @@ function label(p: Previewer): string {
  *
  * Nobody you follow gets no line at all — the count in the action row already
  * said that, and "1,204 people you don't know hyped this" helps no one.
+ *
+ * It never names the viewer. The star beside the count is already filled and
+ * gold once you have hyped something, so "You, Aman & 5 others" spends one of
+ * only two name slots restating what the star said. You are still in the
+ * total, and you still lead the Hyped-by list.
  */
 export function proofSentence(
   previewers: Previewer[],
   total: number,
-  /** Whether the viewer hyped it too; they lead, and it doubles as the receipt. */
-  youHyped = false,
 ): { names: string[]; joiner: string; tail: string } | null {
   if (previewers.length === 0) return null;
 
-  const named = previewers.slice(0, 2).map(label);
-  const names = youHyped ? ["You", ...named].slice(0, 2) : named;
+  const names = previewers.slice(0, 2).map(label);
   const rest = Math.max(0, total - names.length);
 
   // Two people is a sentence, so they get "and". Once there is a remainder it

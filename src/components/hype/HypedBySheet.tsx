@@ -27,7 +27,7 @@ type Row = {
   username: string | null;
   avatar_url: string | null;
   hue: number | null;
-  relation: "you" | "close" | "mutual" | "following" | "other";
+  relation: "you" | "close" | "talk" | "mutual" | "following" | "other";
   is_verified: boolean | null;
 };
 
@@ -36,6 +36,7 @@ const PAGE = 30;
 const RELATION: Record<Row["relation"], string | null> = {
   you: "you",
   close: "close friend",
+  talk: "you talk",
   mutual: "mutual",
   following: "you follow",
   other: null,

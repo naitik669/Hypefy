@@ -708,7 +708,6 @@ export function ShotFeedCard({
           <HypeProofLine
             previewers={proof.previewers}
             total={hypeCount}
-            youHyped={hyped}
             onOpen={() => setHypedBySheet(true)}
           />
         </div>
