@@ -27,6 +27,9 @@ import { ShareButton } from "@/components/feed/QuickShare";
 import { EditPostSheet } from "@/components/feed/EditPostSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { HypeBreak } from "@/components/feed/HypeBreak";
+import { HypeProofLine } from "@/components/hype/HypeProofLine";
+import { HypedBySheet } from "@/components/hype/HypedBySheet";
+import type { HypeProof } from "@/lib/hype-proof";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { DisplayName } from "@/components/ui/DisplayName";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
@@ -118,6 +121,7 @@ export function FeedCard({
   initialIsMutualHyper,
   focusCommentId = null,
   showId,
+  proof,
 }: {
   post: FeedPost;
   currentUserId: string;
@@ -129,6 +133,8 @@ export function FeedCard({
    * the top of the feed uses.
    */
   showId?: string;
+  /** Who of your people hyped this, fetched once for the whole feed page. */
+  proof?: HypeProof;
   /** Hyper status resolved by the parent (FeedList) — skips a per-card query.
    *  Undefined for standalone cards (post page, profile viewer), which self-fetch. */
   initialIsHyper?: boolean;
@@ -147,6 +153,7 @@ export function FeedCard({
   // so hype/save work on every surface (profile modal, search, discover...).
   const [uid, setUid] = useState(currentUserId);
 
+  const [hypedBySheet, setHypedBySheet] = useState(false);
   const [hyped, setHyped] = useState(post.initialHyped ?? false);
   const [hypeCount, setHypeCount] = useState(post.hype_count);
   const [hypePending, setHypePending] = useState(false);
@@ -873,6 +880,29 @@ export function FeedCard({
           />
         </button>
       </div>
+
+      {/* Who, of the people you follow, hyped this. The count above stays
+          exact but loses its weight; these two names carry the bold. */}
+      {proof && (
+        <div className="px-4 pt-2">
+          <HypeProofLine
+            previewers={proof.previewers}
+            total={hypeCount}
+            youHyped={hyped}
+            onOpen={() => setHypedBySheet(true)}
+          />
+        </div>
+      )}
+      {proof && (
+        <HypedBySheet
+          open={hypedBySheet}
+          onClose={() => setHypedBySheet(false)}
+          targetType="post"
+          targetId={post.id}
+          total={hypeCount}
+          friendCount={proof.friendCount}
+        />
+      )}
 
       {/* Caption -- clamps long text with a more / less toggle */}
       {(liveCaption || liveBody) && (

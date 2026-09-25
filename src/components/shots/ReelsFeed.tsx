@@ -12,6 +12,9 @@ import { ShareSheet } from "@/components/feed/ShareSheet";
 import { ShareButton } from "@/components/feed/QuickShare";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { HypeBreak } from "@/components/feed/HypeBreak";
+import { HypeProofLine } from "@/components/hype/HypeProofLine";
+import { HypedBySheet } from "@/components/hype/HypedBySheet";
+import { fetchHypeProof, type HypeProof } from "@/lib/hype-proof";
 import { formatCount } from "@/lib/format";
 import { ExpandableText } from "@/components/ui/ExpandableText";
 import { haptics } from "@/lib/haptics";
@@ -375,6 +378,11 @@ function ReelCard({
 
   const [hyped, setHyped] = useState(false);
   const [hypeCount, setHypeCount] = useState(reel.hype_count ?? 0);
+  // Who of your people hyped this. A Shot is one screen at a time, so there
+  // is no page to batch — it is fetched per reel, once, when it becomes the
+  // one you are watching.
+  const [proof, setProof] = useState<HypeProof | null>(null);
+  const [hypedBySheet, setHypedBySheet] = useState(false);
   const [hypePending, setHypePending] = useState(false);
 
   const [commentCount, setCommentCount] = useState(reel.comment_count ?? 0);
@@ -565,6 +573,21 @@ function ReelCard({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, sheetOpen]);
+
+  // Who of your people hyped this, once it is the reel being watched.
+  // Never for the ones queued either side: three avatars each, for Shots
+  // nobody may reach.
+  useEffect(() => {
+    if (!isActive || !currentUserId || proof) return;
+    let alive = true;
+    void fetchHypeProof("shot", [reel.id]).then((found) => {
+      const mine = found.get(reel.id);
+      if (alive && mine) setProof(mine);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [isActive, currentUserId, reel.id, proof]);
 
   // Load hype + saved state for the current user.
   useEffect(() => {
@@ -1039,6 +1062,15 @@ function ReelCard({
             {handle ? `@${handle}` : name}
           </span>
         </Link>
+        {proof && (
+          <HypeProofLine
+            glass
+            previewers={proof.previewers}
+            total={hypeCount}
+            youHyped={hyped}
+            onOpen={() => setHypedBySheet(true)}
+          />
+        )}
         {reel.caption && (
           <ExpandableText
             clampClass="line-clamp-2"
@@ -1049,6 +1081,17 @@ function ReelCard({
           </ExpandableText>
         )}
       </div>
+
+      {proof && (
+        <HypedBySheet
+          open={hypedBySheet}
+          onClose={() => setHypedBySheet(false)}
+          targetType="shot"
+          targetId={reel.id}
+          total={hypeCount}
+          friendCount={proof.friendCount}
+        />
+      )}
 
       {/* Playback progress — thin accent bar hugging the bottom edge */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[3px] bg-white/15">

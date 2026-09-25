@@ -16,7 +16,7 @@ export default async function PrivacySettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_private, dm_privacy, show_activity, hide_read_receipts")
+    .select("is_private, dm_privacy, show_activity, hide_read_receipts, show_hypes")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -34,6 +34,7 @@ export default async function PrivacySettingsPage() {
           }
           initialShowActivity={(profile as any)?.show_activity ?? true}
           initialHideReadReceipts={!!(profile as any)?.hide_read_receipts}
+          initialShowHypes={(profile as any)?.show_hypes ?? true}
         />
 
         {/* Two-factor moved to its own page. Left as a pointer rather than

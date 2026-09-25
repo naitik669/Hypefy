@@ -17,6 +17,7 @@ import { ShotFeedCard } from "@/components/feed/ShotFeedCard";
 import { AdFeedCard } from "@/components/feed/AdFeedCard";
 import { noteAdShown } from "@/lib/ads";
 import { useAdFill, useAdSlots } from "@/components/feed/useAdSlots";
+import { useHypeProof } from "@/components/hype/useHypeProof";
 
 const PAGE_SIZE = 20;
 const POST_SELECT =
@@ -292,6 +293,13 @@ export function FeedList({
   const activePosts = tab === "foryou" ? posts : idsState[tab].posts;
   const activeDone = tab === "foryou" ? fyDone : idsState[tab].done;
 
+  // Who of your people hyped each card, asked once for the whole page rather
+  // than once per card — ten cards a screen would otherwise be ten round
+  // trips, and another twenty every time the feed grows. Cards with no answer
+  // draw exactly as they did before.
+  const postProof = useHypeProof("post", activePosts.map((p) => p.id));
+  const shotProof = useHypeProof("shot", shots.map((s) => s.id));
+
   // Ads, on every tab. Each tab is its own lane, so Following keeps its
   // placements while you look at For You and switching back loses nothing.
   // Only For You has shots to keep clear of. A pull-to-refresh changes
@@ -357,6 +365,7 @@ export function FeedList({
                 shot={item.shot}
                 currentUserId={currentUserId}
                 showId={showByUser[item.shot.user_id]}
+                proof={shotProof.get(item.shot.id)}
               />
             </Reveal>
           ) : (
@@ -372,6 +381,7 @@ export function FeedList({
                 initialIsHyper={hyperSet.has(item.post.user_id)}
                 initialIsMutualHyper={mutualHyperSet.has(item.post.user_id)}
                 showId={showByUser[item.post.user_id]}
+                proof={postProof.get(item.post.id)}
               />
             </Reveal>
           )

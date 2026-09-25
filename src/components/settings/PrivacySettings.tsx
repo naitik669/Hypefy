@@ -11,12 +11,14 @@ export function PrivacySettings({
   initialDmPrivacy,
   initialShowActivity,
   initialHideReadReceipts,
+  initialShowHypes,
 }: {
   userId: string;
   initialIsPrivate: boolean;
   initialDmPrivacy: "everyone" | "following";
   initialShowActivity: boolean;
   initialHideReadReceipts: boolean;
+  initialShowHypes: boolean;
 }) {
   const supabase = createClient();
   const toast = useToast();
@@ -24,6 +26,7 @@ export function PrivacySettings({
   const [dmPrivacy, setDmPrivacy] = useState(initialDmPrivacy);
   const [showActivity, setShowActivity] = useState(initialShowActivity);
   const [hideReceipts, setHideReceipts] = useState(initialHideReadReceipts);
+  const [showHypes, setShowHypes] = useState(initialShowHypes);
   /**
    * Which single control is mid-save — not a panel-wide flag.
    *
@@ -41,6 +44,7 @@ export function PrivacySettings({
       dm_privacy?: string;
       show_activity?: boolean;
       hide_read_receipts?: boolean;
+      show_hypes?: boolean;
     }
   ) {
     setPending(key);
@@ -63,6 +67,16 @@ export function PrivacySettings({
     setShowActivity(next);
     if (!(await save("activity", { show_activity: next })))
       setShowActivity(!next);
+  }
+
+  /**
+   * Whether your name appears when someone you both know sees something you
+   * hyped. Separate from show_activity, which is about last-seen: hiding when
+   * you were online is a different decision from hiding what you liked.
+   */
+  async function toggleShowHypes(next: boolean) {
+    setShowHypes(next);
+    if (!(await save("hypes", { show_hypes: next }))) setShowHypes(!next);
   }
 
   async function toggleReceipts(next: boolean) {
@@ -97,6 +111,15 @@ export function PrivacySettings({
             checked={showActivity}
             onChange={toggleActivity}
             disabled={pending === "activity"}
+          />
+        </div>
+        <div className="mt-2">
+          <SettingToggle
+            label="Show my name when I hype"
+            sub="Let people you both know see that you hyped a post or Shot. Your hypes still count either way."
+            checked={showHypes}
+            onChange={toggleShowHypes}
+            disabled={pending === "hypes"}
           />
         </div>
         <div className="mt-2">

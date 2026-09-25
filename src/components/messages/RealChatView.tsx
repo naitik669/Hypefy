@@ -18,6 +18,7 @@ import { GifPicker } from "@/components/messages/GifPicker";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { TrackChip } from "@/components/music/TrackChip";
 import { musicSnippet, packTrack, unpackTrack } from "@/lib/music-message";
+import { EmptyThread } from "@/components/messages/EmptyThread";
 import type { Track } from "@/lib/music";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { FloatingMenu, MenuItem, MenuDivider } from "@/components/ui/FloatingMenu";
@@ -941,9 +942,13 @@ export function RealChatView({
     supabase.rpc("toggle_reaction", { p_message_id: messageId, p_emoji: emoji }).then(() => {});
   }
 
-  async function send() {
+  /**
+   * @param override Send this instead of whatever is in the composer. Used by
+   * the empty thread's Hey, which has nothing typed to read.
+   */
+  async function send(override?: string) {
     if (editing) { await saveEdit(); return; }
-    const body = text.trim();
+    const body = (override ?? text).trim();
     if (!body || sending) return;
     haptics.tap();
     setSending(true);
@@ -1628,29 +1633,13 @@ export function RealChatView({
           </div>
         )}
         {messages.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-            {isGroup ? (
-              <span className="flex h-16 w-16 items-center justify-center rounded-[30%]"
-                style={{ background: "linear-gradient(140deg, hsl(210 70% 52%), hsl(260 65% 42%))" }}>
-                <Users size={30} className="text-white/95" />
-              </span>
-            ) : (
-              <Avatar name={other.name} hue={other.hue} size={64} src={other.avatarUrl ?? undefined} />
-            )}
-            <p className="mt-2 text-sm font-semibold">{isGroup ? group!.title : other.name}</p>
-            <p className="text-xs text-muted">
-              {isGroup ? `${group!.memberCount} members` : "This is the start of your conversation."}
-            </p>
-            {!isGroup && (
-              <button
-                type="button"
-                onClick={() => { setText("hey 👋"); composerRef.current?.focus(); }}
-                className="mt-2 rounded-pill border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-transform active:scale-95"
-              >
-                Say hi 👋
-              </button>
-            )}
-          </div>
+          <EmptyThread
+            isGroup={isGroup}
+            groupTitle={group?.title}
+            groupMemberCount={group?.memberCount}
+            other={other}
+            onSayHey={() => void send("Hey")}
+          />
         ) : (
           <div className="flex flex-col gap-1.5">
             {messages.map((m, i) => {
@@ -2310,7 +2299,7 @@ export function RealChatView({
             {(text.trim() || attachment || editing) && (
               <button
                 type="button"
-                onClick={editing || text.trim() ? send : sendAttachment}
+                onClick={editing || text.trim() ? () => void send() : sendAttachment}
                 disabled={sending || uploading}
                 aria-label={editing ? "Save changes" : "Send"}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"

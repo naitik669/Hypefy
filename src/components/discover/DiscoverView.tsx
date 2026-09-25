@@ -12,6 +12,7 @@ import { UserSuggestionCard } from "@/components/discover/UserSuggestionCard";
 import { PinFeed, type Pin } from "@/components/discover/PinFeed";
 import { formatCount } from "@/lib/format";
 import { reshuffle } from "@/lib/discover-mix";
+import { HypedByYourPeople } from "@/components/discover/HypedByYourPeople";
 
 type Shot = {
   id: string;
@@ -157,6 +158,19 @@ export function DiscoverView({
           <Section title={topic.label}>
             <PinFeed posts={topic.posts} currentUserId={currentUserId} />
           </Section>
+        )}
+
+        {/* One reason over a row of three, before the grid. It answers
+            "why am I seeing this" without exposing the ranking, and it only
+            appears when three of these actually carry it. */}
+        {cat === "Shots" && trendingShots.length > 0 && (
+          <HypedByYourPeople
+            shots={trendingShots}
+            renderTile={(id) => {
+              const s = trendingShots.find((x) => x.id === id);
+              return s ? <ShotTile shot={s} /> : null;
+            }}
+          />
         )}
 
         {cat === "Shots" &&

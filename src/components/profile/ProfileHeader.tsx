@@ -15,6 +15,7 @@ import {
   type ProfileNote,
 } from "@/components/profile/ProfileStatusBubble";
 import { STATUS_ENABLED } from "@/lib/status-feature";
+import { SharedFollowsLine } from "@/components/profile/SharedFollowsLine";
 
 /**
  * Profile hero — banner, the squircle avatar overlapping its bottom-left
@@ -158,6 +159,11 @@ export function ProfileHeader({
             userId={anthemEditable ? userId : undefined}
           />
           {bio && <p className="mt-1.5 text-sm leading-snug">{bio}</p>}
+          {/* Someone else's profile: the people you have in common. Not on
+              your own, where it would compare you to yourself. */}
+          {currentUserId && currentUserId !== userId && (
+            <SharedFollowsLine otherId={userId} />
+          )}
         </div>
 
         {/* Profile tags */}

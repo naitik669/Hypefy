@@ -31,6 +31,9 @@ import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
 import { ShareButton } from "@/components/feed/QuickShare";
 import { HypeBreak } from "@/components/feed/HypeBreak";
+import { HypeProofLine } from "@/components/hype/HypeProofLine";
+import { HypedBySheet } from "@/components/hype/HypedBySheet";
+import type { HypeProof } from "@/lib/hype-proof";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { useToast } from "@/components/ui/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
@@ -135,17 +138,21 @@ export function ShotFeedCard({
   shot,
   currentUserId,
   showId,
+  proof,
 }: {
   shot: ShotCard;
   currentUserId?: string;
   /** The author's live Show, if they have one — their face opens it. */
   showId?: string;
+  /** Who of your people hyped this, fetched once for the whole feed page. */
+  proof?: HypeProof;
 }) {
   const supabase = createClient();
   const name =
     shot.profiles?.display_name ?? shot.profiles?.username ?? "Someone";
   const username = shot.profiles?.username;
 
+  const [hypedBySheet, setHypedBySheet] = useState(false);
   const [hyped, setHyped] = useState(false);
   const [hypeCount, setHypeCount] = useState(shot.hype_count ?? 0);
   const [hypePending, setHypePending] = useState(false);
@@ -692,6 +699,30 @@ export function ShotFeedCard({
           />
         </button>
       </div>
+
+      {/* Who of your people hyped this. A Shot card in the feed is not
+          full-bleed, so it takes the same plain line a post does; the glass
+          squircle is for the full-screen viewer. */}
+      {proof && (
+        <div className="px-4 pt-2">
+          <HypeProofLine
+            previewers={proof.previewers}
+            total={hypeCount}
+            youHyped={hyped}
+            onOpen={() => setHypedBySheet(true)}
+          />
+        </div>
+      )}
+      {proof && (
+        <HypedBySheet
+          open={hypedBySheet}
+          onClose={() => setHypedBySheet(false)}
+          targetType="shot"
+          targetId={shot.id}
+          total={hypeCount}
+          friendCount={proof.friendCount}
+        />
+      )}
 
       {/* Caption, written the way a post's is: the author, then what they
           said, clamped with a more / less toggle. */}
