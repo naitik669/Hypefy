@@ -63,7 +63,7 @@ export function UserSuggestionCard({
         >
           <span className="truncate text-sm font-semibold">{user.name}</span>
           {user.verified && (
-            <VerifiedStar className="h-5 w-5 shrink-0 text-verified" />
+            <VerifiedStar className="h-5 w-5 shrink-0" />
           )}
         </Link>
         <p className="truncate text-xs text-muted">{user.handle}</p>

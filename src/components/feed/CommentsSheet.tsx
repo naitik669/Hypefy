@@ -1115,7 +1115,7 @@ const Row = memo(function Row({
                 of glows down the side of it turns reading who said what into
                 work. The badge still shows; the font does not. */}
             <span className="truncate text-sm font-semibold">{name}</span>
-            {node.profiles?.is_verified && <VerifiedStar className="h-3 w-3 shrink-0 text-verified" />}
+            {node.profiles?.is_verified && <VerifiedStar className="h-3 w-3 shrink-0" />}
             <span className="text-xs text-faint">
               · {timeAgoShort(node.created_at)}
             </span>

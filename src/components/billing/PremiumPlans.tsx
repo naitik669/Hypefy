@@ -15,7 +15,7 @@ const noop = () => () => {};
 
 /** The two plans side by side, row by row. `verified` is whether the ₹99 plan has it; Premium has them all. */
 const ROWS: { icon: React.ReactNode; name: string; sub: string; verified: boolean }[] = [
-  { icon: <VerifiedStar className="h-[18px] w-[18px] text-verified" />, name: "Verified badge", sub: "The blue star", verified: true },
+  { icon: <VerifiedStar className="h-[18px] w-[18px]" />, name: "Verified badge", sub: "The blue star", verified: true },
   { icon: <Type size={17} />, name: "Name styles", sub: "Fonts and glows", verified: false },
   { icon: <Frame size={17} />, name: "Avatar frames", sub: "On every post and chat", verified: false },
   { icon: <MessageCircle size={17} />, name: "Bubbles & nameplates", sub: "Your look in Messages", verified: false },
@@ -195,7 +195,7 @@ export function PremiumPlans({
         {!hasPremium && (
           hasVerified ? (
             <p className="mt-3 flex h-11 items-center justify-center gap-1.5 text-[14px] font-semibold text-muted">
-              <VerifiedStar className="h-4 w-4 text-verified" /> Verified · Active
+              <VerifiedStar className="h-4 w-4" /> Verified · Active
             </p>
           ) : native ? null : (
             <button

@@ -507,7 +507,7 @@ export function ShotFeedCard({
             <DisplayName name={name} profile={profile} className="min-w-0 truncate" />
           </Link>
           {profile?.is_verified && (
-            <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />
+            <VerifiedStar className="h-3.5 w-3.5 shrink-0" />
           )}
           <span className="ml-1 text-xs text-faint">
             · {timeAgoShort(shot.created_at)}

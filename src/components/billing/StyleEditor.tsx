@@ -115,7 +115,7 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
             </div>
             <p className="mt-3 flex items-center gap-1.5 text-lg font-bold leading-tight">
               <span className="truncate" style={withGlowRoom(nameStyle(view))}>{name}</span>
-              {me.is_verified && <VerifiedStar className="h-4 w-4 shrink-0 text-verified" />}
+              {me.is_verified && <VerifiedStar className="h-4 w-4 shrink-0" />}
             </p>
             {me.username && <p className="text-[13px] text-muted">@{me.username}</p>}
             <div className="mt-4 flex flex-col gap-2">

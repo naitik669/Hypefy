@@ -317,7 +317,7 @@ function MockProfile() {
         {/* Identity */}
         <div className="mt-2.5 flex items-center gap-1.5">
           <span className="text-[17px] font-bold leading-tight">Maya Rivera</span>
-          <VerifiedStar className="h-4 w-4 text-verified" />
+          <VerifiedStar className="h-4 w-4" />
         </div>
         <p className="text-sm text-muted">@maya</p>
         <p className="mt-1.5 text-sm leading-snug text-foreground/90">

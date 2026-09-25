@@ -19,11 +19,11 @@ export function VerifiedBadgeButton({ name, isOwn }: { name: string; isOwn: bool
         aria-label="About the Verified badge"
         className="-m-1 flex shrink-0 items-center p-1"
       >
-        <VerifiedStar className="h-4 w-4 text-verified" />
+        <VerifiedStar className="h-4 w-4" />
       </button>
       <BottomSheet open={open} onClose={() => setOpen(false)}>
         <div className="flex flex-col items-center px-2 pb-4 pt-2 text-center">
-          <VerifiedStar className="h-14 w-14 text-verified drop-shadow-[0_0_18px_rgba(56,151,240,0.45)]" />
+          <VerifiedStar className="h-14 w-14 drop-shadow-[0_0_18px_rgba(77,141,255,0.45)]" />
           <p className="mt-3 text-lg font-extrabold">Verified</p>
           <p className="mt-1 max-w-[32ch] text-sm text-muted">
             {isOwn

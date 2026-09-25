@@ -170,7 +170,7 @@ export default async function ExplorePage() {
                         {u.display_name ?? u.username}
                       </span>
                       {u.is_verified && (
-                        <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />
+                        <VerifiedStar className="h-3.5 w-3.5 shrink-0" />
                       )}
                     </div>
                     <p className="truncate text-xs text-faint">

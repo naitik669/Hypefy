@@ -1536,7 +1536,7 @@ export function RealChatView({
             <div className="min-w-0">
               <p className="flex min-w-0 items-center gap-1 text-sm font-semibold">
                 <DisplayName name={other.name} profile={other.cosmetics} className="truncate" />
-                {other.verified && <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />}
+                {other.verified && <VerifiedStar className="h-3.5 w-3.5 shrink-0" />}
               </p>
               {(() => {
                 const pres = presenceLabel(otherLastSeen);

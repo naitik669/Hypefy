@@ -261,7 +261,7 @@ function Name({ data, centred = false, size = "lg" }: { data: ProfileCardData; c
           <DisplayName name={data.name} profile={data.cosmetics} className="min-w-0 truncate" />
         </h2>
         {data.verified && (
-          <VerifiedStar className={`shrink-0 text-verified ${size === "lg" ? "h-5 w-5" : "h-[17px] w-[17px]"}`} />
+          <VerifiedStar className={`shrink-0 ${size === "lg" ? "h-5 w-5" : "h-[17px] w-[17px]"}`} />
         )}
       </div>
       {data.username && <p className="text-sm text-foreground/55">@{data.username}</p>}

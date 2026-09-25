@@ -11,7 +11,6 @@ import { FilterPills } from "@/components/ui/FilterPills";
 import { EmptyScene, ghostCtaClass } from "@/components/empty/EmptyScene";
 import { FishingArt } from "@/components/empty/scenes";
 import { Avatar } from "@/components/ui/Avatar";
-import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { type FeedPost } from "@/components/feed/FeedCard";
 import { PostResultsGrid } from "@/components/search/PostResultsGrid";
 import { ListRowSkeleton } from "@/components/skeletons/Skeletons";

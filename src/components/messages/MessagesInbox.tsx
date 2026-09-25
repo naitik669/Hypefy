@@ -673,7 +673,7 @@ export function MessagesInbox({
                 }`}
               >
                 <DisplayName name={r.name} profile={r.cosmetics} className="min-w-0 truncate" />
-                {r.verified && <VerifiedStar className="ml-1 h-3.5 w-3.5 shrink-0 text-verified" />}
+                {r.verified && <VerifiedStar className="ml-1 h-3.5 w-3.5 shrink-0" />}
                 {r.isGroup && (
                   <span className="ml-1.5 shrink-0 whitespace-nowrap text-xs font-normal text-faint">
                     · {r.memberCount}

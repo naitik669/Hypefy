@@ -18,7 +18,6 @@ export const contentType = "image/png";
 
 const BG = "#0a0a0a";
 const ACCENT = "#a3e635";
-const VERIFIED = "#3897f0";
 const PHOTO_W = 520;
 
 // Spelled out in full so the build sees which files are read and ships them
@@ -163,19 +162,37 @@ function Stat({ icon, value, label }: { icon: React.ReactNode; value: string; la
   );
 }
 
-/** Hypefy's verified seal — the same shape as VerifiedStar. */
+/**
+ * Hypefy's verified badge — the same mark as VerifiedStar, redrawn for the
+ * card renderer, which reads plain CSS more reliably than it reads an SVG
+ * gradient. The squircle is a rounded box with the light on it and the star
+ * sits inside, so the two stay the same badge.
+ */
 function Seal() {
   return (
-    <svg width="54" height="54" viewBox="0 0 24 24" style={{ marginLeft: 12, flexShrink: 0 }}>
-      <path
-        fill={VERIFIED}
-        d="M 9.32 5.53 Q 12 2 14.68 5.53 Q 19.07 4.93 18.47 9.32 Q 22 12 18.47 14.68 Q 19.07 19.07 14.68 18.47 Q 12 22 9.32 18.47 Q 4.93 19.07 5.53 14.68 Q 2 12 5.53 9.32 Q 4.93 4.93 9.32 5.53 Z"
-      />
-      <path
-        fill="#fff"
-        d="M 12 6 L 13.41 10.06 L 17.71 10.15 L 14.28 12.74 L 15.53 16.85 L 12 14.4 L 8.47 16.85 L 9.72 12.74 L 6.29 10.15 L 10.59 10.06 Z"
-      />
-    </svg>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 54,
+        height: 54,
+        marginLeft: 12,
+        flexShrink: 0,
+        borderRadius: 18,
+        background: "linear-gradient(180deg, #6aa4ff, #1b48cc)",
+      }}
+    >
+      <svg width="54" height="54" viewBox="0 0 24 24">
+        <path
+          d="M 12 5.8 L 13.7 9.65 L 17.9 10.08 L 14.76 12.9 L 15.64 17.02 L 12 14.9 L 8.36 17.02 L 9.24 12.9 L 6.1 10.08 L 10.3 9.65 Z"
+          fill="#fff"
+          stroke="#fff"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
   );
 }
 

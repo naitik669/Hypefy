@@ -61,7 +61,7 @@ export function SubscriptionList({ subs }: { subs: SubRow[] }) {
           const cancellable = s.provider === "razorpay" && !s.cancel_at_period_end;
           return (
             <li key={s.id} className="flex items-start gap-3 px-3 py-3.5">
-              <VerifiedStar className="mt-0.5 h-8 w-8 shrink-0 text-verified" />
+              <VerifiedStar className="mt-0.5 h-8 w-8 shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold">{plan?.name ?? s.plan}</p>
                 <p className="mt-0.5 text-xs leading-snug text-muted">{planStatusLine(s)}</p>

@@ -19,7 +19,7 @@
   --color-accent: #a3e635; /* brand: electric lime — deepened for calm on black */
   --color-accent-ink: #0a0a0a; /* text on accent fills */
   --color-hype: #ffd000; /* active Hype star */
-  --color-verified: #3897f0; /* Verified Star (blue) */
+  --color-verified: #4d8dff; /* Verified (blue) — the badge's own family, not Instagram's #3897f0 */
   --color-hashtag: #4ea1ff; /* clickable #hashtags (blue) */
   --color-danger: #ff4545;
 

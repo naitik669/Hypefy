@@ -283,7 +283,7 @@ export function PostPeek({
               <p className="flex min-w-0 items-center gap-1 text-[15px] font-semibold">
                 <DisplayName name={author.name} profile={author.cosmetics} className="truncate" />
                 {author.verified && (
-                  <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />
+                  <VerifiedStar className="h-3.5 w-3.5 shrink-0" />
                 )}
               </p>
               {author.username && (

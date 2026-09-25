@@ -663,7 +663,7 @@ export function FeedCard({
             <DisplayName name={name} profile={profile} className="min-w-0 truncate" />
           </Link>
           {profile?.is_verified && (
-            <VerifiedStar className="h-3.5 w-3.5 shrink-0 text-verified" />
+            <VerifiedStar className="h-3.5 w-3.5 shrink-0" />
           )}
           {isHyper && <HyperStar className="h-3.5 w-3.5 shrink-0" />}
           {isMutualHyper && <MutualHyperBadge />}
