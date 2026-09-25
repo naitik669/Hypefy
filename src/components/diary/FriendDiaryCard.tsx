@@ -67,7 +67,13 @@ export function FriendDiaryCard({
       style={{ height: big ? CARD_H : undefined, background: theme.background, boxShadow: theme.shadow }}
     >
       {bleed && (
-        <button type="button" onClick={onOpen} aria-label="Open this page" className="absolute inset-0 block">
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label="Open this page"
+          data-swipe-through
+          className="absolute inset-0 block"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={entry.imageUrl!} alt="" draggable={false} className="h-full w-full object-cover" />
           {/* Shade at the top and foot, so the name and the reply row read

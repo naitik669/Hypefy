@@ -197,7 +197,10 @@ export function DiaryStack({
     // Buttons, links and the reply popup (a portal, so outside this element)
     // are taps, not the start of a swipe.
     const t = e.target as HTMLElement;
-    if (!e.currentTarget.contains(t) || t.closest("button, a, input, textarea")) return;
+    // A photo page is one big button over the whole card, so a swipe would
+    // never start on it. Buttons that mark themselves swipe-through let the
+    // press become a swipe and still act on a tap.
+    if (!e.currentTarget.contains(t) || t.closest("button:not([data-swipe-through]), a, input, textarea")) return;
     if (order.length < 2 || thrown) return;
     press.current = { x: e.clientX, y: e.clientY, t: e.timeStamp, axis: null };
     swiped.current = false;

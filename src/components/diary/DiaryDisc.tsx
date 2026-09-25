@@ -5,7 +5,9 @@ import { Music, Plus, X } from "lucide-react";
 import { claimPreview, pausePreview, playPreview, useIsPlaying, type Track } from "@/lib/music";
 
 /** A Diary's song goes round again when it ends, wherever it is played. */
-const LOOP = { loop: true } as const;
+/** A tap on the song is a deliberate play, so it is heard even when the app
+ *  is muted — the mute is for songs that start on their own. */
+const LOOP = { loop: true, audible: true } as const;
 
 /**
  * The song on a Diary, as a black CD tucked behind the page, its cover in
