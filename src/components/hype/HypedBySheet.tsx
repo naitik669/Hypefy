@@ -27,13 +27,14 @@ type Row = {
   username: string | null;
   avatar_url: string | null;
   hue: number | null;
-  relation: "close" | "mutual" | "following" | "other";
+  relation: "you" | "close" | "mutual" | "following" | "other";
   is_verified: boolean | null;
 };
 
 const PAGE = 30;
 
 const RELATION: Record<Row["relation"], string | null> = {
+  you: "you",
   close: "close friend",
   mutual: "mutual",
   following: "you follow",

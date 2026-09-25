@@ -1978,16 +1978,31 @@ export function RealChatView({
 
                       {/* Reaction chips */}
                       {reacts.length > 0 && (
-                        <div className={`mt-1 flex flex-wrap gap-1 ${mine ? "justify-end" : "justify-start"}`}>
+                        // Lifted into the bubble's bottom edge rather than
+                        // parked under it, so the reaction belongs to the
+                        // message instead of floating after it. The chip's
+                        // own dark border is the gap.
+                        <div
+                          className={`relative z-10 -mt-2.5 flex flex-wrap gap-1 ${
+                            mine ? "justify-end pr-2" : "justify-start pl-2"
+                          }`}
+                        >
                           {reacts.map((r) => (
                             <button
                               key={r.emoji}
                               type="button"
                               onClick={() => setReactionSheet(m.id)}
-                              className={`animate-react-pop flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[13px] leading-none shadow-sm transition-transform active:scale-90 ${
-                                r.mine
-                                  ? "bg-accent text-accent-ink ring-1 ring-accent"
-                                  : "bg-elevated text-foreground ring-1 ring-white/10"
+                              // Same grey as the embeds either side of it,
+                              // never the brand colour: a reaction is the
+                              // emoji, and a lime plate behind it only
+                              // competes with the emoji for attention. Your
+                              // own is marked by a lighter rim, not a fill.
+                              // The dark border is what cuts it away from
+                              // the bubble it overlaps, and it holds on a
+                              // chat theme, which a background-matched ring
+                              // would not.
+                              className={`animate-react-pop flex items-center gap-0.5 rounded-full border-2 border-black/45 bg-elevated px-2 py-0.5 text-[13px] leading-none text-foreground shadow-sm transition-transform active:scale-90 ${
+                                r.mine ? "ring-1 ring-inset ring-white/25" : ""
                               }`}
                             >
                               <span>{r.emoji}</span>
