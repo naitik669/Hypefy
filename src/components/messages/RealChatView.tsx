@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Image as ImageIcon } from "lucide-react";
+import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon } from "lucide-react";
 import { SendIcon, ShareIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
@@ -15,6 +15,10 @@ import { VoiceRecorder } from "@/components/messages/VoiceRecorder";
 import { PageReplyEmbed, pageSnapshot } from "@/components/diary/PageReplyEmbed";
 import { VoiceMessage } from "@/components/messages/VoiceMessage";
 import { GifPicker } from "@/components/messages/GifPicker";
+import { TrackPicker } from "@/components/music/TrackPicker";
+import { TrackChip } from "@/components/music/TrackChip";
+import { musicSnippet, packTrack, unpackTrack } from "@/lib/music-message";
+import type { Track } from "@/lib/music";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { FloatingMenu, MenuItem, MenuDivider } from "@/components/ui/FloatingMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -146,6 +150,7 @@ function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null 
     case "image": return "Photo";
     case "video": return "Video";
     case "voice": return "Voice note";
+    case "music": return musicSnippet(m.body);
     case "shot": return "Shot";
     case "post": return "Post";
     case "oneshot": return "Photo";
@@ -191,7 +196,7 @@ const DOC_ACCEPT = `${DOC_MIMES.join(",")},.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx
  *  and the one row that genuinely needs a caveat (View once) gets it at
  *  the point of sending, in the composer preview. */
 const ATTACH_OPTIONS: {
-  mode: "camera" | "media" | "oneshot" | "document" | "gif";
+  mode: "camera" | "media" | "oneshot" | "document" | "gif" | "music";
   icon: React.ReactNode;
   label: string;
 }[] = [
@@ -200,6 +205,8 @@ const ATTACH_OPTIONS: {
   { mode: "oneshot", icon: <Eye size={16} />, label: "View once" },
   { mode: "document", icon: <FileText size={16} />, label: "Document" },
   { mode: "gif", icon: <span className="text-[9px] font-black tracking-wider">GIF</span>, label: "GIF" },
+  // A song is an attachment, like a photo or a GIF — not a thing of its own.
+  { mode: "music", icon: <Music size={16} />, label: "Music" },
 ];
 
 /** How long the paperclip is held before its menu opens instead. */
@@ -331,6 +338,7 @@ export function RealChatView({
   const [voiceMode, setVoiceMode] = useState(false);
   const [starBurstId, setStarBurstId] = useState<string | null>(null);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
+  const [songPickerOpen, setSongPickerOpen] = useState(false);
   const [attachment, setAttachment] = useState<{
     file: File;
     /** Object URL for image/video thumbnails; empty for documents. */
@@ -1108,6 +1116,38 @@ export function RealChatView({
     setSending(false);
   }
 
+  /** Send a song, picked from the same picker a Spotlight page uses. The
+   *  track rides in the body as JSON, so no column and no migration. */
+  async function sendSong(track: Track) {
+    setSongPickerOpen(false);
+    if (sending) return;
+    setSending(true);
+    const replyId = replyTo?.id ?? null;
+    setReplyTo(null);
+
+    const body = packTrack(track);
+    const tempId = `temp-${Date.now()}`;
+    const optimistic: ChatMsg = {
+      id: tempId, body, sender_id: currentUserId, kind: "music",
+      post_id: null, reply_to_id: replyId, is_unsent: false,
+      created_at: new Date().toISOString(), _status: "pending",
+    };
+    setMessages((p) => [...p, optimistic]);
+
+    const { data, error } = await supabase.rpc("send_message", {
+      p_conversation_id: conversationId, p_body: body, p_kind: "music",
+      p_post_id: undefined, p_reply_to_id: replyId ?? undefined,
+    });
+    if (error || !data) {
+      setMessages((p) => p.map((m) => m.id === tempId ? { ...m, _status: "failed" as const } : m));
+      showToast("Couldn't send that song.");
+    } else {
+      const real = data as ChatMsg;
+      setMessages((p) => p.some((m) => m.id === real.id) ? p.filter((m) => m.id !== tempId) : p.map((m) => m.id === tempId ? { ...m, ...real, _status: undefined } : m));
+    }
+    setSending(false);
+  }
+
   /** Handle file input change — validate against the chosen mode, build a
    *  preview, and stage the attachment. */
   function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1745,6 +1785,11 @@ export function RealChatView({
                             owner={mine ? { name: other.name, hue: other.hue, avatarUrl: other.avatarUrl } : null}
                           />
                         </div>
+                      ) : m.kind === "music" && unpackTrack(m.body) ? (
+                        // A song plays in the thread; no leaving for another app.
+                        <div className="w-[230px] max-w-full">
+                          <TrackChip track={unpackTrack(m.body)!} />
+                        </div>
                       ) : m.kind === "oneshot" ? (
                         <OneShotBubble
                           m={m}
@@ -2191,6 +2236,7 @@ export function RealChatView({
                     onClick={() => {
                       setAttachMenu(false);
                       if (o.mode === "gif") setGifPickerOpen(true);
+                      else if (o.mode === "music") setSongPickerOpen(true);
                       else if (o.mode === "camera") pickerApi.current?.openCamera();
                       else if (o.mode === "media") mediaInputRef.current?.click();
                       else openPicker(o.mode);
@@ -2431,6 +2477,12 @@ export function RealChatView({
       })()}
 
       {/* Forward picker */}
+      <TrackPicker
+        open={songPickerOpen}
+        onClose={() => setSongPickerOpen(false)}
+        onSelect={(t) => void sendSong(t)}
+      />
+
       <ForwardSheet open={!!forwardMsg} onClose={() => setForwardMsg(null)} msg={forwardMsg} />
 
       {/* Report reason sheet */}

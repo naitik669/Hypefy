@@ -127,6 +127,7 @@ const KIND_VERB: Record<string, string> = {
   image: "sent a photo",
   video: "sent a video",
   voice: "sent a voice note",
+  music: "sent a song",
   oneshot: "sent a view once photo",
   document: "sent a document",
   album: "sent photos",

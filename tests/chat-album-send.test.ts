@@ -211,7 +211,7 @@ describe("the paperclip", () => {
     await act(async () => { press(clip, "pointerdown"); await new Promise((r) => setTimeout(r, 450)); });
     await act(async () => { press(clip, "pointerup"); clip.click(); });
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((b) => b.lastElementChild?.textContent);
-    expect(items).toEqual(["Camera", "Photo or video", "View once", "Document", "GIF"]);
+    expect(items).toEqual(["Camera", "Photo or video", "View once", "Document", "GIF", "Music"]);
     expect(document.querySelector("[data-picker-grid]")).toBeNull();
   });
 
