@@ -179,6 +179,7 @@ export function CommentsSheet({
   targetType = "post",
   focusCommentId = null,
   reportTop,
+  dim,
 }: {
   open: boolean;
   onClose: () => void;
@@ -195,6 +196,8 @@ export function CommentsSheet({
    * thing behind is a page you can scroll back to, not a video you are in.
    */
   reportTop?: string;
+  /** False where the thing behind the sheet is meant to stay watchable. */
+  dim?: boolean;
   /**
    * A specific comment to land on, from ?comment= in the URL. A "replied to
    * your comment" notification had nowhere to point before this — a comment
@@ -553,6 +556,7 @@ export function CommentsSheet({
         // is something you settle into, not a menu.
         size="half"
         reportTop={reportTop}
+        dim={dim}
         footer={
           <Composer
             replyTo={replyTo}

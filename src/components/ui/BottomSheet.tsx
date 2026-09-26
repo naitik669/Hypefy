@@ -81,6 +81,7 @@ export function BottomSheet({
   footer,
   size = "content",
   reportTop,
+  dim = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -117,6 +118,16 @@ export function BottomSheet({
    * comments — and two of them writing the same property would fight.
    */
   reportTop?: string;
+  /**
+   * Whether to darken and blur what is behind the sheet. On by default,
+   * because usually the thing behind is a page you have stepped away from.
+   *
+   * Off when the thing behind is still being watched — a Shot has made room
+   * above the sheet precisely so it can be seen, and dimming it there would
+   * undo the whole point. The backdrop stays, invisible, so a tap outside
+   * still closes the sheet.
+   */
+  dim?: boolean;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -597,7 +608,9 @@ export function BottomSheet({
   return createPortal(
     <div
       ref={veilRef}
-      className="fixed inset-0 z-[200] flex items-end justify-center bg-black/70 backdrop-blur-[6px]"
+      className={`fixed inset-0 z-[200] flex items-end justify-center ${
+        dim ? "bg-black/70 backdrop-blur-[6px]" : ""
+      }`}
       onClick={onClose}
       /*
        * Stop the gesture here.

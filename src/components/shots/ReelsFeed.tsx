@@ -403,6 +403,15 @@ function ReelCard({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const sheetOpen = commentsOpen || shareOpen;
+  /**
+   * Whether a sheet is actually sitting over the video.
+   *
+   * Comments no longer are: the video shrinks into the space above them and
+   * stays on screen, so it keeps playing. That is the whole reason it makes
+   * room — a Shot you can watch while reading what people said about it.
+   * The share sheet still covers it, so that one still stops it.
+   */
+  const sheetCoversVideo = shareOpen;
 
   /**
    * Pinch to zoom the reel.
@@ -555,7 +564,7 @@ function ReelCard({
     // Hold, do not rewind: the sheet closes back onto the same moment. A
     // reel talking away underneath the comments you are reading is the
     // other half of "do not interact with the shot behind".
-    if (isActive && sheetOpen) {
+    if (isActive && sheetCoversVideo) {
       el.pause();
       setPlaying(false);
       return;
@@ -585,8 +594,11 @@ function ReelCard({
       if (iconTimer.current) clearTimeout(iconTimer.current);
       setIconShown(false);
     }
+    // Deliberately not sheetOpen: opening the comments must not re-run this
+    // at all. The video is still on screen and still playing, and the less
+    // this effect touches it the less there is to stutter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, sheetOpen]);
+  }, [isActive, sheetCoversVideo]);
 
   // Who of your people hyped this, once it is the reel being watched.
   // Never for the ones queued either side: three avatars each, for Shots
@@ -1327,6 +1339,11 @@ function ReelCard({
           <CommentsSheet
             open={commentsOpen}
             onClose={() => setCommentsOpen(false)}
+            // Where its top edge is, every frame, so the video above can
+            // follow it rather than snap between two sizes.
+            reportTop={SHEET_TOP}
+            // The video is up there being watched. Do not darken it.
+            dim={false}
             targetType="shot"
             postId={reel.id}
             postOwnerId={reel.user_id}
