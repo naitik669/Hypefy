@@ -3,13 +3,14 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Frame, Image as ImageIcon, Loader2, MessageCircle, Palette, Type, X } from "lucide-react";
+import { ArrowRight, Check, Frame, Image as ImageIcon, Loader2, Palette, Type, X } from "lucide-react";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { useToast } from "@/components/ui/ToastProvider";
 import { isNative } from "@/lib/native";
 import { safeBack } from "@/lib/safe-back";
 import { formatInr, PLANS, TRIAL_DAYS, type PlanId } from "@/lib/billing/plans";
 import { subscribe } from "@/lib/billing/checkout";
+import { CommentIcon } from "@/components/ui/CommentIcon";
 
 const noop = () => () => {};
 
@@ -18,7 +19,7 @@ const ROWS: { icon: React.ReactNode; name: string; sub: string; verified: boolea
   { icon: <VerifiedStar className="h-[18px] w-[18px]" />, name: "Verified badge", sub: "The blue star", verified: true },
   { icon: <Type size={17} />, name: "Name styles", sub: "Fonts and glows", verified: false },
   { icon: <Frame size={17} />, name: "Avatar frames", sub: "On every post and chat", verified: false },
-  { icon: <MessageCircle size={17} />, name: "Bubbles & nameplates", sub: "Your look in Messages", verified: false },
+  { icon: <CommentIcon size={17} />, name: "Bubbles & nameplates", sub: "Your look in Messages", verified: false },
   { icon: <Palette size={17} />, name: "Chat themes", sub: "Pond, Galaxy and more", verified: false },
   { icon: <ImageIcon size={17} />, name: "GIF banner", sub: "An animated profile banner", verified: false },
 ];

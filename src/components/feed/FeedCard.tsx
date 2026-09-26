@@ -2,14 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  Star,
-  MessageCircle,
-  Bookmark,
-  MoreHorizontal,
-  Maximize2,
-  Repeat2,
-} from "lucide-react";
+import { Star, Bookmark, MoreHorizontal, Maximize2, Repeat2 } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
@@ -47,6 +40,7 @@ import { parseTrack } from "@/lib/music";
 import { hypeResult } from "@/lib/supabase/typed";
 import { PollBlock, parsePoll } from "@/components/feed/PollBlock";
 import { useSaveMenus } from "@/components/saved/SaveMenus";
+import { CommentIcon } from "@/components/ui/CommentIcon";
 
 export type FeedPost = {
   id: string;
@@ -843,7 +837,7 @@ export function FeedCard({
             aria-label="Comments"
             className="flex items-center gap-1.5 text-sm font-semibold text-foreground transition-transform duration-150 active:scale-90"
           >
-            <MessageCircle size={22} strokeWidth={2.2} />
+            <CommentIcon size={22} strokeWidth={2.2} />
             {formatCount(commentCount)}
           </button>
 

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Zap, MessageCircle, Play, Compass, Hash } from "lucide-react";
+import { Zap, Play, Compass, Hash } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { DiscoverFilter } from "@/components/discover/DiscoverFilter";
@@ -13,6 +13,7 @@ import { PinFeed, type Pin } from "@/components/discover/PinFeed";
 import { formatCount } from "@/lib/format";
 import { reshuffle } from "@/lib/discover-mix";
 import { HypedByYourPeople } from "@/components/discover/HypedByYourPeople";
+import { CommentIcon } from "@/components/ui/CommentIcon";
 
 type Shot = {
   id: string;
@@ -299,7 +300,7 @@ function ShotTile({ shot }: { shot: Shot }) {
       </span>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent p-2.5 pt-6">
         <Stat icon={<Zap size={12} className="fill-accent text-accent" />} value={shot.hype_count} />
-        <Stat icon={<MessageCircle size={12} />} value={shot.comment_count} />
+        <Stat icon={<CommentIcon size={12} />} value={shot.comment_count} />
       </div>
     </Link>
   );

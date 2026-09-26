@@ -1,25 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowLeft,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  CircleFadingPlus,
-  Link2,
-  Loader2,
-  MessageCircle,
-  Repeat2,
-  Search,
-  Share2,
-} from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, CircleFadingPlus, Link2, Loader2, Repeat2, Search, Share2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { one } from "@/lib/supabase/typed";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { useToast } from "@/components/ui/ToastProvider";
+import { CommentIcon } from "@/components/ui/CommentIcon";
 
 type Friend = {
   id: string;
@@ -525,7 +514,7 @@ export function ShareSheet({
         }
         tint="bg-[#1f3b27] text-[#4ade80]"
       >
-        <MessageCircle size={19} />
+        <CommentIcon size={19} />
       </Action>
       <Action label="More" onClick={() => void shareElsewhere()}>
         <Share2 size={19} />

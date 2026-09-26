@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Eye, Star, MessageCircle, Bookmark } from "lucide-react";
+import { Eye, Star, Bookmark } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatCount } from "@/lib/format";
 import { InsightsChart, type SeriesPoint } from "@/components/profile/InsightsChart";
+import { CommentIcon } from "@/components/ui/CommentIcon";
 
 /** Owner-only creator analytics: per-post and total reach/engagement. */
 export default async function InsightsPage() {
@@ -66,7 +67,7 @@ export default async function InsightsPage() {
           <div className="grid grid-cols-2 gap-2.5">
             <TotalCard icon={<Eye size={16} />} label="Views" value={totals.views} />
             <TotalCard icon={<Star size={16} className="text-hype" />} label="Hypes" value={totals.hypes} />
-            <TotalCard icon={<MessageCircle size={16} />} label="Comments" value={totals.comments} />
+            <TotalCard icon={<CommentIcon size={16} />} label="Comments" value={totals.comments} />
             <TotalCard icon={<Bookmark size={16} />} label="Saves" value={totals.saves} />
           </div>
 

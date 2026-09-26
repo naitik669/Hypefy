@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Star, MessageCircle } from "lucide-react";
+import { Star } from "lucide-react";
 import { GridPeek } from "@/components/feed/GridPeek";
 import { formatCount } from "@/lib/format";
 import type { FeedPost } from "@/components/feed/FeedCard";
+import { CommentIcon } from "@/components/ui/CommentIcon";
 
 function firstImage(p: FeedPost): string | null {
   return p.image_urls?.[0] ?? p.image_url ?? null;
@@ -106,7 +107,7 @@ export function PostResultsGrid({
                   )}
                   {(p.comment_count ?? 0) > 0 && (
                     <span className="flex items-center gap-0.5">
-                      <MessageCircle size={10} />
+                      <CommentIcon size={10} />
                       {formatCount(p.comment_count ?? 0)}
                     </span>
                   )}

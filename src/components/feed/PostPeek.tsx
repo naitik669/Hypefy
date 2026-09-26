@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Star, MessageCircle, Bookmark } from "lucide-react";
+import { Star, Bookmark } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { createClient } from "@/lib/supabase/client";
@@ -18,6 +18,7 @@ import { FollowButton } from "@/components/profile/FollowButton";
 import { formatCount } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { ShareButton } from "@/components/feed/QuickShare";
+import { CommentIcon } from "@/components/ui/CommentIcon";
 
 /**
  * Hold a photo to lift the whole POST off the feed.
@@ -372,7 +373,7 @@ export function PostPeek({
             </PeekAction>
 
             <PeekAction label="Comments" count={commentCount} onClick={onComment}>
-              <MessageCircle size={22} strokeWidth={2.2} />
+              <CommentIcon size={22} strokeWidth={2.2} />
             </PeekAction>
 
             <ShareButton

@@ -3,11 +3,12 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { Phone, Video, Mic, MicOff, VideoOff, MessageCircle } from "lucide-react";
+import { Phone, Video, Mic, MicOff, VideoOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { startRing, stopRing } from "@/lib/ringtone";
 import { Avatar } from "@/components/ui/Avatar";
 import { BLANK_POSTER } from "@/lib/blank-poster";
+import { CommentIcon } from "@/components/ui/CommentIcon";
 
 type CallType = "audio" | "video";
 type Role = "caller" | "callee";
@@ -420,7 +421,6 @@ export function CallProvider({ userId, children }: { userId: string; children: R
   );
 }
 
-
 /* â”€â”€â”€ Call UI: incoming / outgoing / connected â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function CallUI({
   call, localStream, remoteStream, onAccept, onDecline, onQuickReply, onEnd, onOpenChat,
@@ -518,7 +518,7 @@ function CallUI({
             <button type="button" onClick={() => setShowReplies(true)}
               className="flex flex-col items-center gap-1.5 text-white/80">
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10">
-                <MessageCircle size={20} />
+                <CommentIcon size={20} />
               </span>
               <span className="text-xs">Message</span>
             </button>
@@ -544,7 +544,7 @@ function CallUI({
             ) : (
               <button type="button" onClick={onOpenChat} aria-label="Open chat"
                 className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-white">
-                <MessageCircle size={22} />
+                <CommentIcon size={22} />
               </button>
             )}
           </div>

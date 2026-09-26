@@ -2,20 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  Play,
-  VolumeX,
-  Volume2,
-  Star,
-  MessageCircle,
-  Bookmark,
-  MoreHorizontal,
-  Flag,
-  Ban,
-  ChevronRight,
-  Link2,
-  Share2,
-} from "lucide-react";
+import { Play, VolumeX, Volume2, Star, Bookmark, MoreHorizontal, Flag, Ban, ChevronRight, Link2, Share2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
@@ -52,6 +39,7 @@ import {
 } from "@/lib/shot-audio";
 import type { ShotCard } from "@/lib/feed-mix";
 import { BLANK_POSTER } from "@/lib/blank-poster";
+import { CommentIcon } from "@/components/ui/CommentIcon";
 
 /**
  * A Shot, sitting in the post feed.
@@ -666,7 +654,7 @@ export function ShotFeedCard({
             aria-label="Comments"
             className="flex items-center gap-1.5 text-sm font-semibold text-foreground transition-transform duration-150 active:scale-90 disabled:opacity-70"
           >
-            <MessageCircle size={22} strokeWidth={2.2} />
+            <CommentIcon size={22} strokeWidth={2.2} />
             {formatCount(commentCount)}
           </button>
 

@@ -1,11 +1,12 @@
 "use client";
 
-import { Star, MessageCircle, Bookmark, ImageIcon } from "lucide-react";
+import { Star, Bookmark, ImageIcon } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { Avatar } from "@/components/ui/Avatar";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { TrackChip } from "@/components/music/TrackChip";
 import type { Track } from "@/lib/music";
+import { CommentIcon } from "@/components/ui/CommentIcon";
 
 export type PreviewAuthor = {
   name: string;
@@ -88,7 +89,7 @@ export function PostPreview({
           {/* action rail — inert, purely to place the text correctly below it */}
           <div aria-hidden className="flex items-center gap-3 px-3 pt-2.5 text-faint">
             <Star size={16} />
-            <MessageCircle size={16} />
+            <CommentIcon size={16} />
             <ShareIcon size={16} weight="bold" />
             <span className="flex-1" />
             <Bookmark size={16} />

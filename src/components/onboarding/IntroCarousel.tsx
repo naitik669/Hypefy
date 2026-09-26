@@ -2,11 +2,12 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Star, MessageCircle, Play, Compass, Bell } from "lucide-react";
+import { ArrowRight, Star, Play, Compass, Bell } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { IntroFinale } from "@/components/onboarding/IntroFinale";
 import { Avatar } from "@/components/ui/Avatar";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { CommentIcon } from "@/components/ui/CommentIcon";
 
 const SLIDES = ["welcome", "posts", "shots", "discover", "identity"] as const;
 
@@ -426,7 +427,7 @@ function WelcomeVisual() {
               <Star size={17} className="fill-hype text-hype" />
               <span className="text-[11px] font-bold">2.4k</span>
             </span>
-            <MessageCircle size={15} className="text-muted" />
+            <CommentIcon size={15} className="text-muted" />
             <ShareIcon size={14} className="text-muted" />
           </div>
         </div>
@@ -569,7 +570,7 @@ function BgPost({ post }: { post: BgPostData }) {
       <div className="mt-2 flex items-center gap-2">
         <Star size={13} className="fill-hype text-hype" />
         <span className="text-[10px] font-bold">{post.hypes}</span>
-        <MessageCircle size={12} className="text-muted" />
+        <CommentIcon size={12} className="text-muted" />
         <ShareIcon size={11} className="text-muted" />
       </div>
     </div>
@@ -616,7 +617,7 @@ function MockPostCard() {
           <Star size={24} className="fill-hype text-hype" />
           <span className="text-[15px] font-bold">2.4k</span>
         </span>
-        <MessageCircle size={23} className="text-muted" />
+        <CommentIcon size={23} className="text-muted" />
         <ShareIcon size={22} className="text-muted" />
       </div>
     </div>
@@ -698,7 +699,7 @@ function ReelCard({ data, w, h, active = false }: { data: ReelData; w: number; h
           />
           <span className="text-[10px] font-semibold">{data.hypes}</span>
         </span>
-        <MessageCircle size={big ? 22 : 18} />
+        <CommentIcon size={big ? 22 : 18} />
         <ShareIcon size={big ? 20 : 16} />
       </div>
 

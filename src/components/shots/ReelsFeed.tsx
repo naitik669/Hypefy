@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Star, MessageCircle, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban } from "lucide-react";
+import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
@@ -32,6 +32,7 @@ import { ShotAdCard } from "@/components/shots/ShotAdCard";
 import { useSaveMenus } from "@/components/saved/SaveMenus";
 import { useLongPress } from "@/lib/useLongPress";
 import { BLANK_POSTER } from "@/lib/blank-poster";
+import { CommentIcon } from "@/components/ui/CommentIcon";
 
 type ReelProfile = {
   display_name: string | null;
@@ -998,7 +999,7 @@ function ReelCard({
           label={commentCount > 0 ? formatCount(commentCount) : "Comment"}
           onClick={() => setCommentsOpen(true)}
         >
-          <MessageCircle size={31} className="text-white" />
+          <CommentIcon size={31} className="text-white" />
         </RailButton>
 
         {/* Hold to send it straight to the people you share with most. */}
