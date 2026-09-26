@@ -41,8 +41,8 @@ import { useSaveMenus } from "@/components/saved/SaveMenus";
  */
 const SHEET_TOP = "--shot-sheet-top";
 
-/** The strip the rail turns into once the video has made room. */
-const STRIP_H = 44;
+/** How thick the playback bar is, and so how far above the sheet it sits. */
+const PROGRESS_H = 3;
 import { useLongPress } from "@/lib/useLongPress";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { CommentIcon } from "@/components/ui/CommentIcon";
@@ -896,11 +896,11 @@ function ReelCard({
           commentsOpen ? "object-contain" : "h-full object-cover"
         }`}
         style={{
-          // With comments up the video takes only what is left above the
-          // sheet, less the strip the rail moves into, and shows its whole
-          // frame rather than filling — nothing is cropped away to make room
-          // for a conversation about it.
-          height: commentsOpen ? `calc(var(${SHEET_TOP}, 100%) - ${STRIP_H}px)` : undefined,
+          // With the comments up the video takes everything above the
+          // sheet, and shows its whole frame rather than filling — nothing is
+          // cropped to make room for a conversation about it, and nothing is
+          // stretched to a shape it was not shot in.
+          height: commentsOpen ? `var(${SHEET_TOP}, 100%)` : undefined,
           transform: pinchScale === 1 ? undefined : `scale(${pinchScale})`,
           // Snap back under its own power once the fingers leave, but track
           // them exactly while they are down.
@@ -1008,21 +1008,13 @@ function ReelCard({
         {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
       </button>
 
-      {/* The action rail, which lies down once the comments are up.
-          Everything in it shrinks together rather than each button being
-          told a second size — one rule on the container, so a control added
-          later gets the strip treatment without anyone remembering to. */}
+      {/* The action rail, which stands down entirely once the comments are
+          up: every one of these is a thing to do to the Shot, and the sheet
+          below is where the doing is happening. Hyping still works without
+          it — a double tap on the video always has. */}
       <div
-        className={
-          commentsOpen
-            ? "absolute inset-x-0 z-20 flex flex-row items-center justify-end gap-4 px-4 [&_span]:text-[11px] [&_svg]:h-[21px] [&_svg]:w-[21px] [&>*]:flex-row [&>*]:gap-1.5"
-            : "absolute bottom-6 right-3 z-20 flex flex-col items-center gap-5"
-        }
-        style={
-          commentsOpen
-            ? { top: `calc(var(${SHEET_TOP}, 100%) - ${STRIP_H}px)`, height: STRIP_H }
-            : undefined
-        }
+        className="absolute bottom-6 right-3 z-20 flex flex-col items-center gap-5"
+        hidden={commentsOpen}
       >
         <RailButton
           label={hypeCount > 0 ? formatCount(hypeCount) : "Hype"}
@@ -1097,22 +1089,13 @@ function ReelCard({
         </RailButton>
       </div>
 
-      {/* Author, and the caption when there is room for it. With the
-          comments open the caption goes — it is the one thing on screen that
-          the sheet below is already a better version of — but the author
-          stays, because a Shot you cannot attribute is worse than a small
-          one. */}
+      {/* Author and caption, which also stand down. Both describe the
+          Shot, and they would be sitting directly on top of a panel that
+          describes it better — the hype line worst of all, naming people who
+          reacted immediately above a list of people reacting. */}
       <div
-        className={
-          commentsOpen
-            ? "absolute left-0 z-20 flex flex-row items-center gap-2 px-4"
-            : "absolute inset-x-0 bottom-0 z-20 flex flex-col gap-2 p-4 pr-16"
-        }
-        style={
-          commentsOpen
-            ? { top: `calc(var(${SHEET_TOP}, 100%) - ${STRIP_H}px)`, height: STRIP_H }
-            : undefined
-        }
+        className="absolute inset-x-0 bottom-0 z-20 flex flex-col gap-2 p-4 pr-16"
+        hidden={commentsOpen}
       >
         <Link
           href={handle ? `/u/${handle}` : "#"}
@@ -1121,7 +1104,7 @@ function ReelCard({
           <Avatar
             name={name}
             hue={hue}
-            size={commentsOpen ? 26 : 38}
+            size={38}
             src={reel.profiles?.avatar_url ?? undefined}
             className="ring-2 ring-white/70"
           />
@@ -1166,7 +1149,7 @@ function ReelCard({
         className="pointer-events-none absolute inset-x-0 z-30 h-[3px] bg-white/15"
         style={
           commentsOpen
-            ? { top: `calc(var(${SHEET_TOP}, 100%) - ${STRIP_H}px - 3px)` }
+            ? { top: `calc(var(${SHEET_TOP}, 100%) - ${PROGRESS_H}px)` }
             : { bottom: 0 }
         }
       >
