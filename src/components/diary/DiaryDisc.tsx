@@ -186,35 +186,22 @@ export function DiscSleeve({
  * The song's name on the page, under the words — the other way to play it,
  * for anyone who does not think to tap the disc.
  *
- * Over a photo it is a frosted squircle sized to its own text, which reads on
- * any picture and covers almost none of it; it was a black slab across the
- * middle of the card. It lands with the page, scaling up and settling, so the
- * song is the thing that moves rather than the writer's name.
+ * Only on pages without a photo. There was once a frosted-glass version for
+ * photo pages; it was dropped, because on a photo the disc behind the card
+ * already says there is a song, plays it, and names it when tapped, and a
+ * second label for the same song was sitting on the picture.
  */
-export function SongLine({
-  track,
-  onRemove,
-  glass = false,
-}: {
-  track: Track;
-  onRemove?: () => void;
-  /** Over a photo: a frosted squircle that pops in. */
-  glass?: boolean;
-}) {
+export function SongLine({ track, onRemove }: { track: Track; onRemove?: () => void }) {
   const playing = useIsPlaying(track.id);
   return (
-    <div className={`flex min-w-0 items-center gap-1 ${glass ? "animate-song-pop origin-left" : ""}`}>
+    <div className="flex min-w-0 items-center gap-1">
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
           playPreview(track, LOOP);
         }}
-        className={
-          glass
-            ? "flex min-w-0 items-center gap-2 rounded-[13px] border border-white/15 bg-white/[0.14] py-1.5 pl-2.5 pr-3 text-left text-[12px] text-white/90 backdrop-blur-md transition-colors hover:bg-white/20"
-            : "flex min-w-0 items-center gap-2 rounded-full py-1 pr-2 text-left text-[12px] text-white/70 transition-colors hover:text-white"
-        }
+        className="flex min-w-0 items-center gap-2 rounded-full py-1 pr-2 text-left text-[12px] text-white/70 transition-colors hover:text-white"
       >
         <span aria-hidden className="flex h-3 w-3.5 shrink-0 items-end justify-between">
           {[0.55, 1, 0.7].map((h, i) => (

@@ -53,6 +53,22 @@ export function noteSize(text: string): { size: number; clamp: number } {
  * would run off the edge). Measured for a card about 250px wide inside; wider
  * cards simply have room to spare.
  */
+/**
+ * The size for a caption kept to one line, as a photo page's is.
+ *
+ * Short words stay big; past about twenty characters it settles at 26px and
+ * stops shrinking, because a caption small enough to fit sixty characters
+ * across a card is too small to read. Anything that still does not fit
+ * travels instead (see PageCaption) — so this only has to be close, and the
+ * floor matters more than the arithmetic.
+ */
+export function lineSize(text: string, inside = 250): number {
+  const n = Math.max(1, Array.from(text.trim()).length);
+  // Bold letters average about 0.55em across a whole line, wider than the
+  // 0.68em-per-character estimate fillSize uses on a single long word.
+  return Math.max(26, Math.min(44, Math.floor(inside / (0.55 * n))));
+}
+
 export function fillSize(text: string, inside = 250): number {
   const t = text.trim();
   const n = Array.from(t).length;

@@ -1,13 +1,14 @@
 "use client";
 
 import { useRef } from "react";
+import { PageCaption } from "@/components/diary/PageCaption";
 import { PagePhoto } from "@/components/diary/PagePhoto";
 import Link from "next/link";
 import { Maximize2, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { SongLine } from "@/components/diary/DiaryDisc";
 import { DiaryResponder, HypeStar } from "@/components/diary/DiaryResponder";
-import { diaryTheme, fillSize, lifeLeft, timeAgo } from "@/components/diary/DiaryPage";
+import { diaryTheme, fillSize, lifeLeft, lineSize, timeAgo } from "@/components/diary/DiaryPage";
 import type { DiaryEntry } from "@/lib/diary";
 
 /**
@@ -74,13 +75,27 @@ export function FriendDiaryCard({
           data-swipe-through
           className="absolute inset-0 block"
         >
+          {/* A blurred, dimmed copy of the photo, filling the card behind
+              it. The card is a fixed near-square and a phone shoots tall, so
+              filling it with the photo itself cost the top of the head and
+              the chin; contained on a bed of itself, the frame is whole and
+              the card still has no empty corners. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={entry.imageUrl!} alt="" draggable={false} className="h-full w-full object-cover" />
+          <img
+            src={entry.imageUrl!}
+            alt=""
+            aria-hidden
+            draggable={false}
+            className="absolute inset-0 h-full w-full scale-125 object-cover blur-[22px] brightness-[0.42] saturate-[0.7]"
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={entry.imageUrl!} alt="" draggable={false} className="relative h-full w-full object-contain" />
           {/* Shade at the top and foot, so the name and the reply row read
-              on any photo, however bright. */}
+              on any photo, however bright. Lighter than it was: the bed is
+              already dark, and the foot no longer has a song sitting on it. */}
           <span
             aria-hidden
-            className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,.5),transparent_28%,transparent_52%,rgba(0,0,0,.75))]"
+            className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,.45),transparent_24%,transparent_66%,rgba(0,0,0,.6))]"
           />
         </button>
       )}
@@ -130,20 +145,18 @@ export function FriendDiaryCard({
         </header>
 
         {bleed ? (
-          /* The words sit straight on the photo — no panel, so the picture
-             keeps the whole card — and the song is a frosted squircle above
-             the reply bar, sized to its own text. */
-          (entry.text || entry.track) && (
-            <div onClick={onOpen} className="pointer-events-auto mt-auto flex cursor-pointer flex-col items-start gap-2">
-              {entry.text && (
-                <p
-                  className="line-clamp-3 break-words font-extrabold leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_2px_12px_rgb(0_0_0/0.55)]"
-                  style={{ fontSize: fillSize(entry.text, 150) }}
-                >
-                  {entry.text}
-                </p>
-              )}
-              {entry.track && <SongLine track={entry.track} glass />}
+          /* The words sit straight on the photo, and they are the only
+             thing on it. The song's banner is gone from a photo page
+             altogether: the CD tucked behind the card already says there is
+             one, plays it, and names it when tapped — the banner was a second
+             label for the same song, and it was sitting on someone's face. */
+          entry.text && (
+            <div onClick={onOpen} className="pointer-events-auto mt-auto flex cursor-pointer flex-col items-start">
+              <PageCaption
+                text={entry.text}
+                className="font-extrabold leading-[1.12] tracking-[-0.02em] text-white [text-shadow:0_2px_12px_rgb(0_0_0/0.55)]"
+                style={{ fontSize: lineSize(entry.text) }}
+              />
             </div>
           )
         ) : entry.imageUrl ? (

@@ -3,9 +3,17 @@
 /**
  * The picture on a page.
  *
- * Square, because everything the app crops for itself is: avatars, showcase
- * covers, the grid. A page is read at a glance in a deck, and a square is the
- * one shape that stays the same height whichever way the phone is held.
+ * Whatever shape it was taken in, up to a limit.
+ *
+ * It was square, on the reasoning that everything the app crops for itself is
+ * — avatars, showcase covers, the grid — and that one height reads well in a
+ * list. But those are all pictures of something *else*; a page's photo is
+ * usually a face, and cropping a portrait to a square takes the top of the
+ * head and the chin, which is the whole subject. Nothing here has to line up
+ * in a row, so nothing has to be cropped.
+ *
+ * The cap is the only rule: a very tall photo stops at 420px so one page
+ * cannot take the whole screen and push the next one out of sight.
  *
  * It sits above the words rather than behind them — the words keep the size
  * and weight they have on a page with no picture at all, so a photo page and
@@ -25,14 +33,14 @@ export function PagePhoto({
   className?: string;
 }) {
   return (
-    <div className={`relative aspect-square overflow-hidden rounded-2xl bg-black/25 w-full ${className}`}>
+    <div className={`flex w-full justify-center overflow-hidden rounded-2xl bg-black/25 ${className}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
         alt={alt}
         loading="lazy"
         draggable={false}
-        className="h-full w-full object-cover"
+        className="h-auto max-h-[420px] w-auto max-w-full"
       />
     </div>
   );
