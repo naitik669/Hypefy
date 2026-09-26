@@ -43,6 +43,20 @@ const SHEET_TOP = "--shot-sheet-top";
 
 /** How thick the playback bar is, and so how far above the sheet it sits. */
 const PROGRESS_H = 3;
+
+/**
+ * How tall the video is while the comments are up.
+ *
+ * It follows the sheet down, but it will not follow it up past half. The
+ * sheet rests at half the screen and can be pulled to the top; letting the
+ * video shrink all the way with it would leave a stamp-sized Shot nobody can
+ * watch. Past half the sheet simply covers it instead, which is the right
+ * trade — someone dragging the comments up is reading, not watching.
+ *
+ * 50dvh is the sheet's own resting height (BottomSheet: rest = 0.5), so the
+ * floor is exactly where the sheet starts.
+ */
+const VIDEO_H = `max(var(${SHEET_TOP}, 100%), 50dvh)`;
 import { useLongPress } from "@/lib/useLongPress";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { CommentIcon } from "@/components/ui/CommentIcon";
@@ -892,16 +906,26 @@ function ReelCard({
         ref={videoRef}
         src={reel.media_url}
         poster={reel.poster_url || BLANK_POSTER}
-        className={`absolute inset-x-0 top-0 w-full bg-black ${
-          commentsOpen ? "object-contain" : "h-full object-cover"
+        className={`absolute top-0 bg-black object-cover ${
+          commentsOpen ? "" : "inset-x-0 h-full w-full"
         }`}
         style={{
-          // With the comments up the video takes everything above the
-          // sheet, and shows its whole frame rather than filling — nothing is
-          // cropped to make room for a conversation about it, and nothing is
-          // stretched to a shape it was not shot in.
-          height: commentsOpen ? `var(${SHEET_TOP}, 100%)` : undefined,
-          transform: pinchScale === 1 ? undefined : `scale(${pinchScale})`,
+          // A Shot is a vertical thing, so the stage stays vertical even
+          // once it is small: a 9:16 box as tall as the space allows,
+          // centred, filled the same way it is full-screen. Fitting the
+          // whole frame into a wide box instead was what turned a Shot
+          // filmed wider than 9:16 into a letterboxed horizontal strip.
+          height: commentsOpen ? VIDEO_H : undefined,
+          aspectRatio: commentsOpen ? "9 / 16" : undefined,
+          left: commentsOpen ? "50%" : undefined,
+          // The centring lives in the same transform as the pinch, because
+          // a style transform would otherwise overwrite a class one and drop
+          // the video back to the left edge mid-gesture.
+          transform: commentsOpen
+            ? `translateX(-50%)${pinchScale === 1 ? "" : ` scale(${pinchScale})`}`
+            : pinchScale === 1
+              ? undefined
+              : `scale(${pinchScale})`,
           // Snap back under its own power once the fingers leave, but track
           // them exactly while they are down.
           transition: pinching ? "none" : "transform 220ms ease-out",
@@ -1149,7 +1173,7 @@ function ReelCard({
         className="pointer-events-none absolute inset-x-0 z-30 h-[3px] bg-white/15"
         style={
           commentsOpen
-            ? { top: `calc(var(${SHEET_TOP}, 100%) - ${PROGRESS_H}px)` }
+            ? { top: `calc(${VIDEO_H} - ${PROGRESS_H}px)` }
             : { bottom: 0 }
         }
       >
