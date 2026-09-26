@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Music, Search, Play, Pause, ChevronLeft, Check } from "lucide-react";
+import { Music, Search, Play, Pause, ChevronLeft, Check, Plus } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Waveform } from "@/components/music/Waveform";
@@ -54,6 +54,14 @@ export function TrackPicker({
   const [searched, setSearched] = useState(false);
   // Snippet step: the track being trimmed + chosen start offset
   const [snippet, setSnippet] = useState<Track | null>(null);
+  /**
+   * The song being chosen, kept after the snippet step is backed out of.
+   *
+   * It is not "added": confirming closes the whole sheet, so there is no
+   * list left to mark. It is the row you were last on, which is the thing
+   * you want to see when you come back from trimming to try a different one.
+   */
+  const [marked, setMarked] = useState<string | null>(null);
   const [start, setStart] = useState(0);
   const playingId = usePlayingTrackId();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -100,6 +108,7 @@ export function TrackPicker({
       setTracks([]);
       setSearched(false);
       setSnippet(null);
+      setMarked(null);
       setStart(0);
     } else {
       setTimeout(() => inputRef.current?.focus(), 250);
@@ -109,6 +118,7 @@ export function TrackPicker({
   function openSnippet(track: Track) {
     stopPreview();
     setSnippet(track);
+    setMarked(track.id);
     setStart(0);
   }
 
@@ -266,7 +276,9 @@ export function TrackPicker({
                   key={t.id}
                   type="button"
                   onClick={() => openSnippet(t)}
-                  className="flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left transition-colors hover:bg-white/[0.04]"
+                  className={`flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left transition-colors ${
+                    marked === t.id ? "bg-accent/[0.06]" : "hover:bg-white/[0.04]"
+                  }`}
                 >
                   <span
                     role="button"
@@ -301,8 +313,18 @@ export function TrackPicker({
                     <span className="block truncate text-sm font-semibold">{t.title}</span>
                     <span className="block truncate text-xs text-muted">{t.artist}</span>
                   </span>
-                  <span className="shrink-0 rounded-pill bg-surface px-3 py-1 text-xs font-bold text-accent">
-                    Add
+                  {/* A ring rather than the word "Add", which was ten lime
+                      blocks down the edge of a list meant to be read — and
+                      which said the same thing on every row. The ring fills
+                      into a tick on the song you are choosing, so backing
+                      out of the snippet step shows you where you were. */}
+                  <span
+                    aria-hidden
+                    className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-accent transition-colors ${
+                      marked === t.id ? "bg-accent text-accent-ink" : "text-accent"
+                    }`}
+                  >
+                    {marked === t.id ? <Check size={15} strokeWidth={3} /> : <Plus size={15} strokeWidth={2.6} />}
                   </span>
                 </button>
               );
