@@ -178,6 +178,7 @@ export function CommentsSheet({
   onCountChange,
   targetType = "post",
   focusCommentId = null,
+  reportTop,
 }: {
   open: boolean;
   onClose: () => void;
@@ -187,6 +188,13 @@ export function CommentsSheet({
   onCountChange?: (count: number) => void;
   /** Whether comments belong to a post (default) or a shot/reel. */
   targetType?: "post" | "shot";
+  /**
+   * A CSS custom property to point at this sheet's top edge while it is open,
+   * so what is behind it can make room. Only the Shots viewer asks for this;
+   * a post's comments still open over the page, which is right — there the
+   * thing behind is a page you can scroll back to, not a video you are in.
+   */
+  reportTop?: string;
   /**
    * A specific comment to land on, from ?comment= in the URL. A "replied to
    * your comment" notification had nowhere to point before this — a comment
@@ -544,6 +552,7 @@ export function CommentsSheet({
         // Half the screen to read in, the top of it when pulled up — a thread
         // is something you settle into, not a menu.
         size="half"
+        reportTop={reportTop}
         footer={
           <Composer
             replyTo={replyTo}

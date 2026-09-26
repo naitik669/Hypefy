@@ -80,6 +80,7 @@ export function BottomSheet({
   children,
   footer,
   size = "content",
+  reportTop,
 }: {
   open: boolean;
   onClose: () => void;
@@ -102,6 +103,20 @@ export function BottomSheet({
    * should not have anything moving behind it.
    */
   footer?: React.ReactNode;
+  /**
+   * A CSS custom property to keep pointed at this sheet's top edge, in pixels
+   * from the top of the viewport, for as long as it is open.
+   *
+   * It is how something behind the sheet makes room for it — the Shots viewer
+   * shrinks the video into whatever is left. Written straight to the document
+   * alongside the transform, never through React: this updates on every frame
+   * of a drag, and a state write per touchmove is exactly what this component
+   * exists to avoid.
+   *
+   * Opt-in, and one sheet at a time. Sheets stack — a GIF picker over
+   * comments — and two of them writing the same property would fight.
+   */
+  reportTop?: string;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -167,6 +182,14 @@ export function BottomSheet({
 
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const veilRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * The sheet's own height, kept fresh by an observer rather than measured
+   * inside place(). Reading offsetHeight there would force a layout on every
+   * frame of the drag, which is the one thing this component exists to avoid.
+   */
+  const sheetH = useRef(0);
+  /** Read inside place(), which must not be rebuilt when the prop changes. */
+  const reportRef = useRef(reportTop);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   /** The same two heights, in pixels, for a drag to work against. */
@@ -175,6 +198,49 @@ export function BottomSheet({
       screenH ?? (typeof window === "undefined" ? 800 : window.innerHeight);
     return { rest: screen * rest, top: screen * 0.94 };
   }, [screenH, rest]);
+
+  /**
+   * Watch the sheet's own height so place() never has to measure, and take
+   * the property away again on the way out — otherwise whatever was making
+   * room for the sheet keeps making room for a sheet that has gone.
+   */
+  useEffect(() => {
+    const el = sheetRef.current;
+    reportRef.current = reportTop;
+    if (!showing || !el) return;
+
+    // place() owns the drag, but not the way in: the entrance animation sets
+    // the transform itself, in two steps, and routing it through place()
+    // would disturb a sequence that is doing something careful. So resting is
+    // marked here and dragging is marked there.
+    const mark = () => {
+      sheetH.current = el.offsetHeight;
+      if (!reportTop) return;
+      document.documentElement.style.setProperty(
+        reportTop,
+        `${Math.max(0, Math.round(window.innerHeight - sheetH.current))}px`,
+      );
+    };
+    mark();
+
+    // The height changes when the sheet is pulled up to its taller stop, and
+    // the viewport changes when the keyboard arrives. Optional on purpose:
+    // an old WebView without ResizeObserver still gets the resting mark and
+    // everything place() writes, which is the whole of the drag.
+    const ro =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(mark);
+    ro?.observe(el);
+    window.addEventListener("resize", mark);
+
+    const prop = reportTop;
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", mark);
+      // Whatever was making room must stop making room for a sheet that has
+      // gone, or the video never comes back.
+      if (prop) document.documentElement.style.removeProperty(prop);
+    };
+  }, [showing, reportTop, expanded]);
 
   const trapRef = useFocusTrap<HTMLDivElement>(mounted && open);
 
@@ -188,6 +254,15 @@ export function BottomSheet({
     if (el) {
       el.style.transition = ms ? `transform ${ms}ms ${EASE}` : "none";
       el.style.transform = y ? `translate3d(0,${y}px,0)` : "translate3d(0,0,0)";
+      // Every move of this sheet goes through here — the drag, the settle,
+      // the way in and the way out — so this is the one place that can tell
+      // whatever is behind it where the top edge now is.
+      if (reportRef.current && sheetH.current) {
+        document.documentElement.style.setProperty(
+          reportRef.current,
+          `${Math.max(0, Math.round(window.innerHeight - sheetH.current + y))}px`,
+        );
+      }
     }
     // The backdrop is deliberately NOT tied to the drag. Fading it by the
     // pixel made the whole screen flicker as the sheet moved, and a surface
@@ -304,6 +379,18 @@ export function BottomSheet({
         // sheet to the height of its own contents.
         el.style.height = `${grew ? top : rest}px`;
         el.style.transform = "translate3d(0,0,0)";
+        // Settling here does not go through place(), and when the sheet
+        // springs back to the same height nothing resizes either — so
+        // without this the property keeps the last value the drag wrote and
+        // whatever was making room stays the wrong size. Taken from the
+        // height being settled to, not from a measurement, because that
+        // height is still animating.
+        if (reportRef.current) {
+          document.documentElement.style.setProperty(
+            reportRef.current,
+            `${Math.max(0, Math.round(window.innerHeight - (grew ? top : rest)))}px`,
+          );
+        }
       }
       return;
     }
