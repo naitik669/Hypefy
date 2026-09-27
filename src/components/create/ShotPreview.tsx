@@ -10,7 +10,6 @@ import {
   ALLOWED_SHOT_TYPES,
   MAX_SHOT_MB,
   MAX_SHOW_MB,
-  capturePoster,
 } from "@/lib/video-poster";
 import { ShotCoverPicker } from "@/components/post/ShotCoverPicker";
 import {
@@ -19,9 +18,10 @@ import {
   useMentionHashtag,
 } from "@/components/ui/MentionHashtagPicker";
 import type { Track } from "@/lib/music";
-import { trimToStore, type Trim } from "@/lib/shot-trim";
+import type { Trim } from "@/lib/shot-trim";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { useObjectUrl } from "@/lib/object-url";
+import { useUpload } from "@/components/upload/UploadProvider";
 
 /**
  * Preview and publish step for the camera-first creator.
@@ -54,6 +54,7 @@ export function ShotPreview({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const toast = useToast();
+  const { uploadShot } = useUpload();
   const [caption, setCaption] = useState("");
   const [cursor, setCursor] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -90,6 +91,29 @@ export function ShotPreview({
       return;
     }
 
+    // A Shot goes to the background uploader and you go back to the feed.
+    // Publishing used to hold you here on a spinner for the whole file — up
+    // to 50 MB on a phone — and a failure dropped the clip with it. The
+    // uploader keeps the File, so a failure is a banner with a Retry.
+    //
+    // A Show stays inline: it is a photo, it is quick, and it has none of the
+    // trim or poster work that makes the Shot path worth moving.
+    if (mode === "shot") {
+      uploadShot({
+        userId,
+        file,
+        caption: caption.trim() || null,
+        hashtags: extractHashtags(caption.trim()),
+        mentions: extractMentions(caption.trim()),
+        track,
+        coverTime,
+        duration: edit?.duration ?? 0,
+        trim: edit?.trim ?? { start: 0, end: 0 },
+      });
+      onDone();
+      return;
+    }
+
     setBusy(true);
     const bucket = mode === "show" ? "show-media" : "shot-media";
     const ext = file.name.split(".").pop() || (isVideo ? "webm" : "jpg");
@@ -107,47 +131,13 @@ export function ShotPreview({
 
     const mediaUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 
-    // Poster frame. Best-effort: a Shot without one still plays, so a
-    // failure here must not block publishing.
-    let posterUrl: string | null = null;
-    if (isVideo && mode === "shot") {
-      const poster = await capturePoster(url, coverTime);
-      if (poster) {
-        const posterPath = `${userId}/${Date.now()}-poster.jpg`;
-        const { error: pErr } = await supabase.storage
-          .from(bucket)
-          .upload(posterPath, poster, { contentType: "image/jpeg" });
-        if (!pErr) {
-          posterUrl = supabase.storage.from(bucket).getPublicUrl(posterPath).data
-            .publicUrl;
-        }
-      }
-    }
-
     const text = caption.trim();
-    const { error: insErr } =
-      mode === "show"
-        ? await supabase.from("shows").insert({
-            user_id: userId,
-            media_url: mediaUrl,
-            caption: text || null,
-            track: track ?? null,
-          })
-        : await supabase.from("shots").insert({
-            user_id: userId,
-            media_url: mediaUrl,
-            caption: text || null,
-            poster_url: posterUrl,
-            track: track ?? null,
-            hashtags: extractHashtags(text),
-            // Until now a Shot caption could @someone and reach nobody: the
-            // column did not exist, so 0025 removed the notification type
-            // rather than the gap. Both exist again.
-            mentions: extractMentions(text),
-            duration_secs:
-              edit && edit.duration > 0 ? Number(edit.duration.toFixed(3)) : null,
-            ...(edit ? trimToStore(edit.trim, edit.duration) : {}),
-          });
+    const { error: insErr } = await supabase.from("shows").insert({
+      user_id: userId,
+      media_url: mediaUrl,
+      caption: text || null,
+      track: track ?? null,
+    });
 
     setBusy(false);
 

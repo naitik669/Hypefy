@@ -7,7 +7,7 @@ import { getProfile } from "@/lib/profile";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { CallProvider } from "@/components/calls/CallProvider";
 import { GroupCallProvider } from "@/components/calls/GroupCallProvider";
-import { UploadProvider } from "@/components/upload/UploadProvider";
+import { UploadProvider, ShotUploadCard } from "@/components/upload/UploadProvider";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { NativeShell } from "@/components/native/NativeShell";
 import { SwipeNav } from "@/components/layout/SwipeNav";
@@ -144,6 +144,10 @@ export default async function AppLayout({
       <CallProvider userId={user!.id}>
         <GroupCallProvider userId={user!.id}>
           <UploadProvider>
+            {/* A Shot keeps uploading after you have left the composer, and
+                lands you on the Shots feed — which is fixed and full-screen,
+                with nowhere to put an inline bar. */}
+            <ShotUploadCard />
             <NativeShell />
             <AppLockGate />
             <PresenceHeartbeat />

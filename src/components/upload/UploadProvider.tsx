@@ -6,6 +6,8 @@ import { X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import type { Track } from "@/lib/music";
+import { capturePoster } from "@/lib/video-poster";
+import { trimToStore, type Trim } from "@/lib/shot-trim";
 
 type PostUpload = {
   userId: string;
@@ -23,18 +25,42 @@ type PostUpload = {
   scheduledAt?: string | null;
 };
 
+type ShotUpload = {
+  userId: string;
+  file: File;
+  caption: string | null;
+  hashtags: string[];
+  mentions: string[];
+  track?: Track | null;
+  /** Which frame becomes the poster, in seconds. Null takes the default. */
+  coverTime: number | null;
+  /** The clip's length and the window that plays. */
+  duration: number;
+  trim: Trim;
+};
+
+/** What failed, and enough of it to try again. */
+type Failed =
+  | { kind: "post"; post: PostUpload }
+  | { kind: "shot"; shot: ShotUpload };
+
 type Ctx = {
   progress: number | null;
+  /** What is in flight, so each surface only shows its own kind. */
+  active: "post" | "shot" | null;
   /** The last upload that failed — kept so the user can retry it. */
-  failed: PostUpload | null;
+  failed: Failed | null;
   uploadPost: (a: PostUpload) => void;
+  uploadShot: (a: ShotUpload) => void;
   retryUpload: () => void;
   dismissFailed: () => void;
 };
 const UploadCtx = createContext<Ctx>({
   progress: null,
+  active: null,
   failed: null,
   uploadPost: () => {},
+  uploadShot: () => {},
   retryUpload: () => {},
   dismissFailed: () => {},
 });
@@ -45,7 +71,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const toast = useToast();
   const [progress, setProgress] = useState<number | null>(null);
-  const [failed, setFailed] = useState<PostUpload | null>(null);
+  const [active, setActive] = useState<"post" | "shot" | null>(null);
+  const [failed, setFailed] = useState<Failed | null>(null);
   const trickle = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopTrickle = () => { if (trickle.current) { clearInterval(trickle.current); trickle.current = null; } };
@@ -59,6 +86,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   };
 
   const uploadPost = useCallback(async (a: PostUpload) => {
+    setActive("post");
     setProgress(6);
     setFailed(null);
     startTrickle();
@@ -104,20 +132,91 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       stopTrickle();
       setProgress(null);
       // Stash the payload (Files still valid) so the user can one-tap retry.
-      setFailed(a);
+      setFailed({ kind: "post", post: a });
       toast("Couldn't share your post", "error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, router, toast]);
 
+  /**
+   * A Shot, uploaded after you have already left the composer.
+   *
+   * Publishing used to hold you on a spinner for the whole file — up to 50 MB
+   * on a phone — with a failure that dropped the clip entirely. This returns
+   * you to the feed at once and keeps the File, so a failure is a banner with
+   * a Retry rather than lost work.
+   */
+  const uploadShot = useCallback(async (a: ShotUpload) => {
+    setActive("shot");
+    setProgress(6);
+    setFailed(null);
+    startTrickle();
+    // Its own object URL: the composer that made one has already unmounted
+    // and revoked it by the time the poster is captured.
+    const localUrl = URL.createObjectURL(a.file);
+    try {
+      const ext = a.file.name.split(".").pop() || "webm";
+      const path = `${a.userId}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("shot-media")
+        .upload(path, a.file, { contentType: a.file.type, upsert: false });
+      if (upErr) throw upErr;
+      setProgress(80);
+      const mediaUrl = supabase.storage.from("shot-media").getPublicUrl(path).data.publicUrl;
+
+      // Best effort: a Shot with no poster still plays, so a failure here
+      // must not cost the upload that has already succeeded.
+      let posterUrl: string | null = null;
+      const poster = await capturePoster(localUrl, a.coverTime);
+      if (poster) {
+        const posterPath = `${a.userId}/${Date.now()}-poster.jpg`;
+        const { error: pErr } = await supabase.storage
+          .from("shot-media")
+          .upload(posterPath, poster, { contentType: "image/jpeg" });
+        if (!pErr) {
+          posterUrl = supabase.storage.from("shot-media").getPublicUrl(posterPath).data.publicUrl;
+        }
+      }
+
+      const { error: insErr } = await supabase.from("shots").insert({
+        user_id: a.userId,
+        media_url: mediaUrl,
+        caption: a.caption,
+        poster_url: posterUrl,
+        track: a.track ?? null,
+        hashtags: a.hashtags,
+        mentions: a.mentions,
+        duration_secs: a.duration > 0 ? Number(a.duration.toFixed(3)) : null,
+        ...trimToStore(a.trim, a.duration),
+      });
+      if (insErr) throw insErr;
+
+      stopTrickle();
+      setProgress(100);
+      toast("Shot posted", "success");
+      router.refresh();
+      setTimeout(() => setProgress(null), 700);
+    } catch {
+      stopTrickle();
+      setProgress(null);
+      setFailed({ kind: "shot", shot: a });
+      toast("Couldn't post your Shot", "error");
+    } finally {
+      URL.revokeObjectURL(localUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, router, toast]);
+
   const retryUpload = useCallback(() => {
-    if (failed) uploadPost(failed);
-  }, [failed, uploadPost]);
+    if (!failed) return;
+    if (failed.kind === "post") uploadPost(failed.post);
+    else uploadShot(failed.shot);
+  }, [failed, uploadPost, uploadShot]);
 
   const dismissFailed = useCallback(() => setFailed(null), []);
 
   return (
-    <UploadCtx.Provider value={{ progress, failed, uploadPost, retryUpload, dismissFailed }}>
+    <UploadCtx.Provider value={{ progress, active, failed, uploadPost, uploadShot, retryUpload, dismissFailed }}>
       {children}
     </UploadCtx.Provider>
   );
@@ -128,7 +227,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
  * progress line while uploading, or a retry banner when the last upload failed.
  */
 export function UploadProgressBar() {
-  const { progress, failed, retryUpload, dismissFailed } = useUpload();
+  const { progress, active, failed, retryUpload, dismissFailed } = useUpload();
+
+  if (active === "shot" || failed?.kind === "shot") return null;
 
   if (progress == null && failed) {
     return (
@@ -162,6 +263,66 @@ export function UploadProgressBar() {
         className="h-full bg-accent transition-[width] duration-300 ease-out"
         style={{ width: `${progress}%`, boxShadow: "0 0 8px rgba(163,230,53,0.6)" }}
       />
+    </div>
+  );
+}
+
+/**
+ * A Shot on its way up, from wherever you are.
+ *
+ * Posting a Shot lands you on /shots, where Home's inline bar is not
+ * rendered — and the Shots feed is a fixed, full-screen surface with nothing
+ * to slot a bar into. So this floats above the tab bar instead, and is the
+ * only place a Shot upload reports itself. It is deliberately not the same
+ * component as the post bar: the two live on different screens and neither
+ * ever shows the other's kind.
+ */
+export function ShotUploadCard() {
+  const { progress, active, failed, retryUpload, dismissFailed } = useUpload();
+
+  const isShotFailure = failed?.kind === "shot";
+  if (!isShotFailure && active !== "shot") return null;
+  if (progress == null && !isShotFailure) return null;
+
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(72px+var(--sab))] z-[120] flex justify-center px-3">
+      <div className="pointer-events-auto flex w-full max-w-[420px] items-center gap-3 rounded-2xl border border-border bg-elevated/95 px-4 py-3 shadow-lg backdrop-blur-xl">
+        {isShotFailure ? (
+          <>
+            <p className="min-w-0 flex-1 text-sm font-semibold">Couldn&apos;t post your Shot.</p>
+            <button
+              type="button"
+              onClick={retryUpload}
+              className="shrink-0 rounded-pill bg-accent px-3.5 py-1.5 text-xs font-bold text-accent-ink transition-transform active:scale-95"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={dismissFailed}
+              aria-label="Dismiss"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:text-foreground"
+            >
+              <X size={16} />
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">Posting your Shot…</span>
+              <span className="mt-1.5 block h-1 w-full overflow-hidden rounded-pill bg-border/60">
+                <span
+                  className="block h-full rounded-pill bg-accent transition-[width] duration-300 ease-out"
+                  style={{ width: `${progress ?? 0}%` }}
+                />
+              </span>
+            </span>
+            <span className="shrink-0 text-xs font-bold tabular-nums text-muted">
+              {Math.round(progress ?? 0)}%
+            </span>
+          </>
+        )}
+      </div>
     </div>
   );
 }
