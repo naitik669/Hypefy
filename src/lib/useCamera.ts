@@ -70,11 +70,21 @@ export function useCamera({
   facingDefault = "user",
   portrait = true,
   audio = false,
+  enabled = true,
 }: {
   facingDefault?: FacingMode;
   /** 9:16 for Shots. Shows want the old 4:3. */
   portrait?: boolean;
   audio?: boolean;
+  /**
+   * Whether to hold the camera open at all.
+   *
+   * This used to start on mount with no way to say no, so every screen that
+   * called the hook took the camera — and the indicator light — whether or
+   * not it was showing a viewfinder. Turning it off releases the stream;
+   * turning it back on asks again.
+   */
+  enabled?: boolean;
 } = {}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -163,13 +173,24 @@ export function useCamera({
   );
 
   useEffect(() => {
+    if (!enabled) {
+      // Let go of the hardware rather than merely hiding the picture: the
+      // camera light stays on otherwise, and some devices refuse a second
+      // stream while the first is held.
+      attempt.current++;
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      setReady(false);
+      setError(null);
+      return;
+    }
     void start(facing);
     return () => {
       attempt.current++;
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
-  }, [facing, start]);
+  }, [enabled, facing, start]);
 
   const flip = useCallback(
     () => setFacing((f) => (f === "user" ? "environment" : "user")),

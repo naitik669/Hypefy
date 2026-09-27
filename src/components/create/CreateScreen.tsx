@@ -11,6 +11,8 @@ import {
   Sparkles,
   Images,
   AlertCircle,
+  Video,
+  Camera,
 } from "lucide-react";
 import { useCamera } from "@/lib/useCamera";
 import { useVideoRecorder } from "@/lib/useVideoRecorder";
@@ -26,6 +28,8 @@ import {
 } from "@/components/camera/FilterCarousel";
 import type { Track } from "@/lib/music";
 import { BLANK_POSTER } from "@/lib/blank-poster";
+import { MAX_SHOT_MB } from "@/lib/video-poster";
+import { MAX_SHOT_SECS } from "@/lib/shot-trim";
 
 export type CreateMode = "post" | "shot" | "show" | "live";
 
@@ -70,6 +74,16 @@ export function CreateScreen({
   const [track, setTrack] = useState<Track | null>(null);
   const [trackOpen, setTrackOpen] = useState(false);
   const [captured, setCaptured] = useState<File | null>(null);
+  /**
+   * Where this Shot is coming from.
+   *
+   * Opening the creator used to point a live camera at you before you had
+   * said you wanted to record anything — and because useCamera started on
+   * mount regardless, it did that in every mode, Post and Live included.
+   * Most Shots are a clip somebody already has, so choosing one is the
+   * landing state and the camera is a thing you ask for.
+   */
+  const [source, setSource] = useState<"pick" | "camera">("pick");
   const galleryRef = useRef<HTMLInputElement>(null);
 
   const close = () => safeBack(router);
@@ -78,10 +92,11 @@ export function CreateScreen({
   // Only Shot and Show want a viewfinder. Post is text and gallery, and Live
   // has nothing to show yet — running the camera for either would light the
   // indicator for no reason.
-  const wantsCamera = mode === "shot" || mode === "show";
+  const wantsCamera = (mode === "shot" || mode === "show") && source === "camera";
   const wantsAudio = mode === "shot";
 
-  const cam = useCamera({ portrait: true, audio: wantsAudio });
+  // enabled, so the stream is only ever opened once someone asks to record.
+  const cam = useCamera({ portrait: true, audio: wantsAudio, enabled: wantsCamera });
   // Filters are for photos, so Show mode only: a Shot records the raw stream.
   const filters = useFilterState();
   const filtering = mode === "show" && filters.open;
@@ -177,6 +192,31 @@ export function CreateScreen({
         </div>
       ) : (
         <div className="absolute inset-0 bg-gradient-to-b from-elevated to-black" />
+      )}
+
+      {/* Choose a clip. Sits where the viewfinder would be, so the thing you
+          are most likely to want is the thing under your eyes — and nothing
+          is recording while you decide. */}
+      {!wantsCamera && (mode === "shot" || mode === "show") && (
+        <div className="absolute inset-0 z-[5] flex items-center justify-center px-8">
+          <button
+            type="button"
+            onClick={() => galleryRef.current?.click()}
+            className="flex w-full max-w-[300px] flex-col items-center gap-3 rounded-3xl border-2 border-dashed border-white/20 bg-white/[0.03] px-6 py-10 text-center transition-colors hover:border-accent/50 hover:bg-white/[0.06] active:scale-[0.99]"
+          >
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
+              <Video size={26} className="text-white" />
+            </span>
+            <span className="text-[15px] font-bold text-white">
+              {mode === "show" ? "Choose a photo or video" : "Choose a video"}
+            </span>
+            <span className="text-[11px] leading-relaxed text-white/45">
+              {mode === "show"
+                ? "From your gallery"
+                : `MP4 · WebM · MOV · up to ${MAX_SHOT_MB}MB · trimmed to ${MAX_SHOT_SECS}s`}
+            </span>
+          </button>
+        </div>
       )}
 
       {wantsCamera && cam.error && (
@@ -277,8 +317,22 @@ export function CreateScreen({
             </button>
 
             {/* Shutter. For Post there is no capture — go straight to the
-                existing composer, which handles text and multi-image. */}
-            {mode === "post" ? (
+                existing composer, which handles text and multi-image. For a
+                Shot or a Show it only appears once the camera has been asked
+                for; before that its place is taken by the ask. */}
+            {mode !== "post" && source === "pick" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.tap();
+                  setSource("camera");
+                }}
+                className="flex items-center gap-2 rounded-pill bg-white px-6 py-3.5 text-sm font-bold text-black transition-transform active:scale-95"
+              >
+                <Camera size={18} />
+                {mode === "show" ? "Take one" : "Record"}
+              </button>
+            ) : mode === "post" ? (
               <button
                 type="button"
                 onClick={() => router.push("/create/post")}
@@ -318,8 +372,26 @@ export function CreateScreen({
               </button>
             )}
 
-            {/* Balances the gallery button so the shutter stays centred. */}
-            <span className="h-11 w-11" aria-hidden />
+            {/* Back out of the camera, which otherwise had no exit but the
+                mode switcher. Keeps the shutter centred either way. */}
+            {wantsCamera ? (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.tap();
+                  setSource("pick");
+                }}
+                aria-label="Close the camera"
+                className="flex flex-col items-center gap-1 text-white active:scale-95"
+              >
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/25 bg-black/40 backdrop-blur-sm">
+                  <X size={20} />
+                </span>
+                <span className="text-[11px] font-medium">Close</span>
+              </button>
+            ) : (
+              <span className="h-11 w-11" aria-hidden />
+            )}
           </div>
         )}
 
@@ -337,6 +409,7 @@ export function CreateScreen({
               type="button"
               onClick={() => {
                 haptics.select();
+                setSource("pick");
                 setMode(m.id);
                 if (m.id !== "show") filters.close();
               }}
