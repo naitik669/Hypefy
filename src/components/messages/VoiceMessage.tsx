@@ -2,20 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
+import { barCount, resamplePeaks, voiceWidth } from "@/lib/voice-peaks";
 
 interface Props {
   /** Storage URL from the voice-notes bucket */
   url: string;
   /** Pre-stored duration (seconds) encoded in message body, fallback to audio metadata */
   storedDuration?: number;
+  /** The note's loudness over time, 0–100, recorded with it. Absent on every
+   *  note sent before notes carried their shape. */
+  peaks?: number[];
   mine: boolean;
 }
 
 const BARS = 28;
 
 /**
- * Deterministic organic waveform heights — looks hand-drawn without any
- * heavy audio decoding. Values are stable between renders and don't jump.
+ * The fallback shape, for notes recorded before notes carried their own.
+ *
+ * Deliberately gentle and low-contrast: it is standing in for information
+ * nobody has, and it should not look as confident as a real waveform sitting
+ * next to it in the same thread.
  */
 function staticBar(i: number): number {
   const x = i / BARS;
@@ -42,8 +49,14 @@ function fmt(secs: number) {
  * Theirs → surface background, accent bars
  *
  * Tap the waveform to seek. Tap the play button to toggle playback.
+ *
+ * The bubble is as wide as the note is long, between a floor and a cap, and
+ * the bars are the note's own loudness. Both used to be fixed — every note
+ * was 200px with the same drawing on it — so the waveform said nothing and
+ * the length of what you were about to commit to was invisible until you
+ * pressed play.
  */
-export function VoiceMessage({ url, storedDuration, mine }: Props) {
+export function VoiceMessage({ url, storedDuration, peaks, mine }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0); // 0..1
@@ -101,12 +114,18 @@ export function VoiceMessage({ url, storedDuration, mine }: Props) {
     setProgress(ratio);
   }
 
-  const filledBars = Math.round(progress * BARS);
+  // Width follows the note's length; the bar count follows the width, so
+  // bars stay the same thickness whatever the note.
+  const width = voiceWidth(duration);
+  const bars = barCount(width);
+  const shape = peaks?.length ? resamplePeaks(peaks, bars) : resamplePeaks(STATIC_BARS, bars);
+  const filledBars = Math.round(progress * shape.length);
   const displayTime = playing || progress > 0 ? currentTime : duration;
 
   return (
     <div
-      className={`flex w-[200px] items-center gap-2.5 rounded-2xl px-3 py-2.5 ${
+      style={{ width }}
+      className={`flex items-center gap-2.5 rounded-2xl px-3 py-2.5 ${
         mine ? "rounded-br-md bg-accent" : "rounded-bl-md bg-surface"
       }`}
     >
@@ -128,17 +147,18 @@ export function VoiceMessage({ url, storedDuration, mine }: Props) {
         )}
       </button>
 
-      {/* Waveform + duration */}
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+      {/* Waveform and duration on one line — the duration used to sit under
+          the bars, which made every bubble taller than it needed to be. */}
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         {/* Waveform bars (tap to seek) */}
         <div
           role="slider"
           aria-label="Voice note scrubber"
           aria-valuenow={Math.round(progress * 100)}
-          className="flex h-7 cursor-pointer items-end gap-[2px]"
+          className="flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-[2px]"
           onClick={seek}
         >
-          {STATIC_BARS.map((h, i) => (
+          {shape.map((h, i) => (
             <div
               key={i}
               className={`flex-1 rounded-full transition-colors duration-75 ${
@@ -150,15 +170,15 @@ export function VoiceMessage({ url, storedDuration, mine }: Props) {
                     ? "bg-accent-ink/25"
                     : "bg-foreground/15"
               }`}
-              style={{ height: `${h}%`, minHeight: "10%" }}
+              style={{ height: `${Math.max(12, h)}%`, minHeight: "12%" }}
             />
           ))}
         </div>
 
         {/* Duration / current time */}
         <span
-          className={`tabular-nums text-[10px] font-semibold ${
-            mine ? "text-accent-ink/55" : "text-faint"
+          className={`shrink-0 tabular-nums text-[11px] font-bold ${
+            mine ? "text-accent-ink/60" : "text-muted"
           }`}
         >
           {fmt(displayTime)}

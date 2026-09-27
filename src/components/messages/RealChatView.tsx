@@ -1028,7 +1028,7 @@ export function RealChatView({
   }
 
   /** Upload voice blob to Supabase Storage and send as a voice message. */
-  async function sendVoice(blob: Blob, durationSecs: number) {
+  async function sendVoice(blob: Blob, durationSecs: number, peaks: number[]) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setVoiceMode(false); return; }
 
@@ -1050,8 +1050,13 @@ export function RealChatView({
       .getPublicUrl(path);
 
     // Store as JSON so the player knows the pre-stored duration (avoids
-    // waiting for audio metadata to load before showing a duration).
-    const body = JSON.stringify({ url: publicUrl, duration: durationSecs });
+    // waiting for audio metadata to load before showing a duration) and the
+    // note's shape, measured off the microphone as it was recorded. Keeping
+    // the shape here rather than decoding the audio on every render means the
+    // waveform is drawn before a byte of the file is fetched — and it is the
+    // real one, not a pattern. An older note simply has no peaks and falls
+    // back to the generic shape.
+    const body = JSON.stringify({ url: publicUrl, duration: durationSecs, peaks });
     const replyId = replyTo?.id ?? null;
     setReplyTo(null);
 
@@ -1916,10 +1921,14 @@ export function RealChatView({
                         // Parse stored JSON: { url, duration }
                         let voiceUrl = m.body;
                         let voiceDuration: number | undefined;
+                        let voicePeaks: number[] | undefined;
                         try {
                           const p = JSON.parse(m.body);
                           voiceUrl = p.url ?? m.body;
                           voiceDuration = typeof p.duration === "number" ? p.duration : undefined;
+                          if (Array.isArray(p.peaks) && p.peaks.every((n: unknown) => typeof n === "number")) {
+                            voicePeaks = p.peaks as number[];
+                          }
                         } catch {}
                         return (
                           <div
@@ -1930,7 +1939,7 @@ export function RealChatView({
                             onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
                             className="relative"
                           >
-                            <VoiceMessage url={voiceUrl} storedDuration={voiceDuration} mine={mine} />
+                            <VoiceMessage url={voiceUrl} storedDuration={voiceDuration} peaks={voicePeaks} mine={mine} />
                             {starBurstId === m.id && (
                               <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                                 <Star size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />

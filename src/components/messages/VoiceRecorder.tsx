@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play, Trash2, Loader2 } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
+import { summarisePeaks } from "@/lib/voice-peaks";
 
 type Status = "idle" | "recording" | "paused" | "sending";
 
 interface Props {
-  onSend: (blob: Blob, durationSecs: number) => Promise<void>;
+  /** `peaks` is the note's loudness over time, 0–100, for drawing its shape. */
+  onSend: (blob: Blob, durationSecs: number, peaks: number[]) => Promise<void>;
   onCancel: () => void;
   /** Fires on every real recording-state transition (mic actually live vs.
    *  paused/stopped) — lets the parent broadcast this to the other party,
@@ -18,6 +20,9 @@ interface Props {
 
 const BARS = 30;
 const MAX_SECS = 120; // 2-minute cap
+/** How often loudness is sampled, in ms. 60fps is far more than a waveform
+ *  needs and would push a setState every frame for two minutes. */
+const SAMPLE_MS = 60;
 
 function getSupportedMime(): string {
   const types = [
@@ -57,6 +62,10 @@ export function VoiceRecorder({ onSend, onCancel, onStatusChange }: Props) {
   const animRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  /** Every loudness sample of the whole recording, pauses included, so the
+   *  note is sent with the shape you watched while speaking. */
+  const samplesRef = useRef<number[]>([]);
+  const lastSampleAt = useRef(0);
 
   // Boot — request mic and start immediately
   useEffect(() => {
@@ -117,20 +126,34 @@ export function VoiceRecorder({ onSend, onCancel, onStatusChange }: Props) {
     audioCtxRef.current = ctx;
     const src = ctx.createMediaStreamSource(stream);
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 64;
-    analyser.smoothingTimeConstant = 0.8;
+    // Time domain, not frequency: this used to read the frequency spectrum and
+    // draw it as bars, which is why the "waveform" wriggled constantly and
+    // never went quiet when you stopped talking. Loudness over time is the
+    // thing a voice note's shape is supposed to mean.
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0;
     src.connect(analyser);
     analyserRef.current = analyser;
 
-    const data = new Uint8Array(analyser.frequencyBinCount);
+    const data = new Uint8Array(analyser.fftSize);
     function tick() {
-      analyser.getByteFrequencyData(data);
-      const newBars = Array.from({ length: BARS }, (_, i) => {
-        const idx = Math.floor((i / BARS) * data.length);
-        return Math.max(6, Math.round((data[idx] / 255) * 100));
-      });
-      setBars(newBars);
       animRef.current = requestAnimationFrame(tick);
+      const now = performance.now();
+      if (now - lastSampleAt.current < SAMPLE_MS) return;
+      lastSampleAt.current = now;
+
+      analyser.getByteTimeDomainData(data);
+      // Silence sits at 128; loudness is how far the wave swings from it.
+      let swing = 0;
+      for (const v of data) swing = Math.max(swing, Math.abs(v - 128));
+      // Speech rarely comes near the full range, so it is lifted to use the
+      // height available. The clamp keeps a shout from clipping the bar.
+      const level = Math.min(100, Math.round((swing / 128) * 165));
+
+      samplesRef.current.push(level);
+      // The live bars scroll: the newest sample enters on the right, so the
+      // recording reads left to right exactly as it will once sent.
+      setBars((prev) => [...prev.slice(1), Math.max(6, level)]);
     }
     animRef.current = requestAnimationFrame(tick);
   }
@@ -189,7 +212,7 @@ export function VoiceRecorder({ onSend, onCancel, onStatusChange }: Props) {
 
     const mime = getSupportedMime() || "audio/webm";
     const blob = new Blob(chunksRef.current, { type: mime });
-    await onSend(blob, elapsed);
+    await onSend(blob, elapsed, summarisePeaks(samplesRef.current));
   }
 
   function discard() {
