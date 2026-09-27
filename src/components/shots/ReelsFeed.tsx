@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban } from "lucide-react";
+import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2 } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
@@ -526,6 +526,24 @@ function ReelCard({
   const [reportOpen, setReportOpen] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(false);
 
+  /**
+   * The Shot's own address, on the clipboard.
+   *
+   * Same link the feed's card copies, so a Shot has one address wherever it
+   * is shared from. The clipboard is refused often enough — an insecure
+   * origin, a WebView that has not granted it — that the failure has to say
+   * so rather than look like nothing happened.
+   */
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/shots/${reel.id}`);
+      haptics.success();
+      showToast("Link copied");
+    } catch {
+      showToast("Couldn't copy that link");
+    }
+  }
+
   async function blockAuthor() {
     setConfirmBlock(false);
     const { error } = await supabase.rpc("block_user", {
@@ -1036,8 +1054,15 @@ function ReelCard({
           up: every one of these is a thing to do to the Shot, and the sheet
           below is where the doing is happening. Hyping still works without
           it — a double tap on the video always has. */}
+      {/* z-30, above the author block below.
+          That block is inset-x-0 — the full width of the card — and only
+          *looks* clear of this rail because of its pr-16 padding. Padding is
+          inside the box, so it still covered the rail, and at the same z-20 it
+          came later in the DOM and so won every hit test. It is exactly tall
+          enough to reach the last button in this rail and no further, which is
+          why More was dead while Hype, Comment, Share and Save all worked. */}
       <div
-        className="absolute bottom-6 right-3 z-20 flex flex-col items-center gap-5"
+        className="absolute bottom-6 right-3 z-30 flex flex-col items-center gap-5"
         hidden={commentsOpen}
       >
         <RailButton
@@ -1205,6 +1230,40 @@ function ReelCard({
               type="button"
               onClick={() => {
                 setViewerMenuOpen(false);
+                void copyLink();
+              }}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
+            >
+              <Link2 size={20} className="text-foreground" />
+              <div>
+                <p className="text-sm font-semibold">Copy link</p>
+                <p className="text-xs text-muted">Send it anywhere</p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
+            <button
+              type="button"
+              onClick={() => {
+                setViewerMenuOpen(false);
+                setShareOpen(true);
+              }}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
+            >
+              <Share2 size={20} className="text-foreground" />
+              <div>
+                <p className="text-sm font-semibold">Share to…</p>
+                <p className="text-xs text-muted">Send it in a chat</p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
+            <button
+              type="button"
+              onClick={() => {
+                setViewerMenuOpen(false);
                 setReportOpen(true);
               }}
               className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
@@ -1281,6 +1340,40 @@ function ReelCard({
             onClick={() => setOwnerMenuOpen(false)}
           />
           <div className="absolute inset-x-4 bottom-8 z-40 overflow-hidden rounded-2xl bg-elevated/95 ring-1 ring-border backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={() => {
+                setOwnerMenuOpen(false);
+                void copyLink();
+              }}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
+            >
+              <Link2 size={20} className="text-foreground" />
+              <div>
+                <p className="text-sm font-semibold">Copy link</p>
+                <p className="text-xs text-muted">Send it anywhere</p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
+            <button
+              type="button"
+              onClick={() => {
+                setOwnerMenuOpen(false);
+                setShareOpen(true);
+              }}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
+            >
+              <Share2 size={20} className="text-foreground" />
+              <div>
+                <p className="text-sm font-semibold">Share to…</p>
+                <p className="text-xs text-muted">Send it in a chat</p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
             <button
               type="button"
               disabled={ownerAction !== null}
