@@ -5,7 +5,7 @@ import { ArrowLeft, Music } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
-import { extractHashtags } from "@/lib/content-utils";
+import { extractHashtags, extractMentions } from "@/lib/content-utils";
 import {
   ALLOWED_SHOT_TYPES,
   MAX_SHOT_MB,
@@ -140,6 +140,10 @@ export function ShotPreview({
             poster_url: posterUrl,
             track: track ?? null,
             hashtags: extractHashtags(text),
+            // Until now a Shot caption could @someone and reach nobody: the
+            // column did not exist, so 0025 removed the notification type
+            // rather than the gap. Both exist again.
+            mentions: extractMentions(text),
             duration_secs:
               edit && edit.duration > 0 ? Number(edit.duration.toFixed(3)) : null,
             ...(edit ? trimToStore(edit.trim, edit.duration) : {}),

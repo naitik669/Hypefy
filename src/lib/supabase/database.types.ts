@@ -2035,6 +2035,7 @@ export type Database = {
           id: string
           in_showcase: boolean
           media_url: string
+          mentions: string[]
           poster_url: string | null
           removal_reason: string | null
           removed_at: string | null
@@ -2056,6 +2057,7 @@ export type Database = {
           id?: string
           in_showcase?: boolean
           media_url: string
+          mentions?: string[]
           poster_url?: string | null
           removal_reason?: string | null
           removed_at?: string | null
@@ -2077,6 +2079,7 @@ export type Database = {
           id?: string
           in_showcase?: boolean
           media_url?: string
+          mentions?: string[]
           poster_url?: string | null
           removal_reason?: string | null
           removed_at?: string | null

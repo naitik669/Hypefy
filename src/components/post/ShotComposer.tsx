@@ -10,7 +10,12 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ShotCoverPicker } from "@/components/post/ShotCoverPicker";
 import { ShotTrimmer } from "@/components/post/ShotTrimmer";
 import { TrackPicker } from "@/components/music/TrackPicker";
-import { extractHashtags } from "@/lib/content-utils";
+import { extractHashtags, extractMentions } from "@/lib/content-utils";
+import {
+  SuggestionDropdown,
+  applySuggestion,
+  useMentionHashtag,
+} from "@/components/ui/MentionHashtagPicker";
 import {
   MAX_SHOT_SECS,
   MIN_SHOT_SECS,
@@ -57,10 +62,18 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
+  /** Caret position, so completion knows which word is being typed. */
+  const [cursor, setCursor] = useState(0);
   const [fileError, setFileError] = useState<string | null>(null);
   const [postError, setPostError] = useState<string | null>(null);
   /** Chosen cover frame, in seconds. Null until the picker reports one. */
   const [coverTime, setCoverTime] = useState<number | null>(null);
+  // Live completion for the caption, and the tags it will actually be
+  // indexed under.
+  const { suggestions, reset: resetPicker } = useMentionHashtag(caption, cursor);
+  const captionTags = extractHashtags(caption);
+  const captionMentions = extractMentions(caption);
+
   /** The clip's real length, once the browser has read it. 0 until then. */
   const [duration, setDuration] = useState(0);
   /** The part of the clip that becomes the Shot. */
@@ -185,6 +198,7 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
           poster_url: posterUrl,
           track: track ?? null,
           hashtags: extractHashtags(text),
+          mentions: extractMentions(text),
           duration_secs: duration > 0 ? Number(duration.toFixed(3)) : null,
           ...trimToStore(trim, duration),
         })
@@ -380,14 +394,56 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
               )}
             </button>
 
-            <textarea
-              value={caption}
-              onChange={(e) => setCaption(e.target.value.slice(0, 150))}
-              rows={2}
-              placeholder="Add a caption… (optional)"
-              className="input resize-none"
-            />
+            {/* Completion while typing, the way the camera-first path and
+                the post composer already have it. This one had a bare
+                textarea: tags and mentions were scraped out afterwards and
+                you got no sign whether the handle you typed was anyone. */}
+            <div className="relative">
+              <textarea
+                value={caption}
+                onChange={(e) => {
+                  setCaption(e.target.value.slice(0, 150));
+                  setCursor(e.target.selectionStart ?? 0);
+                }}
+                onSelect={(e) => setCursor((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
+                onBlur={() => setTimeout(resetPicker, 150)}
+                rows={2}
+                placeholder="Add a caption… (optional)"
+                className="input resize-none"
+              />
+              <SuggestionDropdown
+                suggestions={suggestions}
+                onSelect={(s) => {
+                  const { newValue, newCursor } = applySuggestion(caption, cursor, s);
+                  setCaption(newValue.slice(0, 150));
+                  setCursor(newCursor);
+                  resetPicker();
+                }}
+              />
+            </div>
             <p className="-mt-2 text-right text-xs text-faint">{caption.length}/150</p>
+
+            {/* What actually gets indexed, shown rather than implied. */}
+            {(captionTags.length > 0 || captionMentions.length > 0) && (
+              <div className="-mt-1 flex flex-wrap gap-1.5 rounded-xl bg-surface px-3 py-2">
+                {captionTags.map((t) => (
+                  <span
+                    key={t}
+                    className="rounded-full bg-hashtag/15 px-2 py-0.5 text-xs font-semibold text-hashtag"
+                  >
+                    #{t}
+                  </span>
+                ))}
+                {captionMentions.map((m) => (
+                  <span
+                    key={m}
+                    className="rounded-full bg-verified/15 px-2 py-0.5 text-xs font-semibold text-verified"
+                  >
+                    @{m}
+                  </span>
+                ))}
+              </div>
+            )}
           </>
         )}
 
