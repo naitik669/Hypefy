@@ -6,11 +6,11 @@ import { captionRuns } from "@/lib/caption-runs";
 /** How fast a caption travels across the card, in px per second. */
 const SPEED = 110;
 /**
- * The share of one cycle spent moving, rather than waiting at one end or the
- * other. It has to match the percentages in `caption-sweep` (globals.css):
- * 26%→74% out and 88%→100% back, so a little under half.
+ * The share of one cycle spent moving out, rather than waiting at one end or
+ * the other. It has to match `caption-sweep` (globals.css), where the
+ * outward leg runs 36%→80%.
  */
-const TRAVEL_SHARE = 0.48;
+const TRAVEL_SHARE = 0.44;
 /** However short or long the caption, a cycle stays inside these. */
 const SHORTEST = 6;
 const LONGEST = 18;
@@ -69,8 +69,15 @@ export function PageCaption({
       b.dataset.sweeping = "true";
     };
     measure();
-    // The card is resized by the deck as the window changes, and a font can
-    // land after the first paint and make the same words wider.
+    // A web font landing after the first paint makes the same words wider
+    // without changing the box around them, so the observer below never hears
+    // about it — and a caption that should travel would quietly decide it
+    // fits. measure() no-ops once the refs are gone, so a late font on an
+    // unmounted card costs nothing.
+    if (typeof document !== "undefined" && "fonts" in document) {
+      void document.fonts.ready.then(measure);
+    }
+    // The deck resizes the card with the window.
     if (typeof ResizeObserver === "undefined") return;
     const watch = new ResizeObserver(measure);
     if (box.current) watch.observe(box.current);

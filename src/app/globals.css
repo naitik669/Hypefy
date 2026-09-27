@@ -1441,8 +1441,12 @@ html[data-splash="off"] #hypefy-splash {
    the device and handed in as --caption-shift; the duration is set with it,
    so a long caption travels for longer rather than faster. */
 @keyframes caption-sweep {
-  0%, 26% { transform: translateX(0); }
-  74%, 88% { transform: translateX(var(--caption-shift, 0px)); }
+  /* Rest on the opening words — the longest hold in the cycle, because this
+     is where anyone glancing at the card starts reading. */
+  0%, 36% { transform: translateX(0); }
+  /* Out to the end, and a shorter hold there to finish the sentence. */
+  80%, 88% { transform: translateX(var(--caption-shift, 0px)); }
+  /* Back to the opening words, and round again. */
   100% { transform: translateX(0); }
 }
 .animate-caption-sweep {
