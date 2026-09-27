@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Hypefy's own near-black. Same value as --background in globals.css and
-         the theme colour in the web manifest, so the launch screen, the status
-         bar and the page are one colour with no seam. -->
+    <!-- Hypefy's own near-black. The same value the color-background custom
+         property carries in globals.css, and the theme colour in the web
+         manifest, so the launch screen, the status bar and the page are one
+         colour with no seam.
+
+         Do not write that custom property with its two leading hyphens here.
+         XML forbids a double hyphen inside a comment, and Android does not
+         catch it at lint time: it fails the release build much later, at
+         mergeReleaseResources, with an error that names this line and not the
+         reason. -->
     <color name="hypefy_black">#0A0A0A</color>
 </resources>
