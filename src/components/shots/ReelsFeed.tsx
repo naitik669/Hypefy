@@ -13,6 +13,7 @@ import { ShareButton } from "@/components/feed/QuickShare";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { HypeBreak } from "@/components/feed/HypeBreak";
 import { HypeProofLine } from "@/components/hype/HypeProofLine";
+import { playbackWindow } from "@/lib/shot-trim";
 import { HypedBySheet } from "@/components/hype/HypedBySheet";
 import { fetchHypeProof, type HypeProof } from "@/lib/hype-proof";
 import { formatCount } from "@/lib/format";
@@ -72,6 +73,12 @@ export type Reel = {
   id: string;
   user_id: string;
   media_url: string;
+  /** Length of the uploaded file. Null on Shots posted before it was kept. */
+  duration_secs?: number | null;
+  /** The part of the file that plays. Null on either side means no bound
+   *  there — the file is never cut, only the window is stored. */
+  trim_start?: number | null;
+  trim_end?: number | null;
   /** First frame, captured at upload. Used as the video's poster so a reel
    *  shows itself while it loads instead of an empty black rectangle. Null on
    *  Shots uploaded before posters existed — see primeFrame below. */
@@ -217,7 +224,7 @@ export function ReelsFeed({
     supabase
       .from("shots")
       .select(
-        "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, profiles(display_name, avatar_hue, username, avatar_url)"
+        "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, duration_secs, trim_start, trim_end, profiles(display_name, avatar_hue, username, avatar_url)"
       )
       .lt("created_at", oldest)
       .order("created_at", { ascending: false })
@@ -398,6 +405,11 @@ function ReelCard({
   /** False until the video has painted something — poster or first frame. */
   const [frameReady, setFrameReady] = useState(false);
   const [progress, setProgress] = useState(0); // 0..1 playback position
+  /**
+   * The slice of the file this Shot is. Its author chose it in the composer;
+   * the file itself was never cut, so the player is what enforces it.
+   */
+  const window0 = playbackWindow(reel);
   const [buffering, setBuffering] = useState(false);
 
   const name = reel.profiles?.display_name ?? reel.profiles?.username ?? "User";
@@ -619,7 +631,7 @@ function ReelCard({
         });
     } else {
       el.pause();
-      el.currentTime = 0; // rewind so it restarts clean when revisited
+      el.currentTime = window0.start; // rewind so it restarts clean when revisited
       setPlaying(false);
       setProgress(0);
       // Do not leave a glyph mid-fade on a reel nobody is looking at.
@@ -873,6 +885,12 @@ function ReelCard({
    */
   function primeFrame(el: HTMLVideoElement) {
     if (reel.poster_url || el.currentTime > 0) return;
+    // A trimmed Shot's first frame is the first frame it plays, not the
+    // file's — otherwise it shows a moment its author cut out.
+    if (window0.start > 0) {
+      el.currentTime = window0.start;
+      return;
+    }
     try {
       el.currentTime = 0.05;
     } catch {
@@ -948,7 +966,10 @@ function ReelCard({
           // them exactly while they are down.
           transition: pinching ? "none" : "transform 220ms ease-out",
         }}
-        loop
+        // Loop is handled in onTimeUpdate when the Shot is trimmed: the
+        // native loop would run to the end of the file, past the part its
+        // author chose.
+        loop={window0.end === null}
         muted={muted}
         playsInline
         preload={preload}
@@ -957,7 +978,16 @@ function ReelCard({
         onLoadedData={() => setFrameReady(true)}
         onTimeUpdate={(e) => {
           const v = e.currentTarget;
-          if (v.duration) setProgress(v.currentTime / v.duration);
+          // Progress runs across the trimmed window, not the file, so the bar
+          // fills as the Shot plays rather than creeping through a minute of
+          // video nobody is going to see.
+          const from = window0.start;
+          const to = window0.end ?? v.duration;
+          if (to > from) setProgress(Math.min(1, Math.max(0, (v.currentTime - from) / (to - from))));
+          // A seek landing before the window (or a browser that ignored the
+          // initial one) is pulled back in rather than left playing outside.
+          if (v.currentTime < from - 0.25) v.currentTime = from;
+          else if (window0.end !== null && v.currentTime >= window0.end) v.currentTime = from;
         }}
         onWaiting={() => setBuffering(true)}
         onPlaying={() => {

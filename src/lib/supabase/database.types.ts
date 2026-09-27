@@ -2029,6 +2029,7 @@ export type Database = {
           caption: string | null
           comment_count: number
           created_at: string
+          duration_secs: number | null
           hashtags: string[]
           hype_count: number
           id: string
@@ -2041,12 +2042,15 @@ export type Database = {
           save_count: number
           share_count: number
           track: Json | null
+          trim_end: number | null
+          trim_start: number | null
           user_id: string
         }
         Insert: {
           caption?: string | null
           comment_count?: number
           created_at?: string
+          duration_secs?: number | null
           hashtags?: string[]
           hype_count?: number
           id?: string
@@ -2059,12 +2063,15 @@ export type Database = {
           save_count?: number
           share_count?: number
           track?: Json | null
+          trim_end?: number | null
+          trim_start?: number | null
           user_id: string
         }
         Update: {
           caption?: string | null
           comment_count?: number
           created_at?: string
+          duration_secs?: number | null
           hashtags?: string[]
           hype_count?: number
           id?: string
@@ -2077,6 +2084,8 @@ export type Database = {
           save_count?: number
           share_count?: number
           track?: Json | null
+          trim_end?: number | null
+          trim_start?: number | null
           user_id?: string
         }
         Relationships: [
@@ -2830,10 +2839,11 @@ export type Database = {
         Args: { p_after: string; p_conversation_id: string }
         Returns: undefined
       }
-      // Hand-held: the generator types a nullable text argument as
-      // non-null, but set_chat_theme takes null to mean "turned off the chat
-      // theme" and ChatThemePicker passes it. Re-apply after regenerating.
       set_chat_theme: {
+        // p_theme is nullable: null turns the chat theme off, which is a real
+        // path (ChatThemePicker's pick(null)). The generator keeps reporting
+        // it as non-null because the function's default hides it — RE-APPLY
+        // THIS after regenerating these types, or the build breaks.
         Args: { p_conversation_id: string; p_theme: string | null }
         Returns: undefined
       }

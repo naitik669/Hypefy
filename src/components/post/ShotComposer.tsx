@@ -8,8 +8,18 @@ import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
 import { ShotCoverPicker } from "@/components/post/ShotCoverPicker";
+import { ShotTrimmer } from "@/components/post/ShotTrimmer";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { extractHashtags } from "@/lib/content-utils";
+import {
+  MAX_SHOT_SECS,
+  MIN_SHOT_SECS,
+  defaultTrim,
+  fmtSecs,
+  tooShort,
+  trimToStore,
+  type Trim,
+} from "@/lib/shot-trim";
 import type { Track } from "@/lib/music";
 
 // Shared with the camera-first creator rather than restated. This file said 60
@@ -51,6 +61,10 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
   const [postError, setPostError] = useState<string | null>(null);
   /** Chosen cover frame, in seconds. Null until the picker reports one. */
   const [coverTime, setCoverTime] = useState<number | null>(null);
+  /** The clip's real length, once the browser has read it. 0 until then. */
+  const [duration, setDuration] = useState(0);
+  /** The part of the clip that becomes the Shot. */
+  const [trim, setTrim] = useState<Trim>({ start: 0, end: 0 });
   const [track, setTrack] = useState<Track | null>(null);
   const [trackOpen, setTrackOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -74,8 +88,30 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
     }
     setFile(f);
     setPreview(URL.createObjectURL(f));
-    // A new clip invalidates the old choice.
+    // A new clip invalidates every choice made about the old one.
     setCoverTime(null);
+    setDuration(0);
+    setTrim({ start: 0, end: 0 });
+  }
+
+  /**
+   * The clip's length, the moment the browser knows it.
+   *
+   * Shots had no length rule at all — the only guard was the 50 MB bucket, so
+   * a three-minute clip was a valid Shot in a feed people flick through. The
+   * check lives here rather than at post time so the answer arrives while the
+   * clip is still on screen and can be swapped.
+   */
+  function onMetadata(e: React.SyntheticEvent<HTMLVideoElement>) {
+    const secs = e.currentTarget.duration;
+    if (!Number.isFinite(secs) || secs <= 0) return;
+    setDuration(secs);
+    setTrim(defaultTrim(secs));
+    setFileError(
+      tooShort(secs)
+        ? `That clip is under ${MIN_SHOT_SECS}s. Shots need to be a little longer.`
+        : null,
+    );
   }
 
   function removeFile() {
@@ -97,6 +133,12 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
 
   function handlePost() {
     if (!file) return;
+    // The button is disabled for this, but a clip whose metadata arrives late
+    // could still be posted from a stale render.
+    if (blocked) {
+      setPostError(blocked);
+      return;
+    }
     setPostError(null);
     startTransition(async () => {
       const ext = file.name.split(".").pop() ?? "mp4";
@@ -143,6 +185,8 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
           poster_url: posterUrl,
           track: track ?? null,
           hashtags: extractHashtags(text),
+          duration_secs: duration > 0 ? Number(duration.toFixed(3)) : null,
+          ...trimToStore(trim, duration),
         })
         .select("id")
         .single();
@@ -198,11 +242,25 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
     );
   }
 
+  /**
+   * Why this clip cannot be posted, or null.
+   *
+   * Computed rather than stored, so it can never disagree with the trim the
+   * handles are showing. A clip whose metadata has not loaded yet is allowed
+   * through here and caught by the same rules at post time.
+   */
+  const blocked =
+    duration > 0 && tooShort(duration)
+      ? `Shots need to be at least ${MIN_SHOT_SECS}s.`
+      : duration > 0 && trim.end - trim.start > MAX_SHOT_SECS + 0.001
+        ? `That is ${fmtSecs(trim.end - trim.start)}. Trim it to ${fmtSecs(MAX_SHOT_SECS)} or less.`
+        : null;
+
   const postButton = (className: string) => (
     <button
       type="button"
       onClick={handlePost}
-      disabled={!file || pending}
+      disabled={!file || pending || blocked !== null}
       className={`flex h-12 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-40 ${className}`}
     >
       {pending ? (
@@ -256,6 +314,7 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
                     className="max-h-[60vh] w-full bg-black object-contain"
                     controls
                     playsInline
+                    onLoadedMetadata={onMetadata}
                   />
                   <button
                     type="button"
@@ -278,10 +337,15 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
             </div>
             <input ref={fileRef} type="file" accept={ALLOWED_TYPES.join(",")} className="hidden" onChange={onFileChange} />
             {fileError && <p className="text-xs text-danger">{fileError}</p>}
+            {!fileError && blocked && <p className="text-xs text-danger">{blocked}</p>}
 
             {/* Sits with the clip, before the caption: the cover is a property
                 of the video, and choosing it while the video is the thing on
                 screen is the moment it makes sense. */}
+            {preview && duration > 0 && (
+              <ShotTrimmer src={preview} duration={duration} value={trim} onChange={setTrim} />
+            )}
+
             {preview && (
               <ShotCoverPicker
                 src={preview}

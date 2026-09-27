@@ -6,7 +6,7 @@ import { GoneScreen } from "@/components/empty/GoneScreen";
 import { getAdContext } from "@/lib/ads-server";
 
 const SELECT =
-  "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, profiles(display_name, avatar_hue, username, avatar_url)";
+  "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, duration_secs, trim_start, trim_end, profiles(display_name, avatar_hue, username, avatar_url)";
 
 // Shared between generateMetadata and the page render (deduped per request).
 const getShot = cache(async (shotId: string) => {

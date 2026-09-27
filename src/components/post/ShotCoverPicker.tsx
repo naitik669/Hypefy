@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ImageIcon, Loader2 } from "lucide-react";
+import { extractStrip, type Frame } from "@/lib/video-frames";
 
 /**
  * Choose which frame of a Shot becomes its cover.
@@ -25,74 +26,6 @@ import { ImageIcon, Loader2 } from "lucide-react";
 
 /** How many candidate frames to offer. */
 const FRAME_COUNT = 6;
-/** Thumbnails are small; no reason to decode them at full width. */
-const STRIP_WIDTH = 160;
-
-export type Frame = { time: number; url: string };
-
-/**
- * Pull `count` evenly spaced frames out of a video.
- *
- * Deliberately avoids both ends: the first frame of a phone recording is
- * usually black or a blur, and the last is usually the hand coming back.
- */
-export function frameTimes(duration: number, count = FRAME_COUNT): number[] {
-  if (!Number.isFinite(duration) || duration <= 0) return [0];
-  // Inset by half a step so the samples sit inside the clip rather than on
-  // its edges.
-  const step = duration / count;
-  return Array.from({ length: count }, (_, i) =>
-    Math.min(duration - 0.01, Math.max(0, step * i + step / 2))
-  );
-}
-
-async function extractFrames(
-  src: string,
-  onFrame: (f: Frame) => void,
-  signal: { cancelled: boolean }
-): Promise<void> {
-  const video = document.createElement("video");
-  video.muted = true;
-  video.playsInline = true;
-  video.preload = "auto";
-  video.src = src;
-
-  const ready = await new Promise<boolean>((resolve) => {
-    const bail = setTimeout(() => resolve(false), 8000);
-    video.onerror = () => {
-      clearTimeout(bail);
-      resolve(false);
-    };
-    video.onloadedmetadata = () => {
-      clearTimeout(bail);
-      resolve(true);
-    };
-  });
-  if (!ready || signal.cancelled) return;
-
-  const scale = Math.min(1, STRIP_WIDTH / (video.videoWidth || STRIP_WIDTH));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round((video.videoWidth || STRIP_WIDTH) * scale);
-  canvas.height = Math.round((video.videoHeight || STRIP_WIDTH) * scale);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  for (const time of frameTimes(video.duration)) {
-    if (signal.cancelled) return;
-    const seeked = await new Promise<boolean>((resolve) => {
-      // A seek that never lands must not hang the whole strip.
-      const bail = setTimeout(() => resolve(false), 4000);
-      video.onseeked = () => {
-        clearTimeout(bail);
-        resolve(true);
-      };
-      video.currentTime = time;
-    });
-    if (!seeked || signal.cancelled) continue;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    onFrame({ time, url: canvas.toDataURL("image/jpeg", 0.7) });
-  }
-}
 
 export function ShotCoverPicker({
   src,
@@ -115,8 +48,9 @@ export function ShotCoverPicker({
     pickedRef.current = false;
     const signal = { cancelled: false };
 
-    extractFrames(
+    extractStrip(
       src,
+      FRAME_COUNT,
       (f) => {
         if (signal.cancelled) return;
         setFrames((prev) => [...prev, f]);
@@ -127,7 +61,7 @@ export function ShotCoverPicker({
           onChange(f.time);
         }
       },
-      signal
+      signal,
     ).finally(() => {
       if (!signal.cancelled) setDone(true);
     });

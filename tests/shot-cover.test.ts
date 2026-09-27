@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { frameTimes } from "@/components/post/ShotCoverPicker";
+import { frameTimes } from "@/lib/video-frames";
 
 /**
  * Which moments get offered as a Shot's cover. Getting this wrong is quiet:
