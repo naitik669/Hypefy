@@ -20,6 +20,7 @@ import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { haptics } from "@/lib/haptics";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { ShotPreview } from "@/components/create/ShotPreview";
+import { ShotEditor } from "@/components/create/ShotEditor";
 import {
   FilterCarousel,
   FilterRailButton,
@@ -29,7 +30,7 @@ import {
 import type { Track } from "@/lib/music";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { MAX_SHOT_MB } from "@/lib/video-poster";
-import { MAX_SHOT_SECS } from "@/lib/shot-trim";
+import { MAX_SHOT_SECS, type Trim } from "@/lib/shot-trim";
 
 export type CreateMode = "post" | "shot" | "show" | "live";
 
@@ -84,6 +85,15 @@ export function CreateScreen({
    * landing state and the camera is a thing you ask for.
    */
   const [source, setSource] = useState<"pick" | "camera">("pick");
+  /**
+   * What the edit stage settled on, once it has been through. Null means the
+   * clip has not been edited yet, which is what puts the editor on screen.
+   */
+  const [edited, setEdited] = useState<{
+    duration: number;
+    trim: Trim;
+    coverTime: number | null;
+  } | null>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
   const close = () => safeBack(router);
@@ -133,7 +143,42 @@ export function CreateScreen({
   function onGallery(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (file) setCaptured(file);
+    if (file) {
+      setEdited(null);
+      setCaptured(file);
+    }
+  }
+
+  const songPicker = trackOpen ? (
+    <TrackPicker
+      open={trackOpen}
+      onClose={() => setTrackOpen(false)}
+      onSelect={(t) => {
+        setTrack(t);
+        setTrackOpen(false);
+      }}
+    />
+  ) : null;
+
+  // Edit step — trim, cover and sound, before anything is written about it.
+  // A Show is a photo: none of these apply, so it goes straight to the
+  // caption. A Shot goes through here, whichever way its clip arrived, which
+  // is what makes the length rule true of both routes rather than only the
+  // other composer.
+  if (captured && mode !== "show" && !edited) {
+    return (
+      <>
+        <ShotEditor
+          file={captured}
+          track={track}
+          onPickSound={() => setTrackOpen(true)}
+          onClearSound={() => setTrack(null)}
+          onBack={() => setCaptured(null)}
+          onNext={setEdited}
+        />
+        {songPicker}
+      </>
+    );
   }
 
   // Preview step — the captured media, caption, hashtags and publish.
@@ -144,7 +189,8 @@ export function CreateScreen({
         mode={mode === "show" ? "show" : "shot"}
         track={track}
         userId={userId}
-        onBack={() => setCaptured(null)}
+        edit={edited ?? undefined}
+        onBack={() => (edited ? setEdited(null) : setCaptured(null))}
         onDone={() => router.replace(mode === "show" ? "/home" : "/shots")}
       />
     );
@@ -434,16 +480,7 @@ export function CreateScreen({
         onChange={onGallery}
       />
 
-      {trackOpen && (
-        <TrackPicker
-          open={trackOpen}
-          onClose={() => setTrackOpen(false)}
-          onSelect={(t) => {
-            setTrack(t);
-            setTrackOpen(false);
-          }}
-        />
-      )}
+      {songPicker}
     </div>
   );
 }

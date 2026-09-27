@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowLeft, Music } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
@@ -19,7 +19,9 @@ import {
   useMentionHashtag,
 } from "@/components/ui/MentionHashtagPicker";
 import type { Track } from "@/lib/music";
+import { trimToStore, type Trim } from "@/lib/shot-trim";
 import { BLANK_POSTER } from "@/lib/blank-poster";
+import { useObjectUrl } from "@/lib/object-url";
 
 /**
  * Preview and publish step for the camera-first creator.
@@ -33,6 +35,7 @@ export function ShotPreview({
   mode,
   track,
   userId,
+  edit,
   onBack,
   onDone,
 }: {
@@ -40,6 +43,12 @@ export function ShotPreview({
   mode: "shot" | "show";
   track: Track | null;
   userId: string;
+  /**
+   * What the edit stage decided: the clip's length, the window that plays,
+   * and which frame is the cover. Absent for a Show, which is a photo and
+   * has none of them.
+   */
+  edit?: { duration: number; trim: Trim; coverTime: number | null };
   onBack: () => void;
   onDone: () => void;
 }) {
@@ -48,17 +57,18 @@ export function ShotPreview({
   const [caption, setCaption] = useState("");
   const [cursor, setCursor] = useState(0);
   const [busy, setBusy] = useState(false);
-  /** Chosen cover frame, in seconds. Only Shots have a poster. */
-  const [coverTime, setCoverTime] = useState<number | null>(null);
+  /** Chosen cover frame, in seconds. Only Shots have a poster. Chosen in
+   *  the edit stage now; this keeps it for the Show path, which has none. */
+  const [coverTime, setCoverTime] = useState<number | null>(edit?.coverTime ?? null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const { suggestions, reset } = useMentionHashtag(caption, cursor);
   const isVideo = file.type.startsWith("video/");
 
   // Object URLs leak until revoked, and a long session through the creator
-  // can mint a lot of them.
-  const url = useMemo(() => URL.createObjectURL(file), [file]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  // can mint a lot of them — but revoking them in an effect cleanup breaks
+  // every second reader of the same URL, which is what the cover picker is.
+  const url = useObjectUrl(file);
 
   // Shows go to a bucket half the size of Shots. Using the Shot limit for both
   // meant a 40MB Show passed this check and was rejected on upload — reported
@@ -130,6 +140,9 @@ export function ShotPreview({
             poster_url: posterUrl,
             track: track ?? null,
             hashtags: extractHashtags(text),
+            duration_secs:
+              edit && edit.duration > 0 ? Number(edit.duration.toFixed(3)) : null,
+            ...(edit ? trimToStore(edit.trim, edit.duration) : {}),
           });
 
     setBusy(false);
