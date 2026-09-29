@@ -59,6 +59,7 @@ import { canEncrypt, isEncrypted, openEnvelope, sealFor, useEnvelopeReader } fro
 import { openEncryptionSetup } from "@/lib/e2ee/open-setup";
 import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 import { ChatImg, ChatLink, ChatVideo } from "@/components/messages/ChatMedia";
+import { mediaUrlsOf, prefetchChatMedia } from "@/lib/chat-media-url";
 
 type PostPreview = {
   id: string;
@@ -354,6 +355,13 @@ export function RealChatView({
    * envelopes themselves, so it needs no column and cannot drift from what
    * was actually sent.
    */
+  // Sign every attachment in the thread in one batched call the moment it
+  // loads, so the first tile is not waiting on a lookup of its own. Runs on
+  // arrivals and older pages alike; links already held cost nothing.
+  useEffect(() => {
+    prefetchChatMedia(storedMessages.flatMap((m) => mediaUrlsOf(m.kind, m.body)));
+  }, [storedMessages]);
+
   const firstEncryptedIndex = useMemo(() => messages.findIndex((m) => !!m._enc), [messages]);
   const [reactions, setReactions] = useState<ReactionRow[]>(initialReactions);
   const [readers, setReaders] = useState<Reader[]>(initialReaders);

@@ -16,6 +16,12 @@ import { createClient } from "@/lib/supabase/client";
  * So a leaked link, a guessed address, or a link pasted into another chat
  * opens nothing for anyone who is not in the conversation, and stops working
  * an hour after it was issued for anyone who is.
+ *
+ * Speed is the cost of that, so most of this file is about not paying it
+ * twice. A thread of fifty tiles would otherwise be fifty round trips before
+ * the first picture; lookups that arrive together are sent as one call per
+ * bucket, a link is reused until shortly before it dies, and links survive a
+ * reload of the tab so reopening a chat is instant.
  */
 
 type Bucket = "chat-media" | "voice-notes";
@@ -24,6 +30,11 @@ type Bucket = "chat-media" | "voice-notes";
 const TTL_SECONDS = 60 * 60;
 /** Re-sign this long before it actually expires, so a link never dies mid-play. */
 const REFRESH_MARGIN_MS = 5 * 60_000;
+/** How long to wait for more lookups before sending the batch. */
+const BATCH_WINDOW_MS = 8;
+/** Storage's own limit on paths per signing call is generous; stay well inside it. */
+const MAX_PER_CALL = 100;
+const STORE_KEY = "hypefy:chat-media-links:v1";
 
 const PUBLIC_URL = /\/storage\/v1\/object\/public\/(chat-media|voice-notes)\/([^?#]+)/;
 
@@ -47,27 +58,141 @@ export function needsSigning(url: string | null | undefined): boolean {
 type Signer = {
   storage: {
     from: (bucket: string) => {
-      createSignedUrl: (
-        path: string,
+      createSignedUrls: (
+        paths: string[],
         expiresIn: number,
-      ) => Promise<{ data: { signedUrl: string } | null; error: unknown }>;
+      ) => Promise<{
+        data: { path: string | null; signedUrl: string; error: string | null }[] | null;
+        error: unknown;
+      }>;
     };
   };
 };
 
 type Entry = { url: string; expiresAt: number };
 const cache = new Map<string, Entry>();
-const inFlight = new Map<string, Promise<string | null>>();
+let hydrated = false;
+
+const keyOf = (bucket: string, path: string) => `${bucket}/${path}`;
 
 function fresh(entry: Entry | undefined, now: number): entry is Entry {
   return !!entry && entry.expiresAt - REFRESH_MARGIN_MS > now;
 }
 
+// ── surviving a reload ─────────────────────────────────────────────────
+
+/**
+ * Links are kept in sessionStorage for the life of the tab.
+ *
+ * Not localStorage: a signed link is a bearer credential for an hour, and it
+ * should not outlive the tab or be visible to another one. Everything here
+ * tolerates storage being missing, full or throwing — the worst outcome is
+ * signing again.
+ */
+function hydrate(now: number): void {
+  if (hydrated) return;
+  hydrated = true;
+  try {
+    const raw = sessionStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    const stored = JSON.parse(raw) as Record<string, Entry>;
+    for (const [k, e] of Object.entries(stored)) {
+      if (e && typeof e.url === "string" && fresh(e, now)) cache.set(k, e);
+    }
+  } catch {
+    /* unreadable or absent — start empty */
+  }
+}
+
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+function persistSoon(): void {
+  if (persistTimer) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    try {
+      const now = Date.now();
+      const live: Record<string, Entry> = {};
+      for (const [k, e] of cache) if (fresh(e, now)) live[k] = e;
+      sessionStorage.setItem(STORE_KEY, JSON.stringify(live));
+    } catch {
+      /* full or unavailable — signing again is the fallback */
+    }
+  }, 250);
+}
+
+// ── batching ───────────────────────────────────────────────────────────
+
+type Waiter = (url: string | null) => void;
+const queue = new Map<Bucket, Map<string, Waiter[]>>();
+const waiting = new Map<string, Promise<string | null>>();
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let queuedClient: Signer | null = null;
+
+function enqueue(bucket: Bucket, path: string, client: Signer): Promise<string | null> {
+  queuedClient = client;
+  return new Promise((resolve) => {
+    const forBucket = queue.get(bucket) ?? new Map<string, Waiter[]>();
+    forBucket.set(path, [...(forBucket.get(path) ?? []), resolve]);
+    queue.set(bucket, forBucket);
+    flushTimer ??= setTimeout(() => void flush(), BATCH_WINDOW_MS);
+  });
+}
+
+async function flush(): Promise<void> {
+  flushTimer = null;
+  const client = queuedClient;
+  const batches = [...queue.entries()];
+  queue.clear();
+  if (!client) return;
+
+  await Promise.all(
+    batches.map(async ([bucket, byPath]) => {
+      const paths = [...byPath.keys()];
+      for (let i = 0; i < paths.length; i += MAX_PER_CALL) {
+        await signChunk(client, bucket, paths.slice(i, i + MAX_PER_CALL), byPath);
+      }
+    }),
+  );
+}
+
+async function signChunk(
+  client: Signer,
+  bucket: Bucket,
+  paths: string[],
+  byPath: Map<string, Waiter[]>,
+): Promise<void> {
+  const answers = new Map<string, string>();
+  try {
+    const { data, error } = await client.storage.from(bucket).createSignedUrls(paths, TTL_SECONDS);
+    if (!error && data) {
+      const issued = Date.now();
+      for (const item of data) {
+        // One refused file must not take its neighbours down with it: an
+        // unsent message or a file from a chat we are not in fails alone.
+        if (item.path && item.signedUrl && !item.error) {
+          answers.set(item.path, item.signedUrl);
+          cache.set(keyOf(bucket, item.path), { url: item.signedUrl, expiresAt: issued + TTL_SECONDS * 1000 });
+        }
+      }
+      persistSoon();
+    }
+  } catch {
+    /* every path in this chunk resolves to null below */
+  }
+  for (const path of paths) {
+    const signed = answers.get(path) ?? null;
+    for (const done of byPath.get(path) ?? []) done(signed);
+  }
+}
+
+// ── public API ─────────────────────────────────────────────────────────
+
 /** A signed link already held and still good — for rendering without a flash. */
 export function peekSigned(url: string, now = Date.now()): string | null {
   const parsed = parseChatMediaUrl(url);
   if (!parsed) return url;
-  const held = cache.get(`${parsed.bucket}/${parsed.path}`);
+  hydrate(now);
+  const held = cache.get(keyOf(parsed.bucket, parsed.path));
   return fresh(held, now) ? held.url : null;
 }
 
@@ -79,8 +204,9 @@ export function peekSigned(url: string, now = Date.now()): string | null {
  * storage refused — not a member, unsent, offline — which the caller shows as
  * an empty tile rather than a broken image.
  *
- * Concurrent requests for one file share one round trip, and a link is
- * reused until shortly before it expires.
+ * Concurrent requests for one file share one lookup, lookups within a few
+ * milliseconds of each other share one call, and a link is reused until
+ * shortly before it expires.
  */
 export async function resolveChatMediaUrl(
   url: string,
@@ -89,37 +215,70 @@ export async function resolveChatMediaUrl(
   const parsed = parseChatMediaUrl(url);
   if (!parsed) return url;
 
-  const key = `${parsed.bucket}/${parsed.path}`;
   const now = opts.now ?? Date.now();
-  const held = cache.get(key);
-  if (!opts.force && fresh(held, now)) return held.url;
+  hydrate(now);
+  const key = keyOf(parsed.bucket, parsed.path);
 
-  const pending = inFlight.get(key);
-  if (pending && !opts.force) return pending;
+  if (!opts.force) {
+    const held = cache.get(key);
+    if (fresh(held, now)) return held.url;
+    const pending = waiting.get(key);
+    if (pending) return pending;
+  }
 
   const client = opts.client ?? (createClient() as unknown as Signer);
-  const request = (async () => {
-    try {
-      const { data, error } = await client.storage
-        .from(parsed.bucket)
-        .createSignedUrl(parsed.path, TTL_SECONDS);
-      if (error || !data?.signedUrl) return null;
-      cache.set(key, { url: data.signedUrl, expiresAt: now + TTL_SECONDS * 1000 });
-      return data.signedUrl;
-    } catch {
-      return null;
-    } finally {
-      inFlight.delete(key);
-    }
-  })();
-  inFlight.set(key, request);
+  const request = enqueue(parsed.bucket, parsed.path, client).finally(() => {
+    if (waiting.get(key) === request) waiting.delete(key);
+  });
+  waiting.set(key, request);
   return request;
 }
 
 /** Forget every signed link — on sign-out, so the next account starts clean. */
 export function clearChatMediaCache(): void {
   cache.clear();
-  inFlight.clear();
+  waiting.clear();
+  queue.clear();
+  if (flushTimer) clearTimeout(flushTimer);
+  flushTimer = null;
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = null;
+  hydrated = true; // do not re-read what is about to be removed
+  try {
+    sessionStorage.removeItem(STORE_KEY);
+  } catch {
+    /* nothing stored, or nowhere to store it */
+  }
+}
+
+/**
+ * Every chat-media URL a message points at.
+ *
+ * Photos and videos hold the URL as their body; voice notes and documents
+ * pack it into JSON alongside a duration or a name; an album holds several.
+ * Never throws — a body that is not what its kind says is simply no URLs.
+ */
+export function mediaUrlsOf(kind: string, body: string | null | undefined): string[] {
+  if (!body) return [];
+  if (kind === "image" || kind === "video") return needsSigning(body) ? [body] : [];
+  if (kind !== "voice" && kind !== "document" && kind !== "album") return [];
+  try {
+    const raw = JSON.parse(body) as { url?: unknown; items?: unknown };
+    const found: unknown[] = Array.isArray(raw.items)
+      ? raw.items.map((i) => (i as { url?: unknown } | null)?.url)
+      : [raw.url];
+    return found.filter((u): u is string => typeof u === "string" && needsSigning(u));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Ask for links ahead of being drawn — a thread that has just loaded can
+ * warm every tile in one call before the first one mounts.
+ */
+export function prefetchChatMedia(urls: (string | null | undefined)[]): void {
+  for (const u of urls) if (u && needsSigning(u)) void resolveChatMediaUrl(u);
 }
 
 /**
