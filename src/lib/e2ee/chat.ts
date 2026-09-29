@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Identity } from "@/lib/e2ee/crypto";
+import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 import {
   E2EE_CHANGED,
   currentIdentity,
@@ -62,7 +63,9 @@ const IDLE: Reader = { me: null, peers: NO_PEERS, self: "unavailable", loading: 
  * changes underneath it — setting up, confirming or unlocking from a sheet
  * that is not part of this screen — via `E2EE_CHANGED`.
  */
-export function useEnvelopeReader(myId: string, peerIds: string[], enabled = true): Reader {
+export function useEnvelopeReader(myId: string, peerIds: string[], wanted = true): Reader {
+  // Parked: idle, no lookups, no network. See flag.ts.
+  const enabled = wanted && E2EE_ENABLED;
   const key = useMemo(
     () => (enabled ? [...new Set(peerIds.filter(Boolean))].sort().join(",") : ""),
     [enabled, peerIds],
@@ -158,7 +161,7 @@ export function sealFor(
   reader: Reader,
   args: { plaintext: string; conversationId: string; myId: string; peerId: string },
 ): string | null {
-  if (reader.self !== "ready") return null;
+  if (!E2EE_ENABLED || reader.self !== "ready") return null;
   const peer = reader.peers.get(args.peerId);
   if (!reader.me || !peer) return null;
   try {
@@ -177,7 +180,7 @@ export function sealFor(
 
 /** Will new messages to this person actually be encrypted? */
 export function canEncrypt(reader: Reader, peerId: string): boolean {
-  return reader.self === "ready" && !!reader.me && reader.peers.has(peerId);
+  return E2EE_ENABLED && reader.self === "ready" && !!reader.me && reader.peers.has(peerId);
 }
 
 /** Is this body encrypted, without needing any keys to answer? */

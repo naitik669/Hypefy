@@ -5,6 +5,7 @@ import { Loader2, Check, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useStepUp } from "@/components/auth/StepUpDialog";
 import { afterPasswordChange } from "@/lib/e2ee/vault";
+import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 
 export function AccountForms({ currentEmail }: { currentEmail: string }) {
   const supabase = createClient();
@@ -98,7 +99,7 @@ export function AccountForms({ currentEmail }: { currentEmail: string }) {
     // The recovery code is untouched either way, so a failure here is not
     // fatal — but the person is told, not left to find out on a new phone.
     const { data: { user } } = await supabase.auth.getUser();
-    const vault = user ? await afterPasswordChange(user.id, currentPw, newPw) : "none";
+    const vault = user && E2EE_ENABLED ? await afterPasswordChange(user.id, currentPw, newPw) : "none";
     setPwMsg({
       ok: true,
       text:

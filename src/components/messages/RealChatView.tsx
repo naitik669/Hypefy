@@ -57,6 +57,7 @@ import { leaveChatAnimated } from "@/lib/leave-chat";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { canEncrypt, isEncrypted, openEnvelope, sealFor, useEnvelopeReader } from "@/lib/e2ee/chat";
 import { openEncryptionSetup } from "@/lib/e2ee/open-setup";
+import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 
 type PostPreview = {
   id: string;
@@ -2200,7 +2201,7 @@ export function RealChatView({
             Said out loud rather than left to be assumed. Silence here would
             let someone believe a plaintext thread was protected, which is
             worse than not having encryption at all. */}
-        {!isGroup && !reader.loading && !canEncrypt(reader, other.id) && (
+        {E2EE_ENABLED && !isGroup && !reader.loading && !canEncrypt(reader, other.id) && (
           <div className="mb-2 flex items-center gap-1.5 px-1 text-[11px] leading-snug text-faint">
             <Unlock size={11} className="shrink-0" />
             <span>

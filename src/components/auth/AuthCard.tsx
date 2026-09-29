@@ -11,6 +11,7 @@ import { isNative } from "@/lib/native";
 import { startNativeGoogleSignIn } from "@/lib/native-auth";
 import { stashPendingOAuth } from "@/lib/pending-oauth";
 import { confirmRecovery, ensureEncryption } from "@/lib/e2ee/vault";
+import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 import { RecoveryCodeScreen } from "@/components/e2ee/RecoveryCodeScreen";
 
 type Mode = "signin" | "signup";
@@ -60,6 +61,11 @@ export function AuthCard({ mode }: { mode: Mode }) {
    * continues.
    */
   async function readyEncryption(userId: string, secret: string, go: () => void) {
+    // Parked: signing in does nothing about encryption at all.
+    if (!E2EE_ENABLED) {
+      go();
+      return;
+    }
     const result = await ensureEncryption(userId, secret);
     if (result.state === "created") {
       setRecovery({ code: result.recoveryCode, userId, next: go });

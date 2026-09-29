@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, KeyRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { afterPasswordReset } from "@/lib/e2ee/vault";
+import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 
 /**
  * Sets a new password at the end of the recovery flow.
@@ -80,7 +81,7 @@ export function ResetPasswordCard() {
     // the recovery code is the only way in. That has to be said before the
     // person is whisked away, not discovered on their next phone.
     const { data: { user } } = await supabase.auth.getUser();
-    const vault = user ? await afterPasswordReset(user.id, password) : "none";
+    const vault = user && E2EE_ENABLED ? await afterPasswordReset(user.id, password) : "none";
     const needsCode = vault === "recovery-only" || vault === "failed";
     if (needsCode) setRecoveryOnly(true);
 

@@ -5,6 +5,7 @@ import { KeyRound, Lock, ShieldCheck } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { useToast } from "@/components/ui/ToastProvider";
 import { RecoveryCodeScreen } from "@/components/e2ee/RecoveryCodeScreen";
+import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 import { E2EE_OPEN_SETUP } from "@/lib/e2ee/open-setup";
 import {
   confirmRecovery,
@@ -33,11 +34,9 @@ import {
  *                           where "unlock" is offered, when there is
  *                           something to read.
  *
- * It is switched off with NEXT_PUBLIC_E2EE_ENROLL=off, which stops new
- * enrollment without touching anyone already enrolled or the database.
+ * It renders nothing unless E2EE is switched on (see lib/e2ee/flag.ts).
  */
 
-const ENABLED = process.env.NEXT_PUBLIC_E2EE_ENROLL !== "off";
 
 /** How long after load before the first look. Enrollment is never urgent. */
 const FIRST_LOOK_MS = 2500;
@@ -104,7 +103,7 @@ export function EncryptionSetup({ userId }: { userId: string }) {
   );
 
   useEffect(() => {
-    if (!ENABLED) return;
+    if (!E2EE_ENABLED) return;
     const timer = setTimeout(() => void route(false), FIRST_LOOK_MS);
     const onOpen = () => void route(true);
     window.addEventListener(E2EE_OPEN_SETUP, onOpen);
