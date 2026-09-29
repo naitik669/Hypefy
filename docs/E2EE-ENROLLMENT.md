@@ -1,10 +1,11 @@
 # Universal E2EE enrollment — audit and plan
 
-Written before any code changes. Sections 1–6 describe what exists today,
-7–8 what is wrong with it, 9–13 what to do about it.
+Written before any code changes. Sections 1–6 describe what existed then,
+7–8 what was wrong with it, 9–13 the plan. **§14 records what was actually
+built, where it differs from the plan, and what is still open.**
 
-Nothing in this document has been implemented yet. The migration in §12 has
-**not** been applied to the production project.
+Status: implemented and pushed (`43df516`, `9a032d3`). Migration `0104` is
+applied to production.
 
 ---
 
@@ -392,3 +393,92 @@ No data is destroyed and no column is dropped.
   enrolled, and without touching the database.
 - **No destructive step anywhere.** Nothing re-encrypts existing messages,
   nothing rewrites history, nothing deletes a key.
+
+---
+
+## 14. Outcome
+
+### Built
+
+| Finding | Status |
+|---|---|
+| F1 Android backup | `allowBackup="false"`. Independent of everything else. |
+| F2 password change | `afterPasswordChange` re-wraps from the device's master key, falling back to the old password. Wired into `AccountForms`. |
+| F3 password reset | `afterPasswordReset` re-wraps if the device holds the key; otherwise drops the dead wrapper and the reset screen says the recovery code is now the way in. Wired into `ResetPasswordCard`. |
+| F4 sign out others | keeps the current account's key (`forgetAllIdentitiesExcept`). |
+| F5 unconfirmed vault relied on | `rc_confirmed_at`; `public_keys` hides unconfirmed vaults; `sealFor` also requires *our own* account to be `ready`. |
+| F6 enrollment reachable from password paths only | `EncryptionSetup` in the app shell, `enroll`, `reissueRecoveryCode`, `confirmRecovery`. |
+| F8 password mandatory | wrapper nullable; `user_keys_recovery_required` check replaces the dropped NOT NULLs. |
+| F10 two tabs enrolling | `navigator.locks` around enrollment, re-reading state inside the lock. |
+| F12 dead code | `afterPasswordChange` / `afterPasswordReset` now have callers. |
+| F13 unmarked legacy | encryption divider ("Messages from here are end-to-end encrypted"), derived from the envelopes — no column. |
+
+### Deviations from the plan
+
+- **`store.ts` `DB_VERSION` was not bumped.** The plan said to. It is
+  unnecessary: adding an optional field to a row needs no IndexedDB schema
+  change, and a bump would have made every open tab hit `onblocked`.
+- **The kill switch is build-time.** `NEXT_PUBLIC_E2EE_ENROLL=off` is inlined
+  at build, so turning it off needs a redeploy, not a toggle.
+- **The dry run I proposed for the migration was skipped.** It was applied
+  directly, on the reasoning that `user_keys` had zero rows and the change is
+  additive; it was then verified against the live schema and with ten
+  behavioural checks under impersonation in a rolled-back transaction.
+- **`enroll`'s own state check is redundant with the database.** Mutation
+  testing showed removing it changes nothing observable, because
+  `init_user_keys` refuses to overwrite and the client discards its unused
+  identity. The server guard is the real protection; the client check only
+  saves the wasted key derivation.
+- **Password sign-in still shows the recovery screen at sign-in** for a brand
+  new vault, as before, because a password is in hand there and the wrapper
+  costs nothing. Everyone else meets it in the setup sheet.
+
+### Verified
+
+- 981 unit tests (44 new in `e2ee-enrollment.test.ts`, 5 in `e2ee-chat`),
+  `tsc` clean, lint at the 380 baseline, production build clean.
+- Mutation-checked: removing the identity-match check and removing the
+  own-account gate each fail tests. (Removing `enroll`'s state check does not
+  — see above.)
+- Database: schema, constraints, grants, and ten behaviours under
+  impersonation — passwordless init, no overwrite, unconfirmed invisible to
+  others, RLS hides the row, confirm is idempotent, missing recovery refused,
+  half a wrapper refused, add/drop wrapper with recovery intact, anon refused.
+  Nothing persisted; `user_keys` is empty.
+- Real browser (throwaway page, deleted): real IndexedDB, real Web Locks
+  (three simultaneous enrollments → exactly one winner), real WebCrypto and
+  Argon2id (~200 ms on desktop), A and B enrolling, A sealing "hello", the
+  stored body being an envelope, both reading it, a wiped device showing it
+  locked, and recovery restoring it. 27/27. Recovery screen's async
+  confirmation, including its failure path, 8/8.
+
+### Not verified — and why it matters
+
+**Two real authenticated accounts have not been exercised.** The browser
+checks above used an in-page fake for the server. They prove the client code
+in a real browser; they do not prove it against real Supabase auth, a real
+`messages` row, `RealChatView`'s realtime path, or the setup sheet rendered
+inside the authenticated shell. That needs two signed-in sessions, which means
+credentials, which are not mine to enter. The remaining step is: sign in as
+two accounts in two browser profiles, let the setup sheet run on each, send a
+text DM, and read the `messages.body` row back from the database.
+
+### Still open
+
+- **F7 key authenticity.** Nothing lets one person verify another's key.
+  Anyone with service-role access can substitute `identity_pub` for a target.
+  Safety numbers and a key-change warning are the fix.
+- **F9, widened.** Anyone holding a valid session can call `rewrap_recovery`,
+  `rewrap_master_key` or `drop_password_wrapper`. They cannot read anything —
+  they lack the master key — but they can overwrite a wrapper with garbage,
+  destroying that route to the vault. A stolen session can therefore cost a
+  user their recovery code. The database cannot check that the new wrapper
+  holds the same key. Closing it needs a proof of possession (for instance
+  signing the request with the identity's Ed25519 key, verified against
+  `signing_pub`).
+- **No forward secrecy, no post-compromise security.** Unchanged.
+- **Device-to-device transfer, key rotation, revocation, a device table.**
+  Nothing in the schema prevents them; none is built.
+- **Everything outside 1:1 text** remains plaintext, as before.
+- **Sending is not blocked when the peer has no keys.** Deliberate during
+  rollout (see §10); an encrypted-only conversation mode is additive later.
