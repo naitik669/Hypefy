@@ -116,9 +116,22 @@ export type Identity = {
 /**
  * Both keypairs from one 32-byte seed.
  *
- * Separated through HKDF with different labels rather than used directly, so
- * the signing key and the encryption key are independent — reusing one
- * secret across two algorithms is a well-known way to lose both.
+ * Every piece of this is a standard construction rather than a choice:
+ *
+ *   HKDF with distinct `info` labels is what RFC 5869 exists for — deriving
+ *   several independent keys from one secret. Extract runs without a salt,
+ *   which the RFC permits and which is right here: the input is already 32
+ *   uniformly random bytes, so there is no entropy to concentrate.
+ *
+ *   An Ed25519 private key *is* a 32-byte seed by specification, so feeding
+ *   one in is not a conversion. An X25519 private key is 32 bytes too, and
+ *   is clamped inside the curve implementation.
+ *
+ * The alternative — deriving one key and converting it to the other curve
+ * with the ed25519-to-curve25519 helper libsodium provides — deliberately
+ * ties the signing key and the encryption key together. That coupling is
+ * the pattern with real literature against it, so two independent keys is
+ * the conservative option, not the clever one.
  */
 export function identityFromSeed(seed: Uint8Array): Identity {
   const boxPriv = hkdf(sha256, seed, undefined, utf8.encode("hypefy/e2ee/box/v1"), 32);

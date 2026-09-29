@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { forgetAllIdentities } from "@/lib/e2ee/store";
 import { useRouter } from "next/navigation";
 import { Trash2, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -38,6 +39,7 @@ export function DeleteAccount({ username }: { username: string | null }) {
       setBusy(false);
       return;
     }
+    await forgetAllIdentities();
     await supabase.auth.signOut();
     // Clear saved multi-account entries for this user too
     try {

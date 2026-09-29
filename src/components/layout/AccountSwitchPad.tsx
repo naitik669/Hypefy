@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { forgetIdentity } from "@/lib/e2ee/store";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Plus } from "@phosphor-icons/react";
@@ -290,6 +291,7 @@ export function AccountSwitchPad({
       // Refresh tokens expire. Drop the dead entry rather than leaving a tile
       // that fails every time it is chosen.
       removeSavedAccount(account.userId);
+      void forgetIdentity(account.userId);
       setAccounts(otherAccounts(currentUserId));
       setSwitching(null);
       toast("That account needs signing in again", "error");

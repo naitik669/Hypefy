@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { forgetIdentity } from "@/lib/e2ee/store";
 import Link from "next/link";
 import { Check, Plus, X, Loader2, ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -67,6 +68,7 @@ export function AccountSwitcher() {
     if (error) {
       // Tokens expired — drop this account and show feedback
       removeSavedAccount(account.userId);
+      void forgetIdentity(account.userId);
       setAccounts(getSavedAccounts());
       setSwitching(null);
       return;
@@ -77,6 +79,8 @@ export function AccountSwitcher() {
   function forget(userId: string) {
     setConfirmForget(null);
     removeSavedAccount(userId);
+    // Only this account's key. The others on this device are still signed in.
+    void forgetIdentity(userId);
     setAccounts(getSavedAccounts());
   }
 

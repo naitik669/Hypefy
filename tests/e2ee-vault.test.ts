@@ -9,6 +9,7 @@ import {
   rewrapPassword,
   regenerateRecoveryCode,
   fetchPublicKeys,
+  ensureEncryption,
 } from "@/lib/e2ee/vault";
 import { forgetAllIdentities } from "@/lib/e2ee/store";
 import { toB64 } from "@/lib/e2ee/crypto";
@@ -320,5 +321,68 @@ describe("locking the device", () => {
     expect(await isUnlocked(USER)).toBe(false);
 
     expect((await unlock(USER, { kind: "password", secret: PW }, supa)).ok).toBe(true);
+  });
+});
+
+describe("ensureEncryption — the silent path at sign-in", () => {
+  it("makes an identity the first time, and hands back the code to show", async () => {
+    const supa = fakeSupabase();
+    const r = await ensureEncryption(USER, PW, supa);
+    expect(r.state).toBe("created");
+    if (r.state !== "created") return;
+    expect(r.recoveryCode).toMatch(/^[0-9A-Z]{5}(-[0-9A-Z]{5}){3}$/);
+    expect(await isUnlocked(USER)).toBe(true);
+  });
+
+  it("does nothing at all when the device is already unlocked", async () => {
+    const supa = fakeSupabase();
+    await ensureEncryption(USER, PW, supa);
+    expect(await ensureEncryption(USER, PW, supa)).toEqual({ state: "ready" });
+  });
+
+  it("opens silently on a new device — the whole point", async () => {
+    // Signing in somewhere else must feel like nothing happened.
+    const supa = fakeSupabase();
+    const first = await ensureEncryption(USER, PW, supa);
+    expect(first.state).toBe("created");
+
+    await forgetAllIdentities(); // a different phone
+    expect(await ensureEncryption(USER, PW, supa)).toEqual({ state: "unlocked" });
+    expect(await isUnlocked(USER)).toBe(true);
+  });
+
+  it("asks for the recovery code only when the password no longer opens it", async () => {
+    // Exactly what a password reset leaves behind.
+    const supa = fakeSupabase();
+    await ensureEncryption(USER, PW, supa);
+    await forgetAllIdentities();
+
+    expect(await ensureEncryption(USER, "the password after a reset", supa)).toEqual({
+      state: "needs-recovery",
+    });
+    expect(await isUnlocked(USER)).toBe(false);
+  });
+
+  it("never blocks sign-in when the server cannot be reached", async () => {
+    // Encryption failing is not a reason to stop someone reaching their feed.
+    const supa = fakeSupabase();
+    supa.signOut();
+    expect(await ensureEncryption(USER, PW, supa)).toEqual({ state: "unavailable" });
+  });
+
+  it("recovers from a vault appearing between the read and the write", async () => {
+    // Two tabs, or a retry. It must open the row that won rather than
+    // reporting failure or keeping the identity it just threw away.
+    const supa = fakeSupabase();
+    const made = await setupIdentity(USER, PW, supa);
+    expect(made.ok).toBe(true);
+    await forgetAllIdentities();
+
+    const r = await ensureEncryption(USER, PW, supa);
+    expect(r).toEqual({ state: "unlocked" });
+    if (made.ok) {
+      const here = await currentIdentity(USER);
+      expect(toB64(here!.boxPub)).toBe(toB64(made.identity.boxPub));
+    }
   });
 });

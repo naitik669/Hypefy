@@ -115,6 +115,72 @@ export async function setupIdentity(
   return { ok: true, identity, recoveryCode };
 }
 
+/**
+ * What happened when we tried to make encryption ready.
+ *
+ * Every case is non-fatal on purpose. This runs while somebody is signing
+ * in to use the app, and encryption failing is never a reason to stop them
+ * getting to their feed.
+ */
+export type EnsureResult =
+  /** Already unlocked on this device. The common case, and it does nothing. */
+  | { state: "ready" }
+  /** A new identity was made. The recovery code exists ONLY here — show it. */
+  | { state: "created"; recoveryCode: string }
+  /** Opened with the password they just typed. They saw nothing. */
+  | { state: "unlocked" }
+  /** The password does not open the vault — almost always after a reset.
+   *  The recovery code is the way back in. */
+  | { state: "needs-recovery" }
+  /** Could not reach the server, or storage is unavailable. Carry on
+   *  unencrypted rather than standing in the way. */
+  | { state: "unavailable" };
+
+/**
+ * Make encryption ready, silently, at the moment a password is typed.
+ *
+ * This is the whole point of the design: signing in is the only time the
+ * plaintext password exists in the browser, so it is the only time a key can
+ * be derived from it without ever asking for anything else. Call it right
+ * after a successful sign-in or sign-up and normal users will never see a
+ * prompt at all.
+ *
+ * The password is used and dropped. It is not stored, and it never leaves
+ * the browser except in Supabase's own sign-in call.
+ */
+export async function ensureEncryption(
+  userId: string,
+  password: string,
+  supabase: Supa = createClient(),
+): Promise<EnsureResult> {
+  try {
+    // Already unlocked here — nothing to do, and no round trip.
+    if (await isUnlocked(userId)) return { state: "ready" };
+
+    const vault = await fetchMyVault(supabase);
+
+    if (!vault) {
+      // No identity yet: a new account, or an existing one signing in for
+      // the first time since encryption shipped.
+      const made = await setupIdentity(userId, password, supabase);
+      if (made.ok) return { state: "created", recoveryCode: made.recoveryCode };
+      // "exists" means a row appeared between the read and the write — two
+      // tabs, or a retry. Fall through and try to open it.
+      if (made.reason === "failed") return { state: "unavailable" };
+    }
+
+    const opened = await unlock(userId, { kind: "password", secret: password }, supabase);
+    if (opened.ok) return { state: "unlocked" };
+    // A vault that the current password cannot open is what a password reset
+    // leaves behind. Only the recovery code gets in now.
+    return opened.reason === "wrong-secret"
+      ? { state: "needs-recovery" }
+      : { state: "unavailable" };
+  } catch {
+    return { state: "unavailable" };
+  }
+}
+
 export type UnlockResult =
   | { ok: true; identity: Identity }
   /** The password or code was wrong — an ordinary event, say so plainly. */

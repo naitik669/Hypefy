@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { forgetAllIdentities } from "@/lib/e2ee/store";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -20,6 +21,9 @@ export function SignOutButton() {
   const [confirm, setConfirm] = useState(false);
 
   async function handleSignOut() {
+    // The key goes with the session. A signed-out device that kept it
+    // could still read every encrypted message it had already received.
+    await forgetAllIdentities();
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();
