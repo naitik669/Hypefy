@@ -218,10 +218,21 @@ export default function PrivacyPage() {
       <h2>12. Security and breach notification</h2>
       <p>
         We use reasonable technical and organizational measures — including
-        encryption in transit, hashed passwords, and access controls — to protect
-        your data. No system is perfectly secure, but if a personal data breach
-        occurs that affects you, we will notify you and the relevant authorities as
-        required by applicable law.
+        encryption in transit and at rest, hashed passwords, and access controls —
+        to protect your data. Photos, videos, files and voice notes sent in a
+        private chat can only be opened by the people in that conversation.
+      </p>
+      <p>
+        Direct messages are <strong>not end-to-end encrypted</strong>. They are
+        stored on our servers so we can deliver them, which means the people who
+        operate Hypefy can technically access them. We do not read private
+        messages. We only look at a conversation if it is reported to us or we are
+        legally required to.
+      </p>
+      <p>
+        No system is perfectly secure, but if a personal data breach occurs that
+        affects you, we will notify you and the relevant authorities as required by
+        applicable law.
       </p>
 
       <h2>13. Changes to this policy</h2>

@@ -5,7 +5,9 @@ Written before any code changes. Sections 1–6 describe what existed then,
 built, where it differs from the plan, and what is still open.**
 
 Status: implemented and pushed (`43df516`, `9a032d3`). Migration `0104` is
-applied to production.
+applied to production. **Parked since `3aa562e`: the whole feature is behind
+`NEXT_PUBLIC_E2EE`, off by default — see `docs/E2EE.md`.** Everything below
+describes the design as built, for the day it returns.
 
 ---
 

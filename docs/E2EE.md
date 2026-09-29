@@ -4,9 +4,39 @@ Design notes for Hypefy's message encryption. Written while building it, so
 it records the reasoning as much as the shape — particularly the parts where
 the obvious approach does not work.
 
-Status: the key machinery is built and tested (`src/lib/e2ee/`, migration
-`0103_user_keys.sql`). **No message is encrypted yet.** Nothing in this
-document is live in the product.
+**Status: PARKED.** The implementation is complete and tested (`src/lib/e2ee/`,
+migrations `0103` and `0104`) but switched off. Hypefy launches on standard
+client-server encryption — TLS in transit, encryption at rest, access controls,
+and private chat media — because E2EE blocks the server-side moderation an app
+store and a 16–24 audience require, and puts a person's whole message history
+one lost recovery code from gone. **No message is encrypted, and nothing in this
+document is live in the product.** Production held zero encrypted messages and
+one unconfirmed vault when it was parked.
+
+To bring it back: set `NEXT_PUBLIC_E2EE=on` and redeploy (the value is inlined at
+build time; see `src/lib/e2ee/flag.ts`). It could return as an opt-in "secret
+chat" rather than the default, with the moderation limits explained to whoever
+turns it on.
+
+## What the product actually promises instead
+
+- Messages are encrypted in transit (TLS) and at rest. Supabase states that all
+  customer data is encrypted at rest with AES-256 and in transit via TLS; we claim
+  no more than that about backups or key custody, because their page does not
+  say.
+- **Messages are not end-to-end encrypted.** They are stored so they can be
+  delivered, and the people who operate Hypefy can technically read them. At-rest
+  encryption protects a stolen disk or backup. It does **not** protect against
+  someone with database or service-role access — which is exactly what E2EE would
+  have covered. That is a conscious trade, not an equivalent.
+- Photos, videos, documents and voice notes in chats are private: shown through
+  hour-long signed links, issued only to the uploader and to members of a
+  conversation that contains the file (migration `0105`).
+- **Insider access is a process, not a mechanism.** Few holders of the
+  service-role key; two-factor on the Supabase and Vercel accounts; look at a
+  conversation only when it is reported or the law requires it. Nothing in the
+  code enforces or logs this. If "we only read reported chats" ever needs to be
+  provable, an access log for admin message reads is the next thing to build.
 
 ---
 
