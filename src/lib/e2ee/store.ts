@@ -27,7 +27,14 @@ const DB = "hypefy-e2ee";
 const DB_VERSION = 1;
 const STORE = "identities";
 
-type Row = { userId: string; seed: Uint8Array; savedAt: number };
+/**
+ * `masterKey` is optional because rows written before enrollment was
+ * universal never had one. A device with a seed but no master key still
+ * reads everything; it just cannot mint a new password wrapper on its own
+ * until it is handed the key again, which happens the next time a password
+ * unlocks the vault.
+ */
+type Row = { userId: string; seed: Uint8Array; masterKey?: Uint8Array; savedAt: number };
 
 function open(): Promise<IDBDatabase | null> {
   return new Promise((resolve) => {
@@ -72,10 +79,33 @@ function run<T>(
   });
 }
 
-/** Keep this device unlocked for that user. */
-export async function saveIdentity(userId: string, seed: Uint8Array): Promise<void> {
-  const row: Row = { userId, seed, savedAt: Date.now() };
+/**
+ * Keep this device unlocked for that user.
+ *
+ * The master key rides along when the caller has it. Holding it is what lets
+ * this device re-wrap the vault under a new password without knowing any old
+ * secret — the difference between a password reset costing nothing and a
+ * password reset costing the recovery code.
+ *
+ * Leaving it out never erases one already stored: an unlock that could not
+ * recover the key must not make the device forget one it had.
+ */
+export async function saveIdentity(
+  userId: string,
+  seed: Uint8Array,
+  masterKey?: Uint8Array,
+): Promise<void> {
+  const kept = masterKey ?? (await loadMasterKey(userId)) ?? undefined;
+  const row: Row = { userId, seed, savedAt: Date.now(), ...(kept ? { masterKey: kept } : {}) };
   await run("readwrite", (s) => s.put(row));
+}
+
+/** The master key, if this device was given it. Null is an ordinary answer. */
+export async function loadMasterKey(userId: string): Promise<Uint8Array | null> {
+  const row = (await run<Row>("readonly", (s) => s.get(userId) as IDBRequest<Row>)) ?? null;
+  if (!row?.masterKey) return null;
+  const key = row.masterKey instanceof Uint8Array ? row.masterKey : new Uint8Array(row.masterKey);
+  return key.length === 32 ? key : null;
 }
 
 /**
@@ -121,4 +151,38 @@ export async function forgetIdentity(userId: string): Promise<void> {
 /** Forget every account's key on this device. */
 export async function forgetAllIdentities(): Promise<void> {
   await run("readwrite", (s) => s.clear());
+}
+
+/**
+ * Forget every account's key except one.
+ *
+ * For "sign out other devices": the saved-accounts list is cleared because
+ * every stored refresh token in it is dead, so the other accounts' keys go
+ * with it. The account the person is signed into right now is not one of
+ * them — wiping it would make them recover on the very device they never
+ * left.
+ */
+export async function forgetAllIdentitiesExcept(keepUserId: string): Promise<void> {
+  const db = await open();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    try {
+      const tx = db.transaction(STORE, "readwrite");
+      const req = tx.objectStore(STORE).openCursor();
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) return;
+        if (cursor.key !== keepUserId) cursor.delete();
+        cursor.continue();
+      };
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
 }

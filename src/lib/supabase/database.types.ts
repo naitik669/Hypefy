@@ -2410,9 +2410,10 @@ export type Database = {
         Row: {
           created_at: string
           identity_pub: string
-          mk_wrapped_pw: string
+          mk_wrapped_pw: string | null
           mk_wrapped_rc: string
-          salt_pw: string
+          rc_confirmed_at: string | null
+          salt_pw: string | null
           salt_rc: string
           seed_wrapped: string
           signing_pub: string
@@ -2423,9 +2424,10 @@ export type Database = {
         Insert: {
           created_at?: string
           identity_pub: string
-          mk_wrapped_pw: string
+          mk_wrapped_pw?: string | null
           mk_wrapped_rc: string
-          salt_pw: string
+          rc_confirmed_at?: string | null
+          salt_pw?: string | null
           salt_rc: string
           seed_wrapped: string
           signing_pub: string
@@ -2436,9 +2438,10 @@ export type Database = {
         Update: {
           created_at?: string
           identity_pub?: string
-          mk_wrapped_pw?: string
+          mk_wrapped_pw?: string | null
           mk_wrapped_rc?: string
-          salt_pw?: string
+          rc_confirmed_at?: string | null
+          salt_pw?: string | null
           salt_rc?: string
           seed_wrapped?: string
           signing_pub?: string
@@ -2736,12 +2739,14 @@ export type Database = {
         }[]
       }
       increment_post_view: { Args: { p_post_id: string }; Returns: undefined }
+      confirm_recovery: { Args: never; Returns: undefined }
+      drop_password_wrapper: { Args: never; Returns: undefined }
       init_user_keys: {
         Args: {
           p_identity_pub: string
-          p_mk_wrapped_pw: string
+          p_mk_wrapped_pw: string | null
           p_mk_wrapped_rc: string
-          p_salt_pw: string
+          p_salt_pw: string | null
           p_salt_rc: string
           p_seed_wrapped: string
           p_signing_pub: string

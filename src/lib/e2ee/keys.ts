@@ -39,10 +39,17 @@ export type KeyVault = {
   identity_pub: string;
   signing_pub: string;
   seed_wrapped: string;
-  mk_wrapped_pw: string;
-  salt_pw: string;
+  /** Null when no password has ever been offered — Google and one-time-code
+   *  accounts never have one, and a password can be added later. Both halves
+   *  are null together or present together; the table enforces it. */
+  mk_wrapped_pw: string | null;
+  salt_pw: string | null;
+  /** Always present. A vault without a recovery route cannot exist. */
   mk_wrapped_rc: string;
   salt_rc: string;
+  /** When the owner confirmed they had saved the code. Null means the vault
+   *  exists but nobody may encrypt to it yet. */
+  rc_confirmed_at?: string | null;
 };
 
 /** How many characters a recovery code has, excluding its dashes. */
@@ -82,34 +89,69 @@ export function normaliseRecoveryCode(input: string): string {
 }
 
 /**
- * Make an identity, and lock it with both secrets.
+ * Make an identity, and lock it.
  *
- * Returns the vault to store and the identity to use right now, so first
- * setup does not have to immediately unwrap what it just wrapped.
+ * The recovery code always locks it. The password is optional: somebody who
+ * signed in with Google or an emailed code has none to offer, and a vault
+ * must not need one. Pass null and the password wrapper is simply absent;
+ * it can be added later from any device that holds the master key.
+ *
+ * Returns the vault to store, the identity to use right now, and the master
+ * key — which the device keeps beside the seed, because it is what lets
+ * that device later mint a wrapper without knowing any old secret.
  */
 export function createVault(
-  password: string,
+  password: string | null,
   recoveryCode: string,
-): { vault: KeyVault; identity: Identity; seed: Uint8Array } {
+): { vault: KeyVault; identity: Identity; seed: Uint8Array; masterKey: Uint8Array } {
   const seed = newSeed();
   const identity = identityFromSeed(seed);
   const masterKey = randomBytes(KEY_BYTES);
 
-  const saltPw = randomBytes(SALT_BYTES);
-  const saltRc = randomBytes(SALT_BYTES);
+  const pw = password === null ? null : wrapForPassword(masterKey, password);
+  const rc = wrapForRecovery(masterKey, recoveryCode);
 
   return {
     seed,
     identity,
+    masterKey,
     vault: {
       identity_pub: toB64(identity.boxPub),
       signing_pub: toB64(identity.signPub),
       seed_wrapped: toB64(wrap(seed, masterKey)),
-      mk_wrapped_pw: toB64(wrap(masterKey, deriveKek(password, saltPw))),
-      salt_pw: toB64(saltPw),
-      mk_wrapped_rc: toB64(wrap(masterKey, deriveKek(normaliseRecoveryCode(recoveryCode), saltRc))),
-      salt_rc: toB64(saltRc),
+      mk_wrapped_pw: pw?.mk_wrapped_pw ?? null,
+      salt_pw: pw?.salt_pw ?? null,
+      mk_wrapped_rc: rc.mk_wrapped_rc,
+      salt_rc: rc.salt_rc,
     },
+  };
+}
+
+/**
+ * The master key, locked under a password. Takes the key itself rather than
+ * an old secret, so any device that holds it can do this — which is what
+ * makes a password reset survivable.
+ */
+export function wrapForPassword(
+  masterKey: Uint8Array,
+  password: string,
+): { mk_wrapped_pw: string; salt_pw: string } {
+  const salt = randomBytes(SALT_BYTES);
+  return {
+    mk_wrapped_pw: toB64(wrap(masterKey, deriveKek(password, salt))),
+    salt_pw: toB64(salt),
+  };
+}
+
+/** The master key, locked under a recovery code. */
+export function wrapForRecovery(
+  masterKey: Uint8Array,
+  recoveryCode: string,
+): { mk_wrapped_rc: string; salt_rc: string } {
+  const salt = randomBytes(SALT_BYTES);
+  return {
+    mk_wrapped_rc: toB64(wrap(masterKey, deriveKek(normaliseRecoveryCode(recoveryCode), salt))),
+    salt_rc: toB64(salt),
   };
 }
 
@@ -123,12 +165,11 @@ export type UnlockWith = { kind: "password"; secret: string } | { kind: "recover
  * the caller needs to tell it apart from a genuine failure so it can say
  * "that password is wrong" rather than "something went wrong".
  */
-export function openVault(vault: KeyVault, with_: UnlockWith): { identity: Identity; seed: Uint8Array } | null {
-  const secret = with_.kind === "recovery" ? normaliseRecoveryCode(with_.secret) : with_.secret;
-  const salt = fromB64(with_.kind === "recovery" ? vault.salt_rc : vault.salt_pw);
-  const wrapped = fromB64(with_.kind === "recovery" ? vault.mk_wrapped_rc : vault.mk_wrapped_pw);
-
-  const masterKey = unwrap(wrapped, deriveKek(secret, salt));
+export function openVault(
+  vault: KeyVault,
+  with_: UnlockWith,
+): { identity: Identity; seed: Uint8Array; masterKey: Uint8Array } | null {
+  const masterKey = recoverMasterKey(vault, with_);
   if (!masterKey) return null;
 
   const seed = unwrap(fromB64(vault.seed_wrapped), masterKey);
@@ -140,7 +181,7 @@ export function openVault(vault: KeyVault, with_: UnlockWith): { identity: Ident
   // rather than silently messaging under a key nobody can answer.
   if (toB64(identity.boxPub) !== vault.identity_pub) return null;
 
-  return { identity, seed };
+  return { identity, seed, masterKey };
 }
 
 /**
@@ -157,11 +198,7 @@ export function rewrapForPassword(
 ): { mk_wrapped_pw: string; salt_pw: string } | null {
   const masterKey = recoverMasterKey(vault, currentSecret);
   if (!masterKey) return null;
-  const salt = randomBytes(SALT_BYTES);
-  return {
-    mk_wrapped_pw: toB64(wrap(masterKey, deriveKek(newPassword, salt))),
-    salt_pw: toB64(salt),
-  };
+  return wrapForPassword(masterKey, newPassword);
 }
 
 /** The same, for issuing a fresh recovery code after one has been spent. */
@@ -172,16 +209,28 @@ export function rewrapForRecovery(
 ): { mk_wrapped_rc: string; salt_rc: string } | null {
   const masterKey = recoverMasterKey(vault, currentSecret);
   if (!masterKey) return null;
-  const salt = randomBytes(SALT_BYTES);
-  return {
-    mk_wrapped_rc: toB64(wrap(masterKey, deriveKek(normaliseRecoveryCode(newCode), salt))),
-    salt_rc: toB64(salt),
-  };
+  return wrapForRecovery(masterKey, newCode);
 }
 
-function recoverMasterKey(vault: KeyVault, with_: UnlockWith): Uint8Array | null {
-  const secret = with_.kind === "recovery" ? normaliseRecoveryCode(with_.secret) : with_.secret;
-  const salt = fromB64(with_.kind === "recovery" ? vault.salt_rc : vault.salt_pw);
-  const wrapped = fromB64(with_.kind === "recovery" ? vault.mk_wrapped_rc : vault.mk_wrapped_pw);
-  return unwrap(wrapped, deriveKek(secret, salt));
+/**
+ * The master key, by whichever secret was offered — or null.
+ *
+ * Null covers a wrong secret and also a route that does not exist: a
+ * password offered to a vault that never had a password wrapper is just
+ * another way of being wrong, and the caller should not have to tell the
+ * two apart to say "that did not work".
+ */
+export function recoverMasterKey(vault: KeyVault, with_: UnlockWith): Uint8Array | null {
+  const recovery = with_.kind === "recovery";
+  const wrapped = recovery ? vault.mk_wrapped_rc : vault.mk_wrapped_pw;
+  const salt = recovery ? vault.salt_rc : vault.salt_pw;
+  if (!wrapped || !salt) return null;
+
+  try {
+    const secret = recovery ? normaliseRecoveryCode(with_.secret) : with_.secret;
+    return unwrap(fromB64(wrapped), deriveKek(secret, fromB64(salt)));
+  } catch {
+    // Malformed base64 in a stored row. Same outcome as a wrong secret.
+    return null;
+  }
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2, Check, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useStepUp } from "@/components/auth/StepUpDialog";
+import { afterPasswordChange } from "@/lib/e2ee/vault";
 
 export function AccountForms({ currentEmail }: { currentEmail: string }) {
   const supabase = createClient();
@@ -91,7 +92,20 @@ export function AccountForms({ currentEmail }: { currentEmail: string }) {
       setPwMsg({ ok: false, text: error.message });
       return;
     }
-    setPwMsg({ ok: true, text: "Password updated." });
+    // The password that opens the encryption vault has to follow this one,
+    // or the new password would sign in fine and unlock nothing. Both the
+    // old and the new are in hand right now, which never happens again.
+    // The recovery code is untouched either way, so a failure here is not
+    // fatal — but the person is told, not left to find out on a new phone.
+    const { data: { user } } = await supabase.auth.getUser();
+    const vault = user ? await afterPasswordChange(user.id, currentPw, newPw) : "none";
+    setPwMsg({
+      ok: true,
+      text:
+        vault === "failed"
+          ? "Password updated. It won't open your encrypted messages on a new device — use your recovery code there."
+          : "Password updated.",
+    });
     setCurrentPw("");
     setNewPw("");
     await supabase.rpc("log_security_alert", {

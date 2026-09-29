@@ -14,6 +14,7 @@ import { SwipeNav } from "@/components/layout/SwipeNav";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PresenceHeartbeat } from "@/components/presence/PresenceHeartbeat";
 import { InAppNotifier } from "@/components/messages/InAppNotifier";
+import { EncryptionSetup } from "@/components/e2ee/EncryptionSetup";
 import { AppLockGate } from "@/components/settings/AppLockGate";
 import { SuspendedScreen } from "@/components/moderation/SuspendedScreen";
 
@@ -152,6 +153,7 @@ export default async function AppLayout({
             <AppLockGate />
             <PresenceHeartbeat />
             <InAppNotifier currentUserId={user!.id} />
+            <EncryptionSetup userId={user!.id} />
             <InstallPrompt />
             <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
               {/* Wraps only the scrolling content, never the nav — the bar

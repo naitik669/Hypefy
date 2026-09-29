@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { forgetAllIdentities } from "@/lib/e2ee/store";
+import { forgetAllIdentitiesExcept } from "@/lib/e2ee/store";
 import { LogOut, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -41,9 +41,11 @@ export function SessionsCard() {
       /* private mode — nothing was stored to begin with */
     }
 
-    // And the encryption keys, for the same reason: this device is no longer
-    // one of the ones that may read those accounts' messages.
-    await forgetAllIdentities();
+    // And the encryption keys of the saved accounts, for the same reason.
+    // Not the current one: this device is still signed in as them, and
+    // wiping their key would make them recover on the device they never left.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) await forgetAllIdentitiesExcept(user.id);
 
     await supabase.rpc("log_security_alert", {
       p_body: "Signed out of all other devices",

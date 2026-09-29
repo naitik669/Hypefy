@@ -8,12 +8,16 @@ import { Check, Copy, KeyRound, ShieldCheck } from "lucide-react";
  *
  * It is not stored anywhere the server can read — that is the whole point of
  * it — so if this screen is dismissed without the person keeping it, the
- * code is gone. On the day they reset their password or sign in with Google
- * on a new phone, that will be the difference between their history coming
- * back and being unreadable by anyone alive, us included.
+ * code is gone. On the day they lose a phone, reset a password from a
+ * browser that never held their keys, or clear their site data, that will be
+ * the difference between their history coming back and being unreadable by
+ * anyone alive, us included.
  *
- * Hence the confirmation. Asking for four characters back is friction, and
- * it is deliberately placed exactly where the loss is permanent.
+ * Hence the confirmation. Asking for a few characters back is friction, and
+ * it is deliberately placed exactly where the loss becomes permanent. It also
+ * does real work: confirming is what tells the server this account may be
+ * encrypted to, so `onDone` is awaited and a failure keeps the person here
+ * rather than letting them believe setup finished when it did not.
  */
 
 /** How many characters we ask them to type back. */
@@ -24,13 +28,19 @@ export function RecoveryCodeScreen({
   onDone,
 }: {
   code: string;
-  /** Continue — they have kept it. */
-  onDone: () => void;
+  /**
+   * Called once they have proved they kept it. May be async; if it throws or
+   * rejects, the screen stays up and says so, so nothing continues on the
+   * strength of a confirmation that was never recorded.
+   */
+  onDone: () => void | Promise<void>;
 }) {
   const [copied, setCopied] = useState(false);
   const [typed, setTyped] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [wrong, setWrong] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   /** The last group, which is the one they will have read last. */
   const expected = useMemo(() => code.split("-").at(-1) ?? "", [code]);
@@ -48,16 +58,32 @@ export function RecoveryCodeScreen({
     }
   }
 
+  async function finish() {
+    if (!matches) {
+      setWrong(true);
+      return;
+    }
+    setBusy(true);
+    setFailed(false);
+    try {
+      await onDone();
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="flex min-h-dvh flex-col justify-center gap-6 px-6 py-10">
       <div className="flex flex-col items-center gap-3 text-center">
         <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/15">
           <ShieldCheck size={26} className="text-accent" />
         </span>
-        <h1 className="text-2xl font-extrabold tracking-tight">Your messages are encrypted</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">Save your recovery code</h1>
         <p className="max-w-[320px] text-sm text-muted">
-          Nobody at Hypefy can read your chats. Keep this code somewhere safe — it is the
-          only way back in if you forget your password.
+          This code is the backup way into your encrypted messages. Write it down or keep it
+          in a password manager — we can&rsquo;t show it again.
         </p>
       </div>
 
@@ -78,6 +104,11 @@ export function RecoveryCodeScreen({
         </button>
       </div>
 
+      <p className="text-center text-xs leading-relaxed text-faint">
+        If you lose this device and this code, your encrypted messages can&rsquo;t be
+        recovered by anyone — including us.
+      </p>
+
       {!confirming ? (
         <button
           type="button"
@@ -97,6 +128,7 @@ export function RecoveryCodeScreen({
             onChange={(e) => {
               setTyped(e.target.value.slice(0, CHECK_LEN));
               setWrong(false);
+              setFailed(false);
             }}
             autoCapitalize="characters"
             autoComplete="off"
@@ -109,13 +141,18 @@ export function RecoveryCodeScreen({
               That doesn&rsquo;t match. Check the code above.
             </p>
           )}
+          {failed && (
+            <p className="text-xs text-danger">
+              Couldn&rsquo;t finish setting up. Check your connection and try again.
+            </p>
+          )}
           <button
             type="button"
-            onClick={() => (matches ? onDone() : setWrong(true))}
+            onClick={() => void finish()}
             className="h-12 rounded-xl bg-accent text-sm font-bold text-accent-ink transition active:scale-[0.99] disabled:opacity-40"
-            disabled={typed.length < CHECK_LEN}
+            disabled={typed.length < CHECK_LEN || busy}
           >
-            Continue
+            {busy ? "Finishing…" : "Continue"}
           </button>
         </div>
       )}

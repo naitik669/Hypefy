@@ -56,6 +56,7 @@ import { uploadAlbumFiles, type AlbumFile } from "@/lib/chat-album-upload";
 import { leaveChatAnimated } from "@/lib/leave-chat";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { canEncrypt, isEncrypted, openEnvelope, sealFor, useEnvelopeReader } from "@/lib/e2ee/chat";
+import { openEncryptionSetup } from "@/lib/e2ee/open-setup";
 
 type PostPreview = {
   id: string;
@@ -341,6 +342,17 @@ export function RealChatView({
         : { ...m, _enc: "locked" as const };
     });
   }, [storedMessages, reader, isGroup, currentUserId, other.id]);
+
+  /**
+   * Where encryption begins in this thread.
+   *
+   * Everything above it was sent before both people had keys, or while one
+   * of them did not — it is legacy plaintext, and the divider is what makes
+   * that legible without labelling every old message. Derived from the
+   * envelopes themselves, so it needs no column and cannot drift from what
+   * was actually sent.
+   */
+  const firstEncryptedIndex = useMemo(() => messages.findIndex((m) => !!m._enc), [messages]);
   const [reactions, setReactions] = useState<ReactionRow[]>(initialReactions);
   const [readers, setReaders] = useState<Reader[]>(initialReaders);
   const [text, setText] = useState("");
@@ -1746,6 +1758,12 @@ export function RealChatView({
                       </span>
                     </div>
                   )}
+                  {i === firstEncryptedIndex && (
+                    <div className="flex items-center justify-center gap-1.5 px-6 py-2 text-center text-[11px] font-semibold text-muted">
+                      <Lock size={11} className="shrink-0 text-accent" />
+                      Messages from here are end-to-end encrypted
+                    </div>
+                  )}
                   {m.kind === "system" ? (
                     /* Chat-settings notices (screenshot alert / vanish mode /
                        auto-delete) — an event the THREAD reports, not something
@@ -1776,17 +1794,24 @@ export function RealChatView({
 
                       {/* Bubble */}
                       {m._enc === "locked" ? (
-                        /* Encrypted, and this device cannot open it: signed in
-                           without unlocking, or the sender's keys changed. The
-                           words are not lost — another device that holds the key
-                           still reads them. */
-                        <div className={`relative flex min-w-[80px] items-center gap-1.5 rounded-2xl border border-border px-3.5 pt-2 pb-5 text-sm italic text-faint ${mine ? "rounded-br-md" : "rounded-bl-md"}`}>
-                          <Lock size={12} />
-                          This message is locked
+                        /* Encrypted, and this device cannot open it. If the device
+                           simply has not been unlocked, tapping does something about
+                           it. Otherwise (the sender's keys changed, the row is bad)
+                           nothing here can help, and pretending it could would be
+                           worse than saying so. The words are not lost either way —
+                           a device that holds the key still reads them. */
+                        <button
+                          type="button"
+                          disabled={reader.self !== "device-locked"}
+                          onClick={openEncryptionSetup}
+                          className={`relative flex min-w-[80px] items-center gap-1.5 rounded-2xl border border-border px-3.5 pt-2 pb-5 text-left text-sm italic text-faint enabled:active:opacity-70 ${mine ? "rounded-br-md" : "rounded-bl-md"}`}
+                        >
+                          <Lock size={12} className="shrink-0" />
+                          {reader.self === "device-locked" ? "Unlock to read" : "Couldn’t decrypt this message"}
                           <span className="absolute bottom-1.5 right-2.5 text-[9px] font-medium leading-none text-faint/60">
                             {timeLabel(m.created_at)}
                           </span>
-                        </div>
+                        </button>
                       ) : m.is_unsent ? (
                         /* Unsent — time embedded inside at bottom-right */
                         <div className={`relative min-w-[80px] rounded-2xl border border-border px-3.5 pt-2 pb-5 text-sm italic text-faint ${mine ? "rounded-br-md" : "rounded-bl-md"}`}>
@@ -2176,12 +2201,29 @@ export function RealChatView({
             let someone believe a plaintext thread was protected, which is
             worse than not having encryption at all. */}
         {!isGroup && !reader.loading && !canEncrypt(reader, other.id) && (
-          <p className="mb-2 flex items-center gap-1.5 px-1 text-[11px] leading-snug text-faint">
+          <div className="mb-2 flex items-center gap-1.5 px-1 text-[11px] leading-snug text-faint">
             <Unlock size={11} className="shrink-0" />
-            {reader.me
-              ? `Not encrypted — ${other.name} hasn’t set up encryption yet.`
-              : "Not encrypted on this device. Unlock it in Settings to encrypt new messages."}
-          </p>
+            <span>
+              {reader.self === "ready"
+                ? `Not encrypted — ${other.name} hasn’t set up encrypted messaging yet.`
+                : reader.self === "unavailable"
+                ? "Not encrypted — couldn’t check your encryption right now."
+                : "Not encrypted."}
+            </span>
+            {reader.self !== "ready" && reader.self !== "unavailable" && (
+              <button
+                type="button"
+                onClick={openEncryptionSetup}
+                className="font-semibold text-accent"
+              >
+                {reader.self === "device-locked"
+                  ? "Unlock"
+                  : reader.self === "recovery-pending"
+                  ? "Finish setup"
+                  : "Set up encrypted messaging"}
+              </button>
+            )}
+          </div>
         )}
 
         {/* ── GIF picker panel — slides in just above the input row ── */}

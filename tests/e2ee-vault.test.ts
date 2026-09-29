@@ -10,10 +10,11 @@ import {
   regenerateRecoveryCode,
   fetchPublicKeys,
   ensureEncryption,
+  confirmRecovery,
 } from "@/lib/e2ee/vault";
 import { forgetAllIdentities } from "@/lib/e2ee/store";
 import { toB64 } from "@/lib/e2ee/crypto";
-import type { KeyVault } from "@/lib/e2ee/keys";
+import { fakeVaultSupabase, type FakeSupa } from "./helpers/fake-vault-supabase";
 
 /**
  * The wiring between the key lifecycle, Supabase and this device.
@@ -31,91 +32,10 @@ import type { KeyVault } from "@/lib/e2ee/keys";
 const USER = "user-under-test";
 const PW = "correct horse battery staple";
 
-/** A stand-in for user_keys that behaves the way the migration makes it. */
+/** The shared fake, typed the way vault.ts wants a client. */
 function fakeSupabase() {
-  const rows = new Map<string, KeyVault>();
-  let me: string | null = USER;
-
-  const client = {
-    rows,
-    signOut() {
-      me = null;
-    },
-    from() {
-      return {
-        select() {
-          return {
-            async maybeSingle() {
-              if (!me) return { data: null, error: { message: "not signed in" } };
-              return { data: rows.get(me) ?? null, error: null };
-            },
-          };
-        },
-      };
-    },
-    async rpc(name: string, args: Record<string, string | string[]>) {
-      if (!me) return { data: null, error: { message: "Not signed in" } };
-
-      if (name === "init_user_keys") {
-        // on conflict do nothing: false when a row was already there.
-        if (rows.has(me)) return { data: false, error: null };
-        rows.set(me, {
-          identity_pub: args.p_identity_pub as string,
-          signing_pub: args.p_signing_pub as string,
-          seed_wrapped: args.p_seed_wrapped as string,
-          mk_wrapped_pw: args.p_mk_wrapped_pw as string,
-          salt_pw: args.p_salt_pw as string,
-          mk_wrapped_rc: args.p_mk_wrapped_rc as string,
-          salt_rc: args.p_salt_rc as string,
-        });
-        return { data: true, error: null };
-      }
-
-      if (name === "rewrap_master_key") {
-        const row = rows.get(me);
-        if (!row) return { data: null, error: { message: "No keys to rewrap" } };
-        rows.set(me, {
-          ...row,
-          mk_wrapped_pw: args.p_mk_wrapped_pw as string,
-          salt_pw: args.p_salt_pw as string,
-        });
-        return { data: null, error: null };
-      }
-
-      if (name === "rewrap_recovery") {
-        const row = rows.get(me);
-        if (!row) return { data: null, error: { message: "No keys to rewrap" } };
-        rows.set(me, {
-          ...row,
-          mk_wrapped_rc: args.p_mk_wrapped_rc as string,
-          salt_rc: args.p_salt_rc as string,
-        });
-        return { data: null, error: null };
-      }
-
-      if (name === "public_keys") {
-        const ids = args.p_user_ids as string[];
-        return {
-          data: ids
-            .filter((id) => rows.has(id))
-            .map((id) => ({
-              user_id: id,
-              identity_pub: rows.get(id)!.identity_pub,
-              signing_pub: rows.get(id)!.signing_pub,
-            })),
-          error: null,
-        };
-      }
-
-      return { data: null, error: { message: "unknown rpc " + name } };
-    },
-  };
-
-  // The real client is a large generated type; the surface used here is the
-  // whole surface this module touches.
-  return client as unknown as Parameters<typeof setupIdentity>[2] & typeof client;
+  return fakeVaultSupabase(USER) as unknown as Parameters<typeof setupIdentity>[2] & FakeSupa;
 }
-
 beforeEach(async () => {
   await forgetAllIdentities();
 });
@@ -287,10 +207,11 @@ describe("regenerating a recovery code", () => {
 });
 
 describe("fetchPublicKeys", () => {
-  it("returns the public halves for people who have set up", async () => {
+  it("returns the public halves for people who have set up and confirmed", async () => {
     const supa = fakeSupabase();
     const made = await setupIdentity(USER, PW, supa);
     if (!made.ok) return;
+    await confirmRecovery(USER, supa);
 
     const keys = await fetchPublicKeys([USER], supa);
     expect(toB64(keys.get(USER)!.boxPub)).toBe(toB64(made.identity.boxPub));
@@ -300,6 +221,7 @@ describe("fetchPublicKeys", () => {
   it("simply omits anyone who has not — that is a state, not an error", async () => {
     const supa = fakeSupabase();
     await setupIdentity(USER, PW, supa);
+    await confirmRecovery(USER, supa);
     const keys = await fetchPublicKeys([USER, "someone-with-no-keys"], supa);
     expect(keys.has(USER)).toBe(true);
     expect(keys.has("someone-with-no-keys")).toBe(false);
@@ -334,10 +256,15 @@ describe("ensureEncryption — the silent path at sign-in", () => {
     expect(await isUnlocked(USER)).toBe(true);
   });
 
-  it("does nothing at all when the device is already unlocked", async () => {
+  it("does nothing at all when the device is already unlocked and confirmed", async () => {
     const supa = fakeSupabase();
     await ensureEncryption(USER, PW, supa);
+    expect(await confirmRecovery(USER, supa)).toBe(true);
+
+    const before = supa.writes().length;
     expect(await ensureEncryption(USER, PW, supa)).toEqual({ state: "ready" });
+    // It may look (one select, on sign-in) but it must never write.
+    expect(supa.writes().length).toBe(before);
   });
 
   it("opens silently on a new device — the whole point", async () => {

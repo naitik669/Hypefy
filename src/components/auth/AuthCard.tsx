@@ -10,7 +10,7 @@ import { DateOfBirthPicker } from "@/components/ui/DateOfBirthPicker";
 import { isNative } from "@/lib/native";
 import { startNativeGoogleSignIn } from "@/lib/native-auth";
 import { stashPendingOAuth } from "@/lib/pending-oauth";
-import { ensureEncryption } from "@/lib/e2ee/vault";
+import { confirmRecovery, ensureEncryption } from "@/lib/e2ee/vault";
 import { RecoveryCodeScreen } from "@/components/e2ee/RecoveryCodeScreen";
 
 type Mode = "signin" | "signup";
@@ -48,7 +48,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
    * it after would mean routing a secret through somewhere it should never
    * be, and losing it on a refresh.
    */
-  const [recovery, setRecovery] = useState<{ code: string; next: () => void } | null>(null);
+  const [recovery, setRecovery] = useState<{ code: string; userId: string; next: () => void } | null>(null);
 
   /**
    * Set encryption up, or unlock it, using the password they just typed.
@@ -62,7 +62,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
   async function readyEncryption(userId: string, secret: string, go: () => void) {
     const result = await ensureEncryption(userId, secret);
     if (result.state === "created") {
-      setRecovery({ code: result.recoveryCode, next: go });
+      setRecovery({ code: result.recoveryCode, userId, next: go });
       return;
     }
     // "needs-recovery" lands here too. Asking for a recovery code in the
@@ -390,7 +390,18 @@ export function AuthCard({ mode }: { mode: Mode }) {
   // The recovery screen takes the whole view while it is up. This is the
   // only time the code is ever shown, so nothing may navigate past it.
   if (recovery) {
-    return <RecoveryCodeScreen code={recovery.code} onDone={recovery.next} />;
+    return (
+      <RecoveryCodeScreen
+        code={recovery.code}
+        onDone={async () => {
+          // Recording the confirmation is what lets anyone encrypt to this
+          // account. If it fails, stay here — carrying on would leave a
+          // vault nobody may rely on while the person believes it is done.
+          if (!(await confirmRecovery(recovery.userId))) throw new Error("not confirmed");
+          recovery.next();
+        }}
+      />
+    );
   }
 
   return (

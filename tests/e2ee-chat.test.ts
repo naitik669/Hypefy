@@ -22,11 +22,13 @@ function pair() {
   const mine: Reader = {
     me,
     peers: new Map([[PEER, { boxPub: peer.boxPub, signPub: peer.signPub }]]),
+    self: "ready",
     loading: false,
   };
   const theirs: Reader = {
     me: peer,
     peers: new Map([[ME, { boxPub: me.boxPub, signPub: me.signPub }]]),
+    self: "ready",
     loading: false,
   };
   return { mine, theirs };
@@ -55,6 +57,32 @@ describe("sealing", () => {
     const locked: Reader = { ...mine, me: null };
     expect(sealFor(locked, { plaintext: "hi", conversationId: CONV, myId: ME, peerId: PEER })).toBeNull();
     expect(canEncrypt(locked, PEER)).toBe(false);
+  });
+});
+
+describe("sending is gated on our own setup, not only the peer's", () => {
+  const args = { plaintext: "hi", conversationId: CONV, myId: ME, peerId: PEER };
+
+  it.each(["recovery-pending", "device-locked", "no-vault", "unavailable"] as const)(
+    "does not encrypt while this account is %s",
+    (self) => {
+      // The peer's keys are right there and this device holds an identity —
+      // and it still must not seal, because the recovery code was never
+      // confirmed (or the device cannot be trusted with the vault at all).
+      const { mine } = pair();
+      const early: Reader = { ...mine, self };
+      expect(sealFor(early, args)).toBeNull();
+      expect(canEncrypt(early, PEER)).toBe(false);
+    },
+  );
+
+  it("still READS while unconfirmed — reading is not the risk", () => {
+    // A device that holds the keys should show what arrived. Only sending
+    // under a vault nobody has a backup for is dangerous.
+    const { mine, theirs } = pair();
+    const body = sealFor(theirs, { ...args, myId: PEER, peerId: ME });
+    const early: Reader = { ...mine, self: "recovery-pending" };
+    expect(openEnvelope(early, { body, senderId: PEER, myId: ME, peerId: PEER }).state).toBe("open");
   });
 });
 
@@ -123,7 +151,7 @@ describe("reading", () => {
     const { mine } = pair();
     const body = sealFor(mine, { plaintext: "hi", conversationId: CONV, myId: ME, peerId: PEER });
     const eve = identityFromSeed(newSeed());
-    const hers: Reader = { me: eve, peers: mine.peers, loading: false };
+    const hers: Reader = { me: eve, peers: mine.peers, self: "ready", loading: false };
     expect(openEnvelope(hers, { body, senderId: ME, myId: "eve", peerId: PEER }).state).toBe("locked");
   });
 });

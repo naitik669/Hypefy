@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, KeyRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { afterPasswordReset } from "@/lib/e2ee/vault";
 
 /**
  * Sets a new password at the end of the recovery flow.
@@ -32,6 +33,8 @@ export function ResetPasswordCard() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  /** Set when the reset left encrypted messages reachable only by recovery code. */
+  const [recoveryOnly, setRecoveryOnly] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,13 +73,24 @@ export function ResetPasswordCard() {
       return;
     }
 
+    // What a reset does to encrypted messages depends on whether this browser
+    // ever held the key. If it did, the new password is wrapped around it and
+    // nothing changes. If not — the usual case, since the link is opened
+    // wherever the email is — the old password wrapper opens nothing now and
+    // the recovery code is the only way in. That has to be said before the
+    // person is whisked away, not discovered on their next phone.
+    const { data: { user } } = await supabase.auth.getUser();
+    const vault = user ? await afterPasswordReset(user.id, password) : "none";
+    const needsCode = vault === "recovery-only" || vault === "failed";
+    if (needsCode) setRecoveryOnly(true);
+
     setDone(true);
     // Straight into the app — updateUser leaves the session signed in, so
     // bouncing back to /signin would only ask for the password just set.
     setTimeout(() => {
       router.push("/home");
       router.refresh();
-    }, 1200);
+    }, needsCode ? 7000 : 1200);
   }
 
   const shell =
@@ -130,9 +144,17 @@ export function ResetPasswordCard() {
       </div>
 
       {done ? (
-        <p className="mt-6 rounded-xl border border-accent/20 bg-accent/10 px-3 py-2.5 text-center text-xs font-medium text-accent">
-          Password updated. Taking you in…
-        </p>
+        <div className="mt-6 flex flex-col gap-3">
+          <p className="rounded-xl border border-accent/20 bg-accent/10 px-3 py-2.5 text-center text-xs font-medium text-accent">
+            Password updated. Taking you in…
+          </p>
+          {recoveryOnly && (
+            <p className="rounded-xl border border-border bg-white/[0.04] px-3 py-2.5 text-center text-xs leading-relaxed text-muted">
+              Your encrypted messages now open on a new device with your recovery code, not this
+              password. Keep that code handy.
+            </p>
+          )}
+        </div>
       ) : (
         <form onSubmit={submit} className="mt-6 flex flex-col gap-3">
           <label htmlFor="new-password" className="sr-only">
