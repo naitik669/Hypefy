@@ -287,5 +287,48 @@ discovered later:
 | `src/lib/e2ee/keys.ts` | the lifecycle: make a vault, open it, re-wrap it |
 | `src/lib/e2ee/store.ts` | IndexedDB, **keyed by user id** — one device holds several accounts |
 | `src/lib/e2ee/vault.ts` | the glue: Supabase and the device |
+| `src/lib/e2ee/message.ts` | the envelope that sits in `messages.body` |
+| `src/lib/e2ee/chat.ts` | what a screen calls: can I seal this, can I open that |
 | `supabase/migrations/0103_user_keys.sql` | the table, its RLS, and the three definer RPCs |
 | `tests/e2ee-*.test.ts` | 76 tests, written as properties rather than happy paths |
+
+
+## 7. What is actually wired
+
+Encryption is on for **1:1 text messages only**, and only between two
+people who both have keys. Everything else — groups, photos, videos,
+voice notes, documents, GIFs, songs, page replies, reactions, system
+notices — still goes in plaintext, and the composer says so in the thread
+rather than letting anyone assume otherwise.
+
+The path a message takes:
+
+1. `send()` asks `sealFor` for an envelope. Null means the other person
+   has no keys yet, or this device is locked; the message goes plaintext
+   and the thread shows the notice.
+2. `send_message` stores the envelope. The RPC needed no change — all it
+   ever asked of a body was that it not be empty.
+3. The thread keeps the stored rows exactly as the server has them, and
+   derives what it renders. Every arrival route — the server render, the
+   older-messages page, the catch-up fetch, the realtime echo — ends in
+   that one array, so decryption happens in one place.
+4. The inbox preview and the in-app toast each open the last message the
+   same way, with the peer's key.
+
+Anything that cannot be opened shows as locked rather than as an
+envelope: a device signed in but never unlocked, or a sender who rebuilt
+their identity. The words are not lost — another device holding the key
+still reads them.
+
+### Still to do
+
+- **No real signed-in session has created a vault yet.** SQL proves the
+  RPCs, a fake client proves the glue, a harness proves the screen; the
+  three have never met in one browser.
+- Android Keystore for the local seed. IndexedDB is an application store,
+  not the strongest boundary the platform offers; `android:allowBackup`
+  needs auditing alongside it.
+- `chat-media` and `voice-notes` are public buckets with permanent URLs.
+  That is a hole with or without encryption.
+- Search (`ilike` on the server) matches only older plaintext.
+- Groups, media, and lock-screen decryption.
