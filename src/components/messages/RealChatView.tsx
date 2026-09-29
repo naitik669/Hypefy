@@ -58,6 +58,7 @@ import { BLANK_POSTER } from "@/lib/blank-poster";
 import { canEncrypt, isEncrypted, openEnvelope, sealFor, useEnvelopeReader } from "@/lib/e2ee/chat";
 import { openEncryptionSetup } from "@/lib/e2ee/open-setup";
 import { E2EE_ENABLED } from "@/lib/e2ee/flag";
+import { ChatImg, ChatLink, ChatVideo } from "@/components/messages/ChatMedia";
 
 type PostPreview = {
   id: string;
@@ -1916,8 +1917,8 @@ export function RealChatView({
                           docSize = typeof p.size === "number" ? p.size : undefined;
                         } catch { /* pre-JSON row — fall back to the raw URL */ }
                         return (
-                          <a
-                            href={docUrl}
+                          <ChatLink
+                            url={docUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             onPointerDown={(e) => onPressStart(m, e)}
@@ -1941,7 +1942,7 @@ export function RealChatView({
                               </span>
                             </span>
                             <Download size={15} className={`shrink-0 ${mine ? "text-accent-ink/70" : "text-muted"}`} />
-                          </a>
+                          </ChatLink>
                         );
                       })() : (m.kind === "gif" || m.kind === "image") && m.body ? (
                         /* GIF / image — media bubble with time+status pill overlay */
@@ -1954,8 +1955,7 @@ export function RealChatView({
                           className="relative overflow-hidden rounded-2xl"
                           style={{ width: m.kind === "image" ? MEDIA_W : undefined, maxWidth: MEDIA_W }}
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={m._localUrl ?? m.body} alt={m.kind === "gif" ? "GIF" : ""} className="w-full rounded-2xl object-cover" />
+                          <ChatImg url={m._localUrl ?? m.body} alt={m.kind === "gif" ? "GIF" : ""} className="w-full rounded-2xl object-cover" />
                           {/* GIF badge */}
                           {m.kind === "gif" && (
                             <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white backdrop-blur-sm">
@@ -2006,7 +2006,7 @@ export function RealChatView({
                           className="relative overflow-hidden rounded-2xl bg-black"
                           style={{ width: MEDIA_W, maxWidth: "100%" }}
                         >
-                          <video poster={BLANK_POSTER} src={m._localUrl ?? m.body} className="w-full rounded-2xl" controls playsInline preload="metadata" />
+                          <ChatVideo url={m._localUrl ?? m.body} className="w-full rounded-2xl" controls playsInline preload="metadata" />
                           <span className="absolute bottom-1.5 right-2 flex items-center gap-[3px] rounded-full bg-black/60 px-1.5 py-[3px] backdrop-blur-sm">
                             <span className="text-[9px] font-medium leading-none text-white/85">{timeLabel(m.created_at)}</span>
                             {mine && <MsgStatusTick status={getMsgStatus(m)} />}

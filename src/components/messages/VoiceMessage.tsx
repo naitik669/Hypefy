@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 import { barCount, resamplePeaks, voiceWidth } from "@/lib/voice-peaks";
+import { useChatMediaUrl } from "@/lib/chat-media-url";
 
 interface Props {
   /** Storage URL from the voice-notes bucket */
@@ -64,11 +65,15 @@ export function VoiceMessage({ url, storedDuration, peaks, mine }: Props) {
   const [currentTime, setCurrentTime] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
+  // Voice notes sit in a private bucket; the stored URL is signed on the way in.
+  const { src, retry } = useChatMediaUrl(url);
+
   useEffect(() => {
+    if (!src) return;
     const audio = new Audio();
     audioRef.current = audio;
     audio.preload = "metadata";
-    audio.src = url;
+    audio.src = src;
 
     audio.onloadedmetadata = () => {
       if (isFinite(audio.duration)) setDuration(audio.duration);
@@ -85,13 +90,17 @@ export function VoiceMessage({ url, storedDuration, peaks, mine }: Props) {
       setProgress(0);
       setCurrentTime(0);
     };
-    audio.onerror = () => setLoaded(false);
+    // An expired link in a long-open thread: re-sign once, then give up.
+    audio.onerror = () => {
+      setLoaded(false);
+      retry();
+    };
 
     return () => {
       audio.pause();
       audio.src = "";
     };
-  }, [url]);
+  }, [src, retry]);
 
   function toggle() {
     const audio = audioRef.current;

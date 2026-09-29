@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { forgetAllIdentities } from "@/lib/e2ee/store";
+import { clearChatMediaCache } from "@/lib/chat-media-url";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -24,6 +25,9 @@ export function SignOutButton() {
     // The key goes with the session. A signed-out device that kept it
     // could still read every encrypted message it had already received.
     await forgetAllIdentities();
+    // Signed links are bearer links; do not leave the last account's in memory
+    // for whoever signs in next in this tab.
+    clearChatMediaCache();
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();

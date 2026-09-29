@@ -6,7 +6,7 @@ import { X } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { albumCount, type Album, type AlbumItem } from "@/lib/chat-album";
-import { BLANK_POSTER } from "@/lib/blank-poster";
+import { ChatImg, ChatVideo } from "@/components/messages/ChatMedia";
 
 /**
  * Photos and videos sent together, drawn as a folder: up to three photos
@@ -59,10 +59,9 @@ const GLASS = {
 
 function Thumb({ item }: { item: AlbumItem }) {
   return item.type === "video" ? (
-    <video poster={BLANK_POSTER} src={`${item.url}#t=0.1`} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" />
+    <ChatVideo url={item.url} fragment="#t=0.1" muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" />
   ) : (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={item.url} alt="" loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover" />
+    <ChatImg url={item.url} loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover" />
   );
 }
 
@@ -408,9 +407,9 @@ export function AlbumViewer({
                   }
                 >
                   {item.type === "video" ? (
-                    <video poster={BLANK_POSTER}
+                    <ChatVideo
                       data-index={i}
-                      src={item.url}
+                      url={item.url}
                       playsInline
                       preload="metadata"
                       onPlay={() => setPaused(false)}
@@ -418,8 +417,7 @@ export function AlbumViewer({
                       className="pointer-events-none max-h-full max-w-full"
                     />
                   ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.url} alt="" draggable={false} className="pointer-events-none max-h-full max-w-full object-contain" />
+                    <ChatImg url={item.url} draggable={false} className="pointer-events-none max-h-full max-w-full object-contain" />
                   )}
                 </div>
               )}
