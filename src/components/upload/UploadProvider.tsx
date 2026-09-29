@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import type { Track } from "@/lib/music";
 import { capturePoster } from "@/lib/video-poster";
 import { trimToStore, type Trim } from "@/lib/shot-trim";
+import { uploadContentType } from "@/lib/video-mime";
 
 type PostUpload = {
   userId: string;
@@ -159,7 +160,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       const path = `${a.userId}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("shot-media")
-        .upload(path, a.file, { contentType: a.file.type, upsert: false });
+        .upload(path, a.file, { contentType: uploadContentType(a.file), upsert: false });
       if (upErr) throw upErr;
       setProgress(80);
       const mediaUrl = supabase.storage.from("shot-media").getPublicUrl(path).data.publicUrl;

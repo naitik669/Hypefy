@@ -6,11 +6,7 @@ import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
-import {
-  ALLOWED_SHOT_TYPES,
-  MAX_SHOT_MB,
-  MAX_SHOW_MB,
-} from "@/lib/video-poster";
+import { MAX_SHOT_MB, MAX_SHOW_MB } from "@/lib/video-poster";
 import { ShotCoverPicker } from "@/components/post/ShotCoverPicker";
 import {
   SuggestionDropdown,
@@ -21,6 +17,7 @@ import type { Track } from "@/lib/music";
 import type { Trim } from "@/lib/shot-trim";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { useObjectUrl } from "@/lib/object-url";
+import { isAllowedVideo, isVideoFile, uploadContentType } from "@/lib/video-mime";
 import { useUpload } from "@/components/upload/UploadProvider";
 
 /**
@@ -64,7 +61,9 @@ export function ShotPreview({
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const { suggestions, reset } = useMentionHashtag(caption, cursor);
-  const isVideo = file.type.startsWith("video/");
+  // Not file.type.startsWith: a gallery pick can arrive with no type at all,
+  // and then a video was treated as an image.
+  const isVideo = isVideoFile(file);
 
   // Object URLs leak until revoked, and a long session through the creator
   // can mint a lot of them — but revoking them in an effect cleanup breaks
@@ -77,7 +76,10 @@ export function ShotPreview({
   // a dropped socket.
   const maxMb = mode === "show" ? MAX_SHOW_MB : MAX_SHOT_MB;
   const tooBig = file.size > maxMb * 1024 * 1024;
-  const badType = isVideo && !ALLOWED_SHOT_TYPES.includes(file.type);
+  // Compared on the base type. A clip recorded in the app is
+  // "video/webm;codecs=vp9,opus", which is not any of the bare strings in the
+  // allowed list — so every recorded Shot was refused here.
+  const badType = isVideo && !isAllowedVideo(file);
 
   async function publish() {
     if (busy) return;
@@ -121,7 +123,9 @@ export function ShotPreview({
 
     const { error: upErr } = await supabase.storage
       .from(bucket)
-      .upload(path, file, { contentType: file.type, upsert: false });
+      // The base type, so the object is served as video/webm rather than
+      // video/webm;codecs=vp9,opus.
+      .upload(path, file, { contentType: uploadContentType(file), upsert: false });
 
     if (upErr) {
       setBusy(false);

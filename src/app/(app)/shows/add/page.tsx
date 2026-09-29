@@ -10,7 +10,8 @@ import { LiveCamera } from "@/components/shows/LiveCamera";
 import { Avatar } from "@/components/ui/Avatar";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import type { Track } from "@/lib/music";
-import { MAX_SHOW_MB, ALLOWED_SHOT_TYPES } from "@/lib/video-poster";
+import { MAX_SHOW_MB } from "@/lib/video-poster";
+import { isAllowedVideo, isVideoFile, uploadContentType } from "@/lib/video-mime";
 
 type State = "camera" | "pick-post" | "pick-image" | "preview";
 
@@ -175,10 +176,7 @@ export default function AddShowPage() {
           );
           return;
         }
-        if (
-          capturedFile.type.startsWith("video/") &&
-          !ALLOWED_SHOT_TYPES.includes(capturedFile.type)
-        ) {
+        if (isVideoFile(capturedFile) && !isAllowedVideo(capturedFile)) {
           setError("That video format isn't supported. Try MP4, WebM or MOV.");
           return;
         }
@@ -187,7 +185,10 @@ export default function AddShowPage() {
         const path = `${user.id}/${Date.now()}.${ext}`;
         const { error: uploadErr } = await supabase.storage
           .from("show-media")
-          .upload(path, capturedFile, { contentType: capturedFile.type, upsert: false });
+          .upload(path, capturedFile, {
+            contentType: uploadContentType(capturedFile, capturedFile.type || "image/jpeg"),
+            upsert: false,
+          });
         if (uploadErr) { setError("Upload failed: " + uploadErr.message); return; }
         mediaUrl = supabase.storage.from("show-media").getPublicUrl(path).data.publicUrl;
       } else if (selectedFlat) {

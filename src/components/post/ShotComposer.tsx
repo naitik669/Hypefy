@@ -32,6 +32,7 @@ import type { Track } from "@/lib/music";
 // that exact drift — it just never reached this copy, because the two Shot
 // paths each kept their own number.
 import { MAX_SHOT_MB, ALLOWED_SHOT_TYPES, capturePoster } from "@/lib/video-poster";
+import { isAllowedVideo, uploadContentType } from "@/lib/video-mime";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 
 const MAX_SIZE_MB = MAX_SHOT_MB;
@@ -91,7 +92,7 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
     const f = e.target.files?.[0];
     if (!f) return;
     setFileError(null);
-    if (!ALLOWED_TYPES.includes(f.type)) {
+    if (!isAllowedVideo(f)) {
       setFileError("Shots are videos. Allowed: MP4, WebM, MOV.");
       return;
     }
@@ -158,7 +159,7 @@ export function ShotComposer({ userId, author }: { userId: string; author: ShotA
       const path = `${userId}/${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage
         .from("shot-media")
-        .upload(path, file, { contentType: file.type, upsert: false });
+        .upload(path, file, { contentType: uploadContentType(file), upsert: false });
 
       if (uploadErr) {
         setPostError("Upload failed: " + uploadErr.message);
