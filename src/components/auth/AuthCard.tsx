@@ -10,6 +10,8 @@ import { DateOfBirthPicker } from "@/components/ui/DateOfBirthPicker";
 import { isNative } from "@/lib/native";
 import { startNativeGoogleSignIn } from "@/lib/native-auth";
 import { stashPendingOAuth } from "@/lib/pending-oauth";
+import { ensureEncryption } from "@/lib/e2ee/vault";
+import { RecoveryCodeScreen } from "@/components/e2ee/RecoveryCodeScreen";
 
 type Mode = "signin" | "signup";
 
@@ -38,6 +40,36 @@ export function AuthCard({ mode }: { mode: Mode }) {
   const t = copy[mode];
   const router = useRouter();
   const supabase = createClient();
+  /**
+   * A freshly made recovery code, and where to go once it has been kept.
+   *
+   * Held here rather than passed through a route because it exists nowhere
+   * else — not on the server, not in storage. Navigating first and showing
+   * it after would mean routing a secret through somewhere it should never
+   * be, and losing it on a refresh.
+   */
+  const [recovery, setRecovery] = useState<{ code: string; next: () => void } | null>(null);
+
+  /**
+   * Set encryption up, or unlock it, using the password they just typed.
+   *
+   * The only moment the plaintext password exists in this browser, and so
+   * the only moment a key can be derived from it without asking for
+   * anything. Nothing here can stop a sign-in: a new identity shows its
+   * recovery code, and every other outcome — including failure — simply
+   * continues.
+   */
+  async function readyEncryption(userId: string, secret: string, go: () => void) {
+    const result = await ensureEncryption(userId, secret);
+    if (result.state === "created") {
+      setRecovery({ code: result.recoveryCode, next: go });
+      return;
+    }
+    // "needs-recovery" lands here too. Asking for a recovery code in the
+    // middle of signing in would be the wrong moment; the chat screen asks
+    // when there is actually something encrypted to read.
+    go();
+  }
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -147,7 +179,20 @@ export function AuthCard({ mode }: { mode: Mode }) {
           // router cache, whose /home payload was rendered for the account
           // being switched away from — so a freshly added account landed on
           // the previous user's feed and looked like it had not worked.
+          if (data.user) {
+            await readyEncryption(data.user.id, password, () => {
+              window.location.href = "/home";
+            });
+            return;
+          }
           window.location.href = "/home";
+          return;
+        }
+        if (data.user) {
+          await readyEncryption(data.user.id, password, () => {
+            router.push("/home");
+            router.refresh();
+          });
           return;
         }
         router.push("/home");
@@ -213,6 +258,12 @@ export function AuthCard({ mode }: { mode: Mode }) {
           // to /signin when getUser() comes back null — so a brand new
           // account was thrown back to the sign-in form it had just left,
           // with the account created and its profile never built.
+          if (data.user) {
+            await readyEncryption(data.user.id, password, () => {
+              window.location.href = "/setup-profile";
+            });
+            return;
+          }
           window.location.href = "/setup-profile";
           return;
         } else {
@@ -334,6 +385,12 @@ export function AuthCard({ mode }: { mode: Mode }) {
       setGoogleLoading(false);
     }
     // On success the browser redirects to Google; no further action here.
+  }
+
+  // The recovery screen takes the whole view while it is up. This is the
+  // only time the code is ever shown, so nothing may navigate past it.
+  if (recovery) {
+    return <RecoveryCodeScreen code={recovery.code} onDone={recovery.next} />;
   }
 
   return (
