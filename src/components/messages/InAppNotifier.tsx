@@ -6,6 +6,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
+import { openIncoming } from "@/lib/e2ee/chat";
 import { isEmojiReply } from "@/components/diary/PageReplyEmbed";
 
 /** Human verbs for non-text message kinds — never surface raw URLs in a toast. */
@@ -136,10 +137,24 @@ export function InAppNotifier({ currentUserId }: { currentUserId: string }) {
       if (pathRef.current === `/messages/${row.conversation_id}`) return; // viewing it
       const mem = await getMembership(row.conversation_id);
       if (!mem || mem.muted) return;
+      // An encrypted body has to be opened before it can be shown; failing
+      // that, the toast says a message arrived and nothing about it.
+      const opened = mem.isGroup
+        ? ({ state: "plain" } as const)
+        : await openIncoming({
+            body: row.body,
+            senderId: row.sender_id,
+            myId: currentUserId,
+            peerId: row.sender_id,
+          });
+      if (!active) return;
+      const body = opened.state === "open" ? opened.text : opened.state === "locked" ? null : row.body;
       const content =
-        row.kind === "page_reply"
-          ? isEmojiReply(row.body) ? `Reacted ${row.body} to your page` : `Replied to your page: ${row.body ?? ""}`
-          : KIND_VERB[row.kind] ?? (row.body ?? "Sent a message");
+        opened.state === "locked"
+          ? "Message is locked"
+          : row.kind === "page_reply"
+          ? isEmojiReply(body) ? `Reacted ${body} to your page` : `Replied to your page: ${body ?? ""}`
+          : KIND_VERB[row.kind] ?? (body ?? "Sent a message");
       const key = `m-${row.id}`;
       // Render immediately with what we know; enrich the sender below.
       push({

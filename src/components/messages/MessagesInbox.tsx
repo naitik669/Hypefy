@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { isEncrypted, openEnvelope, useEnvelopeReader } from "@/lib/e2ee/chat";
 import { STATUS_ENABLED } from "@/lib/status-feature";
 import { FloatingPages } from "@/components/diary/FloatingPages";
 import type { DiaryEntry } from "@/lib/diary";
@@ -47,6 +48,8 @@ export type InboxRow = {
   verified?: boolean;
   cosmetics?: { is_premium: boolean; name_font: string | null; name_glow: string | null; avatar_decoration: string | null; nameplate?: string | null } | null;
   isGroup: boolean;
+  /** 1:1 only: the other person's user id, needed to read their envelopes. */
+  peerId?: string | null;
   memberCount: number;
   lastBody: string | null;
   lastKind: string | null;
@@ -157,6 +160,10 @@ function preview(r: InboxRow) {
 
   if (!r.lastAt) return r.isGroup ? "New group" : "Say hi 👋";
 
+  // Still in its envelope: encrypted, and this device could not open it.
+  // Another device holding the key still reads it — the words are not lost.
+  if (isEncrypted(r.lastBody)) return "Message is locked";
+
   // System notices (screenshot alert / vanish mode / auto-delete) are thread
   // events, not something anyone said — so no "You: " prefix and no sender
   // name. The body already reads as a full sentence naming who did it.
@@ -190,7 +197,7 @@ function preview(r: InboxRow) {
 }
 
 export function MessagesInbox({
-  rows,
+  rows: encryptedRows,
   currentUserId,
   children,
   pages = [],
@@ -206,6 +213,36 @@ export function MessagesInbox({
 }) {
   const supabase = createClient();
   const router = useRouter();
+
+  /**
+   * Open the previews of encrypted threads.
+   *
+   * The server renders this list, so what arrives for an encrypted thread
+   * is the envelope. Only threads that actually carry one cost a key
+   * lookup; everything older stays exactly as it was.
+   */
+  const peerIds = useMemo(
+    () =>
+      encryptedRows
+        .filter((r) => !r.isGroup && r.peerId && isEncrypted(r.lastBody))
+        .map((r) => r.peerId as string),
+    [encryptedRows],
+  );
+  const reader = useEnvelopeReader(currentUserId, peerIds, peerIds.length > 0);
+  const rows = useMemo(() => {
+    if (peerIds.length === 0 || reader.loading) return encryptedRows;
+    return encryptedRows.map((r) => {
+      if (!r.peerId || !isEncrypted(r.lastBody)) return r;
+      const opened = openEnvelope(reader, {
+        body: r.lastBody,
+        senderId: r.lastMine ? currentUserId : r.peerId,
+        myId: currentUserId,
+        peerId: r.peerId,
+      });
+      // A locked one keeps its envelope, which is how preview() knows.
+      return opened.state === "open" ? { ...r, lastBody: opened.text } : r;
+    });
+  }, [encryptedRows, peerIds, reader, currentUserId]);
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
   // conversation_id → a matching message body, for content search (2b).

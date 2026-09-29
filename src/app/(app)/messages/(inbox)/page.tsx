@@ -164,6 +164,8 @@ export default async function MessagesPage() {
           verified: !isGroup && members[0].verified,
           cosmetics: isGroup ? null : members[0].cosmetics,
           isGroup,
+          // Needed client-side to open an encrypted preview.
+          peerId: isGroup ? null : members[0].id,
           memberCount: members.length + 1,
           lastBody: last?.body ?? null,
           lastKind: last?.kind ?? null,

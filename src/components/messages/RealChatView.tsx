@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon } from "lucide-react";
+import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock } from "lucide-react";
 import { SendIcon, ShareIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
@@ -55,6 +55,7 @@ import {
 import { uploadAlbumFiles, type AlbumFile } from "@/lib/chat-album-upload";
 import { leaveChatAnimated } from "@/lib/leave-chat";
 import { BLANK_POSTER } from "@/lib/blank-poster";
+import { canEncrypt, isEncrypted, openEnvelope, sealFor, useEnvelopeReader } from "@/lib/e2ee/chat";
 
 type PostPreview = {
   id: string;
@@ -91,6 +92,13 @@ export type ChatMsg = {
   } | null;
   /** Client-only: set on optimistic messages before server confirms */
   _status?: "pending" | "failed";
+  /** Client-only, end-to-end encryption: what happened when we tried to read
+   *  this body. Absent means it was never encrypted. "open" means `body` now
+   *  holds the plaintext while the database holds only the envelope. */
+  _enc?: "open" | "locked";
+  /** Client-only: the envelope we actually sent, kept on the optimistic copy
+   *  so the realtime echo of our own message still matches it. */
+  _cipher?: string;
   /** Client-only: the OneShot's private storage path, kept so a failed send
    *  can be retried without re-uploading. Never comes back from the server. */
   _storagePath?: string;
@@ -146,6 +154,9 @@ function albumOf(m: ChatMsg): Album | null {
 /** Short human snippet for quoting a message — never a raw URL. */
 function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string | null }): string {
   if (m.is_unsent) return "Unsent message";
+  // A body still in its envelope is one this device could not open. Quoting
+  // the JSON would be worse than saying nothing.
+  if (isEncrypted(m.body)) return "Encrypted message";
   switch (m.kind) {
     case "gif": return "GIF";
     case "image": return "Photo";
@@ -292,7 +303,44 @@ export function RealChatView({
   const [themeId, setThemeId] = useState<string | null>(initialTheme);
   const theme = findChatTheme(themeId);
   const router = useRouter();
-  const [messages, setMessages] = useState<ChatMsg[]>(initialMessages);
+  /** Exactly what the server holds — encrypted bodies included. Everything
+   *  that writes messages writes here; reading goes through `messages`. */
+  const [storedMessages, setMessages] = useState<ChatMsg[]>(initialMessages);
+
+  /**
+   * End-to-end encryption for this thread.
+   *
+   * 1:1 text only for now. Groups need sender keys and a re-key whenever
+   * somebody joins, and chat media sits in a public bucket — both are their
+   * own piece of work, and claiming otherwise here would be a lie.
+   */
+  const peerIds = useMemo(() => (isGroup ? [] : [other.id]), [isGroup, other.id]);
+  const reader = useEnvelopeReader(currentUserId, peerIds, !isGroup);
+
+  /**
+   * Open what arrived, once, on the way in.
+   *
+   * Every route a message can take into this component — the server render,
+   * the older-messages page, the catch-up fetch, the realtime echo — ends in
+   * `messages`, so decrypting here covers all of them and every render site
+   * downstream keeps reading a plain `body`. The database still holds only
+   * the envelope; this plaintext never leaves the tab.
+   */
+  const messages = useMemo(() => {
+    if (isGroup || reader.loading) return storedMessages;
+    return storedMessages.map((m) => {
+      if (!isEncrypted(m.body)) return m;
+      const opened = openEnvelope(reader, {
+        body: m.body,
+        senderId: m.sender_id,
+        myId: currentUserId,
+        peerId: other.id,
+      });
+      return opened.state === "open"
+        ? { ...m, body: opened.text, _cipher: m.body ?? undefined, _enc: "open" as const }
+        : { ...m, _enc: "locked" as const };
+    });
+  }, [storedMessages, reader, isGroup, currentUserId, other.id]);
   const [reactions, setReactions] = useState<ReactionRow[]>(initialReactions);
   const [readers, setReaders] = useState<Reader[]>(initialReaders);
   const [text, setText] = useState("");
@@ -734,7 +782,11 @@ export function RealChatView({
             // race against the send RPC's return — replace it instead of
             // appending a duplicate.
             if (m.sender_id === currentUserId) {
-              const tempIdx = prev.findIndex((x) => x.id.startsWith("temp-") && x.kind === m.kind && x.body === m.body);
+              // An encrypted message's optimistic copy holds the plaintext,
+              // so compare against the envelope we actually sent.
+              const tempIdx = prev.findIndex(
+                (x) => x.id.startsWith("temp-") && x.kind === m.kind && (x.body === m.body || (!!x._cipher && x._cipher === m.body)),
+              );
               if (tempIdx !== -1) {
                 const copy = [...prev];
                 copy[tempIdx] = { ...m, post: null, _preview: prev[tempIdx]._preview, _localUrl: prev[tempIdx]._localUrl };
@@ -957,15 +1009,23 @@ export function RealChatView({
     const replyId = replyTo?.id ?? null;
     setReplyTo(null);
 
+    // Null when the other person has not set up encryption yet, or when
+    // this device is locked. Both are ordinary states; the thread says so
+    // rather than refusing to send.
+    const sealed = isGroup
+      ? null
+      : sealFor(reader, { plaintext: body, conversationId, myId: currentUserId, peerId: other.id });
+
     const tempId = `temp-${Date.now()}`;
     const optimistic: ChatMsg = {
       id: tempId, body, sender_id: currentUserId, kind: "text",
       post_id: null, reply_to_id: replyId, is_unsent: false, created_at: new Date().toISOString(),
+      ...(sealed ? { _cipher: sealed } : {}),
     };
     setMessages((p) => [...p, optimistic]);
 
     const { data, error } = await supabase.rpc("send_message", {
-      p_conversation_id: conversationId, p_body: body ?? undefined, p_kind: "text", p_post_id: undefined, p_reply_to_id: replyId ?? undefined,
+      p_conversation_id: conversationId, p_body: sealed ?? body ?? undefined, p_kind: "text", p_post_id: undefined, p_reply_to_id: replyId ?? undefined,
     });
     if (error || !data) {
       // Keep message visible but mark it failed
@@ -1007,7 +1067,9 @@ export function RealChatView({
     setMessages((p) => p.map((m) => (m.id === failed.id ? { ...m, _status: "pending" as const } : m)));
     const { data, error } = await supabase.rpc("send_message", {
       p_conversation_id: conversationId,
-      p_body: failed.body ?? undefined,
+      // The envelope we sealed the first time, so a retry does not quietly
+      // downgrade an encrypted message to plaintext.
+      p_body: failed._cipher ?? failed.body ?? undefined,
       p_kind: failed.kind,
       p_post_id: failed.post_id ?? undefined,
       p_shot_id: failed.shot_id ?? undefined,
@@ -1713,7 +1775,19 @@ export function RealChatView({
                       )}
 
                       {/* Bubble */}
-                      {m.is_unsent ? (
+                      {m._enc === "locked" ? (
+                        /* Encrypted, and this device cannot open it: signed in
+                           without unlocking, or the sender's keys changed. The
+                           words are not lost — another device that holds the key
+                           still reads them. */
+                        <div className={`relative flex min-w-[80px] items-center gap-1.5 rounded-2xl border border-border px-3.5 pt-2 pb-5 text-sm italic text-faint ${mine ? "rounded-br-md" : "rounded-bl-md"}`}>
+                          <Lock size={12} />
+                          This message is locked
+                          <span className="absolute bottom-1.5 right-2.5 text-[9px] font-medium leading-none text-faint/60">
+                            {timeLabel(m.created_at)}
+                          </span>
+                        </div>
+                      ) : m.is_unsent ? (
                         /* Unsent — time embedded inside at bottom-right */
                         <div className={`relative min-w-[80px] rounded-2xl border border-border px-3.5 pt-2 pb-5 text-sm italic text-faint ${mine ? "rounded-br-md" : "rounded-bl-md"}`}>
                           {mine ? "You unsent this message" : "This message was unsent"}
@@ -2096,6 +2170,19 @@ export function RealChatView({
 
       {/* Composer */}
       <div className="border-t border-border/60 bg-background px-3 py-2 pb-[calc(var(--sab)+8px)]">
+
+        {/* ── Why this thread is not encrypted ──
+            Said out loud rather than left to be assumed. Silence here would
+            let someone believe a plaintext thread was protected, which is
+            worse than not having encryption at all. */}
+        {!isGroup && !reader.loading && !canEncrypt(reader, other.id) && (
+          <p className="mb-2 flex items-center gap-1.5 px-1 text-[11px] leading-snug text-faint">
+            <Unlock size={11} className="shrink-0" />
+            {reader.me
+              ? `Not encrypted — ${other.name} hasn’t set up encryption yet.`
+              : "Not encrypted on this device. Unlock it in Settings to encrypt new messages."}
+          </p>
+        )}
 
         {/* ── GIF picker panel — slides in just above the input row ── */}
         {gifPickerOpen && !voiceMode && (
