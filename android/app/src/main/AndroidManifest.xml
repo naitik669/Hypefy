@@ -1,7 +1,23 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Backup is off on purpose.
+
+      Android Auto Backup copies app private storage to the user's Google
+      Drive. For a WebView shell that storage is the WebView's own: the
+      IndexedDB holding this device's encryption seed, and the localStorage
+      holding a refresh token for every saved account. Both would leave the
+      device silently, to a third party, and the encryption seed leaving the
+      device is the one thing the whole design exists to prevent.
+
+      Nothing else here is worth backing up: the account lives on the server
+      and signing in restores it. The cost of this line is that a user
+      restoring a new phone from backup signs in again and unlocks
+      encryption again, which is exactly what should happen.
+    -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
