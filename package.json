@@ -26,6 +26,9 @@
     "@capacitor/push-notifications": "^8.1.2",
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.3",
+    "@noble/ciphers": "^2.4.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
     "@phosphor-icons/react": "^2.1.10",
     "@sentry/nextjs": "^10.62.0",
     "@supabase/ssr": "^0.10.3",
@@ -56,4 +59,4 @@
     "typescript": "^5",
     "vitest": "^2.1.9"
   }
-} 
+}

@@ -2406,6 +2406,48 @@ export type Database = {
           },
         ]
       }
+      user_keys: {
+        Row: {
+          created_at: string
+          identity_pub: string
+          mk_wrapped_pw: string
+          mk_wrapped_rc: string
+          salt_pw: string
+          salt_rc: string
+          seed_wrapped: string
+          signing_pub: string
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          identity_pub: string
+          mk_wrapped_pw: string
+          mk_wrapped_rc: string
+          salt_pw: string
+          salt_rc: string
+          seed_wrapped: string
+          signing_pub: string
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          identity_pub?: string
+          mk_wrapped_pw?: string
+          mk_wrapped_rc?: string
+          salt_pw?: string
+          salt_rc?: string
+          seed_wrapped?: string
+          signing_pub?: string
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: []
+      }
       waitlist: {
         Row: {
           created_at: string
@@ -2694,6 +2736,18 @@ export type Database = {
         }[]
       }
       increment_post_view: { Args: { p_post_id: string }; Returns: undefined }
+      init_user_keys: {
+        Args: {
+          p_identity_pub: string
+          p_mk_wrapped_pw: string
+          p_mk_wrapped_rc: string
+          p_salt_pw: string
+          p_salt_rc: string
+          p_seed_wrapped: string
+          p_signing_pub: string
+        }
+        Returns: boolean
+      }
       is_admin: { Args: never; Returns: boolean }
       is_comment_image: { Args: { p_url: string }; Returns: boolean }
       is_conv_member: { Args: { conv: string }; Returns: boolean }
@@ -2717,6 +2771,14 @@ export type Database = {
       owns_product: {
         Args: { p_product: string; p_uid: string }
         Returns: boolean
+      }
+      public_keys: {
+        Args: { p_user_ids: string[] }
+        Returns: {
+          identity_pub: string
+          signing_pub: string
+          user_id: string
+        }[]
       }
       publish_due_scheduled_posts: { Args: never; Returns: number }
       purge_expired_messages: { Args: never; Returns: undefined }
@@ -2745,6 +2807,14 @@ export type Database = {
       reorder_folders: { Args: { p_ids: string[] }; Returns: undefined }
       report_message: {
         Args: { p_details?: string; p_message_id: string; p_reason: string }
+        Returns: undefined
+      }
+      rewrap_master_key: {
+        Args: { p_mk_wrapped_pw: string; p_salt_pw: string }
+        Returns: undefined
+      }
+      rewrap_recovery: {
+        Args: { p_mk_wrapped_rc: string; p_salt_rc: string }
         Returns: undefined
       }
       search_people: {
