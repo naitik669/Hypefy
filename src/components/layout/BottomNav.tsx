@@ -82,7 +82,7 @@ const LiveIcon = (p: { size?: number; className?: string }) => (
  * because it is the one option other people see the instant you let go.
  */
 const CREATE_SHORTCUTS: HoldAction[] = [
-  { icon: PostIcon, label: "Post", href: "/create?mode=post" },
+  { icon: PostIcon, label: "Post", href: "/create/post" },
   { icon: ShotIcon, label: "Shot", href: "/create?mode=shot" },
   { icon: ShowIcon, label: "Show", href: "/create?mode=show" },
   { icon: LiveIcon, label: "Live", href: "/create?mode=live", tone: "danger" },

@@ -32,9 +32,10 @@ import { BLANK_POSTER } from "@/lib/blank-poster";
 import { MAX_SHOT_MB } from "@/lib/video-poster";
 import { MAX_SHOT_SECS, type Trim } from "@/lib/shot-trim";
 
-export type CreateMode = "post" | "shot" | "show" | "live";
+export type CreateMode = "shot" | "show" | "live";
 
-const MODES: { id: CreateMode; label: string }[] = [
+/** Post is here to switch to, not to do: it leaves for the composer. */
+const MODES: { id: CreateMode | "post"; label: string }[] = [
   { id: "post", label: "Post" },
   { id: "shot", label: "Shot" },
   { id: "show", label: "Show" },
@@ -99,9 +100,8 @@ export function CreateScreen({
   const close = () => safeBack(router);
   useOverlayBackButton(true, close);
 
-  // Only Shot and Show want a viewfinder. Post is text and gallery, and Live
-  // has nothing to show yet — running the camera for either would light the
-  // indicator for no reason.
+  // Only Shot and Show want a viewfinder. Live has nothing to show yet, so
+  // running the camera for it would light the indicator for no reason.
   const wantsCamera = (mode === "shot" || mode === "show") && source === "camera";
   const wantsAudio = mode === "shot";
 
@@ -362,11 +362,9 @@ export function CreateScreen({
               <span className="text-[11px] font-medium">Add</span>
             </button>
 
-            {/* Shutter. For Post there is no capture — go straight to the
-                existing composer, which handles text and multi-image. For a
-                Shot or a Show it only appears once the camera has been asked
-                for; before that its place is taken by the ask. */}
-            {mode !== "post" && source === "pick" ? (
+            {/* Shutter. It only appears once the camera has been asked for;
+                before that its place is taken by the ask. */}
+            {source === "pick" ? (
               <button
                 type="button"
                 onClick={() => {
@@ -377,14 +375,6 @@ export function CreateScreen({
               >
                 <Camera size={18} />
                 {mode === "show" ? "Take one" : "Record"}
-              </button>
-            ) : mode === "post" ? (
-              <button
-                type="button"
-                onClick={() => router.push("/create/post")}
-                className="rounded-pill bg-accent px-7 py-3.5 text-sm font-bold text-accent-ink active:scale-95"
-              >
-                Write a post
               </button>
             ) : (
               <button
@@ -455,6 +445,10 @@ export function CreateScreen({
               type="button"
               onClick={() => {
                 haptics.select();
+                if (m.id === "post") {
+                  router.push("/create/post");
+                  return;
+                }
                 setSource("pick");
                 setMode(m.id);
                 if (m.id !== "show") filters.close();
