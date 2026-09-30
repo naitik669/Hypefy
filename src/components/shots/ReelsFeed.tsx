@@ -1171,14 +1171,6 @@ function ReelCard({
           <CommentIcon size={31} className="text-white" />
         </RailButton>
 
-        <RailButton
-          label={rehypeCount > 0 ? formatCount(rehypeCount) : rehyped ? "Rehyped" : "Rehype"}
-          onClick={toggleRehype}
-          disabled={rehypePending}
-        >
-          <RehypeIcon size={31} active={rehyped} pulse={rehypePulse} className={rehyped ? "" : "text-white"} />
-        </RailButton>
-
         {/* Hold to send it straight to the people you share with most. */}
         <ShareButton
           postId={reel.id}
@@ -1189,6 +1181,14 @@ function ReelCard({
           <ShareIcon size={29} weight="bold" className="text-white" />
           <span className="text-xs font-semibold tabular-nums text-white drop-shadow">Share</span>
         </ShareButton>
+
+        <RailButton
+          label={rehypeCount > 0 ? formatCount(rehypeCount) : rehyped ? "Rehyped" : "Rehype"}
+          onClick={toggleRehype}
+          disabled={rehypePending}
+        >
+          <RehypeIcon size={31} active={rehyped} pulse={rehypePulse} className={rehyped ? "" : "text-white"} />
+        </RailButton>
 
         <button
           type="button"

@@ -890,7 +890,22 @@ export function FeedCard({
             {formatCount(commentCount)}
           </button>
 
-          {/* Rehype: reshare to your followers. Tap again to take it back. */}
+          {/* Tap opens the share sheet; hold sends straight to the people
+              you share with most. */}
+          <ShareButton
+            postId={post.id}
+            onOpenSheet={() => setShareOpen(true)}
+            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 active:scale-90"
+          >
+            <ShareIcon size={21} weight="bold" />
+            {((post as any).share_count ?? 0) > 0 &&
+              formatCount((post as any).share_count)}
+          </ShareButton>
+        </div>
+
+        <div className="flex items-center gap-5">
+          {/* Rehype sits with Save: both are about keeping or passing on the
+            post, where Hype, Comment and Share are about reacting to it. */}
           <button
             type="button"
             onClick={toggleRehype}
@@ -905,38 +920,26 @@ export function FeedCard({
             {rehypeCount > 0 && formatCount(rehypeCount)}
           </button>
 
-          {/* Tap opens the share sheet; hold sends straight to the people
-              you share with most. */}
-          <ShareButton
-            postId={post.id}
-            onOpenSheet={() => setShareOpen(true)}
-            className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 active:scale-90"
+          <button
+            type="button"
+            ref={saveButton}
+            {...saveMenus.handlers}
+            aria-label={saved ? "Saved. Tap for folders, hold to file" : "Save"}
+            aria-haspopup="menu"
+            className="text-foreground transition-transform duration-150 active:scale-90"
+            // A press that starts here is a tap or a hold-and-slide, never a scroll.
+            style={{ touchAction: "none", WebkitTouchCallout: "none" }}
           >
-            <ShareIcon size={21} weight="bold" />
-            {((post as any).share_count ?? 0) > 0 &&
-              formatCount((post as any).share_count)}
-          </ShareButton>
+            <Bookmark
+              size={21}
+              strokeWidth={2.2}
+              className={`${
+                saveBurst ? "animate-hype-burst" : ""
+              } transition-colors ${saved ? "text-accent" : ""}`}
+              fill={saved ? "currentColor" : "none"}
+            />
+          </button>
         </div>
-
-        <button
-          type="button"
-          ref={saveButton}
-          {...saveMenus.handlers}
-          aria-label={saved ? "Saved. Tap for folders, hold to file" : "Save"}
-          aria-haspopup="menu"
-          className="text-foreground transition-transform duration-150 active:scale-90"
-          // A press that starts here is a tap or a hold-and-slide, never a scroll.
-          style={{ touchAction: "none", WebkitTouchCallout: "none" }}
-        >
-          <Bookmark
-            size={21}
-            strokeWidth={2.2}
-            className={`${
-              saveBurst ? "animate-hype-burst" : ""
-            } transition-colors ${saved ? "text-accent" : ""}`}
-            fill={saved ? "currentColor" : "none"}
-          />
-        </button>
       </div>
 
       {/* Who, of the people you follow, hyped this. The count above stays
