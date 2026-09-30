@@ -6,7 +6,8 @@ import { DECK_SEATS, fetchDeck, fetchRoute, routeStops, seatDeck, setRehype, typ
 import type { RehypeDeckHandle } from "@/components/feed/RehypeDeck";
 
 /**
- * The rehype deck: three faces at most, you in the oldest seat once you
+ * The rehype deck: three faces at most, ranked by how much you interact with
+ * each person (in the database), you in the lowest-ranked seat once you
  * rehype, and a relay route behind a tap. The seating rule is the part most
  * likely to drift — it decides whether a rehype moves one face or all of them.
  */
@@ -28,7 +29,7 @@ describe("seatDeck — who sits where", () => {
     expect(ids(seatDeck([A, B, C, D], null, false))).toBe("a,b,c");
   });
 
-  it("gives your seat to you in place of the oldest on show — only that seat changes", () => {
+  it("gives you the lowest-ranked seat on show — only that seat changes", () => {
     const before = seatDeck([A, B, C], ME, false);
     const after = seatDeck([A, B, C], ME, true);
     expect(ids(before)).toBe("a,b,c");
@@ -78,6 +79,18 @@ describe("fetching", () => {
     { user_id: "me", display_name: "Me", username: "me", avatar_url: null, avatar_hue: 10, is_me: true },
     { user_id: "a", display_name: null, username: "aman", avatar_url: "x.png", avatar_hue: null, is_me: false },
   ];
+
+  it("puts the others in rank order, whatever order the rows arrive in", async () => {
+    const unordered = [
+      { user_id: "c", display_name: "C", username: "c", avatar_url: null, avatar_hue: 1, is_me: false, rank: 3 },
+      { user_id: "a", display_name: "A", username: "a", avatar_url: null, avatar_hue: 1, is_me: false, rank: 1 },
+      { user_id: "me", display_name: "Me", username: "me", avatar_url: null, avatar_hue: 1, is_me: true, rank: 0 },
+      { user_id: "b", display_name: "B", username: "b", avatar_url: null, avatar_hue: 1, is_me: false, rank: 2 },
+    ];
+    const deck = await fetchDeck({ rpc: async () => ({ data: unordered, error: null }) }, "post", "p1");
+    expect(deck.others.map((o) => o.userId)).toEqual(["a", "b", "c"]);
+    expect(deck.me?.userId).toBe("me");
+  });
 
   it("splits you from the others, and falls back sensibly on missing fields", async () => {
     const db = { rpc: async () => ({ data: rows, error: null }) };
@@ -145,6 +158,8 @@ describe("setRehype records who it came from", () => {
 
 // ── the component ─────────────────────────────────────────────────────────
 
+type RouteLoader = (tapped: DeckPerson) => Promise<{ people: DeckPerson[]; endsAtYou: boolean }>;
+
 let root: Root;
 let host: HTMLDivElement;
 
@@ -161,7 +176,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-async function renderDeck(seated: DeckPerson[], loadRoute = vi.fn(async () => ({ people: [A, B], endsAtYou: true }))) {
+async function renderDeck(
+  seated: DeckPerson[],
+  loadRoute = vi.fn<RouteLoader>(async () => ({ people: [A, B], endsAtYou: true })),
+) {
   const { RehypeDeck } = await import("@/components/feed/RehypeDeck");
   const ref = createRef<RehypeDeckHandle>();
   const draw = (s: DeckPerson[]) =>
@@ -183,6 +201,13 @@ describe("RehypeDeck", () => {
     expect(faces()).toHaveLength(3);
     expect(host.querySelector('[role="group"]')?.getAttribute("aria-label")).toBe("Rehyped by A, B, you");
     expect(faces()[2].getAttribute("aria-label")).toMatch(/^You rehyped this/);
+  });
+
+  it("asks for the route to the face that was tapped, not a guess", async () => {
+    const { loadRoute } = await renderDeck([B, A]);
+    await act(async () => faces()[1].click());
+    expect(loadRoute).toHaveBeenCalledTimes(1);
+    expect(loadRoute.mock.calls[0][0].userId).toBe("a");
   });
 
   it("opens the route on a tap: loads it, then spells out the chain from the author to you", async () => {
@@ -211,7 +236,7 @@ describe("RehypeDeck", () => {
   });
 
   it("does nothing with an empty route, and stays usable", async () => {
-    const empty = vi.fn(async () => ({ people: [] as DeckPerson[], endsAtYou: true }));
+    const empty = vi.fn<RouteLoader>(async () => ({ people: [], endsAtYou: true }));
     await renderDeck([A], empty);
     await act(async () => faces()[0].click());
     await act(async () => { vi.advanceTimersByTime(300); });

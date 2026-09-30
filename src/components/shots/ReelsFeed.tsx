@@ -93,6 +93,8 @@ export type Reel = {
   profiles: ReelProfile;
   /** Set when a Shot reached the feed because someone you follow rehyped it. */
   _rehypedBy?: string | null;
+  /** …and who, by id — recorded as the link when you rehype it. */
+  _rehypedById?: string | null;
 };
 
 /**
@@ -766,7 +768,7 @@ function ReelCard({
     if (prev) haptics.tap();
     else haptics.success();
 
-    const res = await setRehype(supabase as never, currentUserId, "shot", reel.id, !prev);
+    const res = await setRehype(supabase as never, currentUserId, "shot", reel.id, !prev, prev ? null : (reel._rehypedById ?? null));
     setRehypePending(false);
     if (res.ok) {
       setRehyped(res.rehyped);

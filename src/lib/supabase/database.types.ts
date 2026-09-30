@@ -2826,6 +2826,7 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: {
           rehyped_at: string
+          rehyper_id: string
           rehyper_name: string | null
           shot: Json
         }[]
@@ -2838,10 +2839,15 @@ export type Database = {
           avatar_url: string | null
           display_name: string | null
           is_me: boolean
+          rank: number
           rehyped_at: string
           user_id: string
           username: string | null
         }[]
+      }
+      relationship_strength: {
+        Args: { p_lookback_days?: number; p_user_ids: string[] }
+        Returns: { strength: number; user_id: string }[]
       }
       rehype_route: {
         Args: { p_from: string; p_kind: string; p_target: string }

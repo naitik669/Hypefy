@@ -249,6 +249,7 @@ export default async function HomePage() {
         : post.profiles,
       created_at: r.created_at, // rank by repost time
       _repostedBy: reposter,
+      _repostedById: r.user_id as string,
     };
     // Repost wins over the plain copy so the header shows
     byId.set(
@@ -258,6 +259,7 @@ export default async function HomePage() {
             ...byId.get(post.id),
             created_at: r.created_at,
             _repostedBy: reposter,
+            _repostedById: r.user_id as string,
           }
         : normalised
     );

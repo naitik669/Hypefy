@@ -26,7 +26,7 @@ function shotScore(s: any, now: number, authorAff: Record<string, number>) {
  */
 const REHYPE_BOOST = 8;
 
-type RehypeRow = { rehyped_at: string; rehyper_name: string | null; shot: unknown };
+type RehypeRow = { rehyped_at: string; rehyper_id: string; rehyper_name: string | null; shot: unknown };
 
 /** A Shot as the feed ranks it: the row, plus how it got here. */
 type FeedShot = Record<string, unknown> & {
@@ -35,6 +35,7 @@ type FeedShot = Record<string, unknown> & {
   created_at: string;
   profiles: unknown;
   _rehypedBy?: string;
+  _rehypedById?: string;
   _rehypedAt?: string;
 };
 
@@ -77,6 +78,7 @@ export default async function ShotsPage() {
       // "" rather than null when the rehyper has no name, so the label still
       // shows and reads "Someone rehyped".
       _rehypedBy: r.rehyper_name ?? "",
+      _rehypedById: r.rehyper_id,
       _rehypedAt: r.rehyped_at,
     });
   }

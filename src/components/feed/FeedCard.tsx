@@ -85,6 +85,8 @@ export type FeedPost = {
   poll?: unknown;
   /** Display name of the followed user whose rehype surfaced this post. */
   _repostedBy?: string | null;
+  /** …and their id: the rehype this post actually reached you through. */
+  _repostedById?: string | null;
 };
 
 /** Deduplicate and merge single/multi image fields */
@@ -564,10 +566,10 @@ export function FeedCard({
     if (prev) haptics.tap();
     else haptics.success();
 
-    // The newest rehype by someone you follow is most likely how this reached
-    // you, so that is the link the relay route records. The database drops it
-    // if it turns out not to be a rehype of this post.
-    const via = prev ? null : (deckData.others[0]?.userId ?? null);
+    // Whose rehype put this post in front of you — known exactly when the feed
+    // surfaced it through one, and nothing otherwise. Never a guess: a route
+    // built on a guess would show a path the post did not take.
+    const via = prev ? null : (post._repostedById ?? null);
     const res = await setRehype(supabase as never, uid, "post", post.id, !prev, via);
     setRehypePending(false);
     if (res.ok) {
@@ -882,12 +884,11 @@ export function FeedCard({
             ref={deckRef}
             seated={seated}
             authorName={name}
-            loadRoute={async () => {
-              const mine = rehyped && deckData.me;
-              const from = mine ? uid : deckData.others[0]?.userId;
-              if (!from) return { people: [], endsAtYou: true };
-              const people = await fetchRoute(supabase as never, "post", post.id, from, uid);
-              return { people, endsAtYou: !mine };
+            loadRoute={async (tapped) => {
+              // The route to the face you tapped. It carries on to "you" only if
+              // that is the rehype this post actually reached you through.
+              const people = await fetchRoute(supabase as never, "post", post.id, tapped.userId, uid);
+              return { people, endsAtYou: !tapped.isMe && tapped.userId === post._repostedById };
             }}
           />
         </div>

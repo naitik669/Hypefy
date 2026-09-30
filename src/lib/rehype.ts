@@ -130,6 +130,7 @@ type PersonRow = {
   avatar_url: string | null;
   avatar_hue: number | null;
   is_me?: boolean;
+  rank?: number;
 };
 
 function toPerson(r: PersonRow, meId?: string): DeckPerson {
@@ -144,8 +145,13 @@ function toPerson(r: PersonRow, meId?: string): DeckPerson {
 }
 
 /**
- * Who is in the deck: your own rehype, if any, and the three most recent by
- * people you follow, newest first. Empty on any failure — no deck is shown.
+ * Who is in the deck: your own rehype, if any, and the three people whose
+ * rehypes rank highest for you, best first.
+ *
+ * The ranking is done in the database (rehype_deck, migration 0108): how much
+ * you and each person actually interact — hypes, comments, saves, rehypes and
+ * chats, both ways, decaying over 60 days — plus how fresh their rehype is and
+ * whether you follow them. Empty on any failure — no deck is shown.
  */
 export async function fetchDeck(
   db: Rpc,
@@ -159,7 +165,10 @@ export async function fetchDeck(
     const me = rows.find((r) => r.is_me);
     return {
       me: me ? toPerson(me) : null,
-      others: rows.filter((r) => !r.is_me).map((r) => toPerson(r)),
+      others: rows
+        .filter((r) => !r.is_me)
+        .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))
+        .map((r) => toPerson(r)),
     };
   } catch {
     return { others: [], me: null };
@@ -194,9 +203,9 @@ export async function fetchRoute(
 /**
  * Who sits where.
  *
- * Three seats, most recent rehypers first. Once you rehype, you take the
- * seat of the oldest one on show — only that seat changes, so nothing else in
- * the row moves. With room to spare you simply join the end.
+ * Three seats, best-ranked first. Once you rehype, you take the last seat —
+ * the one ranked lowest for you — so only that seat changes and nothing else
+ * in the row moves. With room to spare you simply join the end.
  */
 export function seatDeck(others: DeckPerson[], me: DeckPerson | null, rehyped: boolean): DeckPerson[] {
   const shown = others.slice(0, DECK_SEATS);

@@ -7,8 +7,8 @@ import { routeStops, type DeckPerson } from "@/lib/rehype";
 /**
  * The rehype deck: who passed this post on, sitting at the bottom of the photo.
  *
- * Three squircle faces at most — the people you follow who rehyped it, newest
- * first, and you in the oldest seat once you have. Each is tilted and set at
+ * Three squircle faces at most — the people whose rehypes rank highest for
+ * you (see fetchDeck), and you in the last seat once you have rehyped it. Each is tilted and set at
  * its own height, so the row reads as a loose wave rather than a shelf, and
  * each carries the rehype arrows so it can't be mistaken for a tag.
  *
@@ -62,8 +62,8 @@ export function RehypeDeck({
   ref?: Ref<RehypeDeckHandle>;
   /** Who sits in the deck, per seatDeck(). */
   seated: DeckPerson[];
-  /** The route to show on a tap, and whether it ends at "you" rather than a face. */
-  loadRoute: () => Promise<{ people: DeckPerson[]; endsAtYou: boolean }>;
+  /** The route to the face that was tapped, and whether it carries on to "you". */
+  loadRoute: (tapped: DeckPerson) => Promise<{ people: DeckPerson[]; endsAtYou: boolean }>;
   authorName: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -153,11 +153,11 @@ export function RehypeDeck({
     [closeRoute],
   );
 
-  async function onTap(e: React.MouseEvent) {
+  async function onTap(e: React.MouseEvent, tapped: DeckPerson) {
     e.stopPropagation();
     if (busy.current) return;
     busy.current = true;
-    const r = await loadRoute();
+    const r = await loadRoute(tapped);
     openRoute({ people: r.people, endsAtYou: r.endsAtYou, bigLast: false });
   }
 
@@ -206,7 +206,7 @@ export function RehypeDeck({
             <button
               key={f.person.userId === "__leaving" ? `leaving-${i}` : f.person.userId}
               type="button"
-              onClick={onTap}
+              onClick={(e) => void onTap(e, f.person)}
               aria-label={`${f.person.isMe ? "You" : f.person.name} rehyped this. Show how it reached you`}
               className="pointer-events-auto absolute"
               style={{
