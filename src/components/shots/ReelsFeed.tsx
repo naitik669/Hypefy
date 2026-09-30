@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2 } from "lucide-react";
+import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, Repeat2 } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
+import { RehypeIcon } from "@/components/ui/RehypeIcon";
+import { isRehyped, rehypedBy, setRehype } from "@/lib/rehype";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
@@ -87,7 +89,10 @@ export type Reel = {
   created_at: string;
   hype_count?: number;
   comment_count?: number;
+  repost_count?: number;
   profiles: ReelProfile;
+  /** Set when a Shot reached the feed because someone you follow rehyped it. */
+  _rehypedBy?: string | null;
 };
 
 /**
@@ -516,6 +521,9 @@ function ReelCard({
 
   const [saved, setSaved] = useState(false);
   const [savePending, setSavePending] = useState(false);
+  const [rehyped, setRehyped] = useState(false);
+  const [rehypeCount, setRehypeCount] = useState(reel.repost_count ?? 0);
+  const [rehypePending, setRehypePending] = useState(false);
   // Save: a tap saves and drops down the folders, a hold fans them out, and
   // the very first save explains the hold (see useSaveMenus).
   const saveButton = useRef<HTMLButtonElement>(null);
@@ -664,7 +672,7 @@ function ReelCard({
     let active = true;
     async function load() {
       if (!currentUserId) return;
-      const [mine, total, savedRow] = await Promise.all([
+      const [mine, total, savedRow, rehypedNow] = await Promise.all([
         supabase
           .from("hypes")
           .select("id")
@@ -674,7 +682,7 @@ function ReelCard({
           .maybeSingle(),
         supabase
           .from("shots")
-          .select("hype_count, comment_count, in_showcase")
+          .select("hype_count, comment_count, in_showcase, repost_count")
           .eq("id", reel.id)
           .maybeSingle(),
         supabase
@@ -683,6 +691,7 @@ function ReelCard({
           .eq("user_id", currentUserId)
           .eq("shot_id", reel.id)
           .maybeSingle(),
+        isRehyped(supabase as never, currentUserId, "shot", reel.id),
       ]);
       if (!active) return;
       setHyped(!!mine.data);
@@ -690,8 +699,10 @@ function ReelCard({
         setHypeCount(total.data.hype_count ?? 0);
         setCommentCount(total.data.comment_count ?? 0);
         setInShowcase(!!(total.data as any).in_showcase);
+        setRehypeCount((total.data as { repost_count?: number | null }).repost_count ?? 0);
       }
       setSaved(!!savedRow.data);
+      setRehyped(rehypedNow);
     }
     load();
     return () => {
@@ -736,6 +747,40 @@ function ReelCard({
     } finally {
       setHypePending(false);
     }
+  }
+
+  /** Reshare this Shot to your followers, or take it back. */
+  async function toggleRehype() {
+    if (rehypePending) return;
+    if (!currentUserId) {
+      showToast("Sign in to rehype");
+      return;
+    }
+    const prev = rehyped;
+    const prevCount = rehypeCount;
+    setRehypePending(true);
+    setRehyped(!prev);
+    setRehypeCount((c) => Math.max(0, c + (prev ? -1 : 1)));
+    if (prev) haptics.tap();
+    else haptics.success();
+
+    const res = await setRehype(supabase as never, currentUserId, "shot", reel.id, !prev);
+    setRehypePending(false);
+    if (res.ok) {
+      setRehyped(res.rehyped);
+      if (!prev) showToast("Rehyped to your followers", "success");
+      return;
+    }
+    setRehyped(prev);
+    setRehypeCount(prevCount);
+    showToast(
+      res.reason === "not-allowed"
+        ? "Shots from private accounts can't be rehyped."
+        : prev
+          ? "Couldn't undo that. Try again."
+          : "Couldn't rehype. Try again.",
+      "error",
+    );
   }
 
   /** Save or unsave for real; resolves whether it worked. */
@@ -1124,6 +1169,14 @@ function ReelCard({
           <CommentIcon size={31} className="text-white" />
         </RailButton>
 
+        <RailButton
+          label={rehypeCount > 0 ? formatCount(rehypeCount) : rehyped ? "Rehyped" : "Rehype"}
+          onClick={toggleRehype}
+          disabled={rehypePending}
+        >
+          <RehypeIcon size={31} active={rehyped} className={rehyped ? "" : "text-white"} />
+        </RailButton>
+
         {/* Hold to send it straight to the people you share with most. */}
         <ShareButton
           postId={reel.id}
@@ -1176,6 +1229,12 @@ function ReelCard({
         className="absolute inset-x-0 bottom-0 z-20 flex flex-col gap-2 p-4 pr-16"
         hidden={commentsOpen}
       >
+        {reel._rehypedBy !== undefined && reel._rehypedBy !== null && (
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-white/85 drop-shadow">
+            <Repeat2 size={14} className="text-accent" />
+            {rehypedBy(reel._rehypedBy)}
+          </span>
+        )}
         <Link
           href={handle ? `/u/${handle}` : "#"}
           className="flex items-center gap-2.5"

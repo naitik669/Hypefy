@@ -2024,6 +2024,42 @@ export type Database = {
           },
         ]
       }
+      shot_reposts: {
+        Row: {
+          created_at: string
+          id: string
+          shot_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          shot_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          shot_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shot_reposts_shot_id_fkey"
+            columns: ["shot_id"]
+            isOneToOne: false
+            referencedRelation: "shots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shot_reposts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shots: {
         Row: {
           caption: string | null
@@ -2040,6 +2076,7 @@ export type Database = {
           removal_reason: string | null
           removed_at: string | null
           removed_by: string | null
+          repost_count: number
           save_count: number
           share_count: number
           track: Json | null
@@ -2062,6 +2099,7 @@ export type Database = {
           removal_reason?: string | null
           removed_at?: string | null
           removed_by?: string | null
+          repost_count?: number
           save_count?: number
           share_count?: number
           track?: Json | null
@@ -2084,6 +2122,7 @@ export type Database = {
           removal_reason?: string | null
           removed_at?: string | null
           removed_by?: string | null
+          repost_count?: number
           save_count?: number
           share_count?: number
           track?: Json | null
@@ -2777,6 +2816,15 @@ export type Database = {
         Args: { p_product: string; p_uid: string }
         Returns: boolean
       }
+      followed_shot_rehypes: {
+        Args: { p_limit?: number }
+        Returns: {
+          rehyped_at: string
+          rehyper_name: string | null
+          shot: Json
+        }[]
+      }
+      can_see_activity_of: { Args: { p_user: string }; Returns: boolean }
       public_keys: {
         Args: { p_user_ids: string[] }
         Returns: {

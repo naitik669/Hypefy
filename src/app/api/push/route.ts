@@ -39,7 +39,7 @@ function pushCopy(type: string, actor: string, body: string | null) {
     case type.startsWith("hype_"):
       return { title: `⭐ ${actor}`, body: body ?? "hyped your post" };
     case type === "repost":
-      return { title: `↻ ${actor}`, body: "reposted your post" };
+      return { title: `↻ ${actor}`, body: body ?? "rehyped your post" };
     case type.startsWith("comment_"):
       return { title: `💬 ${actor}`, body: body ?? "commented on your post" };
     case type === "follow":

@@ -103,9 +103,12 @@ describe("Send to", () => {
 
   it("offers everything else until someone is picked", () => {
     const text = footer().textContent ?? "";
-    for (const label of ["Copy link", "Repost", "Add to Show", "WhatsApp", "More"]) {
+    for (const label of ["Copy link", "Add to Show", "WhatsApp", "More"]) {
       expect(text).toContain(label);
     }
+    // Rehype has its own button beside Share now; a second one in here
+    // would be two ways to do the same thing, one of them hidden.
+    expect(text).not.toContain("Repost");
     expect(footer().querySelector('[aria-label^="Send to"]')).toBeNull();
   });
 

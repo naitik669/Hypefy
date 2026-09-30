@@ -1,22 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Grid3x3, Zap, Bookmark, Play } from "lucide-react";
+import { Grid3x3, Zap, Play, Repeat2 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyScene, SceneLine, ctaClass } from "@/components/empty/EmptyScene";
-import { ClapperArt, FrameArt, LockerArt } from "@/components/empty/scenes";
+import { ClapperArt, FrameArt } from "@/components/empty/scenes";
 import { RichPostText } from "@/components/ui/RichPostText";
-import { FoldersStrip } from "@/components/saved/FoldersStrip";
+import { RehypesGrid } from "@/components/profile/RehypesGrid";
 import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 
-type Tab = "Posts" | "Shots" | "Saved";
+/** Saved is not a tab: it has its own page, behind the bookmark at the top of
+ *  the profile, which paginates where the tab stopped at 30. */
+type Tab = "Posts" | "Shots" | "Rehypes";
 
 const tabs: { key: Tab; Icon: typeof Grid3x3 }[] = [
   { key: "Posts", Icon: Grid3x3 },
   { key: "Shots", Icon: Zap },
-  { key: "Saved", Icon: Bookmark },
+  { key: "Rehypes", Icon: Repeat2 },
 ];
 
 type PostRow = {
@@ -42,8 +44,6 @@ export function ProfileTabs({ userId }: { userId: string }) {
   const [postsHasMore, setPostsHasMore] = useState(true);
   const [shots, setShots] = useState<ShotRow[] | null>(null);
   const [shotsHasMore, setShotsHasMore] = useState(true);
-  const [saved, setSaved] = useState<PostRow[] | null>(null);
-  const [savedShots, setSavedShots] = useState<ShotRow[] | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const postsSentinel = useRef<HTMLDivElement>(null);
   const shotsSentinel = useRef<HTMLDivElement>(null);
@@ -52,7 +52,6 @@ export function ProfileTabs({ userId }: { userId: string }) {
   useEffect(() => {
     if (tab === "Posts" && posts === null) loadPosts();
     if (tab === "Shots" && shots === null) loadShots();
-    if (tab === "Saved" && saved === null) loadSaved();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -148,43 +147,6 @@ export function ProfileTabs({ userId }: { userId: string }) {
     setShots((prev) => [...(prev ?? []), ...(data ?? [])]);
     setShotsHasMore((data ?? []).length === PAGE);
     setLoadingMore(false);
-  }
-
-  async function loadSaved() {
-    const [postsRes, shotsRes] = await Promise.all([
-      supabase
-        .from("saved_posts")
-        .select(
-          "post_id, created_at, posts(id, image_url, image_urls, caption, created_at, aspect_ratio)"
-        )
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(PAGE),
-      supabase
-        .from("saved_shots")
-        .select(
-          "shot_id, created_at, shots(id, media_url, caption, created_at)"
-        )
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(PAGE),
-    ]);
-    const postRows = (postsRes.data ?? []).flatMap(
-      (row: { posts: PostRow | PostRow[] | null }) => {
-        const p = row.posts;
-        if (!p) return [];
-        return Array.isArray(p) ? p : [p];
-      }
-    );
-    setSaved(postRows);
-    const shotRows = (shotsRes.data ?? []).flatMap(
-      (row: { shots: ShotRow | ShotRow[] | null }) => {
-        const s = row.shots;
-        if (!s) return [];
-        return Array.isArray(s) ? s : [s];
-      }
-    );
-    setSavedShots(shotRows);
   }
 
   return (
@@ -293,52 +255,8 @@ export function ProfileTabs({ userId }: { userId: string }) {
             </div>
           ))}
 
-        {/* Saved — posts + shots */}
-        {tab === "Saved" &&
-          (saved === null || savedShots === null ? (
-            <GridSkeleton />
-          ) : saved.length === 0 && savedShots.length === 0 ? (
-            <EmptyScene
-              art={<LockerArt />}
-              title="Locker's empty"
-              text="Tap the bookmark on any post to stash it."
-              timing={{ head: 1.1, sub: 1.45, cta: 1.8 }}
-              cta={
-                <Link href="/discover" className={ctaClass}>
-                  Find something to save
-                </Link>
-              }
-            />
-          ) : (
-            <>
-              <FoldersStrip userId={userId} />
-              <div className={GRID_WRAP}>
-                <div className={GRID}>
-                  {saved.map((p) => (
-                    <PostThumb key={`p-${p.id}`} post={p} />
-                  ))}
-                  {savedShots.map((s) => (
-                    <Link
-                      key={`s-${s.id}`}
-                      href={`/shots/${s.id}`}
-                      className="relative block h-full overflow-hidden rounded-xl bg-surface"
-                    >
-                      <video poster={BLANK_POSTER}
-                        src={s.media_url}
-                        className="h-full w-full object-cover"
-                        muted
-                        playsInline
-                        preload="metadata"
-                      />
-                      <span className="absolute right-1.5 top-1.5 text-white drop-shadow">
-                        <Play size={14} className="fill-white" />
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </>
-          ))}
+        {/* Rehypes — what they passed on, posts and Shots together */}
+        {tab === "Rehypes" && <RehypesGrid userId={userId} isOwn />}
       </div>
     </div>
   );

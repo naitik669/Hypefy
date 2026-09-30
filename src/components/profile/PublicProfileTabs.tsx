@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Grid3x3, Zap, Bookmark, Copy } from "lucide-react";
+import { Grid3x3, Zap, Copy, Repeat2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { type FeedPost } from "@/components/feed/FeedCard";
@@ -12,13 +12,13 @@ import {
   ConeArt,
   CurtainsArt,
   FrameArt,
-  LockerArt,
 } from "@/components/empty/scenes";
+import { RehypesGrid } from "@/components/profile/RehypesGrid";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 
-type Tab = "Posts" | "Shots" | "Saved";
+type Tab = "Posts" | "Shots" | "Rehypes";
 
 /** Someone else's empty profile gets one of three scenes, always the same one
  *  for the same person, so it reads as theirs rather than random. */
@@ -62,11 +62,12 @@ export function PublicProfileTabs({
   initialFollowing?: boolean;
   initialRequested?: boolean;
 }) {
-  const tabs: Tab[] = isOwn ? ["Posts", "Shots", "Saved"] : ["Posts", "Shots"];
+  // Rehypes are public, like a reshare anywhere else; the database still
+  // hides a private account's from people who do not follow it.
+  const tabs: Tab[] = ["Posts", "Shots", "Rehypes"];
   const [tab, setTab] = useState<Tab>("Posts");
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [shots, setShots] = useState<any[]>([]);
-  const [saved, setSaved] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
 
@@ -91,34 +92,20 @@ export function PublicProfileTabs({
           .order("created_at", { ascending: false })
           .limit(30);
         setShots(data ?? []);
-      } else if (tab === "Saved" && isOwn) {
-        const { data } = await supabase
-          .from("saved_posts")
-          .select(
-            "posts(*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration))"
-          )
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(30);
-        const flat = (data ?? [])
-          .map((r: any) => r.posts)
-          .filter(Boolean)
-          .map((p: any) => ({ ...normPost(p), initialSaved: true }));
-        setSaved(flat);
       }
       setLoading(false);
     }
     load();
   }, [tab, userId, isOwn, supabase]);
 
-  const activePosts = tab === "Posts" ? posts : tab === "Saved" ? saved : [];
+  const activePosts = tab === "Posts" ? posts : [];
 
   return (
     <div className="mt-2">
       {/* Tab bar — thin hairline dividers, blends with the page background */}
       <div className="sticky top-14 z-10 flex border-y border-border chrome-bar">
         {tabs.map((t) => {
-          const Icon = t === "Posts" ? Grid3x3 : t === "Shots" ? Zap : Bookmark;
+          const Icon = t === "Posts" ? Grid3x3 : t === "Shots" ? Zap : Repeat2;
           return (
             <button
               key={t}
@@ -151,21 +138,11 @@ export function PublicProfileTabs({
               ))}
             </div>
           </div>
-        ) : tab === "Posts" || (tab === "Saved" && isOwn) ? (
+        ) : tab === "Rehypes" ? (
+          <RehypesGrid userId={userId} isOwn={isOwn} name={name} />
+        ) : tab === "Posts" ? (
           activePosts.length === 0 ? (
-            tab === "Saved" ? (
-              <EmptyScene
-                art={<LockerArt />}
-                title="Locker's empty"
-                text="Tap the bookmark on any post to stash it."
-                timing={{ head: 1.1, sub: 1.45, cta: 1.8 }}
-                cta={
-                  <Link href="/discover" className={ctaClass}>
-                    Find something to save
-                  </Link>
-                }
-              />
-            ) : isOwn ? (
+            isOwn ? (
               <EmptyScene
                 art={<FrameArt />}
                 title="Blank wall"

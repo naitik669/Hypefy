@@ -136,7 +136,7 @@ export default async function HomePage() {
           .order("created_at", { ascending: false })
           .limit(50)
       : Promise.resolve({ data: [] as any[] }),
-    // Recent reposts by people I follow: their reposted posts join the feed
+    // Recent rehypes by people I follow: the posts they rehyped join the feed
     followingIds.size > 0
       ? supabase
           .from("reposts")
@@ -229,8 +229,8 @@ export default async function HomePage() {
     if (!byId.has(p.id)) byId.set(p.id, p);
   }
 
-  // Blend in reposted posts: use the REPOST time for recency so they resurface,
-  // and tag with who reposted for the FeedCard header.
+  // Blend in rehyped posts: use the rehype time for recency so they resurface,
+  // and tag with who rehyped for the FeedCard header.
   for (const r of (followedReposts ?? []) as any[]) {
     const post = Array.isArray(r.posts) ? r.posts[0] : r.posts;
     if (!post) continue;
@@ -238,8 +238,10 @@ export default async function HomePage() {
     const reposterProfile = Array.isArray(r.profiles)
       ? r.profiles[0]
       : r.profiles;
+    // "" rather than null for a nameless account, so the card still says
+    // "Someone rehyped" instead of silently dropping the label.
     const reposter =
-      reposterProfile?.display_name ?? reposterProfile?.username ?? null;
+      reposterProfile?.display_name ?? reposterProfile?.username ?? "";
     const normalised = {
       ...post,
       profiles: Array.isArray(post.profiles)

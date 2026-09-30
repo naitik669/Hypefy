@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, CircleFadingPlus, Link2, Loader2, Repeat2, Search, Share2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, CircleFadingPlus, Link2, Loader2, Search, Share2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { one } from "@/lib/supabase/typed";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -86,8 +86,6 @@ export function ShareSheet({
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [copied, setCopied] = useState(false);
-  const [reposted, setReposted] = useState(false);
-  const [reposting, setReposting] = useState(false);
   const [addingShow, setAddingShow] = useState(false);
   const [showAdded, setShowAdded] = useState(false);
   const [sendingDm, setSendingDm] = useState(false);
@@ -328,27 +326,6 @@ export function ShareSheet({
     void shareToShow();
   }
 
-  /** Real repost — inserts into reposts (trigger bumps count + notifies owner). */
-  async function repost() {
-    if (reposting || targetType !== "post") return;
-    setReposting(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { error } = await supabase.from("reposts").insert({ user_id: user.id, post_id: postId });
-      if (error?.code === "23505") {
-        await supabase.from("reposts").delete().eq("user_id", user.id).eq("post_id", postId);
-        setReposted(false);
-        return;
-      }
-      if (error) { showToast("Couldn't repost. Try again."); return; }
-      setReposted(true);
-      setTimeout(() => { setReposted(false); onClose(); }, 900);
-    } finally {
-      setReposting(false);
-    }
-  }
-
   async function sendToSelected() {
     if (sendingDm || sent.size === 0) return;
     setSendingDm(true);
@@ -489,11 +466,6 @@ export function ShareSheet({
       <Action label={copied ? "Copied" : "Copy link"} done={copied} onClick={() => void copyLink()}>
         {copied ? <Check size={19} /> : <Link2 size={19} />}
       </Action>
-      {targetType === "post" && (
-        <Action label={reposted ? "Reposted" : "Repost"} done={reposted} onClick={() => void repost()}>
-          {reposted ? <Check size={19} /> : <Repeat2 size={19} />}
-        </Action>
-      )}
       <Action
         label={showAdded ? "Added" : "Add to Show"}
         done={showAdded}

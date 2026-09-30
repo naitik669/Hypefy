@@ -38,6 +38,8 @@ import { TrackChip } from "@/components/music/TrackChip";
 import { MusicMuteButton } from "@/components/music/MusicMuteButton";
 import { parseTrack } from "@/lib/music";
 import { hypeResult } from "@/lib/supabase/typed";
+import { isRehyped, rehypedBy, setRehype } from "@/lib/rehype";
+import { RehypeIcon } from "@/components/ui/RehypeIcon";
 import { PollBlock, parsePoll } from "@/components/feed/PollBlock";
 import { useSaveMenus } from "@/components/saved/SaveMenus";
 import { CommentIcon } from "@/components/ui/CommentIcon";
@@ -73,11 +75,14 @@ export type FeedPost = {
   } | null;
   initialHyped?: boolean;
   initialSaved?: boolean;
+  /** Whether the viewer has rehyped this. Undefined means ask the database. */
+  initialRehyped?: boolean;
+  repost_count?: number | null;
   /** Attached song ({id,title,artist,artwork,preview} jsonb) — see src/lib/music. */
   track?: unknown;
   /** Poll ({options: string[]} jsonb) — see PollBlock. */
   poll?: unknown;
-  /** Display name of the followed user whose repost surfaced this post. */
+  /** Display name of the followed user whose rehype surfaced this post. */
   _repostedBy?: string | null;
 };
 
@@ -158,6 +163,9 @@ export function FeedCard({
   const [saveBurst, setSaveBurst] = useState(false);
 
   const [saved, setSaved] = useState(post.initialSaved ?? false);
+  const [rehyped, setRehyped] = useState(post.initialRehyped ?? false);
+  const [rehypeCount, setRehypeCount] = useState(post.repost_count ?? 0);
+  const [rehypePending, setRehypePending] = useState(false);
   const [savePending, setSavePending] = useState(false);
 
   const [imgIdx, setImgIdx] = useState(0);
@@ -434,7 +442,7 @@ export function FeedCard({
       if (!id) return;
 
       // Always re-fetch the authoritative hype count + comment count
-      const [hypeRow, savedRow, countRow] = await Promise.all([
+      const [hypeRow, savedRow, countRow, rehypedNow] = await Promise.all([
         post.initialHyped === undefined
           ? supabase
               .from("hypes")
@@ -454,17 +462,22 @@ export function FeedCard({
           : Promise.resolve({ data: post.initialSaved ? { id: "x" } : null }),
         supabase
           .from("posts")
-          .select("hype_count, comment_count")
+          .select("hype_count, comment_count, repost_count")
           .eq("id", post.id)
           .maybeSingle(),
+        post.initialRehyped === undefined
+          ? isRehyped(supabase as never, id, "post", post.id)
+          : Promise.resolve(post.initialRehyped),
       ]);
 
       if (!active) return;
       setHyped(!!hypeRow.data);
       setSaved(!!savedRow.data);
+      setRehyped(rehypedNow);
       if (countRow.data) {
         setHypeCount(countRow.data.hype_count ?? post.hype_count);
         setCommentCount(countRow.data.comment_count ?? post.comment_count);
+        setRehypeCount((countRow.data as { repost_count?: number | null }).repost_count ?? 0);
       }
     }
     sync();
@@ -520,6 +533,40 @@ export function FeedCard({
   const hue = profile?.avatar_hue ?? 280;
   const profileHref =
     post.user_id === uid ? "/profile" : username ? `/u/${username}` : "#";
+
+  /** Reshare to your followers, or take it back. Optimistic, rolled back on failure. */
+  async function toggleRehype() {
+    if (rehypePending) return;
+    if (!uid) {
+      showToast("Sign in to rehype");
+      return;
+    }
+    const prev = rehyped;
+    const prevCount = rehypeCount;
+    setRehypePending(true);
+    setRehyped(!prev);
+    setRehypeCount((c) => Math.max(0, c + (prev ? -1 : 1)));
+    if (prev) haptics.tap();
+    else haptics.success();
+
+    const res = await setRehype(supabase as never, uid, "post", post.id, !prev);
+    setRehypePending(false);
+    if (res.ok) {
+      setRehyped(res.rehyped);
+      if (!prev) showToast("Rehyped to your followers", "success");
+      return;
+    }
+    setRehyped(prev);
+    setRehypeCount(prevCount);
+    showToast(
+      res.reason === "not-allowed"
+        ? "Posts from private accounts can't be rehyped."
+        : prev
+          ? "Couldn't undo that. Try again."
+          : "Couldn't rehype. Try again.",
+      "error",
+    );
+  }
 
   async function toggleHype() {
     if (hypePending) return;
@@ -630,11 +677,11 @@ export function FeedCard({
       {post.user_id !== uid && (
         <FeedImpression postId={post.id} viewerId={uid} />
       )}
-      {/* Repost attribution */}
-      {post._repostedBy && (
+      {/* Who of the people you follow rehyped this into your feed. */}
+      {post._repostedBy !== undefined && post._repostedBy !== null && (
         <div className="flex items-center gap-1.5 px-4 pt-2.5 text-xs text-muted">
           <Repeat2 size={14} className="text-accent" />
-          <span className="font-semibold">{post._repostedBy}</span> reposted
+          <span className="font-semibold">{rehypedBy(post._repostedBy)}</span>
         </div>
       )}
       {/* Header */}
@@ -839,6 +886,21 @@ export function FeedCard({
           >
             <CommentIcon size={22} strokeWidth={2.2} />
             {formatCount(commentCount)}
+          </button>
+
+          {/* Rehype: reshare to your followers. Tap again to take it back. */}
+          <button
+            type="button"
+            onClick={toggleRehype}
+            disabled={rehypePending}
+            aria-pressed={rehyped}
+            aria-label={rehyped ? "Rehyped. Tap to undo" : "Rehype"}
+            className={`flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-transform duration-150 active:scale-90 disabled:opacity-70 ${
+              rehyped ? "text-accent" : "text-foreground"
+            }`}
+          >
+            <RehypeIcon size={23} active={rehyped} />
+            {rehypeCount > 0 && formatCount(rehypeCount)}
           </button>
 
           {/* Tap opens the share sheet; hold sends straight to the people
