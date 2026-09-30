@@ -39,7 +39,7 @@ import { MusicMuteButton } from "@/components/music/MusicMuteButton";
 import { parseTrack } from "@/lib/music";
 import { hypeResult } from "@/lib/supabase/typed";
 import { isRehyped, rehypedBy, setRehype } from "@/lib/rehype";
-import { RehypeIcon } from "@/components/ui/RehypeIcon";
+import { RehypeCount, RehypeIcon } from "@/components/ui/RehypeIcon";
 import { PollBlock, parsePoll } from "@/components/feed/PollBlock";
 import { useSaveMenus } from "@/components/saved/SaveMenus";
 import { CommentIcon } from "@/components/ui/CommentIcon";
@@ -917,7 +917,9 @@ export function FeedCard({
             }`}
           >
             <RehypeIcon size={23} active={rehyped} pulse={rehypePulse} />
-            {rehypeCount > 0 && formatCount(rehypeCount)}
+            {rehypeCount > 0 && (
+              <RehypeCount value={formatCount(rehypeCount)} pulse={rehypePulse} active={rehyped} />
+            )}
           </button>
 
           <button

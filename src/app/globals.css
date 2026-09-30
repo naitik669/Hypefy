@@ -304,50 +304,125 @@ html[data-dm-leave]::view-transition-old(root) {
   animation: hype-burst 0.35s ease-out;
 }
 
-/* Rehype. Passing something on turns the arrows half way round with a small
-   pop; taking it back turns them a little the other way, shrinking and dimming
-   as if pulled back in. The icon reads the same upside down, so the half turn
-   can end at 180deg and the reset to 0 afterwards is invisible. Transform and
-   opacity only. */
-@keyframes rehype-on {
+/* Rehype: the two arrows swap places.
+   Each arrow travels half way round the loop on its own — the left one up and
+   over, the right one down and under — landing where the other started. The
+   icon reads the same after a half turn, so the reset to 0 when the animation
+   ends is invisible.
+
+   Smoothness comes from three things: one gentle overshoot rather than a
+   bounce, a turn long enough to follow (0.65s), and a 40ms stagger so the
+   arrows move together with only a trace of lag. The whole icon swells a
+   little underneath. Undo is a short turn back, a slight shrink and a dim.
+   Transform and opacity only. */
+.rehype-icon g {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+}
+
+@keyframes rehype-spin {
   0% {
-    transform: rotate(0deg) scale(1);
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(180deg);
+  }
+}
+
+@keyframes rehype-swell {
+  0% {
+    transform: scale(1);
   }
   45% {
-    transform: rotate(140deg) scale(1.18);
+    transform: scale(1.08);
   }
   100% {
-    transform: rotate(180deg) scale(1);
+    transform: scale(1);
   }
 }
 
-@keyframes rehype-off {
+@keyframes rehype-back {
   0% {
-    transform: rotate(0deg) scale(1);
+    transform: rotate(0deg);
     opacity: 1;
   }
-  40% {
-    transform: rotate(-70deg) scale(0.86);
-    opacity: 0.55;
+  45% {
+    transform: rotate(-28deg);
+    opacity: 0.65;
   }
   100% {
-    transform: rotate(0deg) scale(1);
+    transform: rotate(0deg);
     opacity: 1;
   }
 }
 
-.animate-rehype-on {
-  animation: rehype-on 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+@keyframes rehype-shrink {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(0.93);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
-.animate-rehype-off {
-  animation: rehype-off 0.32s ease-out;
+.rehype-on .rehype-all {
+  animation: rehype-swell 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.rehype-on .rehype-a {
+  animation: rehype-spin 0.65s cubic-bezier(0.34, 1.28, 0.5, 1);
+}
+.rehype-on .rehype-b {
+  /* backwards, not both: hold the start during the 40ms wait, but let go at
+     the end. Holding the end would leave this arrow turned while the other
+     resets, drawing both on the same side of the loop until the next tap. */
+  animation: rehype-spin 0.65s 0.04s cubic-bezier(0.34, 1.28, 0.5, 1) backwards;
+}
+.rehype-off .rehype-all {
+  animation: rehype-shrink 0.45s cubic-bezier(0.45, 0, 0.25, 1);
+}
+.rehype-off .rehype-a,
+.rehype-off .rehype-b {
+  animation: rehype-back 0.45s cubic-bezier(0.45, 0, 0.25, 1);
+}
+
+/* The count rolls with it: up into place on a rehype, down on an undo. */
+@keyframes rehype-count-up {
+  0% {
+    transform: translateY(7px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes rehype-count-down {
+  0% {
+    transform: translateY(-7px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-rehype-count-up {
+  display: inline-block;
+  animation: rehype-count-up 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.animate-rehype-count-down {
+  display: inline-block;
+  animation: rehype-count-down 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-rehype-on,
-  .animate-rehype-off {
-    animation: none;
+  .rehype-icon g,
+  .animate-rehype-count-up,
+  .animate-rehype-count-down {
+    animation: none !important;
   }
 }
 
