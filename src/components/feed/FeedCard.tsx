@@ -166,6 +166,7 @@ export function FeedCard({
   const [rehyped, setRehyped] = useState(post.initialRehyped ?? false);
   const [rehypeCount, setRehypeCount] = useState(post.repost_count ?? 0);
   const [rehypePending, setRehypePending] = useState(false);
+  const [rehypePulse, setRehypePulse] = useState(0);
   const [savePending, setSavePending] = useState(false);
 
   const [imgIdx, setImgIdx] = useState(0);
@@ -545,6 +546,7 @@ export function FeedCard({
     const prevCount = rehypeCount;
     setRehypePending(true);
     setRehyped(!prev);
+    setRehypePulse((p) => p + 1);
     setRehypeCount((c) => Math.max(0, c + (prev ? -1 : 1)));
     if (prev) haptics.tap();
     else haptics.success();
@@ -899,7 +901,7 @@ export function FeedCard({
               rehyped ? "text-accent" : "text-foreground"
             }`}
           >
-            <RehypeIcon size={23} active={rehyped} />
+            <RehypeIcon size={23} active={rehyped} pulse={rehypePulse} />
             {rehypeCount > 0 && formatCount(rehypeCount)}
           </button>
 

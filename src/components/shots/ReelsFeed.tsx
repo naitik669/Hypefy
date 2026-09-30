@@ -524,6 +524,7 @@ function ReelCard({
   const [rehyped, setRehyped] = useState(false);
   const [rehypeCount, setRehypeCount] = useState(reel.repost_count ?? 0);
   const [rehypePending, setRehypePending] = useState(false);
+  const [rehypePulse, setRehypePulse] = useState(0);
   // Save: a tap saves and drops down the folders, a hold fans them out, and
   // the very first save explains the hold (see useSaveMenus).
   const saveButton = useRef<HTMLButtonElement>(null);
@@ -760,6 +761,7 @@ function ReelCard({
     const prevCount = rehypeCount;
     setRehypePending(true);
     setRehyped(!prev);
+    setRehypePulse((p) => p + 1);
     setRehypeCount((c) => Math.max(0, c + (prev ? -1 : 1)));
     if (prev) haptics.tap();
     else haptics.success();
@@ -1174,7 +1176,7 @@ function ReelCard({
           onClick={toggleRehype}
           disabled={rehypePending}
         >
-          <RehypeIcon size={31} active={rehyped} className={rehyped ? "" : "text-white"} />
+          <RehypeIcon size={31} active={rehyped} pulse={rehypePulse} className={rehyped ? "" : "text-white"} />
         </RailButton>
 
         {/* Hold to send it straight to the people you share with most. */}

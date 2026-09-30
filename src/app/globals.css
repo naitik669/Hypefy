@@ -304,6 +304,53 @@ html[data-dm-leave]::view-transition-old(root) {
   animation: hype-burst 0.35s ease-out;
 }
 
+/* Rehype. Passing something on turns the arrows half way round with a small
+   pop; taking it back turns them a little the other way, shrinking and dimming
+   as if pulled back in. The icon reads the same upside down, so the half turn
+   can end at 180deg and the reset to 0 afterwards is invisible. Transform and
+   opacity only. */
+@keyframes rehype-on {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  45% {
+    transform: rotate(140deg) scale(1.18);
+  }
+  100% {
+    transform: rotate(180deg) scale(1);
+  }
+}
+
+@keyframes rehype-off {
+  0% {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: rotate(-70deg) scale(0.86);
+    opacity: 0.55;
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-rehype-on {
+  animation: rehype-on 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-rehype-off {
+  animation: rehype-off 0.32s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rehype-on,
+  .animate-rehype-off {
+    animation: none;
+  }
+}
+
 /* Slow drifting glow for the landing background */
 @keyframes drift {
   0% {
