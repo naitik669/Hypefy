@@ -261,6 +261,31 @@ describe("RehypeDeck", () => {
     expect(faces().map((f) => f.getAttribute("aria-label")!.split(" ")[0])).toEqual(["A", "B", "You"]);
   });
 
+  it("keeps faces bare: no name tag on you, and one rehype mark for the whole row", async () => {
+    await renderDeck([A, B, ME]);
+    const group = host.querySelector('[role="group"]')!;
+    // Only the avatars' own initials — no "You" tag on top of yours.
+    expect(group.textContent).toBe("ABM");
+    expect(group.querySelectorAll("svg")).toHaveLength(1);
+    expect(faces()[0].querySelector("svg")).not.toBeNull();
+  });
+
+  it("rises in once, then only a face that joins later animates", async () => {
+    const { draw } = await renderDeck([A, B]);
+    const motion = () => faces().map((f) => (f.firstElementChild as HTMLElement).style.animation);
+    expect(motion().every((m) => m.startsWith("deck-rise"))).toBe(true);
+    // The entrances finish...
+    await act(async () => {
+      faces().forEach((f) => f.firstElementChild!.dispatchEvent(new Event("animationend", { bubbles: true })));
+    });
+    expect(motion()).toEqual(["", ""]);
+    // ...and when you join, you pop into your seat while the others stay still.
+    await draw([A, B, ME]);
+    const [a, b, me] = motion();
+    expect([a, b]).toEqual(["", ""]);
+    expect(me).toMatch(/^deck-pop-in /);
+  });
+
   it("swaps only your seat back on undo", async () => {
     const { ref, draw } = await renderDeck([A, B, ME]);
     await act(async () => ref.current!.undo());

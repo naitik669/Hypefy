@@ -388,27 +388,23 @@ html[data-dm-leave]::view-transition-old(root) {
   animation: rehype-back 0.45s cubic-bezier(0.45, 0, 0.25, 1);
 }
 
-/* The rehype deck: faces bubble up from below the photo, sway, and settle;
-   at rest they bob a little, each out of step. The relay route pops faces
-   onto their stops as the line reaches them, and pops them off again. See
-   RehypeDeck.tsx for the timing, which is driven from script. */
-@keyframes deck-bubble {
-  0% {
-    transform: translateY(90px) scale(0.45);
+/* The rehype deck: faces rise in once when the deck loads, a face that joins
+   later pops into its seat, and nothing moves at rest. The relay route fades
+   in as one layer, pops faces onto their stops as the line reaches them, and
+   fades out as one. See RehypeDeck.tsx for the timing, driven from script. */
+@keyframes deck-rise {
+  from {
+    transform: translateY(10px) scale(0.9);
     opacity: 0;
   }
-  40% {
+  to {
+    transform: none;
     opacity: 1;
   }
-  58% {
-    transform: translateY(-14px) translateX(3px) scale(1.06);
-  }
-  78% {
-    transform: translateY(3px) translateX(-2px);
-  }
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
+}
+@keyframes deck-fade-in {
+  from {
+    opacity: 0;
   }
 }
 @keyframes deck-pop-in {
@@ -450,15 +446,6 @@ html[data-dm-leave]::view-transition-old(root) {
   100% {
     transform: scale(0);
     opacity: 0;
-  }
-}
-@keyframes deck-bob {
-  0%,
-  100% {
-    translate: 0 0;
-  }
-  50% {
-    translate: 0 -4px;
   }
 }
 @keyframes deck-drain {

@@ -8,28 +8,33 @@ import { routeStops, type DeckPerson } from "@/lib/rehype";
  * The rehype deck: who passed this post on, sitting at the bottom of the photo.
  *
  * Three squircle faces at most — the people whose rehypes rank highest for
- * you (see fetchDeck), and you in the last seat once you have rehyped it. Each is tilted and set at
- * its own height, so the row reads as a loose wave rather than a shelf, and
- * each carries the rehype arrows so it can't be mistaken for a tag.
+ * you (see fetchDeck), and you in the last seat once you have rehyped it. Each
+ * is tilted and set at its own height, so the row reads as a loose wave rather
+ * than a shelf. One small rehype mark on the leading face says what the row
+ * is; the faces themselves are bare — no rings, no labels.
  *
- * A tap plays the relay route: the faces pop off the row and back on at their
- * stops along the path the post travelled — the author, each rehype it passed
- * through, then you — hold for a moment, and bubble back into the row.
+ * A tap plays the relay route: the row fades away, the line draws from the
+ * author through each rehype it passed through, the faces pop onto their
+ * stops, hold for a moment, and the whole layer fades back to the row.
+ *
+ * Motion is kept deliberately small: faces rise in once when the deck first
+ * loads, a face that joins later pops into its own seat, and nothing moves at
+ * rest. Faces already on show never re-animate.
  *
  * What is on screen (`shown`) is kept apart from what the parent says is true
  * (`seated`): a change that lands mid-animation — you rehyping, the data
  * arriving late — waits for the current motion to finish instead of making
- * faces jump. Only faces that are new to the row animate in.
+ * faces jump.
  */
 
 /** Face size, px. */
-const S = 38;
+const S = 36;
 /** Space between faces, px. */
-const GAP = 14;
+const GAP = 12;
 /** How far each seat is lifted off the bottom — the wave. */
-const RAISE = [0, 34, 12];
+const RAISE = [0, 26, 9];
 /** Each seat's tilt, degrees. */
-const TILT = [-8, 6, -4];
+const TILT = [-6, 5, -3];
 /** Tilt for route stops, in order. */
 const ROUTE_TILT = [-6, 5, -4, 4, -5, 6];
 /** How long the route stays once drawn. */
@@ -37,6 +42,9 @@ const HOLD_MS = 500;
 /** Time for the line to draw, and when it starts. */
 const DRAW_MS = 800;
 const DRAW_DELAY_MS = 120;
+/** The row fading out before the route appears, and the route fading away. */
+const ROW_FADE_MS = 190;
+const ROUTE_FADE_MS = 260;
 
 /** What the post calls when you rehype or undo, so the deck can show it. */
 export type RehypeDeckHandle = {
@@ -46,12 +54,16 @@ export type RehypeDeckHandle = {
   undo: () => void;
 };
 
-type Face = { person: DeckPerson; enter: boolean };
+/** `rise`: the deck's first appearance. `pop`: one face joining a row already on show. */
+type Face = { person: DeckPerson; enter: "rise" | "pop" | null };
 /** The photo's size is measured when the route opens, not during render. */
 type Route = { people: DeckPerson[]; endsAtYou: boolean; bigLast: boolean; w: number; h: number };
 
 const reducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+/** A soft shadow, so bare faces still separate from a busy photo. */
+const LIFT = "drop-shadow(0 3px 8px rgb(0 0 0 / 0.35))";
 
 export function RehypeDeck({
   ref,
@@ -68,7 +80,7 @@ export function RehypeDeck({
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState<Face[]>([]);
-  const [leaving, setLeaving] = useState(false);
+  const [rowHidden, setRowHidden] = useState(false);
   const [route, setRoute] = useState<Route | null>(null);
   const [routeLeaving, setRouteLeaving] = useState(false);
   const [drawn, setDrawn] = useState(false);
@@ -85,34 +97,33 @@ export function RehypeDeck({
   };
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
-  /** Bring the row in line with `seated`, animating only faces that are new to it. */
-  const sync = useCallback((all: boolean) => {
-    let entering = false;
+  /** Bring the row in line with `seated`; only faces new to it animate. */
+  const sync = useCallback(() => {
     setShown((prev) => {
-      const same =
-        !all &&
-        prev.length === latest.current.length &&
-        prev.every((f, i) => f.person.userId === latest.current[i].userId);
+      const want = latest.current;
+      const same = prev.length === want.length && prev.every((f, i) => f.person.userId === want[i].userId);
       // Nothing changed: keep the same array, so a parent re-render never
       // turns into a render loop here.
       if (same) return prev;
-      const had = new Set(prev.map((f) => f.person.userId));
-      const next = latest.current.map((person) => ({ person, enter: all || !had.has(person.userId) }));
-      entering = next.some((f) => f.enter);
-      return next;
+      const had = new Map(prev.map((f) => [f.person.userId, f]));
+      const first = prev.length === 0;
+      return want.map((person) => {
+        const old = had.get(person.userId);
+        // Faces already on show keep whatever they were doing, and never replay.
+        if (old) return { person, enter: old.enter };
+        return { person, enter: first ? "rise" : "pop" };
+      });
     });
-    // Once the entrance has played, let the faces settle into their idle bob.
-    timers.current.push(
-      setTimeout(() => {
-        if (entering) setShown((prev) => prev.map((f) => (f.enter ? { ...f, enter: false } : f)));
-      }, 1400),
-    );
   }, []);
 
   // Outside any motion, follow the parent — e.g. the deck's data arriving.
   useEffect(() => {
-    if (!busy.current) sync(false);
+    if (!busy.current) sync();
   }, [seated, sync]);
+
+  /** An entrance has played: drop the flag so a re-render can't replay it. */
+  const settled = (userId: string) =>
+    setShown((prev) => prev.map((f) => (f.person.userId === userId && f.enter ? { ...f, enter: null } : f)));
 
   const closeRoute = useCallback(() => {
     setDraining(false);
@@ -121,12 +132,12 @@ export function RehypeDeck({
       setRoute(null);
       setRouteLeaving(false);
       setDrawn(false);
-      setLeaving(false);
-      sync(true); // everyone bubbles back, in whatever seats are now true
+      setRowHidden(false);
+      sync(); // the row fades back; only a seat that changed pops
       later(() => {
         busy.current = false;
-      }, 1100);
-    }, reducedMotion() ? 0 : 330);
+      }, 400);
+    }, reducedMotion() ? 0 : ROUTE_FADE_MS);
   }, [sync]);
 
   const openRoute = useCallback(
@@ -139,7 +150,7 @@ export function RehypeDeck({
       busy.current = true;
       timers.current.forEach(clearTimeout);
       timers.current = [];
-      setLeaving(true);
+      setRowHidden(true);
       later(() => {
         setRoute(next);
         requestAnimationFrame(() => requestAnimationFrame(() => setDrawn(true)));
@@ -148,7 +159,7 @@ export function RehypeDeck({
           setDraining(true);
           later(closeRoute, HOLD_MS);
         }, shownAt);
-      }, reducedMotion() ? 0 : 190);
+      }, reducedMotion() ? 0 : ROW_FADE_MS);
     },
     [closeRoute],
   );
@@ -173,13 +184,13 @@ export function RehypeDeck({
         busy.current = true;
         // Your face leaves its seat; whoever you displaced comes back into it.
         setShown((prev) =>
-          prev.map((f) => (f.person.isMe ? { enter: false, person: { ...f.person, userId: "__leaving" } } : f)),
+          prev.map((f) => (f.person.isMe ? { enter: null, person: { ...f.person, userId: "__leaving" } } : f)),
         );
         later(() => {
-          sync(false);
+          sync();
           later(() => {
             busy.current = false;
-          }, 900);
+          }, 400);
         }, reducedMotion() ? 0 : 230);
       },
     }),
@@ -199,36 +210,36 @@ export function RehypeDeck({
       onTouchStart={(e) => e.stopPropagation()}
     >
       {/* The row */}
-      <div role="group" aria-label={`Rehyped by ${names.join(", ")}`}>
+      <div
+        role="group"
+        aria-label={`Rehyped by ${names.join(", ")}`}
+        className="transition-[opacity,transform] duration-200 ease-out"
+        style={{ opacity: rowHidden ? 0 : 1, transform: rowHidden ? "translateY(6px)" : undefined }}
+      >
         {shown.map((f, i) => {
-          const goingOut = leaving || f.person.userId === "__leaving";
+          const goingOut = f.person.userId === "__leaving";
+          const animation = goingOut
+            ? "deck-pop-out 0.2s ease-in forwards"
+            : f.enter === "rise"
+              ? `deck-rise 0.42s ${i * 70}ms cubic-bezier(0.2, 0.8, 0.2, 1) both`
+              : f.enter === "pop"
+                ? "deck-pop-in 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both"
+                : undefined;
           return (
             <button
-              key={f.person.userId === "__leaving" ? `leaving-${i}` : f.person.userId}
+              key={goingOut ? `leaving-${i}` : f.person.userId}
               type="button"
               onClick={(e) => void onTap(e, f.person)}
               aria-label={`${f.person.isMe ? "You" : f.person.name} rehyped this. Show how it reached you`}
-              className="pointer-events-auto absolute"
-              style={{
-                left: 12 + i * (S + GAP),
-                bottom: 14 + (RAISE[i] ?? 0),
-                width: S,
-                height: S,
-                visibility: route ? "hidden" : undefined,
-                animation: goingOut || f.enter ? undefined : `deck-bob 3.4s ${i * 0.45}s ease-in-out infinite`,
-              }}
+              className={`absolute ${rowHidden ? "" : "pointer-events-auto"}`}
+              style={{ left: 12 + i * (S + GAP), bottom: 14 + (RAISE[i] ?? 0), width: S, height: S }}
             >
               <span
                 className="block h-full w-full"
-                style={{
-                  animation: goingOut
-                    ? "deck-pop-out 0.2s ease-in forwards"
-                    : f.enter
-                      ? `deck-bubble 0.9s ${i * 0.15}s cubic-bezier(0.3, 0.9, 0.4, 1) both`
-                      : undefined,
-                }}
+                style={{ animation }}
+                onAnimationEnd={() => f.enter && settled(f.person.userId)}
               >
-                <DeckFace person={f.person} tilt={TILT[i] ?? 0} />
+                <DeckFace person={f.person} tilt={TILT[i] ?? 0} mark={i === 0} />
               </span>
             </button>
           );
@@ -256,31 +267,23 @@ export function RehypeDeck({
   );
 }
 
-/** One face: the avatar in a lime squircle ring (white for you), tilted, with the rehype badge. */
-function DeckFace({ person, tilt }: { person: DeckPerson; tilt: number }) {
+/** One face: the bare squircle avatar, tilted, lifted off the photo by a soft shadow. */
+function DeckFace({ person, tilt, mark = false }: { person: DeckPerson; tilt: number; mark?: boolean }) {
   return (
-    <span className="relative block h-full w-full">
-      <span
-        className={`block h-full w-full rounded-[30%] p-[2.5px] ${person.isMe ? "bg-white" : "bg-accent"}`}
-        style={{ transform: `rotate(${tilt}deg)` }}
-      >
-        <Avatar name={person.name} hue={person.hue} src={person.avatarUrl ?? undefined} size={S - 5} />
-      </span>
-      <span
-        className="absolute -bottom-1.5 -right-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-[30%] border-2 border-black bg-accent"
-        style={{ transform: `rotate(${tilt}deg)` }}
-        aria-hidden
-      >
-        <svg viewBox="0 0 24 24" width={11} height={11} fill="none" stroke="#13200a" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M13 18H7a2 2 0 0 1-2-2V6" />
-          <path d="m2 9 3-3 3 3" />
-          <path d="M11 6h6a2 2 0 0 1 2 2v10" />
-          <path d="m22 15-3 3-3-3" />
-        </svg>
-      </span>
-      {person.isMe && (
-        <span className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white px-1.5 text-[9px] font-bold text-black">
-          You
+    <span className="relative block h-full w-full" style={{ transform: `rotate(${tilt}deg)`, filter: LIFT }}>
+      <Avatar name={person.name} hue={person.hue} src={person.avatarUrl ?? undefined} size={S} />
+      {mark && (
+        // The one sign that this row is rehypes: the Rehype mark itself, on glass.
+        <span
+          className="absolute -bottom-1 -right-1 flex h-[17px] w-[17px] items-center justify-center rounded-[30%] bg-black/55 text-white backdrop-blur-md"
+          aria-hidden
+        >
+          <svg viewBox="0 0 24 24" width={11} height={11} fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M13 18H7a2 2 0 0 1-2-2V6" />
+            <path d="m2 9 3-3 3 3" />
+            <path d="M11 6h6a2 2 0 0 1 2 2v10" />
+            <path d="m22 15-3 3-3-3" />
+          </svg>
         </span>
       )}
     </span>
@@ -325,13 +328,15 @@ function RouteLayer({
       type="button"
       onClick={onClose}
       aria-label={`How this reached you: ${chain.join(", then ")}. Tap to close`}
-      className="pointer-events-auto absolute inset-0 cursor-default"
+      className="pointer-events-auto absolute inset-0 cursor-default transition-opacity ease-out"
+      // The whole layer fades as one, in and out — nothing pops off piece by piece.
+      style={{
+        opacity: leaving ? 0 : 1,
+        transitionDuration: `${ROUTE_FADE_MS}ms`,
+        animation: "deck-fade-in 0.22s ease-out both",
+      }}
     >
-      <span
-        className="absolute inset-0 bg-black transition-opacity duration-300"
-        style={{ opacity: leaving ? 0 : 0.35 }}
-        aria-hidden
-      />
+      <span className="absolute inset-0 bg-black/30" aria-hidden />
       <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${W} ${H}`} aria-hidden>
         <path
           d={d}
@@ -341,13 +346,11 @@ function RouteLayer({
           strokeWidth={3}
           strokeLinecap="round"
           className={`rehype-route-path ${drawn ? "is-drawn" : ""}`}
-          style={{ opacity: leaving ? 0 : 1 }}
         />
       </svg>
 
       <span
-        className="absolute inset-x-2.5 top-2.5 truncate rounded-full bg-black/85 px-3 py-1 text-center text-[11px] font-semibold text-white transition-opacity duration-300"
-        style={{ opacity: leaving ? 0 : 1 }}
+        className="absolute inset-x-2.5 top-2.5 truncate rounded-full bg-black/70 px-3 py-1 text-center text-[11px] font-semibold text-white backdrop-blur-md"
         aria-hidden
       >
         {chain.map((name, i) => (
@@ -370,9 +373,7 @@ function RouteLayer({
             <span
               className="block h-full w-full"
               style={{
-                animation: leaving
-                  ? `deck-pop-out 0.2s ${k * 40}ms ease-in forwards`
-                  : `${big ? "deck-pop-in-big 0.5s" : "deck-pop-in 0.38s"} ${popAt(k)}ms cubic-bezier(0.34, 1.56, 0.64, 1) both`,
+                animation: `${big ? "deck-pop-in-big 0.5s" : "deck-pop-in 0.38s"} ${popAt(k)}ms cubic-bezier(0.34, 1.56, 0.64, 1) both`,
               }}
             >
               <DeckFace person={p} tilt={ROUTE_TILT[k % ROUTE_TILT.length]} />
@@ -383,11 +384,12 @@ function RouteLayer({
 
       {end && (
         <span
-          className="absolute h-3.5 w-3.5 rounded-full border-[3px] border-black bg-accent"
+          className="absolute h-3 w-3 rounded-full bg-accent"
           style={{
-            left: end.x - 7,
-            top: end.y - 7,
-            animation: leaving ? "deck-pop-out 0.2s ease-in forwards" : `deck-pop-in 0.3s ${DRAW_DELAY_MS + DRAW_MS - 50}ms both`,
+            left: end.x - 6,
+            top: end.y - 6,
+            filter: LIFT,
+            animation: `deck-pop-in 0.3s ${DRAW_DELAY_MS + DRAW_MS - 50}ms both`,
           }}
           aria-hidden
         />
