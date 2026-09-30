@@ -71,11 +71,16 @@ export async function setRehype(
   kind: RehypeKind,
   targetId: string,
   next: boolean,
+  /** Whose rehype brought it to you, for the relay route. The database drops
+   *  it if that person did not in fact rehype this, so a guess is harmless. */
+  via?: string | null,
 ): Promise<RehypeResult> {
   const { table, column } = TABLE[kind];
   try {
     if (next) {
-      const { error } = await db.from(table).insert({ user_id: userId, [column]: targetId });
+      const row: Record<string, string> = { user_id: userId, [column]: targetId };
+      if (via && via !== userId) row.via_user_id = via;
+      const { error } = await db.from(table).insert(row);
       if (!error) return { ok: true, rehyped: true };
       if (error.code === "23505" || /duplicate|unique/i.test(error.message)) {
         return { ok: true, rehyped: true };
@@ -97,4 +102,123 @@ export async function setRehype(
 /** What the thread says, so the wording lives in one place. */
 export function rehypedBy(name: string | null | undefined): string {
   return `${name?.trim() || "Someone"} rehyped`;
+}
+
+// ── the deck and the relay route ───────────────────────────────────────
+
+/** One face in the deck or on the route. */
+export type DeckPerson = {
+  userId: string;
+  name: string;
+  username: string | null;
+  avatarUrl: string | null;
+  hue: number;
+  isMe: boolean;
+};
+
+/** Faces the deck ever shows at once. */
+export const DECK_SEATS = 3;
+
+type Rpc = {
+  rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>;
+};
+
+type PersonRow = {
+  user_id: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  avatar_hue: number | null;
+  is_me?: boolean;
+};
+
+function toPerson(r: PersonRow, meId?: string): DeckPerson {
+  return {
+    userId: r.user_id,
+    name: r.display_name?.trim() || r.username || "Someone",
+    username: r.username,
+    avatarUrl: r.avatar_url,
+    hue: r.avatar_hue ?? 200,
+    isMe: r.is_me ?? r.user_id === meId,
+  };
+}
+
+/**
+ * Who is in the deck: your own rehype, if any, and the three most recent by
+ * people you follow, newest first. Empty on any failure — no deck is shown.
+ */
+export async function fetchDeck(
+  db: Rpc,
+  kind: RehypeKind,
+  targetId: string,
+): Promise<{ others: DeckPerson[]; me: DeckPerson | null }> {
+  try {
+    const { data, error } = await db.rpc("rehype_deck", { p_kind: kind, p_target: targetId });
+    if (error || !Array.isArray(data)) return { others: [], me: null };
+    const rows = data as PersonRow[];
+    const me = rows.find((r) => r.is_me);
+    return {
+      me: me ? toPerson(me) : null,
+      others: rows.filter((r) => !r.is_me).map((r) => toPerson(r)),
+    };
+  } catch {
+    return { others: [], me: null };
+  }
+}
+
+/**
+ * The relay route to one person's rehype, earliest first, ending with them.
+ * A hop through a private account you cannot see ends it early — the
+ * database decides that, not this.
+ */
+export async function fetchRoute(
+  db: Rpc,
+  kind: RehypeKind,
+  targetId: string,
+  fromUserId: string,
+  meId?: string,
+): Promise<DeckPerson[]> {
+  try {
+    const { data, error } = await db.rpc("rehype_route", {
+      p_kind: kind,
+      p_target: targetId,
+      p_from: fromUserId,
+    });
+    if (error || !Array.isArray(data)) return [];
+    return (data as PersonRow[]).map((r) => toPerson(r, meId));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Who sits where.
+ *
+ * Three seats, most recent rehypers first. Once you rehype, you take the
+ * seat of the oldest one on show — only that seat changes, so nothing else in
+ * the row moves. With room to spare you simply join the end.
+ */
+export function seatDeck(others: DeckPerson[], me: DeckPerson | null, rehyped: boolean): DeckPerson[] {
+  const shown = others.slice(0, DECK_SEATS);
+  if (!rehyped || !me) return shown;
+  if (shown.length >= DECK_SEATS) return [...shown.slice(0, DECK_SEATS - 1), me];
+  return [...shown, me];
+}
+
+/**
+ * Where each stop on the route sits, as fractions of the photo.
+ *
+ * From the top-right towards the bottom-left, zig-zagging so the line between
+ * stops curves rather than running straight, which is what makes it read as
+ * a journey. The author is off the top-left corner, before the first stop.
+ */
+export function routeStops(count: number): { x: number; y: number }[] {
+  if (count <= 0) return [];
+  return Array.from({ length: count }, (_, k) => {
+    const t = count === 1 ? 0.5 : k / (count - 1);
+    return {
+      x: 0.82 - t * 0.66,
+      y: 0.24 + t * 0.4 + (k % 2 ? 0.07 : -0.05),
+    };
+  });
 }

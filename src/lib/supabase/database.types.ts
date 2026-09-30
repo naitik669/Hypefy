@@ -1866,18 +1866,21 @@ export type Database = {
           id: string
           post_id: string
           user_id: string
+          via_user_id: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           post_id: string
           user_id: string
+          via_user_id?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           post_id?: string
           user_id?: string
+          via_user_id?: string | null
         }
         Relationships: [
           {
@@ -2030,18 +2033,21 @@ export type Database = {
           id: string
           shot_id: string
           user_id: string
+          via_user_id: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           shot_id: string
           user_id: string
+          via_user_id?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           shot_id?: string
           user_id?: string
+          via_user_id?: string | null
         }
         Relationships: [
           {
@@ -2825,6 +2831,29 @@ export type Database = {
         }[]
       }
       can_see_activity_of: { Args: { p_user: string }; Returns: boolean }
+      rehype_deck: {
+        Args: { p_kind: string; p_target: string }
+        Returns: {
+          avatar_hue: number | null
+          avatar_url: string | null
+          display_name: string | null
+          is_me: boolean
+          rehyped_at: string
+          user_id: string
+          username: string | null
+        }[]
+      }
+      rehype_route: {
+        Args: { p_from: string; p_kind: string; p_target: string }
+        Returns: {
+          avatar_hue: number | null
+          avatar_url: string | null
+          display_name: string | null
+          hop: number
+          user_id: string
+          username: string | null
+        }[]
+      }
       public_keys: {
         Args: { p_user_ids: string[] }
         Returns: {
