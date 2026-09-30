@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createElement, createRef, act } from "react";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { DECK_SEATS, fetchDeck, fetchRoute, routeStops, seatDeck, setRehype, type DeckPerson } from "@/lib/rehype";
-import type { RehypeDeckHandle } from "@/components/feed/RehypeDeck";
+import { DECK_SEATS, fetchDeck, fetchMe, seatDeck, setRehype, type DeckPerson } from "@/lib/rehype";
+import { reconcileFaces } from "@/components/feed/RehypeDeck";
 
 /**
  * The rehype deck: three faces at most, ranked by how much you interact with
- * each person (in the database), you in the lowest-ranked seat once you
- * rehype, and a relay route behind a tap. The seating rule is the part most
+ * each person (in the database), and you in the lowest-ranked seat once you
+ * rehype. The seating rule is the part most
  * likely to drift — it decides whether a rehype moves one face or all of them.
  */
 
@@ -52,28 +52,6 @@ describe("seatDeck — who sits where", () => {
   });
 });
 
-describe("routeStops", () => {
-  it("places one stop per person, inside the photo", () => {
-    for (const n of [1, 2, 3, 4, 5, 6]) {
-      const stops = routeStops(n);
-      expect(stops).toHaveLength(n);
-      for (const s of stops) {
-        expect(s.x).toBeGreaterThan(0.05);
-        expect(s.x).toBeLessThan(0.95);
-        expect(s.y).toBeGreaterThan(0.05);
-        expect(s.y).toBeLessThan(0.95);
-      }
-    }
-    expect(routeStops(0)).toEqual([]);
-  });
-
-  it("runs from the top-right towards the bottom-left, so it reads as travelling to you", () => {
-    const s = routeStops(4);
-    expect(s[0].x).toBeGreaterThan(s[3].x);
-    expect(s[0].y).toBeLessThan(s[3].y);
-  });
-});
-
 describe("fetching", () => {
   const rows = [
     { user_id: "me", display_name: "Me", username: "me", avatar_url: null, avatar_hue: 10, is_me: true },
@@ -104,27 +82,38 @@ describe("fetching", () => {
   it("is empty, never throwing, when the call fails", async () => {
     expect(await fetchDeck({ rpc: async () => ({ data: null, error: { m: 1 } }) }, "post", "p")).toEqual({ others: [], me: null });
     expect(await fetchDeck({ rpc: () => Promise.reject(new Error("net")) }, "post", "p")).toEqual({ others: [], me: null });
-    expect(await fetchRoute({ rpc: () => Promise.reject(new Error("net")) }, "post", "p", "a")).toEqual([]);
-  });
-
-  it("marks you on the route by id, since route rows carry no is_me", async () => {
-    const route = [
-      { user_id: "a", display_name: "A", username: "a", avatar_url: null, avatar_hue: 1 },
-      { user_id: "me", display_name: "Me", username: "me", avatar_url: null, avatar_hue: 2 },
-    ];
-    const got = await fetchRoute({ rpc: async () => ({ data: route, error: null }) }, "post", "p", "me", "me");
-    expect(got.map((p) => p.isMe)).toEqual([false, true]);
   });
 
   it("asks for the right function and arguments", async () => {
     const calls: [string, Record<string, unknown>][] = [];
     const db = { rpc: async (fn: string, args: Record<string, unknown>) => { calls.push([fn, args]); return { data: [], error: null }; } };
     await fetchDeck(db, "shot", "s1");
-    await fetchRoute(db, "post", "p1", "u1");
-    expect(calls).toEqual([
-      ["rehype_deck", { p_kind: "shot", p_target: "s1" }],
-      ["rehype_route", { p_kind: "post", p_target: "p1", p_from: "u1" }],
-    ]);
+    expect(calls).toEqual([["rehype_deck", { p_kind: "shot", p_target: "s1" }]]);
+  });
+
+  it("fetches your own face once per session, and retries after a failure", async () => {
+    let calls = 0;
+    let fail = true;
+    const db = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => {
+              calls++;
+              return fail
+                ? { data: null, error: { m: 1 } }
+                : { data: { display_name: "Crazie", username: "crazie", avatar_url: null, avatar_hue: 90 }, error: null };
+            },
+          }),
+        }),
+      }),
+    };
+    expect(await fetchMe(db, "u-me-1")).toBeNull();
+    fail = false;
+    const me = await fetchMe(db, "u-me-1");
+    expect(me).toMatchObject({ userId: "u-me-1", name: "Crazie", isMe: true });
+    await fetchMe(db, "u-me-1");
+    expect(calls).toBe(2);
   });
 });
 
@@ -158,14 +147,44 @@ describe("setRehype records who it came from", () => {
 
 // ── the component ─────────────────────────────────────────────────────────
 
-type RouteLoader = (tapped: DeckPerson) => Promise<{ people: DeckPerson[]; endsAtYou: boolean }>;
+type Face = ReturnType<typeof reconcileFaces>[number];
+const motions = (fs: Face[]) => fs.map((f) => `${f.person.userId}:${f.seat}:${f.motion}`).join(" ");
+
+describe("reconcileFaces", () => {
+  it("rises the row in on its first appearance", () => {
+    expect(motions(reconcileFaces([], [A, B]))).toBe("a:0:rise b:1:rise");
+  });
+
+  it("never replays a face already on show; only a newcomer pops", () => {
+    const idle = reconcileFaces([], [A, B]).map((f) => ({ ...f, motion: "idle" as const }));
+    expect(motions(reconcileFaces(idle, [A, B, ME]))).toBe("a:0:idle b:1:idle me:2:pop");
+  });
+
+  it("keeps a face that leaves in its seat to pop out, while its replacement pops in", () => {
+    const idle = reconcileFaces([], [A, B, ME]).map((f) => ({ ...f, motion: "idle" as const }));
+    expect(motions(reconcileFaces(idle, [A, B, C]))).toBe("a:0:idle b:1:idle c:2:pop me:2:leave");
+  });
+
+  it("brings a face straight back if it returns while leaving", () => {
+    const leaving = reconcileFaces(
+      reconcileFaces([], [A, ME]).map((f) => ({ ...f, motion: "idle" as const })),
+      [A],
+    );
+    expect(motions(reconcileFaces(leaving, [A, ME]))).toBe("a:0:idle me:1:pop");
+  });
+
+  it("with reduced motion, just shows the seating", () => {
+    const idle = reconcileFaces([], [A, ME], true);
+    expect(motions(idle)).toBe("a:0:idle me:1:idle");
+    expect(motions(reconcileFaces(idle, [A], true))).toBe("a:0:idle");
+  });
+});
 
 let root: Root;
 let host: HTMLDivElement;
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  vi.useFakeTimers();
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
@@ -173,92 +192,32 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
-  vi.useRealTimers();
 });
 
-async function renderDeck(
-  seated: DeckPerson[],
-  loadRoute = vi.fn<RouteLoader>(async () => ({ people: [A, B], endsAtYou: true })),
-) {
+async function renderDeck(seated: DeckPerson[]) {
   const { RehypeDeck } = await import("@/components/feed/RehypeDeck");
-  const ref = createRef<RehypeDeckHandle>();
-  const draw = (s: DeckPerson[]) =>
-    act(async () => root.render(createElement(RehypeDeck, { ref, seated: s, authorName: "crazie", loadRoute })));
+  const draw = (s: DeckPerson[]) => act(async () => root.render(createElement(RehypeDeck, { seated: s })));
   await draw(seated);
-  return { ref, loadRoute, draw };
+  return { draw };
 }
-const faces = () => [...host.querySelectorAll<HTMLButtonElement>('[role="group"] button')];
-const routeLayer = () => host.querySelector<HTMLButtonElement>('button[aria-label^="How this reached you"]');
+const faces = () => [...host.querySelectorAll<HTMLAnchorElement>('[role="group"] a')];
+const endAll = () =>
+  act(async () => {
+    faces().forEach((f) => f.firstElementChild!.dispatchEvent(new Event("animationend", { bubbles: true })));
+  });
 
 describe("RehypeDeck", () => {
-  it("draws nothing when nobody you follow rehyped it", async () => {
+  it("draws nothing when nobody rehyped it", async () => {
     await renderDeck([]);
     expect(host.innerHTML).toBe("");
   });
 
-  it("shows each seated face, named for screen readers", async () => {
+  it("shows each seated face, named for screen readers, each opening a profile", async () => {
     await renderDeck([A, B, ME]);
     expect(faces()).toHaveLength(3);
     expect(host.querySelector('[role="group"]')?.getAttribute("aria-label")).toBe("Rehyped by A, B, you");
-    expect(faces()[2].getAttribute("aria-label")).toMatch(/^You rehyped this/);
-  });
-
-  it("asks for the route to the face that was tapped, not a guess", async () => {
-    const { loadRoute } = await renderDeck([B, A]);
-    await act(async () => faces()[1].click());
-    expect(loadRoute).toHaveBeenCalledTimes(1);
-    expect(loadRoute.mock.calls[0][0].userId).toBe("a");
-  });
-
-  it("opens the route on a tap: loads it, then spells out the chain from the author to you", async () => {
-    const { loadRoute } = await renderDeck([B, A]);
-    await act(async () => faces()[0].click());
-    expect(loadRoute).toHaveBeenCalledTimes(1);
-    await act(async () => { vi.advanceTimersByTime(250); });
-    const layer = routeLayer();
-    expect(layer).not.toBeNull();
-    expect(layer!.getAttribute("aria-label")).toBe("How this reached you: crazie, then A, then B, then you. Tap to close");
-  });
-
-  it("closes the route by itself after the hold, and the row comes back", async () => {
-    await renderDeck([B, A]);
-    await act(async () => faces()[0].click());
-    await act(async () => { vi.advanceTimersByTime(250 + 1300 + 500 + 400); });
-    expect(routeLayer()).toBeNull();
-    expect(faces()).toHaveLength(2);
-  });
-
-  it("ignores taps while the route is playing, so it can't stack", async () => {
-    const { loadRoute } = await renderDeck([B, A]);
-    await act(async () => faces()[0].click());
-    await act(async () => faces()[1]?.click());
-    expect(loadRoute).toHaveBeenCalledTimes(1);
-  });
-
-  it("does nothing with an empty route, and stays usable", async () => {
-    const empty = vi.fn<RouteLoader>(async () => ({ people: [], endsAtYou: true }));
-    await renderDeck([A], empty);
-    await act(async () => faces()[0].click());
-    await act(async () => { vi.advanceTimersByTime(300); });
-    expect(routeLayer()).toBeNull();
-    await act(async () => faces()[0].click());
-    expect(empty).toHaveBeenCalledTimes(2);
-  });
-
-  it("plays your rehype's route, then seats you where the parent says", async () => {
-    const { ref, draw } = await renderDeck([A, B, C]);
-    await act(async () => ref.current!.playRehype([A, ME]));
-    // The parent updates the seating while the route is playing...
-    await draw([A, B, ME]);
-    // ...and in the moment before the route appears, while the old faces pop
-    // out, you must not already be bubbling into the row.
-    expect(faces().some((f) => f.getAttribute("aria-label")!.startsWith("You"))).toBe(false);
-    await act(async () => { vi.advanceTimersByTime(250); });
-    expect(routeLayer()!.getAttribute("aria-label")).toContain("then you");
-    // ...and the row only changes once the route has gone.
-    await act(async () => { vi.advanceTimersByTime(1300 + 500 + 400); });
-    expect(routeLayer()).toBeNull();
-    expect(faces().map((f) => f.getAttribute("aria-label")!.split(" ")[0])).toEqual(["A", "B", "You"]);
+    expect(faces()[2].getAttribute("aria-label")).toBe("You rehyped this");
+    expect(faces().map((f) => f.getAttribute("href"))).toEqual(["/u/a", "/u/b", "/profile"]);
   });
 
   it("keeps faces bare: no name tag on you, and one rehype mark for the whole row", async () => {
@@ -270,27 +229,32 @@ describe("RehypeDeck", () => {
     expect(faces()[0].querySelector("svg")).not.toBeNull();
   });
 
+  it("seats you on the very next render when you rehype — nothing waits", async () => {
+    const { draw } = await renderDeck([A, B, C]);
+    await endAll();
+    await draw([A, B, ME]);
+    const live = faces().filter((f) => f.getAttribute("aria-hidden") !== "true");
+    expect(live.map((f) => f.getAttribute("aria-label")!.split(" ")[0])).toEqual(["A", "B", "You"]);
+  });
+
   it("rises in once, then only a face that joins later animates", async () => {
     const { draw } = await renderDeck([A, B]);
     const motion = () => faces().map((f) => (f.firstElementChild as HTMLElement).style.animation);
     expect(motion().every((m) => m.startsWith("deck-rise"))).toBe(true);
-    // The entrances finish...
-    await act(async () => {
-      faces().forEach((f) => f.firstElementChild!.dispatchEvent(new Event("animationend", { bubbles: true })));
-    });
+    await endAll();
     expect(motion()).toEqual(["", ""]);
-    // ...and when you join, you pop into your seat while the others stay still.
     await draw([A, B, ME]);
     const [a, b, me] = motion();
     expect([a, b]).toEqual(["", ""]);
     expect(me).toMatch(/^deck-pop-in /);
   });
 
-  it("swaps only your seat back on undo", async () => {
-    const { ref, draw } = await renderDeck([A, B, ME]);
-    await act(async () => ref.current!.undo());
+  it("removes a face that left once its exit has played", async () => {
+    const { draw } = await renderDeck([A, B, ME]);
+    await endAll();
     await draw([A, B, C]);
-    await act(async () => { vi.advanceTimersByTime(300); });
+    expect(faces()).toHaveLength(4);
+    await endAll();
     expect(faces().map((f) => f.getAttribute("aria-label")!.split(" ")[0])).toEqual(["A", "B", "C"]);
   });
 });

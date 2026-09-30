@@ -71,8 +71,9 @@ export async function setRehype(
   kind: RehypeKind,
   targetId: string,
   next: boolean,
-  /** Whose rehype brought it to you, for the relay route. The database drops
-   *  it if that person did not in fact rehype this, so a guess is harmless. */
+  /** Whose rehype brought it to you. Recorded for the relay route (parked
+   *  for now; the database keeps the links). The database drops it if that
+   *  person did not in fact rehype this. */
   via?: string | null,
 ): Promise<RehypeResult> {
   const { table, column } = TABLE[kind];
@@ -104,9 +105,9 @@ export function rehypedBy(name: string | null | undefined): string {
   return `${name?.trim() || "Someone"} rehyped`;
 }
 
-// ── the deck and the relay route ───────────────────────────────────────
+// ── the deck ───────────────────────────────────────
 
-/** One face in the deck or on the route. */
+/** One face in the deck. */
 export type DeckPerson = {
   userId: string;
   name: string;
@@ -175,29 +176,43 @@ export async function fetchDeck(
   }
 }
 
+const meCache = new Map<string, Promise<DeckPerson | null>>();
+
+type ProfileDb = {
+  from: (table: string) => {
+    select: (cols: string) => {
+      eq: (col: string, v: string) => { maybeSingle: () => PromiseLike<{ data: unknown; error: unknown }> };
+    };
+  };
+};
+
 /**
- * The relay route to one person's rehype, earliest first, ending with them.
- * A hop through a private account you cannot see ends it early — the
- * database decides that, not this.
+ * Your own face, so a rehype can seat you the moment you tap instead of after
+ * a round trip. Fetched once per session and shared by every post and Shot.
+ * Null on failure — you are then seated when the deck next loads.
  */
-export async function fetchRoute(
-  db: Rpc,
-  kind: RehypeKind,
-  targetId: string,
-  fromUserId: string,
-  meId?: string,
-): Promise<DeckPerson[]> {
-  try {
-    const { data, error } = await db.rpc("rehype_route", {
-      p_kind: kind,
-      p_target: targetId,
-      p_from: fromUserId,
-    });
-    if (error || !Array.isArray(data)) return [];
-    return (data as PersonRow[]).map((r) => toPerson(r, meId));
-  } catch {
-    return [];
-  }
+export function fetchMe(db: ProfileDb, userId: string): Promise<DeckPerson | null> {
+  const hit = meCache.get(userId);
+  if (hit) return hit;
+  const load = (async () => {
+    try {
+      const { data, error } = await db
+        .from("profiles")
+        .select("display_name, username, avatar_url, avatar_hue")
+        .eq("id", userId)
+        .maybeSingle();
+      if (error || !data) return null;
+      return toPerson({ ...(data as Omit<PersonRow, "user_id">), user_id: userId, is_me: true });
+    } catch {
+      return null;
+    }
+  })();
+  meCache.set(userId, load);
+  // A failure is not remembered, so the next post tries again.
+  void load.then((me) => {
+    if (!me) meCache.delete(userId);
+  });
+  return load;
 }
 
 /**
@@ -212,22 +227,4 @@ export function seatDeck(others: DeckPerson[], me: DeckPerson | null, rehyped: b
   if (!rehyped || !me) return shown;
   if (shown.length >= DECK_SEATS) return [...shown.slice(0, DECK_SEATS - 1), me];
   return [...shown, me];
-}
-
-/**
- * Where each stop on the route sits, as fractions of the photo.
- *
- * From the top-right towards the bottom-left, zig-zagging so the line between
- * stops curves rather than running straight, which is what makes it read as
- * a journey. The author is off the top-left corner, before the first stop.
- */
-export function routeStops(count: number): { x: number; y: number }[] {
-  if (count <= 0) return [];
-  return Array.from({ length: count }, (_, k) => {
-    const t = count === 1 ? 0.5 : k / (count - 1);
-    return {
-      x: 0.82 - t * 0.66,
-      y: 0.24 + t * 0.4 + (k % 2 ? 0.07 : -0.05),
-    };
-  });
 }

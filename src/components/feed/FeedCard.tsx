@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Star, Bookmark, MoreHorizontal, Maximize2, Repeat2 } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
@@ -38,8 +38,9 @@ import { TrackChip } from "@/components/music/TrackChip";
 import { MusicMuteButton } from "@/components/music/MusicMuteButton";
 import { parseTrack } from "@/lib/music";
 import { hypeResult } from "@/lib/supabase/typed";
-import { fetchDeck, fetchRoute, isRehyped, rehypedBy, seatDeck, setRehype, type DeckPerson } from "@/lib/rehype";
-import { RehypeDeck, type RehypeDeckHandle } from "@/components/feed/RehypeDeck";
+import { isRehyped, rehypedBy, setRehype } from "@/lib/rehype";
+import { useRehypeDeck } from "@/lib/use-rehype-deck";
+import { RehypeDeck } from "@/components/feed/RehypeDeck";
 import { RehypeCount, RehypeIcon } from "@/components/ui/RehypeIcon";
 import { PollBlock, parsePoll } from "@/components/feed/PollBlock";
 import { useSaveMenus } from "@/components/saved/SaveMenus";
@@ -170,13 +171,8 @@ export function FeedCard({
   const [rehypeCount, setRehypeCount] = useState(post.repost_count ?? 0);
   const [rehypePending, setRehypePending] = useState(false);
   const [rehypePulse, setRehypePulse] = useState(0);
-  /** The deck on the photo: people you follow who rehyped this, and you. */
-  const [deckData, setDeckData] = useState<{ others: DeckPerson[]; me: DeckPerson | null }>({
-    others: [],
-    me: null,
-  });
-  const deckRef = useRef<RehypeDeckHandle>(null);
-  const seated = useMemo(() => seatDeck(deckData.others, deckData.me, rehyped), [deckData, rehyped]);
+  /** The deck on the photo: who rehyped this, ranked for you, and you once you have. */
+  const seated = useRehypeDeck("post", post.id, uid, rehyped);
   const [savePending, setSavePending] = useState(false);
 
   const [imgIdx, setImgIdx] = useState(0);
@@ -453,7 +449,7 @@ export function FeedCard({
       if (!id) return;
 
       // Always re-fetch the authoritative hype count + comment count
-      const [hypeRow, savedRow, countRow, rehypedNow, deckNow] = await Promise.all([
+      const [hypeRow, savedRow, countRow, rehypedNow] = await Promise.all([
         post.initialHyped === undefined
           ? supabase
               .from("hypes")
@@ -479,14 +475,12 @@ export function FeedCard({
         post.initialRehyped === undefined
           ? isRehyped(supabase as never, id, "post", post.id)
           : Promise.resolve(post.initialRehyped),
-        fetchDeck(supabase as never, "post", post.id),
       ]);
 
       if (!active) return;
       setHyped(!!hypeRow.data);
       setSaved(!!savedRow.data);
       setRehyped(rehypedNow);
-      setDeckData(deckNow);
       if (countRow.data) {
         setHypeCount(countRow.data.hype_count ?? post.hype_count);
         setCommentCount(countRow.data.comment_count ?? post.comment_count);
@@ -557,9 +551,7 @@ export function FeedCard({
     const prev = rehyped;
     const prevCount = rehypeCount;
     setRehypePending(true);
-    // Undoing: your face leaves its seat now, before the state flips, so the
-    // deck can show it going rather than having it simply vanish.
-    if (prev) deckRef.current?.undo();
+    // The deck follows this at once: your face takes its seat, or leaves it.
     setRehyped(!prev);
     setRehypePulse((p) => p + 1);
     setRehypeCount((c) => Math.max(0, c + (prev ? -1 : 1)));
@@ -574,25 +566,11 @@ export function FeedCard({
     setRehypePending(false);
     if (res.ok) {
       setRehyped(res.rehyped);
-      if (!prev) {
-        showToast("Rehyped to your followers", "success");
-        // Play the route ending with you, then take your seat. The route is
-        // started before the deck's data changes, so your face waits for it.
-        const [route, deckNow] = await Promise.all([
-          fetchRoute(supabase as never, "post", post.id, uid, uid),
-          fetchDeck(supabase as never, "post", post.id),
-        ]);
-        deckRef.current?.playRehype(route);
-        setDeckData(deckNow);
-      } else {
-        setDeckData((d) => ({ ...d, me: null }));
-      }
+      if (!prev) showToast("Rehyped to your followers", "success");
       return;
     }
     setRehyped(prev);
     setRehypeCount(prevCount);
-    // A failed undo put your face back in the data; reload so the deck agrees.
-    if (prev) void fetchDeck(supabase as never, "post", post.id).then(setDeckData);
     showToast(
       res.reason === "not-allowed"
         ? "Posts from private accounts can't be rehyped."
@@ -879,18 +857,10 @@ export function FeedCard({
             </div>
           )}
 
-          {/* Who passed this on: tap for the route it took to reach you. */}
-          <RehypeDeck
-            ref={deckRef}
-            seated={seated}
-            authorName={name}
-            loadRoute={async (tapped) => {
-              // The route to the face you tapped. It carries on to "you" only if
-              // that is the rehype this post actually reached you through.
-              const people = await fetchRoute(supabase as never, "post", post.id, tapped.userId, uid);
-              return { people, endsAtYou: !tapped.isMe && tapped.userId === post._repostedById };
-            }}
-          />
+          {/* Who passed this on. */}
+          <div className="absolute bottom-3.5 left-3 z-10">
+            <RehypeDeck seated={seated} />
+          </div>
         </div>
       )}
 

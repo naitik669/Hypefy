@@ -388,13 +388,12 @@ html[data-dm-leave]::view-transition-old(root) {
   animation: rehype-back 0.45s cubic-bezier(0.45, 0, 0.25, 1);
 }
 
-/* The rehype deck: faces rise in once when the deck loads, a face that joins
-   later pops into its seat, and nothing moves at rest. The relay route fades
-   in as one layer, pops faces onto their stops as the line reaches them, and
-   fades out as one. See RehypeDeck.tsx for the timing, driven from script. */
+/* The rehype deck: faces rise in once when the deck first shows, a face that
+   joins pops into its seat, one that leaves pops out, and nothing moves at
+   rest. Small and quick, so the deck never feels like it is in the way. */
 @keyframes deck-rise {
   from {
-    transform: translateY(10px) scale(0.9);
+    transform: translateY(8px) scale(0.92);
     opacity: 0;
   }
   to {
@@ -402,32 +401,13 @@ html[data-dm-leave]::view-transition-old(root) {
     opacity: 1;
   }
 }
-@keyframes deck-fade-in {
-  from {
-    opacity: 0;
-  }
-}
 @keyframes deck-pop-in {
   0% {
-    transform: scale(0);
+    transform: scale(0.4);
     opacity: 0;
   }
-  60% {
-    transform: scale(1.2);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-@keyframes deck-pop-in-big {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  55% {
-    transform: scale(1.35);
+  65% {
+    transform: scale(1.08);
     opacity: 1;
   }
   100% {
@@ -436,43 +416,15 @@ html[data-dm-leave]::view-transition-old(root) {
   }
 }
 @keyframes deck-pop-out {
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  35% {
-    transform: scale(1.12);
-  }
-  100% {
-    transform: scale(0);
+  to {
+    transform: scale(0.4);
     opacity: 0;
   }
-}
-@keyframes deck-drain {
-  from {
-    transform: scaleX(1);
-  }
-  to {
-    transform: scaleX(0);
-  }
-}
-.rehype-route-path {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  transition: opacity 0.25s;
-}
-.rehype-route-path.is-drawn {
-  transition: stroke-dashoffset 0.8s 0.12s cubic-bezier(0.4, 0, 0.2, 1);
-  stroke-dashoffset: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .rehype-deck * {
     animation: none !important;
-    transition: none !important;
-  }
-  .rehype-route-path {
-    stroke-dashoffset: 0;
   }
 }
 

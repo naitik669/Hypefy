@@ -7,6 +7,8 @@ import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizon
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { RehypeIcon } from "@/components/ui/RehypeIcon";
 import { isRehyped, rehypedBy, setRehype } from "@/lib/rehype";
+import { useRehypeDeck } from "@/lib/use-rehype-deck";
+import { RehypeDeck } from "@/components/feed/RehypeDeck";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
@@ -527,6 +529,8 @@ function ReelCard({
   const [rehypeCount, setRehypeCount] = useState(reel.repost_count ?? 0);
   const [rehypePending, setRehypePending] = useState(false);
   const [rehypePulse, setRehypePulse] = useState(0);
+  // Who rehyped this Shot, loaded for the reel on screen and its neighbours.
+  const deck = useRehypeDeck("shot", reel.id, currentUserId, rehyped, preload === "auto");
   // Save: a tap saves and drops down the folders, a hold fans them out, and
   // the very first save explains the hold (see useSaveMenus).
   const saveButton = useRef<HTMLButtonElement>(null);
@@ -1233,11 +1237,16 @@ function ReelCard({
         className="absolute inset-x-0 bottom-0 z-20 flex flex-col gap-2 p-4 pr-16"
         hidden={commentsOpen}
       >
-        {reel._rehypedBy !== undefined && reel._rehypedBy !== null && (
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-white/85 drop-shadow">
-            <Repeat2 size={14} className="text-accent" />
-            {rehypedBy(reel._rehypedBy)}
-          </span>
+        {(deck.length > 0 || (reel._rehypedBy !== undefined && reel._rehypedBy !== null)) && (
+          <div className="flex items-end gap-3">
+            <RehypeDeck seated={deck} size={30} />
+            {reel._rehypedBy !== undefined && reel._rehypedBy !== null && (
+              <span className="flex items-center gap-1.5 pb-1 text-xs font-semibold text-white/85 drop-shadow">
+                {deck.length === 0 && <Repeat2 size={14} className="text-accent" />}
+                {rehypedBy(reel._rehypedBy)}
+              </span>
+            )}
+          </div>
         )}
         <Link
           href={handle ? `/u/${handle}` : "#"}
