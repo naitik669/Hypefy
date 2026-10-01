@@ -125,7 +125,11 @@ export function DiaryDisc({
 }
 
 /** How far the page stops short of the right edge to leave the disc room. */
-const GUTTER = 44;
+/** The room a sleeved page leaves to its right for the disc behind it. A
+ *  caller sizing a page by --card-w adds this, so the page itself keeps its
+ *  width and the disc sits outside it. */
+export const DISC_GUTTER = 44;
+const GUTTER = DISC_GUTTER;
 /** The disc before the page has been measured, and its limits after. */
 const SLEEVE_DISC = 108;
 const SLEEVE_MIN = 96;

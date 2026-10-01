@@ -26,7 +26,8 @@ const FLY = "420ms cubic-bezier(0.3, 0.6, 0.35, 1)";
  * deck, on the cards behind as on the one in front: a good part of the disc
  * and its cover shows. When the song plays it lifts up and out to the right.
  */
-const INSET = 40;
+/** Each side of a card, from the deck's own edges — see --card-w in DiaryHome. */
+const INSET = "calc((100% - var(--card-w, 288px)) / 2)";
 const DISC = `calc(${CARD_H} * 0.48)`;
 const DISC_AT = { right: `calc(${CARD_H} * -0.11)`, top: `calc(${CARD_H} * -0.13)` };
 const PLAYING_SLIDE = 8;

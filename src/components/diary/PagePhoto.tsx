@@ -12,8 +12,10 @@
  * head and the chin, which is the whole subject. Nothing here has to line up
  * in a row, so nothing has to be cropped.
  *
- * The cap is the only rule: a very tall photo stops at 420px so one page
- * cannot take the whole screen and push the next one out of sight.
+ * The cap is the only rule: a very tall photo stops before it can take the
+ * whole screen and push the next page out of sight. 420px by default, or
+ * whatever the caller gives it — in the spotlight that is a share of the
+ * card height, so a photo page fits the first screen like every other page.
  *
  * It sits above the words rather than behind them — the words keep the size
  * and weight they have on a page with no picture at all, so a photo page and
@@ -26,11 +28,14 @@ export function PagePhoto({
   url,
   alt = "",
   className = "",
+  maxHeight = "420px",
 }: {
   url: string;
   /** Empty by default: the words under it are the caption. */
   alt?: string;
   className?: string;
+  /** How tall the photo may be, as a CSS length. */
+  maxHeight?: string;
 }) {
   return (
     <div className={`flex w-full justify-center overflow-hidden rounded-2xl bg-black/25 ${className}`}>
@@ -40,7 +45,8 @@ export function PagePhoto({
         alt={alt}
         loading="lazy"
         draggable={false}
-        className="h-auto max-h-[420px] w-auto max-w-full"
+        style={{ maxHeight }}
+        className="h-auto w-auto max-w-full"
       />
     </div>
   );
