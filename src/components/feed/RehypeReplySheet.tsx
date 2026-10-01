@@ -20,6 +20,9 @@ import { sendRehypeReply, type DeckPerson, type RehypeKind } from "@/lib/rehype"
  *
  * Their profile is still a tap away, quietly, for when that is what you meant.
  */
+
+/** React: a reply you can send in one tap, without typing. */
+const REACTIONS = ["🔥", "😂", "😍", "😮", "👏", "💯"];
 export function RehypeReplySheet({
   person,
   kind,
@@ -37,10 +40,10 @@ export function RehypeReplySheet({
   const [sent, setSent] = useState(false);
   const showToast = useToast();
 
-  async function send() {
+  async function send(body = note) {
     if (!person || sending) return;
     setSending(true);
-    const ok = await sendRehypeReply(createClient() as never, kind, targetId, person.userId, note);
+    const ok = await sendRehypeReply(createClient() as never, kind, targetId, person.userId, body);
     setSending(false);
     if (!ok) {
       showToast("Couldn't send that. Try again.", "error");
@@ -86,7 +89,23 @@ export function RehypeReplySheet({
 
       {!self && (
         <>
-          <div className="flex items-center gap-2 pb-1 pt-3">
+          {/* React: the same reply, said in one tap. */}
+          <div className="flex items-center justify-between gap-1 pt-3.5">
+            {REACTIONS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => void send(emoji)}
+                disabled={sending}
+                aria-label={`React ${emoji}`}
+                className="flex h-11 flex-1 items-center justify-center rounded-2xl bg-surface text-[22px] transition-transform active:scale-90 disabled:opacity-60"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 pb-1 pt-2.5">
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -108,7 +127,8 @@ export function RehypeReplySheet({
             </button>
           </div>
           <p className="pb-1 text-[12px] text-faint">
-            Goes to {person?.name} as a message: the post, then what you said.
+            Either way it goes to {person?.name} as a message: the post, then
+            what you said about it.
           </p>
         </>
       )}
