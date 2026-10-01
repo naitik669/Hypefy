@@ -62,12 +62,19 @@ export const REEL = {
   /** Room above the reel where an arriving face fades in under the "+",
    *  instead of being cut off at the reel's top edge. One face tall. */
   HEADROOM: 60,
-  /** Reel travel per px of thumb: 20px of thumb brings the next account. */
+  /** Reel travel per px of thumb with a short list: 20px brings the next
+   *  account. A longer list turns faster — see reelRatio. */
   RATIO: 3,
+  /** How much faster per account past the four in view, and the ceiling. */
+  RATIO_PER_EXTRA: 0.5,
+  RATIO_MAX: 6,
   /** Thumb travel past the end of the list that lands on "+". */
   ADD_PUSH: 28,
   /** No move for this long and the reel glides on by itself. */
   GLIDE_AFTER_MS: 40,
+  /** What a glide keeps of its speed each frame. At 0.9 it was spent in about
+   *  a tenth of a second, which on a long list was barely one more account. */
+  GLIDE_KEEP: 0.94,
 } as const;
 
 /** Faces sink into a fade at the bottom. The top fade is per face, in paint(). */
@@ -83,6 +90,27 @@ export function reelCentre(i: number, scroll: number) {
 export function reelHeight(n: number) {
   return REEL.PAD + Math.min(n, REEL.VISIBLE) * REEL.PITCH;
 }
+/**
+ * How far the reel turns per px of thumb.
+ *
+ * A short list wants precision: four or five faces, and every account is a
+ * small deliberate movement. A long one wants reach — the thumb has the few
+ * inches between the tab and the top of its travel, and at a flat 20px per
+ * account a tenth account was most of that, so getting to it was a slow haul
+ * rather than a flick through a list.
+ *
+ * So the reel speeds up with the number of accounts you cannot already see,
+ * up to twice its slowest: ten accounts come at 10px of thumb each instead
+ * of 20. The faces do not move faster than that, because past about there
+ * they stop being faces and start being a blur.
+ */
+export function reelRatio(n: number): number {
+  // Counted from the second account you cannot see, so the shortest list
+  // that scrolls at all keeps exactly the feel it had.
+  const hidden = Math.max(0, n - REEL.VISIBLE - 1);
+  return Math.min(REEL.RATIO_MAX, REEL.RATIO + hidden * REEL.RATIO_PER_EXTRA);
+}
+
 /** Furthest the reel turns. */
 export function reelMax(n: number) {
   return Math.max(0, (n - REEL.VISIBLE) * REEL.PITCH);
@@ -99,15 +127,16 @@ export function turnReel(
   n: number
 ): { scroll: number; push: number } {
   const max = reelMax(n);
+  const ratio = reelRatio(n);
   let { scroll, push } = state;
   if (up > 0) {
-    const turn = Math.min(max - scroll, up * REEL.RATIO);
+    const turn = Math.min(max - scroll, up * ratio);
     scroll += turn;
-    push += up - turn / REEL.RATIO;
+    push += up - turn / ratio;
   } else if (up < 0) {
     const spend = Math.min(push, -up);
     push -= spend;
-    scroll = Math.max(0, scroll - (-up - spend) * REEL.RATIO);
+    scroll = Math.max(0, scroll - (-up - spend) * ratio);
   }
   return { scroll, push };
 }
@@ -236,7 +265,7 @@ export function AccountSwitchPad({
           // The glide: the reel carries on briefly after the thumb stops.
           s.scroll = Math.max(0, Math.min(max, s.scroll + s.vel * dt));
           if (s.scroll === 0 || s.scroll === max) s.vel = 0;
-          s.vel *= Math.pow(0.9, dt / 16);
+          s.vel *= Math.pow(REEL.GLIDE_KEEP, dt / 16);
         } else if (still) {
           s.vel = 0;
           const to = Math.round(s.scroll / REEL.PITCH) * REEL.PITCH;
