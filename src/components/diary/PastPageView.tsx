@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, Copy, Loader2, Star, Trash2, X } from "lucide-react";
+import { Check, Copy, Download, Loader2, Star, Trash2, X } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { DiscSleeve, SongLine, DISC_GUTTER } from "@/components/diary/DiaryDisc";
 import { PagePhoto } from "@/components/diary/PagePhoto";
-import { diaryTheme, fillSize } from "@/components/diary/DiaryPage";
+import { diaryTheme, fillSize, pageStops } from "@/components/diary/DiaryPage";
+import { loadPhoto, renderPageImage, savePageImage } from "@/lib/page-image";
 import type { ArchivedDiary } from "@/lib/diary";
 
 /**
@@ -67,6 +68,8 @@ export function PastPageView({
 }) {
   const [copied, setCopied] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   // Escape closes it, the way the sheets do.
   useEffect(() => {
@@ -83,12 +86,38 @@ export function PastPageView({
     setShowing(page?.writtenAt ?? null);
     setCopied(false);
     setConfirming(false);
+    setSaved(false);
   }
 
   if (!page || typeof document === "undefined") return null;
 
   const theme = diaryTheme(page.color, hue);
   const text = page.text?.trim() ?? "";
+
+  /** The page as a picture, with the wordmark at its foot. */
+  async function save() {
+    if (!page || saving) return;
+    setSaving(true);
+    try {
+      const blob = await renderPageImage({
+        text: page.text ?? "",
+        stops: pageStops(page.color, hue),
+        photo: page.imageUrl ? await loadPhoto(page.imageUrl) : null,
+        track: page.track ? `${page.track.title}${page.track.artist ? ` — ${page.track.artist}` : ""}` : null,
+        accent:
+          getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim() || "#a3e635",
+      });
+      if (!blob) return;
+      const day = new Date(page.writtenAt).toISOString().slice(0, 10);
+      const how = await savePageImage(blob, `hypefy-page-${day}.png`);
+      if (how !== "failed") {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1600);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function copy() {
     try {
@@ -173,6 +202,22 @@ export function PastPageView({
         </p>
 
         <div className="flex gap-2 pb-2">
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={saving}
+            aria-label="Save this page as a picture"
+            className="flex flex-1 flex-col items-center gap-1.5 rounded-2xl bg-surface py-3 text-[11px] font-bold disabled:opacity-60"
+          >
+            {saving ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : saved ? (
+              <Check size={18} className="text-accent" />
+            ) : (
+              <Download size={18} />
+            )}
+            {saved ? "Saved" : "Save"}
+          </button>
           <button
             type="button"
             onClick={() => void copy()}

@@ -230,6 +230,23 @@ export function swatchOf(color: DiaryColor, hue: number): string {
  * four surfaces as pageTint, so every place a page is drawn takes either.
  * A Glow colour runs from its first ink at the top to its second at the foot.
  */
+export function pageStops(color: string | null | undefined, hue: number): { from: string; to: string; glow: string } {
+  const c = DIARY_COLORS.find((d) => d.key === colorKey(color))!;
+  if (c.key === "ink") {
+    return { from: `hsl(${hue} 10% 14%)`, to: `hsl(${hue} 8% 9.5%)`, glow: `hsl(${hue} 55% 42% / 0.22)` };
+  }
+  const { hue: h, sat: s } = c;
+  const h2 = c.hue2 ?? h;
+  const blend = c.hue2 !== undefined;
+  const l = c.lum ?? 0;
+  const s2 = Math.max(0, s - 6);
+  return {
+    from: `hsl(${h} ${s}% ${(blend ? 31 : 29) + l}%)`,
+    to: `hsl(${h2} ${s2}% ${(blend ? 19 : 15) + l / 2}%)`,
+    glow: `hsl(${h} ${s + 10}% 58% / 0.32)`,
+  };
+}
+
 export function diaryTheme(color: string | null | undefined, hue: number) {
   const c = DIARY_COLORS.find((d) => d.key === colorKey(color))!;
   if (c.key === "ink") return pageTint(hue);
@@ -240,8 +257,9 @@ export function diaryTheme(color: string | null | undefined, hue: number) {
   const s2 = Math.max(0, s - 6);
   // A near-grey page gets a near-grey burn line, not a vivid one.
   const bs = s < 20 ? s + 40 : 90;
+  const stops = pageStops(color, hue);
   return {
-    background: `radial-gradient(120% 90% at 0% 0%, hsl(${h} ${s + 10}% 58% / 0.32), transparent 60%), linear-gradient(165deg, hsl(${h} ${s}% ${(blend ? 31 : 29) + l}%), hsl(${h2} ${s2}% ${(blend ? 19 : 15) + l / 2}%))`,
+    background: `radial-gradient(120% 90% at 0% 0%, ${stops.glow}, transparent 60%), linear-gradient(165deg, ${stops.from}, ${stops.to})`,
     shadow: `inset 0 1px 0 hsl(${h} 80% 88% / 0.14), 0 22px 44px -26px hsl(${h2} 60% 6% / 0.95)`,
     burn: blend ? `linear-gradient(90deg, hsl(${h} ${bs}% 72%), hsl(${h2} ${bs}% 72%))` : `hsl(${h} ${bs}% 72%)`,
     screen: `radial-gradient(90% 60% at 10% 0%, hsl(${h} ${s + 10}% 55% / 0.45), transparent 70%), linear-gradient(180deg, hsl(${h} ${s}% ${24 + l}%), hsl(${h2} ${s2}% 9%))`,
