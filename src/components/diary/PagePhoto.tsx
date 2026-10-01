@@ -14,8 +14,8 @@
  *
  * The cap is the only rule: a very tall photo stops before it can take the
  * whole screen and push the next page out of sight. 420px by default, or
- * whatever the caller gives it — in the spotlight that is a share of the
- * card height, so a photo page fits the first screen like every other page.
+ * whatever the caller gives it — an archived page opened on its own gets a
+ * share of the space it has, so the whole page fits without scrolling.
  *
  * It sits above the words rather than behind them — the words keep the size
  * and weight they have on a page with no picture at all, so a photo page and

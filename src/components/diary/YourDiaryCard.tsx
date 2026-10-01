@@ -86,11 +86,7 @@ export function YourDiaryCard({
           </div>
         )}
 
-        {entry.imageUrl && (
-          // A share of the card height, so your photo page is the size of
-          // everyone else’s in the deck rather than a column of its own.
-          <PagePhoto url={entry.imageUrl} className="mt-3" maxHeight="calc(var(--card-h, 420px) * 0.72)" />
-        )}
+        {entry.imageUrl && <PagePhoto url={entry.imageUrl} className="mt-3" />}
 
         {entry.text && (
           <p

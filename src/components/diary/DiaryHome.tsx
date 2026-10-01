@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, ChevronDown } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DiaryComposer, DiaryEditor, type DiaryDraft } from "@/components/diary/DiaryEditor";
-import { DiscSleeve, DISC_GUTTER } from "@/components/diary/DiaryDisc";
+import { DiscSleeve } from "@/components/diary/DiaryDisc";
 import { FriendDiaryCard } from "@/components/diary/FriendDiaryCard";
 import { YourDiaryCard } from "@/components/diary/YourDiaryCard";
 import { DiaryStack } from "@/components/diary/DiaryStack";
@@ -213,17 +213,10 @@ export function DiaryHome({
           className="relative isolate -mx-3 flex flex-col justify-center overflow-x-clip px-3 py-4"
           style={{
             minHeight: SPOTLIGHT_HEIGHT,
-            // How wide a page is, everywhere one is shown at full size — the
-            // deck here, and an archived page opened. Narrower than the screen
-            // by a good margin: a page that runs nearly edge to edge reads as
-            // a panel, and the thing being held up should look like a card
-            // someone wrote. It stops growing at 288px, so on a big phone the
-            // page does not sprawl.
-            ["--card-w" as string]: "clamp(232px, calc(min(100vw, 480px) - 128px), 288px)",
-            // Taller than it is wide by a quarter, measured from the width so
-            // the proportion holds on every screen; a short screen may cut it
-            // back rather than push the rest of the page out of sight.
-            ["--card-h" as string]: `min(calc(var(--card-w) * 1.25), calc(${SPOTLIGHT_HEIGHT} - 250px))`,
+            // Only a little taller than it is wide — a tenth — so it reads as a
+            // card, not a column. Its width is the screen less the margins
+            // (2 × (12 + 40)px); a very short screen can take it down to 260px.
+            ["--card-h" as string]: `clamp(260px, calc((min(100vw, 480px) - 104px) * 1.1), calc(${SPOTLIGHT_HEIGHT} - 250px))`,
           }}
         >
           {/* A light from above, onto the deck — just a touch. */}
@@ -231,15 +224,7 @@ export function DiaryHome({
           {alone ? (
             // Nobody else has a page up: the light falls on yours — or on
             // the page to write it on.
-            <div
-                className="mx-auto"
-                // Your own page is sleeved, which keeps the disc inside the
-                // box; the deck hangs it outside instead. Add the gutter so
-                // the page is --card-w either way.
-                style={{ width: `calc(var(--card-w) + ${mine?.track ? DISC_GUTTER : 0}px)` }}
-              >
-                {yours}
-              </div>
+            <div className="mx-auto w-full max-w-[360px] px-2">{yours}</div>
           ) : (
             <DiaryStack
               list={others}
@@ -301,7 +286,13 @@ export function DiaryHome({
         onRestore={onRestore}
         me={me}
       />
-      <DiaryArchiveSheet open={archiveOpen} onClose={() => setArchiveOpen(false)} hue={me.hue} />
+      <DiaryArchiveSheet
+        open={archiveOpen}
+        onClose={() => setArchiveOpen(false)}
+        hue={me.hue}
+        name={me.name}
+        avatarUrl={me.avatarUrl}
+      />
       {storyAt !== null && (
         <DiaryStories
           list={others}

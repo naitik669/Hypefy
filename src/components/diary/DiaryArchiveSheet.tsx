@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Lock, Music, Trash2 } from "lucide-react";
+import { Loader2, Lock, Music } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { diaryTheme, fillSize } from "@/components/diary/DiaryPage";
+import { PastPageView } from "@/components/diary/PastPageView";
 import { archivePeriods, toArchive, type ArchivedDiary } from "@/lib/diary";
 
 const ENDED: Record<ArchivedDiary["endedHow"], string> = {
@@ -44,17 +45,24 @@ export function DiaryArchiveSheet({
   open,
   onClose,
   hue,
+  name = "You",
+  avatarUrl = null,
 }: {
   open: boolean;
   onClose: () => void;
   /** Your hue, for past pages in the default colour. */
   hue: number;
+  /** You, for the header on an opened page. */
+  name?: string;
+  avatarUrl?: string | null;
 }) {
   const [items, setItems] = useState<ArchivedDiary[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [forgetting, setForgetting] = useState<string | null>(null);
   /** Which pile is open. The newest one starts open, since it is why you came. */
   const [opened, setOpened] = useState<string | null>(null);
+  /** The page you tapped, shown full screen over the archive. */
+  const [reading, setReading] = useState<ArchivedDiary | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -84,6 +92,8 @@ export function DiaryArchiveSheet({
       return;
     }
     setItems((prev) => (prev ?? []).filter((i) => i.writtenAt !== writtenAt));
+    // Deleted from the page you were reading: there is nothing left to read.
+    setReading((r) => (r?.writtenAt === writtenAt ? null : r));
   }
 
   const piles = archivePeriods(items ?? []);
@@ -149,26 +159,20 @@ export function DiaryArchiveSheet({
                 {isOpen && (
                   <div className="no-scrollbar -mx-5 flex gap-2.5 overflow-x-auto px-5 pb-1 pt-2.5">
                     {pile.items.map((d) => (
-                      <div key={d.writtenAt} className="shrink-0" style={{ width: CARD }}>
+                      <button
+                        key={d.writtenAt}
+                        type="button"
+                        onClick={() => setReading(d)}
+                        aria-label={`Open the page from ${when(d.writtenAt)}`}
+                        className="shrink-0 text-left"
+                        style={{ width: CARD }}
+                      >
                         <MiniPage page={d} hue={hue} width={CARD} />
-                        <div className="flex items-center gap-1 px-0.5 pt-1.5 text-[10px] text-muted">
+                        <span className="flex items-center gap-1 px-0.5 pt-1.5 text-[10px] text-muted">
                           <span className="truncate font-semibold">{when(d.writtenAt)}</span>
                           {ENDED[d.endedHow] && <span className="truncate text-faint">· {ENDED[d.endedHow]}</span>}
-                          <button
-                            type="button"
-                            onClick={() => forget(d.writtenAt)}
-                            disabled={forgetting === d.writtenAt}
-                            aria-label={`Delete the page from ${when(d.writtenAt)} for good`}
-                            className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-faint hover:bg-white/5 hover:text-danger disabled:opacity-50"
-                          >
-                            {forgetting === d.writtenAt ? (
-                              <Loader2 size={12} className="animate-spin" />
-                            ) : (
-                              <Trash2 size={12} />
-                            )}
-                          </button>
-                        </div>
-                      </div>
+                        </span>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -177,6 +181,16 @@ export function DiaryArchiveSheet({
           })}
         </div>
       )}
+
+      <PastPageView
+        page={reading}
+        hue={hue}
+        name={name}
+        avatarUrl={avatarUrl}
+        onClose={() => setReading(null)}
+        onDelete={forget}
+        deleting={forgetting === reading?.writtenAt}
+      />
     </BottomSheet>
   );
 }
