@@ -174,9 +174,15 @@ describe("reconcileFaces", () => {
   });
 
   it("with reduced motion, just shows the seating", () => {
-    const idle = reconcileFaces([], [A, ME], true);
+    const idle = reconcileFaces([], [A, ME], "idle");
     expect(motions(idle)).toBe("a:0:idle me:1:idle");
-    expect(motions(reconcileFaces(idle, [A], true))).toBe("a:0:idle");
+    expect(motions(reconcileFaces(idle, [A], "idle"))).toBe("a:0:idle");
+  });
+
+  it("pops faces back in when they return after being dropped off the photo", () => {
+    // The whole deck was dragged away, so the row is empty: without being told
+    // otherwise these would rise in, as if the post had only just loaded.
+    expect(motions(reconcileFaces([], [A, B, ME], "pop"))).toBe("a:0:pop b:1:pop me:2:pop");
   });
 });
 
@@ -268,8 +274,27 @@ describe("fadeOutside — a face belongs to the picture", () => {
 let root: Root;
 let host: HTMLDivElement;
 
+/** jsdom has no IntersectionObserver; this one can be told what happened. */
+let lastObserver: {
+  observe: () => void;
+  disconnect: () => void;
+  fire: (isIntersecting: boolean) => void;
+} | null = null;
+
+function fakeObserver(cb: (entries: { isIntersecting: boolean }[]) => void) {
+  // Returned rather than assigned to `this`, so `new` hands back this object.
+  lastObserver = {
+    observe() {},
+    disconnect() {},
+    fire: (isIntersecting: boolean) => cb([{ isIntersecting }]),
+  };
+  return lastObserver;
+}
+
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  lastObserver = null;
+  (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = fakeObserver;
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
@@ -279,11 +304,36 @@ afterEach(() => {
   host.remove();
 });
 
-async function renderDeck(seated: DeckPerson[]) {
+async function renderDeck(seated: DeckPerson[], bounds?: { current: HTMLElement | null }) {
   const { RehypeDeck } = await import("@/components/feed/RehypeDeck");
-  const draw = (s: DeckPerson[]) => act(async () => root.render(createElement(RehypeDeck, { seated: s })));
+  const draw = (s: DeckPerson[]) =>
+    act(async () => root.render(createElement(RehypeDeck, { seated: s, bounds })));
   await draw(seated);
   return { draw };
+}
+
+const rect = (left: number, top: number, right: number, bottom: number) =>
+  ({ left, top, right, bottom, x: left, y: top, width: right - left, height: bottom - top }) as DOMRect;
+
+/**
+ * A deck sitting near the bottom-left of a 200x200 picture, as it does on a
+ * post. jsdom measures everything as zero, so both boxes are stated here.
+ */
+async function renderOnPicture(seated: DeckPerson[]) {
+  const picture = document.createElement("div");
+  picture.getBoundingClientRect = () => rect(0, 0, 200, 200);
+  host.appendChild(picture);
+  const out = await renderDeck(seated, { current: picture });
+  host.querySelector('[role="group"]')!.getBoundingClientRect = () => rect(10, 120, 130, 181);
+  return out;
+}
+
+/** Scroll the post out of sight and back. */
+function scrollPast() {
+  const io = lastObserver;
+  if (!io) throw new Error("the deck is not watching for the post scrolling by");
+  act(() => io.fire(false));
+  act(() => io.fire(true));
 }
 const faces = () => [...host.querySelectorAll<HTMLAnchorElement>('[role="group"] a')];
 const endAll = () =>
@@ -373,6 +423,49 @@ describe("RehypeDeck", () => {
     const click = new MouseEvent("click", { bubbles: true, cancelable: true });
     await act(async () => first.dispatchEvent(click));
     expect(click.defaultPrevented).toBe(false);
+  });
+
+  it("a face let go off the picture stays gone, and comes back when the post scrolls by", async () => {
+    const { draw } = await renderOnPicture([A, B, C]);
+    const first = faces()[0];
+    const point = (type: string, x: number, y: number) =>
+      act(async () => first.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y })));
+
+    // Carry the row down past the bottom of the picture.
+    await point("pointerdown", 100, 100);
+    await point("pointermove", 100, 190);
+    expect(faces().map((f) => f.style.opacity)).toEqual(["0", "0", "0"]);
+
+    // Letting go there leaves nothing behind — no springing back.
+    await point("pointerup", 100, 190);
+    expect(faces()).toHaveLength(0);
+    // The box stays, so the deck can still tell when the post scrolls by.
+    expect(host.querySelector('[role="group"]')).not.toBeNull();
+
+    scrollPast();
+    const back = faces();
+    expect(back.map((f) => f.getAttribute("aria-label")!.split(" ")[0])).toEqual(["A", "B", "C"]);
+    expect(back.every((f) => (f.firstElementChild as HTMLElement).style.animation.startsWith("deck-pop-in"))).toBe(true);
+
+    // They are properly back: the next word from the parent must not find
+    // them still on the dropped list and take them away again.
+    await draw([A, B, C]);
+    expect(faces().filter((f) => f.getAttribute("aria-hidden") !== "true")).toHaveLength(3);
+  });
+
+  it("keeps a deck you have not cleared, however much the post scrolls", async () => {
+    await renderOnPicture([A, B, C]);
+    const first = faces()[0];
+    const point = (type: string, x: number, y: number) =>
+      act(async () => first.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y })));
+    // A drag that stays on the picture: everyone comes home on release.
+    await point("pointerdown", 100, 100);
+    await point("pointermove", 120, 90);
+    await point("pointerup", 120, 90);
+    expect(faces()).toHaveLength(3);
+    // Nothing was dropped, so there is nothing to watch for and nothing to
+    // restore — the row just stays as it is.
+    expect(lastObserver).toBeNull();
   });
 
   it("removes a face that left once its exit has played", async () => {

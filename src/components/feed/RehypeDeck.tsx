@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import type { DeckPerson } from "@/lib/rehype";
 
@@ -53,6 +53,9 @@ type Vec = { x: number; y: number };
 type Motion = "rise" | "pop" | "idle" | "leave";
 type Face = { person: DeckPerson; seat: number; motion: Motion };
 
+/** Shared so "nothing dropped" is always the same value, and never re-runs the effect. */
+const EMPTY_SET: ReadonlySet<string> = new Set();
+
 const reducedMotion = () =>
   typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
@@ -60,18 +63,21 @@ const reducedMotion = () =>
  * The faces to draw for a new seating. Faces already there keep their motion
  * and never replay; new ones rise (the row's first appearance) or pop (joining
  * a row already on show); ones no longer seated stay in their seat to pop out.
- * Exported for tests.
+ *
+ * `force` overrides what a new face does: "pop" for faces coming back after
+ * being dropped off the photo, "idle" for reduced motion, which also drops the
+ * exits. Exported for tests.
  */
-export function reconcileFaces(faces: Face[], seated: DeckPerson[], instant = false): Face[] {
+export function reconcileFaces(faces: Face[], seated: DeckPerson[], force?: "idle" | "pop"): Face[] {
   const first = !faces.some((f) => f.motion !== "leave");
   const byId = new Map(faces.map((f) => [f.person.userId, f]));
   const next: Face[] = seated.map((person, seat) => {
     const had = byId.get(person.userId);
     if (had && had.motion !== "leave") return { person, seat, motion: had.motion };
     // New, or coming back while it was still on its way out.
-    return { person, seat, motion: instant ? "idle" : first ? "rise" : "pop" };
+    return { person, seat, motion: force ?? (first ? "rise" : "pop") };
   });
-  if (instant) return next;
+  if (force === "idle") return next;
   const still = new Set(seated.map((p) => p.userId));
   const leaving = faces
     .filter((f) => !still.has(f.person.userId))
@@ -145,15 +151,47 @@ export function RehypeDeck({
   // Measured when a drag starts, in the deck's own coordinates, so no layout
   // is read while the faces are moving.
   const [box, setBox] = useState<Box | null>(null);
+  // Let go of a face off the photo and it is gone — not snapped back — until
+  // the post is scrolled away and comes round again.
+  const [dropped, setDropped] = useState<ReadonlySet<string>>(EMPTY_SET);
   const group = useRef<HTMLDivElement>(null);
   const from = useRef<Vec>({ x: 0, y: 0 });
   const moved = useRef(false);
+  const here = useMemo(() => seated.filter((p) => !dropped.has(p.userId)), [seated, dropped]);
+  // What the parent last said, for the observer below, which outlives a render.
+  const latest = useRef(seated);
+  useEffect(() => {
+    latest.current = seated;
+  }, [seated]);
   // Follow the parent during render rather than in an effect, so a change
   // shows on the same frame instead of one render late.
   if (seated !== seenSeating) {
     setSeenSeating(seated);
-    setFaces((f) => reconcileFaces(f, seated, reducedMotion()));
+    setFaces((f) => reconcileFaces(f, here, reducedMotion() ? "idle" : undefined));
   }
+
+  // Scrolling the post out of sight and back brings the dropped faces back,
+  // popping into their seats. Nothing else does: a deck you cleared stays
+  // cleared while you are looking at it.
+  useEffect(() => {
+    const el = group.current;
+    if (!el || dropped.size === 0) return;
+    let away = false;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) {
+          away = true;
+        } else if (away) {
+          away = false;
+          setDropped(EMPTY_SET);
+          setFaces((f) => reconcileFaces(f, latest.current, reducedMotion() ? "idle" : "pop"));
+        }
+      },
+      { threshold: 0 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [dropped]);
 
   const settle = (face: Face) =>
     setFaces((all) =>
@@ -162,15 +200,17 @@ export function RehypeDeck({
         : all.map((f) => (f.person.userId === face.person.userId && f.motion !== "leave" ? { ...f, motion: "idle" } : f)),
     );
 
-  if (faces.length === 0) return null;
+  // With everything dropped the box stays, empty: it is what the observer
+  // above watches to know the post has scrolled by.
+  if (faces.length === 0 && dropped.size === 0) return null;
 
   const step = size * (1 + GAP);
   const lift = (seat: number) => (RAISE[seat] ?? 0) * size;
   const seats = faces.map((f) => ({ x: f.seat * step, y: -lift(f.seat) }));
   const layout = drag ? dragLayout(seats, drag.index, drag.d, GATHER_PX, size * FAN) : null;
-  const columns = Math.max(...faces.map((f) => f.seat)) + 1;
+  const columns = faces.length ? Math.max(...faces.map((f) => f.seat)) + 1 : 1;
   const height = size * (1 + RAISE[1]);
-  const names = seated.map((p) => (p.isMe ? "you" : p.name));
+  const names = here.map((p) => (p.isMe ? "you" : p.name));
 
   function onDown(e: React.PointerEvent, index: number) {
     e.stopPropagation();
@@ -193,12 +233,30 @@ export function RehypeDeck({
     );
     setDrag({ index, d: { x: 0, y: 0 } });
   }
+  /** Let go: anything that has faded out stays gone, the rest swing back. */
+  function onUp(shown: number[]) {
+    const gone = faces.filter((_, i) => shown[i] === 0).map((f) => f.person.userId);
+    if (gone.length) {
+      setDropped((d) => new Set([...d, ...gone]));
+      setFaces((all) => all.filter((f) => !gone.includes(f.person.userId)));
+    }
+    setDrag(null);
+  }
   function onMove(e: React.PointerEvent, index: number) {
     if (drag?.index !== index) return;
     const d = { x: e.clientX - from.current.x, y: e.clientY - from.current.y };
     if (Math.hypot(d.x, d.y) > TAP_PX) moved.current = true;
     setDrag({ index, d });
   }
+
+  // How much of each face is still on the picture. One per face, so letting
+  // go knows which ones have left for good.
+  const shownAll = faces.map((f, i) => {
+    if (!drag) return 1;
+    const top = height - lift(f.seat) - size + (layout?.offsets[i].y ?? 0);
+    const left = seats[i].x + (layout?.offsets[i].x ?? 0);
+    return fadeOutside({ left, top, right: left + size, bottom: top + size }, box, size * 0.5);
+  });
 
   return (
     <div
@@ -217,12 +275,7 @@ export function RehypeDeck({
         const leaving = f.motion === "leave";
         const held = drag?.index === i;
         const off = layout?.offsets[i] ?? { x: 0, y: 0 };
-        // Where this face is now, and how much of it is still on the picture.
-        const top = height - lift(f.seat) - size + off.y;
-        const left = seats[i].x + off.x;
-        const shown = drag
-          ? fadeOutside({ left, top, right: left + size, bottom: top + size }, box, size * 0.5)
-          : 1;
+        const shown = shownAll[i];
         const animation =
           f.motion === "rise"
             ? `deck-rise 0.36s ${f.seat * 60}ms cubic-bezier(0.2, 0.8, 0.2, 1) both`
@@ -269,7 +322,8 @@ export function RehypeDeck({
             }}
             onPointerDown={(e) => !leaving && onDown(e, i)}
             onPointerMove={(e) => onMove(e, i)}
-            onPointerUp={() => setDrag(null)}
+            onPointerUp={() => onUp(shownAll)}
+            // A cancelled gesture is not a decision: everyone comes home.
             onPointerCancel={() => setDrag(null)}
             // A drag is not a tap: it must not open a profile on release.
             onClick={(e) => moved.current && e.preventDefault()}

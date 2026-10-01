@@ -405,6 +405,8 @@ function ReelCard({
   const supabase = createClient();
   const showToast = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
+  /** The Shot itself, which is what the rehype deck may be dragged off. */
+  const reelRef = useRef<HTMLElement>(null);
   const [playing, setPlaying] = useState(true);
   /** The play/pause glyph is a confirmation, not a control: it flashes to show
    *  the tap landed, then clears so it is not parked over the video. */
@@ -984,6 +986,7 @@ function ReelCard({
 
   return (
     <section
+      ref={reelRef}
       className="relative h-full w-full"
       onTouchStart={onReelTouchStart}
       onTouchMove={onReelTouchMove}
@@ -1238,7 +1241,7 @@ function ReelCard({
       >
         {/* Who passed this on. The faces carry the rehype mark themselves,
             so the line that used to name them here is gone. */}
-        <RehypeDeck seated={deck} size={30} />
+        <RehypeDeck seated={deck} size={30} bounds={reelRef} />
         <Link
           href={handle ? `/u/${handle}` : "#"}
           className="flex items-center gap-2.5"
