@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { gestureBlocked } from "@/components/layout/SwipeNav";
 import { clampPinch, PINCH_MAX, reelSwipeOutcome } from "@/components/shots/ReelsFeed";
-import { clampZoom, ZOOM_MAX, ZOOM_MIN } from "@/components/feed/FeedCard";
+import { clampZoom, ownsSwipe, ZOOM_MAX, ZOOM_MIN } from "@/components/feed/FeedCard";
 import { autoplayAllowed } from "@/components/feed/ShotFeedCard";
 
 /**
@@ -21,6 +21,32 @@ describe("gestureBlocked", () => {
     // null target cannot be inside a horizontal scroller, so this isolates
     // the overlay half of the rule.
     expect(gestureBlocked(0, null)).toBe(false);
+  });
+});
+
+describe("ownsSwipe — whose sideways drag is it", () => {
+  it("is the post’s when there are photos to move between", () => {
+    expect(ownsSwipe(2)).toBe(true);
+    expect(ownsSwipe(6)).toBe(true);
+  });
+
+  it("is the tab swipe’s on a post with one photo, or none", () => {
+    // Nowhere to go inside the post, so the drag means what it means
+    // everywhere else in the app: the next page.
+    expect(ownsSwipe(1)).toBe(false);
+    expect(ownsSwipe(0)).toBe(false);
+  });
+
+  it("decides what the gallery tells SwipeNav", () => {
+    const gallery = (count: number) => {
+      const el = document.createElement("div");
+      if (ownsSwipe(count)) el.setAttribute("data-hswipe", "");
+      document.body.appendChild(el);
+      return el;
+    };
+    // A carousel keeps the gesture; a single photo hands it back.
+    expect(gestureBlocked(0, gallery(3))).toBe(true);
+    expect(gestureBlocked(0, gallery(1))).toBe(false);
   });
 });
 

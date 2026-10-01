@@ -113,6 +113,19 @@ export const ZOOM_MAX = 4;
  * than as zooming out. Guarded against a zero starting gap, which would put
  * NaN into a transform and blank the image.
  */
+/**
+ * Does this post's photo own a sideways drag?
+ *
+ * Only when there is somewhere to go: a post with two or more photos moves
+ * between them. On a post with one, a sideways drag is nobody's — so it goes
+ * back to the tab swipe, which is what a sideways drag means everywhere else
+ * in the app. Before this, every post swallowed it and a single-photo post
+ * was a dead patch of screen you could not swipe off.
+ */
+export function ownsSwipe(imageCount: number): boolean {
+  return imageCount > 1;
+}
+
 export function clampZoom(ratio: number): number {
   if (!Number.isFinite(ratio)) return ZOOM_MIN;
   return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, ratio));
@@ -374,7 +387,7 @@ export function FeedCard({
 
     const dx = galleryTouchStartX.current - e.changedTouches[0].clientX;
     const dy = galleryTouchStartY.current - e.changedTouches[0].clientY;
-    if (Math.abs(dx) >= 30 && Math.abs(dx) > Math.abs(dy)) {
+    if (ownsSwipe(images.length) && Math.abs(dx) >= 30 && Math.abs(dx) > Math.abs(dy)) {
       // Swipe detected — advance exactly ONE image regardless of velocity
       setImgIdx((i) =>
         dx > 0 ? Math.min(i + 1, images.length - 1) : Math.max(i - 1, 0)
@@ -388,7 +401,7 @@ export function FeedCard({
       Math.abs(dy) < HOLD_SLOP_PX &&
       e.timeStamp - galleryTouchStartAt.current < 250
     ) {
-      handleImageTap(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+      handleImageTap(e.changedTouches[0].clientX, e.changedTouches[0].clientY, e.timeStamp);
     }
   }
   function onGalleryTouchCancel() {
@@ -397,10 +410,10 @@ export function FeedCard({
     gestureConsumed.current = false;
     setPeekSrc(null);
   }
-  function onGalleryClick() {
+  function onGalleryClick(e: React.MouseEvent) {
     // On touch devices onTouchEnd already handled the tap; skip click synthesis.
     if (galleryIsTouchEvent.current) return;
-    handleImageTap(); // desktop mouse click
+    handleImageTap(e.clientX, e.clientY, e.timeStamp); // desktop mouse click
   }
   function onGalleryContextMenu(e: React.MouseEvent) {
     // A long press on an image raises the WebView's own save/copy callout,
@@ -442,7 +455,10 @@ export function FeedCard({
   const postTrack = parseTrack(post.track);
   const postPoll = parsePoll(post.poll);
 
-  const lastTapRef = useRef({ at: 0, x: 0, y: 0 });
+  // -Infinity, not 0: the times are the events own, counted from when the
+  // page opened, so a first tap in the first 300ms of that would otherwise
+  // read as the second half of a double-tap and hype the post.
+  const lastTapRef = useRef({ at: -Infinity, x: 0, y: 0 });
 
   // â”€â”€ Self-sync: resolve user + fetch hype/save/comment state â”€â”€
   useEffect(() => {
@@ -642,8 +658,14 @@ export function FeedCard({
     setTimeout(() => setShowParticles(false), 640);
   }
 
-  function handleImageTap(x = 0, y = 0) {
-    const now = Date.now();
+  /**
+   * The time comes from the event, not the clock: the tap that decides a
+   * double-tap is read out of the event that caused it, and reading the clock
+   * inside a function declared during render is a different thing to reason
+   * about.
+   */
+  function handleImageTap(x = 0, y = 0, at = 0) {
+    const now = at;
     const last = lastTapRef.current;
     // Both taps close together in time AND on the same spot.
     if (now - last.at < 300 && Math.hypot(x - last.x, y - last.y) < 40) {
@@ -753,8 +775,10 @@ export function FeedCard({
           // Tells SwipeNav this element owns its sideways drags. It is
           // overflow-hidden with a JS transform, so nothing about its computed
           // style identifies it as a carousel — without this, swiping between
-          // a post's photos was read as a tab swipe and landed you in Messages.
-          data-hswipe=""
+          // a post's photos was read as a tab swipe and landed you in
+          // Messages. Only when there are photos to move between: see
+          // ownsSwipe.
+          {...(ownsSwipe(images.length) ? { "data-hswipe": "" } : {})}
           onTouchStart={onGalleryTouchStart}
           onTouchMove={onGalleryTouchMove}
           onTouchEnd={onGalleryTouchEnd}
