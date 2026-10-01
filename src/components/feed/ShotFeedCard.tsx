@@ -40,6 +40,13 @@ import {
 import type { ShotCard } from "@/lib/feed-mix";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { CommentIcon } from "@/components/ui/CommentIcon";
+import { RehypeCount, RehypeIcon } from "@/components/ui/RehypeIcon";
+import { isRehyped, setRehype, type DeckPerson } from "@/lib/rehype";
+import { useRehypeDeck } from "@/lib/use-rehype-deck";
+import { RehypeDeck } from "@/components/feed/RehypeDeck";
+import { RehypeReplySheet } from "@/components/feed/RehypeReplySheet";
+import { PostPeek } from "@/components/feed/PostPeek";
+import { useLongPress } from "@/lib/useLongPress";
 
 /**
  * A Shot, sitting in the post feed.
@@ -155,6 +162,14 @@ export function ShotFeedCard({
   const [saveBurst, setSaveBurst] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [rehyped, setRehyped] = useState(false);
+  const [rehypeCount, setRehypeCount] = useState(shot.repost_count ?? 0);
+  const [rehypePending, setRehypePending] = useState(false);
+  const [rehypePulse, setRehypePulse] = useState(0);
+  /** Whose rehype you tapped, and are about to reply to. */
+  const [replyTo, setReplyTo] = useState<DeckPerson | null>(null);
+  /** Held to lift the whole Shot out of the feed, playing. */
+  const [peekOpen, setPeekOpen] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(false);
   const showToast = useToast();
   const router = useRouter();
@@ -173,8 +188,35 @@ export function ShotFeedCard({
   const [armed, setArmed] = useState(false);
   const [playing, setPlaying] = useState(false);
 
+  /**
+   * Who rehyped this Shot, ranked for you. Only once the card is near the
+   * viewport, like the hype state below: a feed of ten Shots should not be
+   * ten decks fetched for the nine nobody reaches.
+   */
+  const seated = useRehypeDeck("shot", shot.id, currentUserId, rehyped, armed);
+
   /** True while the card is the one on screen, so retries know to bother. */
   const inViewRef = useRef(false);
+
+  /**
+   * Hold the Shot to lift it out of the feed. A tap still opens the viewer:
+   * useLongPress swallows the click a hold ends in.
+   */
+  const peekPress = useLongPress(() => {
+    haptics.select();
+    setPeekOpen(true);
+  });
+
+  // One copy of a Shot playing at a time. The peek plays its own, and this
+  // one is behind it — audible, out of sync, and decoding for nothing.
+  useEffect(() => {
+    if (!peekOpen) return;
+    const v = videoRef.current;
+    if (v && !v.paused) {
+      v.pause();
+      setPlaying(false);
+    }
+  }, [peekOpen]);
 
   // The mute preference and the audio owner both live outside React, because
   // they are shared by every card on the page. This mirrors them in.
@@ -199,6 +241,19 @@ export function ShotFeedCard({
       .then(({ data }) => {
         if (live) setHyped(!!data);
       });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [armed, currentUserId, shot.id]);
+
+  // And whether you have already rehyped it, on the same terms.
+  useEffect(() => {
+    if (!armed || !currentUserId) return;
+    let live = true;
+    void isRehyped(supabase as never, currentUserId, "shot", shot.id).then((yes) => {
+      if (live) setRehyped(yes);
+    });
     return () => {
       live = false;
     };
@@ -276,6 +331,39 @@ export function ShotFeedCard({
     } else if (!prev) {
       showToast("Saved", "success");
     }
+  }
+
+  async function toggleRehype() {
+    if (rehypePending) return;
+    if (!currentUserId) {
+      showToast("Sign in to rehype");
+      return;
+    }
+    const prev = rehyped;
+    const prevCount = rehypeCount;
+    setRehypePending(true);
+    haptics.select();
+    setRehyped(!prev);
+    setRehypePulse((n) => n + 1);
+    setRehypeCount((c) => Math.max(0, c + (prev ? -1 : 1)));
+
+    const res = await setRehype(supabase as never, currentUserId, "shot", shot.id, !prev);
+    setRehypePending(false);
+    if (res.ok) {
+      setRehyped(res.rehyped);
+      if (!prev) showToast("Rehyped to your followers", "success");
+      return;
+    }
+    setRehyped(prev);
+    setRehypeCount(prevCount);
+    showToast(
+      res.reason === "not-allowed"
+        ? "Shots from private accounts can't be rehyped."
+        : prev
+          ? "Couldn't undo that rehype."
+          : "Couldn't rehype. Try again.",
+      "error",
+    );
   }
 
   async function toggleHype() {
@@ -518,16 +606,26 @@ export function ShotFeedCard({
         </button>
       </div>
 
+      {/* The media and the deck, which is a SIBLING of it: the Shot clips
+          what is inside it, and these faces are meant to be dragged off. */}
+      <div className="relative mx-4">
       <Link
         ref={wrapRef}
         href={`/shots/${shot.id}`}
         prefetch={false}
+        {...peekPress}
+        onPointerDown={(e) => {
+          // The mute button lives inside this link. Holding it is holding the
+          // button, not the Shot.
+          if ((e.target as Element)?.closest?.("button")) return;
+          peekPress.onPointerDown(e);
+        }}
         aria-label={`Open ${name}'s Shot`}
         /* 4:5, not the Shot's native 9:16. A true 9:16 tile is about 1.7
            viewports tall on a phone — one Shot would fill the screen and the
            feed would stop being a feed. This is the same shape band FeedCard
            uses for its gallery, so the two sit together. */
-        className="relative mx-4 block aspect-[4/5] overflow-hidden rounded-2xl bg-black"
+        className="relative block aspect-[4/5] overflow-hidden rounded-2xl bg-black"
       >
         {/* One element, not a video hidden behind an image.
 
@@ -614,6 +712,11 @@ export function ShotFeedCard({
         )}
       </Link>
 
+        <div className="pointer-events-none absolute bottom-3.5 left-3 z-20">
+          <RehypeDeck seated={seated} bounds={wrapRef} onPick={setReplyTo} />
+        </div>
+      </div>
+
       {/* The post card's action row, to the same measurements: the same four
           controls, the same spacing, the same counts, Save out on the right. */}
       <div className="flex items-center justify-between px-4 pt-3">
@@ -669,6 +772,25 @@ export function ShotFeedCard({
           </ShareButton>
         </div>
 
+        <div className="flex items-center gap-5">
+        {/* Beside Save, as on the post card: both are about keeping or passing
+            the Shot on, where the three on the left are reactions to it. */}
+        <button
+          type="button"
+          onClick={toggleRehype}
+          disabled={rehypePending}
+          aria-pressed={rehyped}
+          aria-label={rehyped ? "Rehyped. Tap to undo" : "Rehype"}
+          className={`flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-transform duration-150 active:scale-90 disabled:opacity-70 ${
+            rehyped ? "text-accent" : "text-foreground"
+          }`}
+        >
+          <RehypeIcon size={23} active={rehyped} pulse={rehypePulse} />
+          {rehypeCount > 0 && (
+            <RehypeCount value={formatCount(rehypeCount)} pulse={rehypePulse} active={rehyped} />
+          )}
+        </button>
+
         <button
           type="button"
           onClick={toggleSave}
@@ -686,6 +808,7 @@ export function ShotFeedCard({
             fill={saved ? "currentColor" : "none"}
           />
         </button>
+        </div>
       </div>
 
       {/* Who of your people hyped this. A Shot card in the feed is not
@@ -868,6 +991,49 @@ export function ShotFeedCard({
           />
         </>
       )}
+
+      {/* Held open, and playing: a Shot lifted out of the feed as a frozen
+          frame would be less of it than the card it came from. 9/16, its true
+          shape, rather than the 4:5 the feed crops it to. */}
+      {peekOpen && (
+        <PostPeek
+          src={shot.poster_url || BLANK_POSTER}
+          videoSrc={shot.media_url}
+          aspectRatio={9 / 16}
+          postId={shot.id}
+          targetType="shot"
+          author={{
+            id: shot.user_id,
+            name,
+            username: username ?? null,
+            avatarUrl: profile?.avatar_url ?? null,
+            hue: profile?.avatar_hue ?? 280,
+            verified: !!profile?.is_verified,
+            cosmetics: profile,
+          }}
+          caption={shot.caption}
+          currentUserId={currentUserId ?? ""}
+          hyped={hyped}
+          hypeCount={hypeCount}
+          commentCount={commentCount}
+          saved={saved}
+          rehyped={rehyped}
+          rehypeCount={rehypeCount}
+          onRehype={() => void toggleRehype()}
+          onHype={() => void toggleHype()}
+          onComment={() => setCommentsOpen(true)}
+          onShare={() => setShareOpen(true)}
+          onSave={() => void toggleSave()}
+          onClose={() => setPeekOpen(false)}
+        />
+      )}
+
+      <RehypeReplySheet
+        person={replyTo}
+        kind="shot"
+        targetId={shot.id}
+        onClose={() => setReplyTo(null)}
+      />
     </article>
   );
 }

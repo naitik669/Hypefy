@@ -23,6 +23,7 @@ export type ShotCard = {
   hype_count?: number | null;
   comment_count?: number | null;
   share_count?: number | null;
+  repost_count?: number | null;
   /** The same author fields a post carries, so a Shot's header can match it. */
   profiles: {
     id?: string | null;

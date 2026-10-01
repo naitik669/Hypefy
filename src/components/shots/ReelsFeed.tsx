@@ -63,7 +63,35 @@ const PROGRESS_H = 3;
  * 50dvh is the sheet's own resting height (BottomSheet: rest = 0.5), so the
  * floor is exactly where the sheet starts.
  */
-const VIDEO_H = `max(var(${SHEET_TOP}, 100%), 50dvh)`;
+const VIDEO_H = `max(var(${SHEET_TOP}, 100dvh), 50dvh)`;
+
+/**
+ * And how wide: a 9:16 box of that height.
+ *
+ * Stated rather than left to aspect-ratio, because knowing the width is what
+ * lets the box be centred in CSS instead of with a transform. See shotStage.
+ */
+const VIDEO_W = `calc(${VIDEO_H} * 9 / 16)`;
+
+/**
+ * Where the video sits, and what of it moves.
+ *
+ * The centring used to live in the same transform as the pinch — and that
+ * transform has a transition on it, for the pinch to glide back under. So
+ * opening the comments ANIMATED the centring: the Shot slid in from the right
+ * every single time, which is the little slide this fixes. The width above is
+ * known, so the left edge is arithmetic, and the transform is left to the one
+ * thing that should actually move.
+ */
+export function shotStage(
+  commentsOpen: boolean,
+  pinchScale: number,
+): { height?: string; width?: string; left?: string; transform?: string } {
+  const transform = pinchScale === 1 ? undefined : `scale(${pinchScale})`;
+  if (!commentsOpen) return { transform };
+  // Half the stage's width back from the middle of the screen.
+  return { height: VIDEO_H, width: VIDEO_W, left: `calc(50% - ${VIDEO_H} * 9 / 32)`, transform };
+}
 import { useLongPress } from "@/lib/useLongPress";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { CommentIcon } from "@/components/ui/CommentIcon";
@@ -1017,17 +1045,7 @@ function ReelCard({
           // centred, filled the same way it is full-screen. Fitting the
           // whole frame into a wide box instead was what turned a Shot
           // filmed wider than 9:16 into a letterboxed horizontal strip.
-          height: commentsOpen ? VIDEO_H : undefined,
-          aspectRatio: commentsOpen ? "9 / 16" : undefined,
-          left: commentsOpen ? "50%" : undefined,
-          // The centring lives in the same transform as the pinch, because
-          // a style transform would otherwise overwrite a class one and drop
-          // the video back to the left edge mid-gesture.
-          transform: commentsOpen
-            ? `translateX(-50%)${pinchScale === 1 ? "" : ` scale(${pinchScale})`}`
-            : pinchScale === 1
-              ? undefined
-              : `scale(${pinchScale})`,
+          ...shotStage(commentsOpen, pinchScale),
           // Snap back under its own power once the fingers leave, but track
           // them exactly while they are down.
           transition: pinching ? "none" : "transform 220ms ease-out",

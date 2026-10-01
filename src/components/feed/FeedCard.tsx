@@ -1105,6 +1105,9 @@ export function FeedCard({
           hypeCount={hypeCount}
           commentCount={commentCount}
           saved={saved}
+          rehyped={rehyped}
+          rehypeCount={rehypeCount}
+          onRehype={toggleRehype}
           onHype={toggleHype}
           onComment={() => setCommentsOpen(true)}
           onShare={() => setShareOpen(true)}

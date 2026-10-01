@@ -19,6 +19,7 @@ import { formatCount } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { ShareButton } from "@/components/feed/QuickShare";
 import { CommentIcon } from "@/components/ui/CommentIcon";
+import { RehypeCount, RehypeIcon } from "@/components/ui/RehypeIcon";
 
 /**
  * Hold a photo to lift the whole POST off the feed.
@@ -90,6 +91,7 @@ export type PeekAuthor = {
 
 export function PostPeek({
   src,
+  videoSrc,
   aspectRatio,
   postId,
   targetType = "post",
@@ -100,6 +102,9 @@ export function PostPeek({
   hypeCount,
   commentCount,
   saved,
+  rehyped,
+  rehypeCount = 0,
+  onRehype,
   onHype,
   onComment,
   onShare,
@@ -107,6 +112,13 @@ export function PostPeek({
   onClose,
 }: {
   src: string;
+  /**
+   * A Shot's video. With one, the peek PLAYS rather than holding a still —
+   * `src` becomes the poster it starts from. Holding a Shot and getting a
+   * frozen frame of it was the one place in the app where expanding a video
+   * gave you less of it than the thing you expanded.
+   */
+  videoSrc?: string;
   /** The post's composed shape (posts.aspect_ratio), so the box is right from
    *  the first frame. Null falls back to a square, as the feed card does. */
   aspectRatio?: number | null;
@@ -120,6 +132,18 @@ export function PostPeek({
   hypeCount: number;
   commentCount: number;
   saved: boolean;
+  /**
+   * Rehype, where the caller has it. Optional because a grid tile does not:
+   * GridPeek fetches what the peek needs when the peek opens, and a rehype
+   * state nobody has asked for is a query for nothing.
+   *
+   * The deck of faces is deliberately NOT here. It belongs on the post in the
+   * feed, where it can be dragged off; three faces floating over a card you
+   * opened to look at properly is clutter in front of the picture.
+   */
+  rehyped?: boolean;
+  rehypeCount?: number;
+  onRehype?: () => void;
   onHype: () => void;
   onComment: () => void;
   onShare: () => void;
@@ -135,6 +159,7 @@ export function PostPeek({
   /** Replays the burst on the icon that was just turned on. */
   const [hypeBurst, setHypeBurst] = useState(0);
   const [saveBurst, setSaveBurst] = useState(0);
+  const [rehypePulse, setRehypePulse] = useState(0);
   /** Taking a hype back snaps the star in two, as on the feed. */
   const [broke, setBroke] = useState(false);
   useEffect(() => {
@@ -323,13 +348,29 @@ export function PostPeek({
               object-cover crops nothing — you see the whole post, at the size
               it will still be once the pixels land. */}
           <div className="relative mx-auto w-full overflow-hidden" style={peekPhotoBox(aspectRatio)}>
-            <OptimizedImage
-              src={src}
-              alt={caption ?? "Post"}
-              sizes="(max-width: 480px) 100vw, 440px"
-              className="object-cover"
-              draggable={false}
-            />
+            {videoSrc ? (
+              /* Muted, because the card underneath may still be the one that
+                 owns the sound and two copies of the same Shot out of sync is
+                 worse than a silent one. Loops, so a two-second Shot held for
+                 ten does not end up a still after all. */
+              <video
+                src={videoSrc}
+                poster={src || undefined}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : (
+              <OptimizedImage
+                src={src}
+                alt={caption ?? "Post"}
+                sizes="(max-width: 480px) 100vw, 440px"
+                className="object-cover"
+                draggable={false}
+              />
+            )}
           </div>
           {burst > 0 && (
             <div key={burst} className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -386,22 +427,46 @@ export function PostPeek({
             </ShareButton>
           </div>
 
-          <PeekAction
-            label={saved ? "Remove from saved" : "Save"}
-            active={saved}
-            onClick={() => {
-              if (!saved) setSaveBurst((n) => n + 1);
-              onSave();
-            }}
-          >
-            <Bookmark
-              key={saveBurst}
-              size={21}
-              strokeWidth={2.2}
-              className={`${saveBurst ? "animate-hype-burst" : ""} transition-colors`}
-              fill={saved ? "currentColor" : "none"}
-            />
-          </PeekAction>
+          <div className="flex items-center gap-5">
+            {/* Beside Save, as on the feed card: both are about keeping or
+                passing the post on, where the three on the left are reactions. */}
+            {onRehype && (
+              <PeekAction
+                label={rehyped ? "Rehyped. Tap to undo" : "Rehype"}
+                active={!!rehyped}
+                onClick={() => {
+                  setRehypePulse((n) => n + 1);
+                  onRehype();
+                }}
+              >
+                <RehypeIcon size={23} active={!!rehyped} pulse={rehypePulse} />
+                {rehypeCount > 0 && (
+                  <RehypeCount
+                    value={formatCount(rehypeCount)}
+                    pulse={rehypePulse}
+                    active={!!rehyped}
+                  />
+                )}
+              </PeekAction>
+            )}
+
+            <PeekAction
+              label={saved ? "Remove from saved" : "Save"}
+              active={saved}
+              onClick={() => {
+                if (!saved) setSaveBurst((n) => n + 1);
+                onSave();
+              }}
+            >
+              <Bookmark
+                key={saveBurst}
+                size={21}
+                strokeWidth={2.2}
+                className={`${saveBurst ? "animate-hype-burst" : ""} transition-colors`}
+                fill={saved ? "currentColor" : "none"}
+              />
+            </PeekAction>
+          </div>
         </div>
 
         <div className="px-4 pb-4 pt-2">

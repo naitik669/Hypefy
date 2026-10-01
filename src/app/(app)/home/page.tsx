@@ -161,7 +161,7 @@ export default async function HomePage() {
     supabase
       .from("shots")
       .select(
-        "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, save_count, share_count, profiles(id, display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
+        "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, save_count, share_count, repost_count, profiles(id, display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
       )
       .order("created_at", { ascending: false })
       .limit(30),

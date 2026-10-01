@@ -11,6 +11,13 @@ import { createRoot, type Root } from "react-dom/client";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push() {}, refresh() {} }) }));
 vi.mock("@/components/ui/ToastProvider", () => ({ useToast: () => () => {} }));
+// One face in the deck, so "the card has one and the peek does not" is a claim
+// about something that exists rather than a selector that never matches.
+vi.mock("@/lib/use-rehype-deck", () => ({
+  useRehypeDeck: () => [
+    { userId: "u3", name: "Ira", username: "ira", avatarUrl: null, hue: 120, isMe: false },
+  ],
+}));
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     from: () => ({
@@ -100,5 +107,84 @@ describe("a Shot in the feed", () => {
     expect(badge!.closest("a")).toBeTruthy();
     const header = host.querySelector("article > div") as HTMLElement;
     expect(header.textContent).not.toContain("SHOT");
+  });
+});
+
+/**
+ * A Shot in the home feed can be passed on, and can be lifted out of the feed
+ * and watched. Both were things a post card could already do and a Shot card
+ * could not — the same content, two different sets of what you can do with it.
+ */
+/** jsdom has no PointerEvent; a MouseEvent with a pointerId is what React reads. */
+const pointerDown = () =>
+  Object.assign(new MouseEvent("pointerdown", { bubbles: true, clientX: 10, clientY: 10, button: 0 }), {
+    pointerId: 1,
+    pointerType: "touch",
+  });
+
+describe("rehyping a Shot from the feed", () => {
+  it("offers the rehype beside Save, where the post card keeps it", () => {
+    const rehype = label("Rehype") as HTMLElement;
+    expect(rehype).toBeTruthy();
+    // Same row as Save, and not in the reactions group on the left.
+    expect(rehype.parentElement).toBe(label("Save")!.parentElement);
+    expect(rehype.parentElement).not.toBe(label("Hype")!.parentElement);
+  });
+
+  it("says in its label whether it is on, so the icon is not the only word for it", () => {
+    expect(label("Rehype")).toBeTruthy();
+    expect(label("Rehyped. Tap to undo")).toBeFalsy();
+  });
+});
+
+describe("holding a Shot in the feed", () => {
+  /** A hold: down, wait past the threshold, no movement. */
+  async function hold() {
+    const media = host.querySelector("a[href='/shots/s1']") as HTMLElement;
+    await act(async () => {
+      media.dispatchEvent(
+        pointerDown(),
+      );
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(600);
+    });
+  }
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("lifts the Shot out and PLAYS it, rather than freezing a frame of it", async () => {
+    await hold();
+    const peek = document.querySelector('[role="dialog"][aria-label="Post preview"]');
+    expect(peek).toBeTruthy();
+    const video = peek!.querySelector("video") as HTMLVideoElement;
+    expect(video).toBeTruthy();
+    expect(video.getAttribute("src")).toBe(SHOT.media_url);
+    expect(video.hasAttribute("autoplay")).toBe(true);
+    expect(video.hasAttribute("loop")).toBe(true);
+  });
+
+  it("carries the rehype into the peek, and none of the faces", async () => {
+    await hold();
+    const peek = document.querySelector('[role="dialog"][aria-label="Post preview"]')!;
+    expect(peek.querySelector('[aria-label="Rehype"]')).toBeTruthy();
+    // The deck belongs on the card, where it can be dragged off. Over a Shot
+    // someone opened to watch properly it is just something in the way.
+    expect(host.querySelector(".rehype-deck")).toBeTruthy();
+    expect(peek.querySelector(".rehype-deck")).toBeFalsy();
+  });
+
+  it("does nothing when the hold lands on the mute button", async () => {
+    const mute = label("Unmute") as HTMLElement;
+    await act(async () => {
+      mute.dispatchEvent(
+        pointerDown(),
+      );
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(document.querySelector('[aria-label="Post preview"]')).toBeFalsy();
   });
 });
