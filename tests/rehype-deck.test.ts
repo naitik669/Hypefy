@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { DECK_SEATS, fetchDeck, fetchMe, seatDeck, setRehype, type DeckPerson } from "@/lib/rehype";
-import { dragLayout, reconcileFaces } from "@/components/feed/RehypeDeck";
+import { dragLayout, fadeOutside, reconcileFaces } from "@/components/feed/RehypeDeck";
 
 /**
  * The rehype deck: three faces at most, ranked by how much you interact with
@@ -233,6 +233,35 @@ describe("dragLayout — carrying the deck around", () => {
       { x: 0, y: 0 },
       { x: 0, y: 0 },
     ]);
+  });
+});
+
+describe("fadeOutside — a face belongs to the picture", () => {
+  // A 200x200 picture, with the deck's own box somewhere inside it.
+  const picture = { left: -12, top: -150, right: 188, bottom: 50 };
+  const face = (left: number, top: number) => ({ left, top, right: left + 36, bottom: top + 36 });
+
+  it("shows a face fully while it is inside", () => {
+    expect(fadeOutside(face(0, 0), picture, 18)).toBe(1);
+    // Flush against the edge still counts as inside.
+    expect(fadeOutside(face(152, 0), picture, 18)).toBe(1);
+  });
+
+  it("fades it as it crosses the edge, and it is gone once half of it is out", () => {
+    expect(fadeOutside(face(161, 0), picture, 18)).toBeCloseTo(0.5);
+    expect(fadeOutside(face(170, 0), picture, 18)).toBe(0);
+    // Far outside stays gone rather than going negative.
+    expect(fadeOutside(face(400, 0), picture, 18)).toBe(0);
+  });
+
+  it("watches every edge, not just the sides", () => {
+    expect(fadeOutside(face(0, 23), picture, 18)).toBeCloseTo(0.5); // below
+    expect(fadeOutside(face(0, -159), picture, 18)).toBeCloseTo(0.5); // above
+    expect(fadeOutside(face(-21, 0), picture, 18)).toBeCloseTo(0.5); // left
+  });
+
+  it("leaves faces alone when nothing says where the picture is", () => {
+    expect(fadeOutside(face(9999, 9999), null, 18)).toBe(1);
   });
 });
 

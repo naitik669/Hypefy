@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import type { DeckPerson } from "@/lib/rehype";
 
@@ -106,10 +106,46 @@ export function dragLayout(
   return { gathered, offsets };
 }
 
-export function RehypeDeck({ seated, size = 36 }: { seated: DeckPerson[]; size?: number }) {
+/** A rectangle in the deck's own coordinates: the picture the faces live on. */
+export type Box = { left: number; top: number; right: number; bottom: number };
+
+/**
+ * How visible a face is as it leaves the picture: fully there while it is
+ * inside, fading as it crosses the edge, gone by the time half of it is out.
+ *
+ * A face carried off the photo must not go on floating over the Hype row or
+ * the post below — it belongs to the picture, so it leaves with it.
+ * Exported for tests.
+ */
+export function fadeOutside(face: Box, bounds: Box | null, over: number): number {
+  if (!bounds) return 1;
+  const out = Math.max(
+    bounds.left - face.left,
+    face.right - bounds.right,
+    bounds.top - face.top,
+    face.bottom - bounds.bottom,
+    0,
+  );
+  return Math.max(0, 1 - out / over);
+}
+
+export function RehypeDeck({
+  seated,
+  size = 36,
+  bounds,
+}: {
+  seated: DeckPerson[];
+  size?: number;
+  /** The picture the deck sits on. Faces dragged past its edge fade out. */
+  bounds?: RefObject<HTMLElement | null>;
+}) {
   const [faces, setFaces] = useState<Face[]>([]);
   const [seenSeating, setSeenSeating] = useState<DeckPerson[]>([]);
   const [drag, setDrag] = useState<{ index: number; d: Vec } | null>(null);
+  // Measured when a drag starts, in the deck's own coordinates, so no layout
+  // is read while the faces are moving.
+  const [box, setBox] = useState<Box | null>(null);
+  const group = useRef<HTMLDivElement>(null);
   const from = useRef<Vec>({ x: 0, y: 0 });
   const moved = useRef(false);
   // Follow the parent during render rather than in an effect, so a change
@@ -133,6 +169,7 @@ export function RehypeDeck({ seated, size = 36 }: { seated: DeckPerson[]; size?:
   const seats = faces.map((f) => ({ x: f.seat * step, y: -lift(f.seat) }));
   const layout = drag ? dragLayout(seats, drag.index, drag.d, GATHER_PX, size * FAN) : null;
   const columns = Math.max(...faces.map((f) => f.seat)) + 1;
+  const height = size * (1 + RAISE[1]);
   const names = seated.map((p) => (p.isMe ? "you" : p.name));
 
   function onDown(e: React.PointerEvent, index: number) {
@@ -142,6 +179,18 @@ export function RehypeDeck({ seated, size = 36 }: { seated: DeckPerson[]; size?:
     e.currentTarget.setPointerCapture?.(e.pointerId);
     from.current = { x: e.clientX, y: e.clientY };
     moved.current = false;
+    const picture = bounds?.current?.getBoundingClientRect();
+    const mine = group.current?.getBoundingClientRect();
+    setBox(
+      picture && mine
+        ? {
+            left: picture.left - mine.left,
+            top: picture.top - mine.top,
+            right: picture.right - mine.left,
+            bottom: picture.bottom - mine.top,
+          }
+        : null,
+    );
     setDrag({ index, d: { x: 0, y: 0 } });
   }
   function onMove(e: React.PointerEvent, index: number) {
@@ -153,10 +202,11 @@ export function RehypeDeck({ seated, size = 36 }: { seated: DeckPerson[]; size?:
 
   return (
     <div
+      ref={group}
       role="group"
       aria-label={names.length ? `Rehyped by ${names.join(", ")}` : undefined}
       className="rehype-deck pointer-events-auto relative shrink-0"
-      style={{ width: size + (columns - 1) * step, height: size * (1 + RAISE[1]) }}
+      style={{ width: size + (columns - 1) * step, height }}
       // A touch that starts on the deck belongs to the deck, never to the
       // gallery's swipe or double-tap-to-Hype underneath it.
       onTouchStart={(e) => e.stopPropagation()}
@@ -167,6 +217,12 @@ export function RehypeDeck({ seated, size = 36 }: { seated: DeckPerson[]; size?:
         const leaving = f.motion === "leave";
         const held = drag?.index === i;
         const off = layout?.offsets[i] ?? { x: 0, y: 0 };
+        // Where this face is now, and how much of it is still on the picture.
+        const top = height - lift(f.seat) - size + off.y;
+        const left = seats[i].x + off.x;
+        const shown = drag
+          ? fadeOutside({ left, top, right: left + size, bottom: top + size }, box, size * 0.5)
+          : 1;
         const animation =
           f.motion === "rise"
             ? `deck-rise 0.36s ${f.seat * 60}ms cubic-bezier(0.2, 0.8, 0.2, 1) both`
@@ -199,14 +255,17 @@ export function RehypeDeck({ seated, size = 36 }: { seated: DeckPerson[]; size?:
               height: size,
               touchAction: "none",
               zIndex: held ? 2 : 1,
+              opacity: shown,
+              // Once it has faded out it is not there to be tapped either.
+              visibility: shown === 0 ? "hidden" : undefined,
               transform: `translate3d(${off.x}px, ${off.y}px, 0)`,
               // The face in your hand tracks it exactly; the others glide
               // after it, and everyone swings back when you let go.
               transition: drag
                 ? held
-                  ? "none"
-                  : "transform 0.24s ease-out"
-                : "transform 0.55s cubic-bezier(0.22, 1.1, 0.36, 1)",
+                  ? "opacity 0.12s linear"
+                  : "transform 0.24s ease-out, opacity 0.12s linear"
+                : "transform 0.55s cubic-bezier(0.22, 1.1, 0.36, 1), opacity 0.3s ease-out",
             }}
             onPointerDown={(e) => !leaving && onDown(e, i)}
             onPointerMove={(e) => onMove(e, i)}

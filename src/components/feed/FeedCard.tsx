@@ -856,7 +856,7 @@ export function FeedCard({
               the photo clips what is inside it, and these faces are meant to
               be dragged off it. */}
           <div className="pointer-events-none absolute bottom-3.5 left-7 z-20">
-            <RehypeDeck seated={seated} />
+            <RehypeDeck seated={seated} bounds={galleryRef} />
           </div>
         </div>
       )}
