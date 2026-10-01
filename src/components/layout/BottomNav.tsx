@@ -197,7 +197,7 @@ export function BottomNav({
                 // right below it. The background-coloured ring cuts the bubble's
                 // stroke away behind the badge so the two shapes stay readable
                 // where they overlap.
-                <span className="absolute -right-2 -top-1.5 flex h-[18px] min-w-[18px] animate-react-pop items-center justify-center rounded-[6px] bg-danger px-1 text-[10px] font-black leading-none text-white ring-[3px] ring-background">
+                <span className="absolute -right-2 -top-1.5 flex h-[18px] min-w-[18px] animate-react-pop items-center justify-center rounded-full bg-danger px-1 text-[10px] font-black leading-none text-white ring-[3px] ring-background">
                   {unreadMsgs > 9 ? "9+" : unreadMsgs}
                 </span>
               )}

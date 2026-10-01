@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
 import { haptics } from "@/lib/haptics";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
+import { useFrozenPage } from "@/lib/overlay-shield";
 
 /** Hold before the stack appears. Matches AccountSwitchPad. */
 const HOLD_MS = 320;
@@ -340,6 +341,7 @@ export function NavHoldMenu({
    * navigating the page away underneath it.
    */
   useOverlayBackButton(open, close);
+  useFrozenPage(open);
 
   /**
    * Hold the page still while the stack is up.

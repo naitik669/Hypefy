@@ -19,6 +19,7 @@ import {
   Ban,
 } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
+import { shieldProps } from "@/lib/overlay-shield";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { ShowViewersSheet } from "@/components/shows/ShowViewersSheet";
@@ -119,7 +120,7 @@ export function ShowViewer({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black">
+    <div className="fixed inset-0 z-50 bg-black" {...shieldProps}>
       <ShowScreen
         key={show.id}
         show={show}

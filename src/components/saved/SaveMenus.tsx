@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bookmark } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { shieldProps } from "@/lib/overlay-shield";
 import { useToast } from "@/components/ui/ToastProvider";
 import { haptics } from "@/lib/haptics";
 import type { Folder } from "@/lib/folders";
@@ -297,6 +298,7 @@ export function useSaveMenus({
                   aria-hidden
                   className={`fixed inset-0 z-[150] ${menu === "hint" ? "" : "bg-black/45 animate-[fade-in_0.2s_ease-out_both]"}`}
                   onClick={close}
+                  {...shieldProps}
                   style={{ pointerEvents: menu === "fan" && !detached ? "none" : "auto" }}
                 />
                 {/* The bookmark, lifted above the dim so the menu reads as coming out of it. */}

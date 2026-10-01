@@ -106,7 +106,7 @@ function GroupAvatar() {
 function UnreadBadge({ count }: { count: number }) {
   const label = count > 9 ? "9+" : String(count);
   return (
-    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-[7px] bg-accent px-1 text-[10px] font-black leading-none text-accent-ink">
+    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-black leading-none text-accent-ink">
       {label}
     </span>
   );
@@ -820,7 +820,7 @@ export function MessagesInbox({
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`flex shrink-0 items-center gap-1.5 rounded-pill px-4 py-1.5 text-sm font-semibold transition-colors ${
+            className={`flex shrink-0 items-center gap-1.5 rounded-[14px] px-4 py-1.5 text-sm font-semibold transition-colors ${
               tab === t.key
                 ? "bg-accent text-accent-ink"
                 : "bg-surface text-muted"
@@ -829,7 +829,7 @@ export function MessagesInbox({
             {t.label}
             {t.count > 0 && (
               <span
-                className={`flex h-4 min-w-4 items-center justify-center rounded-[6px] px-1 text-[10px] font-bold ${
+                className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
                   tab === t.key
                     ? "bg-accent-ink/15 text-accent-ink"
                     : "bg-accent text-accent-ink"
