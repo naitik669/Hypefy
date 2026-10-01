@@ -42,8 +42,7 @@ export function InterestCard({
   const name = actor?.username ?? actor?.display_name ?? "A friend";
   return (
     <div
-      className="mx-3 my-2 grid gap-2.5 rounded-[18px] border border-accent/25 p-3"
-      style={{ background: "radial-gradient(120% 100% at 0% 0%, rgb(163 230 53 / 0.14), transparent 60%), var(--color-surface)" }}
+      className="mx-3 my-2 grid gap-2.5 rounded-[18px] border border-accent/25 bg-surface p-3"
       role="region"
       aria-label="New kind of notification"
       data-interest-card=""

@@ -5,6 +5,7 @@ import { CheckCheck, Loader2, Trash2, UserPlus, ShieldAlert, Sparkles, SlidersHo
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { lockAxis } from "@/components/layout/SwipeNav";
 import { PushNudge } from "@/components/pwa/PushNudge";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { EmptyScene, ctaClass } from "@/components/empty/EmptyScene";
@@ -699,6 +700,27 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 const SWIPE_REVEAL = 80; // px per action revealed — matches each button's w-20
 const SWIPE_COMMIT = 110; // px drag distance that commits the clear
 
+/**
+ * How far a row has been dragged, given the finger's travel. Never past the
+ * far end, never to the right of home: the actions live on the left.
+ * Exported for tests.
+ */
+export function swipeTo(dx: number, from: number, limit: number): number {
+  return Math.max(-limit - 20, Math.min(0, from + dx));
+}
+
+/**
+ * Where a row settles when the finger lifts: cleared if it was carried past
+ * everything revealed, open at the actions if it was pulled most of the way
+ * to them, and home otherwise. Clearing is the one that cannot be undone, so
+ * it asks for the whole distance rather than a flick. Exported for tests.
+ */
+export function settleTo(x: number, reveal: number, commitAt: number): "clear" | "open" | "closed" {
+  if (x <= -commitAt) return "clear";
+  if (x <= -reveal / 2) return "open";
+  return "closed";
+}
+
 /** One notification row (single or grouped). Swipe left to reveal + confirm clear. */
 function NotifRow({
   group: g,
@@ -726,30 +748,64 @@ function NotifRow({
   const [dragging, setDragging] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const startX = useRef<number | null>(null);
+  const startY = useRef(0);
   const startDragX = useRef(0);
+  /**
+   * Which way this touch is going: sideways is the row's, up and down is the
+   * list's, and null until it is clear. Without it the row followed every
+   * finger, so reading down Activity dragged rows open under the thumb, and a
+   * swipe for the options scrolled the list at the same time.
+   */
+  const axis = useRef<null | "x" | "y">(null);
+  const row = useRef<HTMLAnchorElement | null>(null);
+
+  // Once the gesture is the row's, the browser's scroll is cancelled for the
+  // rest of it. Native and non-passive: React's own touch handlers cannot.
+  useEffect(() => {
+    const el = row.current;
+    if (!el) return;
+    const onMove = (e: TouchEvent) => {
+      if (axis.current !== "x" || !e.cancelable) return;
+      e.preventDefault();
+    };
+    el.addEventListener("touchmove", onMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onMove);
+  }, []);
 
   function onTouchStart(e: React.TouchEvent) {
     startX.current = e.touches[0].clientX;
+    startY.current = e.touches[0].clientY;
     startDragX.current = dragX;
+    axis.current = null;
     setDragging(true);
   }
   function onTouchMove(e: React.TouchEvent) {
     if (startX.current === null) return;
     const dx = e.touches[0].clientX - startX.current;
-    const next = Math.max(-commitAt - 20, Math.min(0, startDragX.current + dx));
-    setDragX(next);
+    const dy = e.touches[0].clientY - startY.current;
+    if (axis.current === null) axis.current = lockAxis(dx, dy);
+    // Still ambiguous, or the list's: leave the row where it is.
+    if (axis.current !== "x") return;
+    setDragX(swipeTo(dx, startDragX.current, commitAt));
   }
   function onTouchEnd() {
     setDragging(false);
     startX.current = null;
-    if (dragX <= -commitAt) {
+    // A row that never claimed the gesture settles back rather than sticking
+    // half open on whatever the scroll had dragged it to.
+    if (axis.current !== "x") {
+      axis.current = null;
+      setDragX(startDragX.current);
+      return;
+    }
+    axis.current = null;
+    const settled = settleTo(dragX, SWIPE_REVEAL, commitAt);
+    if (settled === "clear") {
       setLeaving(true);
       setDragX(-400);
       setTimeout(onClear, 200);
-    } else if (dragX <= -SWIPE_REVEAL / 2) {
-      setDragX(-reveal); // settle open
     } else {
-      setDragX(0); // spring back closed
+      setDragX(settled === "open" ? -reveal : 0);
     }
   }
 
@@ -786,6 +842,7 @@ function NotifRow({
       </button>
 
       <Link
+        ref={row}
         href={g.href}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
