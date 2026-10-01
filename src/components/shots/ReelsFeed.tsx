@@ -19,6 +19,7 @@ import { HypeParticles } from "@/components/feed/HypeParticles";
 import { HypeBreak } from "@/components/feed/HypeBreak";
 import { HypeProofLine } from "@/components/hype/HypeProofLine";
 import { playbackWindow } from "@/lib/shot-trim";
+import { overlayCount } from "@/lib/overlay-stack";
 import { HypedBySheet } from "@/components/hype/HypedBySheet";
 import { fetchHypeProof, type HypeProof } from "@/lib/hype-proof";
 import { formatCount } from "@/lib/format";
@@ -258,7 +259,9 @@ export function ReelsFeed({
   }, [activeIdx, items.length, noMore]);
 
   function onSwipeTouchStart(e: React.TouchEvent) {
-    if (sheetOpen) return;
+    // Holding Share opens a row over the reel; the finger holding it is on
+    // this strip, and without this the reel slides away under the faces.
+    if (sheetOpen || overlayCount() > 0) return;
     // Two fingers is a pinch on the reel. The reel tells us via onSheetChange,
     // but that is a state update and this handler runs in the same event that
     // triggered it — so the flag is still false here. Count the fingers.
@@ -279,6 +282,11 @@ export function ReelsFeed({
    */
   function onSwipeTouchMove(e: React.TouchEvent) {
     if (sheetOpen || drag === null) return;
+    // Opened mid-swipe: put the reel back rather than carrying on under it.
+    if (overlayCount() > 0) {
+      setDrag(null);
+      return;
+    }
     // A second finger landing mid-swipe turns the gesture into a pinch.
     // Abandon the drag rather than letting the reel slide while it scales.
     if (e.touches.length !== 1) {
@@ -1187,6 +1195,9 @@ function ReelCard({
           postId={reel.id}
           targetType="shot"
           onOpenSheet={() => setShareOpen(true)}
+          // The rail is against the right edge, so the row of faces unrolls
+          // to the left from the button rather than off the screen.
+          align="end"
           className="flex flex-col items-center gap-1 transition-transform active:scale-90"
         >
           <ShareIcon size={29} weight="bold" className="text-white" />

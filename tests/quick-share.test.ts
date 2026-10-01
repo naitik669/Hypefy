@@ -298,3 +298,43 @@ describe("holding share, inside the swipeable feed", () => {
     expect(page.style.transform).toBe("");
   });
 });
+
+describe("rowBox — where the card hangs off the button", () => {
+  const PHONE = 390;
+  // Five tiles: four faces and the way through to everyone else.
+  const FIVE = 5;
+
+  it("runs right from a button on the left of a post", async () => {
+    const { rowBox } = await import("@/components/layout/NavHoldMenu");
+    const { left, width } = rowBox({ left: 20, right: 64 }, FIVE, PHONE, "start");
+    expect(left).toBe(20);
+    expect(left + width).toBeLessThanOrEqual(PHONE - 8);
+  });
+
+  it("runs left from the Shots rail, which is already against the right edge", async () => {
+    const { rowBox } = await import("@/components/layout/NavHoldMenu");
+    const rail = { left: 334, right: 378 };
+    const { left, width } = rowBox(rail, FIVE, PHONE, "end");
+    // Its right edge lands on the button's, so the row starts where the
+    // thumb already is and runs away from the screen edge.
+    expect(left + width).toBe(rail.right);
+    expect(left).toBeGreaterThanOrEqual(8);
+  });
+
+  it("keeps the card on screen whichever way it was told to run", async () => {
+    const { rowBox } = await import("@/components/layout/NavHoldMenu");
+    const far = rowBox({ left: 360, right: 390 }, FIVE, PHONE, "start");
+    expect(far.left + far.width).toBeLessThanOrEqual(PHONE - 8);
+    const near = rowBox({ left: 0, right: 40 }, FIVE, PHONE, "end");
+    expect(near.left).toBe(8);
+  });
+
+  it("shrinks the tiles rather than the screen on a narrow phone", async () => {
+    const { rowBox } = await import("@/components/layout/NavHoldMenu");
+    const wide = rowBox({ left: 20, right: 64 }, FIVE, 430, "start");
+    // A 280px phone is where five tiles stop fitting at full size.
+    const narrow = rowBox({ left: 20, right: 64 }, FIVE, 280, "start");
+    expect(narrow.tile).toBeLessThan(wide.tile);
+    expect(narrow.left + narrow.width).toBeLessThanOrEqual(280 - 8);
+  });
+});

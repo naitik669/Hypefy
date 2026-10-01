@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { overlayCount } from "@/lib/overlay-stack";
 import Link from "next/link";
 import { Star, Bookmark, MoreHorizontal, Maximize2 } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
@@ -301,6 +302,10 @@ export function FeedCard({
   );
 
   function onGalleryTouchStart(e: React.TouchEvent) {
+    // Something is open over the post — the share row, a sheet. The finger
+    // that opened it started here, so its moves still arrive at the gallery
+    // unless it is told to let them go.
+    if (overlayCount() > 0) return;
     galleryIsTouchEvent.current = true;
     gestureConsumed.current = false;
     clearHold();
@@ -323,6 +328,7 @@ export function FeedCard({
   }
 
   function onGalleryTouchMove(e: React.TouchEvent) {
+    if (overlayCount() > 0) return;
     if (e.touches.length > 1) {
       // A second finger can land after the first — start the pinch from
       // wherever they are now, not from the single-finger origin.

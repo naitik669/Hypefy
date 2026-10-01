@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MoreHorizontal } from "lucide-react";
+import { Share2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { haptics } from "@/lib/haptics";
@@ -33,8 +33,15 @@ export type ShareTarget = {
   avatar_url: string | null;
 };
 
-/** How many faces the row holds, before the More tile. */
-const TARGETS = 6;
+/**
+ * How many faces the row holds, before the Share tile.
+ *
+ * Four, not six: the row hangs off the share button rather than spanning the
+ * screen, and past four the card reaches the far edge and has to be pulled
+ * back — which puts the first face somewhere other than under the thumb that
+ * is already resting on the button.
+ */
+const TARGETS = 4;
 
 /** Resolved once per session: the list barely moves and a hold must feel instant. */
 let cached: ShareTarget[] | null = null;
@@ -58,6 +65,7 @@ export function ShareButton({
   onOpenSheet,
   className = "",
   label = "Share",
+  align = "start",
   children,
 }: {
   postId: string;
@@ -66,6 +74,13 @@ export function ShareButton({
   onOpenSheet: () => void;
   className?: string;
   label?: string;
+  /**
+   * Which way the row unrolls from the button. "start" for a button on the
+   * left of a post's action row; "end" for the Shots rail, which is itself
+   * against the right edge — a row running right from there would be off the
+   * screen before it began.
+   */
+  align?: "start" | "end";
   /** The icon, so each surface keeps its own size and colour. */
   children: React.ReactNode;
 }) {
@@ -138,7 +153,7 @@ export function ShareButton({
         };
       }),
       // Everyone else, and every other way to share, one slide further.
-      { key: "more", label: "More", icon: MoreHorizontal, onSelect: onOpenSheet },
+      { key: "more", label: "Share", icon: Share2, onSelect: onOpenSheet },
     ]);
   }, [send, onOpenSheet]);
 
@@ -155,10 +170,11 @@ export function ShareButton({
     <NavHoldMenu
       actions={actions}
       label="Send to"
-      // A card just above the button, left edge under its left edge. A column
-      // would cover the post you are sharing, and drawn inside the feed it
-      // would sit under the veil and be blurred along with the page.
+      // A card just above the button, running out from it the way the button
+      // has room. A column would cover the post you are sharing, and drawn
+      // inside the feed it would sit under the veil and be blurred with it.
       layout="row"
+      align={align}
       // The feed scrolls under this button, unlike the nav bar it borrows the
       // gesture from, so the page keeps its own touches until the stack opens.
       touchAction="pan-y"

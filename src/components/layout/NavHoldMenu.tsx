@@ -88,6 +88,30 @@ const ROW_SLOP_PX = 16;
  * How much a row tile swells for a thumb this far from its centre: 1 on top
  * of it, falling to 0 a tile and a half away. Drives the Dock-style lens.
  */
+/**
+ * How wide a row card is, and where its left edge goes.
+ *
+ * The card hangs off the trigger: from its left edge running right, or from
+ * its right edge running left when the trigger is itself against the right of
+ * the screen — the Shots rail, where a row running right would start off the
+ * screen. Either way it is kept on screen, which is the one rule that beats
+ * the other two. Exported for tests.
+ */
+export function rowBox(
+  trigger: { left: number; right: number },
+  count: number,
+  viewport: number,
+  align: "start" | "end" = "start",
+): { left: number; width: number; tile: number } {
+  const tile = Math.min(
+    ROW_TILE,
+    Math.floor((viewport - 16 - ROW_PAD * 2 - (count - 1) * ROW_GAP) / count),
+  );
+  const width = count * tile + (count - 1) * ROW_GAP + ROW_PAD * 2;
+  const from = align === "end" ? trigger.right - width : trigger.left;
+  return { left: Math.max(8, Math.min(from, viewport - width - 8)), width, tile };
+}
+
 export function rowLens(distance: number): number {
   const reach = ROW_TILE * 1.6;
   return Math.max(0, 1 - Math.abs(distance) / reach);
@@ -118,6 +142,7 @@ export function NavHoldMenu({
   actions,
   label,
   layout = "stack",
+  align = "start",
   touchAction = "none",
   onArm,
   holdMs = HOLD_MS,
@@ -145,6 +170,13 @@ export function NavHoldMenu({
    * component would have re-earned the same bugs.
    */
   layout?: "stack" | "arc" | "row";
+  /**
+   * Row only: which end of the card sits under the trigger. "start" puts its
+   * left edge under the trigger's left edge and runs right; "end" puts its
+   * right edge under the trigger's right edge and runs left, for a trigger
+   * already against the right of the screen.
+   */
+  align?: "start" | "end";
   /**
    * What the browser may do with a touch that starts on the trigger.
    *
@@ -455,20 +487,14 @@ export function NavHoldMenu({
           box.left + box.width / 2 < window.innerWidth / 2 ? "right" : "left"
         );
         if (layout === "row") {
-          // Tile, gap and the card's own padding: enough to keep it on screen
-          // without measuring something that has not been drawn yet.
-          // Tiles shrink to fit a narrow screen rather than run off its edge.
-          const n = ready.length;
-          const tile = Math.min(
-            ROW_TILE,
-            Math.floor((window.innerWidth - 16 - ROW_PAD * 2 - (n - 1) * ROW_GAP) / n),
-          );
-          const width = n * tile + (n - 1) * ROW_GAP + ROW_PAD * 2;
+          // Sized and placed without measuring the card, which has not been
+          // drawn yet: tiles shrink on a narrow screen rather than run off it.
+          const { left, tile } = rowBox(box, ready.length, window.innerWidth, align);
           // Card, the name above it, and the 8px it stands off the button.
           const CARD_H = 104;
           const below = box.top < CARD_H + 8;
           setRowPos({
-            left: Math.max(8, Math.min(box.left, window.innerWidth - width - 8)),
+            left,
             top: below ? box.bottom + 8 : window.innerHeight - box.top + 8,
             below,
             tile,
