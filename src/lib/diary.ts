@@ -259,6 +259,9 @@ export type ArchivedDiary = {
   writtenAt: string;
   endedHow: "replaced" | "taken_down" | "expired";
   color: string | null;
+  /** A photo page's photo. The archive has always carried it; nothing read it
+   *  until the archive started showing pages as pages. */
+  imageUrl: string | null;
 };
 
 type ArchiveRow = {
@@ -268,6 +271,7 @@ type ArchiveRow = {
   written_at: string;
   ended_how: string;
   color?: string | null;
+  image_url?: string | null;
 };
 
 export function toArchive(rows: ArchiveRow[] | null | undefined): ArchivedDiary[] {
@@ -279,7 +283,54 @@ export function toArchive(rows: ArchiveRow[] | null | undefined): ArchivedDiary[
     endedHow:
       r.ended_how === "replaced" || r.ended_how === "taken_down" ? r.ended_how : "expired",
     color: r.color ?? null,
+    imageUrl: r.image_url ?? null,
   }));
+}
+
+/* ─── The archive, by when ─────────────────────────────────────────────── */
+
+/** The piles the archive is kept in, newest first. */
+export const ARCHIVE_PERIODS = ["Today", "This week", "This month", "Previous month", "Older"] as const;
+export type ArchivePeriod = (typeof ARCHIVE_PERIODS)[number];
+
+const sameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+/**
+ * Which pile a page belongs to.
+ *
+ * Days first, then calendar months: a page from three days ago is "This week"
+ * even when those three days crossed into a new month, because that is how
+ * someone looking for it would think of it. Months are calendar months rather
+ * than rolling thirty-day windows, so "Previous month" means the month before
+ * this one and not "somewhere between 30 and 60 days ago".
+ */
+export function archivePeriod(writtenAt: string, now: Date = new Date()): ArchivePeriod {
+  const at = new Date(writtenAt);
+  // A page dated ahead of now — a phone whose clock runs behind the server's —
+  // is the newest thing you have, not the oldest.
+  if (at.getTime() > now.getTime() || sameDay(at, now)) return "Today";
+  const days = (now.getTime() - at.getTime()) / 86_400_000;
+  if (days < 7) return "This week";
+  const months = (now.getFullYear() - at.getFullYear()) * 12 + (now.getMonth() - at.getMonth());
+  if (months <= 0) return "This month";
+  if (months === 1) return "Previous month";
+  return "Older";
+}
+
+/**
+ * The archive in its piles, newest first, with empty piles left out. A page
+ * dated in the future — a phone whose clock runs behind the server's — counts
+ * as today's rather than disappearing into "Older".
+ */
+export function archivePeriods(
+  items: ArchivedDiary[],
+  now: Date = new Date(),
+): { label: ArchivePeriod; items: ArchivedDiary[] }[] {
+  return ARCHIVE_PERIODS.map((label) => ({
+    label,
+    items: items.filter((i) => archivePeriod(i.writtenAt, now) === label),
+  })).filter((g) => g.items.length > 0);
 }
 
 /* ─── Stories ──────────────────────────────────────────────────────────── */

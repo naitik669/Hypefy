@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { Loader2, Lock, Music, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-import { diaryTheme } from "@/components/diary/DiaryPage";
-import { toArchive, type ArchivedDiary } from "@/lib/diary";
+import { diaryTheme, fillSize } from "@/components/diary/DiaryPage";
+import { archivePeriods, toArchive, type ArchivedDiary } from "@/lib/diary";
 
 const ENDED: Record<ArchivedDiary["endedHow"], string> = {
   expired: "",
@@ -22,11 +22,23 @@ function when(iso: string) {
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: days > 300 ? "numeric" : undefined });
 }
 
+/** A page on the shelf, px. Three and a bit fit across a phone. */
+const CARD = 132;
+/** The covers on a closed pile. */
+const COVER = 54;
+
 /**
- * Your past pages. Only you can open this — the archive table has no
- * policy that lets anyone else read a row — and it says so at the top,
- * because "where did my old page go, and who can see it" is the first thing
- * anyone wonders.
+ * Your past pages, kept in piles.
+ *
+ * A pile per period — today, this week, this month, the month before, older —
+ * closed, showing its top few pages fanned like covers. Open one and it lays
+ * out sideways, each page as the page it was: its own colour, its photo, its
+ * note at the size it was written. Pages are what you remember these by, not
+ * rows of text, and a year of them has to fit somewhere.
+ *
+ * Only you can open this — the archive table has no policy that lets anyone
+ * else read a row — and it says so at the top, because "where did my old page
+ * go, and who can see it" is the first thing anyone wonders.
  */
 export function DiaryArchiveSheet({
   open,
@@ -41,6 +53,8 @@ export function DiaryArchiveSheet({
   const [items, setItems] = useState<ArchivedDiary[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [forgetting, setForgetting] = useState<string | null>(null);
+  /** Which pile is open. The newest one starts open, since it is why you came. */
+  const [opened, setOpened] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -50,7 +64,11 @@ export function DiaryArchiveSheet({
       .then(({ data, error }) => {
         if (!live) return;
         if (error) setFailed(true);
-        else setItems(toArchive(data as never));
+        else {
+          const archive = toArchive(data as never);
+          setItems(archive);
+          setOpened(archivePeriods(archive)[0]?.label ?? null);
+        }
       });
     return () => {
       live = false;
@@ -68,9 +86,10 @@ export function DiaryArchiveSheet({
     setItems((prev) => (prev ?? []).filter((i) => i.writtenAt !== writtenAt));
   }
 
+  const piles = archivePeriods(items ?? []);
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Past pages">
+    <BottomSheet open={open} onClose={onClose} title="Past pages" size="tall">
       <p className="flex items-center gap-1.5 px-1 pb-3 text-xs text-muted">
         <Lock size={12} /> Only you
       </p>
@@ -90,38 +109,123 @@ export function DiaryArchiveSheet({
           Pages you write end up here.
         </p>
       ) : (
-        <ul className="flex flex-col gap-2 pb-4">
-          {(items ?? []).map((d) => (
-            <li
-              key={d.writtenAt}
-              className="relative overflow-hidden rounded-2xl p-3.5"
-              style={{ background: diaryTheme(d.color, hue).background, boxShadow: diaryTheme(d.color, hue).shadow }}
-            >
-              <div className="flex items-center gap-2 text-[11px] text-white/55">
-                <span className="font-semibold text-white/80">{when(d.writtenAt)}</span>
-                {ENDED[d.endedHow] && <span>· {ENDED[d.endedHow]}</span>}
+        <div className="flex flex-col gap-2.5 pb-4">
+          {piles.map((pile) => {
+            const isOpen = opened === pile.label;
+            return (
+              <section key={pile.label}>
                 <button
                   type="button"
-                  onClick={() => forget(d.writtenAt)}
-                  disabled={forgetting === d.writtenAt}
-                  aria-label="Delete this page for good"
-                  className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-white/55 hover:bg-white/10 hover:text-danger disabled:opacity-50"
+                  onClick={() => setOpened(isOpen ? null : pile.label)}
+                  aria-expanded={isOpen}
+                  className="flex w-full items-center gap-3 rounded-2xl bg-surface/60 p-2.5 text-left transition-colors active:bg-surface"
                 >
-                  {forgetting === d.writtenAt ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  <span className="relative shrink-0" style={{ width: COVER + 14, height: COVER * 1.25 }}>
+                    {pile.items.slice(0, 3).map((d, i) => (
+                      <span
+                        key={d.writtenAt}
+                        className="absolute left-0 top-0"
+                        style={{
+                          width: COVER,
+                          transform: `translateX(${i * 7}px) rotate(${(i - 1) * 6}deg)`,
+                          zIndex: 3 - i,
+                        }}
+                      >
+                        <MiniPage page={d} hue={hue} width={COVER} cover />
+                      </span>
+                    ))}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-extrabold tracking-[-0.01em]">{pile.label}</span>
+                    <span className="block text-[11px] text-muted">
+                      {pile.items.length} page{pile.items.length === 1 ? "" : "s"}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-[11px] font-semibold text-faint">
+                    {isOpen ? "Close" : "Open"}
+                  </span>
                 </button>
-              </div>
-              <p className="mt-1 break-words text-lg font-extrabold leading-snug tracking-[-0.02em] text-white">
-                {d.text}
-              </p>
-              {d.track && (
-                <p className="mt-1.5 flex items-center gap-1.5 text-xs text-white/65">
-                  <Music size={11} /> {d.track.title}
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
+
+                {isOpen && (
+                  <div className="no-scrollbar -mx-5 flex gap-2.5 overflow-x-auto px-5 pb-1 pt-2.5">
+                    {pile.items.map((d) => (
+                      <div key={d.writtenAt} className="shrink-0" style={{ width: CARD }}>
+                        <MiniPage page={d} hue={hue} width={CARD} />
+                        <div className="flex items-center gap-1 px-0.5 pt-1.5 text-[10px] text-muted">
+                          <span className="truncate font-semibold">{when(d.writtenAt)}</span>
+                          {ENDED[d.endedHow] && <span className="truncate text-faint">· {ENDED[d.endedHow]}</span>}
+                          <button
+                            type="button"
+                            onClick={() => forget(d.writtenAt)}
+                            disabled={forgetting === d.writtenAt}
+                            aria-label={`Delete the page from ${when(d.writtenAt)} for good`}
+                            className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-faint hover:bg-white/5 hover:text-danger disabled:opacity-50"
+                          >
+                            {forgetting === d.writtenAt ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={12} />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
       )}
     </BottomSheet>
+  );
+}
+
+/**
+ * One past page, small: the page it was, shrunk. A cover is the same thing
+ * without its words — on a pile you are reading the colours, not the notes,
+ * and three lots of tiny text stacked at angles is a mess.
+ */
+function MiniPage({
+  page,
+  hue,
+  width,
+  cover = false,
+}: {
+  page: ArchivedDiary;
+  hue: number;
+  width: number;
+  cover?: boolean;
+}) {
+  const theme = diaryTheme(page.color, hue);
+  const text = page.text?.trim() ?? "";
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl"
+      style={{ aspectRatio: "4 / 5", background: theme.background, boxShadow: theme.shadow }}
+    >
+      {page.imageUrl && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={page.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
+        </>
+      )}
+      {!cover && text && (
+        <div className="absolute inset-0 flex items-center justify-center p-2.5">
+          <p
+            className="line-clamp-5 break-words text-center font-extrabold leading-tight tracking-[-0.02em] text-white"
+            style={{ fontSize: Math.max(10, Math.round(fillSize(text, width - 20) * 0.62)) }}
+          >
+            {text}
+          </p>
+        </div>
+      )}
+      {!cover && page.track && (
+        <span className="absolute bottom-1.5 left-2 text-white/70" aria-hidden>
+          <Music size={10} />
+        </span>
+      )}
+    </div>
   );
 }

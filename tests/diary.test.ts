@@ -27,6 +27,11 @@ describe("toDiaryEntries", () => {
     expect(e).toMatchObject({ userId: "u1", name: "Aman", hue: 120, isSelf: false });
   });
 
+  it("carries a photo page's photo, and leaves a written one without", () => {
+    expect(toDiaryEntries([row({ image_url: "page.jpg" })] as never)[0].imageUrl).toBe("page.jpg");
+    expect(toDiaryEntries([row()] as never)[0].imageUrl).toBeNull();
+  });
+
   it("falls back to the username, then to a placeholder, for a name", () => {
     expect(toDiaryEntries([row({ display_name: null })] as never)[0].name).toBe("aman");
     expect(
@@ -167,6 +172,68 @@ describe("archive", () => {
     expect(a).toMatchObject({ audience: "close", endedHow: "taken_down" });
     // An unknown ending is read as the ordinary one, and a malformed track dropped.
     expect(b).toMatchObject({ audience: "mutual", endedHow: "expired", track: null });
+  });
+
+  it("carries a photo page's photo, which the archive has always had", async () => {
+    const { toArchive } = await import("@/lib/diary");
+    const [withPhoto, without] = toArchive([
+      { text: "", audience: "mutual", track: null, written_at: "2026-09-09T00:00:00Z", ended_how: "expired", image_url: "shot.jpg" },
+      { text: "y", audience: "mutual", track: null, written_at: "2026-09-08T00:00:00Z", ended_how: "expired" },
+    ]);
+    expect(withPhoto.imageUrl).toBe("shot.jpg");
+    expect(without.imageUrl).toBeNull();
+  });
+});
+
+describe("the archive in piles", () => {
+  // Built in local time, because the piles are about the reader's own days:
+  // a page written late last night is yesterday's to them, whatever UTC says.
+  const local = (y: number, m: number, d: number, h = 12) => new Date(y, m, d, h, 0, 0);
+  const now = local(2026, 9, 15); // 15 Oct 2026, midday
+  const at = (d: Date) => ({
+    text: d.toISOString(),
+    audience: "mutual" as const,
+    track: null,
+    writtenAt: d.toISOString(),
+    endedHow: "expired" as const,
+    color: null,
+    imageUrl: null,
+  });
+
+  it("puts a page in the pile someone would look for it in", async () => {
+    const { archivePeriod } = await import("@/lib/diary");
+    const period = (d: Date) => archivePeriod(d.toISOString(), now);
+    expect(period(local(2026, 9, 15, 1))).toBe("Today");
+    expect(period(local(2026, 9, 14, 23))).toBe("This week");
+    expect(period(local(2026, 9, 9))).toBe("This week");
+    // Seven days out it stops being this week, but it is still this month.
+    expect(period(local(2026, 9, 8, 11))).toBe("This month");
+    expect(period(local(2026, 9, 1))).toBe("This month");
+    expect(period(local(2026, 8, 30))).toBe("Previous month");
+    expect(period(local(2026, 8, 1))).toBe("Previous month");
+    expect(period(local(2026, 7, 31))).toBe("Older");
+    expect(period(local(2025, 9, 15))).toBe("Older");
+  });
+
+  it("counts days before months, so a week that crossed a month still reads as this week", async () => {
+    const { archivePeriod } = await import("@/lib/diary");
+    expect(archivePeriod(local(2026, 8, 29).toISOString(), local(2026, 9, 2))).toBe("This week");
+  });
+
+  it("keeps a page dated ahead of the clock rather than filing it under Older", async () => {
+    const { archivePeriod } = await import("@/lib/diary");
+    expect(archivePeriod(local(2026, 9, 16, 5).toISOString(), now)).toBe("Today");
+  });
+
+  it("returns the piles newest first, and leaves out the empty ones", async () => {
+    const { archivePeriods } = await import("@/lib/diary");
+    const piles = archivePeriods(
+      [at(local(2026, 7, 2)), at(local(2026, 9, 15, 8)), at(local(2026, 8, 20)), at(local(2026, 9, 15, 9))],
+      now,
+    );
+    expect(piles.map((g) => g.label)).toEqual(["Today", "Previous month", "Older"]);
+    expect(piles[0].items).toHaveLength(2);
+    expect(archivePeriods([], now)).toEqual([]);
   });
 });
 
