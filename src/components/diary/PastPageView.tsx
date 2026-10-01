@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { shieldProps, useOverlayShield } from "@/lib/overlay-shield";
 import { Check, Copy, Download, Loader2, Star, Trash2, X } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { DiscSleeve, SongLine, DISC_GUTTER } from "@/components/diary/DiaryDisc";
@@ -66,6 +67,7 @@ export function PastPageView({
   onDelete: (writtenAt: string) => void;
   deleting?: boolean;
 }) {
+  useOverlayShield(!!page, onClose);
   const [copied, setCopied] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -137,6 +139,7 @@ export function PastPageView({
       aria-modal
       aria-label={`Page from ${dayAndTime(page.writtenAt)}`}
       className="fixed inset-0 z-[210] mx-auto flex max-w-[480px] flex-col bg-background"
+      {...shieldProps}
     >
       <div className="flex shrink-0 items-center gap-2 px-3 pb-1 pt-[calc(var(--sat)+10px)]">
         <button

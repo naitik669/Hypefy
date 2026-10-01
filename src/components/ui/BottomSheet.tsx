@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
+import { useFrozenPage } from "@/lib/overlay-shield";
 
 /**
  * The sheet every overlay in this app arrives in, and a thing you hold.
@@ -545,53 +546,9 @@ export function BottomSheet({
     return () => clearTimeout(t);
   }, [open]);
 
-  /**
-   * Freeze the page behind the sheet.
-   *
-   * The backdrop catches taps, but not a drag: a swipe on a non-scrollable
-   * overlay chains to the nearest scrollable ancestor, which is the document
-   * — so the feed carried on scrolling underneath whatever was being read.
-   *
-   * position:fixed rather than overflow:hidden because iOS ignores the
-   * latter on body; the scroll offset is stashed and restored so closing the
-   * sheet does not fling you back to the top of the feed.
-   *
-   * Counted, because sheets stack — a GIF picker over comments closing must
-   * not unlock the page while the comments are still open.
-   */
-  useEffect(() => {
-    if (!open) return;
-
-    const body = document.body;
-    const depth = Number(body.dataset.sheetDepth ?? "0");
-    body.dataset.sheetDepth = String(depth + 1);
-
-    if (depth === 0) {
-      const y = window.scrollY;
-      body.dataset.sheetScrollY = String(y);
-      body.style.position = "fixed";
-      body.style.top = `-${y}px`;
-      body.style.left = "0";
-      body.style.right = "0";
-      body.style.width = "100%";
-    }
-
-    return () => {
-      const now = Number(body.dataset.sheetDepth ?? "1") - 1;
-      body.dataset.sheetDepth = String(Math.max(0, now));
-      if (now > 0) return;
-
-      const y = Number(body.dataset.sheetScrollY ?? "0");
-      body.style.position = "";
-      body.style.top = "";
-      body.style.left = "";
-      body.style.right = "";
-      body.style.width = "";
-      delete body.dataset.sheetDepth;
-      delete body.dataset.sheetScrollY;
-      window.scrollTo(0, y);
-    };
-  }, [open]);
+  // The page is frozen behind the sheet, counted so stacked sheets do not
+  // unlock it from under each other. See useFrozenPage.
+  useFrozenPage(open);
 
   // Escape closes the sheet, matching CenterModal/FloatingMenu behavior.
   useEffect(() => {

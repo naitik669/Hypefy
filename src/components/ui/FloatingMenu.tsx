@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
+import { shieldProps, useFrozenPage } from "@/lib/overlay-shield";
 
 /**
  * Hypefy's anchored popover — the default visual shell for context menus
@@ -57,6 +58,7 @@ export function FloatingMenu({
 
   // Android hardware back dismisses the menu before it navigates.
   useOverlayBackButton(open, onClose);
+  useFrozenPage(open);
   // Kept mounted through the exit animation when exitMs is set.
   const [leaving, setLeaving] = useState(false);
   const wasOpen = useRef(open);
@@ -102,13 +104,18 @@ export function FloatingMenu({
         <div
           className="fixed inset-0 z-[190]"
           style={zIndex !== undefined ? { zIndex: zIndex - 1 } : undefined}
-          onPointerDown={onClose}
+          {...shieldProps}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
         />
       )}
 
       <div
         ref={trapRef}
         role="menu"
+        {...shieldProps}
         style={zIndex !== undefined ? { ...style, zIndex } : style}
         className={`${leaving ? "animate-menu-pop-out pointer-events-none" : "animate-menu-pop"} z-[200] ${
           bare

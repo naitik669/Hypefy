@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { PagePhoto } from "@/components/diary/PagePhoto";
 import { createPortal } from "react-dom";
+import { shieldProps, useOverlayShield } from "@/lib/overlay-shield";
 import { Star, X } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { DiaryDisc, SongLine } from "@/components/diary/DiaryDisc";
@@ -55,6 +56,8 @@ export function DiaryStories({
   hyped: ReadonlySet<string>;
   onHyped: (userId: string, hyped: boolean) => void;
 }) {
+  // The feed that raised this cannot be scrolled, swiped or pinched behind it.
+  useOverlayShield(true, onClose);
   const [index, setIndex] = useState(start);
   const [elapsed, setElapsed] = useState(0);
   const [held, setHeld] = useState(false);
@@ -137,6 +140,7 @@ export function DiaryStories({
 
   if (!entry || typeof document === "undefined") return null;
 
+
   return createPortal(
     <div
       role="dialog"
@@ -144,6 +148,7 @@ export function DiaryStories({
       aria-label={`${entry.name}'s page`}
       className="fixed inset-0 z-[80] mx-auto flex max-w-[480px] flex-col overflow-hidden text-white"
       style={{ background: diaryTheme(entry.color, entry.hue).screen }}
+      {...shieldProps}
     >
       {/* Progress: one segment per Diary. */}
       <div className="flex gap-1 px-3 pt-[max(var(--sat),12px)]" aria-hidden>

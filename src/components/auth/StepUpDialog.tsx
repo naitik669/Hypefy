@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ShieldCheck, Loader2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { shieldProps } from "@/lib/overlay-shield";
 
 /** How long a completed step-up counts for. */
 const FRESH_MS = 5 * 60_000;
@@ -137,7 +138,10 @@ function StepUpPrompt({
   }
 
   const body = (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center">
+    <div
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center"
+      {...shieldProps}
+    >
       <div className="w-full max-w-[380px] rounded-3xl border border-border bg-elevated p-5 shadow-2xl">
         <div className="mb-4 flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-accent/15 text-accent">
