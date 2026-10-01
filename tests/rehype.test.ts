@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isRehyped, rehypedBy, setRehype } from "@/lib/rehype";
+import { isRehyped, rehypedBy, sendRehypeReply, setRehype } from "@/lib/rehype";
 
 /**
  * Rehype is one act on two kinds of thing, stored in two tables. The ways it
@@ -137,5 +137,60 @@ describe("rehypedBy", () => {
     expect(rehypedBy("   ")).toBe("Someone rehyped");
     expect(rehypedBy(null)).toBe("Someone rehyped");
     expect(rehypedBy(undefined)).toBe("Someone rehyped");
+  });
+});
+
+describe("sendRehypeReply", () => {
+  /** A chat that records what it was asked to do. */
+  function chat(opts: { dm?: unknown; fail?: "dm" | "send"; throws?: boolean } = {}) {
+    const calls: [string, Record<string, unknown>][] = [];
+    const db = {
+      rpc: async (fn: string, args: Record<string, unknown>) => {
+        if (opts.throws) throw new Error("offline");
+        calls.push([fn, args]);
+        if (fn === "get_or_create_dm") {
+          return opts.fail === "dm"
+            ? { data: null, error: { message: "no" } }
+            : { data: "dm" in opts ? opts.dm : "c1", error: null };
+        }
+        return { data: null, error: opts.fail === "send" ? { message: "no" } : null };
+      },
+    };
+    return { db, calls };
+  }
+
+  it("sends the post first, then what you said about it", async () => {
+    const { db, calls } = chat();
+    expect(await sendRehypeReply(db, "post", "p1", "them", "  this is great  ")).toBe(true);
+    expect(calls.map(([fn]) => fn)).toEqual(["get_or_create_dm", "send_message", "send_message"]);
+    expect(calls[0][1]).toEqual({ p_other: "them" });
+    expect(calls[1][1]).toMatchObject({ p_conversation_id: "c1", p_kind: "post", p_post_id: "p1" });
+    // Trimmed, and its own message, the way it reads in a chat.
+    expect(calls[2][1]).toMatchObject({ p_conversation_id: "c1", p_kind: "text", p_body: "this is great" });
+  });
+
+  it("sends a Shot by its own id", async () => {
+    const { db, calls } = chat();
+    await sendRehypeReply(db, "shot", "s1", "them", "");
+    expect(calls[1][1]).toMatchObject({ p_kind: "shot", p_shot_id: "s1", p_post_id: undefined });
+  });
+
+  it("treats an empty note as no note — the post alone is a reply", async () => {
+    const { db, calls } = chat();
+    expect(await sendRehypeReply(db, "post", "p1", "them", "   ")).toBe(true);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("says so rather than claiming a message was sent", async () => {
+    expect(await sendRehypeReply(chat({ fail: "dm" }).db, "post", "p1", "them", "hi")).toBe(false);
+    expect(await sendRehypeReply(chat({ dm: null }).db, "post", "p1", "them", "hi")).toBe(false);
+    expect(await sendRehypeReply(chat({ fail: "send" }).db, "post", "p1", "them", "hi")).toBe(false);
+    expect(await sendRehypeReply(chat({ throws: true }).db, "post", "p1", "them", "hi")).toBe(false);
+  });
+
+  it("does not send your words into a chat the post never reached", async () => {
+    const { db, calls } = chat({ fail: "send" });
+    await sendRehypeReply(db, "post", "p1", "them", "look at this");
+    expect(calls.filter(([fn]) => fn === "send_message")).toHaveLength(1);
   });
 });

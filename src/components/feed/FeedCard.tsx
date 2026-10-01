@@ -38,9 +38,10 @@ import { TrackChip } from "@/components/music/TrackChip";
 import { MusicMuteButton } from "@/components/music/MusicMuteButton";
 import { parseTrack } from "@/lib/music";
 import { hypeResult } from "@/lib/supabase/typed";
-import { isRehyped, setRehype } from "@/lib/rehype";
+import { isRehyped, setRehype, type DeckPerson } from "@/lib/rehype";
 import { useRehypeDeck } from "@/lib/use-rehype-deck";
 import { RehypeDeck } from "@/components/feed/RehypeDeck";
+import { RehypeReplySheet } from "@/components/feed/RehypeReplySheet";
 import { RehypeCount, RehypeIcon } from "@/components/ui/RehypeIcon";
 import { PollBlock, parsePoll } from "@/components/feed/PollBlock";
 import { useSaveMenus } from "@/components/saved/SaveMenus";
@@ -172,6 +173,8 @@ export function FeedCard({
   const [rehypePulse, setRehypePulse] = useState(0);
   /** The deck on the photo: who rehyped this, ranked for you, and you once you have. */
   const seated = useRehypeDeck("post", post.id, uid, rehyped);
+  /** Whose rehype you tapped, and are about to reply to. */
+  const [replyTo, setReplyTo] = useState<DeckPerson | null>(null);
   const [savePending, setSavePending] = useState(false);
 
   const [imgIdx, setImgIdx] = useState(0);
@@ -856,7 +859,7 @@ export function FeedCard({
               the photo clips what is inside it, and these faces are meant to
               be dragged off it. */}
           <div className="pointer-events-none absolute bottom-3.5 left-7 z-20">
-            <RehypeDeck seated={seated} bounds={galleryRef} />
+            <RehypeDeck seated={seated} bounds={galleryRef} onPick={setReplyTo} />
           </div>
         </div>
       )}
@@ -1124,6 +1127,7 @@ export function FeedCard({
           setLiveBody(b || null);
         }}
       />
+      <RehypeReplySheet person={replyTo} kind="post" targetId={post.id} onClose={() => setReplyTo(null)} />
     </article>
   );
 }

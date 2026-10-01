@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2 } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { RehypeIcon } from "@/components/ui/RehypeIcon";
-import { isRehyped, setRehype } from "@/lib/rehype";
+import { isRehyped, setRehype, type DeckPerson } from "@/lib/rehype";
 import { useRehypeDeck } from "@/lib/use-rehype-deck";
 import { RehypeDeck } from "@/components/feed/RehypeDeck";
+import { RehypeReplySheet } from "@/components/feed/RehypeReplySheet";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
@@ -532,6 +533,8 @@ function ReelCard({
   const [rehypePulse, setRehypePulse] = useState(0);
   // Who rehyped this Shot, loaded for the reel on screen and its neighbours.
   const deck = useRehypeDeck("shot", reel.id, currentUserId, rehyped, preload === "auto");
+  /** Whose rehype you tapped, and are about to reply to. */
+  const [replyTo, setReplyTo] = useState<DeckPerson | null>(null);
   // Save: a tap saves and drops down the folders, a hold fans them out, and
   // the very first save explains the hold (see useSaveMenus).
   const saveButton = useRef<HTMLButtonElement>(null);
@@ -1241,7 +1244,7 @@ function ReelCard({
       >
         {/* Who passed this on. The faces carry the rehype mark themselves,
             so the line that used to name them here is gone. */}
-        <RehypeDeck seated={deck} size={30} bounds={reelRef} />
+        <RehypeDeck seated={deck} size={30} bounds={reelRef} onPick={setReplyTo} />
         <Link
           href={handle ? `/u/${handle}` : "#"}
           className="flex items-center gap-2.5"
@@ -1555,6 +1558,7 @@ function ReelCard({
           {saveMenus.overlays}
         </>
       )}
+      <RehypeReplySheet person={replyTo} kind="shot" targetId={reel.id} onClose={() => setReplyTo(null)} />
     </section>
   );
 }

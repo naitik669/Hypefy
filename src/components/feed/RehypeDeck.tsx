@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import type { DeckPerson } from "@/lib/rehype";
@@ -18,8 +17,11 @@ import type { DeckPerson } from "@/lib/rehype";
  * They are handled, not just looked at. Drag one and the others lean after it;
  * drag it far and they gather into a bubble behind your finger, which you can
  * carry off the photo entirely (the deck is rendered beside the picture, not
- * inside it, so nothing clips it). Let go and they swing back to their seats.
- * A tap that never became a drag still opens that person's profile.
+ * inside it, so nothing clips it). Let go outside and it stays gone until the
+ * post comes round again; let go inside and they swing back to their seats.
+ *
+ * A tap that never became a drag replies to that rehype, which is what you
+ * wanted to do with it — see RehypeReplySheet.
  *
  * Changes apply on the frame the parent's seating changes — nothing queues —
  * so a rehype or an undo shows at once. Faces already on show never replay
@@ -139,11 +141,14 @@ export function RehypeDeck({
   seated,
   size = 36,
   bounds,
+  onPick,
 }: {
   seated: DeckPerson[];
   size?: number;
   /** The picture the deck sits on. Faces dragged past its edge fade out. */
   bounds?: RefObject<HTMLElement | null>;
+  /** A tap on a face — a drag is not a tap, and never calls this. */
+  onPick?: (person: DeckPerson) => void;
 }) {
   const [faces, setFaces] = useState<Face[]>([]);
   const [seenSeating, setSeenSeating] = useState<DeckPerson[]>([]);
@@ -289,10 +294,10 @@ export function RehypeDeck({
                   ? undefined
                   : `deck-float ${5.2 + f.seat * 0.9}s ${f.seat * 0.7}s ease-in-out infinite`;
         return (
-          <Link
+          <button
+            type="button"
             key={leaving ? `${p.userId}-leaving` : p.userId}
-            href={p.isMe ? "/profile" : p.username ? `/u/${p.username}` : "#"}
-            aria-label={`${p.isMe ? "You" : p.name} rehyped this`}
+            aria-label={`${p.isMe ? "You" : p.name} rehyped this. Reply to it`}
             aria-hidden={leaving || undefined}
             tabIndex={leaving ? -1 : undefined}
             draggable={false}
@@ -325,8 +330,8 @@ export function RehypeDeck({
             onPointerUp={() => onUp(shownAll)}
             // A cancelled gesture is not a decision: everyone comes home.
             onPointerCancel={() => setDrag(null)}
-            // A drag is not a tap: it must not open a profile on release.
-            onClick={(e) => moved.current && e.preventDefault()}
+            // A drag is not a tap: it must not open anything on release.
+            onClick={() => !moved.current && !leaving && onPick?.(p)}
           >
             <span className="block h-full w-full" style={{ animation }} onAnimationEnd={() => settle(f)}>
               <span
@@ -340,7 +345,7 @@ export function RehypeDeck({
                 {!leaving && <RehypeMark size={size} />}
               </span>
             </span>
-          </Link>
+          </button>
         );
       })}
     </div>

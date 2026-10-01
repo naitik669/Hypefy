@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { DECK_SEATS, fetchDeck, fetchMe, seatDeck, setRehype, type DeckPerson } from "@/lib/rehype";
@@ -306,10 +306,11 @@ afterEach(() => {
 
 async function renderDeck(seated: DeckPerson[], bounds?: { current: HTMLElement | null }) {
   const { RehypeDeck } = await import("@/components/feed/RehypeDeck");
+  const onPick = vi.fn<(person: DeckPerson) => void>();
   const draw = (s: DeckPerson[]) =>
-    act(async () => root.render(createElement(RehypeDeck, { seated: s, bounds })));
+    act(async () => root.render(createElement(RehypeDeck, { seated: s, bounds, onPick })));
   await draw(seated);
-  return { draw };
+  return { draw, onPick };
 }
 
 const rect = (left: number, top: number, right: number, bottom: number) =>
@@ -335,7 +336,7 @@ function scrollPast() {
   act(() => io.fire(false));
   act(() => io.fire(true));
 }
-const faces = () => [...host.querySelectorAll<HTMLAnchorElement>('[role="group"] a')];
+const faces = () => [...host.querySelectorAll<HTMLButtonElement>('[role="group"] button')];
 const endAll = () =>
   act(async () => {
     faces().forEach((f) => f.firstElementChild!.dispatchEvent(new Event("animationend", { bubbles: true })));
@@ -347,12 +348,20 @@ describe("RehypeDeck", () => {
     expect(host.innerHTML).toBe("");
   });
 
-  it("shows each seated face, named for screen readers, each opening a profile", async () => {
+  it("shows each seated face, named for screen readers", async () => {
     await renderDeck([A, B, ME]);
     expect(faces()).toHaveLength(3);
     expect(host.querySelector('[role="group"]')?.getAttribute("aria-label")).toBe("Rehyped by A, B, you");
-    expect(faces()[2].getAttribute("aria-label")).toBe("You rehyped this");
-    expect(faces().map((f) => f.getAttribute("href"))).toEqual(["/u/a", "/u/b", "/profile"]);
+    expect(faces()[2].getAttribute("aria-label")).toBe("You rehyped this. Reply to it");
+  });
+
+  it("replies to the rehype you tapped, rather than opening anyone's profile", async () => {
+    const { onPick } = await renderDeck([A, B, ME]);
+    await act(async () => faces()[1].click());
+    expect(onPick).toHaveBeenCalledTimes(1);
+    expect(onPick.mock.calls[0][0].userId).toBe("b");
+    // Nothing navigates: these are buttons, with nowhere to go.
+    expect(faces().some((f) => f.getAttribute("href"))).toBe(false);
   });
 
   it("keeps faces bare but marks every one of them as a rehype", async () => {
@@ -386,8 +395,8 @@ describe("RehypeDeck", () => {
     expect(me).toMatch(/^deck-pop-in /);
   });
 
-  it("moves with your finger, and a drag does not open a profile", async () => {
-    await renderDeck([A, B, C]);
+  it("moves with your finger, and a drag is not a tap", async () => {
+    const { onPick } = await renderDeck([A, B, C]);
     const first = faces()[0];
     const point = (type: string, x: number, y: number) =>
       act(async () => first.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y })));
@@ -398,9 +407,8 @@ describe("RehypeDeck", () => {
     expect(first.style.transform).toBe("translate3d(90px, -60px, 0)");
     expect(faces()[1].style.transform).not.toBe("translate3d(0px, 0px, 0)");
 
-    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
-    await act(async () => first.dispatchEvent(click));
-    expect(click.defaultPrevented).toBe(true);
+    await act(async () => first.click());
+    expect(onPick).not.toHaveBeenCalled();
 
     // Let go and everyone goes home.
     await point("pointerup", 190, 40);
@@ -411,18 +419,16 @@ describe("RehypeDeck", () => {
     ]);
   });
 
-  it("still opens a profile on a tap that never became a drag", async () => {
-    // Someone with no username, so jsdom has no real page to navigate to.
-    await renderDeck([{ ...A, username: null }, B]);
+  it("still counts a hand that barely moved as a tap", async () => {
+    const { onPick } = await renderDeck([A, B]);
     const first = faces()[0];
     const point = (type: string, x: number, y: number) =>
       act(async () => first.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y })));
     await point("pointerdown", 100, 100);
     await point("pointermove", 102, 101);
     await point("pointerup", 102, 101);
-    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
-    await act(async () => first.dispatchEvent(click));
-    expect(click.defaultPrevented).toBe(false);
+    await act(async () => first.click());
+    expect(onPick.mock.calls[0][0].userId).toBe("a");
   });
 
   it("a face let go off the picture stays gone, and comes back when the post scrolls by", async () => {

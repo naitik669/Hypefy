@@ -228,3 +228,55 @@ export function seatDeck(others: DeckPerson[], me: DeckPerson | null, rehyped: b
   if (shown.length >= DECK_SEATS) return [...shown.slice(0, DECK_SEATS - 1), me];
   return [...shown, me];
 }
+
+// ── replying to a rehype ───────────────────────────────────────────────
+
+type ChatDb = {
+  rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>;
+};
+
+/**
+ * Reply to someone's rehype: the thing they passed on, then what you have to
+ * say about it, in a direct message to them.
+ *
+ * Two messages rather than one, the way the share sheet already does it — the
+ * post as a card, then your words under it, which is how it reads in a chat.
+ * The note is optional: sending the post alone is a reply too.
+ *
+ * Returns false on any failure, so the caller can say so rather than claiming
+ * a message was sent.
+ */
+export async function sendRehypeReply(
+  db: ChatDb,
+  kind: RehypeKind,
+  targetId: string,
+  toUserId: string,
+  note: string,
+): Promise<boolean> {
+  try {
+    const { data: conversationId, error } = await db.rpc("get_or_create_dm", { p_other: toUserId });
+    if (error || !conversationId) return false;
+    const { error: sendErr } = await db.rpc("send_message", {
+      p_conversation_id: conversationId,
+      p_body: undefined,
+      p_kind: kind,
+      p_post_id: kind === "post" ? targetId : undefined,
+      p_shot_id: kind === "shot" ? targetId : undefined,
+      p_reply_to_id: undefined,
+    });
+    if (sendErr) return false;
+    const said = note.trim();
+    if (said) {
+      await db.rpc("send_message", {
+        p_conversation_id: conversationId,
+        p_body: said,
+        p_kind: "text",
+        p_post_id: undefined,
+        p_reply_to_id: undefined,
+      });
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
