@@ -156,6 +156,14 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     // and revoked it by the time the poster is captured.
     const localUrl = URL.createObjectURL(a.file);
     try {
+      // The poster comes FIRST, before the long upload. It is drawn by
+      // decoding the clip in a hidden <video>, and a backgrounded WebView
+      // does not decode: capturing afterwards meant that putting the phone
+      // down during a 50 MB upload — which is exactly what people do — gave
+      // a Shot with no thumbnail. Nothing is sent yet, so it costs only the
+      // moment it takes.
+      const poster = await capturePoster(localUrl, a.coverTime);
+
       const ext = a.file.name.split(".").pop() || "webm";
       const path = `${a.userId}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
@@ -168,7 +176,6 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       // Best effort: a Shot with no poster still plays, so a failure here
       // must not cost the upload that has already succeeded.
       let posterUrl: string | null = null;
-      const poster = await capturePoster(localUrl, a.coverTime);
       if (poster) {
         const posterPath = `${a.userId}/${Date.now()}-poster.jpg`;
         const { error: pErr } = await supabase.storage
