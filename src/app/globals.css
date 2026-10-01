@@ -1677,3 +1677,128 @@ html[data-splash="off"] #hypefy-splash {
     animation: none !important;
   }
 }
+
+/* The 404's lost saucer: the offline page's craft, taking a page with it.
+   Kept here rather than in the page so the markup stays markup; the offline
+   page carries its own copy, because it has to render with no stylesheet at
+   all. See not-found.tsx. */
+@keyframes lost-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-6deg);
+  }
+  50% {
+    transform: translate(6px, -8px) rotate(-1deg);
+  }
+}
+@keyframes lost-lift {
+  0% {
+    transform: translateY(6px);
+    opacity: 0.95;
+  }
+  55% {
+    transform: translateY(-26px);
+    opacity: 0.25;
+  }
+  56% {
+    opacity: 0;
+  }
+  70% {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  85% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(6px);
+    opacity: 0.95;
+  }
+}
+@keyframes lost-beam {
+  0%,
+  100% {
+    opacity: 0.04;
+  }
+  50% {
+    opacity: 0.09;
+  }
+}
+@keyframes lost-blink {
+  0%,
+  100% {
+    fill: #333;
+  }
+  50% {
+    fill: #4a4a4a;
+  }
+}
+.lost-drift {
+  animation: lost-drift 6s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.lost-lift {
+  animation: lost-lift 4s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.lost-beam {
+  animation: lost-beam 4s ease-in-out infinite;
+}
+.lost-blink {
+  animation: lost-blink 2.4s ease-in-out infinite;
+}
+.lost-b2 {
+  animation-delay: 0.4s;
+}
+.lost-b3 {
+  animation-delay: 0.8s;
+}
+.lost-b4 {
+  animation-delay: 1.2s;
+}
+/* Four-pointed stars and specks, drawn in CSS so the page carries no images. */
+.lost-star,
+.lost-dust {
+  position: absolute;
+  pointer-events: none;
+}
+.lost-star {
+  width: 9px;
+  height: 9px;
+}
+.lost-star::before,
+.lost-star::after {
+  content: "";
+  position: absolute;
+  background: #333;
+  border-radius: 1px;
+}
+.lost-star::before {
+  left: 3.7px;
+  top: 0;
+  width: 1.6px;
+  height: 9px;
+}
+.lost-star::after {
+  top: 3.7px;
+  left: 0;
+  width: 9px;
+  height: 1.6px;
+}
+.lost-dust {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #333;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lost-drift,
+  .lost-lift,
+  .lost-beam,
+  .lost-blink {
+    animation: none;
+  }
+}
