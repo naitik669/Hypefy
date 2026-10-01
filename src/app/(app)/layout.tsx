@@ -11,6 +11,7 @@ import { UploadProvider, ShotUploadCard } from "@/components/upload/UploadProvid
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { NativeShell } from "@/components/native/NativeShell";
 import { SwipeNav } from "@/components/layout/SwipeNav";
+import { TabScrollTop } from "@/components/layout/TabScrollTop";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PresenceHeartbeat } from "@/components/presence/PresenceHeartbeat";
 import { InAppNotifier } from "@/components/messages/InAppNotifier";
@@ -40,6 +41,7 @@ export default async function AppLayout({
   if (!user) {
     return (
       <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
+        <TabScrollTop />
         <div className="flex-1">{children}</div>
       </div>
     );
@@ -156,6 +158,7 @@ export default async function AppLayout({
             <EncryptionSetup userId={user!.id} />
             <InstallPrompt />
             <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
+              <TabScrollTop />
               {/* Wraps only the scrolling content, never the nav — the bar
                   has to stay put while the page slides under the finger. */}
               <div className="flex-1 pb-[84px]">
