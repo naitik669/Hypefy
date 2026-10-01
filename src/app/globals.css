@@ -372,7 +372,12 @@ html[data-dm-leave]::view-transition-old(root) {
   animation: rehype-swell 0.65s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .rehype-on .rehype-a {
-  animation: rehype-spin 0.65s cubic-bezier(0.34, 1.28, 0.5, 1);
+  /* 40ms longer than the other arrow, which starts 40ms later, so the two
+     finish together. They used to end 40ms apart: for that moment one arrow
+     had snapped back to its own side while the other was still across the
+     loop, so both were drawn on the same side and the right-hand arrow read
+     as a blink. */
+  animation: rehype-spin 0.69s cubic-bezier(0.34, 1.28, 0.5, 1);
 }
 .rehype-on .rehype-b {
   /* backwards, not both: hold the start during the 40ms wait, but let go at
@@ -389,8 +394,19 @@ html[data-dm-leave]::view-transition-old(root) {
 }
 
 /* The rehype deck: faces rise in once when the deck first shows, a face that
-   joins pops into its seat, one that leaves pops out, and nothing moves at
-   rest. Small and quick, so the deck never feels like it is in the way. */
+   joins pops into its seat, one that leaves pops out. At rest they drift on
+   their own slow cycles, which is what makes them read as floating over the
+   photo rather than stuck to it. Dragging stops the drift (RehypeDeck.tsx),
+   so a face in your hand only follows your finger. */
+@keyframes deck-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -5px;
+  }
+}
 @keyframes deck-rise {
   from {
     transform: translateY(8px) scale(0.92);

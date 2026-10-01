@@ -1,27 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import type { DeckPerson } from "@/lib/rehype";
 
 /**
- * The rehype deck: who passed this on, as a small loose row of faces.
+ * The rehype deck: who passed this on, as a small loose row of floating faces.
  *
  * Three squircle faces at most — the people whose rehypes rank highest for
  * you (see fetchDeck), and you in the last seat once you have rehyped. Each is
- * tilted and set at its own height, so the row reads as a loose wave rather
- * than a shelf. One small rehype mark on the leading face says what the row
- * is. A face opens that person's profile.
+ * tilted, set at its own height and drifting on its own slow cycle, so the row
+ * reads as faces floating over the photo rather than a shelf of avatars. Each
+ * carries the rehype mark, which is the only thing that says what the row is —
+ * there is no caption.
  *
- * Motion is small and never blocks anything: the row rises in once when it
- * first appears, a face that joins pops into its seat, a face that leaves
- * pops out of it, and nothing moves at rest. Changes apply the moment the
- * parent's seating changes — there is no queue to wait behind — so a rehype
- * or an undo shows on the very next frame.
+ * They are handled, not just looked at. Drag one and the others lean after it;
+ * drag it far and they gather into a bubble behind your finger, which you can
+ * carry off the photo entirely (the deck is rendered beside the picture, not
+ * inside it, so nothing clips it). Let go and they swing back to their seats.
+ * A tap that never became a drag still opens that person's profile.
  *
- * The component only positions faces inside its own box; the caller places
- * the box (over a photo, or in a Shot's caption stack).
+ * Changes apply on the frame the parent's seating changes — nothing queues —
+ * so a rehype or an undo shows at once. Faces already on show never replay
+ * their entrance.
+ *
+ * The component only positions faces inside its own box; the caller places the
+ * box.
  */
 
 /** Space between faces, as a share of the face size. */
@@ -30,7 +35,21 @@ const GAP = 1 / 3;
 const RAISE = [0, 0.7, 0.25];
 /** Each seat's tilt, degrees. */
 const TILT = [-6, 5, -3];
+/** Drag this far from the seat and the row gathers into a bubble. */
+const GATHER_PX = 64;
+/** How far the others lean after a drag before that — just enough to feel tied together. */
+const TRAIL = 0.14;
+/** Where the gathered faces sit around the one you hold: a shallow fan, up and
+ *  to the left, so each stays visible instead of hiding under the one in front
+ *  (and clear of the finger, which covers the held face). Degrees. */
+const FAN_FROM = 205;
+const FAN_STEP = 50;
+/** How far out they sit, as a share of the face size. */
+const FAN = 0.62;
+/** Movement beyond this makes it a drag rather than a tap. */
+const TAP_PX = 6;
 
+type Vec = { x: number; y: number };
 type Motion = "rise" | "pop" | "idle" | "leave";
 type Face = { person: DeckPerson; seat: number; motion: Motion };
 
@@ -60,9 +79,39 @@ export function reconcileFaces(faces: Face[], seated: DeckPerson[], instant = fa
   return [...next, ...leaving];
 }
 
+/**
+ * Where each face sits during a drag, as an offset from its own seat.
+ *
+ * Up to the gather distance the row only leans after your finger. Past it the
+ * others leave their seats and bunch around the face you are holding, fanned
+ * so they read as a bubble of faces rather than one blurred pile.
+ * Exported for tests.
+ */
+export function dragLayout(
+  seats: Vec[],
+  dragged: number,
+  d: Vec,
+  gatherAt = GATHER_PX,
+  fan = 22,
+): { gathered: boolean; offsets: Vec[] } {
+  const gathered = Math.hypot(d.x, d.y) >= gatherAt;
+  const hub = { x: seats[dragged].x + d.x, y: seats[dragged].y + d.y };
+  let behind = 0;
+  const offsets = seats.map((seat, i) => {
+    if (i === dragged) return d;
+    if (!gathered) return { x: d.x * TRAIL, y: d.y * TRAIL };
+    const angle = ((FAN_FROM + behind++ * FAN_STEP) * Math.PI) / 180;
+    return { x: hub.x + Math.cos(angle) * fan - seat.x, y: hub.y + Math.sin(angle) * fan - seat.y };
+  });
+  return { gathered, offsets };
+}
+
 export function RehypeDeck({ seated, size = 36 }: { seated: DeckPerson[]; size?: number }) {
   const [faces, setFaces] = useState<Face[]>([]);
   const [seenSeating, setSeenSeating] = useState<DeckPerson[]>([]);
+  const [drag, setDrag] = useState<{ index: number; d: Vec } | null>(null);
+  const from = useRef<Vec>({ x: 0, y: 0 });
+  const moved = useRef(false);
   // Follow the parent during render rather than in an effect, so a change
   // shows on the same frame instead of one render late.
   if (seated !== seenSeating) {
@@ -80,47 +129,102 @@ export function RehypeDeck({ seated, size = 36 }: { seated: DeckPerson[]; size?:
   if (faces.length === 0) return null;
 
   const step = size * (1 + GAP);
-  const seats = Math.max(...faces.map((f) => f.seat)) + 1;
+  const lift = (seat: number) => (RAISE[seat] ?? 0) * size;
+  const seats = faces.map((f) => ({ x: f.seat * step, y: -lift(f.seat) }));
+  const layout = drag ? dragLayout(seats, drag.index, drag.d, GATHER_PX, size * FAN) : null;
+  const columns = Math.max(...faces.map((f) => f.seat)) + 1;
   const names = seated.map((p) => (p.isMe ? "you" : p.name));
+
+  function onDown(e: React.PointerEvent, index: number) {
+    e.stopPropagation();
+    // Keeps the gesture on this face even when the finger leaves it, which is
+    // the normal case here — the whole point is to drag it away.
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    from.current = { x: e.clientX, y: e.clientY };
+    moved.current = false;
+    setDrag({ index, d: { x: 0, y: 0 } });
+  }
+  function onMove(e: React.PointerEvent, index: number) {
+    if (drag?.index !== index) return;
+    const d = { x: e.clientX - from.current.x, y: e.clientY - from.current.y };
+    if (Math.hypot(d.x, d.y) > TAP_PX) moved.current = true;
+    setDrag({ index, d });
+  }
 
   return (
     <div
       role="group"
       aria-label={names.length ? `Rehyped by ${names.join(", ")}` : undefined}
-      className="rehype-deck relative shrink-0"
-      style={{ width: size + (seats - 1) * step, height: size * (1 + RAISE[1]) }}
-      // A tap that starts on the deck belongs to the deck, never to the
+      className="rehype-deck pointer-events-auto relative shrink-0"
+      style={{ width: size + (columns - 1) * step, height: size * (1 + RAISE[1]) }}
+      // A touch that starts on the deck belongs to the deck, never to the
       // gallery's swipe or double-tap-to-Hype underneath it.
       onTouchStart={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      {faces.map((f) => {
+      {faces.map((f, i) => {
         const p = f.person;
+        const leaving = f.motion === "leave";
+        const held = drag?.index === i;
+        const off = layout?.offsets[i] ?? { x: 0, y: 0 };
         const animation =
           f.motion === "rise"
             ? `deck-rise 0.36s ${f.seat * 60}ms cubic-bezier(0.2, 0.8, 0.2, 1) both`
             : f.motion === "pop"
               ? "deck-pop-in 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both"
-              : f.motion === "leave"
+              : leaving
                 ? "deck-pop-out 0.18s ease-in forwards"
-                : undefined;
+                : // At rest they drift, each on its own slow cycle. A hand on
+                  // the deck stops the drifting, so only your drag moves them.
+                  drag
+                  ? undefined
+                  : `deck-float ${5.2 + f.seat * 0.9}s ${f.seat * 0.7}s ease-in-out infinite`;
         return (
           <Link
-            key={f.motion === "leave" ? `${p.userId}-leaving` : p.userId}
+            key={leaving ? `${p.userId}-leaving` : p.userId}
             href={p.isMe ? "/profile" : p.username ? `/u/${p.username}` : "#"}
             aria-label={`${p.isMe ? "You" : p.name} rehyped this`}
-            aria-hidden={f.motion === "leave" || undefined}
-            tabIndex={f.motion === "leave" ? -1 : undefined}
-            className={`absolute ${f.motion === "leave" ? "pointer-events-none" : ""}`}
-            style={{ left: f.seat * step, bottom: (RAISE[f.seat] ?? 0) * size, width: size, height: size }}
+            aria-hidden={leaving || undefined}
+            tabIndex={leaving ? -1 : undefined}
+            draggable={false}
+            // Without this the browser starts its own drag of the photo
+            // inside the avatar on the first move, which cancels the pointer
+            // stream and drops the face back into its seat.
+            onDragStart={(e) => e.preventDefault()}
+            className={`absolute select-none ${leaving ? "pointer-events-none" : ""}`}
+            style={{
+              left: seats[i].x,
+              bottom: lift(f.seat),
+              width: size,
+              height: size,
+              touchAction: "none",
+              zIndex: held ? 2 : 1,
+              transform: `translate3d(${off.x}px, ${off.y}px, 0)`,
+              // The face in your hand tracks it exactly; the others glide
+              // after it, and everyone swings back when you let go.
+              transition: drag
+                ? held
+                  ? "none"
+                  : "transform 0.24s ease-out"
+                : "transform 0.55s cubic-bezier(0.22, 1.1, 0.36, 1)",
+            }}
+            onPointerDown={(e) => !leaving && onDown(e, i)}
+            onPointerMove={(e) => onMove(e, i)}
+            onPointerUp={() => setDrag(null)}
+            onPointerCancel={() => setDrag(null)}
+            // A drag is not a tap: it must not open a profile on release.
+            onClick={(e) => moved.current && e.preventDefault()}
           >
             <span className="block h-full w-full" style={{ animation }} onAnimationEnd={() => settle(f)}>
               <span
-                className="relative block h-full w-full"
-                style={{ transform: `rotate(${TILT[f.seat] ?? 0}deg)`, filter: "drop-shadow(0 3px 8px rgb(0 0 0 / 0.35))" }}
+                className="relative block h-full w-full transition-transform duration-200"
+                style={{
+                  transform: `rotate(${TILT[f.seat] ?? 0}deg) scale(${layout?.gathered && !held ? 0.88 : 1})`,
+                  filter: "drop-shadow(0 3px 8px rgb(0 0 0 / 0.35))",
+                }}
               >
                 <Avatar name={p.name} hue={p.hue} src={p.avatarUrl ?? undefined} size={size} />
-                {f.seat === 0 && f.motion !== "leave" && <RehypeMark />}
+                {!leaving && <RehypeMark size={size} />}
               </span>
             </span>
           </Link>
@@ -130,14 +234,16 @@ export function RehypeDeck({ seated, size = 36 }: { seated: DeckPerson[]; size?:
   );
 }
 
-/** The one sign that this row is rehypes: the Rehype arrows, on glass. */
-function RehypeMark() {
+/** What says this row is rehypes, now that nothing is written above it: the Rehype arrows, on glass. */
+function RehypeMark({ size }: { size: number }) {
+  const box = Math.round(size * 0.47);
   return (
     <span
-      className="absolute -bottom-1 -right-1 flex h-[17px] w-[17px] items-center justify-center rounded-[30%] bg-black/55 text-white backdrop-blur-md"
+      className="absolute -bottom-1 -right-1 flex items-center justify-center rounded-[30%] bg-black/55 text-white backdrop-blur-md"
+      style={{ width: box, height: box }}
       aria-hidden
     >
-      <svg viewBox="0 0 24 24" width={11} height={11} fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+      <svg viewBox="0 0 24 24" width={box * 0.65} height={box * 0.65} fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
         <path d="M13 18H7a2 2 0 0 1-2-2V6" />
         <path d="m2 9 3-3 3 3" />
         <path d="M11 6h6a2 2 0 0 1 2 2v10" />

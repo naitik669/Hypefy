@@ -141,7 +141,7 @@ export default async function HomePage() {
       ? supabase
           .from("reposts")
           .select(
-            "post_id, created_at, user_id, profiles:user_id(display_name, username), posts(*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration))"
+            "post_id, created_at, user_id, posts(*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration))"
           )
           .in("user_id", [...followingIds])
           .order("created_at", { ascending: false })
@@ -230,25 +230,17 @@ export default async function HomePage() {
   }
 
   // Blend in rehyped posts: use the rehype time for recency so they resurface,
-  // and tag with who rehyped for the FeedCard header.
+  // and carry who rehyped, by id — the deck on the photo shows their face.
   for (const r of (followedReposts ?? []) as any[]) {
     const post = Array.isArray(r.posts) ? r.posts[0] : r.posts;
     if (!post) continue;
     if (blockedIds.has(post.user_id) || blockedIds.has(r.user_id)) continue;
-    const reposterProfile = Array.isArray(r.profiles)
-      ? r.profiles[0]
-      : r.profiles;
-    // "" rather than null for a nameless account, so the card still says
-    // "Someone rehyped" instead of silently dropping the label.
-    const reposter =
-      reposterProfile?.display_name ?? reposterProfile?.username ?? "";
     const normalised = {
       ...post,
       profiles: Array.isArray(post.profiles)
         ? post.profiles[0] ?? null
         : post.profiles,
       created_at: r.created_at, // rank by repost time
-      _repostedBy: reposter,
       _repostedById: r.user_id as string,
     };
     // Repost wins over the plain copy so the header shows
@@ -258,7 +250,6 @@ export default async function HomePage() {
         ? {
             ...byId.get(post.id),
             created_at: r.created_at,
-            _repostedBy: reposter,
             _repostedById: r.user_id as string,
           }
         : normalised

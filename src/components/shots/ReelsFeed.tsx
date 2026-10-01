@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, Repeat2 } from "lucide-react";
+import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2 } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { RehypeIcon } from "@/components/ui/RehypeIcon";
-import { isRehyped, rehypedBy, setRehype } from "@/lib/rehype";
+import { isRehyped, setRehype } from "@/lib/rehype";
 import { useRehypeDeck } from "@/lib/use-rehype-deck";
 import { RehypeDeck } from "@/components/feed/RehypeDeck";
 import { createClient } from "@/lib/supabase/client";
@@ -93,9 +93,8 @@ export type Reel = {
   comment_count?: number;
   repost_count?: number;
   profiles: ReelProfile;
-  /** Set when a Shot reached the feed because someone you follow rehyped it. */
-  _rehypedBy?: string | null;
-  /** …and who, by id — recorded as the link when you rehype it. */
+  /** Set when a Shot reached the feed through someone's rehype: who, by id.
+   *  Recorded as the link when you rehype it; the deck shows the faces. */
   _rehypedById?: string | null;
 };
 
@@ -1237,17 +1236,9 @@ function ReelCard({
         className="absolute inset-x-0 bottom-0 z-20 flex flex-col gap-2 p-4 pr-16"
         hidden={commentsOpen}
       >
-        {(deck.length > 0 || (reel._rehypedBy !== undefined && reel._rehypedBy !== null)) && (
-          <div className="flex items-end gap-3">
-            <RehypeDeck seated={deck} size={30} />
-            {reel._rehypedBy !== undefined && reel._rehypedBy !== null && (
-              <span className="flex items-center gap-1.5 pb-1 text-xs font-semibold text-white/85 drop-shadow">
-                {deck.length === 0 && <Repeat2 size={14} className="text-accent" />}
-                {rehypedBy(reel._rehypedBy)}
-              </span>
-            )}
-          </div>
-        )}
+        {/* Who passed this on. The faces carry the rehype mark themselves,
+            so the line that used to name them here is gone. */}
+        <RehypeDeck seated={deck} size={30} />
         <Link
           href={handle ? `/u/${handle}` : "#"}
           className="flex items-center gap-2.5"

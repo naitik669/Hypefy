@@ -34,7 +34,6 @@ type FeedShot = Record<string, unknown> & {
   user_id: string;
   created_at: string;
   profiles: unknown;
-  _rehypedBy?: string;
   _rehypedById?: string;
   _rehypedAt?: string;
 };
@@ -75,9 +74,6 @@ export default async function ShotsPage() {
     if (!shot?.id) continue;
     byId.set(shot.id, {
       ...(byId.get(shot.id) ?? shot),
-      // "" rather than null when the rehyper has no name, so the label still
-      // shows and reads "Someone rehyped".
-      _rehypedBy: r.rehyper_name ?? "",
       _rehypedById: r.rehyper_id,
       _rehypedAt: r.rehyped_at,
     });

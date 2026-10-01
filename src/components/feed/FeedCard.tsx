@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Star, Bookmark, MoreHorizontal, Maximize2, Repeat2 } from "lucide-react";
+import { Star, Bookmark, MoreHorizontal, Maximize2 } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
@@ -38,7 +38,7 @@ import { TrackChip } from "@/components/music/TrackChip";
 import { MusicMuteButton } from "@/components/music/MusicMuteButton";
 import { parseTrack } from "@/lib/music";
 import { hypeResult } from "@/lib/supabase/typed";
-import { isRehyped, rehypedBy, setRehype } from "@/lib/rehype";
+import { isRehyped, setRehype } from "@/lib/rehype";
 import { useRehypeDeck } from "@/lib/use-rehype-deck";
 import { RehypeDeck } from "@/components/feed/RehypeDeck";
 import { RehypeCount, RehypeIcon } from "@/components/ui/RehypeIcon";
@@ -84,9 +84,8 @@ export type FeedPost = {
   track?: unknown;
   /** Poll ({options: string[]} jsonb) — see PollBlock. */
   poll?: unknown;
-  /** Display name of the followed user whose rehype surfaced this post. */
-  _repostedBy?: string | null;
-  /** …and their id: the rehype this post actually reached you through. */
+  /** The rehype this post actually reached you through, by user id. Who
+   *  they are is shown by the deck on the photo, not by a line of text. */
   _repostedById?: string | null;
 };
 
@@ -690,13 +689,6 @@ export function FeedCard({
       {post.user_id !== uid && (
         <FeedImpression postId={post.id} viewerId={uid} />
       )}
-      {/* Who of the people you follow rehyped this into your feed. */}
-      {post._repostedBy !== undefined && post._repostedBy !== null && (
-        <div className="flex items-center gap-1.5 px-4 pt-2.5 text-xs text-muted">
-          <Repeat2 size={14} className="text-accent" />
-          <span className="font-semibold">{rehypedBy(post._repostedBy)}</span>
-        </div>
-      )}
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3">
         {/* Their face takes you to them: their Show while one is live,
@@ -745,6 +737,7 @@ export function FeedCard({
 
       {/* Image gallery -- swipe/scroll between images; double-tap to Hype */}
       {images.length > 0 && (
+        <div className="relative">
         <div
           ref={galleryRef}
           className="group relative mx-4 overflow-hidden rounded-2xl"
@@ -857,8 +850,12 @@ export function FeedCard({
             </div>
           )}
 
-          {/* Who passed this on. */}
-          <div className="absolute bottom-3.5 left-3 z-10">
+        </div>
+
+          {/* Who passed this on. A sibling of the photo rather than a child:
+              the photo clips what is inside it, and these faces are meant to
+              be dragged off it. */}
+          <div className="pointer-events-none absolute bottom-3.5 left-7 z-20">
             <RehypeDeck seated={seated} />
           </div>
         </div>

@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { DECK_SEATS, fetchDeck, fetchMe, seatDeck, setRehype, type DeckPerson } from "@/lib/rehype";
-import { reconcileFaces } from "@/components/feed/RehypeDeck";
+import { dragLayout, reconcileFaces } from "@/components/feed/RehypeDeck";
 
 /**
  * The rehype deck: three faces at most, ranked by how much you interact with
@@ -180,6 +180,62 @@ describe("reconcileFaces", () => {
   });
 });
 
+describe("dragLayout — carrying the deck around", () => {
+  // Three seats, 48px apart, the middle one lifted.
+  const seats = [
+    { x: 0, y: 0 },
+    { x: 48, y: -25 },
+    { x: 96, y: -9 },
+  ];
+
+  it("gives the face you hold exactly your finger, and leans the others after it", () => {
+    const { gathered, offsets } = dragLayout(seats, 0, { x: 30, y: -10 });
+    expect(gathered).toBe(false);
+    expect(offsets[0]).toEqual({ x: 30, y: -10 });
+    // The others only lean — a fraction of the drag, same direction.
+    expect(offsets[1].x).toBeGreaterThan(0);
+    expect(offsets[1].x).toBeLessThan(30 * 0.3);
+    expect(offsets[1]).toEqual(offsets[2]);
+  });
+
+  it("gathers everyone around your finger once you drag far enough", () => {
+    const d = { x: 120, y: -90 };
+    const fan = 22;
+    const { gathered, offsets } = dragLayout(seats, 0, d, 64, fan);
+    expect(gathered).toBe(true);
+    const held = { x: seats[0].x + d.x, y: seats[0].y + d.y };
+    const at = (i: number) => ({ x: seats[i].x + offsets[i].x, y: seats[i].y + offsets[i].y });
+    // The held face is exactly under the finger; the others ring it at the
+    // fan distance, each in its own spot, above and to the left of it.
+    expect(at(0)).toEqual(held);
+    for (const i of [1, 2]) {
+      expect(Math.hypot(at(i).x - held.x, at(i).y - held.y)).toBeCloseTo(fan);
+      expect(at(i).x).toBeLessThan(held.x);
+      expect(at(i).y).toBeLessThan(held.y);
+    }
+    expect(at(1)).not.toEqual(at(2));
+  });
+
+  it("gathers at the same distance in any direction, and not a pixel sooner", () => {
+    expect(dragLayout(seats, 1, { x: 0, y: 63 }).gathered).toBe(false);
+    expect(dragLayout(seats, 1, { x: 0, y: 64 }).gathered).toBe(true);
+    expect(dragLayout(seats, 1, { x: -64, y: 0 }).gathered).toBe(true);
+    // Diagonals count the true distance, not each axis on its own.
+    expect(dragLayout(seats, 1, { x: 50, y: 50 }).gathered).toBe(true);
+    expect(dragLayout(seats, 1, { x: 40, y: 40 }).gathered).toBe(false);
+  });
+
+  it("holds the row still when nothing has moved", () => {
+    const { gathered, offsets } = dragLayout(seats, 2, { x: 0, y: 0 });
+    expect(gathered).toBe(false);
+    expect(offsets).toEqual([
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+    ]);
+  });
+});
+
 let root: Root;
 let host: HTMLDivElement;
 
@@ -220,13 +276,13 @@ describe("RehypeDeck", () => {
     expect(faces().map((f) => f.getAttribute("href"))).toEqual(["/u/a", "/u/b", "/profile"]);
   });
 
-  it("keeps faces bare: no name tag on you, and one rehype mark for the whole row", async () => {
+  it("keeps faces bare but marks every one of them as a rehype", async () => {
     await renderDeck([A, B, ME]);
     const group = host.querySelector('[role="group"]')!;
-    // Only the avatars' own initials — no "You" tag on top of yours.
+    // Only the avatars' own initials — no "You" tag, and no caption anywhere:
+    // the marks are the only thing saying what this row is.
     expect(group.textContent).toBe("ABM");
-    expect(group.querySelectorAll("svg")).toHaveLength(1);
-    expect(faces()[0].querySelector("svg")).not.toBeNull();
+    expect(faces().every((f) => f.querySelector("svg") !== null)).toBe(true);
   });
 
   it("seats you on the very next render when you rehype — nothing waits", async () => {
@@ -242,11 +298,52 @@ describe("RehypeDeck", () => {
     const motion = () => faces().map((f) => (f.firstElementChild as HTMLElement).style.animation);
     expect(motion().every((m) => m.startsWith("deck-rise"))).toBe(true);
     await endAll();
-    expect(motion()).toEqual(["", ""]);
+    // Settled faces drift instead of sitting dead still, each on its own cycle.
+    expect(motion().every((m) => m.startsWith("deck-float"))).toBe(true);
+    expect(motion()[0]).not.toBe(motion()[1]);
     await draw([A, B, ME]);
     const [a, b, me] = motion();
-    expect([a, b]).toEqual(["", ""]);
+    expect([a, b].every((m) => m.startsWith("deck-float"))).toBe(true);
     expect(me).toMatch(/^deck-pop-in /);
+  });
+
+  it("moves with your finger, and a drag does not open a profile", async () => {
+    await renderDeck([A, B, C]);
+    const first = faces()[0];
+    const point = (type: string, x: number, y: number) =>
+      act(async () => first.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y })));
+
+    await point("pointerdown", 100, 100);
+    await point("pointermove", 190, 40);
+    // Held face under the finger, the rest gathered behind it.
+    expect(first.style.transform).toBe("translate3d(90px, -60px, 0)");
+    expect(faces()[1].style.transform).not.toBe("translate3d(0px, 0px, 0)");
+
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    await act(async () => first.dispatchEvent(click));
+    expect(click.defaultPrevented).toBe(true);
+
+    // Let go and everyone goes home.
+    await point("pointerup", 190, 40);
+    expect(faces().map((f) => f.style.transform)).toEqual([
+      "translate3d(0px, 0px, 0)",
+      "translate3d(0px, 0px, 0)",
+      "translate3d(0px, 0px, 0)",
+    ]);
+  });
+
+  it("still opens a profile on a tap that never became a drag", async () => {
+    // Someone with no username, so jsdom has no real page to navigate to.
+    await renderDeck([{ ...A, username: null }, B]);
+    const first = faces()[0];
+    const point = (type: string, x: number, y: number) =>
+      act(async () => first.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y })));
+    await point("pointerdown", 100, 100);
+    await point("pointermove", 102, 101);
+    await point("pointerup", 102, 101);
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    await act(async () => first.dispatchEvent(click));
+    expect(click.defaultPrevented).toBe(false);
   });
 
   it("removes a face that left once its exit has played", async () => {
