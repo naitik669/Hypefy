@@ -14,7 +14,6 @@ import { Avatar } from "@/components/ui/Avatar";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { haptics } from "@/lib/haptics";
 import { useToast } from "@/components/ui/ToastProvider";
-import { BLANK_POSTER } from "@/lib/blank-poster";
 import { scheduleUndoable } from "@/lib/undoable";
 import { TuneSheet } from "@/components/notifications/TuneSheet";
 import { InterestCard } from "@/components/notifications/InterestCard";
@@ -35,7 +34,7 @@ export type Notif = {
     avatar_hue: number | null;
     avatar_url: string | null;
   } | null;
-  thumb?: { url: string; isVideo: boolean } | null;
+  thumb?: { url: string } | null;
   /**
    * Where a comment actually lives, resolved alongside the thumbnails.
    *
@@ -136,6 +135,42 @@ function timeAgo(iso: string) {
  *  - "reacted to your status" went to the REACTOR's profile rather than to
  *    your own, where the status they reacted to actually is.
  */
+/** Extensions the app stores video under. Anything else is a picture. */
+const VIDEO_EXT = [".mp4", ".webm", ".mov", ".m4v"];
+
+/** Is this stored media a video? The extension is all there is to go on. */
+function isVideoUrl(url: string): boolean {
+  const path = url.split("?")[0].split("#")[0].toLowerCase();
+  return VIDEO_EXT.some((ext) => path.endsWith(ext));
+}
+
+/**
+ * The picture to draw in the little square beside a row, if there is one.
+ *
+ * Every Shot row used to come out an EMPTY box. The square held a <video>
+ * whose `poster` was pinned to a transparent 1x1 — that poster is there to
+ * suppress Android's grey play-circle, but a <video> shows its poster INSTEAD
+ * of a frame until it plays, so pinning a blank one guaranteed a blank square.
+ * The Shot's own cover was never even fetched, though it had one.
+ *
+ * So this returns a still and only a still. A Shot with no cover returns
+ * nothing at all, and the row simply has no square — which is what a text
+ * post with no picture already does, and is better than a hole. The other way
+ * out, a posterless <video> seeked to a frame, would bring that grey
+ * play-circle back on every Android row (see src/lib/blank-poster.ts).
+ *
+ * Exported for tests.
+ */
+export function mediaThumb(
+  row: { media_url?: string | null; poster_url?: string | null } | null | undefined,
+): { url: string } | null {
+  if (!row) return null;
+  if (row.poster_url) return { url: row.poster_url };
+  // A Show has no poster column at all and may be either, so the file says.
+  if (row.media_url && !isVideoUrl(row.media_url)) return { url: row.media_url };
+  return null;
+}
+
 export function notifHref(n: Notif): string {
   // A security alert has no actor and no target — it is about the account
   // itself, so it opens the page where you can act on it.
@@ -277,14 +312,14 @@ export default function NotificationsPage() {
 
     const [postsRes, shotsRes, showsRes, commentsRes] = await Promise.all([
       postIds.length ? supabase.from("posts").select("id, image_url, image_urls").in("id", postIds) : Promise.resolve({ data: [] as any[] }),
-      shotIds.length ? supabase.from("shots").select("id, media_url").in("id", shotIds) : Promise.resolve({ data: [] as any[] }),
+      shotIds.length ? supabase.from("shots").select("id, media_url, poster_url").in("id", shotIds) : Promise.resolve({ data: [] as any[] }),
       showIds.length ? supabase.from("shows").select("id, media_url").in("id", showIds) : Promise.resolve({ data: [] as any[] }),
       commentIds.length ? supabase.from("comments").select("id, post_id, shot_id").in("id", commentIds) : Promise.resolve({ data: [] as any[] }),
     ]);
 
     const postMap = new Map((postsRes.data ?? []).map((p: any) => [p.id, p.image_urls?.[0] ?? p.image_url ?? null]));
-    const shotMap = new Map((shotsRes.data ?? []).map((s: any) => [s.id, s.media_url ?? null]));
-    const showMap = new Map((showsRes.data ?? []).map((s: any) => [s.id, s.media_url ?? null]));
+    const shotMap = new Map((shotsRes.data ?? []).map((s: any) => [s.id, mediaThumb(s)]));
+    const showMap = new Map((showsRes.data ?? []).map((s: any) => [s.id, mediaThumb(s)]));
     const parentMap = new Map<string, { kind: "post" | "shot"; id: string }>(
       (commentsRes.data ?? [])
         .map((c: any) =>
@@ -299,13 +334,13 @@ export default function NotificationsPage() {
 
     return list.map((n) => {
       if (n.target_type === "post" && n.target_id && postMap.get(n.target_id)) {
-        return { ...n, thumb: { url: postMap.get(n.target_id)!, isVideo: false } };
+        return { ...n, thumb: { url: postMap.get(n.target_id)! } };
       }
       if (n.target_type === "shot" && n.target_id && shotMap.get(n.target_id)) {
-        return { ...n, thumb: { url: shotMap.get(n.target_id)!, isVideo: true } };
+        return { ...n, thumb: shotMap.get(n.target_id)! };
       }
       if (n.target_type === "show" && n.target_id && showMap.get(n.target_id)) {
-        return { ...n, thumb: { url: showMap.get(n.target_id)!, isVideo: false } };
+        return { ...n, thumb: showMap.get(n.target_id)! };
       }
       if (n.target_type === "comment" && n.target_id) {
         return { ...n, parent: parentMap.get(n.target_id) ?? null };
@@ -922,12 +957,11 @@ function NotifRow({
         )}
         {g.thumb && (
           <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface">
-            {g.thumb.isVideo ? (
-              <video poster={BLANK_POSTER} src={g.thumb.url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={g.thumb.url} alt="" className="h-full w-full object-cover" />
-            )}
+            {/* Always a still — a Shot's cover, a post's picture. A <video>
+                here showed its poster rather than a frame, and the poster was
+                blank, which is how every Shot row became an empty square. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={g.thumb.url} alt="" className="h-full w-full object-cover" />
           </div>
         )}
       </Link>
