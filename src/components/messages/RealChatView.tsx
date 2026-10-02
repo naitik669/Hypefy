@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Play, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock } from "lucide-react";
+import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock } from "lucide-react";
 import { SendIcon, ShareIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
@@ -60,6 +60,7 @@ import { openEncryptionSetup } from "@/lib/e2ee/open-setup";
 import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 import { ChatImg, ChatLink, ChatVideo } from "@/components/messages/ChatMedia";
 import { mediaUrlsOf, prefetchChatMedia } from "@/lib/chat-media-url";
+import { SharedShotCard } from "@/components/messages/SharedShotCard";
 
 type PostPreview = {
   id: string;
@@ -67,8 +68,13 @@ type PostPreview = {
   image_url: string | null;
   image_urls?: string[] | null;
 };
-type ShotPreview = { id: string; media_url: string; caption: string | null };
-type ShareProfile = { username: string | null; display_name: string | null; avatar_hue: number | null };
+type ShotPreview = { id: string; media_url: string; poster_url?: string | null; caption: string | null };
+type ShareProfile = {
+  username: string | null;
+  display_name: string | null;
+  avatar_hue: number | null;
+  avatar_url?: string | null;
+};
 
 export type ChatMsg = {
   id: string;
@@ -239,7 +245,7 @@ function fileSize(bytes: number): string {
 const MSG_PAGE = 30;
 /** Select used for both the initial server load and client pagination. */
 const MSG_SELECT =
-  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(username, display_name, avatar_hue)), shot:shots(id, media_url, caption, profiles(username, display_name, avatar_hue))";
+  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(username, display_name, avatar_hue)), shot:shots(id, media_url, poster_url, caption, profiles(username, display_name, avatar_hue, avatar_url))";
 
 /** Flatten Supabase's nested post/shot+profile joins into ChatMsg shape. */
 function mapMessageRow(m: any): ChatMsg {
@@ -681,7 +687,7 @@ export function RealChatView({
   async function hydrateShot(msgId: string, shotId: string) {
     const { data } = await supabase
       .from("shots")
-      .select("id, media_url, caption, profiles(username, display_name, avatar_hue, avatar_url)")
+      .select("id, media_url, poster_url, caption, profiles(username, display_name, avatar_hue, avatar_url)")
       .eq("id", shotId)
       .maybeSingle();
     if (!data) return;
@@ -689,7 +695,7 @@ export function RealChatView({
     const pr = Array.isArray(d.profiles) ? d.profiles[0] : d.profiles;
     setMessages((prev) =>
       prev.map((x) =>
-        x.id === msgId ? { ...x, shot: { id: d.id, media_url: d.media_url, caption: d.caption }, shotProfile: pr } : x,
+        x.id === msgId ? { ...x, shot: { id: d.id, media_url: d.media_url, poster_url: d.poster_url, caption: d.caption }, shotProfile: pr } : x,
       ),
     );
   }
@@ -1851,26 +1857,16 @@ export function RealChatView({
                           </div>
                         </Link>
                       ) : m.kind === "shot" && m.shot ? (
-                        <Link
-                          href={`/shots/${m.shot.id}`}
+                        <SharedShotCard
+                          shot={m.shot}
+                          author={m.shotProfile ?? null}
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
                           onPointerMove={onPressEnd}
                           onPointerLeave={onPressEnd}
                           onClick={(e) => { if (suppressClick.current) { e.preventDefault(); suppressClick.current = false; } }}
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
-                          className="relative block w-40 overflow-hidden rounded-2xl border border-border bg-black"
-                        >
-                          <video poster={BLANK_POSTER} src={m.shot.media_url} className="aspect-[3/4] w-full object-cover" muted playsInline preload="metadata" />
-                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
-                          <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
-                            <Play size={9} className="fill-white" /> Shot
-                          </span>
-                          <div className="absolute inset-x-0 bottom-0 p-2.5">
-                            {m.shotProfile?.username && <p className="text-xs font-bold text-white drop-shadow">@{m.shotProfile.username}</p>}
-                            {m.shot.caption && <p className="line-clamp-1 text-[11px] text-white/85 drop-shadow">{m.shot.caption}</p>}
-                          </div>
-                        </Link>
+                        />
                       ) : m.kind === "page_reply" && pageSnapshot(m.metadata) ? (
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
