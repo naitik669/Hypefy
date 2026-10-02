@@ -5,12 +5,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { SharedPostCard, postCardRatio, type SharedPost } from "@/components/messages/SharedPostCard";
 
 /**
- * A post shared into a chat, in the shared Shot's style: the picture at its
- * own shape, the author along the bottom, a stack mark only when there is
- * more than one picture, and words set large when there is no picture.
+ * A post shared into a chat, framed: the author on top, the photo inset at
+ * its own shape, the caption under it, a stack mark only when there is more
+ * than one photo, and the words set large when there is no photo.
  */
 
-describe("the card's shape", () => {
+describe("the photo's shape", () => {
   it("is the post's own shape", () => {
     expect(postCardRatio(1)).toBe(1);
     expect(postCardRatio(1.5)).toBe(1.5);
@@ -50,20 +50,28 @@ describe("the card", () => {
     return host.querySelector("a") as HTMLAnchorElement;
   }
 
-  it("shows the picture at the post's own shape, and opens the post", async () => {
+  it("shows the photo inset at the post's own shape, and opens the post", async () => {
     const card = await render({ image_url: "https://x.test/a.jpg", aspect_ratio: 1.5 });
     expect(card.getAttribute("href")).toBe("/p/p1");
-    expect(card.querySelector("img[src='https://x.test/a.jpg']")).toBeTruthy();
-    expect(card.style.aspectRatio).toBe("1.5");
+    const img = card.querySelector("img[src='https://x.test/a.jpg']")!;
+    expect((img.parentElement as HTMLElement).style.aspectRatio).toBe("1.5");
+    expect(img.parentElement!.className).toContain("rounded-[11px]");
   });
 
-  it("puts the author at the bottom", async () => {
-    const card = await render({ image_url: "https://x.test/a.jpg" });
-    const name = [...card.querySelectorAll("span")].find((s) => s.textContent === "maya")!;
-    expect(name.parentElement!.className).toContain("bottom-2");
+  it("puts the author on top and the caption under the photo", async () => {
+    const card = await render({ image_url: "https://x.test/a.jpg", caption: "golden hour" });
+    const order = [...card.querySelectorAll("span, img, p")].map((el) =>
+      el.tagName === "IMG" ? "photo" : el.textContent === "maya" ? "name" : el.textContent === "golden hour" ? "caption" : null,
+    ).filter(Boolean);
+    expect(order).toEqual(["name", "photo", "caption"]);
   });
 
-  it("marks a post with several pictures, and only that", async () => {
+  it("leaves out the caption line when there is no caption", async () => {
+    const card = await render({ image_url: "https://x.test/a.jpg", caption: null });
+    expect(card.querySelector("p")).toBeFalsy();
+  });
+
+  it("marks a post with several photos, and only that", async () => {
     let card = await render({ image_urls: ["a", "b", "c"] });
     expect(card.querySelector('[aria-label="3 photos"]')).toBeTruthy();
     await act(async () => root.unmount());
@@ -72,10 +80,10 @@ describe("the card", () => {
     expect(card.querySelector("svg[aria-label]")).toBeFalsy();
   });
 
-  it("sets the words large when there is no picture, rather than two grey lines", async () => {
+  it("sets the words large when there is no photo, once, with the author above", async () => {
     const card = await render({ image_url: null, caption: "the roof is the only quiet place" });
-    expect(card.querySelector("img")).toBeFalsy();
-    expect(card.textContent).toContain("the roof is the only quiet place");
+    expect(card.querySelector("img:not([alt=''])")).toBeFalsy();
+    expect(card.textContent!.match(/the roof is the only quiet place/g)).toHaveLength(1);
     expect(card.textContent).toContain("maya");
   });
 });
