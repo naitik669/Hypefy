@@ -110,8 +110,22 @@ export function SharedShotCard({
         <path d={BOLT} />
       </svg>
 
+      <ShareAuthor author={author} name={name} />
+    </Link>
+  );
+}
+
+/**
+ * Whose it is, along the bottom of a shared Shot or post. Shared so the two
+ * cards cannot drift apart, as their copies of everything else once did.
+ */
+export function ShareAuthor({ author, name, fade = true }: { author: SharedShotAuthor; name: string; fade?: boolean }) {
+  return (
+    <>
       {/* A fade under the name so it reads on any frame, bright ones included. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/60 to-transparent" />
+      {fade && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/60 to-transparent" />
+      )}
       <div className="absolute inset-x-2 bottom-2 flex items-center gap-1.5">
         <Avatar
           name={name}
@@ -122,6 +136,6 @@ export function SharedShotCard({
         />
         <span className="truncate text-xs font-semibold text-white">{name}</span>
       </div>
-    </Link>
+    </>
   );
 }

@@ -61,12 +61,14 @@ import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 import { ChatImg, ChatLink, ChatVideo } from "@/components/messages/ChatMedia";
 import { mediaUrlsOf, prefetchChatMedia } from "@/lib/chat-media-url";
 import { SharedShotCard } from "@/components/messages/SharedShotCard";
+import { SharedPostCard } from "@/components/messages/SharedPostCard";
 
 type PostPreview = {
   id: string;
   caption: string | null;
   image_url: string | null;
   image_urls?: string[] | null;
+  aspect_ratio?: number | null;
 };
 type ShotPreview = { id: string; media_url: string; poster_url?: string | null; caption: string | null };
 type ShareProfile = {
@@ -245,7 +247,7 @@ function fileSize(bytes: number): string {
 const MSG_PAGE = 30;
 /** Select used for both the initial server load and client pagination. */
 const MSG_SELECT =
-  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(username, display_name, avatar_hue)), shot:shots(id, media_url, poster_url, caption, profiles(username, display_name, avatar_hue, avatar_url))";
+  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, post:posts(id, caption, image_url, image_urls, aspect_ratio, profiles!posts_user_id_fkey(username, display_name, avatar_hue, avatar_url)), shot:shots(id, media_url, poster_url, caption, profiles(username, display_name, avatar_hue, avatar_url))";
 
 /** Flatten Supabase's nested post/shot+profile joins into ChatMsg shape. */
 function mapMessageRow(m: any): ChatMsg {
@@ -669,7 +671,7 @@ export function RealChatView({
   async function hydratePost(msgId: string, postId: string) {
     const { data } = await supabase
       .from("posts")
-      .select("id, caption, image_url, image_urls, profiles!posts_user_id_fkey(username, display_name, avatar_hue, avatar_url)")
+      .select("id, caption, image_url, image_urls, aspect_ratio, profiles!posts_user_id_fkey(username, display_name, avatar_hue, avatar_url)")
       .eq("id", postId)
       .maybeSingle();
     if (!data) return;
@@ -678,7 +680,7 @@ export function RealChatView({
     setMessages((prev) =>
       prev.map((x) =>
         x.id === msgId
-          ? { ...x, post: { id: d.id, caption: d.caption, image_url: d.image_url, image_urls: d.image_urls }, postProfile: pr }
+          ? { ...x, post: { id: d.id, caption: d.caption, image_url: d.image_url, image_urls: d.image_urls, aspect_ratio: d.aspect_ratio }, postProfile: pr }
           : x,
       ),
     );
@@ -1837,25 +1839,16 @@ export function RealChatView({
                           </span>
                         </div>
                       ) : m.kind === "post" && m.post ? (
-                        <Link
-                          href={`/p/${m.post.id}`}
+                        <SharedPostCard
+                          post={m.post}
+                          author={m.postProfile ?? null}
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
                           onPointerMove={onPressEnd}
                           onPointerLeave={onPressEnd}
                           onClick={(e) => { if (suppressClick.current) { e.preventDefault(); suppressClick.current = false; } }}
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
-                          className="block w-56 overflow-hidden rounded-2xl border border-border bg-surface"
-                        >
-                          {(m.post.image_urls?.[0] || m.post.image_url) && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={m.post.image_urls?.[0] || m.post.image_url || ""} alt="" className="aspect-square w-full object-cover" />
-                          )}
-                          <div className="p-2.5">
-                            {m.postProfile?.username && <p className="text-xs font-semibold">@{m.postProfile.username}</p>}
-                            {m.post.caption && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{m.post.caption}</p>}
-                          </div>
-                        </Link>
+                        />
                       ) : m.kind === "shot" && m.shot ? (
                         <SharedShotCard
                           shot={m.shot}
