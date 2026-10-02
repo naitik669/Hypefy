@@ -8,6 +8,8 @@ import { hypeResult } from "@/lib/supabase/typed";
 import { PostPeek, type PeekAuthor } from "@/components/feed/PostPeek";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
+import { isRehyped, setRehype, type RehypeKind } from "@/lib/rehype";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 
 /** Matches FeedCard, so the gesture feels the same wherever a post is. */
 const HOLD_MS = 350;
@@ -18,6 +20,12 @@ export type PeekablePost = {
   user_id: string;
   caption: string | null;
   image: string | null;
+  /**
+   * A Shot's video. With one the peek PLAYS rather than holding a still, and
+   * `image` is the poster it starts from — which a Shot may not have, so the
+   * hold is allowed on the video alone.
+   */
+  video?: string | null;
   /** The post's composed shape, so the peek opens at the right size. */
   aspect_ratio: number | null;
   hype_count: number;
@@ -40,11 +48,20 @@ export type PeekablePost = {
  */
 export function GridPeek({
   post,
+  kind = "post",
   currentUserId,
   className = "",
   children,
 }: {
   post: PeekablePost;
+  /**
+   * Which of the two things this tile is.
+   *
+   * A Shot's hypes, saves, comments and rehypes all live in their own tables,
+   * so one wrong default here is silently counting against a post that does
+   * not exist. Everything below reads this rather than assuming "post".
+   */
+  kind?: RehypeKind;
   currentUserId?: string;
   /**
    * Applied to the wrapper, which IS the layout item.
@@ -71,6 +88,46 @@ export function GridPeek({
   const [pending, setPending] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [rehyped, setRehyped] = useState(false);
+  const [rehypePending, setRehypePending] = useState(false);
+
+  /**
+   * Saves, per kind, written out rather than parameterised.
+   *
+   * A table name held in a variable is a `string` to the typed client, which
+   * then cannot check the column against it — the one mistake worth catching
+   * here is saving a Shot into saved_posts, and that is exactly the mistake a
+   * string table name hides.
+   */
+  async function readSaved(userId: string): Promise<boolean> {
+    if (kind === "shot") {
+      const { data } = await supabase
+        .from("saved_shots")
+        .select("shot_id")
+        .eq("user_id", userId)
+        .eq("shot_id", post.id)
+        .maybeSingle();
+      return !!data;
+    }
+    const { data } = await supabase
+      .from("saved_posts")
+      .select("post_id")
+      .eq("user_id", userId)
+      .eq("post_id", post.id)
+      .maybeSingle();
+    return !!data;
+  }
+
+  function writeSaved(userId: string, next: boolean) {
+    if (kind === "shot") {
+      return next
+        ? supabase.from("saved_shots").insert({ user_id: userId, shot_id: post.id })
+        : supabase.from("saved_shots").delete().eq("user_id", userId).eq("shot_id", post.id);
+    }
+    return next
+      ? supabase.from("saved_posts").insert({ user_id: userId, post_id: post.id })
+      : supabase.from("saved_posts").delete().eq("user_id", userId).eq("post_id", post.id);
+  }
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const start = useRef({ x: 0, y: 0 });
@@ -85,29 +142,54 @@ export function GridPeek({
   }
 
   async function openPeek() {
-    if (!post.image) return; // nothing to lift
+    // A Shot may have no poster at all, and a Shot with no poster is exactly
+    // the one you most want to hold to find out what it is.
+    if (!post.image && !post.video) return;
     held.current = true;
     haptics.select();
     setOpen(true);
 
     if (!currentUserId) return;
-    const [h, s] = await Promise.all([
+    const [h, s, r] = await Promise.all([
       supabase
         .from("hypes")
         .select("target_id")
         .eq("user_id", currentUserId)
-        .eq("target_type", "post")
+        .eq("target_type", kind)
         .eq("target_id", post.id)
         .maybeSingle(),
-      supabase
-        .from("saved_posts")
-        .select("post_id")
-        .eq("user_id", currentUserId)
-        .eq("post_id", post.id)
-        .maybeSingle(),
+      readSaved(currentUserId),
+      isRehyped(supabase as never, currentUserId, kind, post.id),
     ]);
     setHyped(!!h.data);
-    setSaved(!!s.data);
+    setSaved(s);
+    setRehyped(r);
+  }
+
+  async function toggleRehype() {
+    if (rehypePending) return;
+    if (!currentUserId) {
+      toast("Sign in to rehype");
+      return;
+    }
+    const prev = rehyped;
+    setRehypePending(true);
+    setRehyped(!prev);
+    haptics.select();
+    const res = await setRehype(supabase as never, currentUserId, kind, post.id, !prev);
+    setRehypePending(false);
+    if (res.ok) {
+      setRehyped(res.rehyped);
+      if (!prev) toast("Rehyped to your followers", "success");
+      return;
+    }
+    setRehyped(prev);
+    toast(
+      res.reason === "not-allowed"
+        ? "Private accounts can't be rehyped."
+        : "Couldn't rehype. Try again.",
+      "error",
+    );
   }
 
   async function toggleHype() {
@@ -120,7 +202,7 @@ export function GridPeek({
     haptics[prev ? "tap" : "success"]();
     try {
       const { data, error } = await supabase.rpc("toggle_hype", {
-        p_target_type: "post",
+        p_target_type: kind,
         p_target_id: post.id,
         p_owner_id: post.user_id,
       });
@@ -143,15 +225,7 @@ export function GridPeek({
     const prev = saved;
     setSaved(!prev);
     haptics.select();
-    const { error } = prev
-      ? await supabase
-          .from("saved_posts")
-          .delete()
-          .eq("user_id", currentUserId)
-          .eq("post_id", post.id)
-      : await supabase
-          .from("saved_posts")
-          .insert({ user_id: currentUserId, post_id: post.id });
+    const { error } = await writeSaved(currentUserId, !prev);
     if (error) {
       // A duplicate insert means it was already saved — the optimistic state
       // is right and the error is not worth showing.
@@ -186,7 +260,7 @@ export function GridPeek({
         onContextMenu={(e) => {
           // The WebView's own long-press menu would otherwise appear on top of
           // the peek, over the image it is showing.
-          if (post.image) e.preventDefault();
+          if (post.image || post.video) e.preventDefault();
         }}
         onClickCapture={(e) => {
           // The hold ends in a click. Swallow it, or letting go navigates to
@@ -203,11 +277,13 @@ export function GridPeek({
         {children}
       </div>
 
-      {open && post.image && (
+      {open && (post.image || post.video) && (
         <PostPeek
-          src={post.image}
+          src={post.image || BLANK_POSTER}
+          videoSrc={post.video ?? undefined}
           aspectRatio={post.aspect_ratio}
           postId={post.id}
+          targetType={kind}
           author={post.author}
           caption={post.caption}
           currentUserId={currentUserId ?? ""}
@@ -215,6 +291,8 @@ export function GridPeek({
           hypeCount={hypeCount}
           commentCount={commentCount}
           saved={saved}
+          rehyped={rehyped}
+          onRehype={toggleRehype}
           onHype={toggleHype}
           onComment={() => setCommentsOpen(true)}
           onShare={() => setShareOpen(true)}
@@ -228,6 +306,7 @@ export function GridPeek({
           <CommentsSheet
             open={commentsOpen}
             onClose={() => setCommentsOpen(false)}
+            targetType={kind}
             postId={post.id}
             postOwnerId={post.user_id}
             currentUserId={currentUserId}
@@ -236,6 +315,7 @@ export function GridPeek({
           <ShareSheet
             open={shareOpen}
             onClose={() => setShareOpen(false)}
+            targetType={kind}
             postId={post.id}
           />
         </>

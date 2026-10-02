@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { DiscoverFilter } from "@/components/discover/DiscoverFilter";
 import { ShotPreview } from "@/components/shots/ShotPreview";
+import { GridPeek } from "@/components/feed/GridPeek";
 import { UserSuggestionCard } from "@/components/discover/UserSuggestionCard";
 import { PinFeed, type Pin } from "@/components/discover/PinFeed";
 import { formatCount } from "@/lib/format";
@@ -22,10 +23,17 @@ type Shot = {
   caption: string | null;
   hype_count: number;
   comment_count: number;
+  /**
+   * The author's id and face, which the query has always returned and this
+   * type did not admit to. Holding a tile needs both: a hype is written
+   * against the owner, and the peek draws the person who posted it.
+   */
+  user_id: string;
   profiles: {
     display_name: string | null;
     username: string | null;
     avatar_hue: number | null;
+    avatar_url?: string | null;
   } | null;
 };
 type Person = {
@@ -169,7 +177,7 @@ export function DiscoverView({
             shots={trendingShots}
             renderTile={(id) => {
               const s = trendingShots.find((x) => x.id === id);
-              return s ? <ShotTile shot={s} /> : null;
+              return s ? <ShotTile shot={s} currentUserId={currentUserId} /> : null;
             }}
           />
         )}
@@ -179,7 +187,7 @@ export function DiscoverView({
             <Section title="Shots">
               <div className="grid grid-cols-3 gap-1 px-1">
                 {trendingShots.map((s) => (
-                  <ShotTile key={s.id} shot={s} />
+                  <ShotTile key={s.id} shot={s} currentUserId={currentUserId} />
                 ))}
               </div>
             </Section>
@@ -282,8 +290,36 @@ function Stat({ icon, value }: { icon: React.ReactNode; value: number }) {
   );
 }
 
-function ShotTile({ shot }: { shot: Shot }) {
+function ShotTile({ shot, currentUserId }: { shot: Shot; currentUserId: string }) {
+  const hue = shot.profiles?.avatar_hue ?? 280;
+  const name = shot.profiles?.display_name ?? shot.profiles?.username ?? "Someone";
+
   return (
+    <GridPeek
+      kind="shot"
+      currentUserId={currentUserId}
+      className="block min-w-0"
+      post={{
+        id: shot.id,
+        user_id: shot.user_id,
+        caption: shot.caption,
+        image: shot.poster_url,
+        video: shot.media_url,
+        aspect_ratio: 9 / 16,
+        hype_count: shot.hype_count,
+        comment_count: shot.comment_count,
+        author: shot.profiles
+          ? {
+              id: shot.user_id,
+              name,
+              username: shot.profiles.username ?? null,
+              avatarUrl: shot.profiles.avatar_url ?? null,
+              hue,
+              verified: false,
+            }
+          : null,
+      }}
+    >
     <Link
       href={`/shots/${shot.id}`}
       className="relative block aspect-[9/16] overflow-hidden rounded-[10px] bg-black"
@@ -303,6 +339,7 @@ function ShotTile({ shot }: { shot: Shot }) {
         <Stat icon={<CommentIcon size={12} />} value={shot.comment_count} />
       </div>
     </Link>
+    </GridPeek>
   );
 }
 

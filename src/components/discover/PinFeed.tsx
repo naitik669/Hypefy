@@ -36,6 +36,16 @@ export type ShotPin = {
   media_url: string;
   poster_url: string | null;
   caption: string | null;
+  /** What holding the tile needs: whose it is, and what it has collected. */
+  user_id?: string;
+  hype_count?: number | null;
+  comment_count?: number | null;
+  profiles?: {
+    display_name: string | null;
+    username: string | null;
+    avatar_hue: number | null;
+    avatar_url?: string | null;
+  } | null;
 };
 
 type Tile = Mixed<Pin, ShotPin>;
@@ -225,7 +235,7 @@ export function PinFeed({
           <div key={c} className="flex min-w-0 flex-1 flex-col gap-1">
             {col.map((t) =>
               t.kind === "shot" ? (
-                <ShotTile key={`shot-${t.item.id}`} shot={t.item} />
+                <ShotTile key={`shot-${t.item.id}`} shot={t.item} currentUserId={currentUserId} />
               ) : (
                 <PinTile key={t.item.id} pin={t.item} currentUserId={currentUserId} />
               )
@@ -348,8 +358,39 @@ function PinTile({ pin, currentUserId }: { pin: Pin; currentUserId: string }) {
  * with one small play mark, because a video you did not know was a video is a
  * surprise when it opens into the reel.
  */
-function ShotTile({ shot }: { shot: ShotPin }) {
+function ShotTile({ shot, currentUserId }: { shot: ShotPin; currentUserId: string }) {
+  const hue = shot.profiles?.avatar_hue ?? 280;
+  const name = shot.profiles?.display_name ?? shot.profiles?.username ?? "Someone";
+
   return (
+    <GridPeek
+      kind="shot"
+      currentUserId={currentUserId}
+      className="block min-w-0"
+      post={{
+        id: shot.id,
+        user_id: shot.user_id ?? "",
+        caption: shot.caption,
+        // The poster is what the peek opens on; the video is what it plays.
+        image: shot.poster_url,
+        video: shot.media_url,
+        // Its own shape, not the 9:16 crop the tile wears — a Shot held
+        // should be the Shot, which is the point of holding it.
+        aspect_ratio: 9 / 16,
+        hype_count: shot.hype_count ?? 0,
+        comment_count: shot.comment_count ?? 0,
+        author: shot.profiles
+          ? {
+              id: shot.user_id ?? "",
+              name,
+              username: shot.profiles.username ?? null,
+              avatarUrl: shot.profiles.avatar_url ?? null,
+              hue,
+              verified: false,
+            }
+          : null,
+      }}
+    >
     <Link
       href={`/shots/${shot.id}`}
       aria-label={shot.caption ? `Shot: ${shot.caption}` : "Shot"}
@@ -366,5 +407,6 @@ function ShotTile({ shot }: { shot: ShotPin }) {
         <Play size={11} className="fill-white" />
       </span>
     </Link>
+    </GridPeek>
   );
 }
