@@ -214,7 +214,10 @@ export function ReactFan({
           <div
             role="menu"
             aria-label="Pick an emoji"
-            className="fixed inset-0 z-[130]"
+            // Above anything that can open it: a Spotlight page, and the chat's
+            // full-screen photo viewer (z-200). Below the emoji picker (z-250)
+            // that its ⋯ hands off to.
+            className="fixed inset-0 z-[230]"
             // Opened without a finger, a click off the fan closes it.
             onClick={detached ? close : undefined}
             style={{ pointerEvents: detached ? "auto" : "none" }}

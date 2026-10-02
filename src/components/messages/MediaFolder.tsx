@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { albumCount, type Album, type AlbumItem } from "@/lib/chat-album";
+import { ViewerResponder } from "@/components/messages/ViewerResponder";
 import { ChatImg, ChatVideo } from "@/components/messages/ChatMedia";
 
 /**
@@ -181,10 +182,20 @@ export function AlbumViewer({
   onClose,
   sender,
   sentAt,
+  respond,
 }: {
   album: Album;
   start: number;
   onClose: () => void;
+  /**
+   * Reply and react from the viewer, as on a Spotlight page. Given by the
+   * chat; left out where there is no message to answer.
+   */
+  respond?: {
+    label: string;
+    onReply: (text: string) => Promise<boolean>;
+    onReact: (emoji: string) => void;
+  };
   /** Who sent it. */
   sender: { name: string; hue?: number; avatarUrl?: string | null };
   /** When, already worded — "Today, 9:41". */
@@ -207,6 +218,8 @@ export function AlbumViewer({
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  /** The sender's face: where a sent emoji flies. */
+  const faceRef = useRef<HTMLSpanElement>(null);
 
   useOverlayBackButton(true, onClose);
 
@@ -367,7 +380,7 @@ export function AlbumViewer({
   return createPortal(
     <div
       className="fixed inset-0 z-[200] select-none overflow-hidden"
-      style={{ touchAction: "none", background: `rgba(0,0,0,${1 - closing * 0.6})` }}
+      style={{ touchAction: "none" }}
       role="dialog"
       aria-label="Photos"
       onPointerDown={onPointerDown}
@@ -375,6 +388,27 @@ export function AlbumViewer({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
     >
+      {/*
+        The ground: the photo itself, blurred far out and darkened, so the
+        viewer takes its colour from what you are looking at instead of
+        sitting on flat black. A video has no still to borrow, so it gets a
+        plain deep ground. Fades with the drag-to-close, as the black did.
+      */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 overflow-hidden bg-[#070707]"
+        style={{ opacity: 1 - closing * 0.6 }}
+      >
+        {album.items[index]?.type === "image" && (
+          <ChatImg
+            key={album.items[index].url}
+            url={album.items[index].url}
+            className="absolute inset-0 h-full w-full scale-125 object-cover opacity-70 blur-[48px] saturate-[1.4]"
+          />
+        )}
+        <div className="absolute inset-0 bg-black/45" />
+      </div>
+
       <div
         ref={trackRef}
         data-viewer-track
@@ -391,7 +425,7 @@ export function AlbumViewer({
           return (
             <div
               key={`${item.url}-${i}`}
-              className="relative flex h-full shrink-0 items-center justify-center overflow-hidden"
+              className="relative flex h-full shrink-0 items-center justify-center overflow-hidden px-3"
               style={{ width }}
             >
               {near && (
@@ -414,10 +448,16 @@ export function AlbumViewer({
                       preload="metadata"
                       onPlay={() => setPaused(false)}
                       onPause={() => setPaused(true)}
-                      className="pointer-events-none max-h-full max-w-full"
+                      className="pointer-events-none max-h-[calc(100%-176px)] max-w-full rounded-[22px]"
                     />
                   ) : (
-                    <ChatImg url={item.url} draggable={false} className="pointer-events-none max-h-full max-w-full object-contain" />
+                    // Rounded, and inset from the edges, so it reads as the
+                    // photo held up rather than the screen turned into it.
+                    <ChatImg
+                      url={item.url}
+                      draggable={false}
+                      className="pointer-events-none max-h-[calc(100%-176px)] max-w-full rounded-[22px] object-contain"
+                    />
                   )}
                 </div>
               )}
@@ -447,7 +487,9 @@ export function AlbumViewer({
         >
           <X size={22} />
         </button>
-        <Avatar name={sender.name} hue={sender.hue} size={34} src={sender.avatarUrl ?? undefined} />
+        <span ref={faceRef} className="shrink-0">
+          <Avatar name={sender.name} hue={sender.hue} size={34} src={sender.avatarUrl ?? undefined} />
+        </span>
         <div className="min-w-0 flex-1 leading-tight">
           <p className="truncate text-[14px] font-semibold">{sender.name}</p>
           <p className="truncate text-[12px] text-white/60">{sentAt}</p>
@@ -461,7 +503,7 @@ export function AlbumViewer({
 
       {/* The caption, and where you are in the folder */}
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-black/60 to-transparent px-6 pb-[calc(var(--sab,0px)+18px)] pt-10 text-white transition-opacity duration-200"
+        className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-black/60 to-transparent px-4 pb-[calc(var(--sab,0px)+16px)] pt-10 text-white transition-opacity duration-200"
         style={{ opacity: showChrome ? 1 : 0 }}
       >
         {album.caption && <p className="text-center text-[15px] leading-snug">{album.caption}</p>}
@@ -473,6 +515,16 @@ export function AlbumViewer({
                 className={`h-1.5 rounded-full transition-all duration-200 ${i === index ? "w-4 bg-white" : "w-1.5 bg-white/40"}`}
               />
             ))}
+          </div>
+        )}
+        {respond && (
+          <div className="w-full" style={{ pointerEvents: showChrome ? "auto" : "none" }}>
+            <ViewerResponder
+              label={respond.label}
+              onReply={respond.onReply}
+              onReact={respond.onReact}
+              target={() => faceRef.current}
+            />
           </div>
         )}
       </div>

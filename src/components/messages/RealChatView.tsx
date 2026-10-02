@@ -443,7 +443,15 @@ export function RealChatView({
   const pickerApi = useRef<MediaPickerApi>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const attachHold = useRef<{ timer: ReturnType<typeof setTimeout> | null; opened: boolean }>({ timer: null, opened: false });
-  const [albumView, setAlbumView] = useState<{ album: Album; start: number; senderId: string; at: string } | null>(null);
+  /** The full-screen viewer: an album, or a single photo as an album of one. */
+  const [albumView, setAlbumView] = useState<{
+    album: Album;
+    start: number;
+    senderId: string;
+    at: string;
+    /** The message it came from, for replying and reacting from the viewer. */
+    msgId: string;
+  } | null>(null);
   // A sending folder's files, by its temp id, kept until they are uploaded so
   // a failed upload can be retried.
   const albumFiles = useRef(new Map<string, AlbumFile[]>());
@@ -1036,16 +1044,21 @@ export function RealChatView({
    * @param override Send this instead of whatever is in the composer. Used by
    * the empty thread's Hey, which has nothing typed to read.
    */
-  async function send(override?: string) {
-    if (editing) { await saveEdit(); return; }
+  /**
+   * Send a text message. `replyOverride` answers that message instead of the
+   * one picked in the composer, and leaves the composer as it is — the
+   * photo viewer's reply bar uses it. True when it went.
+   */
+  async function send(override?: string, replyOverride?: ChatMsg): Promise<boolean> {
+    if (editing && !replyOverride) { await saveEdit(); return true; }
     const body = (override ?? text).trim();
-    if (!body || sending) return;
+    if (!body || sending) return false;
     haptics.tap();
     setSending(true);
-    setText("");
+    if (!replyOverride) setText("");
     emitStopTyping();
-    const replyId = replyTo?.id ?? null;
-    setReplyTo(null);
+    const replyId = replyOverride ? replyOverride.id : replyTo?.id ?? null;
+    if (!replyOverride) setReplyTo(null);
 
     // Null when the other person has not set up encryption yet, or when
     // this device is locked. Both are ordinary states; the thread says so
@@ -1069,16 +1082,18 @@ export function RealChatView({
       // Keep message visible but mark it failed
       setMessages((p) => p.map((m) => (m.id === tempId ? { ...m, _status: "failed" as const } : m)));
       showToast("Couldn't send. Try again.");
-    } else {
-      const real = data as ChatMsg;
-      // If the realtime echo already added the real row, just drop the temp.
-      setMessages((p) =>
-        p.some((m) => m.id === real.id)
-          ? p.filter((m) => m.id !== tempId)
-          : p.map((m) => (m.id === tempId ? { ...m, ...real, _status: undefined } : m)),
-      );
+      setSending(false);
+      return false;
     }
+    const real = data as ChatMsg;
+    // If the realtime echo already added the real row, just drop the temp.
+    setMessages((p) =>
+      p.some((m) => m.id === real.id)
+        ? p.filter((m) => m.id !== tempId)
+        : p.map((m) => (m.id === tempId ? { ...m, ...real, _status: undefined } : m)),
+    );
     setSending(false);
+    return true;
   }
 
   /**
@@ -1613,6 +1628,30 @@ export function RealChatView({
       if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
     }, 420);
   }
+  /**
+   * The message whose photos are open full-screen, for the viewer's reply and
+   * react — not one still sending, which has nothing yet to answer.
+   */
+  const viewed = albumView
+    ? messages.find((x) => x.id === albumView.msgId && !x.id.startsWith("temp-")) ?? null
+    : null;
+  const viewedFirst =
+    viewed && viewed.sender_id !== currentUserId
+      ? (isGroup ? senderName(viewed.sender_id) : other.name).split(" ")[0]
+      : null;
+
+  /** A single photo, full-screen: the viewer, as an album of one. Not after a hold. */
+  function openPhoto(m: ChatMsg) {
+    if (suppressClick.current) { suppressClick.current = false; return; }
+    if (!m.body && !m._localUrl) return;
+    setAlbumView({
+      album: { caption: "", items: [{ url: m._localUrl ?? m.body!, type: "image" }] },
+      start: 0,
+      senderId: m.sender_id,
+      at: m.created_at,
+      msgId: m.id,
+    });
+  }
   function onPressEnd() {
     if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
   }
@@ -1959,7 +1998,13 @@ export function RealChatView({
                           onPointerMove={onPressEnd}
                           onPointerLeave={onPressEnd}
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
-                          className="relative overflow-hidden rounded-2xl"
+                          // A single photo opens full-screen, as a photo in a
+                          // folder always has. It had no tap at all. Not a
+                          // GIF: that already plays where it is.
+                          onClick={m.kind === "image" ? () => openPhoto(m) : undefined}
+                          role={m.kind === "image" ? "button" : undefined}
+                          aria-label={m.kind === "image" ? "Open photo" : undefined}
+                          className={`relative overflow-hidden rounded-2xl ${m.kind === "image" ? "cursor-zoom-in" : ""}`}
                           style={{ width: m.kind === "image" ? MEDIA_W : undefined, maxWidth: MEDIA_W }}
                         >
                           <ChatImg url={m._localUrl ?? m.body} alt={m.kind === "gif" ? "GIF" : ""} className="w-full rounded-2xl object-cover" />
@@ -1994,7 +2039,7 @@ export function RealChatView({
                             album={editing?.id === m.id ? { ...albumOf(m)!, caption: text } : albumOf(m)!}
                             mine={mine}
                             editing={editing?.id === m.id}
-                            onOpen={(start) => setAlbumView({ album: albumOf(m)!, start, senderId: m.sender_id, at: m.created_at })}
+                            onOpen={(start) => setAlbumView({ album: albumOf(m)!, start, senderId: m.sender_id, at: m.created_at, msgId: m.id })}
                           />
                           {starBurstId === m.id && (
                             <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
@@ -2533,6 +2578,15 @@ export function RealChatView({
                 : { name: other.name, hue: other.hue, avatarUrl: other.avatarUrl }
           }
           sentAt={`${dayLabel(albumView.at)}, ${timeLabel(albumView.at)}`}
+          respond={
+            viewed
+              ? {
+                  label: viewedFirst ? `Reply to ${viewedFirst}…` : "Reply…",
+                  onReply: (body: string) => send(body, viewed),
+                  onReact: (emoji: string) => toggleReaction(viewed.id, emoji),
+                }
+              : undefined
+          }
         />
       )}
 
