@@ -83,7 +83,7 @@ async function hold() {
   });
 }
 
-const peek = () => document.querySelector('[role="dialog"][aria-label="Post preview"]');
+const peek = () => document.querySelector('[role="dialog"][aria-label$=" preview"]');
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

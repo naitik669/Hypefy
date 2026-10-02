@@ -156,7 +156,7 @@ describe("holding a Shot in the feed", () => {
 
   it("lifts the Shot out and PLAYS it, rather than freezing a frame of it", async () => {
     await hold();
-    const peek = document.querySelector('[role="dialog"][aria-label="Post preview"]');
+    const peek = document.querySelector('[role="dialog"][aria-label="Shot preview"]');
     expect(peek).toBeTruthy();
     const video = peek!.querySelector("video") as HTMLVideoElement;
     expect(video).toBeTruthy();
@@ -167,7 +167,7 @@ describe("holding a Shot in the feed", () => {
 
   it("carries the rehype into the peek, and none of the faces", async () => {
     await hold();
-    const peek = document.querySelector('[role="dialog"][aria-label="Post preview"]')!;
+    const peek = document.querySelector('[role="dialog"][aria-label="Shot preview"]')!;
     expect(peek.querySelector('[aria-label="Rehype"]')).toBeTruthy();
     // The deck belongs on the card, where it can be dragged off. Over a Shot
     // someone opened to watch properly it is just something in the way.
@@ -185,6 +185,6 @@ describe("holding a Shot in the feed", () => {
     await act(async () => {
       vi.advanceTimersByTime(600);
     });
-    expect(document.querySelector('[aria-label="Post preview"]')).toBeFalsy();
+    expect(document.querySelector('[aria-label="Shot preview"]')).toBeFalsy();
   });
 });

@@ -103,3 +103,95 @@ describe("the peek card", () => {
     expect(box!.style.aspectRatio).toBe("1");
   });
 });
+
+/**
+ * Design F: the media and five actions under it, spread across the width.
+ * No author, no caption, no card — those were all on screen a moment ago.
+ */
+describe("the peek, design F", () => {
+  let root: Root;
+  let host: HTMLDivElement;
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+  });
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    host.remove();
+  });
+
+  async function open(extra: Record<string, unknown> = {}) {
+    const { PostPeek } = await import("@/components/feed/PostPeek");
+    await act(async () =>
+      root.render(
+        createElement(PostPeek, {
+          src: "https://example.invalid/p.jpg",
+          aspectRatio: 1,
+          postId: "p1",
+          caption: "golden hour on the roof",
+          author: { id: "u2", name: "Maya Rao", username: "maya", avatarUrl: null, hue: 30, verified: false },
+          hyped: false,
+          hypeCount: 341,
+          commentCount: 7,
+          saved: false,
+          rehyped: false,
+          rehypeCount: 24,
+          onRehype() {},
+          onHype() {},
+          onComment() {},
+          onShare() {},
+          onSave() {},
+          onClose() {},
+          ...extra,
+        }),
+      ),
+    );
+    return document.querySelector('[role="dialog"]') as HTMLElement;
+  }
+
+  it("draws neither the author nor the caption", async () => {
+    const peek = await open();
+    expect(peek.textContent).not.toContain("Maya");
+    expect(peek.textContent).not.toContain("@maya");
+    expect(peek.textContent).not.toContain("golden hour");
+  });
+
+  it("puts the five actions in one row under the media, with their counts", async () => {
+    const peek = await open();
+    const labels = ["Hype", "Comments", "Share", "Rehype", "Save"];
+    const buttons = labels.map((l) => peek.querySelector(`[aria-label="${l}"]`) as HTMLElement);
+    buttons.forEach((b, i) => expect(b, labels[i]).toBeTruthy());
+    const row = buttons[0].parentElement!;
+    // Share sits inside its hold-to-share wrapper, so "in the row", not "a child of it".
+    expect(buttons.every((b) => row.contains(b))).toBe(true);
+    expect(row.className).toContain("justify-between");
+    expect(row.textContent).toContain("341");
+    expect(row.textContent).toContain("7");
+    expect(row.textContent).toContain("24");
+  });
+
+  it("has no card behind it", async () => {
+    const peek = await open();
+    // The wrapper around the media and the row is bare: no fill, no rounded card.
+    const wrapper = peek.firstElementChild as HTMLElement;
+    expect(wrapper.className).not.toMatch(/bg-|rounded-3xl|shadow/);
+  });
+
+  it("offers the message menu only where it is given one", async () => {
+    let peek = await open();
+    expect(peek.querySelector('[aria-label="More"]')).toBeFalsy();
+    let more = 0;
+    peek = await open({ onMore: () => more++ });
+    const btn = peek.querySelector('[aria-label="More"]') as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+    await act(async () => btn.click());
+    expect(more).toBe(1);
+  });
+
+  it("names itself after what it is showing", async () => {
+    expect((await open()).getAttribute("aria-label")).toBe("Post preview");
+    expect((await open({ targetType: "shot", videoSrc: "s.mp4" })).getAttribute("aria-label")).toBe("Shot preview");
+  });
+});
