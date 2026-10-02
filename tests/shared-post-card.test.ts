@@ -87,3 +87,56 @@ describe("the card", () => {
     expect(card.textContent).toContain("maya");
   });
 });
+
+describe("a shared photo of several", () => {
+  let root: Root;
+  let host: HTMLDivElement;
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    host.remove();
+  });
+
+  async function render(slide: number | undefined) {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+    await act(async () =>
+      root.render(
+        createElement(SharedPostCard, {
+          post: { id: "p1", caption: null, image_url: null, image_urls: ["one.jpg", "two.jpg", "three.jpg"] },
+          author: { username: "maya", display_name: "Maya", avatar_hue: 30, avatar_url: null },
+          slide,
+        }),
+      ),
+    );
+    return host.querySelector("a") as HTMLAnchorElement;
+  }
+
+  it("shows the photo that was shared, not the first", async () => {
+    const card = await render(2);
+    expect(card.querySelector("img[src='three.jpg']")).toBeTruthy();
+    expect(card.querySelector("img[src='one.jpg']")).toBeFalsy();
+  });
+
+  it("opens the post on that photo", async () => {
+    expect((await render(2)).getAttribute("href")).toBe("/p/p1?slide=2");
+  });
+
+  it("shows and opens the first when no slide was recorded", async () => {
+    const card = await render(undefined);
+    expect(card.querySelector("img[src='one.jpg']")).toBeTruthy();
+    expect(card.getAttribute("href")).toBe("/p/p1");
+  });
+});
+
+describe("which photo to show", () => {
+  it("clamps to the photos there are, and falls back to the first", async () => {
+    const { sharedSlide } = await import("@/components/messages/SharedPostCard");
+    expect(sharedSlide(["a", "b", "c"], 1)).toBe(1);
+    expect(sharedSlide(["a", "b", "c"], 9)).toBe(2);
+    expect(sharedSlide(["a", "b", "c"], -1)).toBe(0);
+    expect(sharedSlide(["a"], undefined)).toBe(0);
+    expect(sharedSlide(null, 2)).toBe(0);
+  });
+});

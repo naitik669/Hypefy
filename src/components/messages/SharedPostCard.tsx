@@ -25,6 +25,16 @@ export function postCardRatio(ratio: number | null | undefined): number {
   return Math.min(Math.max(ratio, TALLEST), WIDEST);
 }
 
+/**
+ * Which photo the card shows: the one that was shared, when the message says,
+ * and there is such a photo; otherwise the first. Exported for tests.
+ */
+export function sharedSlide(urls: string[] | null | undefined, slide: number | null | undefined): number {
+  const n = urls?.length ?? 0;
+  if (n === 0 || typeof slide !== "number" || !Number.isFinite(slide)) return 0;
+  return Math.min(Math.max(Math.trunc(slide), 0), n - 1);
+}
+
 export type SharedPost = {
   id: string;
   caption: string | null;
@@ -45,12 +55,16 @@ export type SharedPost = {
 export function SharedPostCard({
   post,
   author,
+  slide,
   ...linkProps
 }: {
   post: SharedPost;
   author: SharedShotAuthor;
+  /** Which photo was shared, from the message. The first when absent. */
+  slide?: number;
 } & Omit<React.ComponentProps<typeof Link>, "href">) {
-  const image = post.image_urls?.[0] || post.image_url || null;
+  const at = sharedSlide(post.image_urls, slide);
+  const image = post.image_urls?.[at] || post.image_urls?.[0] || post.image_url || null;
   const count = post.image_urls?.length ?? (post.image_url ? 1 : 0);
   const [measured, setMeasured] = useState<number | null>(null);
   const ratio = postCardRatio(post.aspect_ratio ?? measured);
@@ -59,7 +73,8 @@ export function SharedPostCard({
 
   return (
     <Link
-      href={`/p/${post.id}`}
+      // Opens on the photo that was shared.
+      href={at > 0 ? `/p/${post.id}?slide=${at}` : `/p/${post.id}`}
       {...linkProps}
       aria-label={`Post by ${name}`}
       className="block rounded-[18px] bg-surface p-2"

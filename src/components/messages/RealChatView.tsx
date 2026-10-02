@@ -101,6 +101,8 @@ export type ChatMsg = {
     oneshot_opened_at?: string;
     /** A reply to someone's page: the page as it was, copied by send_page_reply. */
     page?: unknown;
+    /** A shared post: which of its photos was shared (send_message, 0110). */
+    slide?: number;
   } | null;
   /** Client-only: set on optimistic messages before server confirms */
   _status?: "pending" | "failed";
@@ -1842,6 +1844,7 @@ export function RealChatView({
                         <SharedPostCard
                           post={m.post}
                           author={m.postProfile ?? null}
+                          slide={m.metadata?.slide}
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
                           onPointerMove={onPressEnd}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, CircleFadingPlus, Link2, Loader2, Search, Share2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, CircleFadingPlus, Link2, Loader2, Search, Share2, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { one } from "@/lib/supabase/typed";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -10,33 +10,60 @@ import { SendIcon } from "@/components/ui/ShareIcon";
 import { useToast } from "@/components/ui/ToastProvider";
 import { CommentIcon } from "@/components/ui/CommentIcon";
 
-type Friend = {
+/**
+ * Someone or somewhere to send to: a person, or a group chat you are in.
+ * `key` is unique across both, since a person's id and a chat's id are
+ * different kinds of thing that could in principle collide.
+ */
+export type Target = {
+  key: string;
+  kind: "person" | "group";
+  /** A person's user id, or a group's conversation id. */
   id: string;
-  display_name: string | null;
+  name: string;
   username: string | null;
   avatar_hue: number | null;
-  /** The query has always fetched this; the type omitted it, so the cast to
-   *  Friend[] hid it from the renderer and everyone showed as a gradient
-   *  initial instead of their actual photo. */
   avatar_url: string | null;
-  /** Closeness bucket — see `rank` below. 4 means "not a connection". */
-  tier?: number;
+  /** People in a group, you included. */
+  members?: number | null;
+  /** Shown because you follow each other, not because you interact. */
+  filler?: boolean;
 };
 
 /** What is being sent, for the preview under the title. */
 type Preview = { thumb: string | null; caption: string | null; username: string | null };
 
 /**
- * Below this many real connections, the list is topped up with people you
- * have merely interacted with. Above it, it is connections only.
- *
- * Worth knowing what this does at current scale: every account today has
- * fewer than this, so the top-up still applies to everybody and the list does
- * not actually get shorter. What changes now is the ORDER, and the divider
- * that makes the boundary visible — which is the honest fix while the whole
- * app is small enough that most people have brushed against most others.
+ * Below this many suggestions, people you follow are added after them, so a
+ * new account still has somewhere to send things. They come after a divider
+ * and never above anyone you actually interact with.
  */
-const THIN_CONNECTIONS = 8;
+const THIN = 6;
+
+/**
+ * Where a share goes in the chat: a post with several photos is sent with
+ * the one that was on screen, so the chat shows that photo and not the first.
+ * Exported for tests.
+ */
+export function shareMetadata(
+  targetType: "post" | "shot",
+  imageCount: number,
+  slide: number,
+): { slide: number } | undefined {
+  if (targetType !== "post" || imageCount < 2) return undefined;
+  return { slide: Math.min(Math.max(Math.trunc(slide) || 0, 0), imageCount - 1) };
+}
+
+/**
+ * The suggestions, then (only while they are thin) people you follow who are
+ * not already in them. Exported for tests.
+ */
+export function withFiller(suggested: Target[], follows: Target[]): Target[] {
+  if (suggested.length >= THIN) return suggested;
+  const have = new Set(suggested.map((t) => t.key));
+  return [...suggested, ...follows.filter((f) => !have.has(f.key)).map((f) => ({ ...f, filler: true }))];
+}
+
 
 /**
  * The height of the bottom of the sheet, in both of its states: the row of
@@ -79,7 +106,10 @@ export function ShareSheet({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const showToast = useToast();
-  const [friends, setFriends] = useState<Friend[]>([]);
+  /** Suggested, ranked by real interaction (share_suggestions). */
+  const [targets, setTargets] = useState<Target[]>([]);
+  /** Everyone you follow or who follows you: searchable, never suggested on its own. */
+  const [pool, setPool] = useState<Target[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [sent, setSent] = useState<Set<string>>(new Set());
@@ -117,73 +147,70 @@ export function ShareSheet({
   }, [open]);
 
   /* --- Who to send to ---------------------------------------------------- */
+  // Ranked in the database by how much you actually interact: hypes,
+  // comments, saves, rehypes and chats both ways, what you have shared with
+  // them before, your close friends, and group chats by how active they are.
+  // Someone you merely follow is not suggested; they are found by searching.
   useEffect(() => {
     if (!open) return;
+    let live = true;
     setLoading(true);
-    async function load() {
+    (async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
+      if (!user) { if (live) setLoading(false); return; }
 
-      const [followingRes, followerRes, hyperRes, notifRes] = await Promise.all([
-        supabase.from("follows").select("following_id").eq("follower_id", user.id).limit(100),
-        supabase.from("follows").select("follower_id").eq("following_id", user.id).limit(100),
-        supabase.from("close_friends").select("friend_id").eq("user_id", user.id).limit(100),
-        supabase.from("notifications")
-          .select("actor_id")
-          .eq("user_id", user.id)
-          .not("actor_id", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(50),
+      const [suggested, followingRes, followerRes] = await Promise.all([
+        supabase.rpc("share_suggestions", { p_limit: 40 }),
+        supabase.from("follows").select("following_id").eq("follower_id", user.id).limit(150),
+        supabase.from("follows").select("follower_id").eq("following_id", user.id).limit(150),
       ]);
 
-      const following = new Set<string>((followingRes.data ?? []).map((r) => r.following_id as string));
-      const followers = new Set<string>((followerRes.data ?? []).map((r) => r.follower_id as string));
-      const hypers = new Set<string>((hyperRes.data ?? []).map((r) => r.friend_id as string));
+      const ranked: Target[] = (suggested.data ?? []).map((r) => ({
+        key: `${r.kind === "group" ? "g" : "u"}:${r.id}`,
+        kind: r.kind === "group" ? "group" : "person",
+        id: r.id,
+        name: r.name ?? r.username ?? (r.kind === "group" ? "Group" : "User"),
+        username: r.username,
+        avatar_hue: r.avatar_hue,
+        avatar_url: r.avatar_url,
+        members: r.members,
+      }));
 
-      /**
-       * Closeness, best first. Sharing is an act aimed at someone specific,
-       * so the order of this list is the entire feature — a flat alphabet of
-       * everyone you have ever brushed against is the same as no list.
-       */
-      const rank = (id: string): number => {
-        if (hypers.has(id)) return 0;                              // a Hyper
-        if (following.has(id) && followers.has(id)) return 1;      // mutual
-        if (following.has(id)) return 2;                           // you follow
-        if (followers.has(id)) return 3;                           // follows you
-        return 4;                                                  // acquaintance
-      };
-
-      const connections = new Set<string>([...following, ...followers, ...hypers]);
-      connections.delete(user.id);
-
-      // Notification actors are anyone who ever hyped or commented on your
-      // work. They are a TOP-UP, used only when you barely have connections
-      // yet, so a new account still has somewhere to send things.
-      const allIds = new Set(connections);
-      if (connections.size < THIN_CONNECTIONS) {
-        for (const r of notifRes.data ?? []) {
-          if (r.actor_id) allIds.add(r.actor_id as string);
-        }
+      // Mutuals first, then the rest: the order filler appears in when the
+      // suggestions are thin. Search does not care about order.
+      const following = new Set((followingRes.data ?? []).map((r) => r.following_id as string));
+      const followers = new Set((followerRes.data ?? []).map((r) => r.follower_id as string));
+      const ids = [...new Set([...following, ...followers])].filter((id) => id !== user.id);
+      let people: Target[] = [];
+      if (ids.length) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, display_name, username, avatar_hue, avatar_url")
+          .in("id", ids)
+          .eq("profile_completed", true)
+          .limit(200);
+        const mutual = (id: string) => following.has(id) && followers.has(id);
+        people = (profiles ?? [])
+          .slice()
+          .sort((a, b) => Number(mutual(b.id)) - Number(mutual(a.id)))
+          .map((p) => ({
+            key: `u:${p.id}`,
+            kind: "person" as const,
+            id: p.id,
+            name: p.display_name ?? p.username ?? "User",
+            username: p.username,
+            avatar_hue: p.avatar_hue,
+            avatar_url: p.avatar_url,
+          }));
       }
-      allIds.delete(user.id);
-
-      if (allIds.size === 0) { setFriends([]); setLoading(false); return; }
-
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, display_name, username, avatar_hue, avatar_url")
-        .in("id", [...allIds])
-        .eq("profile_completed", true)
-        .limit(80);
-
-      const sorted = ((profiles ?? []) as Friend[])
-        .map((f) => ({ ...f, tier: rank(f.id) }))
-        .sort((a, b) => (a.tier ?? 4) - (b.tier ?? 4));
-
-      setFriends(sorted);
+      if (!live) return;
+      setTargets(ranked);
+      setPool(people);
       setLoading(false);
-    }
-    load();
+    })();
+    return () => {
+      live = false;
+    };
   }, [open, supabase]);
 
   /* --- What is being sent ------------------------------------------------ */
@@ -221,14 +248,13 @@ export function ShareSheet({
     };
   }, [open, postId, targetType, supabase, imageUrls, initialImageIdx]);
 
-  const filtered = friends.filter((f) => {
-    const q = query.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      (f.display_name ?? "").toLowerCase().includes(q) ||
-      (f.username ?? "").toLowerCase().includes(q)
-    );
-  });
+  const q = query.trim().toLowerCase();
+  /** Everyone you could send to, suggestions first, each once. */
+  const everyone: Target[] = [...targets, ...pool.filter((p) => !targets.some((t) => t.key === p.key))];
+  /** Searching reaches everyone you follow; not searching shows the suggestions. */
+  const filtered: Target[] = q
+    ? everyone.filter((t) => t.name.toLowerCase().includes(q) || (t.username ?? "").toLowerCase().includes(q))
+    : withFiller(targets, pool);
 
   function toggleSend(id: string) {
     setSent((prev) => {
@@ -333,10 +359,18 @@ export function ShareSheet({
     const message = note.trim();
     // Per-recipient success/failure: sends used to fail silently, so a share
     // that reached nobody still showed the "Sent" confirmation.
+    const metadata = shareMetadata(targetType, imageUrls?.length ?? 0, selectedIdx);
     const results = await Promise.all(
-      ids.map(async (uid) => {
-        const { data: convId, error } = await supabase.rpc("get_or_create_dm", { p_other: uid });
-        if (error || !convId) return false;
+      ids.map(async (key) => {
+        // A group is already a conversation; a person needs theirs found or made.
+        const t = everyone.find((x) => x.key === key);
+        if (!t) return false;
+        let convId: string | null = t.kind === "group" ? t.id : null;
+        if (!convId) {
+          const { data, error } = await supabase.rpc("get_or_create_dm", { p_other: t.id });
+          if (error || !data) return false;
+          convId = data as string;
+        }
         const { error: sendErr } = targetType === "shot"
           ? await supabase.rpc("send_message", {
               p_conversation_id: convId, p_body: undefined, p_kind: "shot",
@@ -344,7 +378,7 @@ export function ShareSheet({
             })
           : await supabase.rpc("send_message", {
               p_conversation_id: convId, p_body: undefined, p_kind: "post",
-              p_post_id: postId, p_reply_to_id: undefined,
+              p_post_id: postId, p_reply_to_id: undefined, p_metadata: metadata,
             });
         if (sendErr) return false;
         // What you wrote goes after the post, as its own message — the way it
@@ -378,8 +412,9 @@ export function ShareSheet({
   function prevImg() { setSelectedIdx((i) => Math.max(i - 1, 0)); }
   function nextImg() { setSelectedIdx((i) => Math.min(i + 1, imgs.length - 1)); }
 
-  const picked = friends.filter((f) => sent.has(f.id));
-  const pickedNames = picked.map((f) => f.display_name ?? f.username ?? "User");
+  // From everyone, so a search result stays picked after the search is cleared.
+  const picked = everyone.filter((t) => sent.has(t.key));
+  const pickedNames = picked.map((t) => t.name);
 
   /* --- Footer: everything else, or sending ------------------------------- */
   const footer = picking ? (
@@ -411,12 +446,12 @@ export function ShareSheet({
         <div className="flex">
           {picked.slice(0, 3).map((f, i) => (
             <span
-              key={f.id}
+              key={f.key}
               className="rounded-[9px] ring-2 ring-elevated"
               style={{ marginLeft: i === 0 ? 0 : -6 }}
             >
               <Avatar
-                name={f.display_name ?? f.username ?? "User"}
+                name={f.name}
                 hue={f.avatar_hue ?? 280}
                 size={24}
                 src={f.avatar_url ?? undefined}
@@ -440,24 +475,21 @@ export function ShareSheet({
           maxLength={500}
           className="h-11 min-w-0 flex-1 rounded-2xl bg-surface px-3.5 text-sm outline-none placeholder:text-faint"
         />
+        {/* Just the icon: who it goes to is already written beside it. */}
         <button
           type="button"
           onClick={() => void sendToSelected()}
           disabled={sendingDm}
           aria-label={`Send to ${sent.size}`}
-          className="flex h-11 shrink-0 items-center gap-2 rounded-2xl bg-accent pl-4 pr-2 text-sm font-extrabold text-accent-ink transition-transform active:scale-[0.97] disabled:opacity-60"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[30%] bg-accent text-accent-ink transition-transform active:scale-[0.94] disabled:opacity-60"
         >
           {sendingDm ? (
-            <Loader2 size={16} className="animate-spin" />
+            <Loader2 size={18} className="animate-spin" />
           ) : dmDone ? (
-            <Check size={16} />
+            <Check size={19} strokeWidth={3} />
           ) : (
-            <SendIcon size={15} weight="fill" />
+            <SendIcon size={18} weight="fill" />
           )}
-          {dmDone ? "Sent" : "Send"}
-          <span className="flex h-7 min-w-7 items-center justify-center rounded-[10px] bg-black/15 px-1.5 text-[13px] tabular-nums">
-            {sent.size}
-          </span>
         </button>
       </div>
     </div>
@@ -598,32 +630,29 @@ export function ShareSheet({
             </div>
           ) : filtered.length === 0 ? (
             <p className="py-6 text-center text-sm text-faint">
-              {friends.length === 0
+              {everyone.length === 0
                 ? "Follow people or interact with posts to build your circle."
                 : "Nobody by that name."}
             </p>
           ) : (
             <div className="grid grid-cols-3 gap-x-2 gap-y-5 pb-2 pt-1">
               {filtered.map((f, i) => {
-                const name = f.display_name ?? f.username ?? "User";
-                const selected = sent.has(f.id);
-                // Where the people you actually know end and the people who
-                // once hyped a post begin — without it the two are
-                // indistinguishable, which is what made the list read as
-                // "everyone".
-                const startsAcquaintances =
-                  !query && (f.tier ?? 4) >= 4 && (filtered[i - 1]?.tier ?? 4) < 4;
+                const selected = sent.has(f.key);
+                // Where the people you interact with end and people you only
+                // follow begin, shown only while the suggestions are thin.
+                const startsFiller = !q && f.filler && !filtered[i - 1]?.filler;
                 return (
-                  <div key={f.id} className="contents">
-                    {startsAcquaintances && (
+                  <div key={f.key} className="contents">
+                    {startsFiller && (
                       <p className="col-span-3 pt-1 text-[11px] font-semibold text-faint">
-                        You&rsquo;ve interacted with
+                        People you follow
                       </p>
                     )}
                     <button
                       type="button"
-                      onClick={() => toggleSend(f.id)}
+                      onClick={() => toggleSend(f.key)}
                       aria-pressed={selected}
+                      aria-label={f.kind === "group" ? `${f.name}, group of ${f.members ?? 0}` : f.name}
                       className="flex min-w-0 flex-col items-center gap-2 transition-transform active:scale-95"
                     >
                       <span
@@ -633,7 +662,13 @@ export function ShareSheet({
                             : ""
                         }`}
                       >
-                        <Avatar name={name} hue={f.avatar_hue ?? 280} size={76} src={f.avatar_url ?? undefined} />
+                        <Avatar name={f.name} hue={f.avatar_hue ?? 160} size={76} src={f.avatar_url ?? undefined} />
+                        {/* A group says so in the corner, opposite the tick. */}
+                        {f.kind === "group" && (
+                          <span className="absolute -bottom-1 -left-1 flex h-6 w-6 items-center justify-center rounded-full bg-elevated text-foreground ring-2 ring-elevated">
+                            <Users size={13} strokeWidth={2.6} />
+                          </span>
+                        )}
                         {selected && (
                           <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-ink ring-2 ring-elevated">
                             <Check size={13} strokeWidth={3.4} />
@@ -645,7 +680,7 @@ export function ShareSheet({
                           sent.size > 0 && !selected ? "text-muted" : "text-foreground"
                         }`}
                       >
-                        {name}
+                        {f.name}
                       </span>
                     </button>
                   </div>

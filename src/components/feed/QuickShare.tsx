@@ -66,6 +66,7 @@ export function ShareButton({
   className = "",
   label = "Share",
   align = "start",
+  slide,
   children,
 }: {
   postId: string;
@@ -81,6 +82,11 @@ export function ShareButton({
    * screen before it began.
    */
   align?: "start" | "end";
+  /**
+   * Which photo of a post with several is on screen, so the chat shows the
+   * one that was shared rather than the first. Left out for anything else.
+   */
+  slide?: number;
   /** The icon, so each surface keeps its own size and colour. */
   children: React.ReactNode;
 }) {
@@ -120,6 +126,7 @@ export function ShareButton({
               p_kind: "post",
               p_post_id: postId,
               p_reply_to_id: undefined,
+              p_metadata: slide === undefined ? undefined : { slide },
             });
       if (sendErr) {
         sent.current.delete(t.id);
@@ -132,7 +139,7 @@ export function ShareButton({
       forgetShareTargets();
       toast(`Sent to ${name}`, "success");
     },
-    [postId, targetType, supabase, toast],
+    [postId, targetType, slide, supabase, toast],
   );
 
   /**

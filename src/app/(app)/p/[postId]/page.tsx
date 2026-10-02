@@ -90,6 +90,10 @@ export default async function PostDetailPage({
   const sp = await searchParams;
   const commentParam = sp.comment;
   const focusCommentId = typeof commentParam === "string" ? commentParam : null;
+  // ?slide=<n> opens a post with several photos on that one: what a photo
+  // shared into a chat links to. FeedCard clamps it to the photos there are.
+  const slideParam = Number(typeof sp.slide === "string" ? sp.slide : 0);
+  const initialSlide = Number.isFinite(slideParam) ? slideParam : 0;
   /**
    * Opened from a profile grid, so the thing below this post should be the
    * REST OF THAT PROFILE in order — not a pair of recommendation shelves.
@@ -271,6 +275,7 @@ export default async function PostDetailPage({
         post={post}
         currentUserId={uid}
         focusCommentId={focusCommentId}
+        initialSlide={initialSlide}
       />
 
       {authorFeed.map((p) => (

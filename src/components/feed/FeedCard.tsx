@@ -137,6 +137,7 @@ export function FeedCard({
   initialIsHyper,
   initialIsMutualHyper,
   focusCommentId = null,
+  initialSlide = 0,
   showId,
   proof,
 }: {
@@ -162,6 +163,11 @@ export function FeedCard({
    * has somewhere to point — a comment was not a place before this.
    */
   focusCommentId?: string | null;
+  /**
+   * Which photo to open on. Passed only by /p/[postId] from ?slide= in the
+   * URL, so a shared photo opens on that photo and not on the first.
+   */
+  initialSlide?: number;
 }) {
   const supabase = createClient();
   const images = getImages(post);
@@ -191,7 +197,9 @@ export function FeedCard({
   const [replyTo, setReplyTo] = useState<DeckPerson | null>(null);
   const [savePending, setSavePending] = useState(false);
 
-  const [imgIdx, setImgIdx] = useState(0);
+  const [imgIdx, setImgIdx] = useState(() =>
+    Math.min(Math.max(Math.trunc(initialSlide) || 0, 0), Math.max(images.length - 1, 0)),
+  );
   // JS-controlled swipe: one image per gesture, no native scroll momentum
   /** The card itself, so an attached song plays with the post. */
   const cardRef = useRef<HTMLElement>(null);
@@ -940,6 +948,8 @@ export function FeedCard({
               you share with most. */}
           <ShareButton
             postId={post.id}
+            // The photo on screen goes with it, so the chat shows that one.
+            slide={images.length > 1 ? imgIdx : undefined}
             onOpenSheet={() => setShareOpen(true)}
             className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 active:scale-90"
           >

@@ -2977,6 +2977,7 @@ export type Database = {
           p_body?: string
           p_conversation_id: string
           p_kind?: string
+          p_metadata?: Json
           p_post_id?: string
           p_reply_to_id?: string
           p_shot_id?: string
@@ -3092,6 +3093,19 @@ export type Database = {
       toggle_vanish_mode: {
         Args: { p_conversation_id: string }
         Returns: boolean
+      }
+      share_suggestions: {
+        Args: { p_limit?: number }
+        Returns: {
+          avatar_hue: number | null
+          avatar_url: string | null
+          id: string
+          kind: string
+          members: number | null
+          name: string | null
+          score: number
+          username: string | null
+        }[]
       }
       top_share_targets: {
         Args: { p_limit?: number }
