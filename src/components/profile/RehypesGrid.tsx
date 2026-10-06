@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Play, Repeat2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyScene, ctaClass } from "@/components/empty/EmptyScene";
 import { ReelArt } from "@/components/empty/scenes";
+import { GridPeek } from "@/components/feed/GridPeek";
+import { GridSkeleton, ShotCover } from "@/components/profile/ProfileGrids";
 import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
-import { BLANK_POSTER } from "@/lib/blank-poster";
 
 /**
  * The Rehypes tab: what this person passed on to their followers.
@@ -24,7 +25,7 @@ import { BLANK_POSTER } from "@/lib/blank-poster";
 
 const PAGE = 30;
 
-type Item =
+export type RehypeItem =
   | {
       kind: "post";
       id: string;
@@ -32,48 +33,91 @@ type Item =
       cover: string | null;
       caption: string | null;
       count: number;
+      ratio: number | null;
     }
-  | { kind: "shot"; id: string; at: string; media: string; poster: string | null };
+  | { kind: "shot"; id: string; at: string; media: string; poster: string | null; caption: string | null };
 
-type PostEmbed = { id: string; image_url: string | null; image_urls: string[] | null; caption: string | null };
-type ShotEmbed = { id: string; media_url: string; poster_url: string | null };
+type PostEmbed = {
+  id: string;
+  image_url: string | null;
+  image_urls: string[] | null;
+  caption: string | null;
+  aspect_ratio: number | null;
+};
+type ShotEmbed = { id: string; media_url: string; poster_url: string | null; caption: string | null };
 
 function first<T>(v: T | T[] | null | undefined): T | null {
   if (!v) return null;
   return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
+/**
+ * One page out of two lists.
+ *
+ * Each table is asked for a page older than the cursor, and the two answers
+ * are merged by rehype time. Only the newest `page` of the merge are shown;
+ * the rest are left for next time, when the cursor (the last one shown) will
+ * fetch them again. That is the only way the order stays right: showing all
+ * sixty would put a Shot from last month above a post from last week that the
+ * posts table had not got to yet.
+ *
+ * There is more to come if the merge had leftovers, or either table gave a
+ * full page (it may have more behind it). Exported for tests.
+ */
+export function mergeRehypePage(
+  posts: RehypeItem[],
+  shots: RehypeItem[],
+  page = PAGE,
+): { items: RehypeItem[]; more: boolean } {
+  const merged = [...posts, ...shots].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+  return {
+    items: merged.slice(0, page),
+    more: merged.length > page || posts.length >= page || shots.length >= page,
+  };
+}
+
 export function RehypesGrid({
   userId,
   isOwn,
   name = "They",
+  viewerId,
 }: {
   userId: string;
   isOwn: boolean;
   name?: string;
+  /** Who is looking, so a held tile knows what they have hyped and saved. */
+  viewerId?: string | null;
 }) {
-  const [items, setItems] = useState<Item[] | null>(null);
+  const supabase = useMemo(() => createClient(), []);
+  const [items, setItems] = useState<RehypeItem[] | null>(null);
+  const [more, setMore] = useState(true);
+  const busy = useRef(false);
+  const sentinel = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let live = true;
-    const supabase = createClient();
-    (async () => {
-      const [postsRes, shotsRes] = await Promise.all([
-        supabase
-          .from("reposts")
-          .select("created_at, posts(id, image_url, image_urls, caption)")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(PAGE),
-        supabase
-          .from("shot_reposts")
-          .select("created_at, shots(id, media_url, poster_url)")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(PAGE),
-      ]);
+  const load = useCallback(
+    async (current: RehypeItem[] | null) => {
+      if (busy.current) return;
+      busy.current = true;
+      const before = current?.length ? current[current.length - 1].at : null;
+      let pq = supabase
+        .from("reposts")
+        .select("created_at, posts(id, image_url, image_urls, caption, aspect_ratio)")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(PAGE);
+      let sq = supabase
+        .from("shot_reposts")
+        .select("created_at, shots(id, media_url, poster_url, caption)")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(PAGE);
+      if (before) {
+        pq = pq.lt("created_at", before);
+        sq = sq.lt("created_at", before);
+      }
+      const [postsRes, shotsRes] = await Promise.all([pq, sq]);
 
-      const posts: Item[] = (postsRes.data ?? []).flatMap((r) => {
+      const posts: RehypeItem[] = (postsRes.data ?? []).flatMap((r) => {
         const p = first(r.posts as PostEmbed | PostEmbed[] | null);
         if (!p) return [];
         return [
@@ -81,37 +125,49 @@ export function RehypesGrid({
             kind: "post" as const,
             id: p.id,
             at: r.created_at,
-            cover: p.image_url ?? p.image_urls?.[0] ?? null,
+            cover: p.image_urls?.[0] ?? p.image_url ?? null,
             caption: p.caption,
             count: p.image_urls?.length ?? 0,
+            ratio: p.aspect_ratio,
           },
         ];
       });
-      const shots: Item[] = (shotsRes.data ?? []).flatMap((r) => {
+      const shots: RehypeItem[] = (shotsRes.data ?? []).flatMap((r) => {
         const s = first(r.shots as ShotEmbed | ShotEmbed[] | null);
         if (!s) return [];
-        return [{ kind: "shot" as const, id: s.id, at: r.created_at, media: s.media_url, poster: s.poster_url }];
+        return [
+          { kind: "shot" as const, id: s.id, at: r.created_at, media: s.media_url, poster: s.poster_url, caption: s.caption },
+        ];
       });
 
-      if (!live) return;
-      setItems([...posts, ...shots].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)));
-    })();
-    return () => {
-      live = false;
-    };
-  }, [userId]);
+      // "More" is judged on what the tables returned, not on what survived:
+      // a full page of rehypes whose originals were all removed is not the end.
+      const page = mergeRehypePage(posts, shots);
+      const full = (postsRes.data?.length ?? 0) >= PAGE || (shotsRes.data?.length ?? 0) >= PAGE;
+      busy.current = false;
+      setItems((prev) => {
+        const have = prev ?? [];
+        const seen = new Set(have.map((i) => `${i.kind}-${i.id}`));
+        return [...have, ...page.items.filter((i) => !seen.has(`${i.kind}-${i.id}`))];
+      });
+      setMore(page.more || full);
+    },
+    [supabase, userId],
+  );
 
-  if (items === null) {
-    return (
-      <div className={GRID_WRAP}>
-        <div className={GRID}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-full animate-pulse rounded-xl bg-surface" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    void load(null);
+  }, [load]);
+
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !more || items === null) return;
+    const obs = new IntersectionObserver(([e]) => e.isIntersecting && void load(items), { threshold: 0.1 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [items, more, load]);
+
+  if (items === null) return <GridSkeleton />;
 
   if (items.length === 0) {
     return (
@@ -136,52 +192,60 @@ export function RehypesGrid({
   }
 
   return (
-    <div className={GRID_WRAP}>
-      <div className={GRID}>
-        {items.map((it) =>
-          it.kind === "post" ? (
-            <Link
-              key={`p-${it.id}`}
-              href={`/p/${it.id}`}
+    <div>
+      <div className={GRID_WRAP}>
+        <div className={GRID}>
+          {items.map((it) => (
+            // Holdable, like every other grid. The peek finds out who owns it
+            // and what it has collected as it opens.
+            <GridPeek
+              key={`${it.kind}-${it.id}`}
+              kind={it.kind}
+              currentUserId={viewerId ?? undefined}
               className="relative block h-full overflow-hidden rounded-xl bg-surface"
+              post={{
+                id: it.id,
+                user_id: "",
+                caption: it.caption,
+                image: it.kind === "post" ? it.cover : it.poster,
+                video: it.kind === "shot" ? it.media : null,
+                aspect_ratio: it.kind === "post" ? it.ratio : 9 / 16,
+                hype_count: 0,
+                comment_count: 0,
+                author: null,
+              }}
             >
-              {it.cover ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={it.cover} alt={it.caption ?? "Post"} className="h-full w-full object-cover" />
+              {it.kind === "post" ? (
+                <Link href={`/p/${it.id}`} className="block h-full">
+                  {it.cover ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={it.cover} alt={it.caption ?? "Post"} draggable={false} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full items-start bg-elevated p-2">
+                      <p className="line-clamp-4 text-[10px] leading-snug text-muted">{it.caption}</p>
+                    </div>
+                  )}
+                  <RehypeBadge />
+                  {it.count > 1 && (
+                    <span className="absolute right-1.5 top-1.5 rounded-md bg-black/55 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+                      {it.count}
+                    </span>
+                  )}
+                </Link>
               ) : (
-                <div className="flex h-full items-start bg-elevated p-2">
-                  <p className="line-clamp-4 text-[10px] leading-snug text-muted">{it.caption}</p>
-                </div>
+                <Link href={`/shots/${it.id}`} className="block h-full" aria-label={it.caption ? `Shot: ${it.caption}` : "Shot"}>
+                  <ShotCover poster={it.poster} media={it.media} />
+                  <RehypeBadge />
+                  <span className="absolute right-1.5 top-1.5 text-white drop-shadow">
+                    <Play size={14} className="fill-white" />
+                  </span>
+                </Link>
               )}
-              <RehypeBadge />
-              {it.count > 1 && (
-                <span className="absolute right-1.5 top-1.5 rounded-md bg-black/55 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
-                  {it.count}
-                </span>
-              )}
-            </Link>
-          ) : (
-            <Link
-              key={`s-${it.id}`}
-              href={`/shots/${it.id}`}
-              className="relative block h-full overflow-hidden rounded-xl bg-surface"
-            >
-              <video
-                poster={it.poster ?? BLANK_POSTER}
-                src={it.media}
-                className="h-full w-full object-cover"
-                muted
-                playsInline
-                preload="metadata"
-              />
-              <RehypeBadge />
-              <span className="absolute right-1.5 top-1.5 text-white drop-shadow">
-                <Play size={14} className="fill-white" />
-              </span>
-            </Link>
-          ),
-        )}
+            </GridPeek>
+          ))}
+        </div>
       </div>
+      {more && <div ref={sentinel} className="h-8" />}
     </div>
   );
 }
