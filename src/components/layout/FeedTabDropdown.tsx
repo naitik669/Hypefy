@@ -7,24 +7,19 @@ import { Check, ChevronDown } from "lucide-react";
 import { FloatingMenu } from "@/components/ui/FloatingMenu";
 import { haptics } from "@/lib/haptics";
 
-export type FeedTab = "foryou" | "following" | "favourite" | "hypers";
+export type FeedTab = "foryou" | "following" | "hypers";
 
 /**
  * The tabs you can switch to.
  *
- * "favourite" was missing from this list while being fully implemented
- * everywhere else — the FeedTab type below, FeedList's query, and its own
- * "No Favourites yet" empty state. And because useFeedTab validates the URL
- * param against THIS array, even typing ?feed=favourite fell back to For You.
- *
- * So the feature was complete and reachable from nowhere. Zero of seventeen
- * accounts have ever marked a favourite, which is not a verdict on the idea:
- * there was no screen in the app that showed the result.
+ * There was a Favourites tab too: a second private list of people, with
+ * nearly the same purpose as Hypers and one entry in the whole app. The two
+ * are one list now (migration 0111 moved everyone across), so an old
+ * ?feed=favourite link simply falls back to For You.
  */
 const OPTIONS: { value: FeedTab; label: string }[] = [
   { value: "foryou", label: "For You" },
   { value: "following", label: "Following" },
-  { value: "favourite", label: "Favourites" },
   { value: "hypers", label: "Hypers" },
 ];
 

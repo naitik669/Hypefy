@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Heart, Plus, Star, X } from "lucide-react";
+import { Check, Plus, Star, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -18,12 +18,12 @@ export type CirclePerson = {
   avatarUrl: string | null;
 };
 
-export type CircleKind = "hypers" | "favourites";
+export type CircleKind = "hypers";
 
-/** The two circles differ only in a table name and some words. */
+/** The list's table and its words. One circle now; there used to be two. */
 const SPEC: Record<
   CircleKind,
-  { table: "close_friends" | "favorites"; icon: typeof Star; verb: string; blurb: string }
+  { table: "close_friends"; icon: typeof Star; verb: string; blurb: string }
 > = {
   hypers: {
     table: "close_friends",
@@ -31,16 +31,10 @@ const SPEC: Record<
     verb: "Hyper",
     blurb: "Your closest people. Their posts come first in the Hypers feed, and they're never told.",
   },
-  favourites: {
-    table: "favorites",
-    icon: Heart,
-    verb: "Favourite",
-    blurb: "People you don't want to miss. Their posts get their own feed, privately.",
-  },
 };
 
 /**
- * Your Hypers or Favourites, as a list you can actually see and edit.
+ * Your Hypers, as a list you can actually see and edit.
  *
  * Before this there was no list at all. You could add someone from two
  * overflow menus and then never review the set — and AddHypersPrompt, the one
@@ -168,7 +162,7 @@ export function CircleList({
       {rows.length === 0 ? (
         <EmptyState
           icon={Icon}
-          title={kind === "hypers" ? "No Hypers yet" : "No Favourites yet"}
+          title="No Hypers yet"
           text={`Pick a few below, or use the ··· menu on anyone's profile to ${spec.verb.toLowerCase()} them.`}
           variant="compact"
         />

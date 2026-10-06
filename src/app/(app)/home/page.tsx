@@ -45,7 +45,7 @@ export default async function HomePage() {
 
   // Follow graph first: the followed-posts query depends on it.
   const [{ data: followRows }, blockedIds] = await Promise.all([
-    // Capped, like favorites and close_friends below, and for a harder reason
+    // Capped, like close_friends below, and for a harder reason
     // than volume: every one of these ids is spread into `.in("user_id", …)`
     // further down, which PostgREST renders as a comma-separated value in a
     // GET URL. Past a few thousand follows that URL exceeds proxy limits and
@@ -169,19 +169,13 @@ export default async function HomePage() {
       .limit(30),
   ]);
 
-  // People lists behind the Favourite / Hypers feed tabs — fetched lightly
-  // here (just ids) since FeedList only needs them to scope its own query
-  // when that tab is first opened.
+  // The people behind the Hypers feed tab — fetched lightly here (just ids)
+  // since FeedList only needs them to scope its own query when that tab is
+  // first opened.
   const [
-    { data: favoriteRows },
     { data: hyperRows },
     { data: reverseHyperRows },
   ] = await Promise.all([
-    supabase
-      .from("favorites")
-      .select("friend_id")
-      .eq("user_id", user.id)
-      .limit(500),
     supabase
       .from("close_friends")
       .select("friend_id")
@@ -198,9 +192,6 @@ export default async function HomePage() {
       .eq("friend_id", user.id)
       .limit(1000),
   ]);
-  const favoriteIds = (favoriteRows ?? []).map(
-    (r: any) => r.friend_id as string
-  );
   const hyperIds = (hyperRows ?? []).map((r: any) => r.friend_id as string);
   const reverseHyperIds = (reverseHyperRows ?? []).map(
     (r: any) => r.user_id as string
@@ -485,7 +476,6 @@ export default async function HomePage() {
           initialShots={placedShots}
           currentUserId={user.id}
           followingIds={[...followingIds]}
-          favoriteIds={favoriteIds}
           hyperIds={hyperIds}
           mutualHyperIds={mutualHyperIds}
           blockedIds={[...blockedIds]}

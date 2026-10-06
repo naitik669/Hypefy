@@ -2,12 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CirclePerson, CircleKind } from "@/components/profile/CircleList";
 
 /**
- * Read one of the private circles — Hypers (close_friends) or Favourites.
- *
- * Both tables are (user_id, friend_id) with a profiles FK on each side, so the
- * only thing that differs between them is the name, and the pages that render
- * them should not each re-derive that.
+ * Read your Hypers: the one private list of people, stored in close_friends.
+ * (There were two lists; Favourites was folded into this one in 0111.)
  */
+const SPEC_TABLE: Record<CircleKind, "close_friends"> = { hypers: "close_friends" };
+
 export async function fetchCircle(
   // The generated Database type does not cover the dynamic table name here.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,7 +14,7 @@ export async function fetchCircle(
   kind: CircleKind,
   userId: string
 ): Promise<CirclePerson[]> {
-  const table = kind === "hypers" ? "close_friends" : "favorites";
+  const table = SPEC_TABLE[kind];
   const { data } = await supabase
     .from(table)
     .select(

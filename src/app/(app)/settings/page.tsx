@@ -9,7 +9,6 @@ import {
   Hash,
   Bookmark,
   Star,
-  Heart,
   UserPlus,
   CalendarClock,
   HelpCircle,
@@ -81,7 +80,7 @@ const ITEMS = [
 
 /**
  * The lists the app keeps for you. Every one of these existed as data with no
- * screen: Hypers and Favourites could be added to but never reviewed, follow
+ * screen: Hypers could be added to but never reviewed, follow
  * requests lived only in a notification you could clear, Saved was capped at
  * 30, and /create/scheduled was reachable only from inside the composer that
  * had just scheduled something.
@@ -94,12 +93,6 @@ const LISTS = [
     icon: Bookmark,
   },
   { href: "/hypers", label: "Hypers", sub: "Your closest people", icon: Star },
-  {
-    href: "/favourites",
-    label: "Favourites",
-    sub: "People you don't want to miss",
-    icon: Heart,
-  },
   {
     href: "/requests",
     label: "Follow requests",

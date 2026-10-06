@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Star, Heart, PlusCircle } from "lucide-react";
+import { Star, PlusCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
 import { Reveal } from "@/components/ui/Reveal";
@@ -37,14 +37,14 @@ type IdsListState = { posts: FeedPost[]; done: boolean; init: boolean };
 const EMPTY_IDS_STATE: IdsListState = { posts: [], done: false, init: false };
 
 /**
- * Home feed. The active tab (For You / Following / Favourite / Hypers) comes
+ * Home feed. The active tab (For You / Following / Hypers) comes
  * from the `?feed=` URL param via useFeedTab — the dropdown under the Hypefy
  * wordmark in TopBar writes that param, this component reads it, and the two
  * stay in sync without any shared client state or prop drilling.
  *
  * - **For You**: the server renders the first scored page; scrolling appends
  *   the chronological tail (posts older than everything currently shown).
- * - **Following / Favourite / Hypers**: each lazily loads its first page the
+ * - **Following / Hypers**: each lazily loads its first page the
  *   first time it's opened — posts from the relevant id list (plus your own),
  *   newest first, paginated by created_at. Every tab keeps its own loaded
  *   posts, so switching back and forth doesn't re-fetch.
@@ -54,7 +54,6 @@ export function FeedList({
   initialShots = [],
   currentUserId,
   followingIds = [],
-  favoriteIds = [],
   hyperIds = [],
   mutualHyperIds = [],
   blockedIds = [],
@@ -67,7 +66,6 @@ export function FeedList({
   initialShots?: PlacedShot<ShotCard>[];
   currentUserId: string;
   followingIds?: string[];
-  favoriteIds?: string[];
   hyperIds?: string[];
   mutualHyperIds?: string[];
   blockedIds?: string[];
@@ -94,15 +92,13 @@ export function FeedList({
   const [shots, setShots] = useState<PlacedShot<ShotCard>[]>(initialShots);
   const [fyDone, setFyDone] = useState(initialPosts.length < PAGE_SIZE);
 
-  // Following / Favourite / Hypers — each lazily loaded client-side.
+  // Following / Hypers — each lazily loaded client-side.
   const [idsState, setIdsState] = useState<Record<IdsTab, IdsListState>>({
     following: EMPTY_IDS_STATE,
-    favourite: EMPTY_IDS_STATE,
     hypers: EMPTY_IDS_STATE,
   });
   const idsByTab: Record<IdsTab, string[]> = {
     following: followingIds,
-    favourite: favoriteIds,
     hypers: hyperIds,
   };
 
@@ -208,12 +204,9 @@ export function FeedList({
   }
 
   async function loadMoreIdsTab(t: IdsTab) {
-    // Following/Hypers scope strictly to those people — showing your own
-    // posts there just crowds out the "nothing here yet" prompts. Favourite
-    // keeps the old behavior (includes your own posts) since it's unchanged.
-    const scopeIds = t === "favourite"
-      ? (idsByTab[t].length ? [...idsByTab[t], currentUserId] : [currentUserId])
-      : idsByTab[t];
+    // Scoped strictly to those people — showing your own posts there just
+    // crowds out the "nothing here yet" prompts.
+    const scopeIds = idsByTab[t];
 
     if (scopeIds.length === 0) {
       setIdsState((prev) => ({ ...prev, [t]: { posts: [], done: true, init: true } }));
@@ -279,7 +272,7 @@ export function FeedList({
     observer.observe(el);
     return () => observer.disconnect();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, fyDone, idsState.following.done, idsState.favourite.done, idsState.hypers.done]);
+  }, [tab, fyDone, idsState.following.done, idsState.hypers.done]);
 
   // Scroll to top whenever the tab actually changes (not on the initial mount).
   const prevTabRef = useRef(tab);
@@ -330,7 +323,7 @@ export function FeedList({
             sub="Follow people and their posts land right here."
           />
         ) : (
-          <EmptyIdsTab tab={tab} />
+          <EmptyHypersTab />
         )
       ) : (
         // Shots are spliced in at RENDER only, and only on For You. `posts`
@@ -430,17 +423,15 @@ export function FeedList({
   );
 }
 
-function EmptyIdsTab({ tab }: { tab: "favourite" | "hypers" }) {
-  const isHyper = tab === "hypers";
-  const Icon = isHyper ? Star : Heart;
+function EmptyHypersTab() {
   return (
     <div className="animate-rise flex flex-col items-center justify-center gap-3 px-8 py-24 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface text-muted">
-        <Icon size={28} />
+        <Star size={28} />
       </div>
-      <h2 className="text-lg font-bold">{isHyper ? "No Hypers yet" : "No Favourites yet"}</h2>
+      <h2 className="text-lg font-bold">No Hypers yet</h2>
       <p className="max-w-xs text-sm text-muted">
-        Visit someone&apos;s profile and tap the ⋯ menu to add them as {isHyper ? "a Hyper" : "a Favourite"}.
+        Visit someone&apos;s profile and tap the ⋯ menu to add them as a Hyper.
       </p>
     </div>
   );

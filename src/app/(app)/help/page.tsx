@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   Bookmark,
   Clapperboard,
-  Heart,
   ImageIcon,
   Lock,
   Mail,
@@ -16,7 +15,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 /**
  * The glossary.
  *
- * Hypefy invents its own words — Hype, Hyper, Favourite, Shot, Show, Spotlight —
+ * Hypefy invents its own words — Hype, Hyper, Shot, Show, Spotlight —
  * and defined none of them anywhere. FeatureHint is rendered in exactly one
  * place, explaining Shows, so every other term had to be guessed from context.
  * This is also the app's only real support contact; the one that existed was
@@ -83,13 +82,6 @@ const ACTIONS: Entry[] = [
     what: "One of your closest people. Their posts come first in the Hypers feed. Your list is private — nobody is told they're on it.",
     href: "/hypers",
     hrefLabel: "Your Hypers",
-  },
-  {
-    icon: Heart,
-    term: "Favourite",
-    what: "Someone you don't want to miss. Favourites get their own feed tab, and this list is private too.",
-    href: "/favourites",
-    hrefLabel: "Your Favourites",
   },
   {
     icon: Bookmark,

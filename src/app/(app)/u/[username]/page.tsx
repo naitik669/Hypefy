@@ -89,20 +89,17 @@ export default async function PublicProfilePage({
   let isRequested = false;
   let isHyper = false;
   let isMutualHyper = false;
-  let isFavourite = false;
   if (currentUser && !isOwn) {
-    const [{ data: followRow }, { data: hyperRow }, { data: reverseHyperRow }, { data: favRow }, { data: reqRow }] = await Promise.all([
+    const [{ data: followRow }, { data: hyperRow }, { data: reverseHyperRow }, { data: reqRow }] = await Promise.all([
       supabase.from("follows").select("id").eq("follower_id", currentUser.id).eq("following_id", profile.id).maybeSingle(),
       supabase.from("close_friends").select("user_id").eq("user_id", currentUser.id).eq("friend_id", profile.id).maybeSingle(),
       supabase.from("close_friends").select("user_id").eq("user_id", profile.id).eq("friend_id", currentUser.id).maybeSingle(),
-      supabase.from("favorites").select("user_id").eq("user_id", currentUser.id).eq("friend_id", profile.id).maybeSingle(),
       supabase.from("follow_requests").select("target_id").eq("requester_id", currentUser.id).eq("target_id", profile.id).maybeSingle(),
     ]);
     isFollowing = !!followRow;
     isRequested = !!reqRow;
     isHyper = !!hyperRow;
     isMutualHyper = !!hyperRow && !!reverseHyperRow;
-    isFavourite = !!favRow;
   }
 
   // Private account: only the owner and followers see content
@@ -192,7 +189,6 @@ export default async function PublicProfilePage({
                 targetUserId={profile.id}
                 targetUsername={profile.username}
                 initialHyper={isHyper}
-                initialFavourite={isFavourite}
               />
             </>
           ) : (
