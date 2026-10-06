@@ -2,7 +2,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { buildItems, filterAndSort, isOwned } from "@/lib/marketplace";
+import {
+  CATEGORY_PAGES,
+  buildItems,
+  categoryPage,
+  filterAndSort,
+  isOwned,
+  itemAction,
+  neighbours,
+  placesFor,
+  showcaseOf,
+} from "@/lib/marketplace";
 
 /**
  * The Marketplace: every category filters to exactly its items, sorting by
@@ -68,11 +78,88 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push() {}, refresh() {} 
 vi.mock("@/components/ui/ToastProvider", () => ({ useToast: () => () => {} }));
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
 
-describe("the Marketplace page", () => {
+const ME = { name: "Naitik Kushwaha", username: "naitik", avatarUrl: null, hue: 150 };
+
+describe("the Marketplace as places", () => {
+  it("has a page for every category, and none for anything else", () => {
+    expect(CATEGORY_PAGES.map((c) => c.slug)).toEqual(["frames", "bubbles", "names", "nameplates", "themes"]);
+    expect(categoryPage("frames")?.category).toBe("frame");
+    expect(categoryPage("hats")).toBeUndefined();
+  });
+
+  it("shows a real item from each category on the home", () => {
+    const items = buildItems(PRICES);
+    for (const page of CATEGORY_PAGES) {
+      const show = showcaseOf(page, items);
+      expect(show?.category, page.slug).toBe(page.category);
+      // The one it names, not just whichever came first.
+      expect(show?.id, page.slug).toBe(page.showcase);
+    }
+  });
+
+  it("falls back to the first item if a showcase has left the catalogue", () => {
+    const items = buildItems(PRICES);
+    const gone = { ...categoryPage("frames")!, showcase: "deco-retired" };
+    expect(showcaseOf(gone, items)?.category).toBe("frame");
+  });
+});
+
+describe("what the button on an item does", () => {
+  const items = buildItems(PRICES);
+  const crown = items.find((i) => i.id === "deco-crown")!;
+  const halo = items.find((i) => i.id === "deco-halo")!;
+  const arcade = items.find((i) => i.id === "theme-arcade")!;
+
+  it("wears what is already yours, and uses a chat theme from messages", () => {
+    expect(itemAction(crown, { owned: true, native: false })).toEqual({ kind: "wear", href: "/settings/style?wear=deco-crown" });
+    expect(itemAction(arcade, { owned: true, native: false })).toEqual({ kind: "wear", href: "/messages" });
+  });
+
+  it("sends a Premium item you lack to Premium, in the app too", () => {
+    expect(itemAction(halo, { owned: false, native: false })).toEqual({ kind: "premium", href: "/premium" });
+    expect(itemAction(halo, { owned: false, native: true })).toEqual({ kind: "premium", href: "/premium" });
+  });
+
+  it("sells a priced item on the web, and never inside the Android app", () => {
+    expect(itemAction(crown, { owned: false, native: false })).toEqual({ kind: "buy", pricePaise: 4900 });
+    expect(itemAction(crown, { owned: false, native: true })).toEqual({ kind: "blocked", why: "app" });
+  });
+
+  it("does not sell something with no price set", () => {
+    const unpriced = { ...crown, pricePaise: undefined };
+    expect(itemAction(unpriced, { owned: false, native: false })).toEqual({ kind: "blocked", why: "soon" });
+  });
+});
+
+describe("the preview's places and its row", () => {
+  it("offers only places the item really appears", () => {
+    expect(placesFor("frame")).toEqual(["profile", "chat"]);
+    expect(placesFor("name")).toEqual(["profile", "feed"]);
+    // A nameplate lives in the messages list and nowhere else.
+    expect(placesFor("nameplate")).toEqual(["inbox"]);
+    expect(placesFor("bubble")).toEqual(["chat"]);
+    expect(placesFor("theme")).toEqual(["chat"]);
+  });
+
+  it("puts the item in the middle of the row, two either side, wrapping round", () => {
+    const list = ["a", "b", "c", "d", "e", "f", "g"];
+    expect(neighbours(list, 3)).toEqual(["b", "c", "d", "e", "f"]);
+    expect(neighbours(list, 0)).toEqual(["f", "g", "a", "b", "c"]);
+    expect(neighbours(list, 6)).toEqual(["e", "f", "g", "a", "b"]);
+  });
+
+  it("shows a short category once each rather than repeating it", () => {
+    expect(neighbours(["a", "b", "c"], 1)).toEqual(["a", "b", "c"]);
+    expect(neighbours([], 0)).toEqual([]);
+  });
+});
+
+describe("the Marketplace pages", () => {
   let root: Root;
   let host: HTMLDivElement;
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    native.value = false;
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
@@ -82,50 +169,100 @@ describe("the Marketplace page", () => {
     host.remove();
   });
 
-  async function render(owned: string[] = []) {
-    const { MarketplaceView } = await import("@/components/billing/MarketplaceView");
+  async function category(slug: string, owned: string[] = []) {
+    const { MarketCategory } = await import("@/components/billing/MarketCategory");
     await act(async () =>
       root.render(
-        createElement(MarketplaceView, {
-          configured: true, isPremium: false, owned, prices: PRICES,
-          me: { name: "Naitik", avatarUrl: null, hue: 150 },
+        createElement(MarketCategory, {
+          page: categoryPage(slug)!, configured: true, isPremium: false, owned, prices: PRICES, me: ME,
         }),
       ),
     );
     return host;
   }
   const click = (el: Element) => act(async () => void (el as HTMLElement).click());
-  const button = (text: string) => [...host.querySelectorAll("button")].find((b) => b.textContent?.includes(text));
+  const tile = (name: string) => [...host.querySelectorAll("li")].find((li) => li.textContent?.includes(name))!;
+  const sheet = () => document.querySelector<HTMLElement>('[role="dialog"][aria-label^="Preview of"]');
 
-  it("filters the grid by category", async () => {
-    await render();
-    await click(button("Frames")!);
-    const names = [...host.querySelectorAll("li")].map((li) => li.textContent);
-    expect(names.length).toBe(11);
-    expect(names.some((n) => n?.includes("Crown"))).toBe(true);
-    expect(names.some((n) => n?.includes("Pond"))).toBe(false);
+  it("has a card for every category on the home, each opening its page", async () => {
+    const { MarketHome } = await import("@/components/billing/MarketHome");
+    await act(async () => root.render(createElement(MarketHome, { prices: PRICES, me: ME })));
+    const links = [...host.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+    expect(links).toEqual([
+      "/marketplace/frames", "/marketplace/bubbles", "/marketplace/names", "/marketplace/nameplates", "/marketplace/themes",
+    ]);
+    expect(host.textContent).toContain("11 to pick from");
   });
 
-  it("marks what you own and prices the rest", async () => {
-    await render(["deco-crown"]);
-    await click(button("Frames")!);
-    const crown = [...host.querySelectorAll("li")].find((li) => li.textContent?.includes("Crown"));
-    const flames = [...host.querySelectorAll("li")].find((li) => li.textContent?.includes("Flames"));
-    expect(crown?.textContent).toContain("Yours");
-    expect(flames?.textContent).toContain("₹49");
-  });
-
-  it("shows a picked item on you, with Get on the web and nothing to buy in the app", async () => {
-    native.value = false;
-    await render();
-    await click(button("Flames")!);
-    expect(document.body.textContent).toContain("Get · ₹49");
+  it("lists only that category, three across for frames and two for bubbles", async () => {
+    await category("frames");
+    expect(host.querySelectorAll("li")).toHaveLength(11);
+    expect(host.textContent).toContain("Crown");
+    expect(host.textContent).not.toContain("Pond");
+    expect(host.querySelector("ul")!.className).toContain("grid-cols-3");
     await act(async () => root.unmount());
     root = createRoot(host);
+    await category("bubbles");
+    expect(host.querySelector("ul")!.className).toContain("grid-cols-2");
+  });
+
+  it("puts a claim button and an eye on every tile", async () => {
+    await category("frames", ["deco-crown"]);
+    // Yours already: wear it. Priced: its price. With Premium: Claim.
+    expect(tile("Crown").querySelector("a")!.textContent).toBe("Wear");
+    expect(tile("Flames").querySelector('button[aria-label^="Claim Flames"]')!.textContent).toBe("₹49");
+    expect(tile("Halo").querySelector("a")!.textContent).toContain("Claim");
+    for (const li of host.querySelectorAll("li")) expect(li.querySelector('[aria-label^="Preview "]')).toBeTruthy();
+  });
+
+  it("opens the preview from the eye, on you, with the big claim button", async () => {
+    await category("frames");
+    expect(sheet()).toBeNull();
+    await click(tile("Flames").querySelector('[aria-label="Preview Flames"]')!);
+    expect(sheet()).toBeTruthy();
+    expect(sheet()!.textContent).toContain("Hell yeah, claim it · ₹49");
+    expect(sheet()!.textContent).toContain("@naitik");
+  });
+
+  it("switches between the places a frame shows, and has no switch for a nameplate", async () => {
+    await category("frames");
+    await click(tile("Flames").querySelector('[aria-label="Preview Flames"]')!);
+    const places = [...sheet()!.querySelectorAll('[aria-label="Where it shows"] button')];
+    expect(places.map((b) => b.textContent)).toEqual(["Profile", "In chat"]);
+    expect(sheet()!.textContent).toContain("Follow");
+    await click(places[1]);
+    expect(sheet()!.textContent).not.toContain("Follow");
+    expect(sheet()!.textContent).toContain("save me a seat");
+
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    await category("nameplates");
+    await click(host.querySelector('[aria-label^="Preview "]')!);
+    expect(sheet()!.querySelector('[aria-label="Where it shows"]')).toBeNull();
+  });
+
+  it("moves to another item from the row underneath, without closing", async () => {
+    await category("frames");
+    await click(tile("Flames").querySelector('[aria-label="Preview Flames"]')!);
+    const row = sheet()!.querySelector('[aria-label="More like this"]')!;
+    expect(row.querySelector('[aria-current="true"]')!.getAttribute("aria-label")).toBe("Flames");
+    await click(row.querySelector('[aria-label="Crown"]')!);
+    expect(sheet()!.getAttribute("aria-label")).toBe("Preview of Crown");
+  });
+
+  it("sells nothing inside the Android app, but still previews everything", async () => {
     native.value = true;
-    await render();
-    await click(button("Flames")!);
-    expect(document.body.textContent).not.toContain("Get · ₹49");
-    expect(document.body.textContent).toContain("Not in the app yet");
+    await category("frames");
+    expect(tile("Flames").querySelector('button[aria-label^="Claim Flames"]')).toBeNull();
+    await click(tile("Flames").querySelector('[aria-label="Preview Flames"]')!);
+    expect(sheet()!.textContent).not.toContain("claim it · ₹49");
+    expect(sheet()!.textContent).toContain("Not in the app yet");
+  });
+
+  it("closes from the close button", async () => {
+    await category("frames");
+    await click(tile("Flames").querySelector('[aria-label="Preview Flames"]')!);
+    await click(sheet()!.querySelector('[aria-label="Close"]')!);
+    expect(sheet()).toBeNull();
   });
 });

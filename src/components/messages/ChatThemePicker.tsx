@@ -44,7 +44,7 @@ export function ChatThemePicker({
     if (busy || id === current) return;
     if (theme && !unlocked(theme)) {
       onClose();
-      router.push(theme.tier === "premium" ? "/premium" : "/marketplace");
+      router.push(theme.tier === "premium" ? "/premium" : "/marketplace/themes");
       return;
     }
     setBusy(id ?? "none");

@@ -11,7 +11,7 @@ import { withGlowRoom } from "@/components/ui/DisplayName";
 import { NameplateRow } from "@/components/ui/Nameplate";
 import type { MarketItem } from "@/lib/marketplace";
 
-export type Me = { name: string; avatarUrl: string | null; hue: number };
+export type Me = { name: string; avatarUrl: string | null; hue: number; username?: string | null };
 
 /**
  * The item, shown on you: frames on your own photo, fonts on your own name,

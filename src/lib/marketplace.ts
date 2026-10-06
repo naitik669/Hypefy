@@ -22,23 +22,7 @@ export type MarketItem = {
   rank: number;
 };
 
-export const CATEGORIES: { id: Category | "all"; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "frame", label: "Frames" },
-  { id: "bubble", label: "Bubbles" },
-  { id: "theme", label: "Chat themes" },
-  { id: "name", label: "Names" },
-  { id: "nameplate", label: "Nameplates" },
-];
-
 export type SortId = "featured" | "price-low" | "price-high" | "premium";
-
-export const SORTS: { id: SortId; label: string }[] = [
-  { id: "featured", label: "Featured" },
-  { id: "price-low", label: "Price: low to high" },
-  { id: "price-high", label: "Price: high to low" },
-  { id: "premium", label: "Premium first" },
-];
 
 export function buildItems(prices: Record<string, number> = {}): MarketItem[] {
   let rank = 0;
@@ -99,4 +83,110 @@ export function unlocked(tier: "free" | "premium" | "shop", id: string, owned: s
   if (tier === "free") return true;
   if (tier === "premium") return isPremium;
   return isPremium || owned.includes(id);
+}
+
+/**
+ * The Marketplace as places: a home with one card per category, and a page
+ * for each. The slug is what the address says (/marketplace/frames).
+ *
+ * `showcase` is the item the home shows large for the category — one real
+ * thing from it, since a card with an icon says less than the thing itself.
+ * `columns` is how the category's own page lays out: small square things
+ * three across, wide things two.
+ */
+export type CategoryPage = {
+  slug: string;
+  category: Category;
+  label: string;
+  showcase: string;
+  columns: 2 | 3;
+};
+
+export const CATEGORY_PAGES: CategoryPage[] = [
+  { slug: "frames", category: "frame", label: "Frames", showcase: "deco-crown", columns: 3 },
+  { slug: "bubbles", category: "bubble", label: "Chat bubbles", showcase: "bubble-sunset", columns: 2 },
+  { slug: "names", category: "name", label: "Names", showcase: "font-script", columns: 3 },
+  { slug: "nameplates", category: "nameplate", label: "Nameplates", showcase: "plate-aurora", columns: 2 },
+  { slug: "themes", category: "theme", label: "Chat themes", showcase: "theme-arcade", columns: 2 },
+];
+
+export const categoryPage = (slug: string): CategoryPage | undefined =>
+  CATEGORY_PAGES.find((c) => c.slug === slug);
+
+/** The item a category shows on the home: its showcase, or its first if that has gone. */
+export function showcaseOf(page: CategoryPage, items: MarketItem[]): MarketItem | undefined {
+  const mine = items.filter((i) => i.category === page.category);
+  return mine.find((i) => i.id === page.showcase) ?? mine[0];
+}
+
+/**
+ * What the button on an item does, and says.
+ *
+ *   wear     it is already yours: go and put it on
+ *   premium  it comes with Premium, which you do not have: go and see Premium
+ *   buy      it has a price and can be bought here
+ *   blocked  it cannot be bought here: the Android app (Play's rules), or no
+ *            price has been set yet
+ *
+ * One function, so the tile's small button and the preview's large one can
+ * never disagree about what happens when you tap.
+ */
+export type ItemAction =
+  | { kind: "wear"; href: string }
+  | { kind: "premium"; href: string }
+  | { kind: "buy"; pricePaise: number }
+  | { kind: "blocked"; why: "app" | "soon" };
+
+export function itemAction(
+  item: MarketItem,
+  ctx: { owned: boolean; native: boolean },
+): ItemAction {
+  if (ctx.owned) {
+    return { kind: "wear", href: item.category === "theme" ? "/messages" : `/settings/style?wear=${encodeURIComponent(item.id)}` };
+  }
+  if (item.tier === "premium") return { kind: "premium", href: "/premium" };
+  if (ctx.native) return { kind: "blocked", why: "app" };
+  if (!item.pricePaise) return { kind: "blocked", why: "soon" };
+  return { kind: "buy", pricePaise: item.pricePaise };
+}
+
+/**
+ * Where an item can be seen once it is yours, for the preview's switch. Only
+ * places it really appears: a nameplate lives in the messages list and
+ * nowhere else, so it gets one place and no switch.
+ */
+export type Place = "profile" | "chat" | "feed" | "inbox";
+
+export function placesFor(category: Category): Place[] {
+  switch (category) {
+    case "frame":
+      return ["profile", "chat"];
+    case "name":
+      return ["profile", "feed"];
+    case "nameplate":
+      return ["inbox"];
+    default:
+      return ["chat"];
+  }
+}
+
+export const PLACE_LABEL: Record<Place, string> = {
+  profile: "Profile",
+  chat: "In chat",
+  feed: "In feed",
+  inbox: "Messages",
+};
+
+/**
+ * The items either side of this one, for the row under the preview: two
+ * before, itself, two after, wrapping round, so there is always something to
+ * flick to. Fewer than five in a category gives each of them once.
+ */
+export function neighbours<T>(list: T[], index: number, reach = 2): T[] {
+  const n = list.length;
+  if (n === 0) return [];
+  if (n <= reach * 2 + 1) return list;
+  const out: T[] = [];
+  for (let o = -reach; o <= reach; o++) out.push(list[(((index + o) % n) + n) % n]);
+  return out;
 }
