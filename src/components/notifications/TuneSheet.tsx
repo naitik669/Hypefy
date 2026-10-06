@@ -23,6 +23,7 @@ type Person = { id: string; display_name: string | null; username: string | null
 
 const LEVELS: { key: LevelKey[]; label: string; sub?: string }[] = [
   { key: ["hypes"], label: "Hypes", sub: "On your posts, Shots and comments" },
+  { key: ["rehypes"], label: "Rehypes", sub: "Someone passes your post or Shot on" },
   { key: ["follows"], label: "New followers" },
   { key: ["comments", "mentions"], label: "Replies & mentions" },
   { key: ["shares"], label: "Shares to chats" },

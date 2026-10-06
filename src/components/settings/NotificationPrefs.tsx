@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 
 export type NotifPrefs = {
   hypes?: boolean;
+  rehypes?: boolean;
   comments?: boolean;
   follows?: boolean;
   mentions?: boolean;
@@ -18,6 +19,11 @@ const ITEMS: { key: keyof NotifPrefs; label: string; sub: string }[] = [
     key: "hypes",
     label: "Hypes",
     sub: "Someone hypes your post, Shot, or comment",
+  },
+  {
+    key: "rehypes",
+    label: "Rehypes",
+    sub: "Someone passes your post or Shot on to their followers",
   },
   {
     key: "comments",

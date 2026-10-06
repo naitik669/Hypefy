@@ -67,7 +67,9 @@ const MUTE_EXEMPT = new Set(["new_message", "dm_post_shared", "incoming_call", "
 
 /** Which Tune level a notification answers to, as the server decides it. */
 function levelKeyOf(type: string): LevelKey | null {
-  if (type.startsWith("hype_") || type === "repost") return "hypes";
+  // A rehype is not a hype: it has its own level (0113).
+  if (type === "repost") return "rehypes";
+  if (type.startsWith("hype_")) return "hypes";
   if (type.startsWith("comment_")) return "comments";
   if (type.startsWith("mention_")) return "mentions";
   if (type === "follow" || type === "follow_accepted") return "follows";

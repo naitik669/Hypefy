@@ -8,6 +8,8 @@ export type Level = "all" | "highlights" | "off";
 
 export type ActivityPrefs = {
   hypes?: boolean | "highlights" | "off";
+  /** Its own switch since 0113; it used to answer to `hypes`. */
+  rehypes?: boolean | "highlights" | "off";
   comments?: boolean | "highlights" | "off";
   mentions?: boolean | "highlights" | "off";
   follows?: boolean | "highlights" | "off";
@@ -23,7 +25,7 @@ export type ActivityPrefs = {
   muted?: string[];
 };
 
-export type LevelKey = "hypes" | "comments" | "mentions" | "follows" | "shares";
+export type LevelKey = "hypes" | "rehypes" | "comments" | "mentions" | "follows" | "shares";
 
 export function levelOf(prefs: ActivityPrefs, key: LevelKey): Level {
   const v = prefs[key];

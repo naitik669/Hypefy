@@ -34,8 +34,12 @@ export type RehypeItem =
       caption: string | null;
       count: number;
       ratio: number | null;
+      /** Whose it is: the username of the person who made it. */
+      by: string | null;
     }
-  | { kind: "shot"; id: string; at: string; media: string; poster: string | null; caption: string | null };
+  | { kind: "shot"; id: string; at: string; media: string; poster: string | null; caption: string | null; by: string | null };
+
+type Maker = { username: string | null };
 
 type PostEmbed = {
   id: string;
@@ -43,8 +47,15 @@ type PostEmbed = {
   image_urls: string[] | null;
   caption: string | null;
   aspect_ratio: number | null;
+  profiles: Maker | Maker[] | null;
 };
-type ShotEmbed = { id: string; media_url: string; poster_url: string | null; caption: string | null };
+type ShotEmbed = {
+  id: string;
+  media_url: string;
+  poster_url: string | null;
+  caption: string | null;
+  profiles: Maker | Maker[] | null;
+};
 
 function first<T>(v: T | T[] | null | undefined): T | null {
   if (!v) return null;
@@ -101,13 +112,13 @@ export function RehypesGrid({
       const before = current?.length ? current[current.length - 1].at : null;
       let pq = supabase
         .from("reposts")
-        .select("created_at, posts(id, image_url, image_urls, caption, aspect_ratio)")
+        .select("created_at, posts(id, image_url, image_urls, caption, aspect_ratio, profiles!posts_user_id_fkey(username))")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(PAGE);
       let sq = supabase
         .from("shot_reposts")
-        .select("created_at, shots(id, media_url, poster_url, caption)")
+        .select("created_at, shots(id, media_url, poster_url, caption, profiles(username))")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(PAGE);
@@ -129,6 +140,7 @@ export function RehypesGrid({
             caption: p.caption,
             count: p.image_urls?.length ?? 0,
             ratio: p.aspect_ratio,
+            by: first(p.profiles)?.username ?? null,
           },
         ];
       });
@@ -136,7 +148,15 @@ export function RehypesGrid({
         const s = first(r.shots as ShotEmbed | ShotEmbed[] | null);
         if (!s) return [];
         return [
-          { kind: "shot" as const, id: s.id, at: r.created_at, media: s.media_url, poster: s.poster_url, caption: s.caption },
+          {
+            kind: "shot" as const,
+            id: s.id,
+            at: r.created_at,
+            media: s.media_url,
+            poster: s.poster_url,
+            caption: s.caption,
+            by: first(s.profiles)?.username ?? null,
+          },
         ];
       });
 
@@ -226,6 +246,7 @@ export function RehypesGrid({
                     </div>
                   )}
                   <RehypeBadge />
+                  <MadeBy username={it.by} />
                   {it.count > 1 && (
                     <span className="absolute right-1.5 top-1.5 rounded-md bg-black/55 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
                       {it.count}
@@ -236,6 +257,7 @@ export function RehypesGrid({
                 <Link href={`/shots/${it.id}`} className="block h-full" aria-label={it.caption ? `Shot: ${it.caption}` : "Shot"}>
                   <ShotCover poster={it.poster} media={it.media} />
                   <RehypeBadge />
+                  <MadeBy username={it.by} />
                   <span className="absolute right-1.5 top-1.5 text-white drop-shadow">
                     <Play size={14} className="fill-white" />
                   </span>
@@ -247,6 +269,25 @@ export function RehypesGrid({
       </div>
       {more && <div ref={sentinel} className="h-8" />}
     </div>
+  );
+}
+
+/**
+ * Whose work it is, on the tile.
+ *
+ * The mark in the corner said "this is a rehype" and nothing about of whom,
+ * so a profile's Rehypes tab was a wall of other people's work with no names
+ * on it. The name goes along the foot of each tile.
+ */
+function MadeBy({ username }: { username: string | null }) {
+  if (!username) return null;
+  return (
+    <span
+      data-made-by
+      className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/75 to-transparent px-1.5 pb-1 pt-4 text-[10px] font-bold text-white"
+    >
+      @{username}
+    </span>
   );
 }
 

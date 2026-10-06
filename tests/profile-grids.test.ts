@@ -49,8 +49,8 @@ describe("adding a page", () => {
 });
 
 describe("a page of rehypes, out of two lists", () => {
-  const p = (id: string, at: string): RehypeItem => ({ kind: "post", id, at, cover: null, caption: null, count: 0, ratio: 1 });
-  const s = (id: string, at: string): RehypeItem => ({ kind: "shot", id, at, media: "m", poster: null, caption: null });
+  const p = (id: string, at: string): RehypeItem => ({ kind: "post", id, at, cover: null, caption: null, count: 0, ratio: 1, by: null });
+  const s = (id: string, at: string): RehypeItem => ({ kind: "shot", id, at, media: "m", poster: null, caption: null, by: null });
 
   it("orders by when each was rehyped, posts and Shots together", () => {
     const out = mergeRehypePage([p("p1", "2026-09-05"), p("p2", "2026-09-01")], [s("s1", "2026-09-03")]);
@@ -149,5 +149,51 @@ describe("the grids on a profile", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(500); });
     expect(document.querySelector('[role="dialog"][aria-label="Post preview"]')).toBeTruthy();
     vi.useRealTimers();
+  });
+});
+
+describe("whose work a rehype is", () => {
+  let root: Root;
+  let host: HTMLDivElement;
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver ??= class { observe() {} unobserve() {} disconnect() {} };
+    pages.calls.length = 0;
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+  });
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    document.body.innerHTML = "";
+  });
+
+  it("is named on each tile, post and Shot alike", async () => {
+    // Both tables are asked the same way; each takes its own half of the row.
+    pages.rows = () => [
+      {
+        created_at: "2026-09-20T10:00:00Z",
+        posts: { id: "p1", image_url: "https://x.test/p1.jpg", image_urls: null, caption: "dusk", aspect_ratio: 1, profiles: { username: "maya" } },
+        shots: { id: "s1", media_url: "https://x.test/s1.mp4", poster_url: "https://x.test/s1.jpg", caption: null, profiles: [{ username: "bo.b" }] },
+      },
+    ];
+    const { RehypesGrid } = await import("@/components/profile/RehypesGrid");
+    await act(async () => root.render(createElement(RehypesGrid, { userId: "u9", isOwn: false, name: "Riya" })));
+    const names = [...host.querySelectorAll("[data-made-by]")].map((n) => n.textContent).sort();
+    expect(names).toEqual(["@bo.b", "@maya"]);
+  });
+
+  it("leaves the name off rather than guess, when the maker cannot be read", async () => {
+    pages.rows = () => [
+      {
+        created_at: "2026-09-20T10:00:00Z",
+        posts: { id: "p1", image_url: "https://x.test/p1.jpg", image_urls: null, caption: null, aspect_ratio: 1, profiles: null },
+        shots: null,
+      },
+    ];
+    const { RehypesGrid } = await import("@/components/profile/RehypesGrid");
+    await act(async () => root.render(createElement(RehypesGrid, { userId: "u9", isOwn: false })));
+    expect(host.querySelectorAll('a[href="/p/p1"]')).toHaveLength(1);
+    expect(host.querySelector("[data-made-by]")).toBeNull();
   });
 });

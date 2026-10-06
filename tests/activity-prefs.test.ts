@@ -90,3 +90,25 @@ describe("what Activity shows", () => {
     );
   });
 });
+
+/** A rehype used to answer to the Hypes level. It has its own now (0113). */
+describe("rehypes, apart from hypes", () => {
+  const hype = n({ id: "h", type: "hype_post" });
+  const rehype = n({ id: "r", type: "repost", body: "rehyped your post" });
+
+  it("still shows a rehype when hypes are turned off", () => {
+    expect(shownNotifs([hype, rehype], { hypes: false }).map((x) => x.id)).toEqual(["r"]);
+  });
+
+  it("hides rehypes on their own switch, and leaves hypes alone", () => {
+    expect(shownNotifs([hype, rehype], { rehypes: false }).map((x) => x.id)).toEqual(["h"]);
+    expect(levelOf({ rehypes: "highlights" }, "rehypes")).toBe("highlights");
+    expect(levelOf({}, "rehypes")).toBe("all");
+  });
+
+  it("is offered in both places notifications are set", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/components/notifications/TuneSheet.tsx", "utf8")).toContain('key: ["rehypes"]');
+    expect(readFileSync("src/components/settings/NotificationPrefs.tsx", "utf8")).toContain('key: "rehypes"');
+  });
+});
