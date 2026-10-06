@@ -8,6 +8,7 @@ import { GridPeek } from "@/components/feed/GridPeek";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
 import { BLANK_POSTER } from "@/lib/blank-poster";
+import { repairPoster } from "@/lib/poster-repair";
 
 /**
  * A profile's Posts and Shots grids, once.
@@ -64,7 +65,12 @@ export function usePaged<T extends { id: string; created_at: string }>(
     return () => obs.disconnect();
   }, [items, more, next]);
 
-  return { items, more, sentinel };
+  /** Change one row in place, by id: a Shot that has just been given a cover. */
+  const patch = useCallback((id: string, change: Partial<T>) => {
+    setItems((prev) => prev?.map((r) => (r.id === id ? { ...r, ...change } : r)) ?? prev);
+  }, []);
+
+  return { items, more, sentinel, patch };
 }
 
 /** Add a page to what is there, skipping anything already shown. Exported for tests. */
@@ -204,7 +210,26 @@ export function ShotsGrid({
     },
     [supabase, userId],
   );
-  const { items, more, sentinel } = usePaged(load);
+  const { items, more, sentinel, patch } = usePaged(load);
+
+  // Your own Shots that have no cover get one, here, on your device: only
+  // the owner may change a Shot, so it cannot be done from anywhere else.
+  // One at a time, so a profile of old Shots is not ten videos decoding at once.
+  useEffect(() => {
+    if (!items || viewerId !== userId) return;
+    let live = true;
+    (async () => {
+      for (const s of items) {
+        if (!live) return;
+        if (s.poster_url) continue;
+        const url = await repairPoster(supabase as never, s, viewerId);
+        if (url && live) patch(s.id, { poster_url: url } as Partial<ShotRow>);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [items, viewerId, userId, supabase, patch]);
 
   if (items === null) return <GridSkeleton />;
   if (items.length === 0) return <>{empty}</>;
