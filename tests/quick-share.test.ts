@@ -188,7 +188,7 @@ describe("holding share", () => {
     forgetShareTargets();
     root = createRoot(host);
     await act(async () =>
-      root.render(createElement(ShareButton, { postId: "p1", onOpenSheet: openSheet, children: createElement("span", null, "share") })),
+      root.render(createElement(ShareButton, { postId: "p1", onOpenSheet: openSheet } as never, createElement("span", null, "share"))),
     );
     await hold();
     await pointer(trigger(), "pointermove", 48, 366);
