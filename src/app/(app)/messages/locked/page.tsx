@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { VaultHeader } from "@/components/vault/VaultHeader";
 import { MessagesInbox } from "@/components/messages/MessagesInbox";
 import { VaultGate } from "@/components/vault/VaultGate";
 import { loadInboxRows } from "@/app/(app)/messages/load-rows";
@@ -21,14 +21,17 @@ export default async function LockedChatsPage() {
   const { data: open } = await supabase.rpc("vault_unlocked");
   if (!open) return <VaultGate title="Locked chats" />;
 
-  const [rows, { data: overviewRows }] = await Promise.all([
+  // The ordinary inbox is loaded too, for "Add chats" behind the three
+  // dots: those are the chats that could be locked next.
+  const [rows, outside, { data: overviewRows }] = await Promise.all([
     loadInboxRows(supabase, user.id, "locked"),
+    loadInboxRows(supabase, user.id, "normal"),
     supabase.rpc("vault_overview"),
   ]);
 
   return (
     <>
-      <PageHeader title="Locked chats" showBack />
+      <VaultHeader level="locked" here={rows} outside={outside.filter((r) => !r.isRequest)} />
       <MessagesInbox rows={rows} currentUserId={user.id} level="locked" vault={toVaultOverview(overviewRows)} />
     </>
   );

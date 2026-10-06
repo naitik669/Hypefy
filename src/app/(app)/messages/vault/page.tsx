@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { VaultHeader } from "@/components/vault/VaultHeader";
 import { MessagesInbox } from "@/components/messages/MessagesInbox";
 import { VaultGate } from "@/components/vault/VaultGate";
 import { loadInboxRows } from "@/app/(app)/messages/load-rows";
@@ -20,11 +20,17 @@ export default async function VaultPage() {
   const { data: open } = await supabase.rpc("vault_unlocked");
   if (!open) return <VaultGate title="Vault" />;
 
-  const rows = await loadInboxRows(supabase, user.id, "hidden");
+  // Anything not already hidden can be added from the three dots: chats
+  // still in Messages, and chats that are locked but not hidden.
+  const [rows, locked, normal] = await Promise.all([
+    loadInboxRows(supabase, user.id, "hidden"),
+    loadInboxRows(supabase, user.id, "locked"),
+    loadInboxRows(supabase, user.id, "normal"),
+  ]);
 
   return (
     <>
-      <PageHeader title="Vault" showBack />
+      <VaultHeader level="hidden" here={rows} outside={[...locked, ...normal.filter((r) => !r.isRequest)]} />
       <MessagesInbox rows={rows} currentUserId={user.id} level="hidden" />
     </>
   );
