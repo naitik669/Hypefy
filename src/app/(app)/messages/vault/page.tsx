@@ -18,7 +18,7 @@ export default async function VaultPage() {
   if (!user) redirect("/signin");
 
   const { data: open } = await supabase.rpc("vault_unlocked");
-  if (!open) return <VaultGate title="Vault" />;
+  if (!open) return <VaultGate title="Vault" look="case" />;
 
   // Anything not already hidden can be added from the three dots: chats
   // still in Messages, and chats that are locked but not hidden.

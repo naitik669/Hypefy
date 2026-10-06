@@ -511,3 +511,54 @@ describe("what the server sends while locked", () => {
     vi.doUnmock("@/lib/supabase/server");
   });
 });
+
+describe("the Vault's own door", () => {
+  async function box() {
+    const { VaultGate } = await import("@/components/vault/VaultGate");
+    await act(async () => root.render(createElement(VaultGate, { title: "Vault", look: "case" })));
+  }
+  const state = () => host.querySelector("[data-vault-case]")?.getAttribute("data-vault-case");
+
+  it("is a strongbox with the PIN entered on its front", async () => {
+    await box();
+    expect(host.querySelector("[data-vault-case] h1")?.textContent).toBe("VAULT");
+    // The pad is inside the box, wearing its steel, with the prompt on it.
+    expect(host.querySelector('[data-vault-case] [data-pin-pad="case"]')).not.toBeNull();
+    expect(host.querySelector("[data-vault-case]")?.textContent).toContain("Enter your PIN");
+  });
+
+  it("falls open on the right PIN, and only then has the list drawn", async () => {
+    const { CASE_OPEN_MS } = await import("@/components/vault/VaultGate");
+    vi.useFakeTimers();
+    rpc.answer = (fn) => ({ data: fn === "unlock_vault" ? true : null, error: null });
+    await box();
+    await enter("4821");
+    expect(state()).toBe("opening");
+    expect(vaultMarkedOpen()).toBe(true);
+    expect(nav.refreshed).toBe(0);
+    await act(async () => { vi.advanceTimersByTime(CASE_OPEN_MS + 10); });
+    expect(nav.refreshed).toBe(1);
+  });
+
+  it("shakes at a wrong PIN, says so on its front, and stays shut", async () => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "setTimeout", "clearTimeout"] });
+    rpc.answer = () => ({ data: false, error: null });
+    await box();
+    await enter("0000");
+    await act(async () => { vi.advanceTimersByTime(40); });
+    expect(state()).toBe("shake");
+    expect(host.querySelector('[data-vault-case] [role="alert"]')?.textContent).toBe("Wrong PIN");
+    await act(async () => { vi.advanceTimersByTime(2000); });
+    expect(nav.refreshed).toBe(0);
+  });
+
+  it("is the Vault's alone: locked chats keep the plain pad", async () => {
+    const { VaultGate } = await import("@/components/vault/VaultGate");
+    await act(async () => root.render(createElement(VaultGate, { title: "Locked chats" })));
+    expect(host.querySelector("[data-vault-case]")).toBeNull();
+    expect(host.querySelector('[data-pin-pad="plain"]')).not.toBeNull();
+    const src = (await import("node:fs")).readFileSync("src/app/(app)/messages/vault/page.tsx", "utf8");
+    expect(src).toContain('<VaultGate title="Vault" look="case" />');
+    expect((await import("node:fs")).readFileSync("src/app/(app)/messages/locked/page.tsx", "utf8")).not.toContain('look="case"');
+  });
+});
