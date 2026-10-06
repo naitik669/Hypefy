@@ -24,9 +24,10 @@ vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({ rpc }),
 }));
 
+// As share_suggestions returns them: the same ranking the share sheet uses.
 const TARGETS = [
-  { id: "t1", display_name: "Maya", username: "maya", avatar_hue: 10, avatar_url: null },
-  { id: "t2", display_name: "Leo", username: "leo", avatar_hue: 20, avatar_url: null },
+  { kind: "person", id: "t1", name: "Maya", username: "maya", avatar_hue: 10, avatar_url: null, members: null, score: 9 },
+  { kind: "person", id: "t2", name: "Leo", username: "leo", avatar_hue: 20, avatar_url: null, members: null, score: 5 },
 ];
 
 let root: Root;
@@ -40,7 +41,7 @@ beforeEach(async () => {
   toast.mockReset();
   openSheet.mockReset();
   rpc.mockImplementation(async (fn: string) => {
-    if (fn === "top_share_targets") return { data: TARGETS };
+    if (fn === "share_suggestions") return { data: TARGETS };
     if (fn === "get_or_create_dm") return { data: "c1", error: null };
     return { data: null, error: null };
   });
@@ -166,6 +167,41 @@ describe("holding share", () => {
       await vi.advanceTimersByTimeAsync(500);
     });
     expect(tiles()).toHaveLength(0);
+  });
+
+  it("asks the same question the share sheet does, for as many as the row holds", async () => {
+    await hold();
+    const asked = rpc.mock.calls.filter(([fn]) => fn === "share_suggestions");
+    expect(asked.length).toBeGreaterThan(0);
+    expect(asked[0][1]).toEqual({ p_limit: 4 });
+    expect(rpc.mock.calls.some(([fn]) => fn === "top_share_targets")).toBe(false);
+  });
+
+  it("sends straight into a group chat, without making a one-to-one chat for it", async () => {
+    await act(async () => root.unmount());
+    rpc.mockImplementation(async (fn: string) => {
+      if (fn === "share_suggestions")
+        return { data: [{ kind: "group", id: "g9", name: "Roof crew", username: null, avatar_hue: null, avatar_url: null, members: 4, score: 8 }] };
+      return { data: null, error: null };
+    });
+    const { forgetShareTargets, ShareButton } = await import("@/components/feed/QuickShare");
+    forgetShareTargets();
+    root = createRoot(host);
+    await act(async () =>
+      root.render(createElement(ShareButton, { postId: "p1", onOpenSheet: openSheet, children: createElement("span", null, "share") })),
+    );
+    await hold();
+    await pointer(trigger(), "pointermove", 48, 366);
+    expect(document.body.textContent).toContain("Roof crew");
+    await pointer(trigger(), "pointerup", 48, 366);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const sends = rpc.mock.calls.filter(([fn]) => fn === "send_message");
+    expect(sends).toHaveLength(1);
+    // The group's own conversation, and no chat was looked up or created.
+    expect(sends[0][1]).toMatchObject({ p_conversation_id: "g9", p_post_id: "p1" });
+    expect(rpc.mock.calls.some(([fn]) => fn === "get_or_create_dm")).toBe(false);
   });
 
   it("opens the full sheet when the thumb lifts on More", async () => {

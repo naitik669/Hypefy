@@ -8,8 +8,8 @@ import { haptics } from "@/lib/haptics";
 import { NavHoldMenu, type HoldAction } from "@/components/layout/NavHoldMenu";
 
 /**
- * Hold the share button to send without opening anything: the six people you
- * send posts to and chat with most, as faces, picked by sliding the thumb to
+ * Hold the share button to send without opening anything: the four people or
+ * group chats you interact with most, as faces, picked by sliding the thumb to
  * one and letting go. The face you land on shows a check before the card
  * goes, and a last tile opens the full share sheet.
  *
@@ -25,10 +25,11 @@ import { NavHoldMenu, type HoldAction } from "@/components/layout/NavHoldMenu";
  * what a plain tap still opens.
  */
 
+/** A person, or a group chat you are in. `id` is a user's for one and a conversation's for the other. */
 export type ShareTarget = {
+  kind: "person" | "group";
   id: string;
-  display_name: string | null;
-  username: string | null;
+  name: string;
   avatar_hue: number | null;
   avatar_url: string | null;
 };
@@ -46,11 +47,23 @@ const TARGETS = 4;
 /** Resolved once per session: the list barely moves and a hold must feel instant. */
 let cached: ShareTarget[] | null = null;
 
+/**
+ * The same ranking the share sheet opens on (share_suggestions): the people
+ * and group chats you actually interact with, best first. This row used to
+ * ask a different, older question, so holding the button offered faces the
+ * sheet one tap away would not, and never a group.
+ */
 export async function loadShareTargets(): Promise<ShareTarget[]> {
   if (cached) return cached;
   const supabase = createClient();
-  const { data } = await supabase.rpc("top_share_targets", { p_limit: TARGETS });
-  cached = (data ?? []) as ShareTarget[];
+  const { data } = await supabase.rpc("share_suggestions", { p_limit: TARGETS });
+  cached = (data ?? []).map((r) => ({
+    kind: r.kind === "group" ? ("group" as const) : ("person" as const),
+    id: r.id,
+    name: r.name ?? r.username ?? (r.kind === "group" ? "Group" : "User"),
+    avatar_hue: r.avatar_hue,
+    avatar_url: r.avatar_url,
+  }));
   return cached;
 }
 
@@ -98,14 +111,17 @@ export function ShareButton({
 
   const send = useCallback(
     async (t: ShareTarget) => {
-      const name = t.display_name ?? t.username ?? "them";
+      const name = t.name;
       if (sent.current.has(t.id)) return;
       sent.current.add(t.id);
 
-      const { data: convId, error } = await supabase.rpc("get_or_create_dm", {
-        p_other: t.id,
-      });
-      if (error || !convId) {
+      // A group is already a conversation; a person needs theirs found or made.
+      let convId: string | null = t.kind === "group" ? t.id : null;
+      if (!convId) {
+        const { data, error } = await supabase.rpc("get_or_create_dm", { p_other: t.id });
+        convId = error || !data ? null : (data as string);
+      }
+      if (!convId) {
         sent.current.delete(t.id);
         toast("Couldn't send", "error");
         return;
@@ -150,11 +166,11 @@ export function ShareButton({
     const targets = await loadShareTargets();
     setActions([
       ...targets.map((t) => {
-        const name = t.display_name ?? t.username ?? "User";
+        const name = t.name;
         return {
-          key: t.id,
+          key: `${t.kind}-${t.id}`,
           label: name,
-          avatar: { name, hue: t.avatar_hue ?? 280, src: t.avatar_url },
+          avatar: { name, hue: t.avatar_hue ?? (t.kind === "group" ? 160 : 280), src: t.avatar_url },
           onSelect: () => void send(t),
           confirm: true,
         };
