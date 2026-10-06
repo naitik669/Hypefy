@@ -3,7 +3,8 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, Loader2, Sparkles } from "lucide-react";
+import { Check, Eye, Loader2, Sparkles } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { MarketItemPreview, type Me } from "@/components/billing/MarketItemPreview";
 import { MarketPreviewSheet } from "@/components/billing/MarketPreviewSheet";
@@ -11,9 +12,12 @@ import {
   buildItems,
   filterAndSort,
   isOwned,
+  isWorn,
   itemAction,
+  wornColumn,
   type CategoryPage,
   type MarketItem,
+  type Worn,
 } from "@/lib/marketplace";
 import { formatInr } from "@/lib/billing/plans";
 import { buyItem } from "@/lib/billing/checkout";
@@ -39,6 +43,8 @@ export function MarketCategory({
   owned: initialOwned,
   prices,
   me,
+  userId,
+  worn: initialWorn,
 }: {
   page: CategoryPage;
   configured: boolean;
@@ -46,6 +52,8 @@ export function MarketCategory({
   owned: string[];
   prices: Record<string, number>;
   me: Me;
+  userId: string;
+  worn: Worn;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -54,6 +62,33 @@ export function MarketCategory({
   const [previewing, setPreviewing] = useState<MarketItem | null>(null);
   /** The item being paid for, so only its own button spins. */
   const [buying, setBuying] = useState<string | null>(null);
+  /** What you have on. Changed here the moment you tap, put back if it fails. */
+  const [worn, setWorn] = useState(initialWorn);
+
+  /**
+   * Put an item on, or take it off, right here.
+   *
+   * It used to send you to Your style to do it: claim a frame, leave the
+   * Marketplace, find the frame again, tap it, save. One of each kind is worn
+   * at a time, so putting on a second frame replaces the first.
+   */
+  async function wear(item: MarketItem, on: boolean) {
+    const column = wornColumn(item);
+    if (!column) return;
+    const before = worn;
+    setWorn({ ...worn, [column]: on ? item.id : null });
+    const supabase = createClient();
+    const patch: Partial<Worn> = {};
+    patch[column] = on ? item.id : null;
+    const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
+    if (error) {
+      setWorn(before);
+      toast(error.message.includes("Not unlocked") ? "That one isn't yours yet" : "Couldn't change that. Try again.", "error");
+      return;
+    }
+    toast(on ? `You're wearing ${item.label}` : `${item.label} is off`, "success");
+    router.refresh();
+  }
 
   const items = useMemo(
     () => filterAndSort(buildItems(prices), page.category, "featured"),
@@ -88,7 +123,7 @@ export function MarketCategory({
       <ul className={`grid gap-2.5 px-3 pt-3 ${page.columns === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
         {items.map((item) => {
           const mine = isOwned(item, owned, isPremium);
-          const action = itemAction(item, { owned: mine, native });
+          const action = itemAction(item, { owned: mine, native, worn: isWorn(item, worn) });
           return (
             <li key={item.id} className="flex min-w-0 flex-col gap-2 rounded-[18px] bg-surface p-2">
               <span className={`block overflow-hidden rounded-xl ${page.columns === 3 ? "aspect-square" : "aspect-[4/3]"}`}>
@@ -97,8 +132,22 @@ export function MarketCategory({
               <p className="truncate px-0.5 text-center text-xs font-semibold">{item.label}</p>
               <div className="flex items-center justify-center gap-1.5">
                 {action.kind === "wear" ? (
+                  <button type="button" onClick={() => void wear(item, true)} className={small} aria-label={`Wear ${item.label}`}>
+                    Wear
+                  </button>
+                ) : action.kind === "wearing" ? (
+                  // On already. Tapping takes it off, and it says so to a screen reader.
+                  <button
+                    type="button"
+                    onClick={() => void wear(item, false)}
+                    aria-label={`Wearing ${item.label}. Take it off`}
+                    className={`${small} bg-white/10 text-accent`}
+                  >
+                    <Check size={13} strokeWidth={3} /> On
+                  </button>
+                ) : action.kind === "use" ? (
                   <Link href={action.href} className={small}>
-                    {item.category === "theme" ? "Use" : "Wear"}
+                    Use
                   </Link>
                 ) : action.kind === "premium" ? (
                   <Link href={action.href} className={small} aria-label={`Claim ${item.label} with Premium`}>
@@ -158,6 +207,8 @@ export function MarketCategory({
           siblings={items}
           me={me}
           owned={isOwned(previewing, owned, isPremium)}
+          worn={isWorn(previewing, worn)}
+          onWear={(on) => void wear(previewing, on)}
           native={native}
           busy={buying === previewing.id}
           onPick={setPreviewing}

@@ -120,9 +120,49 @@ export function showcaseOf(page: CategoryPage, items: MarketItem[]): MarketItem 
 }
 
 /**
+ * The five things you can wear, as the columns on your profile that hold them.
+ * One of each at a time: wearing a second frame replaces the first.
+ */
+export type WornColumn = "avatar_decoration" | "name_font" | "name_glow" | "bubble_style" | "nameplate";
+export type Worn = Record<WornColumn, string | null>;
+
+export const NOTHING_WORN: Worn = {
+  avatar_decoration: null,
+  name_font: null,
+  name_glow: null,
+  bubble_style: null,
+  nameplate: null,
+};
+
+/** Where an item goes when worn. Null for a chat theme, which is not worn. */
+export function wornColumn(item: MarketItem): WornColumn | null {
+  switch (item.category) {
+    case "frame":
+      return "avatar_decoration";
+    case "bubble":
+      return "bubble_style";
+    case "nameplate":
+      return "nameplate";
+    case "name":
+      // A name has two parts worn separately: its face and its glow.
+      return item.id.startsWith("glow-") ? "name_glow" : "name_font";
+    default:
+      return null;
+  }
+}
+
+/** Is this item on right now? */
+export function isWorn(item: MarketItem, worn: Worn): boolean {
+  const column = wornColumn(item);
+  return !!column && worn[column] === item.id;
+}
+
+/**
  * What the button on an item does, and says.
  *
- *   wear     it is already yours: go and put it on
+ *   wear     it is yours and you are not wearing it: put it on, right here
+ *   wearing  it is yours and it is on: take it off
+ *   use      a chat theme you own: those are set from inside a chat
  *   premium  it comes with Premium, which you do not have: go and see Premium
  *   buy      it has a price and can be bought here
  *   blocked  it cannot be bought here: the Android app (Play's rules), or no
@@ -132,17 +172,22 @@ export function showcaseOf(page: CategoryPage, items: MarketItem[]): MarketItem 
  * never disagree about what happens when you tap.
  */
 export type ItemAction =
-  | { kind: "wear"; href: string }
+  | { kind: "wear"; column: WornColumn }
+  | { kind: "wearing"; column: WornColumn }
+  | { kind: "use"; href: string }
   | { kind: "premium"; href: string }
   | { kind: "buy"; pricePaise: number }
   | { kind: "blocked"; why: "app" | "soon" };
 
 export function itemAction(
   item: MarketItem,
-  ctx: { owned: boolean; native: boolean },
+  ctx: { owned: boolean; native: boolean; worn?: boolean },
 ): ItemAction {
   if (ctx.owned) {
-    return { kind: "wear", href: item.category === "theme" ? "/messages" : `/settings/style?wear=${encodeURIComponent(item.id)}` };
+    const column = wornColumn(item);
+    // A chat theme belongs to one chat, not to you, so it has nowhere to be worn.
+    if (!column) return { kind: "use", href: "/messages" };
+    return { kind: ctx.worn ? "wearing" : "wear", column };
   }
   if (item.tier === "premium") return { kind: "premium", href: "/premium" };
   if (ctx.native) return { kind: "blocked", why: "app" };

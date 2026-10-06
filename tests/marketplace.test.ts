@@ -7,11 +7,15 @@ import {
   buildItems,
   categoryPage,
   filterAndSort,
+  NOTHING_WORN,
   isOwned,
+  isWorn,
   itemAction,
   neighbours,
   placesFor,
   showcaseOf,
+  wornColumn,
+  type Worn,
 } from "@/lib/marketplace";
 
 /**
@@ -76,7 +80,20 @@ const native = vi.hoisted(() => ({ value: false }));
 vi.mock("@/lib/native", () => ({ isNative: () => native.value }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push() {}, refresh() {} }) }));
 vi.mock("@/components/ui/ToastProvider", () => ({ useToast: () => () => {} }));
-vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
+/** Every change to what you wear, as [patch, your id]. */
+const updates = vi.hoisted(() => ({ calls: [] as [Record<string, unknown>, string][], fail: false }));
+vi.mock("@/lib/supabase/client", () => ({
+  createClient: () => ({
+    from: () => ({
+      update: (patch: Record<string, unknown>) => ({
+        eq: async (_col: string, id: string) => {
+          updates.calls.push([patch, id]);
+          return { error: updates.fail ? { message: "nope" } : null };
+        },
+      }),
+    }),
+  }),
+}));
 
 const ME = { name: "Naitik Kushwaha", username: "naitik", avatarUrl: null, hue: 150 };
 
@@ -110,9 +127,26 @@ describe("what the button on an item does", () => {
   const halo = items.find((i) => i.id === "deco-halo")!;
   const arcade = items.find((i) => i.id === "theme-arcade")!;
 
-  it("wears what is already yours, and uses a chat theme from messages", () => {
-    expect(itemAction(crown, { owned: true, native: false })).toEqual({ kind: "wear", href: "/settings/style?wear=deco-crown" });
-    expect(itemAction(arcade, { owned: true, native: false })).toEqual({ kind: "wear", href: "/messages" });
+  it("wears what is yours right there, and takes off what is on", () => {
+    expect(itemAction(crown, { owned: true, native: false })).toEqual({ kind: "wear", column: "avatar_decoration" });
+    expect(itemAction(crown, { owned: true, native: false, worn: true })).toEqual({ kind: "wearing", column: "avatar_decoration" });
+  });
+
+  it("sends a chat theme to messages, since a theme belongs to a chat and not to you", () => {
+    expect(itemAction(arcade, { owned: true, native: false })).toEqual({ kind: "use", href: "/messages" });
+  });
+
+  it("knows which of the five things each item is", () => {
+    const by = (id: string) => items.find((i) => i.id === id)!;
+    expect(wornColumn(by("deco-crown"))).toBe("avatar_decoration");
+    expect(wornColumn(by("font-script"))).toBe("name_font");
+    // A glow is a name item too, worn separately from the face.
+    expect(wornColumn(by("glow-lime"))).toBe("name_glow");
+    expect(wornColumn(by("bubble-sunset"))).toBe("bubble_style");
+    expect(wornColumn(by("plate-aurora"))).toBe("nameplate");
+    expect(wornColumn(arcade)).toBeNull();
+    expect(isWorn(crown, { ...NOTHING_WORN, avatar_decoration: "deco-crown" })).toBe(true);
+    expect(isWorn(crown, { ...NOTHING_WORN, avatar_decoration: "deco-halo" })).toBe(false);
   });
 
   it("sends a Premium item you lack to Premium, in the app too", () => {
@@ -160,6 +194,8 @@ describe("the Marketplace pages", () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     native.value = false;
+    updates.calls.length = 0;
+    updates.fail = false;
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
@@ -169,12 +205,13 @@ describe("the Marketplace pages", () => {
     host.remove();
   });
 
-  async function category(slug: string, owned: string[] = []) {
+  async function category(slug: string, owned: string[] = [], worn: Partial<Worn> = {}) {
     const { MarketCategory } = await import("@/components/billing/MarketCategory");
     await act(async () =>
       root.render(
         createElement(MarketCategory, {
           page: categoryPage(slug)!, configured: true, isPremium: false, owned, prices: PRICES, me: ME,
+          userId: "me", worn: { ...NOTHING_WORN, ...worn },
         }),
       ),
     );
@@ -209,10 +246,42 @@ describe("the Marketplace pages", () => {
   it("puts a claim button and an eye on every tile", async () => {
     await category("frames", ["deco-crown"]);
     // Yours already: wear it. Priced: its price. With Premium: Claim.
-    expect(tile("Crown").querySelector("a")!.textContent).toBe("Wear");
+    expect(tile("Crown").querySelector('button[aria-label="Wear Crown"]')!.textContent).toBe("Wear");
     expect(tile("Flames").querySelector('button[aria-label^="Claim Flames"]')!.textContent).toBe("₹49");
     expect(tile("Halo").querySelector("a")!.textContent).toContain("Claim");
     for (const li of host.querySelectorAll("li")) expect(li.querySelector('[aria-label^="Preview "]')).toBeTruthy();
+  });
+
+  it("puts an item on right there, without leaving the page", async () => {
+    await category("frames", ["deco-crown"]);
+    await click(tile("Crown").querySelector('button[aria-label="Wear Crown"]')!);
+    expect(updates.calls).toEqual([[{ avatar_decoration: "deco-crown" }, "me"]]);
+    // And the button now says it is on.
+    expect(tile("Crown").querySelector('[aria-label="Wearing Crown. Take it off"]')).toBeTruthy();
+  });
+
+  it("takes off what is on", async () => {
+    await category("frames", ["deco-crown"], { avatar_decoration: "deco-crown" });
+    await click(tile("Crown").querySelector('[aria-label="Wearing Crown. Take it off"]')!);
+    expect(updates.calls).toEqual([[{ avatar_decoration: null }, "me"]]);
+    expect(tile("Crown").querySelector('button[aria-label="Wear Crown"]')).toBeTruthy();
+  });
+
+  it("puts the button back if it could not be saved", async () => {
+    updates.fail = true;
+    await category("frames", ["deco-crown"]);
+    await click(tile("Crown").querySelector('button[aria-label="Wear Crown"]')!);
+    expect(tile("Crown").querySelector('button[aria-label="Wear Crown"]')).toBeTruthy();
+    expect(tile("Crown").querySelector('[aria-label^="Wearing"]')).toBeNull();
+  });
+
+  it("wears from the preview too, and says so", async () => {
+    await category("frames", ["deco-crown"]);
+    await click(tile("Crown").querySelector('[aria-label="Preview Crown"]')!);
+    const wearIt = [...sheet()!.querySelectorAll("button")].find((b) => b.textContent === "Wear it")!;
+    await click(wearIt);
+    expect(updates.calls).toEqual([[{ avatar_decoration: "deco-crown" }, "me"]]);
+    expect(sheet()!.textContent).toContain("wearing it");
   });
 
   it("opens the preview from the eye, on you, with the big claim button", async () => {

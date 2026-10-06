@@ -45,10 +45,12 @@ export function MarketPreviewSheet({
   siblings,
   me,
   owned,
+  worn,
   native,
   busy,
   onPick,
   onBuy,
+  onWear,
   onClose,
 }: {
   item: MarketItem;
@@ -56,10 +58,14 @@ export function MarketPreviewSheet({
   siblings: MarketItem[];
   me: Me;
   owned: boolean;
+  /** It is on you right now. */
+  worn: boolean;
   native: boolean;
   busy: boolean;
   onPick: (item: MarketItem) => void;
   onBuy: () => void;
+  /** Put it on (true) or take it off (false), without leaving. */
+  onWear: (on: boolean) => void;
   onClose: () => void;
 }) {
   useOverlayShield(true, onClose);
@@ -68,7 +74,7 @@ export function MarketPreviewSheet({
   // A different category has different places; never show one it lacks.
   const at = places.includes(place) ? place : places[0];
   const index = Math.max(0, siblings.findIndex((s) => s.id === item.id));
-  const action = itemAction(item, { owned, native });
+  const action = itemAction(item, { owned, native, worn });
 
   if (typeof document === "undefined") return null;
 
@@ -129,8 +135,20 @@ export function MarketPreviewSheet({
           </div>
 
           {action.kind === "wear" ? (
+            <button type="button" onClick={() => onWear(true)} className={cta}>
+              Wear it
+            </button>
+          ) : action.kind === "wearing" ? (
+            <button
+              type="button"
+              onClick={() => onWear(false)}
+              className="flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-white/10 text-[15px] font-extrabold text-foreground transition-transform active:scale-[0.98]"
+            >
+              <Check size={17} strokeWidth={3} className="text-accent" /> You&rsquo;re wearing it · Take it off
+            </button>
+          ) : action.kind === "use" ? (
             <Link href={action.href} className={cta}>
-              {item.category === "theme" ? "Use it" : "Wear it"}
+              Use it in a chat
             </Link>
           ) : action.kind === "premium" ? (
             <Link href={action.href} className={cta}>
