@@ -25,6 +25,8 @@ export function forgetRtcConfig() {
  */
 export async function getRtcConfig(now = Date.now()): Promise<RTCConfiguration> {
   if (kept && now - kept.at < KEEP_MS) return kept.config;
+  // Past its time: a login that may have expired is not offered to a new peer.
+  kept = null;
   try {
     const res = await fetch("/api/calls/ice", { cache: "no-store" });
     if (!res.ok) return STUN_ONLY;
@@ -35,6 +37,14 @@ export async function getRtcConfig(now = Date.now()): Promise<RTCConfiguration> 
   } catch {
     return STUN_ONLY;
   }
+}
+
+/**
+ * The servers last fetched, for the moment a peer is made. Always something
+ * usable: before the first answer, or after a failed one, the public finder.
+ */
+export function currentRtcConfig(): RTCConfiguration {
+  return kept?.config ?? STUN_ONLY;
 }
 
 /**

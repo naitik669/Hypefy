@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { TURN_TTL_SECONDS, buildIceServers, mintTurnLogin } from "@/lib/ice";
-import { callStartError, forgetRtcConfig, getRtcConfig } from "@/lib/call-setup";
+import { callStartError, currentRtcConfig, forgetRtcConfig, getRtcConfig } from "@/lib/call-setup";
 
 /**
  * A call's relay login used to be compiled into the JavaScript everyone
@@ -90,8 +90,12 @@ describe("asking for them, from a call", () => {
   it("uses what the server gives, and asks once for calls close together", async () => {
     const fetched = answer({ iceServers: [{ urls: ["stun:a"] }, { urls: ["turn:b"], username: "n", credential: "p" }] });
     vi.stubGlobal("fetch", fetched);
+    // Before any answer, a peer still has something to connect through.
+    expect(currentRtcConfig().iceServers).toHaveLength(1);
     const first = await getRtcConfig(NOW);
     expect(first.iceServers).toHaveLength(2);
+    // And once it has been fetched, that is what a new peer is made with.
+    expect(currentRtcConfig()).toBe(first);
     await getRtcConfig(NOW + 60_000);
     expect(fetched).toHaveBeenCalledTimes(1);
     // A login lasts an hour: ask again well before then.

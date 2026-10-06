@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Phone, Video, Mic, MicOff, VideoOff } from "lucide-react";
 import { shieldProps, useOverlayShield } from "@/lib/overlay-shield";
-import { callStartError, getRtcConfig } from "@/lib/call-setup";
+import { callStartError, currentRtcConfig, getRtcConfig } from "@/lib/call-setup";
 
 function stayOnCall() {}
 import { createClient } from "@/lib/supabase/client";
@@ -105,11 +105,10 @@ export function CallProvider({ userId, children }: { userId: string; children: R
     }
   }, [userId]);
 
-  const rtcConfig = useRef<RTCConfiguration | undefined>(undefined);
-
   const getMedia = useCallback(async (type: CallType) => {
-    // Both ways into a call come through here before a peer is made.
-    rtcConfig.current = await getRtcConfig();
+    // Both ways into a call come through here before a peer is made, so the
+    // servers are fetched by the time makePeer reads them.
+    await getRtcConfig();
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === "video" });
     localRef.current = stream;
     setLocalStream(stream);
@@ -117,7 +116,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
   }, []);
 
   const makePeer = useCallback((stream: MediaStream) => {
-    const pc = new RTCPeerConnection(rtcConfig.current);
+    const pc = new RTCPeerConnection(currentRtcConfig());
     stream.getTracks().forEach((t) => pc.addTrack(t, stream));
     pc.onicecandidate = (e) => { if (e.candidate) send({ kind: "ice", candidate: e.candidate.toJSON() }); };
     pc.ontrack = (e) => setRemoteStream(e.streams[0]);

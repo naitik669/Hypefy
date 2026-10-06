@@ -11,7 +11,7 @@ import {
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Phone, Mic, MicOff, Video, VideoOff, Users } from "lucide-react";
 import { shieldProps, useOverlayShield } from "@/lib/overlay-shield";
-import { callStartError, getRtcConfig } from "@/lib/call-setup";
+import { callStartError, currentRtcConfig, getRtcConfig } from "@/lib/call-setup";
 
 function stayOnCall() {}
 import { createClient } from "@/lib/supabase/client";
@@ -139,7 +139,7 @@ export function GroupCallProvider({
     (peerId: string, initiator: boolean) => {
       let pc = peersRef.current.get(peerId);
       if (pc) return pc;
-      pc = new RTCPeerConnection(rtcConfig.current);
+      pc = new RTCPeerConnection(currentRtcConfig());
       localRef.current
         ?.getTracks()
         .forEach((t) => pc!.addTrack(t, localRef.current!));
@@ -219,11 +219,9 @@ export function GroupCallProvider({
     [userId, ensurePeer, send]
   );
 
-  const rtcConfig = useRef<RTCConfiguration | undefined>(undefined);
-
   const getMedia = useCallback(async (type: CallType) => {
     // Asked for as the call starts; see src/lib/call-setup.ts.
-    rtcConfig.current = await getRtcConfig();
+    await getRtcConfig();
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
       video: type === "video",
