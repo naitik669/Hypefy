@@ -264,6 +264,23 @@ function mapMessageRow(m: any): ChatMsg {
   };
 }
 
+/**
+ * Does this message carry its sender's face?
+ *
+ * Only someone else's, and only the LAST of a run of theirs: one face at the
+ * foot of what a person said, not one on every bubble. A run ends when the
+ * next message is from someone else, is a notice from the thread itself, or
+ * is on another day. Exported for tests.
+ */
+export function showsFace(
+  m: { sender_id: string; kind: string; created_at: string },
+  next: { sender_id: string; kind: string; created_at: string } | undefined,
+  currentUserId: string,
+): boolean {
+  if (m.sender_id === currentUserId || m.kind === "system") return false;
+  return !next || next.kind === "system" || next.sender_id !== m.sender_id || !sameDay(next.created_at, m.created_at);
+}
+
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
@@ -303,7 +320,7 @@ export function RealChatView({
   currentUserId: string;
   other: Other;
   group?: GroupMeta | null;
-  members?: Record<string, { name: string; hue: number }>;
+  members?: Record<string, { name: string; hue: number; avatarUrl?: string | null }>;
   initialMessages: ChatMsg[];
   initialReactions?: ReactionRow[];
   initialReaders?: Reader[];
@@ -1800,6 +1817,10 @@ export function RealChatView({
                 !sameDay(next.created_at, m.created_at) ||
                 new Date(next.created_at).getTime() - new Date(m.created_at).getTime() > 5 * 60 * 1000;
               const reacts = reactionsByMsg.get(m.id) ?? [];
+              // Who is talking, beside what they said. The others' messages
+              // all leave the same room for it, so a run stays in one line.
+              const face = showsFace(m, next, currentUserId);
+              const who = members?.[m.sender_id] ?? { name: other.name, hue: other.hue, avatarUrl: other.avatarUrl };
               // The sender's own bubble style, else this side of the chat theme.
               const look = resolveBubble({ mine, senderStyleId: bubbleStyles[m.sender_id], theme });
               const lookCss = look ? bubbleCss(look.bubble) : null;
@@ -1845,7 +1866,12 @@ export function RealChatView({
                       </p>
                     </div>
                   ) : (
-                  <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                  <div className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}>
+                    {!mine && (
+                      <span className="w-7 shrink-0" data-msg-face={face || undefined}>
+                        {face && <Avatar name={who.name} hue={who.hue} size={28} src={who.avatarUrl ?? undefined} />}
+                      </span>
+                    )}
                     <div className={`flex max-w-[80%] flex-col ${mine ? "items-end" : "items-start"}`}>
                       {showSender && (
                         <span className="mb-0.5 px-1 text-[11px] font-semibold text-muted">{senderName(m.sender_id)}</span>

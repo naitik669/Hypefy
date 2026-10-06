@@ -53,9 +53,14 @@ export default async function ThreadPage({
   const op = others[0] ?? null;
 
   // Sender lookup + group meta
-  const membersMap: Record<string, { name: string; hue: number }> = {};
+  const membersMap: Record<string, { name: string; hue: number; avatarUrl: string | null }> = {};
   others.forEach((p: any) => {
-    membersMap[p.id] = { name: p.display_name ?? p.username ?? "User", hue: p.avatar_hue ?? 280 };
+    membersMap[p.id] = {
+      name: p.display_name ?? p.username ?? "User",
+      hue: p.avatar_hue ?? 280,
+      // The face beside each of their messages in the thread.
+      avatarUrl: p.avatar_url ?? null,
+    };
   });
   const groupMembers = members
     .map((m: any) => {
