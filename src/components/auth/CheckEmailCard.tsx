@@ -62,6 +62,16 @@ export function CheckEmailCard({ email }: { email: string }) {
           )}{" "}
           to activate your account, then you&apos;re in. ⚡
         </p>
+        {/* Said to everyone, so it tells nobody whether the address was
+            already registered: the sign-up form no longer does either. */}
+        <p className="mt-3 text-[12px] leading-relaxed text-faint">
+          Nothing arriving? If you already have an account with this email, no
+          new link is sent.{" "}
+          <Link href="/signin" className="font-semibold text-muted underline underline-offset-2">
+            Sign in instead
+          </Link>
+          .
+        </p>
 
         {/* Status line */}
         {status === "sent" && (

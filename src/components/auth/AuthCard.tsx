@@ -13,6 +13,7 @@ import { stashPendingOAuth } from "@/lib/pending-oauth";
 import { confirmRecovery, ensureEncryption } from "@/lib/e2ee/vault";
 import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 import { RecoveryCodeScreen } from "@/components/e2ee/RecoveryCodeScreen";
+import { MIN_PASSWORD, signupMissing } from "@/lib/signup-check";
 
 type Mode = "signin" | "signup";
 
@@ -125,6 +126,8 @@ export function AuthCard({ mode }: { mode: Mode }) {
   // Signup can't proceed until the user is 13+ and has accepted the policies.
   const signupBlocked =
     mode === "signup" && (!consent || age === null || age < 13);
+  /** Which part is missing, said under the button instead of only greying it. */
+  const missing = mode === "signup" ? signupMissing({ email, password, dob, age, consent }) : null;
 
   async function saveSessionAsAccount(session: {
     user: { id: string; email?: string | null };
@@ -217,6 +220,12 @@ export function AuthCard({ mode }: { mode: Mode }) {
           setLoading(false);
           return;
         }
+        // The same floor as changing or resetting one.
+        if (password.length < MIN_PASSWORD) {
+          setError(`Use at least ${MIN_PASSWORD} characters for your password.`);
+          setLoading(false);
+          return;
+        }
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -241,14 +250,22 @@ export function AuthCard({ mode }: { mode: Mode }) {
           }
           throw error;
         }
-        // Confirmations on: Supabase hides existing emails (enumeration
-        // protection) by returning a user with an empty identities array.
+        // Confirmations on: Supabase hides whether the email already has an
+        // account, by answering exactly as it would for a new one (a user
+        // with no identities, and no email sent). This used to read that
+        // signal and say "That email is already registered", which undid the
+        // protection: anyone could type an address and learn whether its
+        // owner is on Hypefy. It goes to the same "check your inbox" screen
+        // either way now, and that screen points an existing member at
+        // signing in.
         if (data.user && (data.user.identities?.length ?? 0) === 0) {
-          router.push(
-            `/signin?exists=1&email=${encodeURIComponent(email)}${
-              addMode ? "&add=1&view=form" : ""
-            }`
-          );
+          if (addMode && prevSession) {
+            await supabase.auth.setSession({
+              access_token: prevSession.access_token,
+              refresh_token: prevSession.refresh_token,
+            });
+          }
+          router.push(`/check-email?email=${encodeURIComponent(email)}`);
           return;
         }
         // New account. If a session exists, go straight to setup; otherwise
@@ -467,7 +484,8 @@ export function AuthCard({ mode }: { mode: Mode }) {
                 mode === "signin" ? "current-password" : "new-password"
               }
               required
-              minLength={6}
+              // New passwords meet the floor; an older, shorter one can still sign in.
+              minLength={mode === "signup" ? MIN_PASSWORD : 6}
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -562,6 +580,11 @@ export function AuthCard({ mode }: { mode: Mode }) {
           >
             {loading ? "Please wait…" : t.cta}
           </button>
+          {missing && !loading && (
+            <p data-missing className="-mt-1 text-center text-[11px] text-muted">
+              {missing}
+            </p>
+          )}
         </form>
 
         {/* Google works when adding an account too. The redirect still
