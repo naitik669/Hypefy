@@ -247,7 +247,7 @@ function Section({ children }: { children: React.ReactNode }) {
  * of three separate pill buttons — the same three choices, read as one
  * control rather than a row of individual buttons.
  */
-function LevelControl({ label, level, onChange }: { label: string; level: Level; onChange: (next: Level) => void }) {
+export function LevelControl({ label, level, onChange }: { label: string; level: Level; onChange: (next: Level) => void }) {
   const index = LEVEL_ORDER.indexOf(level);
   return (
     <div className="relative flex w-[156px] shrink-0 rounded-[10px] bg-surface p-[3px]" role="group" aria-label={label}>
