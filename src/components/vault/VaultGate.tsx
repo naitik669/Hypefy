@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { safeBack } from "@/lib/safe-back";
 import { markVaultOpen } from "@/lib/chat-vault";
+import { haptics } from "@/lib/haptics";
 import { useStepUp } from "@/components/auth/StepUpDialog";
 import { PinPad } from "@/components/vault/PinPad";
 import { ChatPinSetup } from "@/components/vault/ChatPinSetup";
 import s from "./vault.module.css";
 
-/** How long the box takes to fall open, before the list is drawn behind it. */
-export const CASE_OPEN_MS = 440;
+/** How long the green lamp is left on before the list replaces the box. */
+export const CASE_OPEN_MS = 320;
+/** How long the red lamp stays on after a wrong PIN. */
+export const CASE_REFUSE_MS = 900;
 
 /**
  * The door. Drawn by the server in place of a locked chat or a locked list,
@@ -29,8 +32,9 @@ export function VaultGate({
   title: string;
   sub?: string;
   /**
-   * "case": the Vault's own door. A strongbox pops up and the PIN is entered
-   * on its front, not under a picture of it. Locked chats keep the plain pad.
+   * "case": the Vault's own door. A strongbox, with the PIN entered on its
+   * front, not under a picture of it. It answers with a buzz and a lamp: red
+   * for a wrong PIN, green for the right one. Locked chats keep the plain pad.
    */
   look?: "plain" | "case";
 }) {
@@ -39,8 +43,10 @@ export function VaultGate({
   const { requireStepUp, stepUpDialog } = useStepUp();
   const [error, setError] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
-  /** The box: still, shaking at a wrong PIN, or falling open at the right one. */
-  const [box, setBox] = useState<"still" | "shake" | "opening">("still");
+  /** The box's lamp: dark, red at a wrong PIN, green at the right one. */
+  const [lamp, setLamp] = useState<"off" | "red" | "green">("off");
+  const lampTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (lampTimer.current) clearTimeout(lampTimer.current); }, []);
 
   async function tryPin(pin: string): Promise<boolean> {
     setError(null);
@@ -53,17 +59,20 @@ export function VaultGate({
     if (!data) {
       setError("Wrong PIN");
       if (look === "case") {
-        // Off and on again, so a second wrong PIN shakes it a second time.
-        setBox("still");
-        requestAnimationFrame(() => setBox("shake"));
+        haptics.error();
+        setLamp("red");
+        if (lampTimer.current) clearTimeout(lampTimer.current);
+        lampTimer.current = setTimeout(() => setLamp("off"), CASE_REFUSE_MS);
       }
       return false;
     }
     markVaultOpen();
     if (look === "case") {
-      // Let the front fall away before the list is drawn where it stood.
-      setBox("opening");
-      setTimeout(() => router.refresh(), CASE_OPEN_MS);
+      // A buzz and the green lamp, held just long enough to be seen.
+      haptics.success();
+      if (lampTimer.current) clearTimeout(lampTimer.current);
+      setLamp("green");
+      lampTimer.current = setTimeout(() => router.refresh(), CASE_OPEN_MS);
       return true;
     }
     router.refresh();
@@ -90,18 +99,20 @@ export function VaultGate({
         <ChevronLeft size={24} />
       </button>
       {look === "case" ? (
-        <div
-          data-vault-case={box}
-          className={`${s.case} ${box === "shake" ? s.shake : ""} ${box === "opening" ? s.opening : ""}`}
-          onAnimationEnd={() => box === "shake" && setBox("still")}
-        >
+        <div data-vault-case={lamp} className={s.case}>
           <i className={s.rivet} />
           <i className={s.rivet} />
           <i className={s.rivet} />
           <i className={s.rivet} />
-          <h1 className={s.plate}>{title.toUpperCase()}</h1>
+          <div className={s.top}>
+            <h1 className={s.plate}>{title.toUpperCase()}</h1>
+            <span
+              aria-hidden
+              className={`${s.lamp} ${lamp === "red" ? s.lampRed : lamp === "green" ? s.lampGreen : ""}`}
+            />
+          </div>
           <div className="mt-4 w-full">
-            <PinPad onSubmit={tryPin} error={error} look="case" hint={sub} disabled={box === "opening"} />
+            <PinPad onSubmit={tryPin} error={error} look="case" hint={sub} disabled={lamp === "green"} />
           </div>
           <span aria-hidden className={s.handle} />
         </div>

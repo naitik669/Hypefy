@@ -38,7 +38,10 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/app-version", () => ({ reloadIfNewBuild: async () => {} }));
 vi.mock("@/lib/safe-back", () => ({ safeBack: () => {} }));
-vi.mock("@/lib/haptics", () => ({ haptics: { tap() {}, select() {}, success() {} } }));
+const buzz = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/haptics", () => ({
+  haptics: { tap() {}, select() {}, success: () => { buzz.push("success"); }, error: () => { buzz.push("error"); } },
+}));
 vi.mock("@/lib/overlay-shield", () => ({ shieldProps: {}, useOverlayShield: () => {}, useFrozenPage: () => {} }));
 vi.mock("@/components/auth/StepUpDialog", () => ({
   useStepUp: () => ({
@@ -527,29 +530,41 @@ describe("the Vault's own door", () => {
     expect(host.querySelector("[data-vault-case]")?.textContent).toContain("Enter your PIN");
   });
 
-  it("falls open on the right PIN, and only then has the list drawn", async () => {
+  it("answers the right PIN with a buzz and a green lamp, then the list", async () => {
     const { CASE_OPEN_MS } = await import("@/components/vault/VaultGate");
     vi.useFakeTimers();
+    buzz.length = 0;
     rpc.answer = (fn) => ({ data: fn === "unlock_vault" ? true : null, error: null });
     await box();
+    expect(state()).toBe("off");
     await enter("4821");
-    expect(state()).toBe("opening");
+    expect(state()).toBe("green");
+    expect(buzz).toEqual(["success"]);
     expect(vaultMarkedOpen()).toBe(true);
+    // The lamp is seen before the box is replaced.
     expect(nav.refreshed).toBe(0);
     await act(async () => { vi.advanceTimersByTime(CASE_OPEN_MS + 10); });
     expect(nav.refreshed).toBe(1);
   });
 
-  it("shakes at a wrong PIN, says so on its front, and stays shut", async () => {
-    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "setTimeout", "clearTimeout"] });
+  it("answers a wrong PIN with a buzz and a red lamp that goes out, and stays shut", async () => {
+    const { CASE_REFUSE_MS } = await import("@/components/vault/VaultGate");
+    vi.useFakeTimers();
+    buzz.length = 0;
     rpc.answer = () => ({ data: false, error: null });
     await box();
     await enter("0000");
-    await act(async () => { vi.advanceTimersByTime(40); });
-    expect(state()).toBe("shake");
+    expect(state()).toBe("red");
+    expect(buzz).toEqual(["error"]);
     expect(host.querySelector('[data-vault-case] [role="alert"]')?.textContent).toBe("Wrong PIN");
-    await act(async () => { vi.advanceTimersByTime(2000); });
+    await act(async () => { vi.advanceTimersByTime(CASE_REFUSE_MS + 10); });
+    expect(state()).toBe("off");
     expect(nav.refreshed).toBe(0);
+  });
+
+  it("does not move: no entrance, no shake, no falling away", async () => {
+    const css = (await import("node:fs")).readFileSync("src/components/vault/vault.module.css", "utf8");
+    expect(css).not.toMatch(/@keyframes|animation\s*:|transform\s*:/);
   });
 
   it("is the Vault's alone: locked chats keep the plain pad", async () => {

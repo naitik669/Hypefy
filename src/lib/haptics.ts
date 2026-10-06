@@ -55,4 +55,10 @@ export const haptics = {
     isNative()
       ? native(() => Haptics.notification({ type: NotificationType.Success }))
       : webVibrate([8, 30, 12]),
+
+  /** Refusal: a wrong PIN. Longer and blunter than a tap, so it is felt as "no". */
+  error: () =>
+    isNative()
+      ? native(() => Haptics.notification({ type: NotificationType.Error }))
+      : webVibrate([40, 50, 40]),
 };
