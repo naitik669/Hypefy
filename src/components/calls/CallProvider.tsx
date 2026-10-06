@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Phone, Video, Mic, MicOff, VideoOff } from "lucide-react";
 import { shieldProps, useOverlayShield } from "@/lib/overlay-shield";
+import { callStartError, getRtcConfig } from "@/lib/call-setup";
 
 function stayOnCall() {}
 import { createClient } from "@/lib/supabase/client";
@@ -36,27 +37,9 @@ type StartArgs = {
   type: CallType;
 };
 
-// ICE servers: Google STUN always, plus a TURN relay if configured via env.
-// TURN is required for calls to connect on cellular / strict (symmetric) NATs.
-//   NEXT_PUBLIC_TURN_URLS=turn:host:3478?transport=udp,turns:host:5349?transport=tcp
-//   NEXT_PUBLIC_TURN_USERNAME=...
-//   NEXT_PUBLIC_TURN_CREDENTIAL=...
-function buildRtcConfig(): RTCConfiguration {
-  const iceServers: RTCIceServer[] = [
-    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
-  ];
-  const turnUrls = process.env.NEXT_PUBLIC_TURN_URLS;
-  if (turnUrls) {
-    iceServers.push({
-      urls: turnUrls.split(",").map((u) => u.trim()).filter(Boolean),
-      username: process.env.NEXT_PUBLIC_TURN_USERNAME,
-      credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
-    });
-  }
-  return { iceServers };
-}
-
-const RTC_CONFIG: RTCConfiguration = buildRtcConfig();
+// The servers a call connects through are asked for when a call starts (see
+// src/lib/call-setup.ts and /api/calls/ice). They used to be built here from
+// NEXT_PUBLIC_TURN_* variables, which put the relay's login in the bundle.
 
 const RING_TIMEOUT = 30_000;
 
@@ -122,7 +105,11 @@ export function CallProvider({ userId, children }: { userId: string; children: R
     }
   }, [userId]);
 
+  const rtcConfig = useRef<RTCConfiguration | undefined>(undefined);
+
   const getMedia = useCallback(async (type: CallType) => {
+    // Both ways into a call come through here before a peer is made.
+    rtcConfig.current = await getRtcConfig();
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === "video" });
     localRef.current = stream;
     setLocalStream(stream);
@@ -130,7 +117,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
   }, []);
 
   const makePeer = useCallback((stream: MediaStream) => {
-    const pc = new RTCPeerConnection(RTC_CONFIG);
+    const pc = new RTCPeerConnection(rtcConfig.current);
     stream.getTracks().forEach((t) => pc.addTrack(t, stream));
     pc.onicecandidate = (e) => { if (e.candidate) send({ kind: "ice", candidate: e.candidate.toJSON() }); };
     pc.ontrack = (e) => setRemoteStream(e.streams[0]);
@@ -253,10 +240,10 @@ export function CallProvider({ userId, children }: { userId: string; children: R
         send({ kind: "end" });
         cleanup(); setCall(null);
       }, RING_TIMEOUT);
-    } catch {
+    } catch (err) {
       if (createdId) await supabase.rpc("end_call", { p_call_id: createdId });
       cleanup(); setCall(null);
-      setError("Camera/microphone permission is required to call.");
+      setError(callStartError(err, "call"));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, userId, getMedia, makePeer, send, cleanup]);
@@ -310,11 +297,11 @@ export function CallProvider({ userId, children }: { userId: string; children: R
         send({ kind: "ready" });
       }
       setCall({ ...c, status: "connected" });
-    } catch {
+    } catch (err) {
       await supabase.rpc("decline_call", { p_call_id: c.id });
       send({ kind: "end" });
       cleanup(); setCall(null);
-      setError("Camera/microphone permission is required to answer.");
+      setError(callStartError(err, "answer"));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getMedia, makePeer, send, supabase, cleanup]);

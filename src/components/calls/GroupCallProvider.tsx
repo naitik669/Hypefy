@@ -11,6 +11,7 @@ import {
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Phone, Mic, MicOff, Video, VideoOff, Users } from "lucide-react";
 import { shieldProps, useOverlayShield } from "@/lib/overlay-shield";
+import { callStartError, getRtcConfig } from "@/lib/call-setup";
 
 function stayOnCall() {}
 import { createClient } from "@/lib/supabase/client";
@@ -58,23 +59,6 @@ type Incoming = {
   starterName: string;
 };
 
-const RTC_CONFIG: RTCConfiguration = (() => {
-  const iceServers: RTCIceServer[] = [
-    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
-  ];
-  const turn = process.env.NEXT_PUBLIC_TURN_URLS;
-  if (turn) {
-    iceServers.push({
-      urls: turn
-        .split(",")
-        .map((u) => u.trim())
-        .filter(Boolean),
-      username: process.env.NEXT_PUBLIC_TURN_USERNAME,
-      credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
-    });
-  }
-  return { iceServers };
-})();
 
 type Ctx = { startGroupCall: (a: StartArgs) => void; inGroupCall: boolean };
 const GroupCallCtx = createContext<Ctx>({
@@ -155,7 +139,7 @@ export function GroupCallProvider({
     (peerId: string, initiator: boolean) => {
       let pc = peersRef.current.get(peerId);
       if (pc) return pc;
-      pc = new RTCPeerConnection(RTC_CONFIG);
+      pc = new RTCPeerConnection(rtcConfig.current);
       localRef.current
         ?.getTracks()
         .forEach((t) => pc!.addTrack(t, localRef.current!));
@@ -235,7 +219,11 @@ export function GroupCallProvider({
     [userId, ensurePeer, send]
   );
 
+  const rtcConfig = useRef<RTCConfiguration | undefined>(undefined);
+
   const getMedia = useCallback(async (type: CallType) => {
+    // Asked for as the call starts; see src/lib/call-setup.ts.
+    rtcConfig.current = await getRtcConfig();
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
       video: type === "video",
@@ -276,12 +264,14 @@ export function GroupCallProvider({
         await getMedia(type);
         setCall(meta);
         openChannel(callId);
-      } catch {
+      } catch (err) {
         cleanup();
         setCall(null);
+        // It used to end here with nothing said: the call simply did not start.
+        toast(callStartError(err, "call"), "error");
       }
     },
-    [getMedia, openChannel, cleanup]
+    [getMedia, openChannel, cleanup, toast]
   );
 
   const startGroupCall = useCallback(
