@@ -13,6 +13,8 @@ import { FishingArt } from "@/components/empty/scenes";
 import { Avatar } from "@/components/ui/Avatar";
 import { type FeedPost } from "@/components/feed/FeedCard";
 import { PostResultsGrid } from "@/components/search/PostResultsGrid";
+import { ShotResultsGrid, type ShotResult } from "@/components/search/ShotResultsGrid";
+import { LEGACY_RECENT_KEY, latestOnly, recentSearchKey } from "@/lib/search-run";
 import { ListRowSkeleton } from "@/components/skeletons/Skeletons";
 import { SearchDiscovery } from "@/components/search/SearchDiscovery";
 import Link from "next/link";
@@ -29,21 +31,24 @@ type Profile = {
   is_verified?: boolean | null;
 };
 
-const RECENT_KEY = "hypefy_recent_searches";
 const RECENT_CAP = 8;
 const SEARCH_DEBOUNCE_MS = 350;
 
-function loadRecent(): string[] {
-  if (typeof window === "undefined") return [];
+/** This account's recent searches. Signed out, there is nowhere to keep them. */
+function loadRecent(userId: string): string[] {
+  if (typeof window === "undefined" || !userId) return [];
   try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as string[];
+    // The old list belonged to the device, not to anyone. Gone, not inherited.
+    localStorage.removeItem(LEGACY_RECENT_KEY);
+    return JSON.parse(localStorage.getItem(recentSearchKey(userId)) ?? "[]") as string[];
   } catch {
     return [];
   }
 }
-function persistRecent(list: string[]) {
+function persistRecent(userId: string, list: string[]) {
+  if (!userId) return;
   try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_CAP)));
+    localStorage.setItem(recentSearchKey(userId), JSON.stringify(list.slice(0, RECENT_CAP)));
   } catch {
     /* quota / private mode — non-fatal */
   }
@@ -60,6 +65,11 @@ export default function SearchPage() {
   const [tab, setTab] = useState("Top");
   const [people, setPeople] = useState<Profile[]>([]);
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [shots, setShots] = useState<ShotResult[]>([]);
+  /** The search itself did not go through: not the same as finding nothing. */
+  const [failed, setFailed] = useState(false);
+  /** Only the newest search may put results on the screen. */
+  const [runs] = useState(latestOnly);
   const toast = useToast();
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
   const [searched, setSearched] = useState(false);
@@ -79,6 +89,7 @@ export default function SearchPage() {
     supabase.auth.getUser().then(({ data }) => {
       const uid = data.user?.id ?? "";
       setUserId(uid);
+      setRecent(loadRecent(uid));
       if (uid) {
         supabase
           .from("hashtag_follows")
@@ -98,7 +109,6 @@ export default function SearchPage() {
           });
       }
     });
-    setRecent(loadRecent());
     if (query) {
       if (query.startsWith("#")) setTab("Tags");
       runSearch(query);
@@ -120,20 +130,20 @@ export default function SearchPage() {
         t,
         ...prev.filter((x) => x.toLowerCase() !== t.toLowerCase()),
       ].slice(0, RECENT_CAP);
-      persistRecent(next);
+      persistRecent(userId, next);
       return next;
     });
   }
   function removeRecentTerm(term: string) {
     setRecent((prev) => {
       const next = prev.filter((x) => x !== term);
-      persistRecent(next);
+      persistRecent(userId, next);
       return next;
     });
   }
   function clearAllRecent() {
     setRecent([]);
-    persistRecent([]);
+    persistRecent(userId, []);
   }
   /** Kick off a search from a chip (recent or trending) — same effect as typing + Enter. */
   function searchFromChip(term: string) {
@@ -195,13 +205,18 @@ export default function SearchPage() {
   async function runSearch(q: string) {
     const trimmed = q.trim();
     if (!trimmed) {
+      // Anything still on its way back is for a box that is now empty.
+      runs.cancel();
       setPeople([]);
       setPosts([]);
+      setShots([]);
       setTags([]);
       setSuggestions([]);
+      setFailed(false);
       setSearched(false);
       return;
     }
+    const run = runs.begin();
     setSearched(true);
     const isTag = trimmed.startsWith("#");
     const isUser = trimmed.startsWith("@");
@@ -215,17 +230,20 @@ export default function SearchPage() {
       // popular post about it. The term also used to be interpolated into
       // PostgREST's `or=` filter, where a comma is syntax — so searching
       // "hey, you" did not return poor results, it returned wrong ones.
-      const peopleRes = isTag
-        ? { data: [] as Profile[] }
-        : await supabase.rpc("search_people", { p_q: trimmed, p_limit: 20 });
-
-      const postsRes = isUser
-        ? { data: [] as any[] }
-        : await supabase
+      // Asked together, not one after another: they do not depend on each
+      // other, and waiting for people before asking for posts doubled the wait.
+      const nothing = { data: [] as any[], error: null };
+      const [peopleRes, shotsRes, postsRes] = await Promise.all([
+        isTag ? nothing : supabase.rpc("search_people", { p_q: trimmed, p_limit: 20 }),
+        isUser ? nothing : supabase.rpc("search_shots", { p_q: trimmed, p_limit: 18 }),
+        isUser
+          ? nothing
+          : supabase
             .rpc("search_posts", { p_q: trimmed, p_limit: 24 })
             .select(
               "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
-            );
+            ),
+      ]);
 
       // Asked for on every search, shown only when the results are thin —
       // see the row below. Cheap, and doing it here means the answer is ready
@@ -233,6 +251,7 @@ export default function SearchPage() {
       supabase
         .rpc("search_suggestions", { p_q: trimmed, p_limit: 3 })
         .then(({ data }) =>
+          runs.isCurrent(run) &&
           setSuggestions(
             ((data ?? []) as { term: string; kind: string }[]).map((r) => ({
               term: r.term,
@@ -241,10 +260,22 @@ export default function SearchPage() {
           )
         );
 
+      // A newer search has been asked since. This answer is for a question
+      // nobody is looking at any more; it used to overwrite the newer one.
+      if (!runs.isCurrent(run)) return;
+
+      // Every part that was asked for came back as an error: that is the
+      // search failing, and must not be shown as "nothing matched".
+      const asked = [isTag ? null : peopleRes, isUser ? null : shotsRes, isUser ? null : postsRes].filter(Boolean);
+      setFailed(asked.length > 0 && asked.every((r) => r!.error));
+
       setPeople(
-        (peopleRes.data ?? []).filter(
+        ((peopleRes.data ?? []) as Profile[]).filter(
           (p: Profile) => !blockedRef.current.has(p.id)
         )
+      );
+      setShots(
+        ((shotsRes.data ?? []) as ShotResult[]).filter((s) => !blockedRef.current.has(s.user_id))
       );
       const np = normPosts(postsRes.data ?? []).filter(
         (p) => !blockedRef.current.has(p.user_id)
@@ -258,7 +289,8 @@ export default function SearchPage() {
   const showPeople = tab === "Top" || tab === "People";
   const showPosts = tab === "Top" || tab === "Posts";
   const showTags = tab === "Top" || tab === "Tags";
-  const resultCount = people.length + posts.length + tags.length;
+  const showShots = tab === "Top" || tab === "Shots";
+  const resultCount = people.length + posts.length + shots.length + tags.length;
   const hasResults = resultCount > 0;
 
   return (
@@ -275,7 +307,7 @@ export default function SearchPage() {
         </button>
         <div className="flex-1">
           <SearchBar
-            placeholder="Search people, posts, #tags"
+            placeholder="Search people, posts, Shots, #tags"
             autoFocus
             value={query}
             onChange={(q) => {
@@ -304,7 +336,7 @@ export default function SearchPage() {
       {query.trim().length > 0 && (
         <div className="pt-3">
           <FilterPills
-            options={["Top", "People", "Posts", "Tags"]}
+            options={["Top", "People", "Posts", "Shots", "Tags"]}
             onChange={setTab}
           />
         </div>
@@ -345,7 +377,19 @@ export default function SearchPage() {
         </p>
       )}
 
-      {!isPending && searched && !hasResults && (
+      {/* The search did not go through. Said as that, with a way to try
+          again, rather than as an empty sea. */}
+      {!isPending && searched && failed && (
+        <div role="alert" className="flex flex-col items-center gap-3 px-6 pb-14 pt-10 text-center">
+          <p className="text-base font-extrabold">Search didn&rsquo;t go through</p>
+          <p className="text-sm text-muted">Check your connection and try again.</p>
+          <button type="button" className={ghostCtaClass} onClick={() => runSearch(query)}>
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!isPending && searched && !hasResults && !failed && (
         <EmptyScene
           art={<FishingArt />}
           title="Nothing's biting"
@@ -474,6 +518,16 @@ export default function SearchPage() {
                   </div>
                 </Link>
               ))}
+            </>
+          )}
+
+          {/* Shots */}
+          {showShots && shots.length > 0 && (
+            <>
+              <h2 className="px-4 pb-2 pt-4 text-xs font-bold uppercase tracking-widest text-faint">
+                Shots
+              </h2>
+              <ShotResultsGrid shots={shots} />
             </>
           )}
 

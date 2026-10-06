@@ -2919,6 +2919,16 @@ export type Database = {
           username: string
         }[]
       }
+      search_shots: {
+        Args: { p_limit?: number; p_q: string }
+        Returns: Database["public"]["Tables"]["shots"]["Row"][]
+        SetofOptions: {
+          from: "*"
+          to: "shots"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       search_posts: {
         Args: { p_limit?: number; p_q: string }
         Returns: {
