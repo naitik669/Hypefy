@@ -339,7 +339,7 @@ export function RealChatView({
   currentUserId: string;
   other: Other;
   group?: GroupMeta | null;
-  members?: Record<string, { name: string; hue: number; avatarUrl?: string | null }>;
+  members?: Record<string, { name: string; username?: string | null; hue: number; avatarUrl?: string | null }>;
   initialMessages: ChatMsg[];
   initialReactions?: ReactionRow[];
   initialReaders?: Reader[];
@@ -1840,6 +1840,11 @@ export function RealChatView({
               // all leave the same room for it, so a run stays in one line.
               const face = showsFace(m, next, currentUserId);
               const who = members?.[m.sender_id] ?? { name: other.name, hue: other.hue, avatarUrl: other.avatarUrl };
+              // Their profile, behind their face. Only when the face is known
+              // to be theirs: someone who has left a group falls back to
+              // another member's details above, and must not link to them.
+              const whoUsername =
+                members?.[m.sender_id]?.username ?? (m.sender_id === other.id ? other.username : null);
               // The sender's own bubble style, else this side of the chat theme.
               const look = resolveBubble({ mine, senderStyleId: bubbleStyles[m.sender_id], theme });
               const lookCss = look ? bubbleCss(look.bubble) : null;
@@ -1892,7 +1897,17 @@ export function RealChatView({
                           // Raised past whatever hangs under the bubble, so
                           // it is level with the bubble and not the reaction.
                           <span className="block" style={{ marginBottom: faceLift(m, reacts.length > 0, showTime) }}>
-                            <Avatar name={who.name} hue={who.hue} size={28} src={who.avatarUrl ?? undefined} />
+                            {whoUsername ? (
+                              <Link
+                                href={`/u/${whoUsername}`}
+                                aria-label={`${who.name}'s profile`}
+                                className="block rounded-full transition-transform active:scale-90"
+                              >
+                                <Avatar name={who.name} hue={who.hue} size={28} src={who.avatarUrl ?? undefined} />
+                              </Link>
+                            ) : (
+                              <Avatar name={who.name} hue={who.hue} size={28} src={who.avatarUrl ?? undefined} />
+                            )}
                           </span>
                         )}
                       </span>

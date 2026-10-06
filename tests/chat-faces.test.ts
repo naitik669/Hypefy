@@ -105,6 +105,64 @@ describe("faces in a group chat", () => {
   });
 });
 
+describe("tapping a face", () => {
+  let root: Root;
+  let host: HTMLDivElement;
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    Element.prototype.scrollIntoView = vi.fn();
+    window.matchMedia ??= (() => ({ matches: false, addEventListener() {}, removeEventListener() {} })) as never;
+    (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver ??= class { observe() {} unobserve() {} disconnect() {} };
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver ??= class { observe() {} unobserve() {} disconnect() {} };
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+  });
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    document.body.innerHTML = "";
+  });
+
+  const links = () => [...host.querySelectorAll("[data-msg-face] a")].map((a) => a.getAttribute("href"));
+
+  it("opens that person's profile, each their own, in a group", async () => {
+    const { RealChatView } = await import("@/components/messages/RealChatView");
+    await act(async () =>
+      root.render(
+        createElement(RealChatView, {
+          conversationId: "faces-link-1",
+          currentUserId: "me",
+          other: { id: "amy", name: "Amy", username: "amy", hue: 120 },
+          group: { title: "Roof crew", memberCount: 4 },
+          members: {
+            amy: { name: "Amy", username: "amy", hue: 120 },
+            bo: { name: "Bo", username: "bo.b", hue: 30 },
+          },
+          // "gone" has left the group: their face is drawn, but leads nowhere.
+          initialMessages: [msg("a1", "amy", 1), msg("b1", "bo", 2), msg("g1", "gone", 3)],
+        }),
+      ),
+    );
+    expect(links()).toEqual(["/u/amy", "/u/bo.b"]);
+    expect(host.querySelectorAll("[data-msg-face] [aria-label=\"Bo's profile\"]")).toHaveLength(1);
+  });
+
+  it("opens the other person's profile in a one-to-one chat", async () => {
+    const { RealChatView } = await import("@/components/messages/RealChatView");
+    await act(async () =>
+      root.render(
+        createElement(RealChatView, {
+          conversationId: "faces-link-2",
+          currentUserId: "me",
+          other: { id: "amy", name: "Amy", username: "amy", hue: 120 },
+          initialMessages: [msg("a1", "amy", 1)],
+        }),
+      ),
+    );
+    expect(links()).toEqual(["/u/amy"]);
+  });
+});
+
 describe("where the face sits", () => {
   it("is level with a plain bubble", async () => {
     const { faceLift } = await import("@/components/messages/RealChatView");

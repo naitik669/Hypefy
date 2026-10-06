@@ -53,10 +53,12 @@ export default async function ThreadPage({
   const op = others[0] ?? null;
 
   // Sender lookup + group meta
-  const membersMap: Record<string, { name: string; hue: number; avatarUrl: string | null }> = {};
+  const membersMap: Record<string, { name: string; username: string | null; hue: number; avatarUrl: string | null }> = {};
   others.forEach((p: any) => {
     membersMap[p.id] = {
       name: p.display_name ?? p.username ?? "User",
+      // Where tapping their face in the thread goes.
+      username: p.username ?? null,
       hue: p.avatar_hue ?? 280,
       // The face beside each of their messages in the thread.
       avatarUrl: p.avatar_url ?? null,
