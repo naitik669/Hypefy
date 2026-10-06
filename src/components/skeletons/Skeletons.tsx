@@ -151,3 +151,83 @@ export function PostDetailSkeleton() {
     </>
   );
 }
+
+/**
+ * A page that is a header and a list of people: Hypers, Follow requests,
+ * Followers and Following. The title is drawn for real where the page knows
+ * it; Followers/Following share a route and cannot, so theirs is left empty
+ * rather than guessed.
+ */
+export function PeopleListSkeleton({ title, rows = 8 }: { title: string; rows?: number }) {
+  return (
+    <div aria-busy="true" aria-label="Loading">
+      <PageHeaderStatic title={title} />
+      <div className="pt-1">
+        {Array.from({ length: rows }, (_, i) => (
+          <ListRowSkeleton key={i} avatarSize={44} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Your Shows: header, a section label, the 3-across grid of 3:4 tiles. */
+export function ShowsGridSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="Loading">
+      <PageHeaderStatic title="Your Shows" />
+      <div className="px-4 pb-10 pt-3">
+        <SkeletonLine width={72} height={10} className="mb-3" />
+        <div className="grid grid-cols-3 gap-2">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} rounded="rounded-xl" className="aspect-[3/4] w-full" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A chat, opening. RealChatView's frame: the same fixed column, the header
+ * at its height with the back arrow drawn for real, a 36px face and a name,
+ * a few bubbles on each side, and the composer's bar at the foot.
+ *
+ * Opening a chat used to show the three generic dots on an empty page, which
+ * is the one screen people open most.
+ */
+const BUBBLES: { mine: boolean; width: string }[] = [
+  { mine: false, width: "52%" },
+  { mine: false, width: "34%" },
+  { mine: true, width: "46%" },
+  { mine: false, width: "60%" },
+  { mine: true, width: "28%" },
+  { mine: true, width: "50%" },
+];
+
+export function ChatThreadSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="Loading" className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
+      <header className="flex h-[calc(3.5rem+var(--sat))] items-center gap-2 border-b border-border/60 chrome-bar px-2 pt-[var(--sat)]">
+        <span className="flex h-10 w-10 items-center justify-center text-foreground">
+          <ChevronLeft size={24} />
+        </span>
+        <AvatarSkeleton size={36} />
+        <div className="flex flex-col gap-1.5">
+          <SkeletonLine width={110} height={11} />
+          <SkeletonLine width={64} height={9} />
+        </div>
+      </header>
+      <div className="flex flex-1 flex-col justify-end gap-2.5 px-3 pb-4">
+        {BUBBLES.map((b, i) => (
+          <div key={i} className={`flex ${b.mine ? "justify-end" : "justify-start"}`}>
+            <Skeleton rounded="rounded-2xl" style={{ width: b.width, height: 36 }} />
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-border/60 px-3 pb-[max(0.75rem,var(--sab))] pt-2.5">
+        <Skeleton rounded="rounded-pill" className="h-11 w-full" />
+      </div>
+    </div>
+  );
+}
