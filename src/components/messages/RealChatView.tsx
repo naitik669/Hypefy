@@ -281,6 +281,25 @@ export function showsFace(
   return !next || next.kind === "system" || next.sender_id !== m.sender_id || !sameDay(next.created_at, m.created_at);
 }
 
+/** Kinds whose time is written under the card, not inside the bubble. */
+const TIME_BELOW = new Set(["voice", "document", "album", "page_reply", "post", "shot"]);
+
+/**
+ * How far to raise the face so it sits level with the bubble's bottom edge,
+ * in pixels.
+ *
+ * The face is lined up with the bottom of everything a message draws, and
+ * two things can hang under the bubble: a reaction chip, which bites into
+ * the bubble's edge and hangs 11px below it (21px tall, overlapping by 10), and, for cards, a
+ * line with the time. Left alone, the face dropped beside those instead of
+ * beside the words. Exported for tests.
+ */
+export function faceLift(m: { kind: string }, hasReactions: boolean, showTime: boolean): number {
+  const REACTION = 11;
+  const TIME_LINE = 17;
+  return (hasReactions ? REACTION : 0) + (showTime && TIME_BELOW.has(m.kind) ? TIME_LINE : 0);
+}
+
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
@@ -1869,7 +1888,13 @@ export function RealChatView({
                   <div className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}>
                     {!mine && (
                       <span className="w-7 shrink-0" data-msg-face={face || undefined}>
-                        {face && <Avatar name={who.name} hue={who.hue} size={28} src={who.avatarUrl ?? undefined} />}
+                        {face && (
+                          // Raised past whatever hangs under the bubble, so
+                          // it is level with the bubble and not the reaction.
+                          <span className="block" style={{ marginBottom: faceLift(m, reacts.length > 0, showTime) }}>
+                            <Avatar name={who.name} hue={who.hue} size={28} src={who.avatarUrl ?? undefined} />
+                          </span>
+                        )}
                       </span>
                     )}
                     <div className={`flex max-w-[80%] flex-col ${mine ? "items-end" : "items-start"}`}>

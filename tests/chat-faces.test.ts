@@ -104,3 +104,25 @@ describe("faces in a group chat", () => {
     expect(host.querySelectorAll("span.w-7.shrink-0")).toHaveLength(3);
   });
 });
+
+describe("where the face sits", () => {
+  it("is level with a plain bubble", async () => {
+    const { faceLift } = await import("@/components/messages/RealChatView");
+    expect(faceLift({ kind: "text" }, false, true)).toBe(0);
+  });
+
+  it("rises past a reaction, so it is beside the words and not the reaction", async () => {
+    const { faceLift } = await import("@/components/messages/RealChatView");
+    expect(faceLift({ kind: "text" }, true, true)).toBe(11);
+  });
+
+  it("rises past the time line under a card, and past both together", async () => {
+    const { faceLift } = await import("@/components/messages/RealChatView");
+    expect(faceLift({ kind: "post" }, false, true)).toBe(17);
+    expect(faceLift({ kind: "voice" }, true, true)).toBe(28);
+    // No time line drawn, nothing to rise past.
+    expect(faceLift({ kind: "post" }, false, false)).toBe(0);
+    // A text bubble keeps its time inside itself.
+    expect(faceLift({ kind: "text" }, false, true)).toBe(0);
+  });
+});
