@@ -100,7 +100,7 @@ export default async function ShotsPage() {
         title="The reel is empty"
         text="Short videos, big energy. Fire the first Shot."
         ctaLabel="Add Shot"
-        ctaHref="/create/shot"
+        ctaHref="/create?mode=shot"
       />
     );
   }

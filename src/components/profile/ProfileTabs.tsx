@@ -84,7 +84,7 @@ export function ProfileTabs({ userId }: { userId: string }) {
                 // The words wait for the board to settle level.
                 timing={{ head: 1.2, sub: 1.55, cta: 1.9 }}
                 cta={
-                  <Link href="/create/shot" className={ctaClass}>
+                  <Link href="/create?mode=shot" className={ctaClass}>
                     Record a Shot
                   </Link>
                 }

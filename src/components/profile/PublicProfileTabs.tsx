@@ -130,7 +130,7 @@ export function PublicProfileTabs({
                 timing={{ head: 1.2, sub: 1.55, cta: 1.9 }}
                 cta={
                   isOwn ? (
-                    <Link href="/create/shot" className={ctaClass}>
+                    <Link href="/create?mode=shot" className={ctaClass}>
                       Record a Shot
                     </Link>
                   ) : undefined

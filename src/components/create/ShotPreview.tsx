@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
 import { MAX_SHOT_MB, MAX_SHOW_MB } from "@/lib/video-poster";
-import { ShotCoverPicker } from "@/components/post/ShotCoverPicker";
 import {
   SuggestionDropdown,
   applySuggestion,
@@ -55,9 +54,9 @@ export function ShotPreview({
   const [caption, setCaption] = useState("");
   const [cursor, setCursor] = useState(0);
   const [busy, setBusy] = useState(false);
-  /** Chosen cover frame, in seconds. Only Shots have a poster. Chosen in
-   *  the edit stage now; this keeps it for the Show path, which has none. */
-  const [coverTime, setCoverTime] = useState<number | null>(edit?.coverTime ?? null);
+  /** The cover frame, in seconds, as the edit stage left it. It was asked
+   *  for again on this screen, a second time for the same Shot. */
+  const coverTime = edit?.coverTime ?? null;
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const { suggestions, reset } = useMentionHashtag(caption, cursor);
@@ -202,14 +201,6 @@ export function ShotPreview({
               ? `That clip is ${(file.size / 1024 / 1024).toFixed(0)}MB — the limit is ${maxMb}MB.`
               : "That video format isn't supported."}
           </p>
-        )}
-
-        {/* Cover frame. The other Shot composer has had this since it shipped;
-            here every Shot got whatever was ~0.5s in, which on a phone
-            recording is very often a hand reaching for the screen. Shots only:
-            a Show has no poster. */}
-        {isVideo && mode === "shot" && !tooBig && !badType && (
-          <ShotCoverPicker src={url} value={coverTime} onChange={setCoverTime} />
         )}
 
         <div className="relative">

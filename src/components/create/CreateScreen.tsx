@@ -31,6 +31,7 @@ import type { Track } from "@/lib/music";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { MAX_SHOT_MB } from "@/lib/video-poster";
 import { MAX_SHOT_SECS, type Trim } from "@/lib/shot-trim";
+import { pickProblem } from "@/lib/pick-check";
 
 export type CreateMode = "shot" | "show" | "live";
 
@@ -95,6 +96,8 @@ export function CreateScreen({
     trim: Trim;
     coverTime: number | null;
   } | null>(null);
+  /** Why the file just chosen cannot be used, said where it was chosen. */
+  const [pickError, setPickError] = useState<string | null>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
   const close = () => safeBack(router);
@@ -143,10 +146,13 @@ export function CreateScreen({
   function onGallery(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (file) {
-      setEdited(null);
-      setCaptured(file);
-    }
+    if (!file) return;
+    // Now, not three screens later at the Post button.
+    const problem = pickProblem(file, mode === "show" ? "show" : "shot");
+    setPickError(problem);
+    if (problem) return;
+    setEdited(null);
+    setCaptured(file);
   }
 
   const songPicker = trackOpen ? (
@@ -431,6 +437,12 @@ export function CreateScreen({
           </div>
         )}
 
+        {pickError && (
+          <p role="alert" className="mx-6 rounded-xl bg-danger/15 px-3 py-2 text-center text-xs text-danger">
+            {pickError}
+          </p>
+        )}
+
         {rec.unsupported && (
           <p className="px-8 text-center text-xs text-danger">
             This browser can&rsquo;t record video. Pick a clip from your gallery instead.
@@ -450,6 +462,7 @@ export function CreateScreen({
                   return;
                 }
                 setSource("pick");
+                setPickError(null);
                 setMode(m.id);
                 if (m.id !== "show") filters.close();
               }}
