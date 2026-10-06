@@ -2,6 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { safeBack } from "@/lib/safe-back";
+import { useOverlayBackButton } from "@/lib/overlay-stack";
+import {
+  LEGACY_POST_DRAFT_KEY,
+  POST_IMAGE_TYPES,
+  isAllowedPostImage,
+  postDraftKey,
+  scheduleState,
+} from "@/lib/post-compose";
+import { PostLeaveSheet } from "@/components/create/CreateExtras";
 import { Image as ImageIcon, X, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import Link from "next/link";
@@ -23,8 +33,6 @@ import type { Track } from "@/lib/music";
 
 const MAX_SIZE_MB = 10;
 const MAX_IMAGES = 10;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const DRAFT_KEY = "hypefy_post_draft";
 
 /** `origFile` is kept alongside the cropped `file` so switching to Auto can
  *  hand the untouched original back — a crop is destructive, and without the
@@ -102,6 +110,9 @@ export function PostComposer({
 }) {
   const router = useRouter();
   const { uploadPost } = useUpload();
+  /** This account's draft. One key for the device let two accounts on the
+   *  same phone read each other's half-written post. */
+  const DRAFT_KEY = postDraftKey(userId);
   const fileRef = useRef<HTMLInputElement>(null);
   const queueRef = useRef<{ id: string; origSrc: string; file: File }[]>([]);
 
@@ -143,42 +154,50 @@ export function PostComposer({
   // Images are deliberately excluded — File objects don't outlive the page.
   useEffect(() => {
     try {
+      // The old, shared draft cannot be said to be anyone's. Gone, not guessed.
+      localStorage.removeItem(LEGACY_POST_DRAFT_KEY);
       const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
       const d = JSON.parse(raw) as {
         caption?: string;
         body?: string;
         track?: Track | null;
+        poll?: string[] | null;
       };
-      if (!d.caption && !d.body && !d.track) return;
+      const poll = Array.isArray(d.poll) ? d.poll.filter((o) => typeof o === "string").slice(0, 4) : null;
+      if (!d.caption && !d.body && !d.track && !poll?.some((o) => o.trim())) return;
       setCaption((d.caption ?? "").slice(0, 280));
       setBody((d.body ?? "").slice(0, 1000));
       setTrack(d.track ?? null);
+      // A poll is words too, and was the one part of them that did not come back.
+      if (poll?.some((o) => o.trim())) setPollOptions(poll.length >= 2 ? poll : [...poll, ""]);
       setDraftRestored(true);
     } catch {
       /* corrupt draft — ignore */
     }
-  }, []);
+  }, [DRAFT_KEY]);
 
   useEffect(() => {
     try {
-      if (!caption.trim() && !body.trim() && !track) {
+      const pollWritten = !!pollOptions?.some((o) => o.trim());
+      if (!caption.trim() && !body.trim() && !track && !pollWritten) {
         localStorage.removeItem(DRAFT_KEY);
       } else {
         localStorage.setItem(
           DRAFT_KEY,
-          JSON.stringify({ caption, body, track })
+          JSON.stringify({ caption, body, track, poll: pollWritten ? pollOptions : null })
         );
       }
     } catch {
       /* storage full/unavailable — drafts are best-effort */
     }
-  }, [caption, body, track]);
+  }, [caption, body, track, pollOptions, DRAFT_KEY]);
 
   function discardDraft() {
     setCaption("");
     setBody("");
     setTrack(null);
+    setPollOptions(null);
     setDraftRestored(false);
     try {
       localStorage.removeItem(DRAFT_KEY);
@@ -216,6 +235,23 @@ export function PostComposer({
    *  them — the steps sequence the work, they do not gate publishing. */
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  /** Asked before photos are left behind: the words are drafted, they are not. */
+  const [leaving, setLeaving] = useState(false);
+  /** The chosen time went by before Post was pressed. */
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+
+  /**
+   * Back, one step at a time. The header arrow and the phone's Back button
+   * are the same thing here: from Preview to the composer, and out of the
+   * composer only after asking, if there are photos that would be lost.
+   */
+  function back() {
+    if (leaving) return setLeaving(false);
+    if (step !== 0) return setStep(0);
+    if (imgs.length > 0) return setLeaving(true);
+    safeBack(router);
+  }
+  useOverlayBackButton(true, back);
 
   const currentRatio = RATIOS[ratioIdx];
   const isAuto = currentRatio.value === null;
@@ -274,7 +310,8 @@ export function PostComposer({
     const slots = MAX_IMAGES - imgs.length;
     const raw: { id: string; origSrc: string; file: File }[] = [];
     for (const f of files.slice(0, slots)) {
-      if (!ALLOWED_TYPES.includes(f.type)) {
+      // By type, or by extension when the gallery gives no type at all.
+      if (!isAllowedPostImage(f)) {
         setFileError("Only JPEG, PNG, and WebP images are allowed.");
         continue;
       }
@@ -412,12 +449,20 @@ export function PostComposer({
       ? { options: cleanPollOptions.slice(0, 4) }
       : null;
 
-  // Only schedule when a future time is chosen; past/now falls back to posting now.
-  const willSchedule =
-    !!scheduleAt && new Date(scheduleAt).getTime() > Date.now() + 30_000;
+  // A time was chosen, so the button says Schedule. Whether that time is
+  // still ahead is decided when it is pressed, not when it was last drawn.
+  const willSchedule = scheduleAt !== null;
 
   function handlePost() {
     if (submitted || !canPost) return;
+    // The time they picked has gone by. Posting now instead, under a chip
+    // that still shows that time, is not what they asked for: say so.
+    if (scheduleState(scheduleAt) === "passed") {
+      setScheduleError("That time has passed. Pick a new time, or remove the schedule to post now.");
+      setStep(0);
+      return;
+    }
+    setScheduleError(null);
     setSubmitted(true);
     // Hand off to the global uploader so it keeps running after we navigate —
     // Home shows a progress bar + a toast when it finishes.
@@ -447,8 +492,15 @@ export function PostComposer({
       <PageHeader
         title={STEPS[step].label}
         showBack
-        onBack={step === 0 ? undefined : () => setStep(0)}
+        onBack={back}
       />
+      {leaving && (
+        <PostLeaveSheet
+          photos={imgs.length}
+          onLeave={() => safeBack(router)}
+          onStay={() => setLeaving(false)}
+        />
+      )}
       <div className="flex flex-col gap-4 px-4 pb-8 pt-2">
         {/* ── Roadmap ─────────────────────────────────────────────
           Bars only. Naming the steps put a label on each pane that repeated
@@ -758,7 +810,7 @@ export function PostComposer({
         <input
           ref={fileRef}
           type="file"
-          accept={ALLOWED_TYPES.join(",")}
+          accept={POST_IMAGE_TYPES.join(",")}
           multiple
           className="hidden"
           onChange={onFileChange}
@@ -914,7 +966,10 @@ export function PostComposer({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setScheduleAt(null)}
+                    onClick={() => {
+                      setScheduleAt(null);
+                      setScheduleError(null);
+                    }}
                     aria-label="Cancel schedule"
                     className="shrink-0 text-muted hover:text-foreground"
                   >
@@ -923,6 +978,12 @@ export function PostComposer({
                 </div>
               )}
             </div>
+
+            {scheduleError && (
+              <p role="alert" className="rounded-xl bg-danger/10 px-3 py-2 text-xs text-danger">
+                {scheduleError}
+              </p>
+            )}
 
             {/* "Scheduled" alone, next to a Schedule row, read as a status rather
           than a link to the list. */}
@@ -942,7 +1003,10 @@ export function PostComposer({
               open={schedulePickerOpen}
               value={scheduleAt}
               onClose={() => setSchedulePickerOpen(false)}
-              onConfirm={setScheduleAt}
+              onConfirm={(at) => {
+                setScheduleAt(at);
+                setScheduleError(null);
+              }}
             />
           </>
         )}

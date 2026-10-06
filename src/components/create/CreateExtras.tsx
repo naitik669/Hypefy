@@ -179,3 +179,53 @@ export function LeaveSheet({
     </div>
   );
 }
+
+/**
+ * Asked before a post with photos is left.
+ *
+ * What was written is kept for next time on its own. The photos are not: a
+ * picked file does not outlive the page. So this is asked only when there
+ * are photos, and says exactly which half would be lost.
+ */
+export function PostLeaveSheet({
+  photos,
+  onLeave,
+  onStay,
+}: {
+  photos: number;
+  onLeave: () => void;
+  onStay: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[260] flex items-end justify-center bg-black/60" onClick={onStay}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Leave this post?"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[480px] animate-rise rounded-t-3xl bg-elevated px-5 pb-[max(1.25rem,var(--sab))] pt-5"
+      >
+        <p className="text-center text-base font-extrabold text-foreground">Leave this post?</p>
+        <p className="mx-auto mt-1 max-w-[32ch] text-center text-xs text-muted">
+          What you wrote is kept for next time. Your {photos === 1 ? "photo is" : `${photos} photos are`} not.
+        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={onStay}
+            className="h-12 rounded-2xl bg-accent text-sm font-extrabold text-accent-ink active:scale-[0.98]"
+          >
+            Keep editing
+          </button>
+          <button
+            type="button"
+            onClick={onLeave}
+            className="h-12 rounded-2xl bg-danger/15 text-sm font-bold text-danger active:scale-[0.98]"
+          >
+            Leave
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

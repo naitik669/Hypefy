@@ -9,6 +9,7 @@ import type { Track } from "@/lib/music";
 import { capturePoster } from "@/lib/video-poster";
 import { trimToStore, type Trim } from "@/lib/shot-trim";
 import { uploadContentType } from "@/lib/video-mime";
+import { postImageUpload } from "@/lib/post-compose";
 
 type PostUpload = {
   userId: string;
@@ -94,10 +95,13 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     try {
       const urls: string[] = [];
       for (let i = 0; i < a.files.length; i++) {
-        const path = `${a.userId}/${Date.now()}-${i}.jpg`;
+        // Named and served as what it is: a photo posted in Auto is sent
+        // as picked, and may be a PNG or WebP rather than a JPEG.
+        const kind = postImageUpload(a.files[i]);
+        const path = `${a.userId}/${Date.now()}-${i}.${kind.ext}`;
         const { error } = await supabase.storage
           .from("post-images")
-          .upload(path, a.files[i], { contentType: "image/jpeg", upsert: false });
+          .upload(path, a.files[i], { contentType: kind.contentType, upsert: false });
         if (error) throw error;
         urls.push(supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl);
         setProgress(Math.min(85, 10 + ((i + 1) / a.files.length) * 72));
