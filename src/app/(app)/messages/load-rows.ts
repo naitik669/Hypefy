@@ -19,28 +19,45 @@ export async function loadInboxRows(
   userId: string,
   level: ChatLevel,
 ): Promise<InboxRow[]> {
-  // Which of my chats are at this level. Asked first, and only their ids go
-  // on to the queries below: a chat at another level has nothing fetched
-  // about it, so nothing about it can reach the page.
+  // Which of my chats are at this level. Only their ids go on to the
+  // queries below: a chat at another level has nothing fetched about it, so
+  // nothing about it can reach the page.
+  //
   // my_chat_levels, not the columns: nobody may read locked_at or hidden_at
   // directly (0116), so that the other person in a chat cannot see that you
   // locked it.
-  const { data: levelRows } = await supabase.rpc("my_chat_levels");
+  const newestFifty = () =>
+    supabase
+      .from("conversations")
+      .select("id, last_message_at, type, title")
+      .order("last_message_at", { ascending: false })
+      .limit(50);
+
+  // The ordinary inbox is the newest fifty, and does not need to know the
+  // levels to ask for them: both go out together, so opening Messages costs
+  // no more round trips than it did before chats could be locked.
+  const [{ data: levelRows }, newest] = await Promise.all([
+    supabase.rpc("my_chat_levels"),
+    level === "normal" ? newestFifty() : Promise.resolve({ data: null }),
+  ]);
   const atLevel = new Set(
     ((levelRows ?? []) as { conversation_id: string; level: string }[])
       .filter((m) => m.level === level)
       .map((m) => m.conversation_id),
   );
 
-  let convQuery = supabase
-    .from("conversations")
-    .select("id, last_message_at, type, title")
-    .order("last_message_at", { ascending: false });
-  // The ordinary inbox is the newest fifty. A locked or hidden list is every
-  // chat at that level, however old: there is nowhere else to find one.
-  convQuery = level === "normal" ? convQuery.limit(50) : convQuery.in("id", [...atLevel]);
-  const { data: allConvs } = atLevel.size === 0 && level !== "normal" ? { data: [] } : await convQuery;
-  const convs = (allConvs ?? []).filter((c: any) => atLevel.has(c.id));
+  // A locked or hidden list is every chat at that level, however old: there
+  // is nowhere else to find one. That does need the ids first.
+  let allConvs: any[] = (newest.data as any[] | null) ?? [];
+  if (level !== "normal" && atLevel.size > 0) {
+    const { data } = await supabase
+      .from("conversations")
+      .select("id, last_message_at, type, title")
+      .order("last_message_at", { ascending: false })
+      .in("id", [...atLevel]);
+    allConvs = data ?? [];
+  }
+  const convs = allConvs.filter((c: any) => atLevel.has(c.id));
 
   const convIds = convs.map((c: any) => c.id);
 
