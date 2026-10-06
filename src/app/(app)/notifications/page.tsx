@@ -112,6 +112,16 @@ const NEVER_GROUP = new Set([
   "milestone",
 ]);
 
+/**
+ * Comments, replies and mentions each carry words someone wrote to you.
+ * Folded into "Aman and 2 others commented", two of the three comments were
+ * never shown, on the one kind of notification this screen marks as needing
+ * an answer. Each stays a row of its own.
+ */
+function saysSomething(type: string): boolean {
+  return type.startsWith("comment_") || type.startsWith("mention_");
+}
+
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 60) return "now";
@@ -233,7 +243,7 @@ export function groupNotifs(list: Notif[]): Group[] {
   const groups = new Map<string, Group & { seenActorIds: Set<string> }>();
 
   for (const n of list) {
-    const groupable = !NEVER_GROUP.has(n.type) && n.target_id;
+    const groupable = !NEVER_GROUP.has(n.type) && !saysSomething(n.type) && n.target_id;
     const kind = groupable ? `${n.type}|${n.target_type}|${n.target_id}` : `solo-${n.id}`;
 
     let g = byKey.get(kind);
@@ -264,7 +274,10 @@ export function groupNotifs(list: Notif[]): Group[] {
     if (!n.is_read) g.isRead = false;
     if (!g.thumb && n.thumb) g.thumb = n.thumb;
 
-    const actorId = n.actor?.username ?? n.actor?.display_name ?? `anon-${n.id}`;
+    // By account. This used to be by username, then by display name: two
+    // different people who share a display name and have no username yet
+    // were counted as one, and "and 2 others" came up one short.
+    const actorId = n.actor_id ?? n.actor?.username ?? `anon-${n.id}`;
     if (!g.seenActorIds.has(actorId)) {
       g.seenActorIds.add(actorId);
       g.actorCount += 1;
