@@ -2,12 +2,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { readFileSync } from "node:fs";
 import {
   CATEGORY_PAGES,
   buildItems,
   categoryPage,
   filterAndSort,
   NOTHING_WORN,
+  blockedReason,
   isOwned,
   isWorn,
   itemAction,
@@ -157,6 +159,23 @@ describe("what the button on an item does", () => {
   it("sells a priced item on the web, and never inside the Android app", () => {
     expect(itemAction(crown, { owned: false, native: false })).toEqual({ kind: "buy", pricePaise: 4900 });
     expect(itemAction(crown, { owned: false, native: true })).toEqual({ kind: "blocked", why: "app" });
+  });
+
+  it("offers no Buy where there is no way to pay", () => {
+    expect(itemAction(crown, { owned: false, native: false, configured: false })).toEqual({ kind: "blocked", why: "soon" });
+    // What is already yours is still yours to wear.
+    expect(itemAction(crown, { owned: true, native: false, configured: false }).kind).toBe("wear");
+  });
+
+  it("says why, without pointing anyone in the app at a purchase somewhere else", () => {
+    expect(blockedReason("app")).toBe("Not available in the app");
+    expect(blockedReason("soon")).toBe("Coming soon");
+    // Both stores refuse an app that sends people to buy outside their billing.
+    for (const f of ["MarketCategory.tsx", "MarketPreviewSheet.tsx", "MarketHome.tsx", "PremiumPlans.tsx"]) {
+      const src = readFileSync(`src/components/billing/${f}`, "utf8");
+      expect(src, f).not.toMatch(/on the website/i);
+      expect(src, f).not.toContain("Payments are coming soon");
+    }
   });
 
   it("does not sell something with no price set", () => {
@@ -325,7 +344,8 @@ describe("the Marketplace pages", () => {
     expect(tile("Flames").querySelector('button[aria-label^="Claim Flames"]')).toBeNull();
     await click(tile("Flames").querySelector('[aria-label="Preview Flames"]')!);
     expect(sheet()!.textContent).not.toContain("claim it · ₹49");
-    expect(sheet()!.textContent).toContain("Not in the app yet");
+    expect(sheet()!.textContent).toContain("Not available in the app");
+    expect(sheet()!.textContent).not.toMatch(/website/i);
   });
 
   it("closes from the close button", async () => {

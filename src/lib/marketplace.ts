@@ -165,8 +165,8 @@ export function isWorn(item: MarketItem, worn: Worn): boolean {
  *   use      a chat theme you own: those are set from inside a chat
  *   premium  it comes with Premium, which you do not have: go and see Premium
  *   buy      it has a price and can be bought here
- *   blocked  it cannot be bought here: the Android app (Play's rules), or no
- *            price has been set yet
+ *   blocked  it cannot be bought here: the app (the stores' rules), no price
+ *            has been set yet, or this deployment cannot take payments
  *
  * One function, so the tile's small button and the preview's large one can
  * never disagree about what happens when you tap.
@@ -181,7 +181,13 @@ export type ItemAction =
 
 export function itemAction(
   item: MarketItem,
-  ctx: { owned: boolean; native: boolean; worn?: boolean },
+  ctx: {
+    owned: boolean;
+    native: boolean;
+    worn?: boolean;
+    /** Can this deployment take a payment at all? Assumed so unless told. */
+    configured?: boolean;
+  },
 ): ItemAction {
   if (ctx.owned) {
     const column = wornColumn(item);
@@ -192,7 +198,21 @@ export function itemAction(
   if (item.tier === "premium") return { kind: "premium", href: "/premium" };
   if (ctx.native) return { kind: "blocked", why: "app" };
   if (!item.pricePaise) return { kind: "blocked", why: "soon" };
+  // No way to pay here yet. Said on the button, rather than offering a Buy
+  // that answers "coming soon" after it is tapped.
+  if (ctx.configured === false) return { kind: "blocked", why: "soon" };
   return { kind: "buy", pricePaise: item.pricePaise };
+}
+
+/**
+ * Why an item cannot be bought here, in words.
+ *
+ * In the app this says only that, and nothing about where else it can be
+ * bought: both stores refuse apps that point people at a purchase outside
+ * their own billing, and the line used to send them to the website.
+ */
+export function blockedReason(why: "app" | "soon"): string {
+  return why === "app" ? "Not available in the app" : "Coming soon";
 }
 
 /**

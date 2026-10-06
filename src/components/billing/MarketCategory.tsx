@@ -13,6 +13,7 @@ import {
   filterAndSort,
   isOwned,
   isWorn,
+  blockedReason,
   itemAction,
   wornColumn,
   type CategoryPage,
@@ -97,10 +98,6 @@ export function MarketCategory({
 
   async function buy(item: MarketItem) {
     if (buying) return;
-    if (!configured) {
-      toast("Payments are coming soon", "plain");
-      return;
-    }
     setBuying(item.id);
     const result = await buyItem(item.id);
     setBuying(null);
@@ -109,7 +106,7 @@ export function MarketCategory({
       toast(`${item.label} is yours`, "success");
       router.refresh();
     } else if (result.reason === "not_configured") {
-      toast("Payments are coming soon", "plain");
+      toast("Payments aren't open yet", "plain");
     } else if (result.reason === "failed") {
       toast(result.message ?? "Something went wrong", "error");
     }
@@ -123,7 +120,7 @@ export function MarketCategory({
       <ul className={`grid gap-2.5 px-3 pt-3 ${page.columns === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
         {items.map((item) => {
           const mine = isOwned(item, owned, isPremium);
-          const action = itemAction(item, { owned: mine, native, worn: isWorn(item, worn) });
+          const action = itemAction(item, { owned: mine, native, configured, worn: isWorn(item, worn) });
           return (
             <li key={item.id} className="flex min-w-0 flex-col gap-2 rounded-[18px] bg-surface p-2">
               <span className={`block overflow-hidden rounded-xl ${page.columns === 3 ? "aspect-square" : "aspect-[4/3]"}`}>
@@ -168,12 +165,7 @@ export function MarketCategory({
                   // says why when asked, rather than being a dead button.
                   <button
                     type="button"
-                    onClick={() =>
-                      toast(
-                        action.why === "app" ? "Not in the app yet. Get it on the website." : "Coming soon",
-                        "plain",
-                      )
-                    }
+                    onClick={() => toast(blockedReason(action.why), "plain")}
                     className={`${small} bg-white/10 text-foreground`}
                   >
                     {item.pricePaise ? formatInr(item.pricePaise) : "Soon"}
@@ -210,6 +202,7 @@ export function MarketCategory({
           worn={isWorn(previewing, worn)}
           onWear={(on) => void wear(previewing, on)}
           native={native}
+          configured={configured}
           busy={buying === previewing.id}
           onPick={setPreviewing}
           onBuy={() => void buy(previewing)}

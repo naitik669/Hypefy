@@ -13,6 +13,7 @@ import { formatInr } from "@/lib/billing/plans";
 import { shieldProps, useOverlayShield } from "@/lib/overlay-shield";
 import {
   PLACE_LABEL,
+  blockedReason,
   itemAction,
   neighbours,
   placesFor,
@@ -47,6 +48,7 @@ export function MarketPreviewSheet({
   owned,
   worn,
   native,
+  configured,
   busy,
   onPick,
   onBuy,
@@ -61,6 +63,8 @@ export function MarketPreviewSheet({
   /** It is on you right now. */
   worn: boolean;
   native: boolean;
+  /** Whether this deployment can take a payment. */
+  configured: boolean;
   busy: boolean;
   onPick: (item: MarketItem) => void;
   onBuy: () => void;
@@ -74,7 +78,7 @@ export function MarketPreviewSheet({
   // A different category has different places; never show one it lacks.
   const at = places.includes(place) ? place : places[0];
   const index = Math.max(0, siblings.findIndex((s) => s.id === item.id));
-  const action = itemAction(item, { owned, native, worn });
+  const action = itemAction(item, { owned, native, worn, configured });
 
   if (typeof document === "undefined") return null;
 
@@ -161,7 +165,7 @@ export function MarketPreviewSheet({
             </button>
           ) : (
             <p className="flex h-[52px] items-center justify-center rounded-2xl bg-white/[0.06] text-sm font-semibold text-muted">
-              {action.why === "app" ? "Not in the app yet. Get it on the website." : "Coming soon"}
+              {blockedReason(action.why)}
             </p>
           )}
         </div>

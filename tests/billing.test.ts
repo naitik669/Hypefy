@@ -137,6 +137,16 @@ describe("the Premium page", () => {
     expect(text).toContain("available in the app yet");
   });
 
+  it("offers nothing to tap when this deployment cannot take a payment", async () => {
+    native.value = false;
+    const text = await render({ configured: false });
+    // It used to show the full offer, and answer "coming soon" once tapped.
+    expect(text).not.toContain("Start 7-day free trial");
+    expect(text).not.toContain("Just the badge");
+    expect(text).toContain("Premium opens soon");
+    expect(text).not.toContain("Get Premium");
+  });
+
   it("drops the trial wording once the free trial is used", async () => {
     native.value = false;
     const text = await render({ trialEligible: false });

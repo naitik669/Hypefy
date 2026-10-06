@@ -53,10 +53,6 @@ export function PremiumPlans({
 
   async function start(plan: PlanId) {
     if (busy) return;
-    if (!configured) {
-      toast("Payments are coming soon", "plain");
-      return;
-    }
     setBusy(plan);
     const result = await subscribe(plan, PLANS[plan].name);
     setBusy(null);
@@ -65,7 +61,7 @@ export function PremiumPlans({
       router.push("/settings/subscription");
       router.refresh();
     } else if (result.reason === "not_configured") {
-      toast("Payments are coming soon", "plain");
+      toast("Payments aren't open yet", "plain");
     } else if (result.reason === "failed") {
       toast(result.message ?? "Something went wrong", "error");
     }
@@ -160,6 +156,12 @@ export function PremiumPlans({
           <p className="rounded-3xl bg-black/70 px-5 py-5 text-center text-sm text-muted">
             Premium isn’t available in the app yet.
           </p>
+        ) : !configured ? (
+          // No way to pay on this deployment. Said here, in place of a button
+          // that looked live and answered "coming soon" when tapped.
+          <p data-not-open className="rounded-3xl bg-black/70 px-5 py-5 text-center text-sm text-muted">
+            Premium opens soon. There is nothing to pay for yet.
+          </p>
         ) : (
           <button
             type="button"
@@ -184,7 +186,7 @@ export function PremiumPlans({
           </button>
         )}
 
-        {!hasPremium && !native && (
+        {!hasPremium && !native && configured && (
           <p className="mt-2 text-center text-[12px] text-muted [text-wrap:balance]">
             {trialEligible ? "We’ll remind you 2 days before it ends. " : ""}Cancel anytime ·{" "}
             <Link href="/terms#paid" className="underline underline-offset-2">
@@ -198,7 +200,7 @@ export function PremiumPlans({
             <p className="mt-3 flex h-11 items-center justify-center gap-1.5 text-[14px] font-semibold text-muted">
               <VerifiedStar className="h-4 w-4" /> Verified · Active
             </p>
-          ) : native ? null : (
+          ) : native || !configured ? null : (
             <button
               type="button"
               onClick={() => start("verified")}
@@ -211,7 +213,7 @@ export function PremiumPlans({
           )
         )}
 
-        {(hasPremium || native) && (
+        {(hasPremium || native || !configured) && (
           <p className="mt-3 text-center text-[11px] text-faint">
             <Link href="/terms#paid" className="underline-offset-2 hover:underline">
               Terms
