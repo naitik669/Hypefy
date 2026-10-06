@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { RealChatView } from "@/components/messages/RealChatView";
 import { one } from "@/lib/supabase/typed";
 import { visibleBubbleStyle } from "@/lib/bubble-styles";
+import { VaultGate } from "@/components/vault/VaultGate";
 
 export default async function ThreadPage({
   params,
@@ -22,6 +23,8 @@ export default async function ThreadPage({
     { data: members },
     { data: conv },
     { data: latestMsgs },
+    { data: levels },
+    { data: vaultOpen },
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase
@@ -37,8 +40,24 @@ export default async function ThreadPage({
       .eq("conversation_id", threadId)
       .order("created_at", { ascending: false })
       .limit(30),
+    // Is this chat locked, and has the PIN been entered? Asked alongside the
+    // rest so opening a chat costs no extra round trip.
+    supabase.rpc("my_chat_levels"),
+    supabase.rpc("vault_unlocked"),
   ]);
   if (!user) redirect("/signin");
+
+  // A locked chat is not drawn until the PIN has been entered. The door is
+  // returned here, before anything above is put into the page: what was
+  // fetched stays on the server. This is also what makes "Message" on
+  // someone's profile ask for the PIN, with nothing special there: every
+  // way into a chat arrives at this page.
+  const level = ((levels ?? []) as { conversation_id: string; level: string }[]).find(
+    (l) => l.conversation_id === threadId,
+  )?.level;
+  if (level && level !== "normal" && !vaultOpen) {
+    return <VaultGate title="This chat is locked" />;
+  }
 
   if (!members || members.length === 0) notFound();
   const me = members.find((m: any) => m.user_id === user.id);

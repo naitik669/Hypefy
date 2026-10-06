@@ -94,12 +94,15 @@ export function BottomNav({
   displayName,
   currentUserId,
   initialUnreadMsgs = 0,
+  lockedUnread = false,
 }: {
   avatarUrl: string | null | undefined;
   avatarHue: number;
   displayName: string;
   currentUserId: string;
   initialUnreadMsgs?: number;
+  /** Something unread in a locked or hidden chat: a dot, never a number. */
+  lockedUnread?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -200,6 +203,16 @@ export function BottomNav({
                 <span className="absolute -right-2 -top-1.5 flex h-[18px] min-w-[18px] animate-react-pop items-center justify-center rounded-full bg-danger px-1 text-[10px] font-black leading-none text-white ring-[3px] ring-background">
                   {unreadMsgs > 9 ? "9+" : unreadMsgs}
                 </span>
+              )}
+              {/* Locked chats are left out of the number, which would point
+                  at something the list does not show. A plain dot says only
+                  that something, somewhere behind the PIN, is waiting. */}
+              {lockedUnread && unreadMsgs === 0 && !messagesActive && (
+                <span
+                  data-locked-dot
+                  aria-label="Unread in locked chats"
+                  className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full bg-accent ring-[3px] ring-background"
+                />
               )}
             </span>
             <NavDot active={messagesActive} />

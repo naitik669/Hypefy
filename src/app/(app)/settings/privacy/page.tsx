@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { PrivacySettings } from "@/components/settings/PrivacySettings";
 import { BlockedList } from "@/components/settings/BlockedList";
 import { AppLockSettings } from "@/components/settings/AppLockSettings";
+import { ChatLockSettings } from "@/components/vault/ChatLockSettings";
 import { SettingsCard, SettingsRow } from "@/components/settings/SettingsCard";
 import { ShieldCheck } from "lucide-react";
 
@@ -57,6 +58,12 @@ export default async function PrivacySettingsPage() {
         {/* App lock — migration 0031 shipped the whole backend and no UI. */}
         <div className="mt-8">
           <AppLockSettings />
+        </div>
+
+        {/* Chat lock and the Vault. The only place the app says how the Vault
+            is opened: it has no button of its own. */}
+        <div className="mt-8">
+          <ChatLockSettings />
         </div>
 
         {/* Blocked accounts */}

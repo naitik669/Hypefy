@@ -64,7 +64,7 @@ export function ChatHoldMenu({
       // RLS already restricts both to conversations I belong to. The recent
       // page over-fetches: blocked threads, unaccepted requests and pins
       // filtered out below would otherwise eat into the five.
-      const [pinnedRes, recentRes] = await Promise.all([
+      const [pinnedRes, recentRes, levelsRes] = await Promise.all([
         supabase
           .from("conversation_members")
           .select("conversation_id, pinned_at")
@@ -77,7 +77,15 @@ export function ChatHoldMenu({
           .select("id, type, title, last_message_at")
           .order("last_message_at", { ascending: false })
           .limit(MAX_RECENTS + 5),
+        // A locked or hidden chat is not something to put one thumb-slide
+        // from the tab bar, where anyone holding the phone would see it.
+        supabase.rpc("my_chat_levels"),
       ]);
+      const lockedIds = new Set(
+        ((levelsRes.data ?? []) as { conversation_id: string; level: string }[])
+          .filter((l) => l.level !== "normal")
+          .map((l) => l.conversation_id),
+      );
 
       type Conv = {
         id: string;
@@ -164,7 +172,7 @@ export function ChatHoldMenu({
         peers.set(m.conversation_id, arr);
       });
 
-      const hidden = new Set<string>();
+      const hidden = new Set<string>(lockedIds);
       (mineRes.data ?? []).forEach((m) => {
         // A blocked thread or a request you have not accepted is not something
         // to surface one thumb-slide from the inbox.

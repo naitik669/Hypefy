@@ -387,6 +387,7 @@ export type Database = {
           conversation_id: string
           created_at: string
           last_read_at: string | null
+          hidden_at: string | null
           locked_at: string | null
           muted_at: string | null
           muted_until: string | null
@@ -401,6 +402,7 @@ export type Database = {
           conversation_id: string
           created_at?: string
           last_read_at?: string | null
+          hidden_at?: string | null
           locked_at?: string | null
           muted_at?: string | null
           muted_until?: string | null
@@ -415,6 +417,7 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           last_read_at?: string | null
+          hidden_at?: string | null
           locked_at?: string | null
           muted_at?: string | null
           muted_until?: string | null
@@ -3131,6 +3134,16 @@ export type Database = {
       touch_last_seen: { Args: never; Returns: undefined }
       trial_eligible: { Args: { p_uid: string }; Returns: boolean }
       unfollow_user: { Args: { p_target: string }; Returns: undefined }
+      my_chat_levels: { Args: never; Returns: { conversation_id: string; level: string }[] }
+      unlock_vault: { Args: { p_pin: string }; Returns: boolean }
+      lock_vault: { Args: never; Returns: undefined }
+      touch_vault: { Args: never; Returns: boolean }
+      vault_unlocked: { Args: never; Returns: boolean }
+      set_chat_level: { Args: { p_conversation_id: string; p_level: string }; Returns: undefined }
+      vault_overview: {
+        Args: never
+        Returns: { locked: number; hidden: number; unread: boolean; has_pin: boolean }[]
+      }
       unread_dm_count: { Args: never; Returns: number }
       unsend_message: { Args: { p_message_id: string }; Returns: undefined }
       update_conversation: {

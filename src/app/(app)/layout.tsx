@@ -15,6 +15,8 @@ import { TabScrollTop } from "@/components/layout/TabScrollTop";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PresenceHeartbeat } from "@/components/presence/PresenceHeartbeat";
 import { InAppNotifier } from "@/components/messages/InAppNotifier";
+import { VaultAutoLock } from "@/components/vault/VaultAutoLock";
+import { toVaultOverview } from "@/lib/chat-vault";
 import { EncryptionSetup } from "@/components/e2ee/EncryptionSetup";
 import { AppLockGate } from "@/components/settings/AppLockGate";
 import { SuspendedScreen } from "@/components/moderation/SuspendedScreen";
@@ -51,9 +53,11 @@ export default async function AppLayout({
   // depend on the profile, and waiting for the profile first put a second
   // database round trip in front of the first byte of every page — most
   // visibly on a cold app launch, where it is the whole shell that waits.
-  const [profile, { data: unreadCount }] = await Promise.all([
+  const [profile, { data: unreadCount }, { data: vaultRows }] = await Promise.all([
     getProfile(supabase),
     supabase.rpc("unread_dm_count"),
+    // Counts and one yes/no; never who. For the dot on the Messages tab.
+    supabase.rpc("vault_overview"),
   ]);
 
   // No date of birth on file means we never actually asked — the Google button
@@ -155,6 +159,7 @@ export default async function AppLayout({
             <AppLockGate />
             <PresenceHeartbeat />
             <InAppNotifier currentUserId={user!.id} />
+            <VaultAutoLock />
             <EncryptionSetup userId={user!.id} />
             <InstallPrompt />
             <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
@@ -170,6 +175,7 @@ export default async function AppLayout({
                 displayName={profile.displayName ?? "U"}
                 currentUserId={user!.id}
                 initialUnreadMsgs={initialUnreadMsgs}
+                lockedUnread={toVaultOverview(vaultRows).unread}
               />
             </div>
           </UploadProvider>

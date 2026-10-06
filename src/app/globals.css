@@ -1802,3 +1802,18 @@ html[data-splash="off"] #hypefy-splash {
     animation: none;
   }
 }
+
+/* Pull-and-hold in Messages: a ring that fills over the hold (PullToRefresh). */
+@property --pull-hold {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes pull-hold-fill {
+  from { --pull-hold: 0deg; }
+  to { --pull-hold: 360deg; }
+}
+.pull-hold-ring {
+  background: conic-gradient(var(--color-accent) var(--pull-hold), var(--color-border) 0);
+  animation: pull-hold-fill linear forwards;
+}

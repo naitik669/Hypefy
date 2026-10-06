@@ -29,7 +29,7 @@ type Toast = {
   line: string;
 };
 
-type Membership = { muted: boolean; isGroup: boolean; title: string | null };
+type Membership = { muted: boolean; isGroup: boolean; title: string | null; /** Locked or hidden: banners say nothing about it. */ locked?: boolean };
 
 const AUTO_DISMISS_MS = 4500;
 const MAX_VISIBLE = 3;
@@ -79,19 +79,33 @@ export function InAppNotifier({ currentUserId }: { currentUserId: string }) {
   // Resolve my membership for a conversation: from the warm cache, else fetched
   // once (RLS-gated — a non-member read returns nothing). Returns null if I'm
   // not a member of the conversation.
+  /** Which of my chats are locked or hidden. Refreshed whenever levels are read. */
+  const lockedIds = useRef<Set<string>>(new Set());
+  function noteLevels(data: unknown) {
+    if (!Array.isArray(data)) return;
+    lockedIds.current = new Set(
+      (data as { conversation_id: string; level: string }[])
+        .filter((l) => l.level !== "normal")
+        .map((l) => l.conversation_id),
+    );
+  }
+
   async function getMembership(convId: string): Promise<Membership | null> {
     const cached = membership.current.get(convId);
     if (cached) return cached;
-    const [memberRes, convRes] = await Promise.all([
+    const [memberRes, convRes, levelsRes] = await Promise.all([
       supabase.from("conversation_members").select("muted_at").eq("conversation_id", convId).eq("user_id", currentUserId).maybeSingle(),
       supabase.from("conversations").select("type, title").eq("id", convId).maybeSingle(),
+      supabase.rpc("my_chat_levels"),
     ]);
     if (!memberRes.data) return null;
+    noteLevels(levelsRes.data);
     const conv = convRes.data as { type: string; title: string | null } | null;
     const m: Membership = {
       muted: !!(memberRes.data as { muted_at: string | null }).muted_at,
       isGroup: conv?.type === "group",
       title: conv?.title ?? null,
+      locked: lockedIds.current.has(convId),
     };
     membership.current.set(convId, m);
     return m;
@@ -117,26 +131,46 @@ export function InAppNotifier({ currentUserId }: { currentUserId: string }) {
     let active = true;
 
     // Warm the membership/mute cache so toasts can render without awaiting.
-    supabase
-      .from("conversation_members")
-      .select("conversation_id, muted_at, conversations(type, title)")
-      .eq("user_id", currentUserId)
-      .then(({ data }) => {
-        (data ?? []).forEach((row: any) => {
-          const conv = Array.isArray(row.conversations) ? row.conversations[0] : row.conversations;
-          membership.current.set(row.conversation_id, {
-            muted: !!row.muted_at,
-            isGroup: conv?.type === "group",
-            title: conv?.title ?? null,
-          });
+    // Levels first, so a locked chat is known to be locked before its first
+    // banner could be drawn with a name on it.
+    Promise.all([
+      supabase.rpc("my_chat_levels"),
+      supabase
+        .from("conversation_members")
+        .select("conversation_id, muted_at, conversations(type, title)")
+        .eq("user_id", currentUserId),
+    ]).then(([levelsRes, { data }]) => {
+      noteLevels(levelsRes.data);
+      (data ?? []).forEach((row: any) => {
+        const conv = Array.isArray(row.conversations) ? row.conversations[0] : row.conversations;
+        membership.current.set(row.conversation_id, {
+          muted: !!row.muted_at,
+          isGroup: conv?.type === "group",
+          title: conv?.title ?? null,
+          locked: lockedIds.current.has(row.conversation_id),
         });
       });
+    });
 
     async function handleMessage(row: { id: string; conversation_id: string; sender_id: string; body: string | null; kind: string }) {
       if (!active || row.sender_id === currentUserId) return;
       if (pathRef.current === `/messages/${row.conversation_id}`) return; // viewing it
       const mem = await getMembership(row.conversation_id);
       if (!mem || mem.muted) return;
+      // A locked chat: that a message came, and nothing about it. No name,
+      // no group title, no preview, no face. Tapping it leads to the PIN.
+      if (mem.locked) {
+        push({
+          key: `m-${row.id}`,
+          convId: row.conversation_id,
+          title: "New message",
+          name: "",
+          hue: 280,
+          avatarUrl: null,
+          line: "Open to read",
+        });
+        return;
+      }
       // An encrypted body has to be opened before it can be shown; failing
       // that, the toast says a message arrived and nothing about it.
       const opened = mem.isGroup
@@ -188,7 +222,8 @@ export function InAppNotifier({ currentUserId }: { currentUserId: string }) {
       if (!m || m.sender_id !== currentUserId) return; // only reactions to MY messages
       if (pathRef.current === `/messages/${m.conversation_id}`) return;
       const mem = await getMembership(m.conversation_id);
-      if (!mem || mem.muted) return;
+      // A reaction banner is a name and a face: not for a locked chat.
+      if (!mem || mem.muted || mem.locked) return;
       const verb = row.emoji === "⭐" ? "hyped your message" : `reacted ${row.emoji} to your message`;
       const key = `r-${row.message_id}-${row.user_id}`;
       const who = await enrichName(key, row.user_id);

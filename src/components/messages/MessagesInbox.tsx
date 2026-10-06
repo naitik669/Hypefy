@@ -15,7 +15,14 @@ import {
   PinOff,
   Trash2,
   X,
+  Lock,
+  LockOpen,
+  Eye,
+  EyeOff,
 } from "lucide-react";
+import { NO_VAULT, looksLikePin, markVaultOpen, type ChatLevel, type VaultOverview } from "@/lib/chat-vault";
+import { LockedChatsRow } from "@/components/vault/LockedChatsRow";
+import { ChatPinSetup } from "@/components/vault/ChatPinSetup";
 import { createClient } from "@/lib/supabase/client";
 import { isEncrypted, openEnvelope, useEnvelopeReader } from "@/lib/e2ee/chat";
 import { STATUS_ENABLED } from "@/lib/status-feature";
@@ -167,6 +174,8 @@ function preview(r: InboxRow) {
   // System notices (screenshot alert / vanish mode / auto-delete) are thread
   // events, not something anyone said — so no "You: " prefix and no sender
   // name. The body already reads as a full sentence naming who did it.
+  // A locked chat's last message is never sent to this list, unlocked or not.
+  if (r.lastKind === "locked") return "Open to read";
   if (r.lastKind === "system") return r.lastBody ?? "Chat settings updated";
 
   // A reply to a page: an emoji reads as a reaction, words as a reply.
@@ -202,6 +211,8 @@ export function MessagesInbox({
   children,
   pages = [],
   renderedAt,
+  level = "normal",
+  vault = NO_VAULT,
 }: {
   rows: InboxRow[];
   currentUserId: string;
@@ -210,6 +221,10 @@ export function MessagesInbox({
   children?: React.ReactNode;
   /** Today's pages you can see, yours included — for the card floating over the inbox. */
   pages?: DiaryEntry[];
+  /** Which list this is: the inbox, the locked chats, or the Vault's hidden ones. */
+  level?: ChatLevel;
+  /** How many chats are behind the PIN, and whether any is unread. Never who. */
+  vault?: VaultOverview;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -245,6 +260,8 @@ export function MessagesInbox({
   }, [encryptedRows, peerIds, reader, currentUserId]);
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
+  /** Locking a first chat: the PIN is chosen, then the chat is locked. */
+  const [pinFor, setPinFor] = useState<{ row: InboxRow; next: ChatLevel } | null>(null);
   // conversation_id → a matching message body, for content search (2b).
   const [contentMatches, setContentMatches] = useState<Map<string, string>>(
     new Map()
@@ -323,6 +340,49 @@ export function MessagesInbox({
     }
     showToast(okMessage);
     router.refresh();
+  }
+
+  /**
+   * Lock, hide, unhide or unlock a chat. The database decides whether it is
+   * allowed (0115): raising a chat needs a PIN to exist, and anything done to
+   * a chat that is already locked needs the PIN to have been entered.
+   */
+  async function setLevel(r: InboxRow, next: ChatLevel) {
+    setActionBusy(true);
+    const { error } = await supabase.rpc("set_chat_level", { p_conversation_id: r.id, p_level: next });
+    setActionBusy(false);
+    setMenuRow(null);
+    if (error) {
+      // No PIN yet: choose one, then do what was asked.
+      if (/set a pin first/i.test(error.message)) {
+        setPinFor({ row: r, next });
+        return;
+      }
+      showToast(error.message || "Couldn't change that chat.");
+      return;
+    }
+    showToast(
+      next === "hidden"
+        ? "Hidden in your Vault"
+        : next === "locked"
+          ? level === "hidden" ? "Back in Locked chats" : "Chat locked"
+          : "Chat unlocked",
+    );
+    router.refresh();
+  }
+
+  /**
+   * The Vault has no button. Its PIN typed into this search, then Enter,
+   * opens it; this is the way in without a touchscreen. A wrong guess is
+   * simply a search for some digits: nothing on screen says a door was tried.
+   */
+  async function tryVaultPin() {
+    if (level !== "normal" || vault.hidden === 0 || !looksLikePin(q)) return;
+    const { data } = await supabase.rpc("unlock_vault", { p_pin: q.trim() });
+    if (!data) return;
+    markVaultOpen();
+    setQ("");
+    router.push("/messages/vault");
   }
 
   function togglePin(r: InboxRow) {
@@ -807,6 +867,9 @@ export function MessagesInbox({
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void tryVaultPin();
+            }}
             placeholder="Search messages"
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
           />
@@ -842,6 +905,13 @@ export function MessagesInbox({
         ))}
       </div>
 
+      {/* Locked chats: there when Messages opens, gone at the first scroll
+          or touch, back on a pull. Only on the plain inbox, and only when
+          there is something behind it. */}
+      {level === "normal" && vault.locked > 0 && tab === "all" && !q.trim() && (
+        <LockedChatsRow count={vault.locked} unread={vault.unread} />
+      )}
+
       {/* Spotlight: a small deck of today's pages floating at the bottom
           right, shuffling itself; tap to open Spotlight on the one showing. */}
       <FloatingPages pages={pages} />
@@ -853,6 +923,12 @@ export function MessagesInbox({
           <EmptyScene art={<EnvelopeArt />} title="Inbox zero" text="Every chat's read. Go outside, or start something." />
         ) : !q.trim() && tab === "requests" ? (
           <EmptyScene art={<KnockArt />} title="Door's clear" text="No requests. When someone new knocks, they wait here." />
+        ) : !q.trim() && tab === "all" && level !== "normal" ? (
+          <p className="px-8 py-16 text-center text-sm text-muted">
+            {level === "locked"
+              ? "No locked chats. Hold a chat in Messages and choose Lock chat."
+              : "Your Vault is empty. Hold a locked chat and choose Hide in Vault."}
+          </p>
         ) : (
           <p className="px-4 py-12 text-center text-sm text-faint">Nobody by that name.</p>
         )
@@ -931,6 +1007,53 @@ export function MessagesInbox({
               )}
               {menuRow.muted ? "Unmute" : "Mute"}
             </button>
+            {/* The chat's level. What is offered depends on which list this
+                is: a chat is locked from the inbox, hidden from the locked
+                list, and brought back out from wherever it sits. */}
+            {level === "normal" && (
+              <button
+                type="button"
+                disabled={actionBusy}
+                onClick={() => setLevel(menuRow, "locked")}
+                className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/5 disabled:opacity-60"
+              >
+                <Lock size={18} className="text-muted" />
+                Lock chat
+              </button>
+            )}
+            {level === "locked" && (
+              <button
+                type="button"
+                disabled={actionBusy}
+                onClick={() => setLevel(menuRow, "hidden")}
+                className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/5 disabled:opacity-60"
+              >
+                <EyeOff size={18} className="text-muted" />
+                Hide in Vault
+              </button>
+            )}
+            {level === "hidden" && (
+              <button
+                type="button"
+                disabled={actionBusy}
+                onClick={() => setLevel(menuRow, "locked")}
+                className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/5 disabled:opacity-60"
+              >
+                <Eye size={18} className="text-muted" />
+                Unhide
+              </button>
+            )}
+            {level !== "normal" && (
+              <button
+                type="button"
+                disabled={actionBusy}
+                onClick={() => setLevel(menuRow, "normal")}
+                className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/5 disabled:opacity-60"
+              >
+                <LockOpen size={18} className="text-muted" />
+                Unlock chat
+              </button>
+            )}
             {/* One tap, with five seconds of Undo instead of a dialog: an
                 accidental hold plus a mistap is now one tap to put back. */}
             <button
@@ -948,6 +1071,18 @@ export function MessagesInbox({
             </button>
           </div>
         </BottomSheet>
+      )}
+
+      {pinFor && (
+        <ChatPinSetup
+          reason="first"
+          onClose={() => setPinFor(null)}
+          onDone={() => {
+            const { row, next } = pinFor;
+            setPinFor(null);
+            void setLevel(row, next);
+          }}
+        />
       )}
 
       <ConfirmDialog
