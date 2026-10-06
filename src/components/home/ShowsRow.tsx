@@ -93,7 +93,7 @@ export function ShowsRow({
                 // Use handleShowTap so the seenId is recorded → ring disappears
                 handleShowTap(currentUser.showId, ownLatest ?? currentUser.showId);
               } else {
-                router.push("/shows/add");
+                router.push("/create?mode=show");
               }
             }}
             aria-label={currentUser?.hasActiveShow ? "Watch your Show" : "Add a Show"}
@@ -130,7 +130,7 @@ export function ShowsRow({
 
           {/* Add-show badge — always opens the camera */}
           <Link
-            href="/shows/add"
+            href="/create?mode=show"
             aria-label="Add a Show"
             className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-accent text-accent-ink ring-4 ring-background"
           >

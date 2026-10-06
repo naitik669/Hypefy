@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Scissors, ImageIcon, Music, X } from "lucide-react";
 import { ShotTrimmer } from "@/components/post/ShotTrimmer";
 import { ShotCoverPicker } from "@/components/post/ShotCoverPicker";
@@ -9,6 +9,7 @@ import { useObjectUrl } from "@/lib/object-url";
 import {
   MAX_SHOT_SECS,
   MIN_SHOT_SECS,
+  clampTrim,
   defaultTrim,
   fmtSecs,
   playbackWindow,
@@ -38,10 +39,20 @@ export function ShotEditor({
   track,
   onPickSound,
   onClearSound,
+  initial,
+  onEdit,
   onBack,
   onNext,
 }: {
   file: File;
+  /**
+   * The edit to open on: coming back from the caption, or picking a draft
+   * back up. Without it the trim and cover went back to their defaults every
+   * time you stepped back to this screen.
+   */
+  initial?: { trim: Trim; coverTime: number | null } | null;
+  /** Told of every change, so leaving from here can keep what was done. */
+  onEdit?: (edit: { duration: number; trim: Trim; coverTime: number | null }) => void;
   track: Track | null;
   /** Opens the track picker, which the creator owns. */
   onPickSound: () => void;
@@ -54,8 +65,14 @@ export function ShotEditor({
   const video = useRef<HTMLVideoElement>(null);
   const [duration, setDuration] = useState(0);
   const [trim, setTrim] = useState<Trim>({ start: 0, end: 0 });
-  const [coverTime, setCoverTime] = useState<number | null>(null);
+  const [coverTime, setCoverTime] = useState<number | null>(initial?.coverTime ?? null);
   const [tool, setTool] = useState<Tool>(null);
+
+  useEffect(() => {
+    if (duration > 0) onEdit?.({ duration, trim, coverTime });
+    // onEdit is the parent's to keep stable; this follows the edit itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duration, trim, coverTime]);
 
   const selected = trim.end - trim.start;
   const blocked =
@@ -106,7 +123,12 @@ export function ShotEditor({
               const secs = e.currentTarget.duration;
               if (!Number.isFinite(secs) || secs <= 0) return;
               setDuration(secs);
-              setTrim(defaultTrim(secs));
+              // Clamped against this clip, in case what was kept does not fit it.
+              setTrim(
+                initial && initial.trim.end > initial.trim.start
+                  ? clampTrim(initial.trim.start, initial.trim.end, secs)
+                  : defaultTrim(secs),
+              );
             }}
             onTimeUpdate={(e) => {
               // Looping the chosen window rather than the file. The native

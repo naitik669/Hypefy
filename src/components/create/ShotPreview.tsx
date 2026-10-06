@@ -32,6 +32,8 @@ export function ShotPreview({
   track,
   userId,
   edit,
+  initialCaption = "",
+  onCaptionChange,
   onBack,
   onDone,
 }: {
@@ -45,13 +47,21 @@ export function ShotPreview({
    * has none of them.
    */
   edit?: { duration: number; trim: Trim; coverTime: number | null };
+  /** What was written last time, when this is a draft or a step back. */
+  initialCaption?: string;
+  /** Told of every keystroke, so leaving can keep the words too. */
+  onCaptionChange?: (caption: string) => void;
   onBack: () => void;
   onDone: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const toast = useToast();
   const { uploadShot } = useUpload();
-  const [caption, setCaption] = useState("");
+  const [caption, setCaptionState] = useState(initialCaption);
+  function setCaption(next: string) {
+    setCaptionState(next);
+    onCaptionChange?.(next);
+  }
   const [cursor, setCursor] = useState(0);
   const [busy, setBusy] = useState(false);
   /** The cover frame, in seconds, as the edit stage left it. It was asked

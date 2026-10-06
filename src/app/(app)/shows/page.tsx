@@ -88,7 +88,7 @@ export default async function ShowsPage() {
         showBack
         right={
           <Link
-            href="/shows/add"
+            href="/create?mode=show"
             aria-label="Add a Show"
             className="flex h-9 items-center gap-1 rounded-pill bg-accent px-3 text-xs font-bold text-accent-ink active:scale-[0.98]"
           >
@@ -103,7 +103,7 @@ export default async function ShowsPage() {
           title="Nothing on tonight"
           text="Post a Show, it's gone in 24h."
           cta={
-            <Link href="/shows/add" className={ctaClass}>
+            <Link href="/create?mode=show" className={ctaClass}>
               Post a Show
             </Link>
           }

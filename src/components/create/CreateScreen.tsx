@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
 import {
@@ -32,11 +32,29 @@ import { BLANK_POSTER } from "@/lib/blank-poster";
 import { MAX_SHOT_MB } from "@/lib/video-poster";
 import { MAX_SHOT_SECS, type Trim } from "@/lib/shot-trim";
 import { pickProblem } from "@/lib/pick-check";
+import { capturePoster } from "@/lib/video-poster";
+import { isVideoFile } from "@/lib/video-mime";
+import { useToast } from "@/components/ui/ToastProvider";
+import {
+  MAX_DRAFTS,
+  deleteDraft,
+  listDrafts,
+  saveDraft,
+  type CreationDraft,
+  type DraftEdit,
+} from "@/lib/creation-drafts";
+import { ConstructionNote, DraftStrip, LeaveSheet } from "@/components/create/CreateExtras";
 
-export type CreateMode = "shot" | "show" | "live";
+export type CreateMode = "shot" | "show";
 
-/** Post is here to switch to, not to do: it leaves for the composer. */
-const MODES: { id: CreateMode | "post"; label: string }[] = [
+/** How long the note on an unbuilt control stays up. */
+const NOTE_MS = 2600;
+
+/**
+ * Post is here to switch to, not to do: it leaves for the composer. Live is
+ * here because it is coming: tapping it says so and changes nothing.
+ */
+const MODES: { id: CreateMode | "post" | "live"; label: string }[] = [
   { id: "post", label: "Post" },
   { id: "shot", label: "Shot" },
   { id: "show", label: "Show" },
@@ -61,8 +79,11 @@ const DURATIONS = [15, 30, 60];
 export function CreateScreen({
   userId,
   initialMode = "shot",
+  askedForLive = false,
 }: {
   userId: string;
+  /** They chose Live from the (+) menu: open with the note on its tab. */
+  askedForLive?: boolean;
   /**
    * Which mode to land in. Shot is the default because it is what the camera
    * is already pointed at; holding (+) picks a different one, and arriving on
@@ -72,6 +93,7 @@ export function CreateScreen({
   initialMode?: CreateMode;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [mode, setMode] = useState<CreateMode>(initialMode);
   const [maxSeconds, setMaxSeconds] = useState(DURATIONS[0]);
   const [track, setTrack] = useState<Track | null>(null);
@@ -96,12 +118,163 @@ export function CreateScreen({
     trim: Trim;
     coverTime: number | null;
   } | null>(null);
+  /** Past the editor, on the caption. Kept apart from `edited` so stepping
+   *  back to the editor does not throw the edit away. */
+  const [captioning, setCaptioning] = useState(false);
+  const [caption, setCaption] = useState("");
+  /** The edit as it stands in the editor right now, for a draft saved from there. */
+  const liveEdit = useRef<DraftEdit | null>(null);
+  /** Drafts kept on this device, and which one (if any) is open. */
+  const [drafts, setDrafts] = useState<CreationDraft[]>([]);
+  const [draftId, setDraftId] = useState<string | null>(null);
+  /** The question asked before work in progress is left. */
+  const [leaving, setLeaving] = useState(false);
+  const [saving, setSaving] = useState(false);
+  /** Which unbuilt control is saying so. */
+  const [note, setNote] = useState<"live" | "effects" | null>(askedForLive ? "live" : null);
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Why the file just chosen cannot be used, said where it was chosen. */
   const [pickError, setPickError] = useState<string | null>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
   const close = () => safeBack(router);
-  useOverlayBackButton(true, close);
+
+  /**
+   * Back, one step at a time.
+   *
+   * The hardware Back button used to leave the creator from anywhere in it,
+   * caption screen included, and the clip went with it. A clip recorded here
+   * cannot be chosen again from the gallery.
+   */
+  function back() {
+    if (leaving) return setLeaving(false);
+    if (captured) {
+      // Caption → editor keeps everything. Anything further back would drop
+      // the clip, so that is asked about first.
+      if (captioning && mode === "shot") return setCaptioning(false);
+      return setLeaving(true);
+    }
+    if (source === "camera") return setSource("pick");
+    close();
+  }
+  useOverlayBackButton(true, back);
+
+  useEffect(() => {
+    let live = true;
+    void listDrafts(userId).then((d) => {
+      if (live) setDrafts(d);
+    });
+    return () => {
+      live = false;
+      if (noteTimer.current) clearTimeout(noteTimer.current);
+    };
+  }, [userId]);
+
+  // The note that greets someone who chose Live from the (+) menu goes away
+  // on its own, like the ones raised by a tap.
+  useEffect(() => {
+    if (!askedForLive) return;
+    noteTimer.current = setTimeout(() => setNote(null), NOTE_MS);
+  }, [askedForLive]);
+
+  function sayUnderConstruction(which: "live" | "effects") {
+    haptics.tap();
+    setNote(which);
+    if (noteTimer.current) clearTimeout(noteTimer.current);
+    noteTimer.current = setTimeout(() => setNote(null), NOTE_MS);
+  }
+
+  function noteEdit(edit: DraftEdit) {
+    liveEdit.current = edit;
+  }
+
+  /** Put everything about the clip in hand down. */
+  function clearWork() {
+    setCaptured(null);
+    setEdited(null);
+    setCaptioning(false);
+    setCaption("");
+    setDraftId(null);
+    setLeaving(false);
+    liveEdit.current = null;
+  }
+
+  function startWith(file: File) {
+    clearWork();
+    setCaptured(file);
+  }
+
+  async function removeDraft(id: string) {
+    await deleteDraft(id);
+    setDrafts((prev) => prev.filter((d) => d.id !== id));
+  }
+
+  function discard() {
+    // Opened from a draft, so discarding is deleting that draft.
+    if (draftId) void removeDraft(draftId);
+    clearWork();
+  }
+
+  async function keepAsDraft() {
+    if (!captured || saving) return;
+    setSaving(true);
+    const isShot = mode === "shot";
+    const edit = isShot ? (captioning ? edited : (liveEdit.current ?? edited)) : null;
+    // A still to know it by. Never worth failing the save over.
+    let thumb: Blob | null = null;
+    if (isVideoFile(captured)) {
+      const url = URL.createObjectURL(captured);
+      thumb = await capturePoster(url, edit?.coverTime ?? null).catch(() => null);
+      URL.revokeObjectURL(url);
+    } else {
+      thumb = captured;
+    }
+    const draft: CreationDraft = {
+      id: draftId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      userId,
+      mode,
+      file: captured,
+      thumb,
+      track,
+      edit,
+      caption,
+      savedAt: Date.now(),
+    };
+    const result = await saveDraft(draft);
+    setSaving(false);
+    if (result === "full") {
+      setLeaving(false);
+      toast(`You have ${MAX_DRAFTS} drafts. Delete one to save another.`, "error");
+      return;
+    }
+    if (result === "failed") {
+      setLeaving(false);
+      toast("This device couldn't store the draft.", "error");
+      return;
+    }
+    setDrafts((prev) => [draft, ...prev.filter((d) => d.id !== draft.id)]);
+    clearWork();
+    toast("Saved to drafts", "success");
+  }
+
+  function resume(d: CreationDraft) {
+    haptics.tap();
+    clearWork();
+    setMode(d.mode);
+    setTrack(d.track);
+    setEdited(d.edit);
+    setCaption(d.caption);
+    // Back on the caption if it had got that far; otherwise the editor.
+    setCaptioning(d.mode === "shot" && d.edit !== null);
+    setDraftId(d.id);
+    setCaptured(d.file);
+  }
+
+  /** Published: a draft it came from has done its job. */
+  function finish() {
+    if (draftId) void deleteDraft(draftId);
+    router.replace(mode === "show" ? "/home" : "/shots");
+  }
 
   // Only Shot and Show want a viewfinder. Live has nothing to show yet, so
   // running the camera for it would light the indicator for no reason.
@@ -119,7 +292,7 @@ export function CreateScreen({
   const rec = useVideoRecorder({
     stream,
     maxSeconds,
-    onComplete: (file) => setCaptured(file),
+    onComplete: startWith,
   });
 
   // Lock background scroll for as long as the creator is mounted.
@@ -135,7 +308,7 @@ export function CreateScreen({
     haptics.tap();
     if (mode === "show") {
       const photo = await cam.capturePhoto(`show-${Date.now()}.jpg`, filters.selected);
-      if (photo) setCaptured(photo);
+      if (photo) startWith(photo);
       return;
     }
     if (mode === "shot") {
@@ -151,8 +324,7 @@ export function CreateScreen({
     const problem = pickProblem(file, mode === "show" ? "show" : "shot");
     setPickError(problem);
     if (problem) return;
-    setEdited(null);
-    setCaptured(file);
+    startWith(file);
   }
 
   const songPicker = trackOpen ? (
@@ -171,18 +343,35 @@ export function CreateScreen({
   // caption. A Shot goes through here, whichever way its clip arrived, which
   // is what makes the length rule true of both routes rather than only the
   // other composer.
-  if (captured && mode !== "show" && !edited) {
+  const leaveSheet = leaving ? (
+    <LeaveSheet
+      what={mode === "show" ? "Show" : "Shot"}
+      resumed={draftId !== null}
+      saving={saving}
+      onSave={keepAsDraft}
+      onDiscard={discard}
+      onStay={() => setLeaving(false)}
+    />
+  ) : null;
+
+  if (captured && mode !== "show" && !captioning) {
     return (
       <>
         <ShotEditor
           file={captured}
           track={track}
+          initial={edited}
+          onEdit={noteEdit}
           onPickSound={() => setTrackOpen(true)}
           onClearSound={() => setTrack(null)}
-          onBack={() => setCaptured(null)}
-          onNext={setEdited}
+          onBack={back}
+          onNext={(edit) => {
+            setEdited(edit);
+            setCaptioning(true);
+          }}
         />
         {songPicker}
+        {leaveSheet}
       </>
     );
   }
@@ -190,15 +379,20 @@ export function CreateScreen({
   // Preview step — the captured media, caption, hashtags and publish.
   if (captured) {
     return (
-      <ShotPreview
-        file={captured}
-        mode={mode === "show" ? "show" : "shot"}
-        track={track}
-        userId={userId}
-        edit={edited ?? undefined}
-        onBack={() => (edited ? setEdited(null) : setCaptured(null))}
-        onDone={() => router.replace(mode === "show" ? "/home" : "/shots")}
-      />
+      <>
+        <ShotPreview
+          file={captured}
+          mode={mode}
+          track={track}
+          userId={userId}
+          edit={edited ?? undefined}
+          initialCaption={caption}
+          onCaptionChange={setCaption}
+          onBack={back}
+          onDone={finish}
+        />
+        {leaveSheet}
+      </>
     );
   }
 
@@ -250,7 +444,7 @@ export function CreateScreen({
           are most likely to want is the thing under your eyes — and nothing
           is recording while you decide. */}
       {!wantsCamera && (mode === "shot" || mode === "show") && (
-        <div className="absolute inset-0 z-[5] flex items-center justify-center px-8">
+        <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center gap-5 px-8">
           <button
             type="button"
             onClick={() => galleryRef.current?.click()}
@@ -268,6 +462,11 @@ export function CreateScreen({
                 : `MP4 · WebM · MOV · up to ${MAX_SHOT_MB}MB · trimmed to ${MAX_SHOT_SECS}s`}
             </span>
           </button>
+          <DraftStrip
+            drafts={drafts.filter((d) => d.mode === mode)}
+            onResume={resume}
+            onDelete={(d) => void removeDraft(d.id)}
+          />
         </div>
       )}
 
@@ -296,18 +495,18 @@ export function CreateScreen({
           <X size={20} />
         </button>
 
-        {mode === "shot" && (
-          <button
-            type="button"
-            onClick={() => setTrackOpen(true)}
-            className="flex items-center gap-2 rounded-pill bg-black/45 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm active:scale-95"
-          >
-            <Music size={16} />
-            <span className="max-w-[150px] truncate">
-              {track ? track.title : "Add sound"}
-            </span>
-          </button>
-        )}
+        {/* A Show can carry a song as well; the other Show creator, now gone,
+            was the only place that offered it. */}
+        <button
+          type="button"
+          onClick={() => setTrackOpen(true)}
+          className="flex items-center gap-2 rounded-pill bg-black/45 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm active:scale-95"
+        >
+          <Music size={16} />
+          <span className="max-w-[150px] truncate">
+            {track ? track.title : "Add sound"}
+          </span>
+        </button>
 
         <div className="h-10 w-10" aria-hidden />
       </div>
@@ -331,9 +530,12 @@ export function CreateScreen({
           {mode === "show" ? (
             <FilterRailButton open={filters.open} onClick={() => filters.toggle(cam.snapshot)} />
           ) : (
-            // Video effects are not built yet; the control says so rather
-            // than pretending to do something.
-            <RailButton label="Effects — coming soon" icon={Sparkles} disabled />
+            // Video effects are not built yet. The control is there because
+            // they are coming, and tapping it says so.
+            <span className="relative">
+              <RailButton label="Effects" icon={Sparkles} onClick={() => sayUnderConstruction("effects")} />
+              {note === "effects" && <ConstructionNote side="left" />}
+            </span>
           )}
         </div>
       )}
@@ -350,10 +552,6 @@ export function CreateScreen({
             disabled={!cam.ready}
             thumb={filters.thumb}
           />
-        ) : mode === "live" ? (
-          <p className="px-8 pb-4 text-center text-sm text-white/70">
-            Going live isn&rsquo;t ready yet. It&rsquo;ll show up here when it is.
-          </p>
         ) : (
           <div className="flex items-center justify-center gap-10 px-6">
             {/* Gallery */}
@@ -452,10 +650,14 @@ export function CreateScreen({
         {/* Mode switcher */}
         <div className="flex items-center justify-center gap-1">
           {MODES.map((m) => (
+            <span key={m.id} className="relative">
             <button
-              key={m.id}
               type="button"
               onClick={() => {
+                if (m.id === "live") {
+                  sayUnderConstruction("live");
+                  return;
+                }
                 haptics.select();
                 if (m.id === "post") {
                   router.push("/create/post");
@@ -466,7 +668,7 @@ export function CreateScreen({
                 setMode(m.id);
                 if (m.id !== "show") filters.close();
               }}
-              aria-pressed={mode === m.id}
+              aria-pressed={m.id === "live" ? undefined : mode === m.id}
               className={`rounded-pill px-4 py-2 text-sm font-bold transition ${
                 mode === m.id
                   ? "bg-white/15 text-white"
@@ -475,6 +677,8 @@ export function CreateScreen({
             >
               {m.label}
             </button>
+            {m.id === "live" && note === "live" && <ConstructionNote side="above" />}
+            </span>
           ))}
         </div>
       </div>
