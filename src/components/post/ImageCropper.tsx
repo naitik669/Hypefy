@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { shieldProps, useOverlayShield } from "@/lib/overlay-shield";
 import {
   X,
   Check,
@@ -240,13 +241,17 @@ export function ImageCropper({
     );
   }
 
+  // Back leaves the cropper rather than the screen under it, and the page
+  // under it holds still while a photo is dragged about.
+  useOverlayShield(true, onCancel);
+
   if (typeof document === "undefined") return null;
 
   const edited =
     flipH || flipV || quarter !== 0 || hue !== 0 || sat !== 100 || scale !== 1;
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex flex-col bg-black">
+    <div {...shieldProps} className="fixed inset-0 z-[200] flex flex-col bg-black">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pb-3 pt-12">
         <button

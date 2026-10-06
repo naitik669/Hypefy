@@ -98,3 +98,70 @@ describe("shieldProps", () => {
     expect(outside).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * The overlays that were written before there was a rule, and were letting
+ * the app through: a drag on the cropper scrolled the page, a swipe on a
+ * call changed tab, the keypad of the app lock scrolled the feed behind it.
+ */
+describe("the overlays that had no shield", () => {
+  it("holds the page still while an account is being switched, and swallows touches", async () => {
+    const { AccountSwitchOverlay } = await import("@/components/auth/AccountSwitchOverlay");
+    const outside = vi.fn();
+    await render(
+      createElement("div", { onTouchStart: outside, onPointerDown: outside }, createElement(AccountSwitchOverlay, { name: "Maya" })),
+    );
+    expect(frozen()).toBe(true);
+    const overlay = document.querySelector('[role="status"]')!;
+    await act(async () => {
+      overlay.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+      overlay.dispatchEvent(new Event("touchstart", { bubbles: true }));
+    });
+    expect(outside).not.toHaveBeenCalled();
+  });
+
+  it("holds the page still under the cropper, and Back cancels the crop", async () => {
+    const { ImageCropper } = await import("@/components/post/ImageCropper");
+    const { closeTopOverlay } = await import("@/lib/overlay-stack");
+    const onCancel = vi.fn();
+    const outside = vi.fn();
+    await render(
+      createElement(
+        "div",
+        { onTouchMove: outside, onPointerMove: outside },
+        createElement(ImageCropper, { src: "blob:photo", onCancel, onDone: () => {} }),
+      ),
+    );
+    expect(frozen()).toBe(true);
+    const cropper = document.querySelector(".fixed.inset-0")!;
+    await act(async () => {
+      cropper.dispatchEvent(new Event("pointermove", { bubbles: true }));
+      cropper.dispatchEvent(new Event("touchmove", { bubbles: true }));
+    });
+    expect(outside).not.toHaveBeenCalled();
+
+    await act(async () => { closeTopOverlay(); });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("shields every full-screen surface of a call and of the app lock", async () => {
+    const { readFileSync } = await import("node:fs");
+    const roots = (file: string) =>
+      readFileSync(file, "utf8").split("\n").filter((l) => l.includes('fixed inset-0'));
+    for (const file of [
+      "src/components/calls/CallProvider.tsx",
+      "src/components/calls/GroupCallProvider.tsx",
+      "src/components/settings/AppLockGate.tsx",
+    ]) {
+      const found = roots(file);
+      expect(found.length, file).toBeGreaterThan(0);
+      for (const line of found) expect(line, file).toContain("{...shieldProps}");
+    }
+    // A call takes Back for itself; the lock leaves it, so Back can still leave the app.
+    expect(readFileSync("src/components/calls/CallProvider.tsx", "utf8")).toContain("useOverlayShield(true, stayOnCall)");
+    expect(readFileSync("src/components/calls/GroupCallProvider.tsx", "utf8").match(/useOverlayShield\(true, stayOnCall\)/g)).toHaveLength(2);
+    const lock = readFileSync("src/components/settings/AppLockGate.tsx", "utf8");
+    expect(lock).toContain("useFrozenPage(armed)");
+    expect(lock).not.toContain("useOverlayShield(");
+  });
+});

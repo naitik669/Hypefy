@@ -2,6 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { Avatar } from "@/components/ui/Avatar";
+import { shieldProps, useFrozenPage } from "@/lib/overlay-shield";
 
 /**
  * Covers the app while an account switch is in flight.
@@ -28,10 +29,13 @@ export function AccountSwitchOverlay({
   avatarUrl?: string | null;
   avatarHue?: number | null;
 }) {
+  useFrozenPage(true);
+
   if (typeof document === "undefined") return null;
 
   return createPortal(
     <div
+      {...shieldProps}
       role="status"
       aria-live="polite"
       className="fixed inset-0 z-[999] flex flex-col items-center justify-center bg-background"

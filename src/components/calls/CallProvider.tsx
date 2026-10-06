@@ -4,6 +4,9 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { useRouter } from "next/navigation";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Phone, Video, Mic, MicOff, VideoOff } from "lucide-react";
+import { shieldProps, useOverlayShield } from "@/lib/overlay-shield";
+
+function stayOnCall() {}
 import { createClient } from "@/lib/supabase/client";
 import { startRing, stopRing } from "@/lib/ringtone";
 import { Avatar } from "@/components/ui/Avatar";
@@ -434,6 +437,10 @@ function CallUI({
   onEnd: () => void;
   onOpenChat: () => void;
 }) {
+  // A call is over the whole app: the page under it holds still, a swipe
+  // on the call is not a swipe between tabs, and Back does not walk the app
+  // away underneath. Back does not hang up either; that is what the button is for.
+  useOverlayShield(true, stayOnCall);
   const [secs, setSecs] = useState(0);
   const [muted, setMuted] = useState(false);
   const [camOff, setCamOff] = useState(false);
@@ -460,7 +467,7 @@ function CallUI({
   const showRemoteVideo = call.type === "video" && call.status === "connected" && !!remoteStream;
 
   return (
-    <div className="animate-page-enter fixed inset-0 z-[230] mx-auto flex max-w-[480px] flex-col items-center justify-between overflow-hidden bg-black px-6 py-14">
+    <div {...shieldProps} className="animate-page-enter fixed inset-0 z-[230] mx-auto flex max-w-[480px] flex-col items-center justify-between overflow-hidden bg-black px-6 py-14">
       {showRemoteVideo && <video poster={BLANK_POSTER} ref={remoteVid} autoPlay playsInline className="absolute inset-0 h-full w-full object-cover" />}
       {call.type === "audio" && <video poster={BLANK_POSTER} ref={remoteVid} autoPlay playsInline className="hidden" />}
       {call.type === "video" && call.status === "connected" && (

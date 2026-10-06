@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Delete, Lock } from "lucide-react";
+import { shieldProps, useFrozenPage } from "@/lib/overlay-shield";
 import { createClient } from "@/lib/supabase/client";
 
 /** Per-tab, so closing the tab always re-locks. */
@@ -114,10 +115,14 @@ export function AppLockGate() {
     if (next.length === 6) void submit(next);
   }
 
+  // The lock covers the app; it should also hold it still. A drag on the
+  // keypad used to scroll the feed underneath, and swipe between tabs.
+  useFrozenPage(armed);
+
   if (!armed) return null;
 
   return (
-    <div className="fixed inset-0 z-[300] flex flex-col items-center justify-center gap-6 bg-background px-8">
+    <div {...shieldProps} className="fixed inset-0 z-[300] flex flex-col items-center justify-center gap-6 bg-background px-8">
       <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface text-accent">
         <Lock size={24} />
       </div>
