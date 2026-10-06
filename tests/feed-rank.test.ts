@@ -6,8 +6,7 @@ import {
   tagAffinityFor,
   refreshJitter,
   refreshSeed,
-  rankBatch,
-} from "@/lib/feed-rank";
+  rankBatch, rankAt, withRehype } from "@/lib/feed-rank";
 
 const now = Date.UTC(2026, 5, 28, 12, 0, 0);
 const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
@@ -343,5 +342,28 @@ describe("rankBatch — the client-side tail", () => {
 
   it("returns an empty batch untouched", () => {
     expect(rankBatch([], ctx())).toEqual([]);
+  });
+});
+
+describe("a rehyped post", () => {
+  const post: { id: string; created_at: string; _rankAt?: string; _repostedById?: string } = { id: "p", created_at: "2026-09-01T10:00:00.000Z" };
+
+  it("keeps its own date, so the card does not say a week-old post is five minutes old", () => {
+    const out = withRehype(post, "2026-09-08T10:00:00.000Z", "amy");
+    expect(out.created_at).toBe("2026-09-01T10:00:00.000Z");
+    expect(rankAt(out)).toBe("2026-09-08T10:00:00.000Z");
+  });
+
+  it("ranks by its newest rehype and credits that person, whatever order they arrive in", () => {
+    const newestFirst = withRehype(withRehype(post, "2026-09-08T10:00:00.000Z", "amy"), "2026-09-03T10:00:00.000Z", "bo");
+    const oldestFirst = withRehype(withRehype(post, "2026-09-03T10:00:00.000Z", "bo"), "2026-09-08T10:00:00.000Z", "amy");
+    for (const out of [newestFirst, oldestFirst]) {
+      expect(rankAt(out)).toBe("2026-09-08T10:00:00.000Z");
+      expect(out._repostedById).toBe("amy");
+    }
+  });
+
+  it("ranks an unrehyped post by when it was made", () => {
+    expect(rankAt(post)).toBe(post.created_at);
   });
 });

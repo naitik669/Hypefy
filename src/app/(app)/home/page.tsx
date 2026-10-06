@@ -16,6 +16,8 @@ import {
   refreshJitter,
   refreshSeed,
   shotFeedScore,
+  rankAt,
+  withRehype,
 } from "@/lib/feed-rank";
 import { placeShots } from "@/lib/feed-mix";
 import { isAdult } from "@/lib/ads";
@@ -240,20 +242,10 @@ export default async function HomePage() {
       profiles: Array.isArray(post.profiles)
         ? post.profiles[0] ?? null
         : post.profiles,
-      created_at: r.created_at, // rank by repost time
-      _repostedById: r.user_id as string,
     };
-    // Repost wins over the plain copy so the header shows
-    byId.set(
-      post.id,
-      byId.has(post.id)
-        ? {
-            ...byId.get(post.id),
-            created_at: r.created_at,
-            _repostedById: r.user_id as string,
-          }
-        : normalised
-    );
+    // The post keeps its own date; the newest rehype is what it ranks by,
+    // and whose rehype it is. See withRehype.
+    byId.set(post.id, withRehype(byId.get(post.id) ?? normalised, r.created_at, r.user_id as string));
   }
 
   // My interest signals (hashtags I care about) for personalized ranking.
@@ -325,7 +317,8 @@ export default async function HomePage() {
       ...p,
       _score:
         feedScore(
-          p,
+          // Ranked as fresh as its newest rehype, shown with its own date.
+          { ...p, created_at: rankAt(p) },
           p.user_id === user.id,
           followingIds.has(p.user_id),
           myInterests.size > 0 && postTags(p).some((t) => myInterests.has(t)),
@@ -339,7 +332,7 @@ export default async function HomePage() {
     .sort((a: any, b: any) =>
       b._score !== a._score
         ? b._score - a._score
-        : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        : new Date(rankAt(b)).getTime() - new Date(rankAt(a)).getTime()
     )
     .slice(0, 30);
   const posts = diversify(ranked);

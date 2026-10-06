@@ -271,3 +271,29 @@ export function postTags(p: { hashtags?: string[] | null }): string[] {
     t.replace(/^#/, "").toLowerCase()
   );
 }
+
+/**
+ * A post that someone you follow has rehyped, ready to rank.
+ *
+ * A rehype resurfaces a post: it should rank as if it were as fresh as the
+ * rehype. That used to be done by overwriting the post's own created_at,
+ * which had two costs. The card shows created_at, so a week-old post a friend
+ * rehyped five minutes ago read "5m". And with several friends rehyping the
+ * same post the rows arrive newest first, each overwriting the last, so the
+ * OLDEST rehype decided both the rank and whose rehype it was credited to.
+ *
+ * So the post keeps its own date, and the moment to rank it by is carried
+ * beside it: the newest rehype, with that person as the one who brought it.
+ */
+export function withRehype<P extends { created_at: string; _rankAt?: string; _repostedById?: string }>(
+  post: P,
+  rehypedAt: string,
+  rehypedBy: string,
+): P {
+  if (post._rankAt && post._rankAt >= rehypedAt) return post;
+  return { ...post, _rankAt: rehypedAt, _repostedById: rehypedBy };
+}
+
+/** The moment a post is ranked by: its newest rehype if it has one, else when it was made. */
+export const rankAt = (p: { created_at: string; _rankAt?: string }): string =>
+  p._rankAt && p._rankAt > p.created_at ? p._rankAt : p.created_at;
