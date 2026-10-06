@@ -112,6 +112,33 @@ export function loadPhoto(url: string): Promise<HTMLImageElement | null> {
   });
 }
 
+/** The file extension a picture of this type is saved under. Exported for tests. */
+export function extensionFor(type: string): string {
+  if (type === "image/png") return "png";
+  if (type === "image/webp") return "webp";
+  if (type === "image/gif") return "gif";
+  return "jpg";
+}
+
+/**
+ * A photo page's photo, as the file it is.
+ *
+ * Saving a photo page used to draw the whole page — the colour, the words,
+ * the wordmark — with the photo set inside it, and hand over that drawing.
+ * Someone saving a photo wants the photo. Null if it cannot be fetched or is
+ * not a picture, and the caller falls back to drawing the page.
+ */
+export async function fetchPhoto(url: string): Promise<Blob | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return blob.type.startsWith("image/") ? blob : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Draw the page and hand back the picture. */
 export async function renderPageImage(page: PageImage): Promise<Blob | null> {
   // The words are measured in the face they will be drawn in, so a page is
@@ -212,17 +239,39 @@ export async function renderPageImage(page: PageImage): Promise<Blob | null> {
 }
 
 /**
+ * Is this a phone or tablet, where saving a picture goes through the share
+ * sheet? The browser's own answer where it gives one, a touch-first pointer
+ * otherwise. Exported for tests.
+ *
+ * It matters because a computer can ALSO say it shares files: Windows has a
+ * share dialog, and asking it to take a picture from the browser opens a
+ * panel reading "We couldn't show you all the ways you could share" — and
+ * nothing is saved. On a computer, saving a picture is a download.
+ */
+export function isHandheld(env: { uaMobile?: boolean; coarsePointer?: boolean }): boolean {
+  if (typeof env.uaMobile === "boolean") return env.uaMobile;
+  return !!env.coarsePointer;
+}
+
+function handheld(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData;
+  const coarse = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
+  return isHandheld({ uaMobile: ua?.mobile, coarsePointer: coarse });
+}
+
+/**
  * Put the picture somewhere the person keeps things.
  *
- * The share sheet where there is one — on a phone that is how a picture
- * reaches the camera roll, and it lets them send it on instead if that is
- * what they meant. A plain download otherwise, which is what a desktop
- * browser does with it.
+ * On a phone, the share sheet: that is how a picture reaches the camera
+ * roll, and it lets them send it on instead if that is what they meant. On a
+ * computer, a plain download — see isHandheld for why it never shares there.
  */
 export async function savePageImage(blob: Blob, filename: string): Promise<"shared" | "downloaded" | "failed"> {
-  const file = new File([blob], filename, { type: "image/png" });
+  // Its own type, not always PNG: a saved photo is the JPEG it was taken as.
+  const file = new File([blob], filename, { type: blob.type || "image/png" });
   const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
-  if (nav.canShare?.({ files: [file] })) {
+  if (handheld() && nav.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file] });
       return "shared";

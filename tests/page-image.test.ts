@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { fitText, savePageImage, wrapText } from "@/lib/page-image";
+import { extensionFor, fetchPhoto, fitText, isHandheld, savePageImage, wrapText } from "@/lib/page-image";
 
 /**
  * Saving a page as a picture. The drawing itself needs a canvas, so what is
@@ -67,9 +67,29 @@ describe("savePageImage", () => {
     vi.unstubAllGlobals();
   });
 
+  /** A phone unless told otherwise: the share sheet is a phone's way of saving. */
   function stubNavigator(over: Record<string, unknown>) {
-    vi.stubGlobal("navigator", { ...navigator, ...over });
+    vi.stubGlobal("navigator", { ...navigator, userAgentData: { mobile: true }, ...over });
   }
+
+  it("downloads on a computer even when the browser says it can share files", async () => {
+    // Windows offers a share dialog that cannot take a picture from the
+    // browser: it opens a panel saying so, and nothing is saved.
+    const share = vi.fn(async () => {});
+    stubNavigator({ userAgentData: { mobile: false }, canShare: () => true, share });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:x", revokeObjectURL: () => {} });
+    expect(await savePageImage(blob, "page.png")).toBe("downloaded");
+    expect(share).not.toHaveBeenCalled();
+    click.mockRestore();
+  });
+
+  it("shares a photo as the JPEG it is, not relabelled as a PNG", async () => {
+    const share = vi.fn<(d: { files: File[] }) => Promise<void>>(async () => {});
+    stubNavigator({ canShare: () => true, share });
+    await savePageImage(new Blob(["x"], { type: "image/jpeg" }), "photo.jpg");
+    expect(share.mock.calls[0][0].files[0].type).toBe("image/jpeg");
+  });
 
   it("offers the share sheet where there is one — that is how a picture reaches a camera roll", async () => {
     const share = vi.fn(async () => {});
@@ -110,5 +130,44 @@ describe("savePageImage", () => {
       },
     });
     expect(await savePageImage(blob, "page.png")).toBe("failed");
+  });
+});
+
+describe("phone or computer", () => {
+  it("takes the browser's own answer when it gives one", () => {
+    expect(isHandheld({ uaMobile: true, coarsePointer: false })).toBe(true);
+    // A touchscreen laptop is still a computer.
+    expect(isHandheld({ uaMobile: false, coarsePointer: true })).toBe(false);
+  });
+  it("goes by a touch-first pointer where the browser does not say", () => {
+    expect(isHandheld({ coarsePointer: true })).toBe(true);
+    expect(isHandheld({ coarsePointer: false })).toBe(false);
+    expect(isHandheld({})).toBe(false);
+  });
+});
+
+describe("a photo page's photo", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("is fetched as the file it is", async () => {
+    const jpeg = new Blob(["x"], { type: "image/jpeg" });
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, blob: async () => jpeg })));
+    expect(await fetchPhoto("https://x/p.jpg")).toBe(jpeg);
+  });
+
+  it("is nothing when it cannot be fetched, or is not a picture, so the page is drawn instead", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, blob: async () => new Blob() })));
+    expect(await fetchPhoto("https://x/p.jpg")).toBeNull();
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, blob: async () => new Blob(["<html>"], { type: "text/html" }) })));
+    expect(await fetchPhoto("https://x/p.jpg")).toBeNull();
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
+    expect(await fetchPhoto("https://x/p.jpg")).toBeNull();
+  });
+
+  it("is named for its type", () => {
+    expect(extensionFor("image/jpeg")).toBe("jpg");
+    expect(extensionFor("image/png")).toBe("png");
+    expect(extensionFor("image/webp")).toBe("webp");
+    expect(extensionFor("")).toBe("jpg");
   });
 });

@@ -8,7 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { DiscSleeve, SongLine, DISC_GUTTER } from "@/components/diary/DiaryDisc";
 import { PagePhoto } from "@/components/diary/PagePhoto";
 import { diaryTheme, fillSize, pageStops } from "@/components/diary/DiaryPage";
-import { loadPhoto, renderPageImage, savePageImage } from "@/lib/page-image";
+import { extensionFor, fetchPhoto, loadPhoto, renderPageImage, savePageImage } from "@/lib/page-image";
 import type { ArchivedDiary } from "@/lib/diary";
 
 /**
@@ -96,11 +96,25 @@ export function PastPageView({
   const theme = diaryTheme(page.color, hue);
   const text = page.text?.trim() ?? "";
 
-  /** The page as a picture, with the wordmark at its foot. */
+  /**
+   * A photo page saves its photo, as it is. A written page has no picture of
+   * its own, so it is drawn: its colour, its words, the wordmark at its foot.
+   */
   async function save() {
     if (!page || saving) return;
     setSaving(true);
     try {
+      const day = new Date(page.writtenAt).toISOString().slice(0, 10);
+      const photo = page.imageUrl ? await fetchPhoto(page.imageUrl) : null;
+      if (photo) {
+        const how = await savePageImage(photo, `hypefy-photo-${day}.${extensionFor(photo.type)}`);
+        if (how !== "failed") {
+          setSaved(true);
+          setTimeout(() => setSaved(false), 1600);
+        }
+        return;
+      }
+      // No photo, or it could not be fetched: the page itself, drawn.
       const blob = await renderPageImage({
         text: page.text ?? "",
         stops: pageStops(page.color, hue),
@@ -110,7 +124,6 @@ export function PastPageView({
           getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim() || "#a3e635",
       });
       if (!blob) return;
-      const day = new Date(page.writtenAt).toISOString().slice(0, 10);
       const how = await savePageImage(blob, `hypefy-page-${day}.png`);
       if (how !== "failed") {
         setSaved(true);
@@ -209,7 +222,7 @@ export function PastPageView({
             type="button"
             onClick={() => void save()}
             disabled={saving}
-            aria-label="Save this page as a picture"
+            aria-label={page.imageUrl ? "Save this photo" : "Save this page as a picture"}
             className="flex flex-1 flex-col items-center gap-1.5 rounded-2xl bg-surface py-3 text-[11px] font-bold disabled:opacity-60"
           >
             {saving ? (

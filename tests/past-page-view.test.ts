@@ -130,3 +130,47 @@ describe("opening a past page", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Saving. A photo page saves the photo, as the file it is. It used to save a
+ * drawing of the whole page with the photo set inside it, which is not what
+ * anyone saving a photo is after.
+ */
+describe("saving a past page", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("saves a photo page's own photo, not a picture of the page", async () => {
+    const jpeg = new Blob(["photo"], { type: "image/jpeg" });
+    const fetched = vi.fn(async () => ({ ok: true, blob: async () => jpeg }));
+    vi.stubGlobal("fetch", fetched);
+    let made: Blob | null = null;
+    vi.stubGlobal("URL", { ...URL, createObjectURL: (b: Blob) => ((made = b), "blob:x"), revokeObjectURL: () => {} });
+    let name = "";
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      name = this.download;
+    });
+    const canvas = vi.spyOn(HTMLCanvasElement.prototype, "getContext");
+
+    await open({ page: { ...PAGE, imageUrl: "https://x.test/roof.jpg" } });
+    const save = button("Save this photo")!;
+    expect(save).toBeTruthy();
+    await act(async () => {
+      save.click();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(fetched).toHaveBeenCalledWith("https://x.test/roof.jpg");
+    expect(made).toBe(jpeg);
+    expect(name).toBe("hypefy-photo-2026-09-19.jpg");
+    // Nothing was drawn: the page was not turned into a picture.
+    expect(canvas).not.toHaveBeenCalled();
+    click.mockRestore();
+    canvas.mockRestore();
+  });
+
+  it("still calls a written page a page", async () => {
+    await open({ page: PAGE });
+    expect(button("Save this page as a picture")).toBeTruthy();
+    expect(button("Save this photo")).toBeNull();
+  });
+});
