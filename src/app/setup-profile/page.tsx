@@ -13,13 +13,12 @@ export default async function SetupProfilePage() {
 
   const profile = await getProfile(supabase);
 
-  // Seed username from email local-part
-  const emailSeed =
-    user.email?.split("@")[0]?.toLowerCase().replace(/[^a-z0-9_.]/g, "") ?? "";
-
   const initial = {
     displayName: profile?.displayName ?? "",
-    username: profile?.username ?? emailSeed,
+    // Empty until they have one. It was pre-filled from their email address,
+    // which put most of that address on a public profile; the stepper
+    // suggests one from the name they choose to show instead.
+    username: profile?.username ?? "",
     bio: profile?.bio ?? "",
     tags: profile?.profileTags ?? [],
     avatarHue: profile?.avatarHue ?? hueFromId(user.id),

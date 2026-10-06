@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   ArrowRight,
   ArrowLeft,
@@ -16,6 +16,7 @@ import { saveProfile } from "@/app/setup-profile/actions";
 import { PROFILE_TAGS } from "@/lib/profile";
 import { APP_ORIGIN } from "@/lib/profile-card";
 import { haptics } from "@/lib/haptics";
+import { usernameFromName } from "@/lib/username-seed";
 // The same editor Settings uses, so a photo is framed identically whether
 // it is set during setup or changed later.
 import { ImageCropper } from "@/components/post/ImageCropper";
@@ -58,6 +59,14 @@ type FormState = {
 
 type UsernameStatus = "idle" | "invalid" | "checking" | "available" | "taken";
 
+const USERNAME_SHAPE = /^[a-z0-9_.]{3,20}$/;
+
+/** Where a username stands before anyone has been asked about it. */
+function statusBeforeChecking(u: string): UsernameStatus {
+  if (u.length === 0) return "idle";
+  return USERNAME_SHAPE.test(u) ? "checking" : "invalid";
+}
+
 export function SetupStepper({
   userId,
   initial,
@@ -68,7 +77,11 @@ export function SetupStepper({
   const supabase = createClient();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(initial);
-  const [uStatus, setUStatus] = useState<UsernameStatus>("idle");
+  // A username that is already in the field is on its way to being checked,
+  // not unchecked: see the effect below.
+  const [uStatus, setUStatus] = useState<UsernameStatus>(() => statusBeforeChecking(initial.username));
+  /** The username the field holds now, so a slow answer about an older one is dropped. */
+  const latestUsername = useRef(initial.username);
   const [uploading, setUploading] = useState(false);
   /** Chosen file waiting to be framed. The cropper owns it until done. */
   const [cropSrc, setCropSrc] = useState<string | null>(null);
@@ -81,23 +94,36 @@ export function SetupStepper({
     setError(null);
   }
 
+  /** Ask whether a well-formed username is free. */
+  async function verifyUsername(u: string) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", u)
+      .maybeSingle();
+    // The field has moved on since this was asked.
+    if (latestUsername.current !== u) return;
+    setUStatus(data && data.id !== userId ? "taken" : "available");
+  }
+
+  // A username that arrives already filled in was never checked: checking
+  // only happened on typing. So Next sat disabled beside a perfectly good
+  // name, with nothing saying why, until the name was edited.
+  useEffect(() => {
+    if (USERNAME_SHAPE.test(initial.username)) void verifyUsername(initial.username);
+    // Once, for the name the screen opened with.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function onUsernameChange(raw: string) {
     const u = raw.toLowerCase().replace(/[^a-z0-9_.]/g, "");
     set("username", u);
+    latestUsername.current = u;
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!/^[a-z0-9_.]{3,20}$/.test(u)) {
-      setUStatus(u.length === 0 ? "idle" : "invalid");
-      return;
-    }
-    setUStatus("checking");
-    debounceRef.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("username", u)
-        .maybeSingle();
-      setUStatus(data && data.id !== userId ? "taken" : "available");
-    }, 450);
+    const status = statusBeforeChecking(u);
+    setUStatus(status);
+    if (status !== "checking") return;
+    debounceRef.current = setTimeout(() => void verifyUsername(u), 450);
   }
 
   /** Gate the picked file before the cropper ever sees it. */
@@ -143,7 +169,7 @@ export function SetupStepper({
         return form.displayName.trim().length >= 2;
       case 1:
         return (
-          /^[a-z0-9_.]{3,20}$/.test(form.username) && uStatus === "available"
+          USERNAME_SHAPE.test(form.username) && uStatus === "available"
         );
       default:
         return true;
@@ -152,6 +178,12 @@ export function SetupStepper({
 
   function next() {
     haptics.tap();
+    // Leaving the name with no username yet: suggest one from the name they
+    // just gave, and have it checked like any other.
+    if (step === 0 && form.username.length === 0) {
+      const guess = usernameFromName(form.displayName);
+      if (guess) onUsernameChange(guess);
+    }
     setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
     setError(null);
   }
