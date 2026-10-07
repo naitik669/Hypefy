@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { noteSpotlightOpened } from "@/lib/spotlight-nudge";
+import { noteSpotlightPosted } from "@/lib/spotlight-nudge";
 import { Archive, ChevronDown } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DiaryComposer, DiaryEditor, type DiaryDraft } from "@/components/diary/DiaryEditor";
@@ -90,8 +90,8 @@ export function DiaryHome({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-time read of browser-only storage; see above
     setFresh(new Set(unseen(initial, loadSeen()).map((e) => e.userId)));
     markSeen(initial);
-    // They are here: the reminder in Messages can stand down.
-    noteSpotlightOpened();
+    // Their own page is up: the note in Messages can stand down.
+    noteSpotlightPosted(initial.find((e) => e.isSelf)?.createdAt);
   }, [initial]);
   const minePage = initial.find((e) => e.isSelf)?.createdAt ?? null;
   // Once per page: reading "what is new" also marks it seen, so a second run

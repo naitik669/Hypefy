@@ -1,38 +1,37 @@
 /**
- * When to remind someone that Spotlight exists.
+ * When to point at the Spotlight deck.
  *
  * Spotlight is a small deck tucked at the edge of Messages, with no label.
- * People who have found it do not need telling; people who have not, or who
- * tried it once and forgot, do. So the reminder is tied to use:
+ * A note with an arrow says what it is. Who sees it, and how often:
  *
- *   never opened        remind often
- *   opened, but not     remind now and then
- *     for a while
- *   opened lately       say nothing
+ *   - someone who has not put a page on Spotlight in the last week sees it
+ *     (which, the first time, is nearly everyone);
+ *   - then only now and then, days apart, and only a few times in all;
+ *   - someone who has posted in the last week does not see it at all;
+ *   - posting starts it over: lapse for a week again and it may come back.
  *
- * Dismissing it is an answer: each time, it stays away for longer.
- * Kept on the device; it is a courtesy, not a record.
+ * Kept on the device. It is a courtesy, not a record, so "has not posted"
+ * means "this phone has not seen you post".
  */
 
 export type SpotlightUse = {
-  /** When Spotlight was last opened (ms), or null if never. */
-  openedAt: number | null;
-  /** When the reminder was last dismissed (ms), or null. */
-  dismissedAt: number | null;
-  /** How many times it has been dismissed. */
-  dismissals: number;
+  /** When their own page was last seen up (ms), or null if never. */
+  postedAt: number | null;
+  /** When the note was last shown (ms), or null. */
+  shownAt: number | null;
+  /** How many times it has been shown since they last posted. */
+  shows: number;
 };
 
-export const NEVER_USED: SpotlightUse = { openedAt: null, dismissedAt: null, dismissals: 0 };
+export const NEVER_USED: SpotlightUse = { postedAt: null, shownAt: null, shows: 0 };
 
 const DAY = 24 * 60 * 60 * 1000;
-/** Opened within this long: they know it is there. */
-export const ACTIVE_FOR_MS = 7 * DAY;
-/** The first stay-away after a dismissal; it doubles each time. */
-const FIRST_SNOOZE_MS = 2 * DAY;
-/** Someone who has used Spotlight is given longer between reminders. */
-const LAPSED_SNOOZE_MS = 5 * DAY;
-const LONGEST_SNOOZE_MS = 21 * DAY;
+/** Posted within this long: they know what the deck is. */
+export const POSTED_LATELY_MS = 7 * DAY;
+/** At least this long between two showings. */
+export const POINT_GAP_MS = 4 * DAY;
+/** "A few times": after this many, it stops until they post and lapse again. */
+export const POINT_LIMIT = 4;
 
 const KEY = "hypefy_spotlight_use";
 
@@ -40,13 +39,13 @@ export function readSpotlightUse(): SpotlightUse {
   try {
     const p = JSON.parse(localStorage.getItem(KEY) ?? "null") as Partial<SpotlightUse> | null;
     return {
-      openedAt: typeof p?.openedAt === "number" ? p.openedAt : null,
-      dismissedAt: typeof p?.dismissedAt === "number" ? p.dismissedAt : null,
-      dismissals: typeof p?.dismissals === "number" && p.dismissals > 0 ? Math.floor(p.dismissals) : 0,
+      postedAt: typeof p?.postedAt === "number" ? p.postedAt : null,
+      shownAt: typeof p?.shownAt === "number" ? p.shownAt : null,
+      shows: typeof p?.shows === "number" && p.shows > 0 ? Math.floor(p.shows) : 0,
     };
   } catch {
-    // Private mode: behave as though it is in use, so nothing nags.
-    return { openedAt: Date.now(), dismissedAt: null, dismissals: 0 };
+    // Private mode: behave as though they post, so nothing nags.
+    return { postedAt: Date.now(), shownAt: null, shows: 0 };
   }
 }
 
@@ -58,44 +57,33 @@ function write(use: SpotlightUse) {
   }
 }
 
-/** Spotlight was opened: the best answer there is. Starts the count again. */
-export function noteSpotlightOpened(now = Date.now()) {
-  write({ openedAt: now, dismissedAt: null, dismissals: 0 });
-}
-
-export function noteNudgeDismissed(now = Date.now()) {
-  const use = readSpotlightUse();
-  write({ ...use, dismissedAt: now, dismissals: use.dismissals + 1 });
-}
-
-/** How long the reminder stays away after its latest dismissal. */
-export function snoozeFor(use: SpotlightUse): number {
-  if (use.dismissals <= 0) return 0;
-  const base = use.openedAt === null ? FIRST_SNOOZE_MS : LAPSED_SNOOZE_MS;
-  return Math.min(LONGEST_SNOOZE_MS, base * 2 ** (use.dismissals - 1));
-}
-
-export function shouldNudge(use: SpotlightUse, now: number): boolean {
-  if (use.openedAt !== null && now - use.openedAt < ACTIVE_FOR_MS) return false;
-  if (use.dismissedAt !== null && now - use.dismissedAt < snoozeFor(use)) return false;
+/** Should the note be shown now? */
+export function shouldPoint(use: SpotlightUse, now: number): boolean {
+  if (use.postedAt !== null && now - use.postedAt < POSTED_LATELY_MS) return false;
+  if (use.shows >= POINT_LIMIT) return false;
+  if (use.shownAt !== null && now - use.shownAt < POINT_GAP_MS) return false;
   return true;
 }
 
-/** What the reminder says, from what is waiting. */
-export function nudgeLine(fromOthers: number, hasOwn: boolean): { title: string; text: string; cta: string } {
-  if (fromOthers > 0) {
-    return {
-      title: fromOthers === 1 ? "1 page in Spotlight" : `${fromOthers} pages in Spotlight`,
-      text: "From people you follow back. Gone in a day.",
-      cta: "Read",
-    };
-  }
-  if (!hasOwn) {
-    return {
-      title: "Say something for a day",
-      text: "A line, a song, a mood. Only people you follow back see it.",
-      cta: "Write",
-    };
-  }
-  return { title: "Your page is up", text: "See who read it, and who reacted.", cta: "Open" };
+/** Their own page is up, posted at `at`: remembered, and the count starts over. */
+export function withPosted(use: SpotlightUse, at: number): SpotlightUse {
+  if (use.postedAt !== null && at <= use.postedAt) return use;
+  return { postedAt: at, shownAt: null, shows: 0 };
+}
+
+export function withPointed(use: SpotlightUse, now: number): SpotlightUse {
+  return { ...use, shownAt: now, shows: use.shows + 1 };
+}
+
+/** Their own page, as an ISO time, was seen up. */
+export function noteSpotlightPosted(createdAt: string | null | undefined) {
+  const at = createdAt ? Date.parse(createdAt) : NaN;
+  if (!Number.isFinite(at)) return;
+  const before = readSpotlightUse();
+  const after = withPosted(before, at);
+  if (after !== before) write(after);
+}
+
+export function noteSpotlightPointed(now = Date.now()) {
+  write(withPointed(readSpotlightUse(), now));
 }

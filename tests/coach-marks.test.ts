@@ -15,14 +15,16 @@ import {
   withVisit,
 } from "@/lib/hint-schedule";
 import {
-  ACTIVE_FOR_MS,
   NEVER_USED,
-  noteNudgeDismissed,
-  noteSpotlightOpened,
-  nudgeLine,
+  POINT_GAP_MS,
+  POINT_LIMIT,
+  POSTED_LATELY_MS,
+  noteSpotlightPointed,
+  noteSpotlightPosted,
   readSpotlightUse,
-  shouldNudge,
-  snoozeFor,
+  shouldPoint,
+  withPointed,
+  withPosted,
 } from "@/lib/spotlight-nudge";
 
 /**
@@ -221,47 +223,66 @@ describe("a hint on the screen", () => {
   });
 });
 
-describe("reminding someone about Spotlight", () => {
+describe("pointing at the Spotlight deck", () => {
   beforeEach(() => localStorage.clear());
 
-  it("reminds someone who has never opened it", () => {
-    expect(shouldNudge(NEVER_USED, NOW)).toBe(true);
+  it("points for someone who has never posted, the first time", () => {
+    expect(shouldPoint(NEVER_USED, NOW)).toBe(true);
   });
 
-  it("says nothing to someone who has opened it lately", () => {
-    expect(shouldNudge({ ...NEVER_USED, openedAt: NOW - DAY }, NOW)).toBe(false);
-    expect(shouldNudge({ ...NEVER_USED, openedAt: NOW - ACTIVE_FOR_MS - 1 }, NOW)).toBe(true);
+  it("says nothing to someone who posted in the last week", () => {
+    expect(shouldPoint({ ...NEVER_USED, postedAt: NOW - DAY }, NOW)).toBe(false);
+    expect(shouldPoint({ ...NEVER_USED, postedAt: NOW - POSTED_LATELY_MS + 1 }, NOW)).toBe(false);
   });
 
-  it("stays away after being dismissed, for longer each time", () => {
-    const once = { openedAt: null, dismissedAt: NOW, dismissals: 1 };
-    expect(shouldNudge(once, NOW + DAY)).toBe(false);
-    expect(shouldNudge(once, NOW + 2 * DAY + 1)).toBe(true);
-    expect(snoozeFor({ ...once, dismissals: 2 })).toBe(4 * DAY);
-    expect(snoozeFor({ ...once, dismissals: 3 })).toBe(8 * DAY);
-    expect(snoozeFor({ ...once, dismissals: 9 })).toBe(21 * DAY);
+  it("points again once a week has gone by without a post", () => {
+    expect(shouldPoint({ ...NEVER_USED, postedAt: NOW - POSTED_LATELY_MS }, NOW)).toBe(true);
   });
 
-  it("reminds someone who has never tried it more often than someone who has", () => {
-    const never = { openedAt: null, dismissedAt: NOW, dismissals: 1 };
-    const lapsed = { openedAt: NOW - 30 * DAY, dismissedAt: NOW, dismissals: 1 };
-    expect(snoozeFor(never)).toBeLessThan(snoozeFor(lapsed));
+  it("only now and then: not again until days have passed", () => {
+    const shown = withPointed(NEVER_USED, NOW);
+    expect(shouldPoint(shown, NOW + DAY)).toBe(false);
+    expect(shouldPoint(shown, NOW + POINT_GAP_MS - 1)).toBe(false);
+    expect(shouldPoint(shown, NOW + POINT_GAP_MS)).toBe(true);
   });
 
-  it("opening Spotlight stands the reminder down and forgets the dismissals", () => {
-    noteNudgeDismissed(NOW);
-    noteNudgeDismissed(NOW);
-    expect(readSpotlightUse().dismissals).toBe(2);
-    noteSpotlightOpened(NOW);
-    expect(readSpotlightUse()).toEqual({ openedAt: NOW, dismissedAt: null, dismissals: 0 });
-    expect(shouldNudge(readSpotlightUse(), NOW + DAY)).toBe(false);
+  it("only a few times: then it stops, however long they go without posting", () => {
+    let use = NEVER_USED;
+    let at = NOW;
+    let shown = 0;
+    for (let i = 0; i < 20; i++) {
+      if (shouldPoint(use, at)) {
+        use = withPointed(use, at);
+        shown++;
+      }
+      at += POINT_GAP_MS;
+    }
+    expect(shown).toBe(POINT_LIMIT);
+    expect(shouldPoint(use, at + 365 * DAY)).toBe(false);
   });
 
-  it("says what is waiting", () => {
-    expect(nudgeLine(3, false)).toMatchObject({ title: "3 pages in Spotlight", cta: "Read" });
-    expect(nudgeLine(1, true).title).toBe("1 page in Spotlight");
-    expect(nudgeLine(0, false)).toMatchObject({ title: "Say something for a day", cta: "Write" });
-    expect(nudgeLine(0, true).cta).toBe("Open");
+  it("posting starts it over: quiet for a week, then it may come back", () => {
+    let use = NEVER_USED;
+    for (let i = 0; i < POINT_LIMIT; i++) use = withPointed(use, NOW + i * POINT_GAP_MS);
+    use = withPosted(use, NOW + 100 * DAY);
+    expect(use).toEqual({ postedAt: NOW + 100 * DAY, shownAt: null, shows: 0 });
+    expect(shouldPoint(use, NOW + 101 * DAY)).toBe(false);
+    expect(shouldPoint(use, NOW + 108 * DAY)).toBe(true);
+  });
+
+  it("seeing the same page again does not start the count over", () => {
+    const use = { postedAt: NOW, shownAt: NOW + 8 * DAY, shows: 2 };
+    expect(withPosted(use, NOW)).toBe(use);
+    expect(withPosted(use, NOW - DAY)).toBe(use);
+  });
+
+  it("remembers on the device, and ignores a time it cannot read", () => {
+    noteSpotlightPosted("not a date");
+    noteSpotlightPosted(null);
+    expect(readSpotlightUse()).toEqual(NEVER_USED);
+    noteSpotlightPosted(new Date(NOW).toISOString());
+    noteSpotlightPointed(NOW + 9 * DAY);
+    expect(readSpotlightUse()).toEqual({ postedAt: NOW, shownAt: NOW + 9 * DAY, shows: 1 });
   });
 });
 
@@ -281,9 +302,12 @@ describe("where it is wired", () => {
     for (const t of targets) expect(all, `Home points at ${t}`).toContain(`data-coach="${t}"`);
   });
 
-  it("Messages reminds about Spotlight, and opening Spotlight is noted", () => {
-    expect(read("src/app/(app)/messages/(inbox)/page.tsx")).toContain("<SpotlightNudge");
-    expect(read("src/components/diary/DiaryHome.tsx")).toContain("noteSpotlightOpened();");
+  it("Messages has the note and no banner, and a page being up is what is remembered", () => {
+    const messages = read("src/app/(app)/messages/(inbox)/page.tsx");
+    expect(messages).toContain("<SpotlightPointer ownPageAt=");
+    expect(messages).not.toContain("SpotlightNudge");
+    expect(read("src/components/diary/DiaryHome.tsx")).toContain("noteSpotlightPosted(");
+    expect(read("src/components/diary/FloatingPages.tsx")).toContain('data-coach="spotlight"');
   });
 
   it("the ring and the note hold still for people who asked for less motion", () => {

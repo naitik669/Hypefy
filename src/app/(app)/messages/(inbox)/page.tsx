@@ -7,8 +7,7 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { toDiaryEntries } from "@/lib/diary";
 import { loadInboxRows } from "@/app/(app)/messages/load-rows";
 import { toVaultOverview } from "@/lib/chat-vault";
-import { SpotlightNudge } from "@/components/diary/SpotlightNudge";
-import { HintPointer } from "@/components/ui/CoachMarks";
+import { SpotlightPointer } from "@/components/diary/SpotlightPointer";
 
 /** When this inbox was drawn, so the page can tell a fresh one from one kept in memory. */
 const renderStamp = () => Date.now();
@@ -54,21 +53,9 @@ export default async function MessagesPage() {
           who has hidden a chat: for everyone else a pull is just a pull. */}
       <PullToRefresh holdTo={vault.hidden > 0 ? "/messages/vault" : undefined}>
         {/* Spotlight has no label anywhere: a small deck of cards in the
-            corner, and nothing to say what it is. This says so, to people
-            who are not using it, and less often each time they wave it off. */}
-        <SpotlightNudge
-          hasOwn={pages.some((p) => p.isSelf)}
-          others={pages
-            .filter((p) => !p.isSelf)
-            .map((p) => ({ userId: p.userId, name: p.name, avatarUrl: p.avatarUrl, hue: p.hue }))}
-        />
-        {/* And once, a note pointing at the deck itself, timed for when it
-            has slid out: the banner says Spotlight exists, this says where. */}
-        <HintPointer
-          screen="messages"
-          delayMs={1100}
-          hints={[{ id: "spotlight", target: "spotlight", text: "This is Spotlight. Tap the deck to read today's pages or write yours." }]}
-        />
+            corner, and nothing to say what it is. A note points at it for
+            people who have not posted there lately, a few times at most. */}
+        <SpotlightPointer ownPageAt={pages.find((p) => p.isSelf)?.createdAt ?? null} />
         <MessagesInbox rows={rows} currentUserId={user.id} pages={pages} renderedAt={renderStamp()} vault={vault} />
       </PullToRefresh>
       </div>

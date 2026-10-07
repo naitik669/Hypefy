@@ -112,9 +112,10 @@ describe("a deck with pages in it", () => {
 
 describe("the note that points at it", () => {
   it("is on Messages, aimed at the deck, timed for when it is out", () => {
-    const src = readFileSync("src/app/(app)/messages/(inbox)/page.tsx", "utf8");
-    expect(src).toMatch(/<HintPointer\s+screen="messages"\s+delayMs=\{1100\}/);
-    expect(src).toContain('target: "spotlight"');
+    expect(readFileSync("src/app/(app)/messages/(inbox)/page.tsx", "utf8")).toContain("<SpotlightPointer");
+    const pointer = readFileSync("src/components/diary/SpotlightPointer.tsx", "utf8");
+    expect(pointer).toContain("export const POINT_AFTER_MS = 1100;");
+    expect(pointer).toContain('target="spotlight"');
     expect(readFileSync("src/components/diary/FloatingPages.tsx", "utf8")).toContain('data-coach="spotlight"');
   });
 });
