@@ -1,42 +1,93 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { GROUP_PHOTO_MAX_BYTES, centredSquare, groupPhotoProblem } from "@/lib/group-photo";
 
 /**
- * The group half of the chat details screen, in the same cards as the rest
- * of it, and the reactions list showing each person's own picture.
+ * The group half of the chat details screen: name and photo changed at the
+ * top, members second (a strip that becomes a list), and the reactions list
+ * showing each person's own picture.
  */
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 
 describe("the group on the chat details screen", () => {
   const info = read("src/components/messages/ConversationInfo.tsx");
-  const group = info.slice(info.indexOf("data-group-name"), info.indexOf('<div className="h-8" />'));
+  const members = info.slice(info.indexOf("data-group-members"), info.indexOf("{/* Shared in this chat"));
 
-  it("sits in cards, not the old full-width rows", () => {
-    expect(info).not.toContain("function Section(");
-    expect(info).not.toContain("<Section");
-    expect(group).toContain("data-group-members");
-    expect(group.split("rounded-2xl bg-surface").length).toBeGreaterThanOrEqual(3);
+  it("the photo and the name are changed where they are shown, by admins", () => {
+    expect(info).toContain("{isGroup && isAdmin ? (\n          <label className=\"relative cursor-pointer\" data-group-photo>");
+    expect(info).toContain('aria-label="Change group photo"');
+    expect(info).toContain('aria-label="Rename group"');
+    expect(info).toContain("else void saveName();");
+    // The separate "Group name" card is gone.
+    expect(info).not.toContain("data-group-name");
+    expect(info).not.toContain("Only admins can rename this group.");
+  });
+
+  it("a new photo goes into the admin's own folder and is then set on the group", () => {
+    expect(info).toContain("const path = `${currentUserId}/group-${conversationId}-${Date.now()}.jpg`;");
+    expect(info).toContain("p_avatar_url: url,");
+    // If the group refuses it, the file is not left behind.
+    expect(info).toContain('await supabase.storage.from("avatars").remove([path]);');
+  });
+
+  it("members come second: before what was shared, and before privacy", () => {
+    const m = info.indexOf("data-group-members");
+    expect(m).toBeGreaterThan(info.indexOf("data-quick-actions"));
+    expect(info.indexOf("data-shared-card")).toBeGreaterThan(m);
+    expect(info.indexOf("data-privacy")).toBeGreaterThan(info.indexOf("data-shared-card"));
+  });
+
+  it("a strip of faces until See all, then the same people as a list", () => {
+    expect(members).toContain('{allMembers ? "Show less" : "See all"}');
+    expect(members).toContain("inert={allMembers}");
+    expect(members).toContain("inert={!allMembers}");
+    expect(members).toContain('allMembers ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"');
+    expect(members).toContain('allMembers ? "grid-rows-[1fr]" : "grid-rows-[0fr]"');
+  });
+
+  it("the rows come down one after another, and hold still for people who asked for less motion", () => {
+    expect(members).toContain("transitionDelay: allMembers ? `${Math.min(i, 12) * MEMBER_STAGGER_MS}ms` : \"0ms\",");
+    expect(members).toContain('allMembers ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"');
+    expect(members.split("motion-reduce:transition-none").length).toBe(4);
   });
 
   it("what an admin can do to a member is behind that member's dots", () => {
-    expect(group).toContain("aria-label={`Options for ${m.name}`}");
-    expect(group).toContain("open={memberMenu === m.id}");
-    expect(group).toContain('label={m.role === "admin" ? "Make a member" : "Make admin"}');
-    expect(group).toContain('label="Remove from group"');
-    // Only for admins, and never on yourself.
-    expect(group).toContain("{isAdmin && m.id !== currentUserId && (");
+    expect(members).toContain("aria-label={`Options for ${m.name}`}");
+    expect(members).toContain('label={m.role === "admin" ? "Make a member" : "Make admin"}');
+    expect(members).toContain('label="Remove from group"');
+    expect(members).toContain("{isAdmin && m.id !== currentUserId && (");
+    expect(members).toContain("setConfirmRemove(m);");
+    // The last rows open upward, inside the card that clips the list.
+    expect(members).toContain('i >= members.length - 2 ? "bottom-11" : "top-11"');
   });
 
-  it("removing still asks first, and changing a role still goes through the same call", () => {
-    expect(group).toContain("setConfirmRemove(m);");
-    expect(group).toContain('supabase.rpc("set_member_role", {');
-    expect(group).toContain('p_role: m.role === "admin" ? "member" : "admin",');
+  it("the actions under the name are icons, each still named", () => {
+    const qa = info.slice(info.indexOf("data-quick-actions"), info.indexOf("data-group-members"));
+    for (const label of ['label="View profile"', 'label="Chat theme"', 'label="Add people"']) expect(qa).toContain(label);
+    expect(qa).toContain('label={isMuted ? "Unmute notifications" : "Mute notifications"}');
+    const fn = info.slice(info.indexOf("function QuickAction("), info.indexOf("function PrivacyRow("));
+    expect(fn).toContain("aria-label={label}");
+    expect(fn).not.toContain("{label}\n");
   });
 
-  it("adding people and renaming are still admin-only", () => {
-    expect(group).toContain("disabled={!isAdmin}");
-    expect(group).toContain("{isAdmin && name.trim() !== title && (");
-    expect(group).toContain('supabase.rpc("add_conversation_member", {');
+  it("Add, from the icon or the strip, opens the list with the search ready", () => {
+    expect(info).toContain("function startAdding() {\n    setAllMembers(true);\n    setAdding(true);\n  }");
+    expect(info.split("onClick={startAdding}").length).toBe(3);
+  });
+});
+
+describe("a group photo", () => {
+  it("is the centred square of whatever was chosen", () => {
+    expect(centredSquare(4000, 3000)).toEqual({ sx: 500, sy: 0, side: 3000 });
+    expect(centredSquare(1080, 1920)).toEqual({ sx: 0, sy: 420, side: 1080 });
+    expect(centredSquare(512, 512)).toEqual({ sx: 0, sy: 0, side: 512 });
+    expect(centredSquare(0, 10).side).toBe(0);
+  });
+
+  it("must be a picture, and not an enormous one", () => {
+    expect(groupPhotoProblem({ type: "image/jpeg", size: 1000 })).toBeNull();
+    expect(groupPhotoProblem({ type: "video/mp4", size: 1000 })).toBe("Choose a photo.");
+    expect(groupPhotoProblem({ type: "image/png", size: GROUP_PHOTO_MAX_BYTES + 1 })).toContain("too large");
   });
 });
 

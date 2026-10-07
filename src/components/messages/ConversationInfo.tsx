@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import {
   Palette,
   Ban,
+  Camera,
+  Pencil,
+  Plus,
   Bell,
   Check,
   ChevronRight,
@@ -34,9 +37,14 @@ import { removeChat } from "@/lib/chat-removal";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ChatThemePicker } from "@/components/messages/ChatThemePicker";
-import { findChatTheme } from "@/lib/chat-themes";
 import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { groupPhotoProblem, toSquareJpeg } from "@/lib/group-photo";
+
+/** How long the member strip takes to become the list, and back. */
+export const MEMBERS_MS = 320;
+/** Each row of the list follows the one above by this much. */
+export const MEMBER_STAGGER_MS = 35;
 import { ChatImg, ChatVideo } from "@/components/messages/ChatMedia";
 import { SHARED_TAB_ICONS, SharedPanel, type SharedPerson } from "@/components/messages/ConversationMedia";
 import type { Shared, SharedTab } from "@/lib/chat-shared";
@@ -69,7 +77,7 @@ const AUTO_DELETE_OPTIONS: { label: string; value: string | null }[] = [
   { label: "30 days", value: "30 days" },
 ];
 
-/** One of the round actions under the name. */
+/** One of the actions under the name: an icon, named for a screen reader. */
 function QuickAction({
   icon,
   label,
@@ -78,28 +86,23 @@ function QuickAction({
   on = false,
 }: {
   icon: React.ReactNode;
+  /** Not shown. What the icon does, read out and shown on a long hover. */
   label: string;
   onClick?: () => void;
   href?: string;
   /** Lit: the thing it names is switched on (muted). */
   on?: boolean;
 }) {
-  const cls = `flex flex-1 flex-col items-center gap-1.5 rounded-2xl py-3 text-[11px] font-semibold transition-colors active:scale-[0.97] ${
-    on ? "bg-accent/15 text-accent" : "bg-surface text-muted hover:text-foreground"
+  const cls = `flex h-12 flex-1 items-center justify-center rounded-2xl transition-colors active:scale-[0.97] ${
+    on ? "bg-accent/15 text-accent" : "bg-surface text-foreground hover:bg-elevated"
   }`;
-  const body = (
-    <>
-      <span className={on ? "text-accent" : "text-foreground"}>{icon}</span>
-      {label}
-    </>
-  );
   return href ? (
-    <Link href={href} className={cls}>
-      {body}
+    <Link href={href} aria-label={label} title={label} className={cls}>
+      {icon}
     </Link>
   ) : (
-    <button type="button" onClick={onClick} aria-pressed={on} className={cls}>
-      {body}
+    <button type="button" onClick={onClick} aria-label={label} title={label} aria-pressed={on} className={cls}>
+      {icon}
     </button>
   );
 }
@@ -244,6 +247,12 @@ export function ConversationInfo({
   /** The Shared tab that is open in place, or none. */
   const [sharedTab, setSharedTab] = useState<SharedTab | null>(null);
   const [timerOpen, setTimerOpen] = useState(false);
+  /** The whole member list, not the strip of faces. */
+  const [allMembers, setAllMembers] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  /** The group picture as it is now: what the page gave, or the one just set. */
+  const [photo, setPhoto] = useState<string | null>(avatarUrl);
+  const [photoBusy, setPhotoBusy] = useState(false);
   /** The member whose menu (make admin, remove) is open. */
   const [memberMenu, setMemberMenu] = useState<string | null>(null);
   const rest = shared.media.length - PREVIEW_TILES;
@@ -362,7 +371,51 @@ export function ConversationInfo({
       return;
     }
     showToast("Group renamed");
+    setEditingName(false);
     router.refresh();
+  }
+
+  /** A new group picture: cut square, put in this admin's own folder, then set on the group. */
+  async function changePhoto(file: File | undefined) {
+    if (!file || photoBusy) return;
+    const problem = groupPhotoProblem(file);
+    if (problem) {
+      showToast(problem);
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      const square = await toSquareJpeg(file);
+      const path = `${currentUserId}/group-${conversationId}-${Date.now()}.jpg`;
+      const { error: upErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, square, { contentType: "image/jpeg", cacheControl: "3600", upsert: false });
+      if (upErr) throw upErr;
+      const url = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+      const { error } = await supabase.rpc("update_conversation", {
+        p_conversation_id: conversationId,
+        p_title: undefined,
+        p_avatar_url: url,
+      });
+      if (error) {
+        // Not left behind: the group never pointed at it.
+        await supabase.storage.from("avatars").remove([path]);
+        throw error;
+      }
+      setPhoto(url);
+      showToast("Group photo changed");
+      router.refresh();
+    } catch {
+      showToast("Couldn't change the group photo. Try again.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  /** Straight to adding someone: the list opens with the search at its head. */
+  function startAdding() {
+    setAllMembers(true);
+    setAdding(true);
   }
 
   async function chooseAutoDelete(value: string | null) {
@@ -394,9 +447,77 @@ export function ConversationInfo({
           report, delete) are behind the dots beside the name, out of the way
           of a thumb scrolling the settings below. */}
       <div className="flex flex-col items-center gap-2 px-6 pt-6 pb-1 text-center">
-        <Avatar name={title} hue={peer?.hue ?? 280} src={avatarUrl ?? undefined} size={88} />
-        <div className="relative mt-1 flex max-w-full items-center gap-1 pl-9">
+        {isGroup && isAdmin ? (
+          <label className="relative cursor-pointer" data-group-photo>
+            <Avatar name={title} hue={peer?.hue ?? 280} src={photo ?? undefined} size={88} />
+            <span className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-[3px] border-background bg-accent text-accent-ink">
+              {photoBusy ? <Loader2 size={14} className="animate-spin" /> : <Camera size={15} strokeWidth={2.4} />}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              aria-label="Change group photo"
+              disabled={photoBusy}
+              onChange={(e) => {
+                void changePhoto(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        ) : (
+          <Avatar name={title} hue={peer?.hue ?? 280} src={(isGroup ? photo : avatarUrl) ?? undefined} size={88} />
+        )}
+        {editingName ? (
+          <form
+            className="mt-1 flex w-full max-w-xs items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (name.trim() === title) setEditingName(false);
+              else void saveName();
+            }}
+          >
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value.slice(0, 50))}
+              aria-label="Group name"
+              placeholder="Group name"
+              className="h-10 min-w-0 flex-1 rounded-xl bg-surface px-3 text-center text-base font-bold outline-none"
+            />
+            <button
+              type="submit"
+              disabled={savingName || !name.trim()}
+              aria-label="Save group name"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-ink disabled:opacity-60"
+            >
+              {savingName ? <Loader2 size={16} className="animate-spin" /> : <Check size={18} strokeWidth={2.6} />}
+            </button>
+            <button
+              type="button"
+              aria-label="Cancel"
+              onClick={() => {
+                setName(title);
+                setEditingName(false);
+              }}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface text-muted"
+            >
+              <X size={18} />
+            </button>
+          </form>
+        ) : (
+        <div className={`relative mt-1 flex max-w-full items-center gap-1 ${isGroup && isAdmin ? "pl-[4.5rem]" : "pl-9"}`}>
           <h2 className="min-w-0 truncate text-lg font-extrabold">{title}</h2>
+          {isGroup && isAdmin && (
+            <button
+              type="button"
+              aria-label="Rename group"
+              onClick={() => setEditingName(true)}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground"
+            >
+              <Pencil size={16} />
+            </button>
+          )}
           <button
             type="button"
             aria-label="More options"
@@ -448,6 +569,7 @@ export function ConversationInfo({
             />
           </FloatingMenu>
         </div>
+        )}
         {!isGroup && peer?.username && (
           <p className="text-sm text-muted">@{peer.username}</p>
         )}
@@ -458,23 +580,240 @@ export function ConversationInfo({
         )}
       </div>
 
-      {/* What you reach for most, one tap each. */}
-      <div className="mt-4 flex gap-2 px-4">
+      {/* What you reach for most, one tap each. Icons only. */}
+      <div className="mt-4 flex gap-2 px-4" data-quick-actions>
         {!isGroup && peer?.username && (
-          <QuickAction icon={<UserCircle size={22} />} label="Profile" href={`/u/${peer.username}`} />
+          <QuickAction icon={<UserCircle size={22} />} label="View profile" href={`/u/${peer.username}`} />
         )}
         <QuickAction
           icon={isMuted ? <BellOff size={22} /> : <Bell size={22} />}
-          label={isMuted ? "Muted" : "Mute"}
+          label={isMuted ? "Unmute notifications" : "Mute notifications"}
           on={isMuted}
           onClick={toggleMute}
         />
-        <QuickAction
-          icon={<Palette size={22} />}
-          label={findChatTheme(chatTheme)?.label ?? "Theme"}
-          onClick={() => setThemeOpen(true)}
-        />
+        <QuickAction icon={<Palette size={22} />} label="Chat theme" onClick={() => setThemeOpen(true)} />
+        {isGroup && isAdmin && <QuickAction icon={<UserPlus size={22} />} label="Add people" onClick={startAdding} />}
       </div>
+
+      {/* Who is in the group. A strip of faces until "See all", when the
+          strip folds away and the same people come down as a list, one after
+          another, each with their name and (for an admin) their menu. */}
+      {isGroup && (
+        <section className="mt-6" data-group-members data-all={allMembers || undefined}>
+          <div className="flex items-center justify-between px-5 pb-2">
+            <p className="text-[11px] font-bold tracking-widest text-faint uppercase">
+              {members.length} {members.length === 1 ? "member" : "members"}
+            </p>
+            <button
+              type="button"
+              aria-expanded={allMembers}
+              onClick={() => {
+                setAllMembers((v) => !v);
+                setAdding(false);
+                setMemberMenu(null);
+              }}
+              className="text-xs font-bold text-accent"
+            >
+              {allMembers ? "Show less" : "See all"}
+            </button>
+          </div>
+
+          <div
+            inert={allMembers}
+            style={{ transitionDuration: `${MEMBERS_MS}ms` }}
+            className={`grid transition-[grid-template-rows,opacity] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
+              allMembers ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <div className="no-scrollbar flex gap-3 overflow-x-auto px-4 pb-1">
+                {isAdmin && (
+                  <button type="button" onClick={startAdding} className="flex w-14 shrink-0 flex-col items-center gap-1.5">
+                    <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/15 text-accent">
+                      <Plus size={22} strokeWidth={2.4} />
+                    </span>
+                    <span className="text-[11px] font-semibold text-accent">Add</span>
+                  </button>
+                )}
+                {members.map((m) => (
+                  <Link
+                    key={m.id}
+                    href={m.username ? `/u/${m.username}` : "#"}
+                    className="flex w-14 shrink-0 flex-col items-center gap-1.5"
+                  >
+                    <Avatar name={m.name} hue={m.hue} src={m.avatarUrl ?? undefined} size={56} />
+                    <span className="w-full truncate text-center text-[11px] font-semibold text-muted">
+                      {m.id === currentUserId ? "You" : m.name.split(" ")[0]}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div
+            inert={!allMembers}
+            style={{ transitionDuration: `${MEMBERS_MS}ms` }}
+            className={`grid px-4 transition-[grid-template-rows] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
+              allMembers ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <div className="divide-y divide-border/50 rounded-2xl bg-surface">
+                {isAdmin && (
+                  <div>
+                    <button
+                      type="button"
+                      aria-expanded={adding}
+                      onClick={() => setAdding((v) => !v)}
+                      className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-white/[0.04]"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                        <UserPlus size={18} />
+                      </span>
+                      <span className="flex-1 text-sm font-semibold text-accent">Add people</span>
+                      {adding && <X size={16} className="text-faint" />}
+                    </button>
+
+                    {adding && (
+                      <div className="px-3.5 pb-3">
+                        <div className="flex h-10 items-center gap-2 rounded-xl bg-background/70 px-3">
+                          <Search size={15} className="shrink-0 text-faint" />
+                          <input
+                            value={q}
+                            onChange={(e) => setQ(e.target.value)}
+                            placeholder="Search people you know…"
+                            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
+                          />
+                          {searching && <Loader2 size={14} className="animate-spin text-faint" />}
+                        </div>
+                        {results.map((r) => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            disabled={busy === r.id}
+                            onClick={() =>
+                              run(
+                                r.id,
+                                () =>
+                                  supabase.rpc("add_conversation_member", {
+                                    p_conversation_id: conversationId,
+                                    p_user_id: r.id,
+                                  }) as unknown as Promise<{ error: unknown }>,
+                                `Added ${r.name}`,
+                                "Couldn't add them."
+                              ).then((okd) => {
+                                if (okd) setResults((x) => x.filter((y) => y.id !== r.id));
+                              }) as unknown as void
+                            }
+                            className="mt-2 flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left hover:bg-white/[0.04] disabled:opacity-60"
+                          >
+                            <Avatar name={r.name} hue={r.hue} src={r.avatarUrl ?? undefined} size={36} />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold">{r.name}</span>
+                              {r.username && (
+                                <span className="block truncate text-xs text-muted">@{r.username}</span>
+                              )}
+                            </span>
+                            {busy === r.id ? (
+                              <Loader2 size={16} className="animate-spin text-muted" />
+                            ) : (
+                              <UserPlus size={16} className="text-accent" />
+                            )}
+                          </button>
+                        ))}
+                        {!searching && q.trim() && results.length === 0 && (
+                          <p className="mt-3 text-center text-xs text-faint">No one found.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {members.map((m, i) => (
+                  <div
+                    key={m.id}
+                    data-member={m.id}
+                    // Each comes down a beat after the one above; all leave together.
+                    style={{
+                      transitionDuration: `${MEMBERS_MS}ms`,
+                      transitionDelay: allMembers ? `${Math.min(i, 12) * MEMBER_STAGGER_MS}ms` : "0ms",
+                    }}
+                    className={`relative flex items-center gap-3 px-3.5 py-2.5 transition-[opacity,transform] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
+                      allMembers ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"
+                    }`}
+                  >
+                    <Link href={m.username ? `/u/${m.username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
+                      <Avatar name={m.name} hue={m.hue} src={m.avatarUrl ?? undefined} size={40} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">
+                          {m.name}
+                          {m.id === currentUserId && <span className="ml-1 text-xs font-normal text-faint">(you)</span>}
+                        </span>
+                        {m.username && <span className="block truncate text-xs text-muted">@{m.username}</span>}
+                      </span>
+                    </Link>
+                    {m.role === "admin" && (
+                      <span className="shrink-0 rounded-pill bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">Admin</span>
+                    )}
+                    {isAdmin && m.id !== currentUserId && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busy === m.id}
+                          aria-label={`Options for ${m.name}`}
+                          aria-haspopup="menu"
+                          aria-expanded={memberMenu === m.id}
+                          onClick={() => setMemberMenu(m.id)}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground disabled:opacity-60"
+                        >
+                          {busy === m.id ? <Loader2 size={16} className="animate-spin" /> : <MoreHorizontal size={18} />}
+                        </button>
+                        <FloatingMenu
+                          open={memberMenu === m.id}
+                          onClose={() => setMemberMenu(null)}
+                          // The list is clipped to its card while it folds, so
+                          // the last rows open their menu upward, inside it.
+                          origin={i >= members.length - 2 ? "bottom-right" : "top-right"}
+                          className={`absolute right-3 min-w-[200px] ${i >= members.length - 2 ? "bottom-11" : "top-11"}`}
+                        >
+                          <MenuItem
+                            icon={m.role === "admin" ? ShieldOff : ShieldCheck}
+                            label={m.role === "admin" ? "Make a member" : "Make admin"}
+                            onClick={() => {
+                              setMemberMenu(null);
+                              void run(
+                                m.id,
+                                () =>
+                                  supabase.rpc("set_member_role", {
+                                    p_conversation_id: conversationId,
+                                    p_user_id: m.id,
+                                    p_role: m.role === "admin" ? "member" : "admin",
+                                  }) as unknown as Promise<{ error: unknown }>,
+                                m.role === "admin" ? `${m.name} is now a member` : `${m.name} is now an admin`,
+                                "Couldn't change their role."
+                              );
+                            }}
+                          />
+                          <MenuItem
+                            icon={UserMinus}
+                            label="Remove from group"
+                            danger
+                            onClick={() => {
+                              setMemberMenu(null);
+                              setConfirmRemove(m);
+                            }}
+                          />
+                        </FloatingMenu>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Shared in this chat: the three kinds and how many of each. Tapping
           one opens it right here, the card growing downward under the icons;
@@ -605,183 +944,6 @@ export function ConversationInfo({
           />
         </div>
       </section>
-
-      {/* The group: its name, and who is in it. Same cards as the rest of
-          the screen; what an admin can do to a member is behind that
-          member's dots, not two bare icons beside every name. */}
-      {isGroup && (
-        <>
-          <section className="mt-6 px-4" data-group-name>
-            <p className="px-1 pb-2 text-[11px] font-bold tracking-widest text-faint uppercase">Group name</p>
-            <div className="rounded-2xl bg-surface p-2.5">
-              <div className="flex items-center gap-2">
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value.slice(0, 50))}
-                  disabled={!isAdmin}
-                  aria-label="Group name"
-                  placeholder="Group name"
-                  className="h-10 min-w-0 flex-1 rounded-xl bg-background/70 px-3 text-sm font-semibold outline-none disabled:opacity-60"
-                />
-                {isAdmin && name.trim() !== title && (
-                  <button
-                    type="button"
-                    onClick={saveName}
-                    disabled={savingName}
-                    className="flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-bold text-accent-ink disabled:opacity-60"
-                  >
-                    {savingName ? <Loader2 size={15} className="animate-spin" /> : "Save"}
-                  </button>
-                )}
-              </div>
-              {!isAdmin && <p className="px-1 pt-2 text-xs text-faint">Only admins can rename this group.</p>}
-            </div>
-          </section>
-
-          <section className="mt-6 px-4" data-group-members>
-            <p className="px-1 pb-2 text-[11px] font-bold tracking-widest text-faint uppercase">
-              {members.length} {members.length === 1 ? "member" : "members"}
-            </p>
-            <div className="divide-y divide-border/50 rounded-2xl bg-surface">
-              {isAdmin && (
-                <div>
-                  <button
-                    type="button"
-                    aria-expanded={adding}
-                    onClick={() => setAdding((v) => !v)}
-                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-white/[0.04]"
-                  >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
-                      <UserPlus size={18} />
-                    </span>
-                    <span className="flex-1 text-sm font-semibold text-accent">Add people</span>
-                    {adding && <X size={16} className="text-faint" />}
-                  </button>
-
-                  {adding && (
-                    <div className="px-3.5 pb-3">
-                      <div className="flex h-10 items-center gap-2 rounded-xl bg-background/70 px-3">
-                        <Search size={15} className="shrink-0 text-faint" />
-                        <input
-                          value={q}
-                          onChange={(e) => setQ(e.target.value)}
-                          placeholder="Search people you know…"
-                          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
-                        />
-                        {searching && <Loader2 size={14} className="animate-spin text-faint" />}
-                      </div>
-                      {results.map((r) => (
-                        <button
-                          key={r.id}
-                          type="button"
-                          disabled={busy === r.id}
-                          onClick={() =>
-                            run(
-                              r.id,
-                              () =>
-                                supabase.rpc("add_conversation_member", {
-                                  p_conversation_id: conversationId,
-                                  p_user_id: r.id,
-                                }) as unknown as Promise<{ error: unknown }>,
-                              `Added ${r.name}`,
-                              "Couldn't add them."
-                            ).then((okd) => {
-                              if (okd) setResults((x) => x.filter((y) => y.id !== r.id));
-                            }) as unknown as void
-                          }
-                          className="mt-2 flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left hover:bg-white/[0.04] disabled:opacity-60"
-                        >
-                          <Avatar name={r.name} hue={r.hue} src={r.avatarUrl ?? undefined} size={36} />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-semibold">{r.name}</span>
-                            {r.username && (
-                              <span className="block truncate text-xs text-muted">@{r.username}</span>
-                            )}
-                          </span>
-                          {busy === r.id ? (
-                            <Loader2 size={16} className="animate-spin text-muted" />
-                          ) : (
-                            <UserPlus size={16} className="text-accent" />
-                          )}
-                        </button>
-                      ))}
-                      {!searching && q.trim() && results.length === 0 && (
-                        <p className="mt-3 text-center text-xs text-faint">No one found.</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {members.map((m) => (
-                <div key={m.id} className="relative flex items-center gap-3 px-3.5 py-2.5" data-member={m.id}>
-                  <Link href={m.username ? `/u/${m.username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
-                    <Avatar name={m.name} hue={m.hue} src={m.avatarUrl ?? undefined} size={40} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">
-                        {m.name}
-                        {m.id === currentUserId && <span className="ml-1 text-xs font-normal text-faint">(you)</span>}
-                      </span>
-                      {m.username && <span className="block truncate text-xs text-muted">@{m.username}</span>}
-                    </span>
-                  </Link>
-                  {m.role === "admin" && (
-                    <span className="shrink-0 rounded-pill bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">Admin</span>
-                  )}
-                  {isAdmin && m.id !== currentUserId && (
-                    <>
-                      <button
-                        type="button"
-                        disabled={busy === m.id}
-                        aria-label={`Options for ${m.name}`}
-                        aria-haspopup="menu"
-                        aria-expanded={memberMenu === m.id}
-                        onClick={() => setMemberMenu(m.id)}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground disabled:opacity-60"
-                      >
-                        {busy === m.id ? <Loader2 size={16} className="animate-spin" /> : <MoreHorizontal size={18} />}
-                      </button>
-                      <FloatingMenu
-                        open={memberMenu === m.id}
-                        onClose={() => setMemberMenu(null)}
-                        className="absolute right-3 top-11 min-w-[200px]"
-                      >
-                        <MenuItem
-                          icon={m.role === "admin" ? ShieldOff : ShieldCheck}
-                          label={m.role === "admin" ? "Make a member" : "Make admin"}
-                          onClick={() => {
-                            setMemberMenu(null);
-                            void run(
-                              m.id,
-                              () =>
-                                supabase.rpc("set_member_role", {
-                                  p_conversation_id: conversationId,
-                                  p_user_id: m.id,
-                                  p_role: m.role === "admin" ? "member" : "admin",
-                                }) as unknown as Promise<{ error: unknown }>,
-                              m.role === "admin" ? `${m.name} is now a member` : `${m.name} is now an admin`,
-                              "Couldn't change their role."
-                            );
-                          }}
-                        />
-                        <MenuItem
-                          icon={UserMinus}
-                          label="Remove from group"
-                          danger
-                          onClick={() => {
-                            setMemberMenu(null);
-                            setConfirmRemove(m);
-                          }}
-                        />
-                      </FloatingMenu>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        </>
-      )}
 
       <div className="h-8" />
 
