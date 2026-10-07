@@ -87,7 +87,7 @@ const ACTIONS: Entry[] = [
   {
     icon: GhostShareIcon,
     term: "Ghost Share",
-    what: "Puts a post or a Shot near the top of one person's feed without telling them it was you. It works with people you follow who follow you back, and you get a few each week. You'll see that it was placed, and nothing after that. People you follow back can do the same for you. Find it under Share.",
+    what: "Puts a post or a Shot near the top of one person's feed without telling them it was you. It works with people you follow who follow you back, and you get a few each week. You'll see that it was placed, and nothing after that. People you follow back can do the same for you: if a ghost floats up when you hype something, someone placed it for you. Find it under Share.",
   },
   {
     icon: Bookmark,

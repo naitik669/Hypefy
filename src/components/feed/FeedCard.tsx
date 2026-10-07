@@ -21,6 +21,7 @@ import { ShareButton } from "@/components/feed/QuickShare";
 import { EditPostSheet } from "@/components/feed/EditPostSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { HypeBreak } from "@/components/feed/HypeBreak";
+import { GhostRise, useGhostRise } from "@/components/ghost/GhostRise";
 import { HypeProofLine } from "@/components/hype/HypeProofLine";
 import { HypedBySheet } from "@/components/hype/HypedBySheet";
 import type { HypeProof } from "@/lib/hype-proof";
@@ -180,6 +181,7 @@ export function FeedCard({
   const [hyped, setHyped] = useState(post.initialHyped ?? false);
   const [hypeCount, setHypeCount] = useState(post.hype_count);
   const [hypePending, setHypePending] = useState(false);
+  const ghostRise = useGhostRise("post", post.id);
   const [hypeBurst, setHypeBurst] = useState(false);
   const [showParticles, setShowParticles] = useState(false);
   /** Un-hyping: the star snaps in two and the halves fall. */
@@ -649,6 +651,8 @@ export function FeedCard({
         setHyped(res.hyped);
         setHypeCount(res.hype_count);
       }
+      // Was this one placed for you? Asked after every hype; see GhostRise.
+      if (res ? res.hyped : !prev) void ghostRise.ask();
     } catch {
       setHyped(prev);
       setHypeCount(prevCount);
@@ -928,6 +932,7 @@ export function FeedCard({
               />
               {showParticles && <HypeParticles size={9} />}
               {hypeBreak && <HypeBreak size={23} />}
+              {ghostRise.rising && <GhostRise size={20} />}
             </span>
             <span className={hyped ? "text-hype" : "text-foreground"}>
               {formatCount(hypeCount)}

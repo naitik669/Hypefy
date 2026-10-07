@@ -6,7 +6,9 @@
  * This moves that one item near the top and touches nothing else, so the
  * most it can cost the feed is one off-interest item among the first three.
  *
- * The person whose feed it is is not told. Nothing here marks the item: it
+ * The person whose feed it is is not told, unless they hype it (see
+ * GhostRise, which asks the database at that moment and not before).
+ * Nothing here marks the item: it
  * comes out the same object, with the same fields, as any other in the list.
  * That is the feature, and it is also why this function must never add a
  * flag "for debugging".

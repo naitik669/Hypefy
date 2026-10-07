@@ -81,8 +81,10 @@ export default function PrivacyPage() {
       <p>
         <strong>Ghost Share.</strong> People you follow who also follow you
         can use Ghost Share to place a post or a Shot near the top of your
-        feed. You are not notified and the post or Shot is not marked. It is
-        always something you could already see, and it stops if either of
+        feed. You are not notified and the post or Shot is not marked. If you
+        hype it, a small ghost appears to show that it was placed for you;
+        it does not say by whom. It is always something you could already
+        see, and it stops if either of
         you blocks or unfollows the other. The person who placed it is not
         told whether you saw it. Hypefy keeps a record of who placed what
         for whom, and when, so that misuse can be investigated. To ask about

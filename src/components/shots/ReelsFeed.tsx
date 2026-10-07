@@ -17,6 +17,7 @@ import { ShareSheet } from "@/components/feed/ShareSheet";
 import { ShareButton } from "@/components/feed/QuickShare";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { HypeBreak } from "@/components/feed/HypeBreak";
+import { GhostRise, useGhostRise } from "@/components/ghost/GhostRise";
 import { HypeProofLine } from "@/components/hype/HypeProofLine";
 import { playbackWindow } from "@/lib/shot-trim";
 import { overlayCount } from "@/lib/overlay-stack";
@@ -471,6 +472,7 @@ function ReelCard({
   const [proof, setProof] = useState<HypeProof | null>(null);
   const [hypedBySheet, setHypedBySheet] = useState(false);
   const [hypePending, setHypePending] = useState(false);
+  const ghostRise = useGhostRise("shot", reel.id);
 
   const [commentCount, setCommentCount] = useState(reel.comment_count ?? 0);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -788,6 +790,8 @@ function ReelCard({
         setHyped(res.hyped);
         setHypeCount(res.hype_count);
       }
+      // Was this one placed for you? Asked after every hype; see GhostRise.
+      if (res ? res.hyped : !prev) void ghostRise.ask();
     } catch {
       setHyped(prev);
       setHypeCount(prevCount);
@@ -1198,6 +1202,7 @@ function ReelCard({
             />
             {showParticles && <HypeParticles size={10} />}
             {hypeBreak && <HypeBreak size={32} />}
+            {ghostRise.rising && <GhostRise size={26} />}
           </span>
         </RailButton>
 
