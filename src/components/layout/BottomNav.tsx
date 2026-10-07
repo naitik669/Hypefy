@@ -231,6 +231,7 @@ export function BottomNav({
           <button
             type="button"
             aria-label="Create"
+            data-coach="create"
             onClick={() => {
               haptics.tap();
               router.push("/create");

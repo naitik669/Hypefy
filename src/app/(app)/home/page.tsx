@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/TopBar";
 import { ShowsRow } from "@/components/home/ShowsRow";
 import { FeedList } from "@/components/feed/FeedList";
-import { CoachMarks } from "@/components/ui/CoachMarks";
+import { HintPointer } from "@/components/ui/CoachMarks";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { UploadProgressBar } from "@/components/upload/UploadProvider";
 import {
@@ -478,34 +478,16 @@ export default async function HomePage() {
         {/* Shows are the least-understood thing in the app — 6 views against
             168 hypes. The row itself never says what it is or that it
             expires, so the first question it raises goes unanswered. */}
-        {/* Each of these points at the real control and is finished by using
-            it: see CoachMarks. They replaced cards that sat above the feed
-            and described buttons somewhere further down the page. */}
-        <CoachMarks
-          steps={[
-            {
-              id: "shows",
-              target: "shows",
-              title: "Shows disappear after 24 hours",
-              text: "Yours vanishes after a day. Your posts stay put.",
-              tryIt: "Tap a ring to watch one.",
-            },
-            // The star is the one button everyone finds. That a double tap
-            // does the same, and what a hype does for you, nobody is told.
-            {
-              id: "hype",
-              target: "hype",
-              title: "Hype what you like",
-              text: "It tells them you liked it, and brings more like it to your feed. Double-tapping the photo does the same.",
-              tryIt: "Try it: tap the star.",
-            },
-            {
-              id: "save",
-              target: "save",
-              title: "Keep it in your Library",
-              text: "The bookmark keeps a post for later. Hold it to choose a playlist.",
-              tryIt: "Tap the bookmark to keep this one.",
-            },
+        {/* Hints, sparingly: the first on a first visit, then one now and
+            then, each once. The later ones are the things nothing on screen
+            gives away. See lib/hint-schedule. */}
+        <HintPointer
+          screen="home"
+          hints={[
+            { id: "shows", target: "shows", text: "Shows vanish after 24 hours. Tap a ring to watch." },
+            { id: "hype", target: "hype", text: "Double-tap a photo to hype it, too." },
+            { id: "save", target: "save", text: "Hold the bookmark to drop this straight into a playlist." },
+            { id: "create", target: "create", text: "Hold + to pick what to make: a post, a Shot, a Show." },
           ]}
         />
 

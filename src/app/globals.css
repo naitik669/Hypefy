@@ -1061,8 +1061,17 @@ html[data-dm-leave]::view-transition-old(root) {
 .animate-coach-ring {
   animation: coach-ring 1.8s ease-in-out infinite;
 }
+/* A hint's note arriving: a short fade and a few pixels of rise. */
+@keyframes hint-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-hint-in {
+  animation: hint-in 0.18s ease-out both;
+}
 @media (prefers-reduced-motion: reduce) {
   .animate-coach-ring { animation: none; }
+  .animate-hint-in { animation: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   /* Still appears, still goes: held just above the star, without the drift. */

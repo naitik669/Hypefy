@@ -3,83 +3,119 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { readFileSync } from "node:fs";
-import { boxOf, placeBubble, CoachMarks } from "@/components/ui/CoachMarks";
+import { boxOf, placeBubble, HintPointer, HINT_STAYS_MS } from "@/components/ui/CoachMarks";
+import {
+  HINT_GAP_MS,
+  HINT_GAP_VISITS,
+  NO_HINTS_YET,
+  hintDue,
+  nextHint,
+  readHintState,
+  withShown,
+  withVisit,
+} from "@/lib/hint-schedule";
+import {
+  ACTIVE_FOR_MS,
+  NEVER_USED,
+  noteNudgeDismissed,
+  noteSpotlightOpened,
+  nudgeLine,
+  readSpotlightUse,
+  shouldNudge,
+  snoozeFor,
+} from "@/lib/spotlight-nudge";
 
 /**
- * Tips that point at the real control, and are finished by using it.
+ * Hints: one on a first visit, then one now and then, each once. And a
+ * reminder about Spotlight for people who are not using it.
  */
 
+const DAY = 24 * 60 * 60 * 1000;
+const NOW = 1_800_000_000_000;
 const VIEW = { width: 390, height: 800 };
-const STEPS = [
-  { id: "one", target: "one", title: "First", text: "about the first", tryIt: "Tap it." },
-  { id: "two", target: "two", title: "Second", text: "about the second" },
-  { id: "three", target: "three", title: "Third", text: "about the third" },
-];
+const always = () => true;
 
-/** jsdom lays nothing out, so a control's place is given to it. */
-function control(name: string, rect: { top: number; left: number; width: number; height: number }) {
-  const el = document.createElement("button");
-  el.setAttribute("data-coach", name);
-  el.getBoundingClientRect = () =>
-    ({ ...rect, right: rect.left + rect.width, bottom: rect.top + rect.height, x: rect.left, y: rect.top, toJSON: () => ({}) }) as DOMRect;
-  document.body.appendChild(el);
-  return el;
-}
+describe("when a hint is due", () => {
+  it("is at once, on a first visit", () => {
+    expect(hintDue(NO_HINTS_YET, NOW)).toBe(true);
+    expect(nextHint(["a", "b"], NO_HINTS_YET, NOW, always)).toBe("a");
+  });
 
-describe("where the control is", () => {
+  it("is not again on the next visit, or the one after", () => {
+    let s = withShown(NO_HINTS_YET, "a", NOW);
+    for (let i = 0; i < 3; i++) {
+      s = withVisit(s);
+      expect(nextHint(["a", "b"], s, NOW + 10 * DAY, always)).toBeNull();
+    }
+  });
+
+  it("needs both the days and the visits to have passed", () => {
+    const shown = withShown(NO_HINTS_YET, "a", NOW);
+    const visited = { ...shown, visits: HINT_GAP_VISITS };
+    // Enough visits, too soon.
+    expect(hintDue(visited, NOW + HINT_GAP_MS - 1)).toBe(false);
+    // Long enough, too few visits.
+    expect(hintDue({ ...shown, visits: HINT_GAP_VISITS - 1 }, NOW + HINT_GAP_MS * 5)).toBe(false);
+    // Both.
+    expect(hintDue(visited, NOW + HINT_GAP_MS)).toBe(true);
+    expect(nextHint(["a", "b"], visited, NOW + HINT_GAP_MS, always)).toBe("b");
+  });
+
+  it("never shows the same one twice, and stops when they are used up", () => {
+    const s = { seen: ["a", "b"], lastAt: NOW, visits: 99 };
+    expect(nextHint(["a", "b"], s, NOW + 30 * DAY, always)).toBeNull();
+  });
+
+  it("passes over one whose control is not on the screen, and keeps it for later", () => {
+    expect(nextHint(["a", "b"], NO_HINTS_YET, NOW, (id) => id === "b")).toBe("b");
+    expect(nextHint(["a", "b"], NO_HINTS_YET, NOW, () => false)).toBeNull();
+  });
+
+  it("being shown uses a hint up and starts the wait again", () => {
+    expect(withShown({ seen: ["a"], lastAt: 1, visits: 7 }, "b", NOW)).toEqual({ seen: ["a", "b"], lastAt: NOW, visits: 0 });
+  });
+
+  it("counts tips already read as the old cards", () => {
+    localStorage.clear();
+    localStorage.setItem("hypefy_hint_shows", "1");
+    expect(readHintState("home", ["shows", "hype"]).seen).toEqual(["shows"]);
+    localStorage.clear();
+  });
+});
+
+describe("where the control is, and where the note goes", () => {
   const el = (top: number, left = 20) =>
     ({ getBoundingClientRect: () => ({ top, left, width: 40, height: 40, right: left + 40, bottom: top + 40 }) }) as Element;
 
-  it("is its box when it is properly on screen", () => {
+  it("finds a control that is on screen, and not one that has scrolled off", () => {
     expect(boxOf(el(300), VIEW)).toEqual({ top: 300, left: 20, width: 40, height: 40 });
-  });
-
-  it("is nowhere when it has scrolled off, or is not there", () => {
     expect(boxOf(el(-200), VIEW)).toBeNull();
     expect(boxOf(el(790), VIEW)).toBeNull();
-    expect(boxOf(el(300, 500), VIEW)).toBeNull();
     expect(boxOf(null, VIEW)).toBeNull();
   });
-});
 
-describe("where the bubble goes", () => {
-  it("sits under the control when there is room, pointing up at its middle", () => {
-    const at = placeBubble({ top: 100, left: 40, width: 40, height: 40 }, VIEW, 120);
-    expect(at.below).toBe(true);
-    expect(at.top).toBeGreaterThan(140);
-    // The arrow is at the control's centre (x = 60), measured from the bubble's left.
-    expect(at.left + at.arrow).toBe(60);
+  it("puts the note under the control, or over it when there is no room", () => {
+    expect(placeBubble({ top: 100, left: 40, width: 40, height: 40 }, VIEW, 90).below).toBe(true);
+    expect(placeBubble({ top: 720, left: 40, width: 40, height: 40 }, VIEW, 90).below).toBe(false);
   });
 
-  it("goes over the control when there is no room underneath", () => {
-    const at = placeBubble({ top: 700, left: 40, width: 40, height: 40 }, VIEW, 120);
-    expect(at.below).toBe(false);
-    expect(at.top + 120).toBeLessThan(700);
-  });
-
-  it("stays on the screen for a control at either edge, arrow inside its corners", () => {
-    const right = placeBubble({ top: 100, left: 360, width: 40, height: 40 }, VIEW, 120);
+  it("keeps the note on the screen with its arrow on the control", () => {
+    const mid = placeBubble({ top: 100, left: 175, width: 40, height: 40 }, VIEW, 90);
+    expect(mid.left + mid.arrow).toBe(195);
+    const right = placeBubble({ top: 100, left: 360, width: 40, height: 40 }, VIEW, 90);
     expect(right.left + right.width).toBeLessThanOrEqual(VIEW.width - 12);
-    expect(right.arrow).toBeLessThanOrEqual(right.width - 18);
-    const left = placeBubble({ top: 100, left: -10, width: 30, height: 30 }, VIEW, 120);
-    expect(left.left).toBe(12);
-    expect(left.arrow).toBeGreaterThanOrEqual(18);
-  });
-
-  it("is never wider than a narrow screen allows", () => {
-    expect(placeBubble({ top: 100, left: 40, width: 40, height: 40 }, { width: 240, height: 800 }, 120).width).toBe(216);
+    expect(right.arrow).toBeLessThanOrEqual(right.width - 16);
   });
 });
 
-describe("the tips, in use", () => {
+describe("a hint on the screen", () => {
   let root: Root;
   let host: HTMLDivElement;
-  const mark = () => document.querySelector("[data-coach-mark]");
-  const shown = () => mark()?.getAttribute("data-coach-mark") ?? null;
-  const button = (label: string) =>
-    [...(mark()?.querySelectorAll("button") ?? [])].find((b) => b.textContent === label) as HTMLButtonElement;
-  // Twice: the tip is chosen on the first pass, and it finds its control
-  // on the next frame, which is only asked for once the first has landed.
+  const HINTS = [
+    { id: "one", target: "one", text: "about the first" },
+    { id: "two", target: "two", text: "about the second" },
+  ];
+  const note = () => document.querySelector("[data-hint]");
   const wait = async (ms: number) => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(ms);
@@ -88,15 +124,27 @@ describe("the tips, in use", () => {
       await vi.advanceTimersByTimeAsync(40);
     });
   };
-
-  async function mount(steps = STEPS) {
-    await act(async () => root.render(createElement(CoachMarks, { steps, delayMs: 100 })));
+  function control(name: string, top = 200) {
+    const el = document.createElement("button");
+    el.setAttribute("data-coach", name);
+    el.getBoundingClientRect = () => ({ top, left: 40, width: 40, height: 40, right: 80, bottom: top + 40 }) as DOMRect;
+    document.body.appendChild(el);
+    return el;
+  }
+  async function mount() {
+    await act(async () => root.render(createElement(HintPointer, { screen: "test", hints: HINTS, delayMs: 100 })));
     await wait(150);
+  }
+  async function remount() {
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    await mount();
   }
 
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "requestAnimationFrame", "cancelAnimationFrame"] });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "requestAnimationFrame", "cancelAnimationFrame", "Date"] });
+    vi.setSystemTime(NOW);
     localStorage.clear();
     Object.defineProperty(window, "innerWidth", { configurable: true, value: VIEW.width });
     Object.defineProperty(window, "innerHeight", { configurable: true, value: VIEW.height });
@@ -110,106 +158,136 @@ describe("the tips, in use", () => {
     vi.useRealTimers();
   });
 
-  it("points at the first control, with its words and what to do", async () => {
-    control("one", { top: 200, left: 40, width: 40, height: 40 });
+  it("shows the first one on a first visit, as one line by its control", async () => {
+    control("one");
     await mount();
-    expect(shown()).toBe("one");
-    expect(mark()!.textContent).toContain("First");
-    expect(mark()!.textContent).toContain("Tap it.");
-    expect(mark()!.textContent).toContain("1 of 3");
+    expect(note()!.getAttribute("data-hint")).toBe("one");
+    expect(note()!.textContent).toBe("about the first");
   });
 
-  it("never stands between a finger and the page", async () => {
-    control("one", { top: 200, left: 40, width: 40, height: 40 });
+  it("does not dim the screen or stand in the way of anything", async () => {
+    control("one");
     await mount();
-    expect(mark()!.className).toContain("pointer-events-none");
+    expect(note()!.className).toContain("pointer-events-none");
+    expect(note()!.innerHTML).not.toContain("9999px");
+    expect(note()!.textContent).not.toMatch(/Got it|Skip|of \d/);
   });
 
-  it("using the control finishes the tip and brings up the next", async () => {
-    const one = control("one", { top: 200, left: 40, width: 40, height: 40 });
-    control("two", { top: 300, left: 40, width: 40, height: 40 });
+  it("does not come back on the next visit, nor bring the next one straight after", async () => {
+    control("one");
+    control("two", 300);
     await mount();
-    await act(async () => one.click());
-    expect(localStorage.getItem("hypefy_hint_one")).toBe("1");
-    expect(mark()).toBeNull();
-    await wait(800);
-    expect(shown()).toBe("two");
+    await remount();
+    expect(note()).toBeNull();
   });
 
-  it("Got it moves on without doing the thing", async () => {
-    control("one", { top: 200, left: 40, width: 40, height: 40 });
-    control("two", { top: 300, left: 40, width: 40, height: 40 });
+  it("brings the next one only after days and visits have both passed", async () => {
+    control("one");
+    control("two", 300);
     await mount();
-    await act(async () => button("Got it").click());
-    await wait(400);
-    expect(shown()).toBe("two");
+    for (let i = 0; i < HINT_GAP_VISITS - 1; i++) await remount();
+    vi.setSystemTime(NOW + HINT_GAP_MS + 1000);
+    await remount();
+    expect(note()!.getAttribute("data-hint")).toBe("two");
   });
 
-  it("Skip tips ends all of them, for good", async () => {
-    control("one", { top: 200, left: 40, width: 40, height: 40 });
-    control("two", { top: 300, left: 40, width: 40, height: 40 });
+  it("goes when its control is used", async () => {
+    const one = control("one");
     await mount();
-    await act(async () => button("Skip tips").click());
-    await wait(1000);
-    expect(mark()).toBeNull();
-    for (const s of STEPS) expect(localStorage.getItem(`hypefy_hint_${s.id}`)).toBe("1");
+    await act(async () => {
+      one.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    });
+    expect(note()).toBeNull();
   });
 
-  it("passes over a tip whose control is not on the page, without spending it", async () => {
-    control("two", { top: 300, left: 40, width: 40, height: 40 });
+  it("goes when it is dismissed", async () => {
+    control("one");
     await mount();
-    expect(shown()).toBe("two");
-    expect(localStorage.getItem("hypefy_hint_one")).toBeNull();
+    await act(async () => (note()!.querySelector('[aria-label="Dismiss hint"]') as HTMLButtonElement).click());
+    expect(note()).toBeNull();
   });
 
-  it("does not repeat a tip that was read, here or as one of the old cards", async () => {
-    localStorage.setItem("hypefy_hint_one", "1");
-    control("one", { top: 200, left: 40, width: 40, height: 40 });
-    control("two", { top: 300, left: 40, width: 40, height: 40 });
+  it("goes by itself after a few seconds", async () => {
+    control("one");
     await mount();
-    expect(shown()).toBe("two");
+    await wait(HINT_STAYS_MS);
+    expect(note()).toBeNull();
   });
 
-  it("steps aside while its control is scrolled off the screen", async () => {
-    control("one", { top: -400, left: 40, width: 40, height: 40 });
+  it("says nothing when its control is not on the page, and keeps the hint for later", async () => {
     await mount();
-    expect(mark()).toBeNull();
-    expect(localStorage.getItem("hypefy_hint_one")).toBeNull();
-  });
-
-  it("says nothing at all once everything has been read", async () => {
-    for (const s of STEPS) localStorage.setItem(`hypefy_hint_${s.id}`, "1");
-    control("one", { top: 200, left: 40, width: 40, height: 40 });
-    await mount();
-    expect(mark()).toBeNull();
+    expect(note()).toBeNull();
+    expect(readHintState("test").seen).toEqual([]);
   });
 });
 
-describe("what the tips point at", () => {
+describe("reminding someone about Spotlight", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("reminds someone who has never opened it", () => {
+    expect(shouldNudge(NEVER_USED, NOW)).toBe(true);
+  });
+
+  it("says nothing to someone who has opened it lately", () => {
+    expect(shouldNudge({ ...NEVER_USED, openedAt: NOW - DAY }, NOW)).toBe(false);
+    expect(shouldNudge({ ...NEVER_USED, openedAt: NOW - ACTIVE_FOR_MS - 1 }, NOW)).toBe(true);
+  });
+
+  it("stays away after being dismissed, for longer each time", () => {
+    const once = { openedAt: null, dismissedAt: NOW, dismissals: 1 };
+    expect(shouldNudge(once, NOW + DAY)).toBe(false);
+    expect(shouldNudge(once, NOW + 2 * DAY + 1)).toBe(true);
+    expect(snoozeFor({ ...once, dismissals: 2 })).toBe(4 * DAY);
+    expect(snoozeFor({ ...once, dismissals: 3 })).toBe(8 * DAY);
+    expect(snoozeFor({ ...once, dismissals: 9 })).toBe(21 * DAY);
+  });
+
+  it("reminds someone who has never tried it more often than someone who has", () => {
+    const never = { openedAt: null, dismissedAt: NOW, dismissals: 1 };
+    const lapsed = { openedAt: NOW - 30 * DAY, dismissedAt: NOW, dismissals: 1 };
+    expect(snoozeFor(never)).toBeLessThan(snoozeFor(lapsed));
+  });
+
+  it("opening Spotlight stands the reminder down and forgets the dismissals", () => {
+    noteNudgeDismissed(NOW);
+    noteNudgeDismissed(NOW);
+    expect(readSpotlightUse().dismissals).toBe(2);
+    noteSpotlightOpened(NOW);
+    expect(readSpotlightUse()).toEqual({ openedAt: NOW, dismissedAt: null, dismissals: 0 });
+    expect(shouldNudge(readSpotlightUse(), NOW + DAY)).toBe(false);
+  });
+
+  it("says what is waiting", () => {
+    expect(nudgeLine(3, false)).toMatchObject({ title: "3 pages in Spotlight", cta: "Read" });
+    expect(nudgeLine(1, true).title).toBe("1 page in Spotlight");
+    expect(nudgeLine(0, false)).toMatchObject({ title: "Say something for a day", cta: "Write" });
+    expect(nudgeLine(0, true).cta).toBe("Open");
+  });
+});
+
+describe("where it is wired", () => {
   const read = (p: string) => readFileSync(p, "utf8");
 
-  it.each([
-    ["src/components/home/ShowsRow.tsx", 'data-coach="shows"'],
-    ["src/components/feed/FeedCard.tsx", 'data-coach="hype"'],
-    ["src/components/feed/FeedCard.tsx", 'data-coach="save"'],
-    ["src/components/diary/FloatingPages.tsx", 'data-coach="spotlight"'],
-  ])("%s carries %s", (file, attr) => {
-    expect(read(file)).toContain(attr);
-  });
-
-  it("every tip on Home and in Messages names a control that exists", () => {
-    const all = ["src/components/home/ShowsRow.tsx", "src/components/feed/FeedCard.tsx", "src/components/diary/FloatingPages.tsx"]
+  it("every hint on Home names a control that exists", () => {
+    const all = [
+      "src/components/home/ShowsRow.tsx",
+      "src/components/feed/FeedCard.tsx",
+      "src/components/layout/BottomNav.tsx",
+    ]
       .map(read)
       .join("\n");
-    for (const page of ["src/app/(app)/home/page.tsx", "src/app/(app)/messages/(inbox)/page.tsx"]) {
-      const targets = [...read(page).matchAll(/target: "([a-z]+)"/g)].map((m) => m[1]);
-      expect(targets.length).toBeGreaterThan(0);
-      for (const t of targets) expect(all, `${page} points at ${t}`).toContain(`data-coach="${t}"`);
-    }
+    const targets = [...read("src/app/(app)/home/page.tsx").matchAll(/target: "([a-z]+)"/g)].map((m) => m[1]);
+    expect(targets).toEqual(["shows", "hype", "save", "create"]);
+    for (const t of targets) expect(all, `Home points at ${t}`).toContain(`data-coach="${t}"`);
   });
 
-  it("the ring stops breathing for people who asked for less motion", () => {
+  it("Messages reminds about Spotlight, and opening Spotlight is noted", () => {
+    expect(read("src/app/(app)/messages/(inbox)/page.tsx")).toContain("<SpotlightNudge");
+    expect(read("src/components/diary/DiaryHome.tsx")).toContain("noteSpotlightOpened();");
+  });
+
+  it("the ring and the note hold still for people who asked for less motion", () => {
     const css = read("src/app/globals.css");
-    expect(css).toMatch(/prefers-reduced-motion: reduce\) \{\s*\.animate-coach-ring \{ animation: none; \}/);
+    expect(css).toMatch(/prefers-reduced-motion: reduce\) \{\s*\.animate-coach-ring \{ animation: none; \}\s*\.animate-hint-in \{ animation: none; \}/);
   });
 });
