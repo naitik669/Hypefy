@@ -57,6 +57,7 @@ export function FeedList({
   hyperIds = [],
   mutualHyperIds = [],
   blockedIds = [],
+  hiddenPostIds = [],
   showByUser = {},
   adCountry = null,
   adPersonalised = false,
@@ -69,6 +70,8 @@ export function FeedList({
   hyperIds?: string[];
   mutualHyperIds?: string[];
   blockedIds?: string[];
+  /** Posts this person chose not to see again ("Not interested"). */
+  hiddenPostIds?: string[];
   /** Authors with a live Show, and the one to open: see home/page.tsx. */
   showByUser?: Record<string, string>;
   /** The reader's country, resolved on the server. Null means unknown. */
@@ -80,6 +83,7 @@ export function FeedList({
   const tab = useFeedTab();
   // Authors the viewer has blocked — pagination batches skip them too.
   const blockedSet = new Set(blockedIds);
+  const hiddenPosts = new Set(hiddenPostIds);
   // Authors the viewer follows — the tail ranker needs this to award the
   // social bonus, exactly as the server does for the first page.
   const followingSet = new Set(followingIds);
@@ -179,7 +183,7 @@ export function FeedList({
     // pushed down by feedScore's -25; filtering them again is double jeopardy,
     // and on a corpus this size it empties the feed.
     const fresh = normalize(data).filter(
-      (p) => !current.some((x) => x.id === p.id) && !blockedSet.has(p.user_id),
+      (p) => !current.some((x) => x.id === p.id) && !blockedSet.has(p.user_id) && !hiddenPosts.has(p.id),
     );
     if ((data?.length ?? 0) < PAGE_SIZE) setFyDone(true);
 
@@ -231,7 +235,7 @@ export function FeedList({
     // Same reasoning as the For You tail: a failed page must not latch `done`
     // and turn a network blip into a permanent end-of-feed.
     if (error) return;
-    const fresh = normalize(data).filter((p) => !current.some((x) => x.id === p.id) && !blockedSet.has(p.user_id));
+    const fresh = normalize(data).filter((p) => !current.some((x) => x.id === p.id) && !blockedSet.has(p.user_id) && !hiddenPosts.has(p.id));
     const nowDone = (data?.length ?? 0) < PAGE_SIZE;
     const withState = fresh.length ? await withUserState(fresh) : fresh;
     setIdsState((prev) => ({

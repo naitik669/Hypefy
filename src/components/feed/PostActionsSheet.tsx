@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, UserCheck, Link2, Flag, Trash2, Pencil, Star, Ban } from "lucide-react";
+import { UserPlus, UserCheck, Link2, Flag, Trash2, Pencil, Star, Ban, EyeOff, VolumeX } from "lucide-react";
+import { hideContent, muteUser, QUIET_COPY } from "@/lib/feed-quiet";
 import { createClient } from "@/lib/supabase/client";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import { FloatingMenu, MenuItem, MenuDivider } from "@/components/ui/FloatingMenu";
@@ -27,7 +28,10 @@ export function PostActionsSheet({
   preview,
   onEdit,
   onHyperChange,
+  onHide,
 }: {
+  /** Not interested, or the author was muted: take the post off the screen. */
+  onHide?: () => void;
   open: boolean;
   onClose: () => void;
   postId: string;
@@ -108,6 +112,22 @@ export function PostActionsSheet({
     }
     setHyperPending(false);
     onClose();
+  }
+
+  async function notInterested() {
+    onClose();
+    if (await hideContent(supabase, "post", postId)) {
+      onHide?.();
+      toast(QUIET_COPY.hidden, "success");
+    } else toast(QUIET_COPY.hideFailed, "error");
+  }
+
+  async function mute() {
+    onClose();
+    if (await muteUser(supabase, postUserId)) {
+      onHide?.();
+      toast(QUIET_COPY.muted(`@${postUsername ?? "user"}`), "success");
+    } else toast(QUIET_COPY.muteFailed, "error");
   }
 
   async function share() {
@@ -193,6 +213,8 @@ export function PostActionsSheet({
         {!isOwn && (
           <>
             <MenuDivider />
+            <MenuItem icon={EyeOff} label="Not interested" onClick={notInterested} />
+            <MenuItem icon={VolumeX} label={`Mute @${postUsername ?? "user"}`} onClick={mute} />
             <MenuItem
               icon={Ban}
               label={`Block @${postUsername ?? "user"}`}

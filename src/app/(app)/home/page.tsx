@@ -22,6 +22,7 @@ import {
 import { placeShots } from "@/lib/feed-mix";
 import { isAdult } from "@/lib/ads";
 import { getBlockedIds } from "@/lib/blocked";
+import { getFeedExclusions } from "@/lib/feed-quiet";
 import { jsonRecord } from "@/lib/supabase/typed";
 import { placeGhost } from "@/lib/ghost-place";
 
@@ -50,7 +51,7 @@ export default async function HomePage() {
   const ghostClaim = supabase.rpc("claim_ghost_share", { p_kind: "post" }).then((res) => res);
 
   // Follow graph first: the followed-posts query depends on it.
-  const [{ data: followRows }, blockedIds] = await Promise.all([
+  const [{ data: followRows }, blockedIds, quiet] = await Promise.all([
     // Capped, like close_friends below, and for a harder reason
     // than volume: every one of these ids is spread into `.in("user_id", …)`
     // further down, which PostgREST renders as a comma-separated value in a
@@ -64,7 +65,13 @@ export default async function HomePage() {
       .eq("follower_id", user.id)
       .limit(2000),
     getBlockedIds(supabase),
+    // People this person muted, and single posts and Shots they hid.
+    getFeedExclusions(supabase),
   ]);
+  // On this page a muted person is left out exactly as a blocked one is:
+  // their posts, Shots and Shows, here and in every batch loaded after. So
+  // they join the same set. (Muting does nothing else; see lib/feed-quiet.)
+  for (const id of quiet.muted) blockedIds.add(id);
   const followingIds = new Set(
     (followRows ?? []).map((r: any) => r.following_id as string)
   );
@@ -224,7 +231,7 @@ export default async function HomePage() {
   // Blocked authors never make it into the pool.
   const byId = new Map<string, any>();
   for (const p of [...normalise(followedPosts), ...normalise(rawPosts)]) {
-    if (blockedIds.has(p.user_id)) continue;
+    if (blockedIds.has(p.user_id) || quiet.posts.has(p.id)) continue;
     if (!byId.has(p.id)) byId.set(p.id, p);
   }
 
@@ -234,7 +241,7 @@ export default async function HomePage() {
   if (ghostId && !byId.has(ghostId)) {
     const { data: placed } = await supabase.from("posts").select(POST_COLS).eq("id", ghostId).maybeSingle();
     const [row] = normalise(placed ? [placed] : []);
-    if (row && !blockedIds.has(row.user_id)) byId.set(row.id, row);
+    if (row && !blockedIds.has(row.user_id) && !quiet.posts.has(row.id)) byId.set(row.id, row);
   }
 
   // Blend in rehyped posts: use the rehype time for recency so they resurface,
@@ -242,7 +249,7 @@ export default async function HomePage() {
   for (const r of (followedReposts ?? []) as any[]) {
     const post = Array.isArray(r.posts) ? r.posts[0] : r.posts;
     if (!post) continue;
-    if (blockedIds.has(post.user_id) || blockedIds.has(r.user_id)) continue;
+    if (blockedIds.has(post.user_id) || blockedIds.has(r.user_id) || quiet.posts.has(post.id)) continue;
     const normalised = {
       ...post,
       profiles: Array.isArray(post.profiles)
@@ -361,7 +368,7 @@ export default async function HomePage() {
       ...s,
       profiles: Array.isArray(s.profiles) ? s.profiles[0] ?? null : s.profiles,
     }))
-    .filter((s) => !blockedIds.has(s.user_id))
+    .filter((s) => !blockedIds.has(s.user_id) && !quiet.shots.has(s.id))
     .map((s) => ({
       ...s,
       _score:
@@ -496,6 +503,7 @@ export default async function HomePage() {
           hyperIds={hyperIds}
           mutualHyperIds={mutualHyperIds}
           blockedIds={[...blockedIds]}
+          hiddenPostIds={[...quiet.posts]}
           showByUser={showByUser}
           adCountry={adCountry}
           adPersonalised={adPersonalised}

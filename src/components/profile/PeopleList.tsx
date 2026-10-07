@@ -8,6 +8,9 @@ import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { formatCount } from "@/lib/format";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/ToastProvider";
+import { QUIET_COPY, removeFollower } from "@/lib/feed-quiet";
 
 export type PersonRow = {
   id: string;
@@ -53,6 +56,24 @@ export function PeopleList({
   const busy = useRef(false);
   const sentinel = useRef<HTMLDivElement>(null);
   const iFollow = new Set(iFollowIds);
+  const toast = useToast();
+  // Only on your own followers: nobody else decides who follows you.
+  const canRemove = list === "followers" && ownerId === currentUserId;
+  const [removing, setRemoving] = useState<PersonRow | null>(null);
+  const [removedCount, setRemovedCount] = useState(0);
+
+  async function removeOne() {
+    const row = removing;
+    setRemoving(null);
+    if (!row) return;
+    if (await removeFollower(supabase, row.id)) {
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setRemovedCount((n) => n + 1);
+      toast(QUIET_COPY.removed(row.username ? `@${row.username}` : row.name), "success");
+    } else {
+      toast(QUIET_COPY.removeFailed, "error");
+    }
+  }
 
   const loadMore = useCallback(async () => {
     if (busy.current || done) return;
@@ -122,6 +143,8 @@ export function PeopleList({
     );
   }
 
+  // How many there are now, after any removed on this visit.
+  const left = Math.max(0, total - removedCount);
   const term = q.trim().toLowerCase();
   // Filters what is loaded, which is honest as long as the count says how many
   // there are in total.
@@ -141,7 +164,7 @@ export function PeopleList({
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={`Search ${total > 0 ? formatCount(total) + " " : ""}${list}`}
+            placeholder={`Search ${left > 0 ? formatCount(left) + " " : ""}${list}`}
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
           />
         </div>
@@ -183,6 +206,16 @@ export function PeopleList({
                   variant="inline"
                 />
               )}
+              {canRemove && r.id !== currentUserId && (
+                <button
+                  type="button"
+                  onClick={() => setRemoving(r)}
+                  aria-label={`Remove ${r.username ? `@${r.username}` : r.name} from your followers`}
+                  className="h-8 shrink-0 rounded-xl border border-border px-3 text-xs font-bold text-muted transition-colors hover:text-foreground"
+                >
+                  Remove
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -193,6 +226,16 @@ export function PeopleList({
           {loading && <Loader2 size={18} className="animate-spin text-muted" />}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!removing}
+        onClose={() => setRemoving(null)}
+        onConfirm={removeOne}
+        icon={Users}
+        title={`Remove ${removing?.username ? `@${removing.username}` : (removing?.name ?? "follower")}?`}
+        body="They stop following you and aren't told. If your account is public they can follow you again; to stop that, block them instead."
+        confirmLabel="Remove"
+      />
     </div>
   );
 }

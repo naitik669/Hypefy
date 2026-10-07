@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2 } from "lucide-react";
+import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, EyeOff } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { RehypeIcon } from "@/components/ui/RehypeIcon";
 import { isRehyped, setRehype, type DeckPerson } from "@/lib/rehype";
@@ -98,6 +98,7 @@ import { BLANK_POSTER } from "@/lib/blank-poster";
 import { CommentIcon } from "@/components/ui/CommentIcon";
 import { claimPreview, parseTrack } from "@/lib/music";
 import { SoundPill } from "@/components/music/SoundPill";
+import { hideContent, muteUser, QUIET_COPY } from "@/lib/feed-quiet";
 
 type ReelProfile = {
   display_name: string | null;
@@ -632,6 +633,22 @@ function ReelCard({
     } catch {
       showToast("Couldn't copy that link");
     }
+  }
+
+  // Both redraw the reel from the server, which now leaves this out, the
+  // same way blocking its author does.
+  async function notInterested() {
+    if (await hideContent(supabase, "shot", reel.id)) {
+      showToast(QUIET_COPY.hidden);
+      cardRouter.refresh();
+    } else showToast(QUIET_COPY.hideFailed);
+  }
+
+  async function muteAuthor() {
+    if (await muteUser(supabase, reel.user_id)) {
+      showToast(QUIET_COPY.muted(handle ? `@${handle}` : name));
+      cardRouter.refresh();
+    } else showToast(QUIET_COPY.muteFailed);
   }
 
   async function blockAuthor() {
@@ -1410,6 +1427,38 @@ function ReelCard({
               <div>
                 <p className="text-sm font-semibold">Share to…</p>
                 <p className="text-xs text-muted">Send it in a chat</p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
+            <button
+              type="button"
+              onClick={() => {
+                setViewerMenuOpen(false);
+                void notInterested();
+              }}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
+            >
+              <EyeOff size={20} className="text-foreground" />
+              <div>
+                <p className="text-sm font-semibold">Not interested</p>
+                <p className="text-xs text-muted">Take this Shot out of your feed</p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setViewerMenuOpen(false);
+                void muteAuthor();
+              }}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
+            >
+              <VolumeX size={20} className="text-foreground" />
+              <div>
+                <p className="text-sm font-semibold">Mute {handle ? `@${handle}` : name}</p>
+                <p className="text-xs text-muted">Stop seeing their posts, Shots and Shows. They won&rsquo;t be told</p>
               </div>
             </button>
 

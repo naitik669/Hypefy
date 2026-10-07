@@ -80,6 +80,18 @@ export type Database = {
         }
         Relationships: []
       }
+      muted_users: {
+        Row: { muter_id: string; muted_id: string; created_at: string }
+        Insert: { muter_id: string; muted_id: string; created_at?: string }
+        Update: { muter_id?: string; muted_id?: string; created_at?: string }
+        Relationships: []
+      }
+      hidden_content: {
+        Row: { user_id: string; kind: string; content_id: string; created_at: string }
+        Insert: { user_id: string; kind: string; content_id: string; created_at?: string }
+        Update: { user_id?: string; kind?: string; content_id?: string; created_at?: string }
+        Relationships: []
+      }
       blocked_users: {
         Row: {
           blocked_id: string | null
@@ -3137,6 +3149,10 @@ export type Database = {
       my_chat_levels: { Args: never; Returns: { conversation_id: string; level: string }[] }
       chat_pin_places: { Args: never; Returns: number | null }
       min_app_build: { Args: never; Returns: number }
+      mute_user: { Args: { p_target: string }; Returns: undefined }
+      hide_content: { Args: { p_kind: string; p_content_id: string }; Returns: undefined }
+      feed_exclusions: { Args: never; Returns: { muted: string[]; posts: string[]; shots: string[] }[] }
+      remove_follower: { Args: { p_follower: string }; Returns: boolean }
       ghost_hype_reveal: { Args: { p_kind: string; p_content_id: string }; Returns: boolean }
       ghost_share_status: {
         Args: { p_kind: string; p_content_id: string }

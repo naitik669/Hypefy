@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PrivacySettings } from "@/components/settings/PrivacySettings";
 import { BlockedList } from "@/components/settings/BlockedList";
+import { MutedList } from "@/components/settings/MutedList";
 import { AppLockSettings } from "@/components/settings/AppLockSettings";
 import { ChatLockSettings } from "@/components/vault/ChatLockSettings";
 import { SettingsCard, SettingsRow } from "@/components/settings/SettingsCard";
@@ -72,6 +73,14 @@ export default async function PrivacySettingsPage() {
             Blocked accounts
           </p>
           <BlockedList currentUserId={user.id} />
+        </section>
+
+        {/* Muted accounts: lighter than a block, and theirs to undo here. */}
+        <section className="mt-8">
+          <p className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">
+            Muted accounts
+          </p>
+          <MutedList currentUserId={user.id} />
         </section>
       </div>
     </>

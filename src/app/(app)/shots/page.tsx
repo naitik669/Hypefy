@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ReelsFeed, type Reel } from "@/components/shots/ReelsFeed";
 import { diversify } from "@/lib/feed-rank";
 import { placeGhost } from "@/lib/ghost-place";
+import { getFeedExclusions, isQuieted, NO_EXCLUSIONS } from "@/lib/feed-quiet";
 import { one, jsonRecord } from "@/lib/supabase/typed";
 import { getAdContext } from "@/lib/ads-server";
 
@@ -50,7 +51,7 @@ export default async function ShotsPage() {
   } = await supabase.auth.getUser();
 
   // Candidate window + interaction affinity, ranked into a personalized reel.
-  const [{ data: shots }, affRes, adContext, rehypesRes, ghostRes] = await Promise.all([
+  const [{ data: shots }, affRes, adContext, rehypesRes, ghostRes, quiet] = await Promise.all([
     supabase
       .from("shots")
       .select(SHOT_COLS)
@@ -69,6 +70,8 @@ export default async function ShotsPage() {
     // them (Ghost Share, 0119). At most one, and only its id: who chose it is
     // not something this page is ever told. See src/lib/ghost-place.ts.
     user ? supabase.rpc("claim_ghost_share", { p_kind: "shot" }) : Promise.resolve({ data: null }),
+    // People this person muted, and Shots they chose not to see again.
+    user ? getFeedExclusions(supabase) : Promise.resolve(NO_EXCLUSIONS),
   ]);
   const ghostId = (ghostRes.data as string | null) ?? null;
 
@@ -101,6 +104,7 @@ export default async function ShotsPage() {
 
   const ranked = diversify(
     [...byId.values()]
+      .filter((s) => !isQuieted(s, "shot", quiet))
       .map((s) => {
         const own = shotScore(s, now, authorAff);
         const viaRehype = s._rehypedAt

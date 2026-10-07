@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Play, VolumeX, Volume2, Star, Bookmark, MoreHorizontal, Flag, Ban, ChevronRight, Link2, Share2 } from "lucide-react";
+import { Play, VolumeX, Volume2, Star, Bookmark, MoreHorizontal, Flag, Ban, ChevronRight, Link2, Share2, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
@@ -50,6 +50,7 @@ import { PostPeek } from "@/components/feed/PostPeek";
 import { useLongPress } from "@/lib/useLongPress";
 import { claimPreview, parseTrack } from "@/lib/music";
 import { SoundPill } from "@/components/music/SoundPill";
+import { hideContent, muteUser, QUIET_COPY } from "@/lib/feed-quiet";
 
 /**
  * A Shot, sitting in the post feed.
@@ -301,6 +302,26 @@ export function ShotFeedCard({
     showToast("Blocked", "success");
     // Their Shots should not still be in the feed after blocking them.
     router.refresh();
+  }
+
+  /** Not interested, or its author muted: this card leaves the feed. */
+  const [gone, setGone] = useState(false);
+  useEffect(() => {
+    if (gone) videoRef.current?.pause();
+  }, [gone]);
+
+  async function notInterested() {
+    if (await hideContent(supabase, "shot", shot.id)) {
+      setGone(true);
+      showToast(QUIET_COPY.hidden, "success");
+    } else showToast(QUIET_COPY.hideFailed, "error");
+  }
+
+  async function muteAuthor() {
+    if (await muteUser(supabase, shot.user_id)) {
+      setGone(true);
+      showToast(QUIET_COPY.muted(username ? `@${username}` : name), "success");
+    } else showToast(QUIET_COPY.muteFailed, "error");
   }
 
   async function copyLink() {
@@ -587,7 +608,7 @@ export function ShotFeedCard({
   }, []);
 
   return (
-    <article className="relative border-b border-border/50 pb-3">
+    <article className="relative border-b border-border/50 pb-3" hidden={gone} data-shot-card>
       {/* The post card's header, to the pixel: the same avatar and frame, the
           same name with whatever the author wears on it, the same badge and
           the same timestamp. A Shot is a post you can watch, so its card is a
@@ -939,6 +960,36 @@ export function ShotFeedCard({
           </Link>
           {!isOwn && (
             <>
+              <button
+                type="button"
+                disabled={!currentUserId}
+                onClick={() => {
+                  setMenuOpen(false);
+                  void notInterested();
+                }}
+                className="flex items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5 disabled:opacity-50"
+              >
+                <EyeOff size={20} className="text-foreground" />
+                <span>
+                  <span className="block text-sm font-semibold">Not interested</span>
+                  <span className="block text-xs text-muted">Take this Shot out of your feed</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={!currentUserId}
+                onClick={() => {
+                  setMenuOpen(false);
+                  void muteAuthor();
+                }}
+                className="flex items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5 disabled:opacity-50"
+              >
+                <VolumeX size={20} className="text-foreground" />
+                <span>
+                  <span className="block text-sm font-semibold">Mute {username ? `@${username}` : name}</span>
+                  <span className="block text-xs text-muted">Stop seeing their posts, Shots and Shows. They won&rsquo;t be told</span>
+                </span>
+              </button>
               <button
                 type="button"
                 disabled={!currentUserId}

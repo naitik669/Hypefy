@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Star, Check, Ban, Flag } from "lucide-react";
+import { MoreHorizontal, Star, Check, Ban, Flag, VolumeX } from "lucide-react";
+import { isMutedByMe, muteUser, unmuteUser, QUIET_COPY } from "@/lib/feed-quiet";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -33,6 +34,36 @@ export function HyperFavoriteButton({
   const [isHyper, setIsHyper] = useState(initialHyper);
   const [pending, setPending] = useState<"hyper" | null>(null);
   const [isBlocked, setIsBlocked] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+
+  // Muted state loads lazily when the sheet opens, like blocked below.
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    void isMutedByMe(supabase, currentUserId, targetUserId).then((m) => {
+      if (live) setIsMuted(m);
+    });
+    return () => {
+      live = false;
+    };
+  }, [open, currentUserId, targetUserId, supabase]);
+
+  async function toggleMute() {
+    haptics.select();
+    const who = targetUsername ? `@${targetUsername}` : "them";
+    const was = isMuted;
+    const ok = was
+      ? await unmuteUser(supabase, currentUserId, targetUserId)
+      : await muteUser(supabase, targetUserId);
+    if (!ok) {
+      toast(QUIET_COPY.muteFailed, "error");
+      return;
+    }
+    setIsMuted(!was);
+    setOpen(false);
+    toast(was ? QUIET_COPY.unmuted(who) : QUIET_COPY.muted(who), "success");
+    router.refresh();
+  }
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
@@ -126,6 +157,31 @@ export function HyperFavoriteButton({
 
           {/* Safety actions */}
           <div className="mx-2 my-1 h-px bg-border" />
+
+          {/* The light one first: it is the one most people want. */}
+          {!isBlocked && (
+            <button
+              type="button"
+              onClick={toggleMute}
+              data-mute-toggle
+              className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-white/5"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface text-muted">
+                <VolumeX size={18} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">
+                  {isMuted ? "Unmute" : "Mute"}
+                  {targetUsername ? ` @${targetUsername}` : ""}
+                </p>
+                <p className="text-xs text-muted">
+                  {isMuted
+                    ? "Their posts, Shots and Shows come back to your feed"
+                    : "Stop seeing their posts, Shots and Shows. They won't be told"}
+                </p>
+              </div>
+            </button>
+          )}
 
           {isBlocked ? (
             <button
