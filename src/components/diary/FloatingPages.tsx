@@ -269,6 +269,7 @@ export function FloatingPages({
   return (
     <Link
       ref={link}
+      data-coach="spotlight"
       href={href}
       aria-label={label}
       onPointerDown={onPointerDown}

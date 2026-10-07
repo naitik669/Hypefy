@@ -1050,6 +1050,20 @@ html[data-dm-leave]::view-transition-old(root) {
 .animate-ghost-mist {
   animation: ghost-mist 2.2s ease-in-out forwards;
 }
+
+/* The ring a tip draws round a control (CoachMarks). It breathes, slowly
+   and slightly: enough to say "here", not enough to be a thing to watch.
+   The ring's own shadow is the dimming, so only the border is animated. */
+@keyframes coach-ring {
+  0%, 100% { border-color: rgb(163 230 53 / 1); }
+  50% { border-color: rgb(163 230 53 / 0.45); }
+}
+.animate-coach-ring {
+  animation: coach-ring 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-coach-ring { animation: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   /* Still appears, still goes: held just above the star, without the drift. */
   .animate-ghost-up { animation: none; transform: translateY(-26px); }

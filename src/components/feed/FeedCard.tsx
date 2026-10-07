@@ -915,6 +915,7 @@ export function FeedCard({
             disabled={hypePending}
             aria-pressed={hyped}
             aria-label="Hype"
+            data-coach="hype"
             className="flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-transform duration-150 active:scale-90 disabled:opacity-70"
           >
             <span className="relative">
@@ -986,6 +987,7 @@ export function FeedCard({
           <button
             type="button"
             ref={saveButton}
+            data-coach="save"
             {...saveMenus.handlers}
             aria-label={saved ? "In your Library. Tap for playlists, hold to file" : "Save"}
             aria-haspopup="menu"

@@ -81,7 +81,7 @@ export function ShowsRow({
   const ownShowSeen = !!(ownLatest && seenIds.has(ownLatest));
 
   return (
-    <div className="no-scrollbar flex gap-4 overflow-x-auto px-4 py-4">
+    <div data-coach="shows" className="no-scrollbar flex gap-4 overflow-x-auto px-4 py-4">
 
       {/* ── Your Show ───────────────────────────── */}
       <div className="flex w-16 shrink-0 flex-col items-center gap-1.5">

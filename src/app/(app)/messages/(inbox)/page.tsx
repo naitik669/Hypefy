@@ -7,8 +7,7 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { toDiaryEntries } from "@/lib/diary";
 import { loadInboxRows } from "@/app/(app)/messages/load-rows";
 import { toVaultOverview } from "@/lib/chat-vault";
-import { BookOpen } from "lucide-react";
-import { FeatureHints } from "@/components/ui/FeatureHint";
+import { CoachMarks } from "@/components/ui/CoachMarks";
 
 /** When this inbox was drawn, so the page can tell a fresh one from one kept in memory. */
 const renderStamp = () => Date.now();
@@ -55,13 +54,14 @@ export default async function MessagesPage() {
       <PullToRefresh holdTo={vault.hidden > 0 ? "/messages/vault" : undefined}>
         {/* Spotlight has no label anywhere: a small deck of cards in the
             corner, and nothing to say what it is or that it is yours too. */}
-        <FeatureHints
-          hints={[
+        <CoachMarks
+          steps={[
             {
               id: "spotlight",
-              icon: <BookOpen size={14} />,
-              title: "Spotlight is the deck in the corner",
-              text: "Short pages from people you follow back: a line, a song, a mood. They last a day. Tap the deck to read them or write your own.",
+              target: "spotlight",
+              title: "This is Spotlight",
+              text: "Short pages from people you follow back: a line, a song, a mood. They last a day.",
+              tryIt: "Tap the deck to read them, or write your own.",
             },
           ]}
         />

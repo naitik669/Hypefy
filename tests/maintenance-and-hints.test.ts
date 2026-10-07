@@ -110,7 +110,7 @@ describe("first-run tips", () => {
 
   it("Home and Messages each explain what nothing else does", () => {
     const home = readFileSync("src/app/(app)/home/page.tsx", "utf8");
-    for (const id of ['id: "shows"', 'id: "hype"', 'id: "hold"']) expect(home).toContain(id);
+    for (const id of ['id: "shows"', 'id: "hype"', 'id: "save"']) expect(home).toContain(id);
     expect(readFileSync("src/app/(app)/messages/(inbox)/page.tsx", "utf8")).toContain('id: "spotlight"');
   });
 });
