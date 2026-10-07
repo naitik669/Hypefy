@@ -154,8 +154,52 @@ export function hueFromId(id: string): number {
   return h;
 }
 
+/**
+ * Every column of `profiles` the app may read off the table, its own row or
+ * anyone's. The rest (date of birth, admin, why an account is suspended, who
+ * referred whom, notification preferences) are not readable there at all,
+ * by anyone: see migration 0130. Their owner gets them from
+ * getPrivateProfile.
+ *
+ * A new column has to be added here AND granted in a migration before it can
+ * be read. `select("*")` on profiles is refused by the database.
+ */
+export const PUBLIC_PROFILE_COLUMNS =
+  "id, username, display_name, bio, avatar_url, avatar_hue, banner_id, banner_url, current_vibe, interests, profile_completed, created_at, updated_at, profile_tags, is_private, dm_privacy, last_seen_at, show_activity, is_verified, anthem, hide_read_receipts, card_layout, card_theme, accent_id, suspended_at, suspended_until, is_premium, badge_revoked, name_font, name_glow, avatar_decoration, bubble_style, nameplate, banner_color_1, banner_color_2, profile_colors, show_hypes";
+
+/** The signed-in person's own private fields. */
+export type PrivateProfile = {
+  dateOfBirth: string | null;
+  isAdmin: boolean;
+  suspensionReason: string | null;
+  notifPrefs: Record<string, unknown>;
+  /** How many people joined with their invite. */
+  referralCount: number;
+};
+
+/** What my_private_profile() hands back, read without trusting its shape. */
+export function parsePrivateProfile(raw: unknown): PrivateProfile | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const prefs = r.notif_prefs;
+  return {
+    dateOfBirth: typeof r.date_of_birth === "string" ? r.date_of_birth : null,
+    isAdmin: r.is_admin === true,
+    suspensionReason: typeof r.suspension_reason === "string" ? r.suspension_reason : null,
+    notifPrefs: prefs && typeof prefs === "object" && !Array.isArray(prefs) ? (prefs as Record<string, unknown>) : {},
+    referralCount: typeof r.referral_count === "number" ? r.referral_count : 0,
+  };
+}
+
+/** The signed-in person's private fields, or null when signed out or it failed. */
+export async function getPrivateProfile(supabase: SupabaseClient): Promise<PrivateProfile | null> {
+  const { data, error } = await supabase.rpc("my_private_profile");
+  if (error) return null;
+  return parsePrivateProfile(data);
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function mapProfile(row: any): Profile {
+function mapProfile(row: any, mine: PrivateProfile | null): Profile {
   return {
     id: row.id,
     username: row.username,
@@ -175,11 +219,11 @@ function mapProfile(row: any): Profile {
     nameFont: row.name_font ?? null,
     nameGlow: row.name_glow ?? null,
     avatarDecoration: row.avatar_decoration ?? null,
-    isAdmin: row.is_admin ?? false,
+    isAdmin: mine?.isAdmin ?? false,
     suspendedAt: row.suspended_at ?? null,
     suspendedUntil: row.suspended_until ?? null,
-    suspensionReason: row.suspension_reason ?? null,
-    dateOfBirth: row.date_of_birth ?? null,
+    suspensionReason: mine?.suspensionReason ?? null,
+    dateOfBirth: mine?.dateOfBirth ?? null,
   };
 }
 
@@ -192,11 +236,10 @@ export async function getProfile(
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
+  const [{ data }, mine] = await Promise.all([
+    supabase.from("profiles").select(PUBLIC_PROFILE_COLUMNS).eq("id", user.id).maybeSingle(),
+    getPrivateProfile(supabase),
+  ]);
 
-  return data ? mapProfile(data) : null;
+  return data ? mapProfile(data, mine) : null;
 }

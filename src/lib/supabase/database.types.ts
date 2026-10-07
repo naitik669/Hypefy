@@ -3189,6 +3189,15 @@ export type Database = {
           is_owner: boolean
         }[]
       }
+      my_private_profile: { Args: never; Returns: Json }
+      storage_paths_of: {
+        Args: { p_user: string }
+        Returns: { bucket_id: string; name: string }[]
+      }
+      ip_rate_limit: {
+        Args: { p_key: string; p_limit: number; p_window_seconds: number }
+        Returns: boolean
+      }
       my_playlist_invites: {
         Args: never
         Returns: {

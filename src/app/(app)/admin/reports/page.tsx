@@ -22,9 +22,8 @@ export default async function AdminReportsPage() {
   if (!user) redirect("/signin");
 
   // Fail closed: a failed lookup must not fall through into the queue.
-  const { data: me, error: meErr } = await supabase
-    .from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
-  if (meErr || !(me as any)?.is_admin) notFound();
+  const { data: isAdmin, error: meErr } = await supabase.rpc("is_admin");
+  if (meErr || isAdmin !== true) notFound();
 
   const [{ data: content }, { data: messages }] = await Promise.all([
     supabase

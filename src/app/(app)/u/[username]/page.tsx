@@ -13,7 +13,7 @@ import { FollowButton } from "@/components/profile/FollowButton";
 import { MessageButton } from "@/components/profile/MessageButton";
 import { HyperFavoriteButton } from "@/components/profile/HyperFavoriteButton";
 import { SignOutButton } from "@/components/SignOutButton";
-import { hueFromId } from "@/lib/profile";
+import { hueFromId, PUBLIC_PROFILE_COLUMNS } from "@/lib/profile";
 import { pageText } from "@/lib/diary";
 import { Lock } from "lucide-react";
 
@@ -33,7 +33,7 @@ const getProfileByUsername = cache(async (username: string) => {
   const supabase = await createClient();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("*")
+    .select(PUBLIC_PROFILE_COLUMNS)
     .eq("username", username.toLowerCase())
     .eq("profile_completed", true)
     .maybeSingle();

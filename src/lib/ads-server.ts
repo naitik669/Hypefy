@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isAdult } from "@/lib/ads";
+import { getPrivateProfile } from "@/lib/profile";
 
 /**
  * The two ad inputs only the server can supply.
@@ -25,14 +26,8 @@ export async function getAdContext(
 
   if (!userId) return { adCountry, adPersonalised: false };
 
-  const { data } = await supabase
-    .from("profiles")
-    .select("date_of_birth")
-    .eq("id", userId)
-    .maybeSingle();
+  // The reader's own: a date of birth is not readable off the profiles table.
+  const mine = await getPrivateProfile(supabase);
 
-  return {
-    adCountry,
-    adPersonalised: isAdult((data as { date_of_birth?: string | null } | null)?.date_of_birth),
-  };
+  return { adCountry, adPersonalised: isAdult(mine?.dateOfBirth) };
 }

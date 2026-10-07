@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Download, Loader2, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
+import { PUBLIC_PROFILE_COLUMNS } from "@/lib/profile";
 
 /**
  * "Download your data" — bundles the viewer's own rows into a JSON file,
@@ -62,7 +63,16 @@ export function DataExport() {
         notes,
         hashtags,
       ] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
+        // The table gives the public columns; the private ones (date of
+        // birth, notification preferences) come the only way they can.
+        Promise.all([
+          supabase.from("profiles").select(PUBLIC_PROFILE_COLUMNS).eq("id", uid).maybeSingle(),
+          supabase.rpc("my_private_profile"),
+        ]).then(([pub, mine]) => ({
+          data: pub.data
+            ? { ...pub.data, ...(mine.data && typeof mine.data === "object" && !Array.isArray(mine.data) ? mine.data : {}) }
+            : null,
+        })),
         all((f, t) =>
           supabase
             .from("posts")

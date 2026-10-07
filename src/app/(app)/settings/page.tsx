@@ -24,6 +24,7 @@ import { AccountSwitcher } from "@/components/settings/AccountSwitcher";
 import { InviteRow } from "@/components/growth/InviteButton";
 import { SettingsCard, SettingsRow } from "@/components/settings/SettingsCard";
 import { PremiumSettingsRow } from "@/components/billing/PremiumSettingsRow";
+import { getPrivateProfile } from "@/lib/profile";
 
 const ITEMS = [
   {
@@ -119,21 +120,16 @@ export default async function SettingsPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const [{ data: prof }, { count: joined }] = user
+  const [{ data: prof }, mine] = user
     ? await Promise.all([
-        supabase
-          .from("profiles")
-          .select("username, is_admin")
-          .eq("id", user.id)
-          .maybeSingle(),
-        supabase
-          .from("profiles")
-          .select("id", { count: "exact", head: true })
-          .eq("referred_by", user.id),
+        supabase.from("profiles").select("username").eq("id", user.id).maybeSingle(),
+        // Admin and who joined with their invite: theirs alone to read.
+        getPrivateProfile(supabase),
       ])
-    : [{ data: null }, { count: 0 }];
+    : [{ data: null }, null];
   const username = (prof?.username as string | null) ?? null;
-  const isAdmin = !!(prof as { is_admin?: boolean } | null)?.is_admin;
+  const isAdmin = mine?.isAdmin ?? false;
+  const joined = mine?.referralCount ?? 0;
 
   return (
     <>

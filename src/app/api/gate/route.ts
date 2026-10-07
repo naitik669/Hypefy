@@ -5,6 +5,11 @@ import {
   expectedToken,
   safeEqual,
 } from "@/lib/invite-gate";
+import { attemptAllowed } from "@/lib/api-guard";
+
+/** Tries at the code from one address, right or wrong, per window. */
+export const GATE_TRIES = 10;
+export const GATE_WINDOW_SECONDS = 15 * 60;
 
 /**
  * Exchanges a correct invite code for the gate cookie.
@@ -19,6 +24,15 @@ export async function POST(request: Request) {
   if (!configured) {
     // Nothing to check against — the gate is off.
     return NextResponse.json({ ok: true });
+  }
+
+  // Before the code is even read: the answer to the eleventh guess is the
+  // same whether or not it was right.
+  if (!(await attemptAllowed(request, "gate", GATE_TRIES, GATE_WINDOW_SECONDS))) {
+    return NextResponse.json(
+      { error: "Too many tries. Wait a few minutes and try again." },
+      { status: 429 },
+    );
   }
 
   let submitted: unknown;

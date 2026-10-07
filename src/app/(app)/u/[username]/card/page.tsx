@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { hueFromId } from "@/lib/profile";
+import { hueFromId, PUBLIC_PROFILE_COLUMNS } from "@/lib/profile";
 import { ProfileCardPage } from "@/components/profile/ProfileCardPage";
 
 /**
@@ -45,7 +45,7 @@ export default async function ProfileCardRoute({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("*")
+    .select(PUBLIC_PROFILE_COLUMNS)
     .eq("username", username.toLowerCase())
     .eq("profile_completed", true)
     .maybeSingle();

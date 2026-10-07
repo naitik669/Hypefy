@@ -3,11 +3,17 @@ import * as Sentry from "@sentry/nextjs";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { readAal } from "@/lib/mfa-gate";
+import { removeFilesOf } from "@/lib/account-files";
 
 /**
  * POST /api/account/delete — permanently deletes the calling user's account.
  * Auth comes from the session cookie; the actual deletion needs the service
  * role key (auth.admin). All app rows cascade via FKs to profiles/auth.users.
+ *
+ * Their files do not cascade: nothing in Postgres can delete a Storage
+ * object. They are removed first, and the account only goes once they have:
+ * a failure there leaves an account the person can try again on, where the
+ * other order would leave files nobody owns and nobody can ask about.
  */
 export async function POST() {
   const supabase = await createClient();
@@ -54,9 +60,20 @@ export async function POST() {
     }
   );
 
+  const files = await removeFilesOf(admin, user.id);
+  if (!files.ok) {
+    Sentry.captureException(new Error(`account files: ${files.error}`), {
+      tags: { route: "account/delete" },
+      extra: { removed: files.removed },
+    });
+    return NextResponse.json(
+      { error: "Couldn't remove your photos and videos. Nothing else was deleted. Try again." },
+      { status: 500 },
+    );
+  }
+
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) {
-    console.error("[account/delete]", error.message);
     Sentry.captureException(error, { tags: { route: "account/delete" } });
     return NextResponse.json({ error: "Deletion failed" }, { status: 500 });
   }

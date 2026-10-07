@@ -18,6 +18,7 @@ import { scheduleUndoable } from "@/lib/undoable";
 import { TuneSheet } from "@/components/notifications/TuneSheet";
 import { InterestCard } from "@/components/notifications/InterestCard";
 import { levelOf, needsYou, sectionOf, spotlightDecision, type ActivityPrefs, type LevelKey } from "@/lib/activity-prefs";
+import { parsePrivateProfile } from "@/lib/profile";
 
 export type Notif = {
   id: string;
@@ -400,9 +401,9 @@ export default function NotificationsPage() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(PAGE),
-      supabase.from("profiles").select("notif_prefs").eq("id", user.id).maybeSingle(),
+      supabase.rpc("my_private_profile"),
     ]);
-    setPrefs(((me as { notif_prefs?: ActivityPrefs } | null)?.notif_prefs ?? {}) as ActivityPrefs);
+    setPrefs((parsePrivateProfile(me)?.notifPrefs ?? {}) as ActivityPrefs);
 
     const mapped: Notif[] = (data ?? []).map((n: any) => ({
       ...n,

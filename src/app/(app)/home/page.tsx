@@ -20,6 +20,7 @@ import {
 } from "@/lib/feed-rank";
 import { placeShots } from "@/lib/feed-mix";
 import { isAdult } from "@/lib/ads";
+import { getPrivateProfile } from "@/lib/profile";
 import { getBlockedIds } from "@/lib/blocked";
 import { getFeedExclusions } from "@/lib/feed-quiet";
 import { jsonRecord } from "@/lib/supabase/typed";
@@ -50,6 +51,10 @@ export default async function HomePage() {
   const ghostClaim = supabase.rpc("claim_ghost_share", { p_kind: "post" }).then((res) => res);
 
   // Follow graph first: the followed-posts query depends on it.
+  // Asked for now, read where the ad decision is made: it is not on the
+  // profiles table for anyone to read, its owner included.
+  const privateProfile = getPrivateProfile(supabase);
+
   const [{ data: followRows }, blockedIds, quiet] = await Promise.all([
     // Capped, like close_friends below, and for a harder reason
     // than volume: every one of these ids is spread into `.in("user_id", …)`
@@ -111,9 +116,7 @@ export default async function HomePage() {
     supabase
       .from("profiles")
       .select(
-        // date_of_birth is here only to decide whether ads may be
-        // personalised. It never reaches the browser — only the boolean does.
-        "display_name, username, avatar_hue, avatar_url, interests, profile_tags, date_of_birth"
+        "display_name, username, avatar_hue, avatar_url, interests, profile_tags"
       )
       .eq("id", user.id)
       .maybeSingle(),
@@ -390,9 +393,8 @@ export default async function HomePage() {
   // and this decides whether a reader who may be fourteen gets a personalised
   // ad. A null date of birth — every OAuth account that never passed
   // /age-check — is a no, not a maybe.
-  const adPersonalised = isAdult(
-    (myProfile as any)?.date_of_birth as string | null | undefined
-  );
+  // The date of birth never reaches the browser — only the boolean does.
+  const adPersonalised = isAdult((await privateProfile)?.dateOfBirth);
 
   // Country comes from the edge. An absent header is left null and read as
   // "consent required" downstream, so a misconfigured deploy serves nothing

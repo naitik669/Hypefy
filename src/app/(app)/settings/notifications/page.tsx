@@ -3,17 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { NotificationPrefs, type NotifPrefs } from "@/components/settings/NotificationPrefs";
 import { PushToggle } from "@/components/pwa/PushToggle";
+import { getPrivateProfile } from "@/lib/profile";
 
 export default async function NotificationSettingsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("notif_prefs")
-    .eq("id", user.id)
-    .maybeSingle();
+  const mine = await getPrivateProfile(supabase);
 
   return (
     <>
@@ -32,7 +29,7 @@ export default async function NotificationSettingsPage() {
           </p>
           <NotificationPrefs
             userId={user.id}
-            initialPrefs={((profile as any)?.notif_prefs ?? {}) as NotifPrefs}
+            initialPrefs={(mine?.notifPrefs ?? {}) as NotifPrefs}
           />
         </section>
       </div>
