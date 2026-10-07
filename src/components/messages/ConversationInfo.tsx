@@ -8,12 +8,15 @@ import {
   Ban,
   Bell,
   BellOff,
-  Check,
-  ChevronRight,
   Flag,
+  Ghost,
   Images,
+  LayoutGrid,
   Loader2,
   LogOut,
+  MoreHorizontal,
+  Paperclip,
+  Play,
   Search,
   ShieldCheck,
   Timer,
@@ -32,6 +35,24 @@ import { ReportSheet } from "@/components/ui/ReportSheet";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ChatThemePicker } from "@/components/messages/ChatThemePicker";
 import { findChatTheme } from "@/lib/chat-themes";
+import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
+import { ChatImg, ChatVideo } from "@/components/messages/ChatMedia";
+import type { SharedTab } from "@/lib/chat-shared";
+
+/** What the Shared card on this screen is given: how much there is, and the newest few to show. */
+export type SharedSummary = {
+  counts: Record<SharedTab, number>;
+  preview: { id: string; kind: "image" | "video" | "gif"; url: string }[];
+};
+
+/** The Shared tabs, as icons. The same three, in the same order, as the Shared screen. */
+const SHARED_ICONS: { id: SharedTab; label: string; Icon: typeof Images }[] = [
+  { id: "media", label: "Photos and videos", Icon: Images },
+  { id: "posts", label: "Posts and Shots", Icon: LayoutGrid },
+  { id: "more", label: "Voice notes, files and links", Icon: Paperclip },
+];
+/** How many of the newest photos the card shows before "+N". */
+export const PREVIEW_TILES = 4;
 
 export type RosterMember = {
   id: string;
@@ -58,55 +79,6 @@ const AUTO_DELETE_OPTIONS: { label: string; value: string | null }[] = [
   { label: "30 days", value: "30 days" },
 ];
 
-function Row({
-  icon,
-  label,
-  sub,
-  onClick,
-  href,
-  danger,
-  right,
-  busy,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  sub?: string;
-  onClick?: () => void;
-  href?: string;
-  danger?: boolean;
-  right?: React.ReactNode;
-  busy?: boolean;
-}) {
-  const body = (
-    <>
-      <span className={`shrink-0 ${danger ? "text-danger" : "text-muted"}`}>
-        {busy ? <Loader2 size={20} className="animate-spin" /> : icon}
-      </span>
-      <span className="min-w-0 flex-1 text-left">
-        <span className={`block text-sm font-semibold ${danger ? "text-danger" : ""}`}>
-          {label}
-        </span>
-        {sub && <span className="block text-xs text-muted">{sub}</span>}
-      </span>
-      {right}
-    </>
-  );
-  const cls =
-    "flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.04]";
-  if (href) {
-    return (
-      <Link href={href} className={cls}>
-        {body}
-      </Link>
-    );
-  }
-  return (
-    <button type="button" onClick={onClick} disabled={busy} className={`${cls} disabled:opacity-60`}>
-      {body}
-    </button>
-  );
-}
-
 function Section({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
     <section className="mt-5">
@@ -117,6 +89,85 @@ function Section({ title, children }: { title?: string; children: React.ReactNod
       )}
       <div className="divide-y divide-border/50 border-y border-border/50">{children}</div>
     </section>
+  );
+}
+
+/** One of the round actions under the name. */
+function QuickAction({
+  icon,
+  label,
+  onClick,
+  href,
+  on = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+  href?: string;
+  /** Lit: the thing it names is switched on (muted). */
+  on?: boolean;
+}) {
+  const cls = `flex flex-1 flex-col items-center gap-1.5 rounded-2xl py-3 text-[11px] font-semibold transition-colors active:scale-[0.97] ${
+    on ? "bg-accent/15 text-accent" : "bg-surface text-muted hover:text-foreground"
+  }`;
+  const body = (
+    <>
+      <span className={on ? "text-accent" : "text-foreground"}>{icon}</span>
+      {label}
+    </>
+  );
+  return href ? (
+    <Link href={href} className={cls}>
+      {body}
+    </Link>
+  ) : (
+    <button type="button" onClick={onClick} aria-pressed={on} className={cls}>
+      {body}
+    </button>
+  );
+}
+
+/** A setting that is on or off: said as a switch, not as a row that reads "Off". */
+function SwitchRow({
+  icon,
+  label,
+  sub,
+  on,
+  busy,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  sub: string;
+  on: boolean;
+  busy?: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      disabled={busy}
+      onClick={onChange}
+      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.04] disabled:opacity-60"
+    >
+      <span className="shrink-0 text-muted">{busy ? <Loader2 size={20} className="animate-spin" /> : icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{label}</span>
+        <span className="block text-xs text-muted">{sub}</span>
+      </span>
+      <span
+        aria-hidden
+        className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${on ? "bg-accent" : "bg-border"}`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full transition-transform ${
+            on ? "translate-x-[18px] bg-accent-ink" : "translate-x-0.5 bg-foreground"
+          }`}
+        />
+      </span>
+    </button>
   );
 }
 
@@ -141,7 +192,7 @@ export function ConversationInfo({
   vanishMode,
   autoDeleteAfter,
   screenshotAlert,
-  mediaCount,
+  shared,
   theme = null,
   isPremium = false,
   ownedThemes = [],
@@ -158,7 +209,7 @@ export function ConversationInfo({
   vanishMode: boolean;
   autoDeleteAfter: string | null;
   screenshotAlert: boolean;
-  mediaCount: number;
+  shared: SharedSummary;
   /** The chat's theme id, or null for the default look. */
   theme?: string | null;
   isPremium?: boolean;
@@ -188,6 +239,7 @@ export function ConversationInfo({
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<RosterMember | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Add-member search, groups only.
   const [adding, setAdding] = useState(false);
@@ -326,10 +378,64 @@ export function ConversationInfo({
     <>
       <PageHeader title={isGroup ? "Group info" : "Chat info"} showBack />
 
-      {/* Identity */}
-      <div className="flex flex-col items-center gap-2 px-6 pt-6 pb-2 text-center">
+      {/* Identity. The things you do to a chat rather than in it (block,
+          report, delete) are behind the dots beside the name, out of the way
+          of a thumb scrolling the settings below. */}
+      <div className="flex flex-col items-center gap-2 px-6 pt-6 pb-1 text-center">
         <Avatar name={title} hue={peer?.hue ?? 280} src={avatarUrl ?? undefined} size={88} />
-        <h2 className="mt-1 text-lg font-extrabold">{title}</h2>
+        <div className="relative mt-1 flex max-w-full items-center gap-1 pl-9">
+          <h2 className="min-w-0 truncate text-lg font-extrabold">{title}</h2>
+          <button
+            type="button"
+            aria-label="More options"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(true)}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground"
+          >
+            <MoreHorizontal size={20} />
+          </button>
+          <FloatingMenu open={menuOpen} onClose={() => setMenuOpen(false)} className="absolute right-0 top-9 min-w-[210px] text-left">
+            {!isGroup && (
+              <MenuItem
+                icon={Ban}
+                label={peer?.username ? `Block @${peer.username}` : "Block"}
+                danger
+                onClick={() => {
+                  setMenuOpen(false);
+                  setConfirmBlock(true);
+                }}
+              />
+            )}
+            <MenuItem
+              icon={Flag}
+              label={isGroup ? "Report group" : "Report"}
+              danger
+              onClick={() => {
+                setMenuOpen(false);
+                setReportOpen(true);
+              }}
+            />
+            <MenuItem
+              icon={isGroup ? LogOut : Trash2}
+              label={isGroup ? "Leave group" : "Delete chat"}
+              danger
+              onClick={() => {
+                setMenuOpen(false);
+                removeChat({
+                  id: conversationId,
+                  isGroup,
+                  name: title,
+                  thumb: { src: avatarUrl, name: title, hue: peer?.hue ?? null },
+                  leave: () => supabase.rpc("leave_conversation", { p_conversation_id: conversationId }),
+                  toast: showToast,
+                  onDone: () => router.refresh(),
+                });
+                router.replace("/messages");
+              }}
+            />
+          </FloatingMenu>
+        </div>
         {!isGroup && peer?.username && (
           <p className="text-sm text-muted">@{peer.username}</p>
         )}
@@ -340,36 +446,78 @@ export function ConversationInfo({
         )}
       </div>
 
-      <Section>
+      {/* What you reach for most, one tap each. */}
+      <div className="mt-4 flex gap-2 px-4">
         {!isGroup && peer?.username && (
-          <Row
-            icon={<UserCircle size={20} />}
-            label="View profile"
-            href={`/u/${peer.username}`}
-            right={<ChevronRight size={16} className="text-faint" />}
-          />
+          <QuickAction icon={<UserCircle size={22} />} label="Profile" href={`/u/${peer.username}`} />
         )}
-        <Row
-          icon={<Images size={20} />}
-          label="Media and files"
-          sub={mediaCount > 0 ? `${mediaCount} shared` : "Nothing shared yet"}
-          href={`/messages/${conversationId}/media`}
-          right={<ChevronRight size={16} className="text-faint" />}
-        />
-        <Row
-          icon={<Palette size={20} />}
-          label="Theme"
-          sub={findChatTheme(chatTheme)?.label ?? "Default"}
-          onClick={() => setThemeOpen(true)}
-          right={<ChevronRight size={16} className="text-faint" />}
-        />
-        <Row
-          icon={isMuted ? <BellOff size={20} /> : <Bell size={20} />}
-          label={isMuted ? "Unmute notifications" : "Mute notifications"}
-          sub={isMuted ? "You get no pings from this chat" : undefined}
+        <QuickAction
+          icon={isMuted ? <BellOff size={22} /> : <Bell size={22} />}
+          label={isMuted ? "Muted" : "Mute"}
+          on={isMuted}
           onClick={toggleMute}
         />
-      </Section>
+        <QuickAction
+          icon={<Palette size={22} />}
+          label={findChatTheme(chatTheme)?.label ?? "Theme"}
+          onClick={() => setThemeOpen(true)}
+        />
+      </div>
+
+      {/* Shared in this chat: the three kinds, how many of each, and the
+          newest photos, so it is clear what is in there before it is opened. */}
+      <section className="mt-5 px-4" data-shared-card>
+        <div className="rounded-2xl bg-surface p-2.5">
+          <div className="flex gap-1.5">
+            {SHARED_ICONS.map(({ id, label, Icon }) => (
+              <Link
+                key={id}
+                href={`/messages/${conversationId}/media?tab=${id}`}
+                aria-label={`${label}, ${shared.counts[id]}`}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-background/60 py-2.5 text-xs font-bold tabular-nums text-muted transition-colors hover:text-foreground"
+              >
+                <Icon size={18} strokeWidth={2.2} className="text-foreground" aria-hidden />
+                <span>{shared.counts[id]}</span>
+              </Link>
+            ))}
+          </div>
+          {shared.preview.length > 0 ? (
+            <Link
+              href={`/messages/${conversationId}/media?tab=media`}
+              aria-label="Open photos and videos"
+              className="mt-2 grid grid-cols-4 gap-1"
+            >
+              {shared.preview.slice(0, PREVIEW_TILES).map((m, i) => {
+                const rest = shared.counts.media - PREVIEW_TILES;
+                const last = i === PREVIEW_TILES - 1 && rest > 0;
+                return (
+                  <span key={m.id} className="relative block aspect-square overflow-hidden rounded-lg bg-background">
+                    {m.kind === "video" ? (
+                      <>
+                        <ChatVideo url={m.url} fragment="#t=0.1" preload="metadata" muted playsInline className="h-full w-full object-cover" />
+                        {!last && (
+                          <Play size={16} className="absolute inset-0 m-auto text-white drop-shadow" fill="currentColor" aria-hidden />
+                        )}
+                      </>
+                    ) : (
+                      <ChatImg url={m.url} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                    )}
+                    {last && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-sm font-bold tabular-nums text-white">
+                        +{rest}
+                      </span>
+                    )}
+                  </span>
+                );
+              })}
+            </Link>
+          ) : (
+            <p className="px-1.5 pb-1 pt-2.5 text-xs text-muted">
+              Photos, posts, Shots, voice notes and links sent here collect in these three.
+            </p>
+          )}
+        </div>
+      </section>
 
       {/* Migration 0032, finally reachable. */}
       <Section title="Privacy">
@@ -414,12 +562,13 @@ export function ConversationInfo({
           </div>
         </div>
 
-        <Row
-          icon={<Trash2 size={20} />}
+        <SwitchRow
+          icon={<Ghost size={20} />}
           label="Vanish mode"
-          sub={vanish ? "New messages disappear once seen" : "Off"}
+          sub="New messages disappear once seen"
+          on={vanish}
           busy={busy === "vanish"}
-          onClick={async () => {
+          onChange={async () => {
             const next = !vanish;
             setVanish(next);
             const okd = await run(
@@ -433,16 +582,14 @@ export function ConversationInfo({
             );
             if (!okd) setVanish(!next);
           }}
-          right={
-            vanish ? <Check size={16} className="text-accent" /> : undefined
-          }
         />
-        <Row
+        <SwitchRow
           icon={<ShieldCheck size={20} />}
           label="Screenshot alerts"
-          sub={shot ? "Everyone is told when a screenshot is taken" : "Off"}
+          sub="Everyone is told when a screenshot is taken"
+          on={shot}
           busy={busy === "shot"}
-          onClick={async () => {
+          onChange={async () => {
             const next = !shot;
             setShot(next);
             const okd = await run(
@@ -456,7 +603,6 @@ export function ConversationInfo({
             );
             if (!okd) setShot(!next);
           }}
-          right={shot ? <Check size={16} className="text-accent" /> : undefined}
         />
       </Section>
 
@@ -609,40 +755,6 @@ export function ConversationInfo({
           </Section>
         </>
       )}
-
-      <Section>
-        {!isGroup && (
-          <Row
-            icon={<Ban size={20} />}
-            label={peer?.username ? `Block @${peer.username}` : "Block"}
-            danger
-            onClick={() => setConfirmBlock(true)}
-          />
-        )}
-        <Row
-          icon={<Flag size={20} />}
-          label={isGroup ? "Report group" : "Report"}
-          danger
-          onClick={() => setReportOpen(true)}
-        />
-        <Row
-          icon={isGroup ? <LogOut size={20} /> : <Trash2 size={20} />}
-          label={isGroup ? "Leave group" : "Delete chat"}
-          danger
-          onClick={() => {
-            removeChat({
-              id: conversationId,
-              isGroup,
-              name: title,
-              thumb: { src: avatarUrl, name: title, hue: peer?.hue ?? null },
-              leave: () => supabase.rpc("leave_conversation", { p_conversation_id: conversationId }),
-              toast: showToast,
-              onDone: () => router.refresh(),
-            });
-            router.replace("/messages");
-          }}
-        />
-      </Section>
 
       <div className="h-8" />
 
