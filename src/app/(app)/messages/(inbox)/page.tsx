@@ -8,6 +8,7 @@ import { toDiaryEntries } from "@/lib/diary";
 import { loadInboxRows } from "@/app/(app)/messages/load-rows";
 import { toVaultOverview } from "@/lib/chat-vault";
 import { SpotlightNudge } from "@/components/diary/SpotlightNudge";
+import { HintPointer } from "@/components/ui/CoachMarks";
 
 /** When this inbox was drawn, so the page can tell a fresh one from one kept in memory. */
 const renderStamp = () => Date.now();
@@ -60,6 +61,13 @@ export default async function MessagesPage() {
           others={pages
             .filter((p) => !p.isSelf)
             .map((p) => ({ userId: p.userId, name: p.name, avatarUrl: p.avatarUrl, hue: p.hue }))}
+        />
+        {/* And once, a note pointing at the deck itself, timed for when it
+            has slid out: the banner says Spotlight exists, this says where. */}
+        <HintPointer
+          screen="messages"
+          delayMs={1100}
+          hints={[{ id: "spotlight", target: "spotlight", text: "This is Spotlight. Tap the deck to read today's pages or write yours." }]}
         />
         <MessagesInbox rows={rows} currentUserId={user.id} pages={pages} renderedAt={renderStamp()} vault={vault} />
       </PullToRefresh>

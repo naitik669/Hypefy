@@ -839,6 +839,17 @@ html[data-dm-leave]::view-transition-old(root) {
   100% { opacity: 1; transform: rotate(3deg) scale(1); }
 }
 
+/* The empty Spotlight card's show waits until the card has slid out and
+   sat for a moment (FloatingPages): paused at its first frame, which is the
+   stack squared up and the + and tag not yet there. */
+[data-deck-show="wait"] .animate-page-lean,
+[data-deck-show="wait"] .animate-page-fan-a,
+[data-deck-show="wait"] .animate-page-fan-b,
+[data-deck-show="wait"] .animate-page-pop,
+[data-deck-show="wait"] .animate-page-tag {
+  animation-play-state: paused;
+}
+
 .animate-page-lean {
   transform: rotate(-6deg);
   animation: page-lean 4.2s ease-in-out 1.4s infinite;

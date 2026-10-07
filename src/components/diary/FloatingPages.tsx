@@ -15,6 +15,18 @@ export const REVEAL_PX = 140;
 const TOP_PX = 8;
 /** As Messages opens, how long it stays out before tucking back to the edge. */
 export const INTRO_HOLD_MS = 1600;
+/**
+ * The empty card ("Add your page") has a little show of its own: the stack
+ * fans, the + pops, the tag lands. It used to play the moment Messages
+ * opened, while the card was still tucked at the edge with most of it out of
+ * sight. Now the card slides out first and sits there this long, then the
+ * show plays where it can be seen.
+ */
+export const INTRO_WAIT_MS = 1000;
+/** From the show starting to its last piece landing (globals.css: page-tag). */
+export const INTRO_SHOW_MS = 1450;
+/** A beat to take it in before it goes back to the edge. */
+const INTRO_AFTER_MS = 600;
 /** A drag this far, or a quick flick, sends the top page to the back. */
 const THROW_PX = 40;
 const THROW_MS = 300;
@@ -68,7 +80,10 @@ const reducedMotion = {
 export function FloatingPages({
   pages,
   introHoldMs = INTRO_HOLD_MS,
+  introWaitMs = INTRO_WAIT_MS,
 }: {
+  /** For tests. */
+  introWaitMs?: number;
   pages: DiaryEntry[];
   /** For tests. */
   introHoldMs?: number;
@@ -113,6 +128,13 @@ export function FloatingPages({
   const entering = useRef(false);
   const entered = useRef(false);
   const enterTimer = useRef<number | undefined>(undefined);
+  const showTimer = useRef<number | undefined>(undefined);
+
+  /** Let the empty card's show run (it is held still until told). */
+  function playShow() {
+    window.clearTimeout(showTimer.current);
+    if (link.current) link.current.dataset.deckShow = "play";
+  }
   // The empty card is the deck it is inviting you to start, so it is drawn
   // at the size of one rather than as a small square tile.
   const width = top ? 104 : 92;
@@ -125,6 +147,8 @@ export function FloatingPages({
   function endEntrance() {
     entering.current = false;
     window.clearTimeout(enterTimer.current);
+    // Taken over mid-entrance: whatever was waiting to play, plays.
+    playShow();
   }
 
   /** Slide it: 0 is peeking at the edge, 1 all the way out. */
@@ -162,7 +186,7 @@ export function FloatingPages({
     };
     const el = link.current;
     const still = motionQuery()?.matches ?? false;
-    if (el && !entered.current && top && window.scrollY <= TOP_PX && !still) {
+    if (el && !entered.current && window.scrollY <= TOP_PX && !still) {
       // Messages has just opened, at the top: in from the right, a moment
       // out, then back to wait at the edge. The read of offsetWidth makes
       // sure its start, past the edge, is laid out before it moves, so it
@@ -173,20 +197,28 @@ export function FloatingPages({
       void el.offsetWidth;
       place(1, ENTER);
       el.style.opacity = "1";
+      // With pages in it, it shows itself and goes back. Empty, it comes
+      // out, waits, plays its show where it can be seen, and only then goes.
+      const stay = top ? introHoldMs : introWaitMs + INTRO_SHOW_MS + INTRO_AFTER_MS;
+      if (top) playShow();
+      else showTimer.current = window.setTimeout(playShow, introWaitMs);
       enterTimer.current = window.setTimeout(() => {
         entering.current = false;
         if (!pinned.current && window.scrollY <= TOP_PX) place(0, SLIDE);
-      }, introHoldMs);
+      }, stay);
     } else {
       entered.current = true;
       read(false);
       if (el) el.style.opacity = "1";
+      // No entrance (scrolled, or less motion asked for): nothing to wait for.
+      playShow();
     }
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
       cancelAnimationFrame(frame);
       window.clearTimeout(enterTimer.current);
+      window.clearTimeout(showTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- width only changes with top, which place reads fresh
   }, [width]);
@@ -270,6 +302,8 @@ export function FloatingPages({
     <Link
       ref={link}
       data-coach="spotlight"
+      // Held until the entrance says so: see playShow, and globals.css.
+      data-deck-show="wait"
       href={href}
       aria-label={label}
       onPointerDown={onPointerDown}
