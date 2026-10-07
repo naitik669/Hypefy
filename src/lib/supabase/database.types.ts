@@ -3135,6 +3135,7 @@ export type Database = {
       trial_eligible: { Args: { p_uid: string }; Returns: boolean }
       unfollow_user: { Args: { p_target: string }; Returns: undefined }
       my_chat_levels: { Args: never; Returns: { conversation_id: string; level: string }[] }
+      chat_pin_places: { Args: never; Returns: number | null }
       unlock_vault: { Args: { p_pin: string }; Returns: boolean }
       lock_vault: { Args: never; Returns: undefined }
       touch_vault: { Args: never; Returns: boolean }

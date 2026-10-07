@@ -30,6 +30,8 @@ const rpc = vi.hoisted(() => ({
   answer: (fn: string, args?: Record<string, unknown>) => ({ data: null as unknown, error: null as unknown }),
 }));
 const stepUp = vi.hoisted(() => ({ ok: true, asked: 0 }));
+/** 4 for a PIN chosen now; 5 or 6 for a known older one; null for an older one of unknown length. */
+const pinPlaces = vi.hoisted(() => ({ value: 4 as number | null }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: (to: string) => nav.pushed.push(to), refresh: () => { nav.refreshed += 1; }, back() {} }),
@@ -52,6 +54,8 @@ vi.mock("@/components/auth/StepUpDialog", () => ({
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     rpc: async (fn: string, args?: Record<string, unknown>) => {
+      // How long this account's PIN is, which the door asks before anything.
+      if (fn === "chat_pin_places") return { data: pinPlaces.value, error: null };
       rpc.calls.push({ fn, args });
       return rpc.answer(fn, args);
     },
@@ -70,6 +74,7 @@ beforeEach(() => {
   rpc.answer = () => ({ data: null, error: null });
   stepUp.ok = true;
   stepUp.asked = 0;
+  pinPlaces.value = 4;
   sessionStorage.clear();
   host = document.createElement("div");
   document.body.appendChild(host);
@@ -102,9 +107,9 @@ describe("the rules", () => {
     expect(levelOf({ hidden_at: "2026-10-06" })).toBe("normal");
   });
 
-  it("takes exactly four digits for a PIN", () => {
-    for (const yes of ["1234", "0000", " 4821 "]) expect(looksLikePin(yes), yes).toBe(true);
-    for (const no of ["123", "12345", "123456", "12a4", "", "12 34", "maya"]) expect(looksLikePin(no), no).toBe(false);
+  it("takes four digits for a PIN, or up to six for one chosen before that", () => {
+    for (const yes of ["1234", "0000", " 4821 ", "12345", "123456"]) expect(looksLikePin(yes), yes).toBe(true);
+    for (const no of ["123", "1234567", "12a4", "", "12 34", "maya"]) expect(looksLikePin(no), no).toBe(false);
   });
 
   it("reads the overview the server sends, and nothing from a failed call", () => {
@@ -580,5 +585,66 @@ describe("the Vault's own door", () => {
     const src = (await import("node:fs")).readFileSync("src/app/(app)/messages/vault/page.tsx", "utf8");
     expect(src).toContain('<VaultGate title="Vault" look="case" />');
     expect((await import("node:fs")).readFileSync("src/app/(app)/messages/locked/page.tsx", "utf8")).not.toContain('look="case"');
+  });
+});
+
+/**
+ * PINs became four digits after some people had chosen five or six. Their
+ * PIN was never wrong; a pad that stopped at four could not take it.
+ */
+describe("a PIN chosen before PINs were four digits", () => {
+  async function gate() {
+    const { VaultGate } = await import("@/components/vault/VaultGate");
+    await act(async () => root.render(createElement(VaultGate, { title: "Locked chats" })));
+  }
+  const places = () => host.querySelectorAll("[data-pin-pad] [aria-label$='digits entered'] span").length;
+  const hasEnter = () => [...host.querySelectorAll("button")].some((b) => b.textContent === "Enter");
+
+  it("is given six places and an Enter key while its length is unknown", async () => {
+    pinPlaces.value = null;
+    rpc.answer = (fn) => ({ data: fn === "unlock_vault" ? true : null, error: null });
+    await gate();
+    expect(places()).toBe(6);
+    expect(hasEnter()).toBe(true);
+    // Four digits are not sent early: it may be a longer PIN still being typed.
+    await enter("4821");
+    expect(called("unlock_vault")).toEqual([]);
+    await enter("93");
+    expect(called("unlock_vault")[0].args).toEqual({ p_pin: "482193" });
+    expect(nav.refreshed).toBe(1);
+  });
+
+  it("can also be a four or five digit one, sent with Enter", async () => {
+    pinPlaces.value = null;
+    rpc.answer = (fn) => ({ data: fn === "unlock_vault" ? true : null, error: null });
+    await gate();
+    await enter("48219");
+    expect(called("unlock_vault")).toEqual([]);
+    await tap("Enter");
+    expect(called("unlock_vault")[0].args).toEqual({ p_pin: "48219" });
+  });
+
+  it("gets a pad of exactly its own length once that is known", async () => {
+    pinPlaces.value = 6;
+    rpc.answer = (fn) => ({ data: fn === "unlock_vault" ? true : null, error: null });
+    await gate();
+    expect(places()).toBe(6);
+    expect(hasEnter()).toBe(false);
+    await enter("482193");
+    expect(called("unlock_vault")[0].args).toEqual({ p_pin: "482193" });
+  });
+
+  it("leaves a four digit PIN exactly as it was: four places, no Enter", async () => {
+    await gate();
+    expect(places()).toBe(4);
+    expect(hasEnter()).toBe(false);
+  });
+
+  it("is still replaced by a four digit one when a new PIN is chosen", async () => {
+    pinPlaces.value = null;
+    const { ChatPinSetup } = await import("@/components/vault/ChatPinSetup");
+    await act(async () => root.render(createElement(ChatPinSetup, { reason: "change", onDone() {}, onClose() {} })));
+    expect(places()).toBe(4);
+    expect(hasEnter()).toBe(false);
   });
 });

@@ -36,15 +36,30 @@ export function toVaultOverview(data: unknown): VaultOverview {
   };
 }
 
-/** The chat PIN is exactly this many digits (0117). The app lock's is its own. */
+/** A chat PIN chosen now is exactly this many digits (0117). The app lock's is its own. */
 export const PIN_LENGTH = 4;
+/** The longest a chat PIN chosen before then could be. */
+export const OLD_PIN_MAX = 6;
 
 /**
- * Could this search be the Vault PIN? Exactly four digits and nothing else,
- * the shape set_lock_pin accepts for chats. Anything else is only ever a search.
+ * Could this search be the Vault PIN? Four digits, or up to six for a PIN
+ * chosen before they became four. Anything else is only ever a search.
  */
 export function looksLikePin(query: string): boolean {
-  return /^[0-9]{4}$/.test(query.trim());
+  return /^[0-9]{4,6}$/.test(query.trim());
+}
+
+/**
+ * How the pad should take a PIN, from what the server knows of its length
+ * (chat_pin_places, 0118).
+ *
+ *   a number   that many places, sent on the last one
+ *   null       an older PIN whose length was never recorded: six places and
+ *              an Enter key, as the pad used to be, until it opens once
+ */
+export function padFor(places: number | null): { places: number; enter: boolean } {
+  if (places === null) return { places: OLD_PIN_MAX, enter: true };
+  return { places: Math.min(Math.max(places, PIN_LENGTH), OLD_PIN_MAX), enter: false };
 }
 
 /**

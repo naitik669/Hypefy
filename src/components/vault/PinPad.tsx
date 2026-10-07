@@ -2,16 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { Delete } from "lucide-react";
-import { PIN_LENGTH } from "@/lib/chat-vault";
+import { PIN_LENGTH, padFor } from "@/lib/chat-vault";
 
 /**
- * A keypad for the four digit chat PIN.
+ * A keypad for the chat PIN.
  *
- * The fourth digit submits it: there is no Enter key, because there is never
- * a shorter or longer PIN to wait for. `onSubmit` says whether it was
- * accepted, and a refusal clears the pad so the next try starts clean.
- * Digits and Backspace work from a keyboard too, since the Vault has to open
- * on a laptop.
+ * A PIN is four digits, and the fourth sends it: no Enter key, because there
+ * is nothing shorter or longer to wait for. `length` says otherwise for a
+ * PIN chosen before that rule: its real length if the server knows it, or
+ * null if it does not, in which case the pad offers six places and an Enter
+ * key so that any older PIN can still be typed.
+ *
+ * `onSubmit` says whether it was accepted, and a refusal clears the pad so
+ * the next try starts clean. Digits, Backspace and Enter work from a keyboard
+ * too, since the Vault has to open on a laptop.
  */
 export function PinPad({
   onSubmit,
@@ -19,6 +23,7 @@ export function PinPad({
   disabled,
   look = "plain",
   hint,
+  length = PIN_LENGTH,
 }: {
   onSubmit: (pin: string) => Promise<boolean> | boolean;
   /** Shown under the dots; the caller owns the wording. */
@@ -32,12 +37,16 @@ export function PinPad({
   look?: "plain" | "case";
   /** What the line under the display says when there is no error. */
   hint?: string;
+  /** How many digits the PIN has; null when it is an older one of unknown length. */
+  length?: number | null;
 }) {
+  const pad = padFor(length);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function submit(value: string) {
-    if (busy || disabled || value.length !== PIN_LENGTH) return;
+    const complete = pad.enter ? value.length >= PIN_LENGTH : value.length === pad.places;
+    if (busy || disabled || !complete) return;
     setBusy(true);
     const ok = await onSubmit(value);
     setBusy(false);
@@ -46,9 +55,9 @@ export function PinPad({
 
   function press(digit: string) {
     if (busy || disabled) return;
-    const next = (pin + digit).slice(0, PIN_LENGTH);
+    const next = (pin + digit).slice(0, pad.places);
     setPin(next);
-    if (next.length === PIN_LENGTH) void submit(next);
+    if (next.length === pad.places) void submit(next);
   }
 
   function erase() {
@@ -61,6 +70,7 @@ export function PinPad({
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (/^[0-9]$/.test(e.key)) press(e.key);
       else if (e.key === "Backspace") erase();
+      else if (e.key === "Enter" && pad.enter) void submit(pin);
       else return;
       e.preventDefault();
     }
@@ -86,7 +96,7 @@ export function PinPad({
           className="flex h-11 w-full items-center justify-center gap-3 rounded-xl border-[2.5px] border-[#333] bg-[#141414]"
           aria-label={`${pin.length} digits entered`}
         >
-          {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+          {Array.from({ length: pad.places }).map((_, i) => (
             <span
               key={i}
               className={`h-2.5 w-2.5 rounded-full transition-colors ${i < pin.length ? "bg-accent" : "bg-[#2a2a2a]"}`}
@@ -95,7 +105,7 @@ export function PinPad({
         </div>
       ) : (
         <div className="flex h-6 items-center gap-3" aria-label={`${pin.length} digits entered`}>
-          {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+          {Array.from({ length: pad.places }).map((_, i) => (
             <span
               key={i}
               className={`h-2.5 w-2.5 rounded-full transition-colors ${i < pin.length ? "bg-accent" : "bg-surface"}`}
@@ -117,8 +127,21 @@ export function PinPad({
             {d}
           </button>
         ))}
-        {/* Where Enter was: the fourth digit sends the PIN by itself. */}
-        <span aria-hidden />
+        {pad.enter ? (
+          // Only for an older PIN of unknown length: it may be done at four,
+          // five or six, so the pad has to be told.
+          <button
+            type="button"
+            onClick={() => void submit(pin)}
+            disabled={pin.length < PIN_LENGTH || busy || disabled}
+            className={small}
+          >
+            Enter
+          </button>
+        ) : (
+          // Where Enter was: the last digit sends the PIN by itself.
+          <span aria-hidden />
+        )}
         <button type="button" onClick={() => press("0")} disabled={busy || disabled} className={key}>
           0
         </button>

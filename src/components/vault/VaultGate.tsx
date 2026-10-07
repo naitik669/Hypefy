@@ -46,6 +46,26 @@ export function VaultGate({
   /** The box's lamp: dark, red at a wrong PIN, green at the right one. */
   const [lamp, setLamp] = useState<"off" | "red" | "green">("off");
   const lampTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * How many digits this account's PIN has. Asked before the pad will take
+   * anything: a pad that guessed four would send an older six digit PIN two
+   * digits early, as a wrong one. `undefined` while asking; `null` when it
+   * is an older PIN whose length nobody recorded.
+   */
+  const [pinLength, setPinLength] = useState<number | null | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    void supabase.rpc("chat_pin_places").then(({ data, error: err }) => {
+      if (!live) return;
+      // If it cannot be asked, offer the pad that can type any PIN.
+      setPinLength(err ? null : (data as number | null));
+    });
+    return () => {
+      live = false;
+    };
+    // The client is made fresh each render; this is asked once per door.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => () => { if (lampTimer.current) clearTimeout(lampTimer.current); }, []);
 
   async function tryPin(pin: string): Promise<boolean> {
@@ -112,7 +132,14 @@ export function VaultGate({
             />
           </div>
           <div className="mt-4 w-full">
-            <PinPad onSubmit={tryPin} error={error} look="case" hint={sub} disabled={lamp === "green"} />
+            <PinPad
+              onSubmit={tryPin}
+              error={error}
+              look="case"
+              hint={sub}
+              length={pinLength ?? null}
+              disabled={lamp === "green" || pinLength === undefined}
+            />
           </div>
           <span aria-hidden className={s.handle} />
         </div>
@@ -125,7 +152,7 @@ export function VaultGate({
             <h1 className="text-lg font-bold">{title}</h1>
             <p className="mt-1 text-sm text-muted">{sub}</p>
           </div>
-          <PinPad onSubmit={tryPin} error={error} />
+          <PinPad onSubmit={tryPin} error={error} length={pinLength ?? null} disabled={pinLength === undefined} />
         </>
       )}
       <button type="button" onClick={forgot} className="text-xs font-semibold text-muted underline-offset-2 hover:underline">
