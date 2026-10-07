@@ -23,7 +23,7 @@ import {
 export type SharedPerson = { name: string; hue: number; avatarUrl: string | null };
 
 /** The three tabs are icons: what each holds is said to a screen reader, and by the count beside it. */
-const TABS: { id: SharedTab; label: string; Icon: typeof Images }[] = [
+export const SHARED_TAB_ICONS: { id: SharedTab; label: string; Icon: typeof Images }[] = [
   { id: "media", label: "Photos and videos", Icon: Images },
   { id: "posts", label: "Posts and Shots", Icon: LayoutGrid },
   { id: "more", label: "Voice notes, files and links", Icon: Paperclip },
@@ -71,6 +71,57 @@ export function ConversationMedia({
   initialTab?: SharedTab;
 }) {
   const [tab, setTab] = useState<SharedTab>(initialTab);
+
+  return (
+    <div className="flex flex-col pb-10">
+      <div className="sticky top-14 z-10 chrome-bar border-b border-border/60 px-4 pb-2.5 pt-2">
+        <div role="tablist" aria-label="Shared in this chat" className="flex gap-1 rounded-pill bg-surface p-1">
+          {SHARED_TAB_ICONS.map(({ id, label, Icon }) => {
+            const on = id === tab;
+            const count = shared[id].length;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                aria-label={`${label}, ${count}`}
+                data-shared-tab={id}
+                onClick={() => setTab(id)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-pill py-2 text-xs font-bold tabular-nums transition-colors ${
+                  on ? "bg-accent text-accent-ink" : "text-muted hover:text-foreground"
+                }`}
+              >
+                <Icon size={18} strokeWidth={2.2} aria-hidden />
+                {count > 0 && <span>{count}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <SharedPanel shared={shared} me={me} people={people} isGroup={isGroup} tab={tab} />
+    </div>
+  );
+}
+
+/**
+ * One tab's worth of what was shared: who-sent-it filter, the months, and
+ * the viewer. The Shared screen shows it under its tabs; the chat details
+ * screen opens it in place, under the same three icons.
+ */
+export function SharedPanel({
+  shared,
+  me,
+  people,
+  isGroup = false,
+  tab,
+}: {
+  shared: Shared;
+  me: string;
+  people: Record<string, SharedPerson>;
+  isGroup?: boolean;
+  tab: SharedTab;
+}) {
   const [from, setFrom] = useState<SenderFilter>("all");
   const [open, setOpen] = useState<SharedMedia | null>(null);
 
@@ -93,59 +144,33 @@ export function ConversationMedia({
   }, [open, shared.media]);
 
   return (
-    <div className="flex flex-col pb-10">
-      <div className="sticky top-14 z-10 chrome-bar border-b border-border/60 px-4 pb-2.5 pt-2">
-        <div role="tablist" aria-label="Shared in this chat" className="flex gap-1 rounded-pill bg-surface p-1">
-          {TABS.map(({ id, label, Icon }) => {
-            const on = id === tab;
-            const count = shared[id].length;
-            return (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={on}
-                aria-label={`${label}, ${count}`}
-                data-shared-tab={id}
-                onClick={() => setTab(id)}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-pill py-2 text-xs font-bold tabular-nums transition-colors ${
-                  on ? "bg-accent text-accent-ink" : "text-muted hover:text-foreground"
-                }`}
-              >
-                <Icon size={18} strokeWidth={2.2} aria-hidden />
-                {count > 0 && <span>{count}</span>}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-2 flex gap-1.5">
-          {(
-            [
-              ["all", "All"],
-              ["mine", "You"],
-              ["theirs", theirs],
-            ] as [SenderFilter, string][]
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={from === id}
-              onClick={() => setFrom(id)}
-              className={`max-w-[9rem] truncate rounded-pill px-3 py-1 text-[11px] font-semibold transition-colors ${
-                from === id ? "bg-white/15 text-foreground" : "bg-surface text-muted hover:text-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+    <div data-shared-panel={tab} className="flex flex-col">
+      <div className="flex gap-1.5 px-4 pt-2.5">
+        {(
+          [
+            ["all", "All"],
+            ["mine", "You"],
+            ["theirs", theirs],
+          ] as [SenderFilter, string][]
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={from === id}
+            onClick={() => setFrom(id)}
+            className={`max-w-[9rem] truncate rounded-pill px-3 py-1 text-[11px] font-semibold transition-colors ${
+              from === id ? "bg-white/15 text-foreground" : "bg-surface text-muted hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {shownCount === 0 ? (
         <div className="pt-10">
           <EmptyState
-            icon={TABS.find((t) => t.id === tab)!.Icon}
+            icon={SHARED_TAB_ICONS.find((t) => t.id === tab)!.Icon}
             title={from === "all" ? EMPTY[tab].title : "Nothing from them here"}
             text={from === "all" ? EMPTY[tab].text : "Try All to see everything shared in this chat."}
             variant="compact"

@@ -97,7 +97,7 @@ export default async function ConversationInfoPage({
 
   // What has been shared here, for the card that leads to it: how many of
   // each kind, and the newest few photos.
-  const [{ data: sharedRows }, { count: linkCount }] = await Promise.all([
+  const [{ data: sharedRows }, { data: linkRows }] = await Promise.all([
     supabase
       .from("messages")
       .select(SHARED_SELECT)
@@ -106,15 +106,23 @@ export default async function ConversationInfoPage({
       .eq("is_unsent", false)
       .order("created_at", { ascending: false })
       .limit(300),
+    // Links live inside ordinary messages, so they are asked for by what they contain.
     supabase
       .from("messages")
-      .select("id", { count: "exact", head: true })
+      .select("id, kind, body, sender_id, created_at")
       .eq("conversation_id", threadId)
       .eq("kind", "text")
       .eq("is_unsent", false)
-      .ilike("body", "%http%"),
+      .ilike("body", "%http%")
+      .order("created_at", { ascending: false })
+      .limit(100),
   ]);
-  const sorted = sortShared((sharedRows ?? []) as unknown as SharedRow[]);
+  const shared = sortShared(
+    [...((sharedRows ?? []) as unknown as SharedRow[]), ...((linkRows ?? []) as unknown as SharedRow[])].sort((a, b) =>
+      a.created_at < b.created_at ? 1 : -1,
+    ),
+  );
+  const people = Object.fromEntries(roster.map((m) => [m.id, { name: m.name, hue: m.hue, avatarUrl: m.avatarUrl }]));
 
   return (
     <ConversationInfo
@@ -142,10 +150,8 @@ export default async function ConversationInfoPage({
       vanishMode={!!conv?.vanish_mode}
       autoDeleteAfter={(conv?.auto_delete_after as string) ?? null}
       screenshotAlert={!!conv?.screenshot_alert_at}
-      shared={{
-        counts: { media: sorted.media.length, posts: sorted.posts.length, more: sorted.more.length + (linkCount ?? 0) },
-        preview: sorted.media.slice(0, 4).map(({ id, kind, url }) => ({ id, kind, url })),
-      }}
+      shared={shared}
+      people={people}
       theme={(conv?.theme as string | null) ?? null}
       isPremium={!!mine?.is_premium}
       ownedThemes={(bought ?? []).map((b) => b.product_id)}

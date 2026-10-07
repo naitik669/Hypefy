@@ -131,22 +131,38 @@ describe("the chat details screen", () => {
     expect(info.split("removeChat({").length).toBe(2);
   });
 
-  it("the shared card's three tabs are icons, each leading to its own tab", () => {
-    expect(info).toContain("href={`/messages/${conversationId}/media?tab=${id}`}");
-    expect(info).toContain("aria-label={`${label}, ${shared.counts[id]}`}");
-    for (const icon of ["Icon: Images", "Icon: LayoutGrid", "Icon: Paperclip"]) expect(info).toContain(icon);
+  it("the shared tabs are icons that open in place, and fold away when tapped again", () => {
+    expect(info).toContain("SHARED_TAB_ICONS.map(({ id, label, Icon }) => {");
+    expect(info).toContain("aria-label={`${label}, ${shared[id].length}`}");
+    expect(info).toContain("onClick={() => openShared(id)}");
+    expect(info).toContain("<SharedPanel shared={shared} me={currentUserId} people={people} isGroup={isGroup} tab={sharedTab} />");
+    // It does not leave the screen to do it.
+    expect(info).not.toContain("/media?tab=");
   });
 
-  it("vanish mode and screenshot alerts are switches", () => {
-    expect(info.split("<SwitchRow").length).toBe(3);
-    expect(info).toContain('role="switch"');
-    expect(info).toContain("aria-checked={on}");
+  it("it opens beneath the icons: the page is not moved, and nothing below is hidden", () => {
+    expect(info).toContain("const openShared = (tab: SharedTab) => setSharedTab((now) => (now === tab ? null : tab));");
+    expect(info).not.toContain("scrollIntoView");
+    expect(info).not.toContain("{!sharedTab && (");
+    // Inside the card, under the tabs.
+    const card = info.slice(info.indexOf("data-shared-card"), info.indexOf("data-privacy"));
+    expect(card.indexOf("<SharedPanel")).toBeGreaterThan(card.indexOf('role="tablist"'));
   });
 
-  it("the Shared screen's tabs are icons too, and its viewer names the real sender", () => {
+  it("privacy is one list: the timer shows its value and opens its choices, the other two are switches", () => {
+    expect(info.split("<PrivacyRow").length).toBe(4);
+    expect(info).toContain('role={isSwitch ? "switch" : undefined}');
+    expect(info).toContain("onClick={() => setTimerOpen(true)}");
+    expect(info).toContain('<BottomSheet open={timerOpen} onClose={() => setTimerOpen(false)} title="Disappearing messages">');
+    // The timer still asks before it deletes history that already exists.
+    expect(info).toContain("if (o.value) setConfirmAutoDelete(o.value);");
+  });
+
+  it("the Shared screen holds the same panel under the same icons, and its viewer names the real sender", () => {
     const media = read("src/components/messages/ConversationMedia.tsx");
     expect(media).toContain('role="tablist"');
     expect(media).toContain("aria-label={`${label}, ${count}`}");
+    expect(media).toContain("<SharedPanel shared={shared} me={me} people={people} isGroup={isGroup} tab={tab} />");
     expect(media).toContain("avatarUrl: people[open.senderId]?.avatarUrl ?? null");
     expect(media).toContain("<VoiceMessage");
   });

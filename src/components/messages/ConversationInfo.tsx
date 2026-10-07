@@ -7,15 +7,14 @@ import {
   Palette,
   Ban,
   Bell,
+  Check,
+  ChevronRight,
   BellOff,
   Flag,
   Ghost,
-  Images,
-  LayoutGrid,
   Loader2,
   LogOut,
   MoreHorizontal,
-  Paperclip,
   Play,
   Search,
   ShieldCheck,
@@ -36,21 +35,11 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { ChatThemePicker } from "@/components/messages/ChatThemePicker";
 import { findChatTheme } from "@/lib/chat-themes";
 import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ChatImg, ChatVideo } from "@/components/messages/ChatMedia";
-import type { SharedTab } from "@/lib/chat-shared";
+import { SHARED_TAB_ICONS, SharedPanel, type SharedPerson } from "@/components/messages/ConversationMedia";
+import type { Shared, SharedTab } from "@/lib/chat-shared";
 
-/** What the Shared card on this screen is given: how much there is, and the newest few to show. */
-export type SharedSummary = {
-  counts: Record<SharedTab, number>;
-  preview: { id: string; kind: "image" | "video" | "gif"; url: string }[];
-};
-
-/** The Shared tabs, as icons. The same three, in the same order, as the Shared screen. */
-const SHARED_ICONS: { id: SharedTab; label: string; Icon: typeof Images }[] = [
-  { id: "media", label: "Photos and videos", Icon: Images },
-  { id: "posts", label: "Posts and Shots", Icon: LayoutGrid },
-  { id: "more", label: "Voice notes, files and links", Icon: Paperclip },
-];
 /** How many of the newest photos the card shows before "+N". */
 export const PREVIEW_TILES = 4;
 
@@ -127,51 +116,71 @@ function QuickAction({
   );
 }
 
-/** A setting that is on or off: said as a switch, not as a row that reads "Off". */
-function SwitchRow({
+/**
+ * One row of the privacy list. Its icon is lit while the setting is on, so
+ * the three read at a glance; the right side is a switch, or for the timer
+ * its current value and a chevron.
+ */
+function PrivacyRow({
   icon,
   label,
   sub,
   on,
   busy,
-  onChange,
+  onClick,
+  value,
 }: {
   icon: React.ReactNode;
   label: string;
   sub: string;
   on: boolean;
   busy?: boolean;
-  onChange: () => void;
+  onClick: () => void;
+  /** Given for a row that opens a picker rather than flipping: what it is set to. */
+  value?: string;
 }) {
+  const isSwitch = value === undefined;
   return (
     <button
       type="button"
-      role="switch"
-      aria-checked={on}
+      role={isSwitch ? "switch" : undefined}
+      aria-checked={isSwitch ? on : undefined}
       disabled={busy}
-      onClick={onChange}
-      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.04] disabled:opacity-60"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-white/[0.04] disabled:opacity-60"
     >
-      <span className="shrink-0 text-muted">{busy ? <Loader2 size={20} className="animate-spin" /> : icon}</span>
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+          on ? "bg-accent text-accent-ink" : "bg-background/70 text-muted"
+        }`}
+      >
+        {busy ? <Loader2 size={18} className="animate-spin" /> : icon}
+      </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold">{label}</span>
         <span className="block text-xs text-muted">{sub}</span>
       </span>
-      <span
-        aria-hidden
-        className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${on ? "bg-accent" : "bg-border"}`}
-      >
-        <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full transition-transform ${
-            on ? "translate-x-[18px] bg-accent-ink" : "translate-x-0.5 bg-foreground"
-          }`}
-        />
-      </span>
+      {isSwitch ? (
+        <span aria-hidden className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${on ? "bg-accent" : "bg-border"}`}>
+          <span
+            className={`absolute top-0.5 h-5 w-5 rounded-full transition-transform ${
+              on ? "translate-x-[18px] bg-accent-ink" : "translate-x-0.5 bg-foreground"
+            }`}
+          />
+        </span>
+      ) : (
+        <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-muted">
+          <span className={on ? "text-accent" : ""}>{value}</span>
+          <ChevronRight size={16} className="text-faint" />
+        </span>
+      )}
     </button>
   );
 }
 
 /**
+ * Everything about one conversation, on a real route./**
+ * Everything about one conversation, on a real route./**
  * Everything about one conversation, on a real route.
  *
  * Replaces GroupInfoSheet and gives DMs the screen they never had. It is also
@@ -193,6 +202,7 @@ export function ConversationInfo({
   autoDeleteAfter,
   screenshotAlert,
   shared,
+  people,
   theme = null,
   isPremium = false,
   ownedThemes = [],
@@ -209,7 +219,10 @@ export function ConversationInfo({
   vanishMode: boolean;
   autoDeleteAfter: string | null;
   screenshotAlert: boolean;
-  shared: SharedSummary;
+  /** Everything shared in this chat, sorted, for the tabs that open in place. */
+  shared: Shared;
+  /** Everyone in the chat by id, for the lists and the photo viewer. */
+  people: Record<string, SharedPerson>;
   /** The chat's theme id, or null for the default look. */
   theme?: string | null;
   isPremium?: boolean;
@@ -240,6 +253,15 @@ export function ConversationInfo({
   const [confirmRemove, setConfirmRemove] = useState<RosterMember | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** The Shared tab that is open in place, or none. */
+  const [sharedTab, setSharedTab] = useState<SharedTab | null>(null);
+  const [timerOpen, setTimerOpen] = useState(false);
+  const rest = shared.media.length - PREVIEW_TILES;
+
+  // Opens under the icons, where it was tapped: the page is not moved, so
+  // the name and the actions above stay as they were. The open one, tapped
+  // again, folds away.
+  const openShared = (tab: SharedTab) => setSharedTab((now) => (now === tab ? null : tab));
 
   // Add-member search, groups only.
   const [adding, setAdding] = useState(false);
@@ -464,34 +486,50 @@ export function ConversationInfo({
         />
       </div>
 
-      {/* Shared in this chat: the three kinds, how many of each, and the
-          newest photos, so it is clear what is in there before it is opened. */}
-      <section className="mt-5 px-4" data-shared-card>
-        <div className="rounded-2xl bg-surface p-2.5">
-          <div className="flex gap-1.5">
-            {SHARED_ICONS.map(({ id, label, Icon }) => (
-              <Link
-                key={id}
-                href={`/messages/${conversationId}/media?tab=${id}`}
-                aria-label={`${label}, ${shared.counts[id]}`}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-background/60 py-2.5 text-xs font-bold tabular-nums text-muted transition-colors hover:text-foreground"
-              >
-                <Icon size={18} strokeWidth={2.2} className="text-foreground" aria-hidden />
-                <span>{shared.counts[id]}</span>
-              </Link>
-            ))}
+      {/* Shared in this chat: the three kinds and how many of each. Tapping
+          one opens it right here, the card growing downward under the icons;
+          nothing above it moves and Privacy carries on below. */}
+      <section className="mt-5 px-4" data-shared-card data-open={sharedTab ?? undefined}>
+        <div className="rounded-2xl bg-surface p-1.5">
+          <div role="tablist" aria-label="Shared in this chat" className="flex gap-1.5">
+            {SHARED_TAB_ICONS.map(({ id, label, Icon }) => {
+              const on = sharedTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  aria-expanded={on}
+                  aria-label={`${label}, ${shared[id].length}`}
+                  data-shared-tab={id}
+                  onClick={() => openShared(id)}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold tabular-nums transition-colors ${
+                    on ? "bg-accent text-accent-ink" : "bg-background/60 text-muted hover:text-foreground"
+                  }`}
+                >
+                  <Icon size={18} strokeWidth={2.2} className={on ? "" : "text-foreground"} aria-hidden />
+                  <span>{shared[id].length}</span>
+                </button>
+              );
+            })}
           </div>
-          {shared.preview.length > 0 ? (
-            <Link
-              href={`/messages/${conversationId}/media?tab=media`}
+
+          {sharedTab ? (
+            <div className="animate-rise -mx-1.5 pb-3">
+              <SharedPanel shared={shared} me={currentUserId} people={people} isGroup={isGroup} tab={sharedTab} />
+            </div>
+          ) : shared.media.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => openShared("media")}
               aria-label="Open photos and videos"
-              className="mt-2 grid grid-cols-4 gap-1"
+              className="mt-1.5 grid w-full grid-cols-4 gap-1"
             >
-              {shared.preview.slice(0, PREVIEW_TILES).map((m, i) => {
-                const rest = shared.counts.media - PREVIEW_TILES;
+              {shared.media.slice(0, PREVIEW_TILES).map((m, i) => {
                 const last = i === PREVIEW_TILES - 1 && rest > 0;
                 return (
-                  <span key={m.id} className="relative block aspect-square overflow-hidden rounded-lg bg-background">
+                  <span key={m.id} className="relative block aspect-square overflow-hidden rounded-xl bg-background">
                     {m.kind === "video" ? (
                       <>
                         <ChatVideo url={m.url} fragment="#t=0.1" preload="metadata" muted playsInline className="h-full w-full object-cover" />
@@ -510,101 +548,73 @@ export function ConversationInfo({
                   </span>
                 );
               })}
-            </Link>
+            </button>
           ) : (
-            <p className="px-1.5 pb-1 pt-2.5 text-xs text-muted">
+            <p className="px-2 pb-1.5 pt-2.5 text-xs text-muted">
               Photos, posts, Shots, voice notes and links sent here collect in these three.
             </p>
           )}
         </div>
       </section>
 
-      {/* Migration 0032, finally reachable. */}
-      <Section title="Privacy">
-        <div className="px-4 py-3.5">
-          <div className="flex items-center gap-3">
-            <Timer size={20} className="shrink-0 text-muted" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">Disappearing messages</p>
-              <p className="text-xs text-muted">
-                Deletes for everyone, and applies to messages you have already
-                sent.
-              </p>
-            </div>
-          </div>
-          <div className="mt-2.5 flex flex-wrap gap-1.5 pl-8">
-            {AUTO_DELETE_OPTIONS.map((o) => {
-              const on = autoDelete === o.value;
-              return (
-                <button
-                  key={o.label}
-                  type="button"
-                  disabled={busy === "autodelete"}
-                  // Turning it ON is destructive to history that already
-                  // exists, not just to messages sent from now on — the cron
-                  // sweeps anything older than the window on its next hourly
-                  // run. Measured against real data: one 30-day window in this
-                  // app would remove 74 existing messages immediately. Off
-                  // needs no confirmation; on does.
-                  onClick={() =>
-                    o.value ? setConfirmAutoDelete(o.value) : chooseAutoDelete(null)
-                  }
-                  className={`rounded-pill border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                    on
-                      ? "border-accent bg-accent text-accent-ink"
-                      : "border-border bg-surface text-muted hover:text-foreground"
-                  }`}
-                >
-                  {o.label}
-                </button>
+      {/* Privacy (migration 0032): one list. Two switches, and the timer,
+          which shows what it is set to and opens its four choices. */}
+      <section className="mt-6 px-4" data-privacy>
+        <p className="px-1 pb-2 text-[11px] font-bold tracking-widest text-faint uppercase">Privacy</p>
+        <div className="divide-y divide-border/50 overflow-hidden rounded-2xl bg-surface">
+          <PrivacyRow
+            icon={<Timer size={18} />}
+            label="Disappearing messages"
+            sub={autoDelete ? "Deleted for everyone after a while" : "Messages stay until deleted"}
+            on={!!autoDelete}
+            busy={busy === "autodelete"}
+            value={AUTO_DELETE_OPTIONS.find((o) => o.value === autoDelete)?.label ?? "Off"}
+            onClick={() => setTimerOpen(true)}
+          />
+          <PrivacyRow
+            icon={<Ghost size={18} />}
+            label="Vanish mode"
+            sub="New messages disappear once seen"
+            on={vanish}
+            busy={busy === "vanish"}
+            onClick={async () => {
+              const next = !vanish;
+              setVanish(next);
+              const okd = await run(
+                "vanish",
+                () =>
+                  supabase.rpc("toggle_vanish_mode", {
+                    p_conversation_id: conversationId,
+                  }) as unknown as Promise<{ error: unknown }>,
+                next ? "Vanish mode on" : "Vanish mode off",
+                "Couldn't change vanish mode."
               );
-            })}
-          </div>
+              if (!okd) setVanish(!next);
+            }}
+          />
+          <PrivacyRow
+            icon={<ShieldCheck size={18} />}
+            label="Screenshot alerts"
+            sub="Everyone is told when one is taken"
+            on={shot}
+            busy={busy === "shot"}
+            onClick={async () => {
+              const next = !shot;
+              setShot(next);
+              const okd = await run(
+                "shot",
+                () =>
+                  supabase.rpc("toggle_screenshot_alert", {
+                    p_conversation_id: conversationId,
+                  }) as unknown as Promise<{ error: unknown }>,
+                next ? "Screenshot alerts on" : "Screenshot alerts off",
+                "Couldn't change screenshot alerts."
+              );
+              if (!okd) setShot(!next);
+            }}
+          />
         </div>
-
-        <SwitchRow
-          icon={<Ghost size={20} />}
-          label="Vanish mode"
-          sub="New messages disappear once seen"
-          on={vanish}
-          busy={busy === "vanish"}
-          onChange={async () => {
-            const next = !vanish;
-            setVanish(next);
-            const okd = await run(
-              "vanish",
-              () =>
-                supabase.rpc("toggle_vanish_mode", {
-                  p_conversation_id: conversationId,
-                }) as unknown as Promise<{ error: unknown }>,
-              next ? "Vanish mode on" : "Vanish mode off",
-              "Couldn't change vanish mode."
-            );
-            if (!okd) setVanish(!next);
-          }}
-        />
-        <SwitchRow
-          icon={<ShieldCheck size={20} />}
-          label="Screenshot alerts"
-          sub="Everyone is told when a screenshot is taken"
-          on={shot}
-          busy={busy === "shot"}
-          onChange={async () => {
-            const next = !shot;
-            setShot(next);
-            const okd = await run(
-              "shot",
-              () =>
-                supabase.rpc("toggle_screenshot_alert", {
-                  p_conversation_id: conversationId,
-                }) as unknown as Promise<{ error: unknown }>,
-              next ? "Screenshot alerts on" : "Screenshot alerts off",
-              "Couldn't change screenshot alerts."
-            );
-            if (!okd) setShot(!next);
-          }}
-        />
-      </Section>
+      </section>
 
       {/* Group management */}
       {isGroup && (
@@ -757,6 +767,39 @@ export function ConversationInfo({
       )}
 
       <div className="h-8" />
+
+      <BottomSheet open={timerOpen} onClose={() => setTimerOpen(false)} title="Disappearing messages">
+        <p className="pb-2 text-xs text-muted">
+          Deletes for everyone, and applies to messages already in this chat.
+        </p>
+        <div role="radiogroup" aria-label="Delete messages after" className="-mx-3 pb-4">
+          {AUTO_DELETE_OPTIONS.map((o) => {
+            const on = autoDelete === o.value;
+            return (
+              <button
+                key={o.label}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                // Turning it ON is destructive to history that already
+                // exists, not just to messages sent from now on — the cron
+                // sweeps anything older than the window on its next hourly
+                // run. Off needs no confirmation; on does.
+                onClick={() => {
+                  setTimerOpen(false);
+                  if (on) return;
+                  if (o.value) setConfirmAutoDelete(o.value);
+                  else void chooseAutoDelete(null);
+                }}
+                className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-semibold transition-colors hover:bg-white/[0.05]"
+              >
+                {o.label}
+                {on && <Check size={18} className="text-accent" />}
+              </button>
+            );
+          })}
+        </div>
+      </BottomSheet>
 
       <ChatThemePicker
         open={themeOpen}
