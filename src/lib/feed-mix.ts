@@ -14,6 +14,8 @@
 
 /** A Shot as the feed needs it — a subset of the shots table. */
 export type ShotCard = {
+  /** The song this Shot was made with, as saved by the composer. */
+  track?: unknown;
   id: string;
   user_id: string;
   media_url: string;

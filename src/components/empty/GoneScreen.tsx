@@ -23,6 +23,15 @@ const COPY = {
     cta: "Back to Shows",
     timing: undefined,
   },
+  sound: {
+    back: "/shots",
+    label: "Sound",
+    art: <ReelArt />,
+    title: "Nothing here with this sound",
+    text: "Whatever used it was deleted, or isn't yours to see.",
+    cta: "Back to Shots",
+    timing: { head: 1.15, sub: 1.5, cta: 1.85 },
+  },
 } as const;
 
 /**

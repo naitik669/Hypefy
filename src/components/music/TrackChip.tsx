@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Link from "next/link";
+import { soundHref } from "@/components/music/SoundPill";
 import { Music, Pause, X, ArrowUpRight } from "lucide-react";
 import { type Track, playPreview, claimPreview, useIsPlaying } from "@/lib/music";
 
@@ -111,10 +113,26 @@ export function TrackChip({
           </span>
         )}
       </button>
-      <p className="min-w-0 truncate text-[11px] leading-tight">
-        <span className="font-semibold">{track.title}</span>
-        {track.artist && <span className="text-muted"> · {track.artist}</span>}
-      </p>
+      {onRemove ? (
+        <p className="min-w-0 truncate text-[11px] leading-tight">
+          <span className="font-semibold">{track.title}</span>
+          {track.artist && <span className="text-muted"> · {track.artist}</span>}
+        </p>
+      ) : (
+        // Where it is only being shown, the name is the way to the song's
+        // page: what else was made with it, and a way to use it yourself.
+        <Link
+          href={soundHref(track.id)}
+
+          prefetch={false}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Sound: ${track.title}`}
+          className="min-w-0 truncate text-[11px] leading-tight"
+        >
+          <span className="font-semibold">{track.title}</span>
+          {track.artist && <span className="text-muted"> · {track.artist}</span>}
+        </Link>
+      )}
       {/* Full song on Apple Music — attribution + real listen (feed/anthem chips) */}
       {track.appleUrl && !onRemove && (
         <a

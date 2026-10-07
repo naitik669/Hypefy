@@ -80,7 +80,10 @@ export function CreateScreen({
   userId,
   initialMode = "shot",
   askedForLive = false,
+  initialTrack = null,
 }: {
+  /** A song to start with: "Use this sound" from a sound's page. */
+  initialTrack?: Track | null;
   userId: string;
   /** They chose Live from the (+) menu: open with the note on its tab. */
   askedForLive?: boolean;
@@ -96,7 +99,7 @@ export function CreateScreen({
   const toast = useToast();
   const [mode, setMode] = useState<CreateMode>(initialMode);
   const [maxSeconds, setMaxSeconds] = useState(DURATIONS[0]);
-  const [track, setTrack] = useState<Track | null>(null);
+  const [track, setTrack] = useState<Track | null>(initialTrack);
   const [trackOpen, setTrackOpen] = useState(false);
   const [captured, setCaptured] = useState<File | null>(null);
   /**

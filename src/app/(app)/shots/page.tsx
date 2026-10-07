@@ -9,7 +9,7 @@ import { getAdContext } from "@/lib/ads-server";
 
 /** What a Shot in the feed is made of. One list, so every Shot in it has the same fields. */
 const SHOT_COLS =
-  "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, save_count, repost_count, duration_secs, trim_start, trim_end, profiles(display_name, avatar_hue, avatar_url, username)";
+  "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, save_count, repost_count, duration_secs, trim_start, trim_end, track, profiles(display_name, avatar_hue, avatar_url, username)";
 
 /** Personalized Shot score: engagement (capped) + tiered recency + author affinity. */
 function shotScore(s: any, now: number, authorAff: Record<string, number>) {

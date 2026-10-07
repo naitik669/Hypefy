@@ -96,6 +96,8 @@ export function shotStage(
 import { useLongPress } from "@/lib/useLongPress";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { CommentIcon } from "@/components/ui/CommentIcon";
+import { claimPreview, parseTrack } from "@/lib/music";
+import { SoundPill } from "@/components/music/SoundPill";
 
 type ReelProfile = {
   display_name: string | null;
@@ -123,6 +125,8 @@ export type Reel = {
   hype_count?: number;
   comment_count?: number;
   repost_count?: number;
+  /** The song this Shot was made with, as saved by the composer. */
+  track?: unknown;
   profiles: ReelProfile;
   /** Set when a Shot reached the feed through someone's rehype: who, by id.
    *  Recorded as the link when you rehype it; the deck shows the faces. */
@@ -263,7 +267,7 @@ export function ReelsFeed({
     supabase
       .from("shots")
       .select(
-        "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, duration_secs, trim_start, trim_end, profiles(display_name, avatar_hue, username, avatar_url)"
+        "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, duration_secs, trim_start, trim_end, track, profiles(display_name, avatar_hue, username, avatar_url)"
       )
       .lt("created_at", oldest)
       .order("created_at", { ascending: false })
@@ -446,6 +450,23 @@ function ReelCard({
   /** The Shot itself, which is what the rehype deck may be dragged off. */
   const reelRef = useRef<HTMLElement>(null);
   const [playing, setPlaying] = useState(true);
+  /**
+   * The song this Shot was made with.
+   *
+   * It is stored beside the video, not mixed into it (see lib/shot-trim), so
+   * the reel has to play it: for as long as this Shot is the one on screen,
+   * playing, and not muted. With a song, the clip's own sound stays off;
+   * the composer previews it that way and the person who made it heard it
+   * that way. The reel's own speaker button is the mute for both.
+   */
+  const track = useMemo(() => parseTrack(reel.track), [reel.track]);
+  const trackId = track?.id;
+  useEffect(() => {
+    if (!track || !isActive || !playing || muted) return;
+    return claimPreview(track, { loop: true, audible: true });
+    // The id, not the object: a re-render must not restart the song.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trackId, isActive, playing, muted]);
   /** The play/pause glyph is a confirmation, not a control: it flashes to show
    *  the tap landed, then clears so it is not parked over the video. */
   const [iconShown, setIconShown] = useState(false);
@@ -1058,7 +1079,7 @@ function ReelCard({
         // native loop would run to the end of the file, past the part its
         // author chose.
         loop={window0.end === null}
-        muted={muted}
+        muted={muted || !!track}
         playsInline
         preload={preload}
         onClick={handleTap}
@@ -1311,6 +1332,7 @@ function ReelCard({
             {reel.caption}
           </ExpandableText>
         )}
+        {track && <SoundPill track={track} glass />}
       </div>
 
       {proof && (

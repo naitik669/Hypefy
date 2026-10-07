@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CreateScreen, type CreateMode } from "@/components/create/CreateScreen";
+import { findSound } from "@/lib/sound-lookup";
 
 /**
  * The creator.
@@ -23,7 +24,7 @@ function parseMode(v: string | string[] | undefined): CreateMode {
 export default async function CreatePage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string | string[] }>;
+  searchParams: Promise<{ mode?: string | string[]; sound?: string | string[] }>;
 }) {
   const supabase = await createClient();
   const {
@@ -32,7 +33,7 @@ export default async function CreatePage({
 
   if (!user) redirect("/signin");
 
-  const { mode } = await searchParams;
+  const { mode, sound } = await searchParams;
 
   // A post is written, not filmed. This screen is a camera, so Post never
   // belonged on it — it had a video picker and a button whose only job was to
@@ -42,7 +43,18 @@ export default async function CreatePage({
 
   // Live is not built. Its shortcut still lands here, on Shot, with the note
   // that says so pointing at the Live tab.
+  // "Use this sound" on a sound's page arrives with the song's id. The song
+  // itself is read from something already made with it; if nothing this
+  // person can see uses it any more, they simply start without one.
+  const soundId = Array.isArray(sound) ? sound[0] : sound;
+  const found = soundId ? await findSound(supabase, soundId) : null;
+
   return (
-    <CreateScreen userId={user.id} initialMode={parseMode(mode)} askedForLive={asked === "live"} />
+    <CreateScreen
+      userId={user.id}
+      initialMode={found ? "shot" : parseMode(mode)}
+      askedForLive={asked === "live"}
+      initialTrack={found?.track ?? null}
+    />
   );
 }

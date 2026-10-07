@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Play, VolumeX, Volume2, Star, Bookmark, MoreHorizontal, Flag, Ban, ChevronRight, Link2, Share2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -48,6 +48,8 @@ import { RehypeDeck } from "@/components/feed/RehypeDeck";
 import { RehypeReplySheet } from "@/components/feed/RehypeReplySheet";
 import { PostPeek } from "@/components/feed/PostPeek";
 import { useLongPress } from "@/lib/useLongPress";
+import { claimPreview, parseTrack } from "@/lib/music";
+import { SoundPill } from "@/components/music/SoundPill";
 
 /**
  * A Shot, sitting in the post feed.
@@ -186,6 +188,11 @@ export function ShotFeedCard({
 
   const wrapRef = useRef<HTMLAnchorElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  /** The song this Shot was made with. With one, the clip's own sound stays
+   *  off and the song plays instead: see ReelCard, which does the same. */
+  const track = useMemo(() => parseTrack(shot.track), [shot.track]);
+  const trackId = track?.id;
+  const hasTrack = !!track;
   /** Set once the card has been near the viewport — gates the download. */
   const [armed, setArmed] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -420,7 +427,8 @@ export function ShotFeedCard({
     const v = videoRef.current;
     if (!v || !inViewRef.current) return;
 
-    const wantSound = !isMuted() && ownsAudio(shot.id);
+    // A Shot with a song never asks the video itself for sound.
+    const wantSound = !hasTrack && !isMuted() && ownsAudio(shot.id);
 
     if (wantSound) {
       v.muted = false;
@@ -448,7 +456,7 @@ export function ShotFeedCard({
     } catch {
       setPlaying(false);
     }
-  }, [shot.id]);
+  }, [shot.id, hasTrack]);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -523,7 +531,7 @@ export function ShotFeedCard({
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    const wantSound = !muted;
+    const wantSound = !muted && !hasTrack;
 
     v.muted = !wantSound;
     // The attribute, separately: autoplay policy reads the attribute rather
@@ -551,7 +559,17 @@ export function ShotFeedCard({
         setMuted(true);
       }
     );
-  }, [muted]);
+  }, [muted, hasTrack]);
+
+  // The song, for as long as this card is the one being heard: playing, not
+  // muted (which here also means it owns the feed's sound), and not standing
+  // behind its own peek.
+  useEffect(() => {
+    if (!track || !playing || muted || peekOpen) return;
+    return claimPreview(track, { loop: true, audible: true });
+    // The id, not the object: a re-render must not restart the song.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trackId, playing, muted, peekOpen]);
 
   // A backgrounded tab keeps firing nothing, so the observer never tells us to
   // stop. Without this a shot carries on decoding while the phone is locked.
@@ -838,6 +856,8 @@ export function ShotFeedCard({
           friendCount={proof.friendCount}
         />
       )}
+
+      {track && <SoundPill track={track} className="mx-4 mt-2" />}
 
       {/* Caption, written the way a post's is: the author, then what they
           said, clamped with a more / less toggle. */}

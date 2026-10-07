@@ -11,6 +11,13 @@ import { createRoot, type Root } from "react-dom/client";
  * kept playing over the next post.
  */
 
+// The song's name is a link to its page now. The real Link watches itself
+// with an observer of its own (for prefetching), which is not what is under
+// test here and would be counted among the chip's.
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...rest }: { href: string; children: unknown }) =>
+    createElement("a", { href, ...rest }, children as never),
+}));
 vi.mock("@/lib/spotify-player", () => ({ spotifyPlay: async () => true, spotifyPause: async () => {} }));
 
 const played: string[] = [];
