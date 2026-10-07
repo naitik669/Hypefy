@@ -18,6 +18,7 @@ import {
   Play,
   Search,
   ShieldCheck,
+  ShieldOff,
   Timer,
   Trash2,
   UserMinus,
@@ -67,19 +68,6 @@ const AUTO_DELETE_OPTIONS: { label: string; value: string | null }[] = [
   { label: "7 days", value: "7 days" },
   { label: "30 days", value: "30 days" },
 ];
-
-function Section({ title, children }: { title?: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-5">
-      {title && (
-        <p className="px-4 pb-1.5 text-[11px] font-bold tracking-widest text-faint uppercase">
-          {title}
-        </p>
-      )}
-      <div className="divide-y divide-border/50 border-y border-border/50">{children}</div>
-    </section>
-  );
-}
 
 /** One of the round actions under the name. */
 function QuickAction({
@@ -256,6 +244,8 @@ export function ConversationInfo({
   /** The Shared tab that is open in place, or none. */
   const [sharedTab, setSharedTab] = useState<SharedTab | null>(null);
   const [timerOpen, setTimerOpen] = useState(false);
+  /** The member whose menu (make admin, remove) is open. */
+  const [memberMenu, setMemberMenu] = useState<string | null>(null);
   const rest = shared.media.length - PREVIEW_TILES;
 
   // Opens under the icons, where it was tapped: the page is not moved, so
@@ -616,153 +606,180 @@ export function ConversationInfo({
         </div>
       </section>
 
-      {/* Group management */}
+      {/* The group: its name, and who is in it. Same cards as the rest of
+          the screen; what an admin can do to a member is behind that
+          member's dots, not two bare icons beside every name. */}
       {isGroup && (
         <>
-          <Section title="Group name">
-            <div className="flex items-center gap-2 px-4 py-3">
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value.slice(0, 50))}
-                disabled={!isAdmin}
-                placeholder="Group name"
-                className="h-10 min-w-0 flex-1 rounded-xl bg-surface px-3 text-sm outline-none disabled:opacity-60"
-              />
-              {isAdmin && name.trim() !== title && (
-                <button
-                  type="button"
-                  onClick={saveName}
-                  disabled={savingName}
-                  className="flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-bold text-accent-ink disabled:opacity-60"
-                >
-                  {savingName ? <Loader2 size={15} className="animate-spin" /> : "Save"}
-                </button>
-              )}
-            </div>
-            {!isAdmin && (
-              <p className="px-4 pb-3 text-xs text-faint">Only admins can rename this group.</p>
-            )}
-          </Section>
-
-          <Section title={`${members.length} members`}>
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => setAdding((v) => !v)}
-                className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.04]"
-              >
-                <UserPlus size={20} className="text-accent" />
-                <span className="flex-1 text-sm font-semibold text-accent">Add people</span>
-                {adding && <X size={16} className="text-faint" />}
-              </button>
-            )}
-
-            {adding && (
-              <div className="px-4 py-3">
-                <div className="flex h-10 items-center gap-2 rounded-pill border border-border bg-surface px-3">
-                  <Search size={15} className="shrink-0 text-faint" />
-                  <input
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    placeholder="Search people you know…"
-                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
-                  />
-                  {searching && <Loader2 size={14} className="animate-spin text-faint" />}
-                </div>
-                {results.map((r) => (
+          <section className="mt-6 px-4" data-group-name>
+            <p className="px-1 pb-2 text-[11px] font-bold tracking-widest text-faint uppercase">Group name</p>
+            <div className="rounded-2xl bg-surface p-2.5">
+              <div className="flex items-center gap-2">
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value.slice(0, 50))}
+                  disabled={!isAdmin}
+                  aria-label="Group name"
+                  placeholder="Group name"
+                  className="h-10 min-w-0 flex-1 rounded-xl bg-background/70 px-3 text-sm font-semibold outline-none disabled:opacity-60"
+                />
+                {isAdmin && name.trim() !== title && (
                   <button
-                    key={r.id}
                     type="button"
-                    disabled={busy === r.id}
-                    onClick={() =>
-                      run(
-                        r.id,
-                        () =>
-                          supabase.rpc("add_conversation_member", {
-                            p_conversation_id: conversationId,
-                            p_user_id: r.id,
-                          }) as unknown as Promise<{ error: unknown }>,
-                        `Added ${r.name}`,
-                        "Couldn't add them."
-                      ).then((okd) => {
-                        if (okd) setResults((x) => x.filter((y) => y.id !== r.id));
-                      }) as unknown as void
-                    }
-                    className="mt-2 flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left hover:bg-white/[0.04] disabled:opacity-60"
+                    onClick={saveName}
+                    disabled={savingName}
+                    className="flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-bold text-accent-ink disabled:opacity-60"
                   >
-                    <Avatar name={r.name} hue={r.hue} src={r.avatarUrl ?? undefined} size={36} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{r.name}</span>
-                      {r.username && (
-                        <span className="block truncate text-xs text-muted">@{r.username}</span>
-                      )}
-                    </span>
-                    {busy === r.id ? (
-                      <Loader2 size={16} className="animate-spin text-muted" />
-                    ) : (
-                      <UserPlus size={16} className="text-accent" />
-                    )}
+                    {savingName ? <Loader2 size={15} className="animate-spin" /> : "Save"}
                   </button>
-                ))}
-                {!searching && q.trim() && results.length === 0 && (
-                  <p className="mt-3 text-center text-xs text-faint">No one found.</p>
                 )}
               </div>
-            )}
+              {!isAdmin && <p className="px-1 pt-2 text-xs text-faint">Only admins can rename this group.</p>}
+            </div>
+          </section>
 
-            {members.map((m) => (
-              <div key={m.id} className="flex items-center gap-3 px-4 py-3">
-                <Link href={m.username ? `/u/${m.username}` : "#"} className="shrink-0">
-                  <Avatar name={m.name} hue={m.hue} src={m.avatarUrl ?? undefined} size={40} />
-                </Link>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">
-                    {m.name}
-                    {m.id === currentUserId && (
-                      <span className="ml-1 text-xs font-normal text-faint">(you)</span>
-                    )}
-                  </p>
-                  {m.role === "admin" && (
-                    <p className="text-xs font-semibold text-accent">Admin</p>
+          <section className="mt-6 px-4" data-group-members>
+            <p className="px-1 pb-2 text-[11px] font-bold tracking-widest text-faint uppercase">
+              {members.length} {members.length === 1 ? "member" : "members"}
+            </p>
+            <div className="divide-y divide-border/50 rounded-2xl bg-surface">
+              {isAdmin && (
+                <div>
+                  <button
+                    type="button"
+                    aria-expanded={adding}
+                    onClick={() => setAdding((v) => !v)}
+                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-white/[0.04]"
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                      <UserPlus size={18} />
+                    </span>
+                    <span className="flex-1 text-sm font-semibold text-accent">Add people</span>
+                    {adding && <X size={16} className="text-faint" />}
+                  </button>
+
+                  {adding && (
+                    <div className="px-3.5 pb-3">
+                      <div className="flex h-10 items-center gap-2 rounded-xl bg-background/70 px-3">
+                        <Search size={15} className="shrink-0 text-faint" />
+                        <input
+                          value={q}
+                          onChange={(e) => setQ(e.target.value)}
+                          placeholder="Search people you know…"
+                          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
+                        />
+                        {searching && <Loader2 size={14} className="animate-spin text-faint" />}
+                      </div>
+                      {results.map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          disabled={busy === r.id}
+                          onClick={() =>
+                            run(
+                              r.id,
+                              () =>
+                                supabase.rpc("add_conversation_member", {
+                                  p_conversation_id: conversationId,
+                                  p_user_id: r.id,
+                                }) as unknown as Promise<{ error: unknown }>,
+                              `Added ${r.name}`,
+                              "Couldn't add them."
+                            ).then((okd) => {
+                              if (okd) setResults((x) => x.filter((y) => y.id !== r.id));
+                            }) as unknown as void
+                          }
+                          className="mt-2 flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left hover:bg-white/[0.04] disabled:opacity-60"
+                        >
+                          <Avatar name={r.name} hue={r.hue} src={r.avatarUrl ?? undefined} size={36} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold">{r.name}</span>
+                            {r.username && (
+                              <span className="block truncate text-xs text-muted">@{r.username}</span>
+                            )}
+                          </span>
+                          {busy === r.id ? (
+                            <Loader2 size={16} className="animate-spin text-muted" />
+                          ) : (
+                            <UserPlus size={16} className="text-accent" />
+                          )}
+                        </button>
+                      ))}
+                      {!searching && q.trim() && results.length === 0 && (
+                        <p className="mt-3 text-center text-xs text-faint">No one found.</p>
+                      )}
+                    </div>
                   )}
                 </div>
-                {isAdmin && m.id !== currentUserId && (
-                  <>
-                    <button
-                      type="button"
-                      disabled={busy === m.id}
-                      aria-label={m.role === "admin" ? "Demote to member" : "Make admin"}
-                      onClick={() =>
-                        run(
-                          m.id,
-                          () =>
-                            supabase.rpc("set_member_role", {
-                              p_conversation_id: conversationId,
-                              p_user_id: m.id,
-                              p_role: m.role === "admin" ? "member" : "admin",
-                            }) as unknown as Promise<{ error: unknown }>,
-                          m.role === "admin" ? `${m.name} is now a member` : `${m.name} is now an admin`,
-                          "Couldn't change their role."
-                        )
-                      }
-                      className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground disabled:opacity-60"
-                    >
-                      <ShieldCheck size={17} />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy === m.id}
-                      aria-label={`Remove ${m.name}`}
-                      onClick={() => setConfirmRemove(m)}
-                      className="flex h-9 w-9 items-center justify-center rounded-full text-danger transition-colors hover:bg-danger/10 disabled:opacity-60"
-                    >
-                      <UserMinus size={17} />
-                    </button>
-                  </>
-                )}
-              </div>
-            ))}
-          </Section>
+              )}
+
+              {members.map((m) => (
+                <div key={m.id} className="relative flex items-center gap-3 px-3.5 py-2.5" data-member={m.id}>
+                  <Link href={m.username ? `/u/${m.username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
+                    <Avatar name={m.name} hue={m.hue} src={m.avatarUrl ?? undefined} size={40} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold">
+                        {m.name}
+                        {m.id === currentUserId && <span className="ml-1 text-xs font-normal text-faint">(you)</span>}
+                      </span>
+                      {m.username && <span className="block truncate text-xs text-muted">@{m.username}</span>}
+                    </span>
+                  </Link>
+                  {m.role === "admin" && (
+                    <span className="shrink-0 rounded-pill bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">Admin</span>
+                  )}
+                  {isAdmin && m.id !== currentUserId && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={busy === m.id}
+                        aria-label={`Options for ${m.name}`}
+                        aria-haspopup="menu"
+                        aria-expanded={memberMenu === m.id}
+                        onClick={() => setMemberMenu(m.id)}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground disabled:opacity-60"
+                      >
+                        {busy === m.id ? <Loader2 size={16} className="animate-spin" /> : <MoreHorizontal size={18} />}
+                      </button>
+                      <FloatingMenu
+                        open={memberMenu === m.id}
+                        onClose={() => setMemberMenu(null)}
+                        className="absolute right-3 top-11 min-w-[200px]"
+                      >
+                        <MenuItem
+                          icon={m.role === "admin" ? ShieldOff : ShieldCheck}
+                          label={m.role === "admin" ? "Make a member" : "Make admin"}
+                          onClick={() => {
+                            setMemberMenu(null);
+                            void run(
+                              m.id,
+                              () =>
+                                supabase.rpc("set_member_role", {
+                                  p_conversation_id: conversationId,
+                                  p_user_id: m.id,
+                                  p_role: m.role === "admin" ? "member" : "admin",
+                                }) as unknown as Promise<{ error: unknown }>,
+                              m.role === "admin" ? `${m.name} is now a member` : `${m.name} is now an admin`,
+                              "Couldn't change their role."
+                            );
+                          }}
+                        />
+                        <MenuItem
+                          icon={UserMinus}
+                          label="Remove from group"
+                          danger
+                          onClick={() => {
+                            setMemberMenu(null);
+                            setConfirmRemove(m);
+                          }}
+                        />
+                      </FloatingMenu>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
         </>
       )}
 

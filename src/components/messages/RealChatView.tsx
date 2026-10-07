@@ -2788,7 +2788,11 @@ export function RealChatView({
                 rows.map((r) => {
                   const isMine = r.user_id === currentUserId;
                   const name = senderName(r.user_id);
-                  const hue = isMine ? 280 : members?.[r.user_id]?.hue ?? other.hue;
+                  // Whoever reacted, with their own picture: yours on yours, and
+                  // in a group the member's. Only the other person in a
+                  // one-to-one chat used to get theirs.
+                  const hue = isMine ? (self?.hue ?? 280) : members?.[r.user_id]?.hue ?? other.hue;
+                  const face = isMine ? self?.avatarUrl : members?.[r.user_id] ? members[r.user_id].avatarUrl : other.avatarUrl;
                   return (
                     <button
                       key={`${r.user_id}-${r.emoji}`}
@@ -2798,7 +2802,7 @@ export function RealChatView({
                       }}
                       className={`flex items-center gap-3 rounded-xl px-2 py-2.5 text-left ${isMine ? "hover:bg-white/5" : "cursor-default"}`}
                     >
-                      <Avatar name={name} hue={hue} size={40} src={isMine ? undefined : members?.[r.user_id] ? undefined : other.avatarUrl ?? undefined} />
+                      <Avatar name={name} hue={hue} size={40} src={face ?? undefined} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{name}</p>
                         {isMine && <p className="text-xs text-muted">Tap to remove</p>}
