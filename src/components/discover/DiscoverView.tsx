@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { tagHref } from "@/lib/tag-lookup";
 import { Zap, Play, Compass, Hash } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchBar } from "@/components/ui/SearchBar";
@@ -231,7 +232,7 @@ export function DiscoverView({
               {tags.map((t) => (
                 <Link
                   key={t.tag}
-                  href={`/search?q=%23${encodeURIComponent(t.tag)}`}
+                  href={tagHref(t.tag)}
                   className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03]"
                 >
                   <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface">

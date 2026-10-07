@@ -1,13 +1,12 @@
 import { cache } from "react";
-import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GoneScreen } from "@/components/empty/GoneScreen";
 import { SoundHero } from "@/components/music/SoundHero";
 import { ShotResultsGrid } from "@/components/search/ShotResultsGrid";
-import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
-import { findSound, soundCountLine, SOUND_PAGE_SIZE, type SoundPost } from "@/lib/sound-lookup";
+import { PostTileGrid } from "@/components/feed/PostTileGrid";
+import { findSound, soundCountLine, SOUND_PAGE_SIZE } from "@/lib/sound-lookup";
 
 /**
  * One song, and everything on Hypefy made with it.
@@ -36,27 +35,6 @@ export async function generateMetadata({
     title: `${sound.track.title}${by}`,
     description: `Shots and posts on Hypefy made with ${sound.track.title}.`,
   };
-}
-
-function PostTile({ post }: { post: SoundPost }) {
-  const image = post.image_urls?.[0] ?? post.image_url;
-  const words = post.caption ?? post.body ?? "";
-  return (
-    <Link
-      href={`/p/${post.id}`}
-      aria-label={words ? `Post: ${words}` : "Post"}
-      className="relative block overflow-hidden rounded-xl bg-surface"
-    >
-      {image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={image} alt="" loading="lazy" className="h-full w-full object-cover" />
-      ) : (
-        <span className="flex h-full w-full items-center p-2 text-[11px] leading-snug text-muted">
-          <span className="line-clamp-5">{words}</span>
-        </span>
-      )}
-    </Link>
-  );
 }
 
 export default async function SoundPage({ params }: { params: Promise<{ trackId: string }> }) {
@@ -90,13 +68,7 @@ export default async function SoundPage({ params }: { params: Promise<{ trackId:
         {posts.length > 0 && (
           <section>
             <h2 className="mb-2 px-4 text-xs font-bold uppercase tracking-widest text-faint">Posts</h2>
-            <div className={GRID_WRAP}>
-              <div className={GRID}>
-                {posts.map((p) => (
-                  <PostTile key={p.id} post={p} />
-                ))}
-              </div>
-            </div>
+            <PostTileGrid posts={posts} />
           </section>
         )}
         {(shotCount > SOUND_PAGE_SIZE || postCount > SOUND_PAGE_SIZE) && (

@@ -23,6 +23,7 @@ export default function MaintenancePage() {
         few minutes.
       </p>
       {/* A plain link, not a router call: the point is to ask the server again. */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
       <a
         href="/"
         className="mt-6 flex h-12 w-full max-w-[280px] items-center justify-center rounded-2xl bg-accent text-sm font-extrabold text-accent-ink"

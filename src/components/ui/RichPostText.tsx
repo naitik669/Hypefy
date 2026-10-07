@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { tagHref } from "@/lib/tag-lookup";
 
 /**
  * Renders post caption/body with styled, clickable #hashtags and @mentions.
@@ -26,7 +27,7 @@ export function RichPostText({
           return (
             <Link
               key={i}
-              href={`/search?q=${encodeURIComponent(`#${tag}`)}`}
+              href={tagHref(tag)}
               className="font-bold text-hashtag hover:underline"
             >
               {part}

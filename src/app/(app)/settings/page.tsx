@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CookiePreferencesButton } from "@/components/consent/ConsentBanner";
 import {
+  History,
   UserCircle,
   Shield,
   ShieldCheck,
@@ -93,6 +94,12 @@ const LISTS = [
     icon: Bookmark,
   },
   { href: "/hypers", label: "Hypers", sub: "Your closest people", icon: Star },
+  {
+    href: "/settings/activity",
+    label: "Your activity",
+    sub: "What you hyped and said",
+    icon: History,
+  },
   {
     href: "/requests",
     label: "Follow requests",

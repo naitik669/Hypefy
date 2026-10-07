@@ -6,6 +6,7 @@ import { Hash, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/ToastProvider";
+import { tagHref } from "@/lib/tag-lookup";
 
 /**
  * "Topics you follow" manager — lists the viewer's hashtag_follows with an
@@ -52,7 +53,7 @@ export function HashtagManager({ tags }: { tags: string[] }) {
             <Hash size={17} />
           </span>
           <Link
-            href={`/search?q=${encodeURIComponent(`#${tag}`)}`}
+            href={tagHref(tag)}
             className="min-w-0 flex-1 truncate text-sm font-semibold hover:underline"
           >
             #{tag}
