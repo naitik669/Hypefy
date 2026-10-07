@@ -65,7 +65,20 @@ export function placeBubble(box: Box, viewport: { width: number; height: number 
  *
  * When it is shown, and how often, is its caller's business.
  */
-export function PointerNote({ id, target, text, onGone }: { id: string; target: string; text: string; onGone: () => void }) {
+export function PointerNote({
+  id,
+  target,
+  text,
+  onGone,
+  ring = true,
+}: {
+  id: string;
+  target: string;
+  text: string;
+  onGone: () => void;
+  /** The outline round the control. Off where the control already stands out. */
+  ring?: boolean;
+}) {
   const [box, setBox] = useState<Box | null>(null);
   const gone = useRef(onGone);
   useEffect(() => {
@@ -112,21 +125,24 @@ export function PointerNote({ id, target, text, onGone }: { id: string; target: 
 
   return createPortal(
     <div data-hint={id} className="pointer-events-none fixed inset-0 z-[120]">
-      <div
-        aria-hidden
-        className="animate-coach-ring absolute rounded-2xl border-[1.5px] border-accent"
-        style={{
-          top: box.top - PAD,
-          // Kept on the screen: a control as wide as the page (the Shows
-          // row) would otherwise have a ring whose sides cannot be seen.
-          left: ringLeft,
-          width: Math.min(viewport.width - 4, box.left + box.width + PAD) - ringLeft,
-          height: box.height + PAD * 2,
-        }}
-      />
+      {ring && (
+        <div
+          aria-hidden
+          data-hint-ring
+          className="animate-coach-ring absolute rounded-2xl border-[1.5px] border-accent"
+          style={{
+            top: box.top - PAD,
+            // Kept on the screen: a control as wide as the page (the Shows
+            // row) would otherwise have a ring whose sides cannot be seen.
+            left: ringLeft,
+            width: Math.min(viewport.width - 4, box.left + box.width + PAD) - ringLeft,
+            height: box.height + PAD * 2,
+          }}
+        />
+      )}
       <div
         role="status"
-        className="animate-hint-in pointer-events-auto absolute flex items-start gap-1 rounded-2xl bg-foreground py-2 pl-3 pr-1 text-left text-background shadow-xl"
+        className="animate-hint-in pointer-events-auto absolute flex items-start gap-1 rounded-2xl border border-accent/45 bg-elevated py-2 pl-3 pr-1 text-left text-foreground shadow-xl shadow-black/60"
         // Over the control it is pinned by its foot, so however tall the
         // words make it, it ends the same distance above the ring.
         style={
@@ -137,15 +153,16 @@ export function PointerNote({ id, target, text, onGone }: { id: string; target: 
       >
         <span
           aria-hidden
-          className="absolute h-2.5 w-2.5 rotate-45 bg-foreground"
-          style={{ left: at.arrow - 5, ...(at.below ? { top: -4 } : { bottom: -4 }) }}
+          // The card's own corner, turned: two of its edges carry the outline on.
+          className={`absolute h-2.5 w-2.5 rotate-45 border-accent/45 bg-elevated ${at.below ? "border-l border-t" : "border-b border-r"}`}
+          style={{ left: at.arrow - 5, ...(at.below ? { top: -6 } : { bottom: -6 }) }}
         />
         <p className="min-w-0 flex-1 text-[12.5px] font-semibold leading-snug">{text}</p>
         <button
           type="button"
           onClick={() => gone.current()}
           aria-label="Dismiss hint"
-          className="-my-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-background/60"
+          className="-my-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted"
         >
           <X size={14} strokeWidth={2.6} />
         </button>

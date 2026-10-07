@@ -36,6 +36,8 @@ export function SpotlightPointer({ ownPageAt }: { ownPageAt: string | null }) {
     <PointerNote
       id="spotlight"
       target="spotlight"
+      // The deck has just slid out and is playing its show: it needs no outline.
+      ring={false}
       text="This is Spotlight. Tap the deck to read today's pages or write yours."
       onGone={() => setShow(false)}
     />

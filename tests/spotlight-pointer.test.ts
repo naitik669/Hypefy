@@ -63,6 +63,14 @@ describe("the note on the Spotlight deck", () => {
     expect(note()!.textContent).toContain("This is Spotlight");
   });
 
+  it("has no outline round the deck, and wears the app's dark card, not a white one", async () => {
+    await open();
+    expect(note()!.querySelector("[data-hint-ring]")).toBeNull();
+    const card = note()!.querySelector('[role="status"]')!;
+    expect(card.className).toContain("bg-elevated");
+    expect(card.className).not.toContain("bg-foreground");
+  });
+
   it("is not shown while their own page is up", async () => {
     await open(new Date(NOW - 3600_000).toISOString());
     expect(note()).toBeNull();
