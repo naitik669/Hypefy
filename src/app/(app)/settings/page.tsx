@@ -165,7 +165,7 @@ export default async function SettingsPage() {
           <SettingsRow
             href="/help"
             label="Help"
-            sub="What Hype, Shot and Show mean — and how to reach us"
+            sub="What Hype, Shot and Show mean, and where to report a problem"
             icon={HelpCircle}
           />
         </SettingsCard>
@@ -206,6 +206,10 @@ export default async function SettingsPage() {
           <span className="mx-2">·</span>
           <Link href="/cookies" className="underline hover:text-muted">
             Cookie Policy
+          </Link>
+          <span className="mx-2">·</span>
+          <Link href="/child-safety" className="underline hover:text-muted">
+            Child Safety
           </Link>
         </p>
       </div>

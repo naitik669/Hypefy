@@ -154,7 +154,7 @@ export default function PrivacyPage() {
       <ul>
         <li>access the personal data we hold about you and request a copy — you can export your data in-app from Settings → Account;</li>
         <li>correct or update inaccurate data;</li>
-        <li>delete your account and data in-app from Settings → Account;</li>
+        <li>delete your account and data in-app from Settings → Account (<a href="/delete-account" className="text-accent">how to delete your account</a>);</li>
         <li>object to or restrict certain processing, and withdraw consent;</li>
         <li>nominate another person to exercise your rights in the event of death or incapacity (DPDP);</li>
         <li>lodge a complaint with your data protection authority, or with our Grievance Officer (below).</li>

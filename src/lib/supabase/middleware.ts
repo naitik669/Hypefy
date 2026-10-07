@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { needsSecondFactor } from "@/lib/mfa-gate";
+import { RETURN_COOKIE, RETURN_MAX_AGE_S, safeReturnPath } from "@/lib/return-path";
 
 /**
  * Refreshes the Supabase auth session on every request and keeps cookies in
@@ -100,8 +101,20 @@ export async function updateSession(request: NextRequest) {
     // Straight to the landing rather than through "/", which only works out
     // where to send a signed-out visitor and answers with this same page —
     // one server render and one round trip, on the slowest moment there is.
+    // Note where they were going, so signing in lands there and not on Home.
+    // See src/lib/return-path.ts.
+    const wanted = safeReturnPath(pathname + request.nextUrl.search);
     url.pathname = "/onboarding";
+    url.search = "";
     const redirectResponse = NextResponse.redirect(url);
+    if (wanted) {
+      redirectResponse.cookies.set(RETURN_COOKIE, wanted, {
+        path: "/",
+        maxAge: RETURN_MAX_AGE_S,
+        sameSite: "lax",
+        secure: request.nextUrl.protocol === "https:",
+      });
+    }
     // Carry over any refreshed cookies so we never drop the session on redirect.
     supabaseResponse.cookies.getAll().forEach((c) => {
       redirectResponse.cookies.set(c.name, c.value);

@@ -41,7 +41,7 @@ const SPLASH_FACTS = [
  * reloads and the hard navigation an account switch performs.
  */
 const SPLASH_BOOT = `(function(){try{
-if(/^\\/(privacy|terms|guidelines|gate)(\\/|$)/.test(location.pathname)
+if(/^\\/(privacy|terms|guidelines|cookies|delete-account|child-safety|gate)(\\/|$)/.test(location.pathname)
    || sessionStorage.getItem('hypefy_splash')==='1'){
   document.documentElement.dataset.splash='off';return;
 }

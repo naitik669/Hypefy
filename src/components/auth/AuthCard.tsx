@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { takeReturnPath } from "@/lib/return-path";
 import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { upsertSavedAccount } from "@/lib/saved-accounts";
@@ -197,14 +198,16 @@ export function AuthCard({ mode }: { mode: Mode }) {
           window.location.href = "/home";
           return;
         }
+        // Where they were going before they were asked to sign in, if anywhere.
+        const dest = takeReturnPath() ?? "/home";
         if (data.user) {
           await readyEncryption(data.user.id, password, () => {
-            router.push("/home");
+            router.push(dest);
             router.refresh();
           });
           return;
         }
-        router.push("/home");
+        router.push(dest);
         router.refresh();
       } else {
         // Age gate + consent — must pass before we create the account.

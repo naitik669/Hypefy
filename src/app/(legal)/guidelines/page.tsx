@@ -25,7 +25,7 @@ export default function GuidelinesPage() {
 
       <h2>Keep everyone safe</h2>
       <ul>
-        <li>Absolutely no sexual content involving minors. We remove it, preserve evidence, and report it to the authorities.</li>
+        <li>Absolutely no sexual content involving minors. We remove it, preserve evidence, and report it to the authorities. See our <a href="/child-safety" className="text-accent">Child Safety Standards</a>.</li>
         <li>No content that sexually exploits or endangers anyone.</li>
         <li>No promotion of violence, terrorism, or dangerous organizations.</li>
         <li>No sale or promotion of illegal or regulated goods (such as drugs or weapons).</li>

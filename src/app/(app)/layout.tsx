@@ -9,6 +9,8 @@ import { CallProvider } from "@/components/calls/CallProvider";
 import { GroupCallProvider } from "@/components/calls/GroupCallProvider";
 import { UploadProvider, ShotUploadCard } from "@/components/upload/UploadProvider";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { ConnectionNotice } from "@/components/native/ConnectionNotice";
+import { ReturnToDestination } from "@/components/native/ReturnToDestination";
 import { NativeShell } from "@/components/native/NativeShell";
 import { SwipeNav } from "@/components/layout/SwipeNav";
 import { TabScrollTop } from "@/components/layout/TabScrollTop";
@@ -156,6 +158,8 @@ export default async function AppLayout({
                 with nowhere to put an inline bar. */}
             <ShotUploadCard />
             <NativeShell />
+            <ConnectionNotice />
+            <ReturnToDestination />
             <AppLockGate />
             <PresenceHeartbeat />
             <InAppNotifier currentUserId={user!.id} />

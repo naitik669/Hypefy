@@ -80,6 +80,11 @@ const OPEN_PATHS = [
   "/privacy",
   "/terms",
   "/guidelines",
+  // Google Play asks for both of these at a public address: where an account
+  // can be deleted without the app, and the standards against child sexual
+  // abuse and exploitation. A reviewer opens them signed out.
+  "/delete-account",
+  "/child-safety",
   // The cookie banner links here before anyone has signed in — it has to open.
   "/cookies",
 ];

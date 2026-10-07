@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { SpotlightIcon } from "@/components/diary/SpotlightIcon";
 import { GhostShareIcon } from "@/components/ui/GhostShareIcon";
+import { ReportProblem } from "@/components/settings/ReportProblem";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 /**
@@ -180,9 +181,10 @@ export default function HelpPage() {
           <h2 className="mb-1 px-1 text-xs font-bold uppercase tracking-widest text-faint">
             Still stuck
           </h2>
+          <ReportProblem />
           <a
             href={`mailto:${SUPPORT}`}
-            className="flex items-center gap-3 rounded-2xl border border-border bg-surface px-3 py-4 transition-colors hover:bg-elevated"
+            className="mt-2 flex items-center gap-3 rounded-2xl border border-border bg-surface px-3 py-4 transition-colors hover:bg-elevated"
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-elevated text-foreground">
               <Mail size={19} />
@@ -210,6 +212,10 @@ export default function HelpPage() {
           <span className="mx-2">·</span>
           <Link href="/guidelines" className="underline hover:text-muted">
             Community Guidelines
+          </Link>
+          <span className="mx-2">·</span>
+          <Link href="/child-safety" className="underline hover:text-muted">
+            Child Safety
           </Link>
         </p>
       </div>

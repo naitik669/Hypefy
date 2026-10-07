@@ -51,7 +51,7 @@ const PROMOS: Promo[] = [
   },
   {
     key: "showcase",
-    href: "/showcase",
+    href: "/showcase/new",
     icon: Sparkles,
     eyebrow: "Showcase",
     headline: "Make a board of your own",

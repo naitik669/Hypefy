@@ -8,6 +8,10 @@ apply plugin: 'com.android.application'
  * forgotten — producing an APK Android silently refuses to install as an
  * upgrade. Commit count is monotonic and needs no bookkeeping.
  *
+ * versionName is what people see on the Play listing and in Android's app
+ * info, so it reads as a version, not a commit: 1.0.<build>. Raise the
+ * "1.0" by hand when a release deserves it.
+ *
  * Falls back to 1 / "dev" when git is unavailable (a source zip, or a build
  * container without the .git directory), so the build never breaks over it.
  */
@@ -26,7 +30,7 @@ def gitOutput(String cmd, String fallback) {
 }
 
 def buildVersionCode = gitOutput('git rev-list --count HEAD', '1') as Integer
-def buildVersionName = gitOutput('git rev-parse --short HEAD', 'dev')
+def buildVersionName = buildVersionCode > 1 ? "1.0.${buildVersionCode}" : 'dev'
 
 android {
     namespace = "chat.hypefy.app"
