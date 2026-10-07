@@ -30,7 +30,7 @@ export const SHARED_TAB_ICONS: { id: SharedTab; label: string; Icon: typeof Imag
 ];
 
 const EMPTY: Record<SharedTab, { title: string; text: string }> = {
-  media: { title: "No photos or videos yet", text: "Photos, videos and GIFs sent in this chat collect here." },
+  media: { title: "No photos or videos yet", text: "Photos and videos sent in this chat collect here." },
   posts: { title: "No posts or Shots yet", text: "Posts and Shots shared into this chat collect here." },
   more: { title: "Nothing here yet", text: "Voice notes, files and links sent in this chat collect here." },
 };

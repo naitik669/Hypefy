@@ -11,9 +11,9 @@ const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const row = (over: Partial<SharedRow>): SharedRow => ({ id: "m1", kind: "text", body: null, sender_id: "a", created_at: "2026-10-05T10:00:00Z", ...over });
 
 describe("sorting what was shared", () => {
-  it("photos, videos and GIFs are media", () => {
+  it("photos and videos are media; GIFs are not", () => {
     const s = sortShared([row({ kind: "image", body: "u1" }), row({ id: "m2", kind: "video", body: "u2" }), row({ id: "m3", kind: "gif", body: "u3" })]);
-    expect(s.media.map((m) => [m.kind, m.url])).toEqual([["image", "u1"], ["video", "u2"], ["gif", "u3"]]);
+    expect(s.media.map((m) => [m.kind, m.url])).toEqual([["image", "u1"], ["video", "u2"]]);
     expect(s.posts).toEqual([]);
     expect(s.more).toEqual([]);
   });

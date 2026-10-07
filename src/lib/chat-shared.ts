@@ -24,7 +24,8 @@ type Base = {
   at: string;
 };
 
-export type SharedMedia = Base & { kind: "image" | "video" | "gif"; url: string };
+/** Photos and videos people took or chose. GIFs are reactions, not media, and are left out. */
+export type SharedMedia = Base & { kind: "image" | "video"; url: string };
 export type SharedPost = Base & {
   kind: "post" | "shot";
   /** Null when the post or Shot is gone, or can no longer be seen. */
@@ -101,7 +102,7 @@ export function sortShared(rows: SharedRow[]): Shared {
     if (m.kind === "album") {
       // A folder of photos shows each of them, not the folder.
       (parseAlbum(m.body)?.items ?? []).forEach((it, i) => media.push({ ...base, id: `${m.id}-${i}`, kind: it.type, url: it.url }));
-    } else if (m.kind === "image" || m.kind === "video" || m.kind === "gif") {
+    } else if (m.kind === "image" || m.kind === "video") {
       if (m.body) media.push({ ...base, id: m.id, kind: m.kind, url: m.body });
     } else if (m.kind === "post") {
       const p = one<{ id: string; image_url?: string | null; image_urls?: string[] | null; profiles?: unknown }>(m.post);
@@ -191,4 +192,4 @@ export function fileSize(bytes: number | undefined): string {
 /** The columns the Shared screens read. Kept here so the two pages ask for the same thing. */
 export const SHARED_SELECT =
   "id, kind, body, sender_id, created_at, post_id, shot_id, post:posts(id, image_url, image_urls, profiles!posts_user_id_fkey(username)), shot:shots(id, media_url, poster_url, profiles(username))";
-export const SHARED_KINDS = ["image", "video", "gif", "album", "post", "shot", "voice", "document"];
+export const SHARED_KINDS = ["image", "video", "album", "post", "shot", "voice", "document"];
