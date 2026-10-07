@@ -25,17 +25,18 @@ function slotSeed(id: string): number {
 }
 
 /**
- * Place `ghost` second or third in `feed`.
+ * Place `ghost` first, second or third in `feed`.
  *
  *   - Already within the first three: the feed is returned as it is. It got
  *     there on its own, and moving it would only make the order look odd.
  *   - Elsewhere in the feed: moved up, not duplicated.
  *   - Not in the feed at all: added.
  *
- * Never first. One item pinned to the very top of every visit is a pattern
- * someone notices; second or third is where a good recommendation lands
- * anyway. Which of the two is decided by the item's id, so drawing the page
- * again within the same visit does not shuffle it.
+ * Any of the first three, so there is no one place a placed item always
+ * turns up. Which of them is decided by the item's id rather than by chance
+ * at the moment of drawing: it differs from one placed item to the next, and
+ * drawing the page again within the same visit (a pull to refresh, coming
+ * back to the tab) does not move it.
  */
 export function placeGhost<T extends { id: string }>(feed: T[], ghost: T | null | undefined): T[] {
   if (!ghost) return feed;
@@ -45,7 +46,7 @@ export function placeGhost<T extends { id: string }>(feed: T[], ghost: T | null 
   // The feed's own copy, if it has one: it is the one that was scored.
   const item = at >= 0 ? feed[at] : ghost;
   const rest = at >= 0 ? feed.filter((x) => x.id !== ghost.id) : feed;
-  // Second or third; in a feed too short for that, as near as it allows.
-  const slot = Math.min(rest.length, 1 + (slotSeed(ghost.id) % 2));
+  // First, second or third; in a feed too short for that, as near as it allows.
+  const slot = Math.min(rest.length, slotSeed(ghost.id) % NEAR_TOP);
   return [...rest.slice(0, slot), item, ...rest.slice(slot)];
 }
