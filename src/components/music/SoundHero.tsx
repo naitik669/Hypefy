@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Bookmark, Lock, Music, Pause, Play, Plus } from "lucide-react";
+import { ArrowUpRight, Bookmark, ListPlus, Lock, Music, Pause, Play, Plus } from "lucide-react";
+import { SoundPlaylistSheet } from "@/components/saved/SoundPlaylistSheet";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { haptics } from "@/lib/haptics";
@@ -45,6 +46,7 @@ export function SoundHero({
   const playing = useIsPlaying(track.id);
   const [saved, setSaved] = useState(initialSaved);
   const [pending, setPending] = useState(false);
+  const [filing, setFiling] = useState(false);
   useStopPreviewOnUnmount();
 
   async function toggleSave() {
@@ -60,7 +62,7 @@ export function SoundHero({
       toast("Couldn't update that. Try again.", "error");
       return;
     }
-    toast(was ? "Removed from your sounds" : "Saved. It's in the sound picker when you make a Shot.", "success");
+    toast(was ? "Removed from your Library" : "Added to Library. It's in the sound picker when you make a Shot.", "success");
   }
 
   return (
@@ -124,11 +126,22 @@ export function SoundHero({
             type="button"
             onClick={toggleSave}
             aria-pressed={saved}
-            aria-label={saved ? "Saved. Remove from your sounds" : "Save this sound"}
+            aria-label={saved ? "In your Library. Remove it" : "Add this sound to your Library"}
             data-save-sound
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border"
           >
             <Bookmark size={18} className={saved ? "text-accent" : "text-foreground"} fill={saved ? "currentColor" : "none"} />
+          </button>
+        )}
+        {userId && canUse && (
+          <button
+            type="button"
+            onClick={() => setFiling(true)}
+            aria-label="Add this sound to a playlist"
+            data-sound-playlists
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border text-foreground"
+          >
+            <ListPlus size={18} />
           </button>
         )}
         {track.appleUrl && (
@@ -143,6 +156,17 @@ export function SoundHero({
           </a>
         )}
       </div>
+      {filing && (
+        <SoundPlaylistSheet
+          open
+          track={track}
+          onClose={(changed) => {
+            setFiling(false);
+            // Filing a sound keeps it in the Library too.
+            if (changed) setSaved(true);
+          }}
+        />
+      )}
     </section>
   );
 }

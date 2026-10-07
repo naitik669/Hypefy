@@ -77,7 +77,7 @@ export function FolderFan({
   const cx = anchor.left + anchor.width / 2;
   const cy = anchor.top + anchor.height / 2;
   return (
-    <div role="menu" aria-label="Save to a folder" className="pointer-events-none fixed inset-0 z-[151]">
+    <div role="menu" aria-label="Add to a playlist" className="pointer-events-none fixed inset-0 z-[151]">
       {items.map((item, i) => {
         const s = spots[i];
         const on = i === active;
@@ -89,7 +89,7 @@ export function FolderFan({
             type="button"
             role="menuitem"
             tabIndex={detached ? 0 : -1}
-            aria-label={item.kind === "folder" ? `Save to ${item.folder.name}` : item.kind === "more" ? "All folders" : "New folder"}
+            aria-label={item.kind === "folder" ? `Save to ${item.folder.name}` : item.kind === "more" ? "All playlists" : "New playlist"}
             onClick={(e) => {
               e.stopPropagation();
               onChoose(i);

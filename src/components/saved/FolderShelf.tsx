@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { FolderArt } from "@/components/saved/FolderArt";
 import { haptics } from "@/lib/haptics";
 import type { Folder, FolderCover } from "@/lib/folders";
@@ -12,7 +12,7 @@ const SLOP_PX = 10;
 const SETTLE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 /**
- * Your folders, three to a row, with "All saved" first.
+ * Your folders, three to a row, with "Everything" first.
  *
  * Hold a folder and the grid is picked up: the tiles rock, and you drag the
  * one under your finger to where you want it — the others slide aside as it
@@ -216,7 +216,7 @@ export function FolderShelf({
   return (
     <section className="px-4 pt-4">
       <div className="mb-3 flex h-7 items-center justify-between">
-        <h2 className="text-[13px] font-extrabold tracking-tight text-muted">Folders</h2>
+        <h2 className="text-[13px] font-extrabold tracking-tight text-muted">Playlists</h2>
         {arranging && (
           <button
             type="button"
@@ -231,7 +231,7 @@ export function FolderShelf({
       <div ref={grid} className="relative grid grid-cols-3 gap-x-3 gap-y-4">
         <button type="button" onClick={onOpenAll} disabled={arranging} className="block text-left disabled:opacity-60">
           <FolderArt folder={{ id: "all", emoji: null, color: "all", coverUrl: null, covers: all.covers }} />
-          <span className="mt-2 block truncate text-[13px] font-bold">All saved</span>
+          <span className="mt-2 block truncate text-[13px] font-bold">Everything</span>
           <span className="block text-[11px] tabular-nums text-muted">{all.count ?? " "}</span>
         </button>
 
@@ -273,7 +273,16 @@ export function FolderShelf({
                 {f.emoji && <span className="shrink-0">{f.emoji}</span>}
                 <span className="truncate">{f.name}</span>
               </span>
-              <span className="block text-[11px] tabular-nums text-muted">{f.itemCount}</span>
+              <span className="flex min-w-0 items-center gap-1 text-[11px] tabular-nums text-muted">
+                {f.itemCount}
+                {/* Shared, either way round: yours with others, or someone's with you. */}
+                {(f.memberCount > 0 || !f.isOwner) && (
+                  <>
+                    <Users size={11} className="ml-0.5 shrink-0" aria-hidden />
+                    <span className="truncate">{f.isOwner ? f.memberCount + 1 : f.ownerUsername ? `@${f.ownerUsername}` : "Shared"}</span>
+                  </>
+                )}
+              </span>
             </Link>
           </div>
         ))}
@@ -283,7 +292,7 @@ export function FolderShelf({
             <span className="flex aspect-square items-center justify-center rounded-[22px] border-2 border-dashed border-border text-muted transition-colors active:bg-white/5">
               <Plus size={24} />
             </span>
-            <span className="mt-2 block text-[13px] font-bold text-muted">New folder</span>
+            <span className="mt-2 block text-[13px] font-bold text-muted">New playlist</span>
           </button>
         )}
       </div>

@@ -21,6 +21,12 @@ export type Folder = {
   itemCount: number;
   /** Its newest four, for the mosaic. */
   covers: FolderCover[];
+  /** Yours, or one you were invited to and joined. */
+  isOwner: boolean;
+  /** People who joined it, not counting its owner. */
+  memberCount: number;
+  /** Whose it is, for a shared one. */
+  ownerUsername: string | null;
 };
 
 /** The colours a folder can be — the page palette, less Ink. */
@@ -52,7 +58,7 @@ export function nextFolderColor(count: number): string {
 /** A folder's tile colour. Unknown or unset colours pick one from its id, so
  *  older folders are not all the same. */
 export function folderFill(color: string | null | undefined, seed = "") {
-  // "All saved": not a folder, so none of the folder colours — the app's
+  // "Everything": not a folder, so none of the folder colours — the app's
   // own dark with a breath of its lime.
   if (color === "all")
     return {
@@ -81,6 +87,9 @@ export function toFolder(r: {
   cover_url: string | null;
   item_count: number;
   covers: unknown;
+  is_owner?: boolean | null;
+  member_count?: number | null;
+  owner_username?: string | null;
 }): Folder {
   const covers = Array.isArray(r.covers) ? (r.covers as Record<string, unknown>[]) : [];
   return {
@@ -91,6 +100,11 @@ export function toFolder(r: {
     position: r.position,
     coverUrl: r.cover_url,
     itemCount: Number(r.item_count) || 0,
+    // A row read straight from the table (a playlist just made, or opened by
+    // its own page) carries none of these: it is the reader's own.
+    isOwner: r.is_owner !== false,
+    memberCount: Number(r.member_count) || 0,
+    ownerUsername: r.owner_username ?? null,
     covers: covers.slice(0, 4).map((c) => ({
       kind: c.kind === "shot" ? "shot" : "post",
       thumb: typeof c.thumb === "string" && c.thumb ? c.thumb : null,

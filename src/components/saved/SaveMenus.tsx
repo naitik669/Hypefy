@@ -151,7 +151,7 @@ export function useSaveMenus({
       const ok = await fileInto(supabase, t, next);
       if (!ok) {
         setInside(before);
-        toast("Couldn't update folders", "error");
+        toast("Couldn't update playlists", "error");
         return;
       }
       if (userId) bumpFolderCounts(userId, added, removed);
@@ -371,7 +371,7 @@ function SaveHint({ anchor, onDone }: { anchor: DOMRect; onDone: () => void }) {
   return (
     <div
       role="dialog"
-      aria-label="Saving into folders"
+      aria-label="Adding to playlists"
       className={`fixed z-[151] ${place.up ? "origin-bottom-right" : "origin-top-right"} animate-[pop-menu_0.4s_cubic-bezier(0.2,1.3,0.4,1)_both]`}
       style={place.style}
     >

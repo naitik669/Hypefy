@@ -359,7 +359,7 @@ export function ShotFeedCard({
       setSaved(prev);
       showToast(prev ? "Couldn't unsave" : "Couldn't save", "error");
     } else if (!prev) {
-      showToast("Saved", "success");
+      showToast("Added to Library", "success");
     }
   }
 
@@ -940,7 +940,7 @@ export function ShotFeedCard({
             <span>
               <span className="block text-sm font-semibold">{saved ? "Saved" : "Save"}</span>
               <span className="block text-xs text-muted">
-                {saved ? "Remove it from your saved Shots" : "Keep it in your saved Shots"}
+                {saved ? "Take it out of your Library" : "Keep it in your Library"}
               </span>
             </span>
           </button>

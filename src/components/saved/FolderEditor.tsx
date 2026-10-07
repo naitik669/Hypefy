@@ -105,8 +105,8 @@ function EditorForm({
           autoFocus={!preview}
           value={draft.name}
           onChange={(e) => setDraft({ ...draft, name: e.target.value.slice(0, 40) })}
-          placeholder="Folder name"
-          aria-label="Folder name"
+          placeholder="Playlist name"
+          aria-label="Playlist name"
           className="min-w-0 flex-1 border-b-2 border-border bg-transparent pb-1.5 text-lg font-extrabold outline-none transition-colors placeholder:font-bold placeholder:text-faint focus:border-accent"
         />
       </div>

@@ -50,10 +50,10 @@ export function FoldersStrip({ userId }: { userId: string }) {
           <span className="flex aspect-square items-center justify-center rounded-[22px] border-2 border-dashed border-border text-muted">
             <Plus size={22} />
           </span>
-          <span className="mt-1.5 block text-xs font-bold text-muted">New folder</span>
+          <span className="mt-1.5 block text-xs font-bold text-muted">New playlist</span>
         </button>
 
-        <Link href="/saved" className="flex w-16 shrink-0 flex-col items-center justify-center gap-1 self-start pt-6 text-muted">
+        <Link href="/library" className="flex w-16 shrink-0 flex-col items-center justify-center gap-1 self-start pt-6 text-muted">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-surface ring-1 ring-border">
             <ChevronRight size={18} />
           </span>
@@ -64,13 +64,13 @@ export function FoldersStrip({ userId }: { userId: string }) {
       <FolderEditor
         open={making}
         onClose={() => setMaking(false)}
-        title="New folder"
-        submitLabel="Make folder"
+        title="New playlist"
+        submitLabel="Make playlist"
         initial={{ name: "", emoji: null, color: nextFolderColor(folders.length) }}
         onSubmit={async (draft) => {
           const made = await makeFolder(supabase, userId, draft, folders);
           if (!made) {
-            toast("Couldn't make that folder", "error");
+            toast("Couldn't make that playlist", "error");
             return false;
           }
           setFolders([...folders, made]);

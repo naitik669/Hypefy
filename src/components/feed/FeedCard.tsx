@@ -719,7 +719,7 @@ export function FeedCard({
   async function toggleSave() {
     if (!uid) return showToast("Sign in to save");
     const next = !saved;
-    if (await persistSave(next)) showToast(next ? "Saved" : "Removed", next ? "success" : undefined);
+    if (await persistSave(next)) showToast(next ? "Added to Library" : "Removed", next ? "success" : undefined);
   }
 
   if (deleted) return null;
@@ -987,7 +987,7 @@ export function FeedCard({
             type="button"
             ref={saveButton}
             {...saveMenus.handlers}
-            aria-label={saved ? "Saved. Tap for folders, hold to file" : "Save"}
+            aria-label={saved ? "In your Library. Tap for playlists, hold to file" : "Save"}
             aria-haspopup="menu"
             className="text-foreground transition-transform duration-150 active:scale-90"
             // A press that starts here is a tap or a hold-and-slide, never a scroll.

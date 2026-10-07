@@ -187,6 +187,8 @@ export function notifHref(n: Notif): string {
   // A security alert has no actor and no target — it is about the account
   // itself, so it opens the page where you can act on it.
   if (n.type === "security_alert") return "/settings/security";
+  // Invitations wait at the top of the Library, where they are answered.
+  if (n.type === "playlist_invite") return "/library";
   // About your own plan, from Hypefy rather than a person.
   if (n.type === "trial_reminder") return "/settings/subscription";
 

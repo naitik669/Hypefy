@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownUp, Bookmark, BookmarkMinus, ChevronLeft, FolderPlus, Loader2, Plus, Search, X } from "lucide-react";
+import { LibraryBig, ArrowDownUp, Bookmark, BookmarkMinus, ChevronLeft, FolderPlus, Loader2, Plus, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { safeBack } from "@/lib/safe-back";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -11,6 +11,10 @@ import { EmptyScene, ctaClass } from "@/components/empty/EmptyScene";
 import { LockerArt } from "@/components/empty/scenes";
 import { useToast } from "@/components/ui/ToastProvider";
 import { FolderShelf } from "@/components/saved/FolderShelf";
+import { LibrarySounds } from "@/components/saved/LibrarySounds";
+import { PlaylistInvites } from "@/components/saved/PlaylistInvites";
+import type { PlaylistInvite } from "@/lib/playlists";
+import type { Track } from "@/lib/track";
 import { SavedGrid } from "@/components/saved/SavedGrid";
 import { FolderEditor, type FolderDraft } from "@/components/saved/FolderEditor";
 import { FolderPickSheet } from "@/components/saved/FolderPickSheet";
@@ -19,7 +23,7 @@ import { haptics } from "@/lib/haptics";
 import { makeFolder, nextFolderColor, toFolder, type Folder } from "@/lib/folders";
 import { fetchSavedPage, foundItem, itemKey, mergeSaved, type SavedItem, type SavedOrder } from "@/lib/saved";
 
-type Tab = "all" | "posts" | "shots";
+type Tab = "all" | "posts" | "shots" | "sounds";
 
 const HEADER = "sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center gap-1 border-b border-border/60 chrome-bar px-2 pt-[var(--sat)]";
 const ICON_BTN = "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5";
@@ -39,9 +43,15 @@ export function SavedScreen({
   initialPosts,
   initialShots,
   initialFolders,
+  initialSounds = [],
+  initialInvites = [],
   totalSaved,
   pageSize,
 }: {
+  /** Sounds kept in the Library. */
+  initialSounds?: Track[];
+  /** Playlists this person has been invited to and has not answered. */
+  initialInvites?: PlaylistInvite[];
   userId: string;
   initialPosts: SavedItem[];
   initialShots: SavedItem[];
@@ -189,7 +199,7 @@ export function SavedScreen({
     setPickOpen(false);
     const { error } = await supabase.rpc("file_items", { p_folder: folder.id, ...split(items) });
     if (error) {
-      toast("Couldn't add to that folder", "error");
+      toast("Couldn't add to that playlist", "error");
       return;
     }
     haptics.success();
@@ -229,7 +239,7 @@ export function SavedScreen({
   async function createFolder(draft: FolderDraft) {
     const made = await makeFolder(supabase, userId, draft, folders);
     if (!made) {
-      toast("Couldn't make that folder", "error");
+      toast("Couldn't make that playlist", "error");
       return false;
     }
     setFolders((all) => [...all, made]);
@@ -258,7 +268,14 @@ export function SavedScreen({
   const done = tab === "posts" ? postsDone : tab === "shots" ? shotsDone : postsDone && shotsDone;
   const newest = visible(order === "newest" ? mergeSaved(posts, shots, "newest", { posts: postsDone, shots: shotsDone }) : []);
   const allCovers = (newest.length ? newest : items).slice(0, 4).map((i) => ({ kind: i.kind, thumb: i.thumb, video: i.video }));
-  const nothing = initialPosts.length === 0 && initialShots.length === 0 && folders.length === 0 && items.length === 0 && done;
+  const nothing =
+    initialPosts.length === 0 &&
+    initialShots.length === 0 &&
+    initialSounds.length === 0 &&
+    initialInvites.length === 0 &&
+    folders.length === 0 &&
+    items.length === 0 &&
+    done;
 
   return (
     <div className="flex min-h-full flex-col pb-10">
@@ -298,8 +315,8 @@ export function SavedScreen({
                 setQ(e.target.value);
                 if (!e.target.value.trim()) setFound(null);
               }}
-              placeholder="Search saved"
-              aria-label="Search saved"
+              placeholder="Search your Library"
+              aria-label="Search your Library"
               enterKeyHint="search"
               className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
             />
@@ -324,8 +341,11 @@ export function SavedScreen({
           <button type="button" onClick={() => safeBack(router)} aria-label="Back" className={ICON_BTN}>
             <ChevronLeft size={24} />
           </button>
-          <h1 className="flex-1 truncate px-1 text-[17px] font-extrabold tracking-tight">Saved</h1>
-          <button type="button" onClick={() => setSearching(true)} aria-label="Search saved" className={ICON_BTN}>
+          <h1 className="flex flex-1 items-center gap-2 truncate px-1 text-[17px] font-extrabold tracking-tight">
+            <LibraryBig size={19} className="shrink-0 text-accent" />
+            Library
+          </h1>
+          <button type="button" onClick={() => setSearching(true)} aria-label="Search your Library" className={ICON_BTN}>
             <Search size={20} />
           </button>
           <button
@@ -334,7 +354,7 @@ export function SavedScreen({
               setMakingForSelection(false);
               setEditorOpen(true);
             }}
-            aria-label="New folder"
+            aria-label="New playlist"
             className={ICON_BTN}
           >
             <Plus size={22} />
@@ -359,8 +379,8 @@ export function SavedScreen({
       ) : nothing ? (
         <EmptyScene
           art={<LockerArt />}
-          title="Locker's empty"
-          text="Tap the bookmark on any post or Shot to stash it. Hold it to put it in a folder."
+          title="Your Library is empty"
+          text="Tap the bookmark on any post, Shot or sound to keep it. Hold it to put it in a playlist."
           timing={{ head: 1.1, sub: 1.45, cta: 1.8 }}
           cta={
             <Link href="/discover" className={ctaClass}>
@@ -370,6 +390,7 @@ export function SavedScreen({
         />
       ) : (
         <>
+          <PlaylistInvites initial={initialInvites} onJoined={() => void refreshFolders()} />
           <FolderShelf
             folders={folders}
             all={{ count: total, covers: allCovers }}
@@ -391,6 +412,7 @@ export function SavedScreen({
                   ["all", "All"],
                   ["posts", "Posts"],
                   ["shots", "Shots"],
+                  ["sounds", "Sounds"],
                 ] as [Tab, string][]
               ).map(([id, label]) => (
                 <button
@@ -407,6 +429,7 @@ export function SavedScreen({
               ))}
               <button
                 type="button"
+                hidden={tab === "sounds"}
                 onClick={() => void flipOrder()}
                 aria-label={order === "newest" ? "Newest first. Show oldest first" : "Oldest first. Show newest first"}
                 className="ml-auto flex items-center gap-1.5 rounded-pill px-2.5 py-1.5 text-xs font-bold text-muted transition-colors hover:text-foreground"
@@ -416,10 +439,12 @@ export function SavedScreen({
               </button>
             </div>
 
-            {items.length === 0 && done ? (
+            {tab === "sounds" ? (
+              <LibrarySounds userId={userId} initial={initialSounds} />
+            ) : items.length === 0 && done ? (
               <EmptyState
                 icon={Bookmark}
-                title={tab === "shots" ? "No saved Shots" : tab === "posts" ? "No saved posts" : "Nothing saved yet"}
+                title={tab === "shots" ? "No Shots in your Library" : tab === "posts" ? "No posts in your Library" : "Nothing in your Library yet"}
                 text="Tap the bookmark on anything you want back."
                 variant="compact"
               />
@@ -427,7 +452,7 @@ export function SavedScreen({
               <SavedGrid items={items} selecting={selecting} selected={new Set(selected.keys())} onToggle={toggle} />
             )}
 
-            {!done && (
+            {!done && tab !== "sounds" && (
               <div ref={sentinel} className="flex justify-center py-6">
                 {loading && <Loader2 size={18} className="animate-spin text-muted" />}
               </div>
@@ -439,8 +464,8 @@ export function SavedScreen({
       <FolderEditor
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
-        title="New folder"
-        submitLabel={makingForSelection ? `Make and add ${selected.size}` : "Make folder"}
+        title="New playlist"
+        submitLabel={makingForSelection ? `Make and add ${selected.size}` : "Make playlist"}
         initial={{ name: "", emoji: null, color: nextFolderColor(folders.length) }}
         onSubmit={createFolder}
       />

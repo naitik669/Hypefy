@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
-import { Settings, BarChart3, Bookmark, IdCard } from "lucide-react";
+import { LibraryBig, Settings, BarChart3, IdCard } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, hueFromId } from "@/lib/profile";
 import { pageText } from "@/lib/diary";
@@ -107,11 +107,11 @@ export default async function ProfilePage() {
             {/* Saved is a page now, not just a tab below — the tab fetched 30
                 items with no pagination, so anything older was unreachable. */}
             <Link
-              href="/saved"
-              aria-label="Saved"
+              href="/library"
+              aria-label="Library"
               className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-elevated text-foreground transition-colors hover:bg-elevated/70 active:scale-[0.99]"
             >
-              <Bookmark size={18} />
+              <LibraryBig size={18} />
             </Link>
             <Link
               href="/profile/insights"

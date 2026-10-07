@@ -49,6 +49,7 @@ export default function robots(): MetadataRoute.Robots {
           "/notifications",
           "/settings",
           "/create",
+          "/library",
           "/saved",
           "/favourites",
           "/collections",

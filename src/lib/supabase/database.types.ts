@@ -80,6 +80,19 @@ export type Database = {
         }
         Relationships: []
       }
+      collection_members: {
+        Row: {
+          collection_id: string
+          user_id: string
+          status: string
+          invited_by: string | null
+          created_at: string
+          joined_at: string | null
+        }
+        Insert: { collection_id: string; user_id: string; status?: string; invited_by?: string | null }
+        Update: { status?: string }
+        Relationships: []
+      }
       saved_sounds: {
         Row: { user_id: string; track_id: string; track: Json; created_at: string }
         Insert: { user_id: string; track_id: string; track: Json; created_at?: string }
@@ -3155,6 +3168,42 @@ export type Database = {
       my_chat_levels: { Args: never; Returns: { conversation_id: string; level: string }[] }
       chat_pin_places: { Args: never; Returns: number | null }
       min_app_build: { Args: never; Returns: number }
+      set_sound_playlists: { Args: { p_track: Json; p_folders?: string[] }; Returns: undefined }
+      collection_role: { Args: { p_collection: string }; Returns: string | null }
+      playlist_invite_candidates: {
+        Args: { p_collection: string }
+        Returns: { id: string; name: string | null; username: string | null; avatar_hue: number | null; avatar_url: string | null }[]
+      }
+      invite_to_playlist: { Args: { p_collection: string; p_user: string }; Returns: undefined }
+      respond_playlist_invite: { Args: { p_collection: string; p_accept: boolean }; Returns: undefined }
+      remove_playlist_member: { Args: { p_collection: string; p_user?: string }; Returns: undefined }
+      playlist_members: {
+        Args: { p_collection: string }
+        Returns: {
+          id: string
+          name: string | null
+          username: string | null
+          avatar_hue: number | null
+          avatar_url: string | null
+          status: string
+          is_owner: boolean
+        }[]
+      }
+      my_playlist_invites: {
+        Args: never
+        Returns: {
+          collection_id: string
+          name: string
+          emoji: string | null
+          color: string | null
+          item_count: number
+          owner_name: string | null
+          owner_username: string | null
+          owner_hue: number | null
+          owner_avatar: string | null
+          invited_at: string
+        }[]
+      }
       trending_sounds: { Args: { p_limit?: number }; Returns: { track: Json; uses: number }[] }
       mute_user: { Args: { p_target: string }; Returns: undefined }
       hide_content: { Args: { p_kind: string; p_content_id: string }; Returns: undefined }

@@ -26,7 +26,7 @@ export function placeOver(anchor: DOMRect, width: number, tall: number) {
 /**
  * The list a tap on the bookmark drops down (D1): Saved at the top, ticked
  * while it is; your folders under it, ticked where this one is filed; and
- * New folder last. Every tick applies straight away.
+ * New playlist last. Every tick applies straight away.
  */
 export function FolderDropdown({
   anchor,
@@ -62,8 +62,8 @@ export function FolderDropdown({
               <Bookmark size={16} className={saved ? "text-accent" : "text-foreground"} fill={saved ? "currentColor" : "none"} />
             </span>
           }
-          title="Saved"
-          sub="All your saves"
+          title="Library"
+          sub="Everything you keep"
           on={saved}
           onClick={onToggleSaved}
         />
@@ -97,7 +97,7 @@ export function FolderDropdown({
           <span className="flex h-9 w-9 items-center justify-center rounded-[11px] border-2 border-dashed border-white/15">
             <Plus size={16} strokeWidth={2.6} />
           </span>
-          <span className="text-[13px] font-extrabold">New folder</span>
+          <span className="text-[13px] font-extrabold">New playlist</span>
         </button>
 
         {/* The pointer, towards the bookmark. */}

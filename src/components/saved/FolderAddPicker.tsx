@@ -143,7 +143,7 @@ function Picker({
 
       <div className="flex-1 overflow-y-auto pb-[var(--sab)] pt-1">
         {items.length === 0 && all ? (
-          <EmptyState icon={Bookmark} title="Nothing saved yet" text="Save a post or Shot first, then add it here." variant="compact" />
+          <EmptyState icon={Bookmark} title="Nothing in your Library yet" text="Save a post or Shot first, then add it here." variant="compact" />
         ) : (
           <SavedGrid items={items} selecting selected={inside} onToggle={(i) => void toggle(i)} />
         )}

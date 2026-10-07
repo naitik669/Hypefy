@@ -6,7 +6,7 @@ import { FolderArt } from "@/components/saved/FolderArt";
 import type { Folder } from "@/lib/folders";
 
 /**
- * Choose one folder — where a selection goes. "New folder" hands back to the
+ * Choose one folder — where a selection goes. "New playlist" hands back to the
  * caller, which makes one and files the selection straight into it.
  */
 export function FolderPickSheet({
@@ -57,7 +57,7 @@ export function FolderPickSheet({
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border-2 border-dashed border-border text-muted">
             <Plus size={20} />
           </span>
-          <span className="text-[15px] font-bold">New folder</span>
+          <span className="text-[15px] font-bold">New playlist</span>
         </button>
       </div>
     </BottomSheet>

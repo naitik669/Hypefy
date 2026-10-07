@@ -350,7 +350,7 @@ export function PostPeek({
           )}
 
           <PeekAction
-            label={saved ? "Remove from saved" : "Save"}
+            label={saved ? "Remove from Library" : "Save"}
             active={saved}
             onClick={() => {
               if (!saved) setSaveBurst((n) => n + 1);

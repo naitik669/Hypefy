@@ -1289,7 +1289,7 @@ function ReelCard({
           type="button"
           ref={saveButton}
           {...saveMenus.handlers}
-          aria-label={saved ? "Saved. Tap for folders, hold to file" : "Save"}
+          aria-label={saved ? "In your Library. Tap for playlists, hold to file" : "Save"}
           aria-haspopup="menu"
           className="flex flex-col items-center gap-1 transition-transform active:scale-90"
           // A press that starts here is a tap or a hold-and-slide, never a swipe.

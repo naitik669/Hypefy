@@ -33,7 +33,7 @@ export function FolderSheet({
   target: SavedTarget;
   userId: string;
   onSaved?: () => void;
-  /** Open on the new-folder form — for New folder in the save menus. */
+  /** Open on the new-folder form — for New playlist in the save menus. */
   startMaking?: boolean;
 }) {
   return (
@@ -100,7 +100,7 @@ function FolderList({
       });
       if (error) {
         setInside(before);
-        toast("Couldn't update folders", "error");
+        toast("Couldn't update playlists", "error");
       }
     });
     return queue.current;
@@ -124,7 +124,7 @@ function FolderList({
     const made = await makeFolder(supabase, userId, { name: clean, emoji, color: nextFolderColor(list.length) }, list);
     setCreating(false);
     if (!made) {
-      toast("Couldn't make that folder", "error");
+      toast("Couldn't make that playlist", "error");
       return;
     }
     haptics.select();
@@ -192,8 +192,8 @@ function FolderList({
                   autoFocus
                   value={name}
                   onChange={(e) => setName(e.target.value.slice(0, 40))}
-                  placeholder="Folder name"
-                  aria-label="Folder name"
+                  placeholder="Playlist name"
+                  aria-label="Playlist name"
                   className="min-w-0 flex-1 bg-transparent text-[15px] font-bold outline-none placeholder:font-semibold placeholder:text-faint"
                 />
                 <button
@@ -230,7 +230,7 @@ function FolderList({
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border-2 border-dashed border-border text-muted">
                 <Plus size={20} />
               </span>
-              <span className="text-[15px] font-bold">New folder</span>
+              <span className="text-[15px] font-bold">New playlist</span>
             </button>
           )}
         </div>

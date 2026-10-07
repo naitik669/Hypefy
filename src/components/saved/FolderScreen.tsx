@@ -10,6 +10,9 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 import { FolderArt } from "@/components/saved/FolderArt";
 import { SavedGrid } from "@/components/saved/SavedGrid";
+import { PlaylistPeople } from "@/components/saved/PlaylistPeople";
+import { PlaylistSounds } from "@/components/saved/PlaylistSounds";
+import type { PlaylistRole } from "@/lib/playlists";
 import { FolderEditor, type FolderDraft } from "@/components/saved/FolderEditor";
 import { FolderPickSheet } from "@/components/saved/FolderPickSheet";
 import { FolderAddPicker } from "@/components/saved/FolderAddPicker";
@@ -34,9 +37,12 @@ const PILL = "flex h-9 items-center gap-1.5 rounded-pill bg-elevated px-3 text-x
  */
 export function FolderScreen({
   userId,
+  role = "owner",
   initialFolder,
   initialItems,
 }: {
+  /** The owner, or someone who joined: see lib/playlists. */
+  role?: PlaylistRole;
   userId: string;
   initialFolder: Folder;
   initialItems: SavedItem[];
@@ -57,6 +63,8 @@ export function FolderScreen({
   const [moving, setMoving] = useState(false);
   const [making, setMaking] = useState(false);
   const [others, setOthers] = useState<Folder[]>([]);
+  const [soundCount, setSoundCount] = useState(0);
+  const owner = role === "owner";
 
   const shown = items.filter((i) => !hidden.has(itemKey(i)));
   const fill = folderFill(folder.color, folder.id);
@@ -109,11 +117,11 @@ export function FolderScreen({
     setDeleting(false);
     // .select() so a refusal (no rows, no error) is not read as done.
     if (error || !data?.length) {
-      toast("Couldn't delete that folder", "error");
+      toast("Couldn't delete that playlist", "error");
       return;
     }
     toast(`Deleted ${folder.name}`);
-    router.replace("/saved");
+    router.replace("/library");
   }
 
   // ── Selection ─────────────────────────────────────────────────────────
@@ -182,7 +190,7 @@ export function FolderScreen({
   async function makeAndMove(draft: FolderDraft) {
     const made = await makeFolder(supabase, userId, draft, others);
     if (!made) {
-      toast("Couldn't make that folder", "error");
+      toast("Couldn't make that playlist", "error");
       return false;
     }
     void moveTo(made, [...selected.values()]);
@@ -222,7 +230,7 @@ export function FolderScreen({
           <button
             type="button"
             onClick={() => takeOut([...selected.values()])}
-            aria-label="Take out of folder"
+            aria-label="Take out of playlist"
             className={`${PILL} mr-1 text-danger`}
           >
             <FolderMinus size={15} />
@@ -236,7 +244,7 @@ export function FolderScreen({
             <ChevronLeft size={24} />
           </button>
           <span className="flex-1" />
-          <button type="button" onClick={() => setEditing(true)} aria-label="Edit folder" className={`${ICON_BTN} bg-black/25 backdrop-blur-md`}>
+          <button type="button" onClick={() => setEditing(true)} aria-label="Edit playlist" className={`${ICON_BTN} bg-black/25 backdrop-blur-md`}>
             <Pencil size={18} />
           </button>
         </header>
@@ -248,7 +256,17 @@ export function FolderScreen({
           {folder.emoji && <span className="shrink-0">{folder.emoji}</span>}
           <span className="min-w-0 break-words">{folder.name}</span>
         </h2>
-        <p className="mt-1 text-sm tabular-nums text-muted">{shown.length} saved</p>
+        <p className="mt-1 text-sm tabular-nums text-muted">
+          {shown.length + soundCount} {shown.length + soundCount === 1 ? "item" : "items"}
+          {!owner && folder.ownerUsername ? ` · by @${folder.ownerUsername}` : ""}
+        </p>
+        <PlaylistPeople
+          playlistId={folder.id}
+          playlistName={folder.name}
+          role={role}
+          userId={userId}
+          onLeft={() => router.replace("/library")}
+        />
         <div className="mt-4 flex gap-2">
           <button
             type="button"
@@ -267,24 +285,36 @@ export function FolderScreen({
         </div>
       </section>
 
-      {shown.length === 0 ? (
-        <EmptyState icon={Plus} title="Nothing in here yet" text="Add posts and Shots you've saved." variant="compact" />
-      ) : (
+      <PlaylistSounds playlistId={folder.id} onCount={setSoundCount} />
+
+      {shown.length === 0 && soundCount === 0 ? (
+        <EmptyState
+          icon={Plus}
+          title="Nothing in here yet"
+          text="Add posts and Shots from your Library. Add a sound from its page."
+          variant="compact"
+        />
+      ) : shown.length === 0 ? null : (
         <SavedGrid items={shown} selecting={selecting} selected={new Set(selected.keys())} onToggle={toggle} />
       )}
 
       <FolderEditor
         open={editing}
         onClose={() => setEditing(false)}
-        title="Edit folder"
+        title="Edit playlist"
         submitLabel="Save"
         initial={{ name: folder.name, emoji: folder.emoji, color: folder.color }}
         preview={art}
         onSubmit={save}
-        onDelete={() => {
-          setEditing(false);
-          setDeleting(true);
-        }}
+        // Only its owner can delete a playlist; a member leaves it instead.
+        onDelete={
+          owner
+            ? () => {
+                setEditing(false);
+                setDeleting(true);
+              }
+            : undefined
+        }
       />
 
       <ConfirmDialog
@@ -293,7 +323,7 @@ export function FolderScreen({
         onConfirm={remove}
         icon={Trash2}
         title={`Delete ${folder.name}?`}
-        body="Everything in it stays saved."
+        body="Everything in it stays in your Library. Anyone you shared it with loses it."
         confirmLabel="Delete"
       />
 
@@ -325,7 +355,7 @@ export function FolderScreen({
       <FolderEditor
         open={making}
         onClose={() => setMaking(false)}
-        title="New folder"
+        title="New playlist"
         submitLabel={`Make and move ${selected.size}`}
         initial={{ name: "", emoji: null, color: nextFolderColor(others.length) }}
         onSubmit={makeAndMove}

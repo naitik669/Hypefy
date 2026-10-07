@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CookiePreferencesButton } from "@/components/consent/ConsentBanner";
 import {
+  LibraryBig,
   History,
   UserCircle,
   Shield,
@@ -8,7 +9,6 @@ import {
   Lock,
   Bell,
   Hash,
-  Bookmark,
   Star,
   UserPlus,
   CalendarClock,
@@ -88,10 +88,10 @@ const ITEMS = [
  */
 const LISTS = [
   {
-    href: "/saved",
-    label: "Saved",
-    sub: "Posts and Shots you kept",
-    icon: Bookmark,
+    href: "/library",
+    label: "Library",
+    sub: "Posts, Shots and sounds you kept, and your playlists",
+    icon: LibraryBig,
   },
   { href: "/hypers", label: "Hypers", sub: "Your closest people", icon: Star },
   {

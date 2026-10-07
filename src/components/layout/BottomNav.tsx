@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { haptics } from "@/lib/haptics";
 import { NavHoldMenu, type HoldAction } from "@/components/layout/NavHoldMenu";
 import { ChatHoldMenu } from "@/components/layout/ChatHoldMenu";
-import { Search, Settings, Bookmark, ShoppingBag } from "lucide-react";
+import { LibraryBig, Search, Settings, ShoppingBag } from "lucide-react";
 
 /**
  * Shortcuts behind a hold on Home.
@@ -36,7 +36,7 @@ const HOME_SHORTCUTS: HoldAction[] = [
   // route from the nav at all: you reached it through Settings, or from a
   // link inside Your style.
   { icon: ShoppingBag, label: "Marketplace", href: "/marketplace" },
-  { icon: Bookmark, label: "Saved", href: "/saved" },
+  { icon: LibraryBig, label: "Library", href: "/library" },
   // Discover was here and came out: it has the compass in the top bar AND a
   // right-swipe from the feed, so it was the one entry with two other ways in.
   // Settings had none — it was buried behind the profile tab.

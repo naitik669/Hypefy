@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  Bookmark,
+  LibraryBig,
   Clapperboard,
   ImageIcon,
   Lock,
@@ -91,11 +91,11 @@ const ACTIONS: Entry[] = [
     what: "Puts a post or a Shot near the top of one person's feed without telling them it was you. It works with people you follow who follow you back, and you get a few each week. You'll see that it was placed, and nothing after that. People you follow back can do the same for you: if a ghost floats up when you hype something, someone placed it for you. Find it under Share.",
   },
   {
-    icon: Bookmark,
-    term: "Saved",
-    what: "Anything you keep for later. Hold the bookmark to put a post or Shot in a folder — folders only you can see.",
-    href: "/saved",
-    hrefLabel: "Your Saved",
+    icon: LibraryBig,
+    term: "Library",
+    what: "Everything you keep: posts, Shots and sounds. Tap the bookmark to add something. Group things into playlists, and invite people to a playlist so they can add to it too.",
+    href: "/library",
+    hrefLabel: "Your Library",
   },
   {
     icon: Lock,
