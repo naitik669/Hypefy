@@ -19,6 +19,46 @@ import { X } from "lucide-react";
  * Dismissed for good, not for a day — an explanation you have read is noise
  * the second time.
  */
+export type Hint = {
+  /** Storage key suffix. Changing it re-shows the hint to everyone. */
+  id: string;
+  title: string;
+  text: string;
+  icon?: React.ReactNode;
+};
+
+const hintKey = (id: string) => `hypefy_hint_${id}`;
+
+/**
+ * Several hints for one screen, shown one at a time.
+ *
+ * A screen with three things worth explaining used to have room for one,
+ * or three cards stacked above the content it came to show. This shows the
+ * first that has not been dismissed; dismissing it brings the next one on
+ * the next visit, not straight away, so closing a tip never looks like it
+ * did not work.
+ */
+export function FeatureHints({ hints }: { hints: Hint[] }) {
+  const [current, setCurrent] = useState<Hint | null>(null);
+
+  useEffect(() => {
+    let next: Hint | null = null;
+    try {
+      next = hints.find((h) => localStorage.getItem(hintKey(h.id)) !== "1") ?? null;
+    } catch {
+      /* private mode — skip rather than nag every render */
+    }
+    // Deferred: an effect that sets state straight away renders twice.
+    const t = setTimeout(() => setCurrent(next), 0);
+    return () => clearTimeout(t);
+    // The list is written inline by its caller and never changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!current) return null;
+  return <FeatureHint key={current.id} {...current} />;
+}
+
 export function FeatureHint({
   id,
   title,

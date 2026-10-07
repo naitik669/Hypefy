@@ -6,11 +6,28 @@ import {
   isGateDisabled,
   isOpenPath,
 } from "@/lib/invite-gate";
+import { maintenanceAnswer, maintenanceOn } from "@/lib/maintenance";
 
 // Next 16: "Proxy" is the renamed Middleware. Runs before each request to
 // refresh the Supabase session and guard protected routes.
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Down on purpose: answer before anything reaches Supabase, which may be
+  // the thing that is down. See src/lib/maintenance.ts.
+  if (maintenanceOn()) {
+    const answer = maintenanceAnswer(pathname);
+    if (answer === "api") {
+      return NextResponse.json({ error: "maintenance" }, { status: 503, headers: { "retry-after": "120" } });
+    }
+    if (answer === "page") {
+      return NextResponse.rewrite(new URL("/maintenance", request.url), {
+        status: 503,
+        headers: { "retry-after": "120", "cache-control": "no-store" },
+      });
+    }
+    if (answer === "pass") return NextResponse.next();
+  }
 
   // Pre-launch invite wall. Sits in front of the session refresh so an
   // uninvited visitor never reaches Supabase at all. Set APP_INVITE_CODE

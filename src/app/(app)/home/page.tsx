@@ -4,8 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/TopBar";
 import { ShowsRow } from "@/components/home/ShowsRow";
 import { FeedList } from "@/components/feed/FeedList";
-import { FeatureHint } from "@/components/ui/FeatureHint";
-import { Clock } from "lucide-react";
+import { FeatureHints } from "@/components/ui/FeatureHint";
+import { Clock, Hand, Star } from "lucide-react";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { UploadProgressBar } from "@/components/upload/UploadProvider";
 import {
@@ -479,11 +479,29 @@ export default async function HomePage() {
         {/* Shows are the least-understood thing in the app — 6 views against
             168 hypes. The row itself never says what it is or that it
             expires, so the first question it raises goes unanswered. */}
-        <FeatureHint
-          id="shows"
-          icon={<Clock size={14} />}
-          title="Shows disappear after 24 hours"
-          text="Tap a ring to watch. Yours vanishes after a day — your posts stay put."
+        <FeatureHints
+          hints={[
+            {
+              id: "shows",
+              icon: <Clock size={14} />,
+              title: "Shows disappear after 24 hours",
+              text: "Tap a ring to watch. Yours vanishes after a day — your posts stay put.",
+            },
+            // The star is the one button everyone finds. That a double tap
+            // does the same, and what a hype does for you, nobody is told.
+            {
+              id: "hype",
+              icon: <Star size={14} />,
+              title: "Hype what you like",
+              text: "Tap the star, or double-tap a photo. It tells them you liked it and brings more like it to your feed.",
+            },
+            {
+              id: "hold",
+              icon: <Hand size={14} />,
+              title: "Hold for more",
+              text: "Hold a photo to see it full size. Hold the + to choose what to make. Hold the bookmark to save into a folder.",
+            },
+          ]}
         />
 
         <UploadProgressBar />
