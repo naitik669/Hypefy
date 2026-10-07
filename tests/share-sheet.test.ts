@@ -162,3 +162,42 @@ describe("Send to", () => {
     expect(kinds).toEqual(["post"]);
   });
 });
+
+describe("Send to: Ghost Share", () => {
+  const tile = () => footer().querySelector("[data-ghost-tile]") as HTMLElement | null;
+  async function reopen(status: unknown) {
+    rpc.mockImplementation(async (fn: string) =>
+      fn === "ghost_share_status" ? { data: status, error: null } : { data: [], error: null },
+    );
+    const { ShareSheet } = await import("@/components/feed/ShareSheet");
+    await act(async () => root.render(createElement(ShareSheet, { open: false, onClose: () => {}, postId: "p1" })));
+    await act(async () =>
+      root.render(createElement(ShareSheet, { open: true, onClose: () => {}, postId: "p1", targetType: "shot" })),
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+  }
+
+  it("is not offered until the database says it can be", () => {
+    expect(tile()).toBeNull();
+  });
+
+  it("is not offered on your own, or while it is switched off", async () => {
+    await reopen([{ can: false, used: 0, allowed: 2, resets_at: "2026-10-12T12:00:00Z" }]);
+    expect(tile()).toBeNull();
+  });
+
+  it("is offered with how many are left, asking about this Shot", async () => {
+    await reopen([{ can: true, used: 1, allowed: 2, resets_at: "2026-10-12T12:00:00Z" }]);
+    expect(rpc).toHaveBeenCalledWith("ghost_share_status", { p_kind: "shot", p_content_id: "p1" });
+    expect(tile()!.textContent).toContain("Ghost Share");
+    expect(tile()!.querySelector('[aria-label="1 left this week"]')!.textContent).toBe("1");
+  });
+
+  it("opens the flow, and opens on the limit when none are left", async () => {
+    await reopen([{ can: true, used: 2, allowed: 2, resets_at: "2026-10-12T12:00:00Z" }]);
+    await tap(tile()!.querySelector("button")!);
+    expect(document.querySelector('[aria-label="Ghost Share"]')!.getAttribute("data-ghost-step")).toBe("limit");
+  });
+});

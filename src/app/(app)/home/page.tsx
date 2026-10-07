@@ -23,6 +23,7 @@ import { placeShots } from "@/lib/feed-mix";
 import { isAdult } from "@/lib/ads";
 import { getBlockedIds } from "@/lib/blocked";
 import { jsonRecord } from "@/lib/supabase/typed";
+import { placeGhost } from "@/lib/ghost-place";
 
 function normalise(raw: unknown[] | null) {
   return (raw ?? []).map((p: any) => ({
@@ -42,6 +43,11 @@ export default async function HomePage() {
   if (!user) redirect("/signin");
 
   const nowIso = new Date().toISOString();
+
+  // A post that someone this person follows, and is followed by, chose for
+  // them (Ghost Share, 0119). Asked now so it runs alongside everything
+  // below; at most one, and only its id. See src/lib/ghost-place.ts.
+  const ghostClaim = supabase.rpc("claim_ghost_share", { p_kind: "post" }).then((res) => res);
 
   // Follow graph first: the followed-posts query depends on it.
   const [{ data: followRows }, blockedIds] = await Promise.all([
@@ -222,6 +228,15 @@ export default async function HomePage() {
     if (!byId.has(p.id)) byId.set(p.id, p);
   }
 
+  // The placed post, if it is not already among the candidates: fetched and
+  // put in with the rest, so it is scored and shaped exactly as they are.
+  const ghostId = ((await ghostClaim).data as string | null) ?? null;
+  if (ghostId && !byId.has(ghostId)) {
+    const { data: placed } = await supabase.from("posts").select(POST_COLS).eq("id", ghostId).maybeSingle();
+    const [row] = normalise(placed ? [placed] : []);
+    if (row && !blockedIds.has(row.user_id)) byId.set(row.id, row);
+  }
+
   // Blend in rehyped posts: use the rehype time for recency so they resurface,
   // and carry who rehyped, by id — the deck on the photo shows their face.
   for (const r of (followedReposts ?? []) as any[]) {
@@ -303,7 +318,7 @@ export default async function HomePage() {
   // that scored close together. It used to be a three-minute wall-clock
   // bucket, which made two refreshes inside that window byte-identical.
   const seed = refreshSeed();
-  const ranked = [...byId.values()]
+  const scored = [...byId.values()]
     .map((p: any) => ({
       ...p,
       _score:
@@ -324,9 +339,11 @@ export default async function HomePage() {
       b._score !== a._score
         ? b._score - a._score
         : new Date(rankAt(b)).getTime() - new Date(rankAt(a)).getTime()
-    )
-    .slice(0, 30);
-  const posts = diversify(ranked);
+    );
+  const ranked = scored.slice(0, 30);
+  // Found among everything scored, not only the thirty that made the cut:
+  // being chosen for you does not depend on having ranked well.
+  const posts = placeGhost(diversify(ranked), ghostId ? scored.find((p: any) => p.id === ghostId) : null);
 
   // Shots, mixed in.
   //

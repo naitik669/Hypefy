@@ -3,8 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ReelsFeed, type Reel } from "@/components/shots/ReelsFeed";
 import { diversify } from "@/lib/feed-rank";
+import { placeGhost } from "@/lib/ghost-place";
 import { one, jsonRecord } from "@/lib/supabase/typed";
 import { getAdContext } from "@/lib/ads-server";
+
+/** What a Shot in the feed is made of. One list, so every Shot in it has the same fields. */
+const SHOT_COLS =
+  "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, save_count, repost_count, duration_secs, trim_start, trim_end, profiles(display_name, avatar_hue, avatar_url, username)";
 
 /** Personalized Shot score: engagement (capped) + tiered recency + author affinity. */
 function shotScore(s: any, now: number, authorAff: Record<string, number>) {
@@ -45,10 +50,10 @@ export default async function ShotsPage() {
   } = await supabase.auth.getUser();
 
   // Candidate window + interaction affinity, ranked into a personalized reel.
-  const [{ data: shots }, affRes, adContext, rehypesRes] = await Promise.all([
+  const [{ data: shots }, affRes, adContext, rehypesRes, ghostRes] = await Promise.all([
     supabase
       .from("shots")
-      .select("id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, save_count, repost_count, duration_secs, trim_start, trim_end, profiles(display_name, avatar_hue, avatar_url, username)")
+      .select(SHOT_COLS)
       .order("created_at", { ascending: false })
       .limit(80),
     user ? supabase.rpc("get_affinity", { p_lookback_days: 60 }) : Promise.resolve({ data: null }),
@@ -60,7 +65,12 @@ export default async function ShotsPage() {
     user
       ? supabase.rpc("followed_shot_rehypes", { p_limit: 20 })
       : Promise.resolve({ data: null }),
+    // A Shot that someone this person follows, and is followed by, chose for
+    // them (Ghost Share, 0119). At most one, and only its id: who chose it is
+    // not something this page is ever told. See src/lib/ghost-place.ts.
+    user ? supabase.rpc("claim_ghost_share", { p_kind: "shot" }) : Promise.resolve({ data: null }),
   ]);
+  const ghostId = (ghostRes.data as string | null) ?? null;
 
   const authorAff = jsonRecord((affRes.data as any)?.authors);
   const now = Date.now();
@@ -79,7 +89,17 @@ export default async function ShotsPage() {
     });
   }
 
-  const reels = diversify(
+  // Outside the newest eighty: fetched, and put in with the rest so that it
+  // is scored and shaped exactly as they are.
+  if (ghostId && !byId.has(ghostId)) {
+    const { data: placed } = await supabase.from("shots").select(SHOT_COLS).eq("id", ghostId).maybeSingle();
+    if (placed) {
+      const row = placed as unknown as FeedShot;
+      byId.set(row.id, { ...row, profiles: one(row.profiles as never) });
+    }
+  }
+
+  const ranked = diversify(
     [...byId.values()]
       .map((s) => {
         const own = shotScore(s, now, authorAff);
@@ -92,6 +112,8 @@ export default async function ShotsPage() {
         b._score !== a._score ? b._score - a._score : new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       ),
   );
+
+  const reels = placeGhost(ranked, ghostId ? ranked.find((s) => s.id === ghostId) : null);
 
   if (reels.length === 0) {
     return (

@@ -3136,6 +3136,43 @@ export type Database = {
       unfollow_user: { Args: { p_target: string }; Returns: undefined }
       my_chat_levels: { Args: never; Returns: { conversation_id: string; level: string }[] }
       chat_pin_places: { Args: never; Returns: number | null }
+      ghost_share_status: {
+        Args: { p_kind: string; p_content_id: string }
+        Returns: { can: boolean; used: number; allowed: number; resets_at: string }[]
+      }
+      ghost_share_allowance: {
+        Args: never
+        Returns: { used: number; allowed: number; resets_at: string }[]
+      }
+      ghost_share_targets: {
+        Args: { p_kind: string; p_content_id: string }
+        Returns: {
+          id: string
+          name: string | null
+          username: string | null
+          avatar_hue: number | null
+          avatar_url: string | null
+          already_this_week: boolean
+        }[]
+      }
+      send_ghost_share: {
+        Args: { p_kind: string; p_content_id: string; p_recipient: string }
+        Returns: undefined
+      }
+      my_ghost_shares: {
+        Args: never
+        Returns: {
+          id: string
+          kind: string
+          content_id: string
+          created_at: string
+          recipient_name: string | null
+          recipient_username: string | null
+          recipient_hue: number | null
+          recipient_avatar: string | null
+        }[]
+      }
+      claim_ghost_share: { Args: { p_kind: string }; Returns: string | null }
       unlock_vault: { Args: { p_pin: string }; Returns: boolean }
       lock_vault: { Args: never; Returns: undefined }
       touch_vault: { Args: never; Returns: boolean }

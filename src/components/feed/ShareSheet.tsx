@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, CircleFadingPlus, Link2, Loader2, Search, Share2, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { one } from "@/lib/supabase/typed";
+import { GhostShareIcon } from "@/components/ui/GhostShareIcon";
+import { GhostShareFlow } from "@/components/ghost/GhostShareFlow";
+import { NO_GHOST, ghostLeft, toGhostStatus, type GhostStatus } from "@/lib/ghost-share";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { SendIcon } from "@/components/ui/ShareIcon";
@@ -120,6 +123,24 @@ export function ShareSheet({
   const [showAdded, setShowAdded] = useState(false);
   const [sendingDm, setSendingDm] = useState(false);
   const [dmDone, setDmDone] = useState(false);
+  /**
+   * Ghost Share: whether this can be placed in someone's feed by this
+   * person, and how many they have left this week. Asked when the sheet
+   * opens; the tile is not drawn until the answer says it applies (never on
+   * your own Shot or post).
+   */
+  const [ghost, setGhost] = useState<GhostStatus>(NO_GHOST);
+  const [ghostOpen, setGhostOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    void supabase.rpc("ghost_share_status", { p_kind: targetType, p_content_id: postId }).then(({ data }) => {
+      if (live) setGhost(toGhostStatus(data));
+    });
+    return () => {
+      live = false;
+    };
+  }, [open, supabase, targetType, postId]);
   /**
    * Choosing which photo goes to your Show.
    *
@@ -495,6 +516,22 @@ export function ShareSheet({
     </div>
   ) : (
     <div key="actions" className={`${FOOT} animate-fade-swap no-scrollbar -mx-5 flex items-start gap-3 overflow-x-auto px-5`}>
+      {/* First, because it is the one thing here that is not "send it
+          somewhere": it puts this in one person's feed and tells them
+          nothing. The number is how many are left this week. */}
+      {ghost.can && (
+        <span className="relative shrink-0" data-ghost-tile>
+          <Action label="Ghost Share" onClick={() => setGhostOpen(true)} tint="bg-accent/10 text-accent">
+            <GhostShareIcon size={21} />
+          </Action>
+          <span
+            aria-label={`${ghostLeft(ghost)} left this week`}
+            className="pointer-events-none absolute right-1 top-0 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-black text-accent-ink ring-2 ring-elevated"
+          >
+            {ghostLeft(ghost)}
+          </span>
+        </span>
+      )}
       <Action label={copied ? "Copied" : "Copy link"} done={copied} onClick={() => void copyLink()}>
         {copied ? <Check size={19} /> : <Link2 size={19} />}
       </Action>
@@ -527,6 +564,16 @@ export function ShareSheet({
   );
 
   return (
+    <>
+    {ghostOpen && (
+      <GhostShareFlow
+        kind={targetType}
+        contentId={postId}
+        status={ghost}
+        onClose={() => setGhostOpen(false)}
+        onPlaced={() => setGhost((g) => ({ ...g, used: g.used + 1 }))}
+      />
+    )}
     <BottomSheet open={open} onClose={onClose} title="Send to" size="tall" footer={footer}>
       {picking ? (
         <div className="pb-2">
@@ -691,6 +738,7 @@ export function ShareSheet({
         </>
       )}
     </BottomSheet>
+    </>
   );
 }
 

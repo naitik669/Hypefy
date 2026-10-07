@@ -10,6 +10,7 @@ import {
   Zap,
 } from "lucide-react";
 import { SpotlightIcon } from "@/components/diary/SpotlightIcon";
+import { GhostShareIcon } from "@/components/ui/GhostShareIcon";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 /**
@@ -82,6 +83,11 @@ const ACTIONS: Entry[] = [
     what: "One of your closest people. Their posts come first in the Hypers feed. Your list is private — nobody is told they're on it.",
     href: "/hypers",
     hrefLabel: "Your Hypers",
+  },
+  {
+    icon: GhostShareIcon,
+    term: "Ghost Share",
+    what: "Puts a post or a Shot near the top of one person's feed without telling them it was you. It works with people you follow who follow you back, and you get a few each week. You'll see that it was placed, and nothing after that. People you follow back can do the same for you. Find it under Share.",
   },
   {
     icon: Bookmark,
