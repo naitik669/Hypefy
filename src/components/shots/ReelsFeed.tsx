@@ -1202,7 +1202,7 @@ function ReelCard({
             />
             {showParticles && <HypeParticles size={10} />}
             {hypeBreak && <HypeBreak size={32} />}
-            {ghostRise.rising && <GhostRise size={26} />}
+            {ghostRise.rising && <GhostRise size={30} />}
           </span>
         </RailButton>
 

@@ -1016,26 +1016,47 @@ html[data-dm-leave]::view-transition-old(root) {
   animation: hype-particle 0.6s ease-out forwards;
 }
 
-/* A ghost let out by hyping something that was Ghost Shared to you: it lifts
-   off the star, sways once each way as it goes, and thins out to nothing.
+/* A ghost let out by hyping something that was Ghost Shared to you.
+
+   Three motions on three nested boxes, each with its own curve, so none of
+   them has corners: the outer one only rises (fast at first, easing to a
+   drift), the middle one only sways, the inner one only fades in, thins and
+   blurs away. One set of keyframes doing all three moved in straight lines
+   between its stops and looked like it was being dragged.
+
    Slower than the particles on purpose. They are a spray; this is one thing
-   leaving, and it should be seen leaving. Transform and opacity only. */
-@keyframes ghost-rise {
-  0% { transform: translate(0, 2px) scale(0.5); opacity: 0; }
-  14% { transform: translate(0, -10px) scale(1); opacity: 1; }
-  40% { transform: translate(5px, -30px) scale(1.04); opacity: 0.95; }
-  68% { transform: translate(-4px, -52px) scale(1.08); opacity: 0.6; }
-  100% { transform: translate(2px, -76px) scale(1.12); opacity: 0; }
+   leaving, and it should be seen leaving. */
+@keyframes ghost-up {
+  from { transform: translateY(0); }
+  to { transform: translateY(-96px); }
 }
-.animate-ghost-rise {
-  animation: ghost-rise 1.5s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+@keyframes ghost-sway {
+  0%, 50%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(5px) rotate(4deg); }
+  75% { transform: translateX(-5px) rotate(-4deg); }
+}
+@keyframes ghost-mist {
+  0% { opacity: 0; transform: scale(0.55); filter: blur(2px); }
+  18% { opacity: 0.85; transform: scale(1); filter: blur(0); }
+  55% { opacity: 0.6; filter: blur(0.3px); }
+  100% { opacity: 0; transform: scale(1.25); filter: blur(5px); }
+}
+.animate-ghost-up {
+  animation: ghost-up 2.2s cubic-bezier(0.16, 0.84, 0.3, 1) forwards;
+}
+.animate-ghost-sway {
+  animation: ghost-sway 2.2s ease-in-out forwards;
+}
+.animate-ghost-mist {
+  animation: ghost-mist 2.2s ease-in-out forwards;
 }
 @media (prefers-reduced-motion: reduce) {
-  /* Still appears, still goes: without the drift. */
-  @keyframes ghost-rise {
-    0% { transform: translate(0, -22px); opacity: 0; }
-    20%, 70% { transform: translate(0, -22px); opacity: 1; }
-    100% { transform: translate(0, -22px); opacity: 0; }
+  /* Still appears, still goes: held just above the star, without the drift. */
+  .animate-ghost-up { animation: none; transform: translateY(-26px); }
+  .animate-ghost-sway { animation: none; }
+  @keyframes ghost-mist {
+    0%, 100% { opacity: 0; }
+    20%, 70% { opacity: 0.8; }
   }
 }
 

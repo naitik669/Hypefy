@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Ghost } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { haptics } from "@/lib/haptics";
 import type { GhostKind } from "@/lib/ghost-share";
 
-/** How long the ghost is on screen. Matches ghost-rise in globals.css. */
-export const GHOST_RISE_MS = 1500;
+/** How long the ghost is on screen. Matches the ghost-* animations in globals.css. */
+export const GHOST_RISE_MS = 2200;
 
 /**
  * Hyping something that was Ghost Shared to you lets a ghost out.
@@ -47,14 +46,34 @@ export function useGhostRise(kind: GhostKind, contentId: string) {
 }
 
 /**
- * The ghost itself: drawn over the hype star, drifting up and out.
+ * The ghost itself: drawn over the hype star, drifting up and dissolving.
  * Sits inside the star's own box (which is `relative`), like HypeParticles.
+ *
+ * A shape and nothing else. No eyes, no outline: brightest at the head and
+ * fading to nothing at the hem, so it reads as something see-through
+ * passing, not as a character. `size` is its width.
  */
-export function GhostRise({ size = 20 }: { size?: number }) {
+export function GhostRise({ size = 22 }: { size?: number }) {
+  // Two can be on screen at once (a reel and the card behind it), and a
+  // gradient is found by id.
+  const fade = useId();
   return (
     <span data-ghost-rise aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      <span className="animate-ghost-rise absolute text-white drop-shadow-[0_1px_6px_rgba(255,255,255,0.45)]">
-        <Ghost size={size} fill="currentColor" fillOpacity={0.22} strokeWidth={2} />
+      <span className="animate-ghost-up absolute">
+        <span className="animate-ghost-sway block">
+          <span className="animate-ghost-mist block">
+            <svg width={size} height={size * 1.2} viewBox="0 0 24 29">
+              <defs>
+                <linearGradient id={fade} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#fff" stopOpacity="0.75" />
+                  <stop offset="0.55" stopColor="#fff" stopOpacity="0.38" />
+                  <stop offset="1" stopColor="#fff" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path fill={`url(#${fade})`} d="M3 13a9 9 0 0 1 18 0v14q-2.25-3-4.5 0t-4.5 0t-4.5 0t-4.5 0z" />
+            </svg>
+          </span>
+        </span>
       </span>
     </span>
   );

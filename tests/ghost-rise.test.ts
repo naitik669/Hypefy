@@ -95,6 +95,18 @@ describe("the ghost on a hype", () => {
     expect(ghost()!.getAttribute("aria-hidden")).toBe("true");
     expect(ghost()!.className).toContain("pointer-events-none");
   });
+
+  it("is a see-through shape with no face: one path, fading out toward the hem", async () => {
+    rpc.mockResolvedValue({ data: true, error: null });
+    await mount();
+    await act(async () => ask());
+    const svg = ghost()!.querySelector("svg")!;
+    expect(svg.querySelectorAll("path, circle, ellipse, line, rect")).toHaveLength(1);
+    const stops = [...svg.querySelectorAll("stop")].map((s) => Number(s.getAttribute("stop-opacity")));
+    expect(stops[0]).toBeLessThan(1);
+    expect(stops[stops.length - 1]).toBe(0);
+    expect(svg.querySelector("path")!.getAttribute("fill")).toBe(`url(#${svg.querySelector("linearGradient")!.id})`);
+  });
 });
 
 describe("where it is wired", () => {
@@ -112,6 +124,6 @@ describe("where it is wired", () => {
 
   it("lasts as long in the stylesheet as it does in the component", async () => {
     const { GHOST_RISE_MS } = await import("@/components/ghost/GhostRise");
-    expect(read("src/app/globals.css")).toContain(`animation: ghost-rise ${GHOST_RISE_MS / 1000}s`);
+    expect(read("src/app/globals.css")).toMatch(new RegExp(`animation: ghost-up ${GHOST_RISE_MS / 1000}s[^;]*;[\\s\\S]*animation: ghost-sway ${GHOST_RISE_MS / 1000}s[\\s\\S]*animation: ghost-mist ${GHOST_RISE_MS / 1000}s`));
   });
 });

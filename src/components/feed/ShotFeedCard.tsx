@@ -748,7 +748,7 @@ export function ShotFeedCard({
               />
               {showParticles && <HypeParticles size={9} />}
               {hypeBreak && <HypeBreak size={23} />}
-              {ghostRise.rising && <GhostRise size={20} />}
+              {ghostRise.rising && <GhostRise size={22} />}
             </span>
             <span className={hyped ? "text-hype" : "text-foreground"}>
               {formatCount(hypeCount)}
