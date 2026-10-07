@@ -96,7 +96,8 @@ export function shotStage(
 import { useLongPress } from "@/lib/useLongPress";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { CommentIcon } from "@/components/ui/CommentIcon";
-import { claimPreview, parseTrack } from "@/lib/music";
+import { claimPreview, originalTrackFor, parseTrack } from "@/lib/music";
+import { SoundBox } from "@/components/music/SoundBox";
 import { SoundPill } from "@/components/music/SoundPill";
 import { hideContent, muteUser, QUIET_COPY } from "@/lib/feed-quiet";
 
@@ -462,6 +463,17 @@ function ReelCard({
    */
   const track = useMemo(() => parseTrack(reel.track), [reel.track]);
   const trackId = track?.id;
+  /**
+   * What the Shot sounds like, to show: the song if it has one, and its own
+   * audio if it does not. Only a song is played from here (above); original
+   * audio is simply the video's sound, already playing.
+   */
+  const sound = useMemo(
+    () => track ?? originalTrackFor(reel),
+    // The Shot's identity is what this depends on, not the object.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [track, reel.id],
+  );
   useEffect(() => {
     if (!track || !isActive || !playing || muted) return;
     return claimPreview(track, { loop: true, audible: true });
@@ -1304,6 +1316,9 @@ function ReelCard({
         >
           <MoreHorizontal size={30} className="text-white" />
         </RailButton>
+
+        {/* The sound's cover, where a thumb looks for it: under the dots. */}
+        <SoundBox track={sound} />
       </div>
 
       {/* Author and caption, which also stand down. Both describe the
@@ -1349,7 +1364,7 @@ function ReelCard({
             {reel.caption}
           </ExpandableText>
         )}
-        {track && <SoundPill track={track} glass />}
+        <SoundPill track={sound} glass />
       </div>
 
       {proof && (

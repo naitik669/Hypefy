@@ -47,7 +47,10 @@ export default async function CreatePage({
   // itself is read from something already made with it; if nothing this
   // person can see uses it any more, they simply start without one.
   const soundId = Array.isArray(sound) ? sound[0] : sound;
-  const found = soundId ? await findSound(supabase, soundId) : null;
+  const looked = soundId ? await findSound(supabase, soundId) : null;
+  // Original audio from a private account is not for other people's Shots,
+  // whatever the address says.
+  const found = looked?.canUse ? looked : null;
 
   return (
     <CreateScreen

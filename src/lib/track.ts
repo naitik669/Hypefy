@@ -51,3 +51,49 @@ export function parseTrack(raw: unknown): Track | null {
     ...(t.appleUrl ? { appleUrl: String(t.appleUrl) } : {}),
   };
 }
+
+/**
+ * Original audio: a Shot's own sound, as a song.
+ *
+ * A Shot made without a song still has a sound, the one it was filmed with.
+ * Treating that as a song of its own, whose audio is the Shot's file, is all
+ * it takes for it to have a page and be used by someone else: everything
+ * that plays, names or looks up a song already works on this shape.
+ */
+const ORIGINAL_PREFIX = "original-";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** The song id that stands for one Shot's own audio. */
+export function originalSoundId(shotId: string): string {
+  return `${ORIGINAL_PREFIX}${shotId}`;
+}
+
+/** The Shot an original-audio id points at, or null if it is some other song. */
+export function originalShotId(trackId: string): string | null {
+  if (!trackId.startsWith(ORIGINAL_PREFIX)) return null;
+  const id = trackId.slice(ORIGINAL_PREFIX.length);
+  return UUID.test(id) ? id : null;
+}
+
+export const ORIGINAL_TITLE = "Original audio";
+
+/** A Shot's own audio, in the shape of a song. */
+export function originalTrackFor(shot: {
+  id: string;
+  media_url: string;
+  poster_url?: string | null;
+  trim_start?: number | null;
+  profiles?: { username?: string | null; display_name?: string | null; avatar_url?: string | null } | null;
+}): Track {
+  const who = shot.profiles?.username ? `@${shot.profiles.username}` : (shot.profiles?.display_name ?? "");
+  const start = Number(shot.trim_start);
+  return {
+    id: originalSoundId(shot.id),
+    title: ORIGINAL_TITLE,
+    artist: who,
+    // The person, not the frame: an original sound is somebody's.
+    artwork: shot.profiles?.avatar_url ?? shot.poster_url ?? "",
+    preview: shot.media_url,
+    ...(Number.isFinite(start) && start > 0 ? { start } : {}),
+  };
+}

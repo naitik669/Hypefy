@@ -7,6 +7,7 @@ import { SoundHero } from "@/components/music/SoundHero";
 import { ShotResultsGrid } from "@/components/search/ShotResultsGrid";
 import { PostTileGrid } from "@/components/feed/PostTileGrid";
 import { findSound, soundCountLine, SOUND_PAGE_SIZE } from "@/lib/sound-lookup";
+import { isSoundSaved } from "@/lib/sound-shelf";
 
 /**
  * One song, and everything on Hypefy made with it.
@@ -51,12 +52,20 @@ export default async function SoundPage({ params }: { params: Promise<{ trackId:
   // deleted, or belongs to accounts they do not follow.
   if (!sound) return <GoneScreen kind="sound" />;
 
-  const { track, shots, posts, shotCount, postCount } = sound;
+  const { track, shots, posts, shotCount, postCount, canUse, original } = sound;
+  const saved = user ? await isSoundSaved(supabase, user.id, track.id) : false;
 
   return (
     <>
       <PageHeader title="Sound" showBack />
-      <SoundHero track={track} countLine={soundCountLine(shotCount, postCount)} canCreate={!!user} />
+      <SoundHero
+        track={track}
+        countLine={soundCountLine(shotCount, postCount)}
+        userId={user?.id ?? null}
+        canUse={canUse}
+        initialSaved={saved}
+        ownerHref={original?.username ? `/u/${original.username}` : null}
+      />
 
       <div className="flex flex-col gap-6 pb-24 pt-6">
         {shots.length > 0 && (

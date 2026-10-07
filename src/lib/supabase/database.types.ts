@@ -80,6 +80,12 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_sounds: {
+        Row: { user_id: string; track_id: string; track: Json; created_at: string }
+        Insert: { user_id: string; track_id: string; track: Json; created_at?: string }
+        Update: { user_id?: string; track_id?: string; track?: Json; created_at?: string }
+        Relationships: []
+      }
       muted_users: {
         Row: { muter_id: string; muted_id: string; created_at: string }
         Insert: { muter_id: string; muted_id: string; created_at?: string }
@@ -3149,6 +3155,7 @@ export type Database = {
       my_chat_levels: { Args: never; Returns: { conversation_id: string; level: string }[] }
       chat_pin_places: { Args: never; Returns: number | null }
       min_app_build: { Args: never; Returns: number }
+      trending_sounds: { Args: { p_limit?: number }; Returns: { track: Json; uses: number }[] }
       mute_user: { Args: { p_target: string }; Returns: undefined }
       hide_content: { Args: { p_kind: string; p_content_id: string }; Returns: undefined }
       feed_exclusions: { Args: never; Returns: { muted: string[]; posts: string[]; shots: string[] }[] }

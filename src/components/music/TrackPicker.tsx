@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { EMPTY_SHELF, loadSoundShelf, type SoundShelf } from "@/lib/sound-shelf";
 import { Music, Search, Play, Pause, ChevronLeft, Check, Plus } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -64,6 +66,37 @@ export function TrackPicker({
   const [marked, setMarked] = useState<string | null>(null);
   const [start, setStart] = useState(0);
   const playingId = usePlayingTrackId();
+  /**
+   * What to offer before anything is typed: the sounds this person saved,
+   * then what is being used on Hypefy. An empty search box with nothing
+   * under it made every Shot start from a blank.
+   */
+  const [shelf, setShelf] = useState<SoundShelf>(EMPTY_SHELF);
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    const supabase = createClient();
+    void supabase.auth
+      .getUser()
+      .then(({ data }) => loadSoundShelf(supabase, data.user?.id ?? null))
+      .then((s) => {
+        if (live) setShelf(s);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [open]);
+  const idle = !loading && !searched && tracks.length === 0;
+  const groups: { title: string | null; items: Track[] }[] =
+    tracks.length > 0
+      ? [{ title: null, items: tracks }]
+      : idle
+        ? [
+            { title: "Your sounds", items: shelf.saved },
+            { title: "Trending on Hypefy", items: shelf.trending },
+          ].filter((g) => g.items.length > 0)
+        : [];
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const scrubTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -267,9 +300,16 @@ export function TrackPicker({
               </div>
             ))}
           </div>
-        ) : tracks.length > 0 ? (
+        ) : groups.length > 0 ? (
           <div className="flex flex-col">
-            {tracks.map((t) => {
+            {groups.map((g) => (
+              <Fragment key={g.title ?? "results"}>
+                {g.title && (
+                  <p data-shelf-heading className="px-1 pb-1 pt-3 text-xs font-bold uppercase tracking-widest text-faint first:pt-0">
+                    {g.title}
+                  </p>
+                )}
+            {g.items.map((t) => {
               const playing = playingId === t.id;
               return (
                 <button
@@ -329,6 +369,8 @@ export function TrackPicker({
                 </button>
               );
             })}
+              </Fragment>
+            ))}
           </div>
         ) : searched ? (
           <EmptyState icon={Music} title="No songs found" text="Try a different title or artist." variant="compact" />

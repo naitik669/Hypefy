@@ -8,6 +8,7 @@ import { spotifyPlay, spotifyPause } from "@/lib/spotify-player";
 // "use client": server pages (a sound's page) read songs too.
 import { parseTrack, type Track } from "@/lib/track";
 export { parseTrack, type Track };
+export { originalTrackFor, originalShotId, originalSoundId, ORIGINAL_TITLE } from "@/lib/track";
 
 /**
  * Media-fragment URL for a track — `#t=12` makes the <audio> element start
