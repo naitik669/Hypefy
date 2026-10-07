@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock } from "lucide-react";
+import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock, AlertCircle } from "lucide-react";
 import { SendIcon, ShareIcon } from "@/components/ui/ShareIcon";
+import { FACES_SHOWN, lastMine, readMarkers, receiptFor } from "@/lib/chat-receipts";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { useGroupCall } from "@/components/calls/GroupCallProvider";
@@ -658,6 +659,23 @@ export function RealChatView({
     for (const [mid, em] of tmp) out.set(mid, [...em.entries()].map(([emoji, v]) => ({ emoji, ...v })));
     return out;
   }, [reactions, currentUserId]);
+
+  // How far each message has got, shown under it rather than as a tick in
+  // every bubble: words under my newest in a one-to-one chat, faces under
+  // the last message each member has read in a group. See lib/chat-receipts.
+  // The clock "Seen 4m ago" is read against, moved on twice a minute.
+  const [receiptNow, setReceiptNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setReceiptNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const markers = isGroup ? readMarkers(messages, readers) : new Map<string, string[]>();
+  const myLast = lastMine(messages, currentUserId);
+  const myReceipt = receiptFor(myLast, readers, {
+    isGroup,
+    faces: !!myLast && (markers.get(myLast.id)?.length ?? 0) > 0,
+    now: receiptNow,
+  });
 
   /** Derives the display status for one of my outgoing messages. */
   function getMsgStatus(m: ChatMsg): MsgStatus {
@@ -2204,10 +2222,18 @@ export function RealChatView({
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
                           className={`relative min-w-[80px] max-w-full cursor-default select-none rounded-2xl px-3.5 pt-2 pb-5 text-sm ${
                             mine ? "rounded-br-md" : "rounded-bl-md"
-                          } ${lookCss ? lookCss.className : mine ? "bg-accent text-accent-ink" : "bg-surface text-foreground"} ${
+                          } ${
+                            mine && m._status === "failed"
+                              ? "border border-danger/45 bg-danger/10 text-danger [&>span>span]:!text-danger/60"
+                              : lookCss
+                                ? lookCss.className
+                                : mine
+                                  ? "bg-accent text-accent-ink"
+                                  : "bg-surface text-foreground"
+                          } ${
                             look?.decor && showTime ? "mt-3" : ""
                           }`}
-                          style={lookCss?.style}
+                          style={mine && m._status === "failed" ? undefined : lookCss?.style}
                         >
                           {look?.decor && showTime && <ChatThemeDecor decor={look.decor} mine={mine} />}
                           {m.body}
@@ -2287,53 +2313,91 @@ export function RealChatView({
                         <button
                           type="button"
                           onClick={() => retrySend(m)}
-                          className="px-1 pt-0.5 text-right text-[10px] font-semibold text-danger hover:underline"
+                          className="flex items-center justify-end gap-1 self-end px-1 py-1 text-[11px] font-semibold text-danger"
                         >
-                          Failed · Tap to retry
+                          <AlertCircle size={13} strokeWidth={2.4} aria-hidden />
+                          Not sent · Tap to retry
                         </button>
                       )}
                     </div>
                   </div>
                   )}
+                  {/* Group: the members who have read down to here. */}
+                  {(markers.get(m.id)?.length ?? 0) > 0 && (
+                    <div className="flex items-center justify-end gap-1 pr-1 pt-1" data-read-faces aria-label={`Seen by ${markers.get(m.id)!.map((id) => senderName(id)).join(", ")}`}>
+                      {markers.get(m.id)!.slice(0, FACES_SHOWN).map((id) => (
+                        <span key={id} className="animate-receipt-in block">
+                          <Avatar name={senderName(id)} hue={members?.[id]?.hue ?? other.hue} size={16} src={members?.[id]?.avatarUrl ?? undefined} />
+                        </span>
+                      ))}
+                      {markers.get(m.id)!.length > FACES_SHOWN && (
+                        <span className="text-[10px] font-bold tabular-nums text-faint">+{markers.get(m.id)!.length - FACES_SHOWN}</span>
+                      )}
+                    </div>
+                  )}
+                  {/* The words under my newest message. */}
+                  {myReceipt && myLast?.id === m.id && (
+                    <div
+                      data-receipt={myReceipt.kind}
+                      className={`flex items-center justify-end gap-1 pr-1 pt-1 text-[11px] font-semibold ${
+                        myReceipt.kind === "seen" ? "text-accent" : "text-faint"
+                      }`}
+                    >
+                      {myReceipt.kind === "sending" && (
+                        <span className="h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-faint border-t-transparent motion-reduce:animate-none" aria-hidden />
+                      )}
+                      {myReceipt.kind === "sent" && <span className="h-2 w-2 rounded-full bg-faint" aria-hidden />}
+                      <span key={myReceipt.kind} className="animate-receipt-in">
+                        {myReceipt.kind === "sending" ? "Sending…" : myReceipt.kind === "sent" ? "Sent" : myReceipt.label}
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}
 
-            {/* Recording indicator takes priority — mutually exclusive with typing
-                on the sender's side (voiceMode replaces the text composer). */}
-            {recordingIds.length > 0 ? (
-              <div className="flex flex-col items-start gap-0.5">
-                {isGroup && (
-                  <span className="px-1 text-[11px] font-semibold text-muted">{recordingLabel(recordingIds)}</span>
-                )}
-                <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-surface px-3.5 py-3">
-                  <Mic size={14} className="text-accent" />
-                  <div className="flex h-3 items-end gap-[3px]">
-                    {[0, 1, 2, 3].map((i) => (
-                      <span
-                        key={i}
-                        className="w-[3px] animate-mic-wave rounded-full bg-accent"
-                        style={{ animationDelay: `${i * 0.12}s` }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* Typing indicator — a real incoming chat bubble with bouncing dots */
-              typingIds.length > 0 && (
-                <div className="flex flex-col items-start gap-0.5">
+            {/* Someone is recording or typing: a bubble where their message
+                will land, beside their face. Recording takes priority — it
+                replaces the text composer on the sender's side, so the two
+                never happen together. */}
+            {(recordingIds.length > 0 || typingIds.length > 0) && (() => {
+              const recording = recordingIds.length > 0;
+              const ids = recording ? recordingIds : typingIds;
+              const first = members?.[ids[0]] ?? { name: other.name, hue: other.hue, avatarUrl: other.avatarUrl };
+              return (
+                <div className="flex flex-col items-start gap-0.5" data-activity={recording ? "recording" : "typing"} role="status">
                   {isGroup && (
-                    <span className="px-1 text-[11px] font-semibold text-muted">{typingLabel(typingIds)}</span>
+                    <span className="pl-9 text-[11px] font-semibold text-muted">
+                      {recording ? recordingLabel(ids) : typingLabel(ids)}
+                    </span>
                   )}
-                  <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-surface px-3.5 py-3">
-                    {[0, 0.15, 0.3].map((d, i) => (
-                      <span key={i} className="h-2 w-2 animate-dot-bounce rounded-full bg-muted" style={{ animationDelay: `${d}s` }} />
-                    ))}
+                  {!isGroup && <span className="sr-only">{recording ? recordingLabel(ids) : typingLabel(ids)}</span>}
+                  <div className="flex items-end gap-2">
+                    <Avatar name={first.name} hue={first.hue} size={28} src={first.avatarUrl ?? undefined} />
+                    {recording ? (
+                      <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-surface px-3.5 py-3">
+                        <Mic size={14} className="text-accent" />
+                        <div className="flex h-4 items-end gap-[3px]">
+                          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                            <span
+                              key={i}
+                              className="w-[3px] animate-mic-wave rounded-full bg-accent"
+                              style={{ animationDelay: `${(i % 4) * 0.12 + (i > 3 ? 0.06 : 0)}s` }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-surface px-3.5 py-3">
+                        {[0, 0.15, 0.3].map((d, i) => (
+                          <span key={i} className="h-2 w-2 animate-dot-bounce rounded-full bg-muted" style={{ animationDelay: `${d}s` }} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-              )
-            )}
+              );
+            })()}
 
             <div ref={endRef} />
           </div>
@@ -2993,46 +3057,9 @@ function MsgStatusTick({ status }: { status: MsgStatus }) {
     );
   }
 
-  // ── Failed: clean × mark ─────────────────────────────────────────────────────
-  if (status === "failed") {
-    return (
-      <svg
-        width="11" height="11" viewBox="0 0 11 11" fill="none"
-        aria-label="Failed to send" className="text-danger"
-      >
-        <path d="M1.5 1.5L9.5 9.5M9.5 1.5L1.5 9.5"
-          stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    );
-  }
-
-  // ── Seen: double geometric tick — electric lime + brand glow ─────────────────
-  if (status === "seen") {
-    return (
-      <svg
-        width="20" height="9" viewBox="0 0 20 9" fill="none"
-        aria-label="Seen"
-        style={{ filter: "drop-shadow(0 0 4px rgb(200 255 0 / 0.7))" }}
-        className="text-accent"
-      >
-        {/* first tick */}
-        <path d="M1.5 4.5L4.5 7.5L10.5 1"
-          stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-        {/* second tick — offset right */}
-        <path d="M8 4.5L11 7.5L17 1"
-          stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-
-  // ── Sent: single geometric tick, muted ───────────────────────────────────────
-  return (
-    <svg
-      width="13" height="9" viewBox="0 0 13 9" fill="none"
-      aria-label="Sent" className="text-muted/70"
-    >
-      <path d="M1.5 4.5L4.5 7.5L11 1"
-        stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  // Failed is said in words under the message ("Not sent · Tap to retry"),
+  // and by the bubble itself where it is text.
+  // Sent and seen are not said in the bubble any more: they are the words
+  // (or, in a group, the faces) under the message. See lib/chat-receipts.
+  return null;
 }
