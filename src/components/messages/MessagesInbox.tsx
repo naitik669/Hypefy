@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { NO_VAULT, looksLikePin, markVaultOpen, type ChatLevel, type VaultOverview } from "@/lib/chat-vault";
 import { LockedChatsRow } from "@/components/vault/LockedChatsRow";
+import { useChatDrafts } from "@/lib/chat-drafts";
 import { ChatPinSetup } from "@/components/vault/ChatPinSetup";
 import { createClient } from "@/lib/supabase/client";
 import { isEncrypted, openEnvelope, useEnvelopeReader } from "@/lib/e2ee/chat";
@@ -260,6 +261,8 @@ export function MessagesInbox({
   }, [encryptedRows, peerIds, reader, currentUserId]);
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
+  /** What you typed in each chat and did not send, shown as its preview. */
+  const drafts = useChatDrafts(currentUserId);
   /** Locking a first chat: the PIN is chosen, then the chat is locked. */
   const [pinFor, setPinFor] = useState<{ row: InboxRow; next: ChatLevel } | null>(null);
   // conversation_id → a matching message body, for content search (2b).
@@ -791,7 +794,17 @@ export function MessagesInbox({
                 unread ? "font-semibold text-foreground" : "text-muted"
               }`}
             >
-              {matchBody ? highlightSnippet(matchBody, query) : preview(r)}
+              {matchBody ? (
+                highlightSnippet(matchBody, query)
+              ) : drafts[r.id] ? (
+                // Yours, unsent, and waiting in the box: it stands in for the
+                // last message until it is sent or cleared.
+                <span data-draft>
+                  <span className="font-semibold text-accent">Draft:</span> {drafts[r.id]}
+                </span>
+              ) : (
+                preview(r)
+              )}
             </p>
           </div>
           <div className="relative flex shrink-0 flex-col items-end gap-1.5">

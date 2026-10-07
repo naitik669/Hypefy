@@ -59,6 +59,7 @@ import { canEncrypt, isEncrypted, openEnvelope, sealFor, useEnvelopeReader } fro
 import { openEncryptionSetup } from "@/lib/e2ee/open-setup";
 import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 import { ChatImg, ChatLink, ChatVideo } from "@/components/messages/ChatMedia";
+import { readDraft, writeDraft } from "@/lib/chat-drafts";
 import { mediaUrlsOf, prefetchChatMedia } from "@/lib/chat-media-url";
 import { SharedShotCard } from "@/components/messages/SharedShotCard";
 import { SharedPostCard, sharedSlide } from "@/components/messages/SharedPostCard";
@@ -432,6 +433,31 @@ export function RealChatView({
   }, []);
   const [replyTo, setReplyTo] = useState<ChatMsg | null>(null);
   const [editing, setEditing] = useState<ChatMsg | null>(null);
+
+  // What was typed here and not sent is kept, and is back in the box when the
+  // chat is opened again (src/lib/chat-drafts.ts). Read after the first paint:
+  // the server has no drafts, and a box that started out filled would not
+  // match what it drew.
+  const draftReady = useRef(false);
+  useEffect(() => {
+    let live = true;
+    void Promise.resolve().then(() => {
+      if (!live) return;
+      const kept = readDraft(currentUserId, conversationId);
+      draftReady.current = true;
+      if (kept) setText((now) => now || kept);
+    });
+    return () => {
+      live = false;
+    };
+  }, [currentUserId, conversationId]);
+  // Saved as it changes, and gone the moment the box is empty: sending
+  // clears the box, which clears the draft. Not while an old message is being
+  // edited, when the box holds that message and not something new.
+  useEffect(() => {
+    if (!draftReady.current || editing) return;
+    writeDraft(currentUserId, conversationId, text);
+  }, [text, editing, currentUserId, conversationId]);
   const [menu, setMenu] = useState<{ msg: ChatMsg; rect: DOMRect } | null>(null);
   /**
    * A shared post or Shot held open. Holding one lifts it out, as it does in
