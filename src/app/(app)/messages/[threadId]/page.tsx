@@ -70,6 +70,11 @@ export default async function ThreadPage({
     .map((m: any) => (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles))
     .filter(Boolean);
   const op = others[0] ?? null;
+  // The reader's own face, for the places their own messages are shown with
+  // one: the full-screen photo viewer named them "You" over a blank avatar.
+  const mineProfile = (Array.isArray((me as any).profiles) ? (me as any).profiles[0] : (me as any).profiles) as
+    | { avatar_hue?: number | null; avatar_url?: string | null }
+    | null;
 
   // Sender lookup + group meta
   const membersMap: Record<string, { name: string; username: string | null; hue: number; avatarUrl: string | null }> = {};
@@ -180,6 +185,7 @@ export default async function ThreadPage({
       }}
       group={group}
       members={membersMap}
+      self={{ hue: mineProfile?.avatar_hue ?? 280, avatarUrl: mineProfile?.avatar_url ?? null }}
       initialMessages={messages}
       initialReactions={(reactRows ?? []) as any}
       initialReaders={readers}

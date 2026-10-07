@@ -330,6 +330,7 @@ export function RealChatView({
   other,
   group,
   members,
+  self,
   initialMessages,
   initialReactions = [],
   initialReaders = [],
@@ -341,6 +342,8 @@ export function RealChatView({
   other: Other;
   group?: GroupMeta | null;
   members?: Record<string, { name: string; username?: string | null; hue: number; avatarUrl?: string | null }>;
+  /** The reader's own avatar, for where their own messages are shown with a face. */
+  self?: { hue: number; avatarUrl: string | null };
   initialMessages: ChatMsg[];
   initialReactions?: ReactionRow[];
   initialReaders?: Reader[];
@@ -2663,10 +2666,16 @@ export function RealChatView({
           start={albumView.start}
           onClose={() => setAlbumView(null)}
           sender={
+            // Whoever sent it, with their own picture: yours on yours, and
+            // in a group the member's, not a blank one.
             albumView.senderId === currentUserId
-              ? { name: "You" }
+              ? { name: "You", hue: self?.hue, avatarUrl: self?.avatarUrl ?? null }
               : isGroup
-                ? { name: senderName(albumView.senderId), hue: members?.[albumView.senderId]?.hue }
+                ? {
+                    name: senderName(albumView.senderId),
+                    hue: members?.[albumView.senderId]?.hue,
+                    avatarUrl: members?.[albumView.senderId]?.avatarUrl ?? null,
+                  }
                 : { name: other.name, hue: other.hue, avatarUrl: other.avatarUrl }
           }
           sentAt={`${dayLabel(albumView.at)}, ${timeLabel(albumView.at)}`}
