@@ -8,6 +8,7 @@ import {
   Silkscreen,
   Playfair_Display,
 } from "next/font/google";
+import { UpdateGate } from "@/components/native/UpdateGate";
 import { RegisterSW } from "@/components/pwa/RegisterSW";
 import { ReferralTracker } from "@/components/growth/ReferralTracker";
 import { ClientErrorReporter } from "@/components/pwa/ClientErrorReporter";
@@ -194,6 +195,8 @@ export default async function RootLayout({
             and a reader there is owed the same choice. */}
         <ConsentBanner country={country} />
         <RegisterSW />
+        {/* An install too old for the site says so, signed in or not. */}
+        <UpdateGate />
         <ReferralTracker />
         <ClientErrorReporter />
         {/* Finishes a Google sign-in that a full-page redirect cut short:

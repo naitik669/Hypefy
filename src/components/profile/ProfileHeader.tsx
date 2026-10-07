@@ -10,6 +10,7 @@ import { visibleDecoration } from "@/lib/cosmetics";
 import { HyperStar } from "@/components/ui/HyperStar";
 import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { AnthemChip } from "@/components/profile/AnthemChip";
+import { WebOnly } from "@/components/native/WebOnly";
 import {
   ProfileStatusBubble,
   type ProfileNote,
@@ -143,13 +144,19 @@ export function ProfileHeader({
             )}
             {isHyper && <HyperStar className="h-4 w-4 shrink-0" />}
             {isMutualHyper && <MutualHyperBadge />}
+            {/* Not in the app: the plans it leads to cannot be bought there,
+                so the chip would be an invitation to a page with no way to
+                accept it. Hidden until the page knows where it is running,
+                so the app never shows it for a moment and takes it back. */}
             {!verified && currentUserId === userId && (
-              <Link
-                href="/premium"
-                className="ml-1 rounded-full border border-verified/30 px-2 py-0.5 text-[11px] font-bold text-verified transition-colors hover:bg-verified/10"
-              >
-                Get verified
-              </Link>
+              <WebOnly>
+                <Link
+                  href="/premium"
+                  className="ml-1 rounded-full border border-verified/30 px-2 py-0.5 text-[11px] font-bold text-verified transition-colors hover:bg-verified/10"
+                >
+                  Get verified
+                </Link>
+              </WebOnly>
             )}
           </span>
           {username && <p className="mt-0.5 text-sm text-muted">@{username}</p>}

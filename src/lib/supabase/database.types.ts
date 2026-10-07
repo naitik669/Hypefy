@@ -3136,6 +3136,7 @@ export type Database = {
       unfollow_user: { Args: { p_target: string }; Returns: undefined }
       my_chat_levels: { Args: never; Returns: { conversation_id: string; level: string }[] }
       chat_pin_places: { Args: never; Returns: number | null }
+      min_app_build: { Args: never; Returns: number }
       ghost_hype_reveal: { Args: { p_kind: string; p_content_id: string }; Returns: boolean }
       ghost_share_status: {
         Args: { p_kind: string; p_content_id: string }
