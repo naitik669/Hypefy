@@ -36,12 +36,15 @@ export function toVaultOverview(data: unknown): VaultOverview {
   };
 }
 
+/** The chat PIN is exactly this many digits (0117). The app lock's is its own. */
+export const PIN_LENGTH = 4;
+
 /**
- * Could this search be the Vault PIN? Four to six digits and nothing else,
- * the shape set_lock_pin accepts. Anything else is only ever a search.
+ * Could this search be the Vault PIN? Exactly four digits and nothing else,
+ * the shape set_lock_pin accepts for chats. Anything else is only ever a search.
  */
 export function looksLikePin(query: string): boolean {
-  return /^[0-9]{4,6}$/.test(query.trim());
+  return /^[0-9]{4}$/.test(query.trim());
 }
 
 /**

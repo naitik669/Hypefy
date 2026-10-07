@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { Delete } from "lucide-react";
+import { PIN_LENGTH } from "@/lib/chat-vault";
 
 /**
- * A keypad for a 4 to 6 digit PIN: the same pad the app lock draws, for the
- * chat PIN.
+ * A keypad for the four digit chat PIN.
  *
- * Six digits submit themselves; a shorter PIN needs Enter. `onSubmit` says
- * whether it was accepted, and a refusal clears the pad so the next try
- * starts clean. Digits, Enter and Backspace work from a keyboard too, since
- * the Vault has to open on a laptop.
+ * The fourth digit submits it: there is no Enter key, because there is never
+ * a shorter or longer PIN to wait for. `onSubmit` says whether it was
+ * accepted, and a refusal clears the pad so the next try starts clean.
+ * Digits and Backspace work from a keyboard too, since the Vault has to open
+ * on a laptop.
  */
 export function PinPad({
   onSubmit,
@@ -36,7 +37,7 @@ export function PinPad({
   const [busy, setBusy] = useState(false);
 
   async function submit(value: string) {
-    if (busy || disabled || value.length < 4) return;
+    if (busy || disabled || value.length !== PIN_LENGTH) return;
     setBusy(true);
     const ok = await onSubmit(value);
     setBusy(false);
@@ -45,9 +46,9 @@ export function PinPad({
 
   function press(digit: string) {
     if (busy || disabled) return;
-    const next = (pin + digit).slice(0, 6);
+    const next = (pin + digit).slice(0, PIN_LENGTH);
     setPin(next);
-    if (next.length === 6) void submit(next);
+    if (next.length === PIN_LENGTH) void submit(next);
   }
 
   function erase() {
@@ -60,7 +61,6 @@ export function PinPad({
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (/^[0-9]$/.test(e.key)) press(e.key);
       else if (e.key === "Backspace") erase();
-      else if (e.key === "Enter") void submit(pin);
       else return;
       e.preventDefault();
     }
@@ -86,7 +86,7 @@ export function PinPad({
           className="flex h-11 w-full items-center justify-center gap-3 rounded-xl border-[2.5px] border-[#333] bg-[#141414]"
           aria-label={`${pin.length} digits entered`}
         >
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: PIN_LENGTH }).map((_, i) => (
             <span
               key={i}
               className={`h-2.5 w-2.5 rounded-full transition-colors ${i < pin.length ? "bg-accent" : "bg-[#2a2a2a]"}`}
@@ -95,7 +95,7 @@ export function PinPad({
         </div>
       ) : (
         <div className="flex h-6 items-center gap-3" aria-label={`${pin.length} digits entered`}>
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: PIN_LENGTH }).map((_, i) => (
             <span
               key={i}
               className={`h-2.5 w-2.5 rounded-full transition-colors ${i < pin.length ? "bg-accent" : "bg-surface"}`}
@@ -117,14 +117,8 @@ export function PinPad({
             {d}
           </button>
         ))}
-        <button
-          type="button"
-          onClick={() => void submit(pin)}
-          disabled={pin.length < 4 || busy || disabled}
-          className={small}
-        >
-          Enter
-        </button>
+        {/* Where Enter was: the fourth digit sends the PIN by itself. */}
+        <span aria-hidden />
         <button type="button" onClick={() => press("0")} disabled={busy || disabled} className={key}>
           0
         </button>

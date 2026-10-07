@@ -88,9 +88,9 @@ const tap = (label: string) =>
     if (!b) throw new Error(`no button "${label}"`);
     (b as HTMLButtonElement).click();
   });
-async function enter(digits: string, withEnter = digits.length < 6) {
+/** The fourth digit sends the PIN; there is no Enter key. */
+async function enter(digits: string) {
   for (const d of digits) await tap(d);
-  if (withEnter) await tap("Enter");
 }
 
 describe("the rules", () => {
@@ -102,9 +102,9 @@ describe("the rules", () => {
     expect(levelOf({ hidden_at: "2026-10-06" })).toBe("normal");
   });
 
-  it("takes only four to six digits for a PIN", () => {
-    for (const yes of ["1234", "12345", "123456", " 4821 "]) expect(looksLikePin(yes), yes).toBe(true);
-    for (const no of ["123", "1234567", "12a4", "", "12 34", "maya"]) expect(looksLikePin(no), no).toBe(false);
+  it("takes exactly four digits for a PIN", () => {
+    for (const yes of ["1234", "0000", " 4821 "]) expect(looksLikePin(yes), yes).toBe(true);
+    for (const no of ["123", "12345", "123456", "12a4", "", "12 34", "maya"]) expect(looksLikePin(no), no).toBe(false);
   });
 
   it("reads the overview the server sends, and nothing from a failed call", () => {
@@ -134,22 +134,28 @@ describe("the PIN pad", () => {
   }
   const entered = () => host.querySelectorAll("[data-pin-pad] .bg-accent").length;
 
-  it("sends six digits by themselves, and a shorter PIN on Enter", async () => {
+  it("sends the PIN on the fourth digit, and not before", async () => {
     const got: string[] = [];
     await pad((p) => { got.push(p); return true; });
-    await enter("123456");
-    expect(got).toEqual(["123456"]);
+    await enter("123");
+    expect(got).toEqual([]);
+    await tap("4");
+    expect(got).toEqual(["1234"]);
   });
 
-  it("waits for Enter below six, and does nothing under four", async () => {
+  it("has four places and no Enter key", async () => {
+    await pad(() => true);
+    expect(host.querySelectorAll("[data-pin-pad] [aria-label$='digits entered'] span")).toHaveLength(4);
+    expect([...host.querySelectorAll("button")].map((b) => b.textContent)).not.toContain("Enter");
+  });
+
+  it("takes no fifth digit", async () => {
     const got: string[] = [];
-    await pad((p) => { got.push(p); return true; });
-    await enter("123", false);
-    expect((document.querySelector("button[disabled]") as HTMLButtonElement)?.textContent).toBe("Enter");
-    await tap("4");
-    expect(got).toEqual([]);
-    await tap("Enter");
+    await pad((p) => { got.push(p); return false; });
+    // A refusal clears the pad, so the fifth press starts a new PIN.
+    await enter("12345");
     expect(got).toEqual(["1234"]);
+    expect(entered()).toBe(1);
   });
 
   it("clears itself after a refusal, so the next try starts clean", async () => {
@@ -161,7 +167,7 @@ describe("the PIN pad", () => {
   it("can be typed on a keyboard", async () => {
     const got: string[] = [];
     await pad((p) => { got.push(p); return true; });
-    for (const key of ["4", "8", "2", "x", "1", "9", "Backspace", "Enter"]) {
+    for (const key of ["4", "8", "x", "9", "Backspace", "2", "1"]) {
       await act(async () => void window.dispatchEvent(new KeyboardEvent("keydown", { key })));
     }
     expect(got).toEqual(["4821"]);
@@ -254,7 +260,6 @@ describe("the door", () => {
     for (const round of [0, 1]) {
       void round;
       for (const d of "9173") await press(d);
-      await press("Enter");
     }
     expect(called("set_lock_pin")[0].args).toEqual({ p_scope: "chat", p_pin: "9173" });
     // And straight in with it.

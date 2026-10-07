@@ -172,7 +172,6 @@ describe("locking a chat", () => {
     for (const round of [0, 1]) {
       void round;
       for (const d of "4821") await tap(d);
-      await tap("Enter");
     }
     expect(called("set_lock_pin")[0].args).toEqual({ p_scope: "chat", p_pin: "4821" });
     // The same request again, now that there is a PIN.

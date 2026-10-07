@@ -83,7 +83,7 @@ export function ChatPinSetup({
         <p className="mt-1 max-w-[30ch] text-sm text-muted">
           {first !== null
             ? "Once more, so a slip doesn't lock you out."
-            : "4 to 6 digits. It opens your locked chats, and is separate from the app lock."}
+            : "Four digits. It opens your locked chats, and is separate from the app lock."}
         </p>
       </div>
       <PinPad onSubmit={entered} error={error} />
