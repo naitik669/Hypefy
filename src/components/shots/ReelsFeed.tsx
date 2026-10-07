@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, EyeOff } from "lucide-react";
@@ -98,6 +98,8 @@ import { BLANK_POSTER } from "@/lib/blank-poster";
 import { CommentIcon } from "@/components/ui/CommentIcon";
 import { claimPreview, originalTrackFor, parseTrack } from "@/lib/music";
 import { SoundBox } from "@/components/music/SoundBox";
+import { ShotsEndCard, type NewCheck } from "@/components/shots/ShotsEndCard";
+import { forgetSeenAtOpen, markShotSeen, orderReel, seenAtOpen, SEEN_AFTER_MS, THIN_REEL } from "@/lib/shots-seen";
 import { SoundPill } from "@/components/music/SoundPill";
 import { hideContent, muteUser, QUIET_COPY } from "@/lib/feed-quiet";
 
@@ -134,6 +136,12 @@ export type Reel = {
    *  Recorded as the link when you rehype it; the deck shows the faces. */
   _rehypedById?: string | null;
 };
+
+const MORE_SHOT_COLS =
+  "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, duration_secs, trim_start, trim_end, track, profiles(display_name, avatar_hue, username, avatar_url)";
+
+const noSubscribe = () => () => {};
+const noSeen = () => null;
 
 /**
  * Shots = Reels. Full-screen vertical autoplay feed.
@@ -192,6 +200,7 @@ export function ReelsFeed({
   currentUserId,
   adCountry = null,
   adPersonalised = false,
+  remember = false,
 }: {
   reels: Reel[];
   currentUserId: string | null;
@@ -199,10 +208,28 @@ export function ReelsFeed({
   adCountry?: string | null;
   /** Confirmed 18+, from the server. Null date of birth is a no. */
   adPersonalised?: boolean;
+  /**
+   * The Shots tab: remember what has been watched, put what is new first,
+   * and end with a card instead of a wall. Off for a Shot opened from a
+   * link, which has to open on that Shot.
+   */
+  remember?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const [reels, setReels] = useState<Reel[]>(initialReels);
+
+  // What had been watched when the reel was opened. Null on the server and
+  // for a linked Shot: the order is then exactly as it was given.
+  const seen = useSyncExternalStore(noSubscribe, remember ? seenAtOpen : noSeen, noSeen);
+  useEffect(() => forgetSeenAtOpen, []);
+  /** "Watch again" was pressed this many times: each is a new shuffle. */
+  const [round, setRound] = useState(0);
+  const order = useMemo(
+    () => (seen ? orderReel(reels, seen, round) : { items: reels, caughtUpBefore: null }),
+    [reels, seen, round],
+  );
+  const [check, setCheck] = useState<NewCheck>("idle");
 
   // Ads, spliced in at render. `reels` stays a plain Reel[] so the pagination
   // cursor (the oldest created_at) and the dedupe-by-id keep working on real
@@ -217,7 +244,7 @@ export function ReelsFeed({
     resetKey: initialReels,
     opts: SHOT_AD_OPTS,
   });
-  const items = useMemo(() => spliceFeed(reels, NO_SHOTS, ads), [reels, ads]);
+  const items = useMemo(() => spliceFeed(order.items, NO_SHOTS, ads), [order.items, ads]);
   /**
    * A sheet is up over the active reel.
    *
@@ -293,6 +320,67 @@ export function ReelsFeed({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIdx, items.length, noMore]);
 
+  /**
+   * What the reel is made of: its Shots and ads, the "you're caught up" card
+   * where the new ones give way to the watched ones, and the end card once
+   * there is nothing more to fetch. The cards are slides like any other, so
+   * every position (the active one, the swipe's bounds) counts them.
+   */
+  const slides = useMemo(() => {
+    // A slide: a Shot or an ad, or one of the two cards.
+    const out: ((typeof items)[number] | { kind: "caught-up" } | { kind: "end" })[] = [];
+    for (const item of items) {
+      if (item.kind === "post" && item.post.id === order.caughtUpBefore) out.push({ kind: "caught-up" });
+      out.push(item);
+    }
+    if (seen && noMore && items.length > 0) out.push({ kind: "end" });
+    return out;
+  }, [items, order.caughtUpBefore, seen, noMore]);
+
+  // A Shot that has been on screen a moment has been watched.
+  const activeShotId = (() => {
+    const s = slides[activeIdx];
+    return s?.kind === "post" ? s.post.id : null;
+  })();
+  useEffect(() => {
+    if (!remember || !activeShotId) return;
+    const t = setTimeout(() => markShotSeen(activeShotId), SEEN_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [remember, activeShotId]);
+
+  /** From the top again, in a different order. */
+  function watchAgain() {
+    haptics.select();
+    setCheck("idle");
+    setRound((r) => r + 1);
+    setActiveIdx(0);
+  }
+
+  /** Anything posted since this reel was loaded? */
+  async function checkForNew() {
+    if (check === "checking") return;
+    setCheck("checking");
+    const newest = reels.reduce((m, r) => (r.created_at > m ? r.created_at : m), "");
+    const { data } = await supabase
+      .from("shots")
+      .select(MORE_SHOT_COLS)
+      .gt("created_at", newest || new Date(0).toISOString())
+      .order("created_at", { ascending: false })
+      .limit(10);
+    const fresh = ((data ?? []) as Record<string, unknown>[])
+      .map((s) => ({ ...s, profiles: Array.isArray(s.profiles) ? (s.profiles[0] ?? null) : s.profiles }) as unknown as Reel)
+      .filter((f) => !reels.some((p) => p.id === f.id));
+    if (fresh.length === 0) {
+      setCheck("none");
+      return;
+    }
+    haptics.success();
+    setCheck("idle");
+    setReels((prev) => [...fresh, ...prev]);
+    // New ones are unwatched, so they sort to the top: start there.
+    setActiveIdx(0);
+  }
+
   function onSwipeTouchStart(e: React.TouchEvent) {
     // Holding Share opens a row over the reel; the finger holding it is on
     // this strip, and without this the reel slides away under the faces.
@@ -341,7 +429,7 @@ export function ReelsFeed({
     // Resist at the ends so pulling past the last reel feels like a boundary
     // rather than a broken screen. Downward at index 0 stays free, because
     // that gesture exits Shots and should not fight the user.
-    const atEnd = activeIdx === items.length - 1 && dy < 0;
+    const atEnd = activeIdx === slides.length - 1 && dy < 0;
     if (atEnd) dy *= 0.3;
 
     setDrag(dy);
@@ -358,7 +446,11 @@ export function ReelsFeed({
       elapsed: Date.now() - swipeStartedAt.current,
       first: activeIdx === 0,
     });
-    if (outcome === "next") setActiveIdx((i) => Math.min(i + 1, items.length - 1));
+    if (outcome === "next") {
+      // Pulled up on the end card: that is asking whether there is more.
+      if (activeIdx === slides.length - 1 && slides[activeIdx]?.kind === "end") void checkForNew();
+      setActiveIdx((i) => Math.min(i + 1, slides.length - 1));
+    }
     else if (outcome === "prev") setActiveIdx((i) => i - 1);
     // Pulling down on the first reel leaves Shots.
     else if (outcome === "leave") safeBack(router);
@@ -374,9 +466,17 @@ export function ReelsFeed({
       onTouchCancel={() => setDrag(null)}
     >
       {/* Absolute-positioned reels: each fills the container, translated by index offset */}
-      {items.map((item, i) => (
+      {slides.map((item, i) => (
         <div
-          key={item.kind === "ad" ? item.ad.id : item.kind === "post" ? item.post.id : i}
+          key={
+            item.kind === "ad"
+              ? item.ad.id
+              : item.kind === "post"
+                ? item.post.id
+                : item.kind === "caught-up" || item.kind === "end"
+                  ? item.kind
+                  : i
+          }
           className={`absolute inset-0 will-change-transform ${
             i === activeIdx ? "" : "pointer-events-none"
           }`}
@@ -393,7 +493,16 @@ export function ReelsFeed({
                 : "none",
           }}
         >
-          {item.kind === "ad" ? (
+          {item.kind === "caught-up" || item.kind === "end" ? (
+            <ShotsEndCard
+              variant={item.kind}
+              thin={reels.length < THIN_REEL}
+              check={check}
+              onAgain={watchAgain}
+              onCheck={() => void checkForNew()}
+              onContinue={() => setActiveIdx(i + 1)}
+            />
+          ) : item.kind === "ad" ? (
             <ShotAdCard
               ad={item.ad}
               fill={fill}

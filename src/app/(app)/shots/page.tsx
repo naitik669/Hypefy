@@ -134,6 +134,6 @@ export default async function ShotsPage() {
   return (
     // The rows carry exactly the columns selected above (and the RPC builds
     // the same shape), which is what a Reel is.
-    <ReelsFeed reels={reels as unknown as Reel[]} currentUserId={user?.id ?? null} {...adContext} />
+    <ReelsFeed reels={reels as unknown as Reel[]} currentUserId={user?.id ?? null} remember {...adContext} />
   );
 }
