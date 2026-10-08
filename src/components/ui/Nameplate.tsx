@@ -32,6 +32,10 @@ export function NameplateRow({
   );
 }
 
+/** The motif's own falloff, inside whatever box it is given. */
+const MOTIF_MASK =
+  "linear-gradient(90deg, transparent 6%, rgba(0,0,0,0.6) 28%, #000 46%, #000 64%, rgba(0,0,0,0.5) 84%, transparent 100%)";
+
 /**
  * Where a plate stops when it is worn in a list that has its own marks on
  * the right — the time, the pin, the mute bell, the unread count.
@@ -43,6 +47,23 @@ export function NameplateRow({
  * way a banner behind a list has to.
  */
 export const PLATE_FADE_PX = 88;
+
+/** How long the fade is, in pixels, before that clear space begins. */
+const RAMP_PX = 130;
+
+/**
+ * The fade's shape, as [how far along, how opaque].
+ *
+ * Not a straight line. A linear ramp holds full strength and then turns a
+ * corner into its descent, and the eye reads that corner as an edge however
+ * long the ramp is — which is why lengthening it alone never helped. These
+ * stops ease away from 1 and level off into 0, so there is no point along
+ * the plate where the rate of change jumps.
+ */
+const FADE_STOPS: readonly [number, number][] = [
+  [0, 1], [0.18, 0.94], [0.34, 0.82], [0.48, 0.65],
+  [0.62, 0.45], [0.74, 0.28], [0.85, 0.14], [0.94, 0.05], [1, 0],
+];
 
 /**
  * A nameplate's artwork, filling its (positioned) parent: a wash of colour
@@ -71,7 +92,10 @@ export function Nameplate({
   // and left a straight seam down the row. Nothing is resized here — it is
   // the same artwork, faded out before the marks on the right.
   const taper = fadeRight
-    ? `linear-gradient(90deg, #000 0%, #000 calc(100% - ${fadeRight + 76}px), transparent calc(100% - ${fadeRight}px))`
+    ? `linear-gradient(90deg, #000 0%, ${FADE_STOPS.map(
+        ([at, alpha]) =>
+          `rgba(0,0,0,${alpha}) calc(100% - ${fadeRight + RAMP_PX * (1 - at)}px)`,
+      ).join(", ")})`
     : undefined;
   return (
     <span
@@ -92,8 +116,12 @@ export function Nameplate({
         style={{
           width: fadeRight ? `calc(100% - ${fadeRight}px)` : "100%",
           overflow: "visible",
-          WebkitMaskImage: "linear-gradient(90deg, transparent 18%, #000 62%)",
-          maskImage: "linear-gradient(90deg, transparent 18%, #000 62%)",
+          // Tapers at BOTH ends, so the motif is at its fullest in the
+          // middle of its box and is already thinning by the time the fade
+          // above reaches it. Left to peak at its right edge, it met the
+          // fade head-on and that meeting is what looked like a cut.
+          WebkitMaskImage: MOTIF_MASK,
+          maskImage: MOTIF_MASK,
         }}
       >
         {art.motif}

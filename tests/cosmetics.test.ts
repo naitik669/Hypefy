@@ -91,9 +91,32 @@ describe("a nameplate worn in a list", () => {
   it("fades out in pixels, so the art is never resized or clipped", () => {
     // Holding it in a narrower box instead cut the motif off mid-stroke and
     // left a straight seam down the row.
-    expect(src).toContain("calc(100% - ${fadeRight + 76}px)");
-    expect(src).toContain("calc(100% - ${fadeRight}px)");
+    expect(src).toContain("const RAMP_PX = 130;");
+    expect(src).toContain("calc(100% - ${fadeRight + RAMP_PX * (1 - at)}px)");
     expect(src).toContain('overflow: "visible"');
+  });
+
+  it("eases away rather than turning a corner into its descent", () => {
+    // A straight ramp holds full strength and then turns a corner, and the
+    // eye reads that corner as an edge however long the ramp is — which is
+    // why lengthening it alone never helped.
+    const stops = src.slice(src.indexOf("const FADE_STOPS"), src.indexOf("];", src.indexOf("const FADE_STOPS")));
+    const alphas = [...stops.matchAll(/, ([01](?:\.\d+)?)\]/g)].map((m) => Number(m[1]));
+    expect(alphas.length).toBeGreaterThan(5);
+    expect(alphas[0]).toBe(1);
+    expect(alphas[alphas.length - 1]).toBe(0);
+    // Strictly falling, and never in one big step.
+    alphas.forEach((a, i) => {
+      if (i === 0) return;
+      expect(a).toBeLessThan(alphas[i - 1]);
+      expect(alphas[i - 1] - a).toBeLessThan(0.25);
+    });
+  });
+
+  it("the motif thins at both ends, so it never meets the fade head-on", () => {
+    expect(src).toContain("const MOTIF_MASK");
+    expect(src).toContain("transparent 6%");
+    expect(src).toContain("transparent 100%");
   });
 
   it("the wash holds its strength instead of climbing into the fade", () => {
