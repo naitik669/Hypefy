@@ -3,8 +3,7 @@
 import { Avatar } from "@/components/ui/Avatar";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
-import { PreviewBubbles } from "@/components/messages/ChatThemePicker";
-import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
+import { bubbleCss } from "@/lib/chat-themes";
 import { findBubbleStyle } from "@/lib/bubble-styles";
 import { findFont, findGlow, nameStyle } from "@/lib/cosmetics";
 import { withGlowRoom } from "@/components/ui/DisplayName";
@@ -45,20 +44,6 @@ export function MarketItemPreview({ item, me, large = false }: { item: MarketIte
             </span>
           </span>
         </Stage>
-      );
-    }
-    case "theme": {
-      const t = findChatTheme(item.id);
-      if (!t) return <Stage />;
-      return (
-        <div
-          className={`flex h-full w-full flex-col justify-center ${large ? "px-8" : "px-3"}`}
-          style={{ background: t.background }}
-        >
-          <span className={large ? "origin-center scale-[1.35]" : undefined}>
-            <PreviewBubbles theme={t} />
-          </span>
-        </div>
       );
     }
     case "name": {

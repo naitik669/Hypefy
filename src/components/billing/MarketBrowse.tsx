@@ -3,21 +3,25 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Eye, Loader2, Sparkles } from "lucide-react";
+import { Check, Eye, Loader2, Search, Sparkles, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { MarketItemPreview, type Me } from "@/components/billing/MarketItemPreview";
 import { MarketPreviewSheet } from "@/components/billing/MarketPreviewSheet";
 import {
-  buildItems,
   filterAndSort,
   isOwned,
   isWorn,
   blockedReason,
   itemAction,
   wornColumn,
-  type CategoryPage,
+  onShelf,
+  searchItems,
+  tileAspect,
+  CATEGORY_PAGES,
+  SHELVES,
   type MarketItem,
+  type Shelf,
   type Worn,
 } from "@/lib/marketplace";
 import { formatInr } from "@/lib/billing/plans";
@@ -37,17 +41,22 @@ const noop = () => () => {};
  * Inside the Android app nothing can be bought (Play's rules), but everything
  * can still be previewed.
  */
-export function MarketCategory({
-  page,
+export function MarketBrowse({
+  items: all,
+  columns,
+  browse = false,
   configured,
   isPremium,
   owned: initialOwned,
-  prices,
   me,
   userId,
   worn: initialWorn,
 }: {
-  page: CategoryPage;
+  /** Everything this screen may show, before search and the chips. */
+  items: MarketItem[];
+  columns: 2 | 3;
+  /** The front page: a search box, the shelf chips, and the kinds below. */
+  browse?: boolean;
   configured: boolean;
   isPremium: boolean;
   owned: string[];
@@ -91,10 +100,15 @@ export function MarketCategory({
     router.refresh();
   }
 
-  const items = useMemo(
-    () => filterAndSort(buildItems(prices), page.category, "featured"),
-    [prices, page.category],
-  );
+  const [q, setQ] = useState("");
+  const [shelf, setShelf] = useState<Shelf>("all");
+
+  // Search and the chips narrow the same list; the order within it is the
+  // curated one, so the most visual things still lead.
+  const items = useMemo(() => {
+    const picked = all.filter((i) => onShelf(i, shelf, owned, isPremium));
+    return filterAndSort(searchItems(picked, q), "all", "featured");
+  }, [all, shelf, q, owned, isPremium]);
 
   async function buy(item: MarketItem) {
     if (buying) return;
@@ -117,13 +131,64 @@ export function MarketCategory({
 
   return (
     <div className="pb-24">
-      <ul className={`grid gap-2.5 px-3 pt-3 ${page.columns === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+      {browse && (
+        <div className="px-3 pt-3">
+          <div className="flex h-11 items-center gap-2 rounded-pill bg-surface px-4">
+            <Search size={16} className="shrink-0 text-faint" aria-hidden />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search frames, names, bubbles…"
+              aria-label="Search the marketplace"
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
+            />
+            {q && (
+              <button type="button" onClick={() => setQ("")} aria-label="Clear" className="shrink-0 text-faint">
+                <X size={15} />
+              </button>
+            )}
+          </div>
+          <div role="tablist" aria-label="Which things to show" className="no-scrollbar mt-2.5 flex gap-1.5 overflow-x-auto">
+            {SHELVES.map((s) => {
+              const on = shelf === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  data-shelf={s.id}
+                  onClick={() => setShelf(s.id)}
+                  className={`shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-bold transition-colors ${
+                    on ? "bg-accent text-accent-ink" : "bg-surface text-muted hover:text-foreground"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {browse && items.length === 0 && (
+        <p className="px-6 pt-10 text-center text-sm text-faint">
+          {shelf === "yours"
+            ? "Nothing of yours yet. Claim something and it turns up here."
+            : `Nothing matches “${q.trim()}”.`}
+        </p>
+      )}
+      <ul className={`grid gap-2.5 px-3 pt-3 ${columns === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
         {items.map((item) => {
           const mine = isOwned(item, owned, isPremium);
           const action = itemAction(item, { owned: mine, native, configured, worn: isWorn(item, worn) });
           return (
             <li key={item.id} className="flex min-w-0 flex-col gap-2 rounded-[18px] bg-surface p-2">
-              <span className={`block overflow-hidden rounded-xl ${page.columns === 3 ? "aspect-square" : "aspect-[4/3]"}`}>
+              <span
+                className={`block overflow-hidden rounded-xl ${
+                  tileAspect(item) === "wide" ? "aspect-[4/3]" : "aspect-square"
+                }`}
+              >
                 <MarketItemPreview item={item} me={me} />
               </span>
               <p className="truncate px-0.5 text-center text-xs font-semibold">{item.label}</p>
@@ -185,6 +250,25 @@ export function MarketCategory({
         })}
       </ul>
 
+      {browse && (
+        <section className="mt-8 px-3">
+          <p className="px-1 pb-2 text-[11px] font-bold uppercase tracking-widest text-faint">Browse by kind</p>
+          <div className="grid grid-cols-2 gap-2">
+            {CATEGORY_PAGES.map((cat) => (
+              <Link
+                key={cat.slug}
+                href={`/marketplace/${cat.slug}`}
+                className="rounded-2xl bg-surface px-4 py-3 text-sm font-bold transition-transform active:scale-[0.98]"
+              >
+                {cat.label}
+                <span className="mt-0.5 block text-[11px] font-normal text-muted">
+                  {all.filter((i) => i.category === cat.category).length} to pick from
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
       <p className="mt-8 px-6 text-center text-[11px] text-faint">
         Buying means you agree to the{" "}
         <Link href="/terms#paid" className="underline hover:text-muted">

@@ -1,6 +1,5 @@
 import { DECORATIONS, NAME_FONTS, NAME_GLOWS, type Tier } from "@/lib/cosmetics";
 import { NAMEPLATES } from "@/lib/nameplates";
-import { CHAT_THEMES } from "@/lib/chat-themes";
 import { BUBBLE_STYLES } from "@/lib/bubble-styles";
 
 /**
@@ -9,7 +8,7 @@ import { BUBBLE_STYLES } from "@/lib/bubble-styles";
  * Free chat themes aren't listed: there is nothing to get.
  */
 
-export type Category = "frame" | "bubble" | "theme" | "name" | "nameplate";
+export type Category = "frame" | "bubble" | "name" | "nameplate";
 
 export type MarketItem = {
   id: string;
@@ -36,13 +35,56 @@ export function buildItems(prices: Record<string, number> = {}): MarketItem[] {
   });
   // Curated order for "Featured": the most visual things first.
   return [
-    ...CHAT_THEMES.filter((t) => t.tier !== "free").map((t) => item(t.id, t.label, "theme", t.tier)),
+    // Chat themes are not here. One belongs to a conversation rather than to
+    // a person, so it is chosen in the chat it is for — the shop could sell
+    // you one and then have nowhere to send you. See ChatThemePicker.
     ...DECORATIONS.map((d) => item(d.id, d.label, "frame", d.tier)),
     ...BUBBLE_STYLES.map((b) => item(b.id, b.label, "bubble", b.tier)),
     ...NAME_FONTS.map((f) => item(f.id, f.label, "name", f.tier)),
     ...NAME_GLOWS.map((g) => item(g.id, `${g.label} glow`, "name", g.tier)),
     ...NAMEPLATES.map((n) => item(n.id, n.label, "nameplate", n.tier)),
   ];
+}
+
+/** The shelves the chips across the top stand for. */
+export type Shelf = "all" | "free" | "premium" | "yours";
+
+export const SHELVES: { id: Shelf; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "free", label: "Free" },
+  { id: "premium", label: "Premium" },
+  { id: "yours", label: "Yours" },
+];
+
+export function isShelf(v: unknown): v is Shelf {
+  return typeof v === "string" && SHELVES.some((s) => s.id === v);
+}
+
+/**
+ * Does this belong on that shelf?
+ *
+ * "Yours" is everything you may use, which is not the same as everything you
+ * have paid for: free items are everyone's, and Premium unlocks a shelf full
+ * of them at once.
+ */
+export function onShelf(item: MarketItem, shelf: Shelf, owned: string[], isPremium: boolean): boolean {
+  switch (shelf) {
+    case "free":
+      return item.tier === "free";
+    case "premium":
+      return item.tier === "premium";
+    case "yours":
+      return isOwned(item, owned, isPremium);
+    default:
+      return true;
+  }
+}
+
+/** Items whose name matches what was typed. Empty words match everything. */
+export function searchItems(items: MarketItem[], q: string): MarketItem[] {
+  const term = q.trim().toLowerCase();
+  if (!term) return items;
+  return items.filter((i) => i.label.toLowerCase().includes(term) || i.category.includes(term));
 }
 
 export function filterAndSort(items: MarketItem[], category: Category | "all", sort: SortId): MarketItem[] {
@@ -67,6 +109,17 @@ export function filterAndSort(items: MarketItem[], category: Category | "all", s
     default:
       return list.sort((a, b) => a.rank - b.rank);
   }
+}
+
+/**
+ * The shape of an item's tile.
+ *
+ * A bubble and a nameplate are rows of writing, so a square crops them to
+ * nothing; a frame and a name are the thing itself and sit square. On a page
+ * of one kind every tile agrees, and on the front page they do not have to.
+ */
+export function tileAspect(item: MarketItem): "square" | "wide" {
+  return item.category === "bubble" || item.category === "nameplate" ? "wide" : "square";
 }
 
 /** Is it already yours? */
@@ -107,7 +160,6 @@ export const CATEGORY_PAGES: CategoryPage[] = [
   { slug: "bubbles", category: "bubble", label: "Chat bubbles", showcase: "bubble-sunset", columns: 2 },
   { slug: "names", category: "name", label: "Names", showcase: "font-script", columns: 3 },
   { slug: "nameplates", category: "nameplate", label: "Nameplates", showcase: "plate-aurora", columns: 2 },
-  { slug: "themes", category: "theme", label: "Chat themes", showcase: "theme-arcade", columns: 2 },
 ];
 
 export const categoryPage = (slug: string): CategoryPage | undefined =>

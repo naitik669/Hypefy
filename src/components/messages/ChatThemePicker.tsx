@@ -8,13 +8,16 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { CHAT_THEMES, bubbleCss, type ChatTheme } from "@/lib/chat-themes";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
-import { unlocked as isUnlocked } from "@/lib/marketplace";
+import { blockedReason, unlocked as isUnlocked } from "@/lib/marketplace";
+import { buyItem } from "@/lib/billing/checkout";
+import { isNative } from "@/lib/native";
 import { formatInr } from "@/lib/billing/plans";
 
 /**
  * Pick a theme for this chat. Everyone in it sees the change, and a notice
- * says who made it. Themes you haven't unlocked show their price or
- * "Premium" and lead there instead.
+ * says who made it. A theme you have not unlocked shows its price, or
+ * "Premium", and is taken right here — a theme belongs to a chat, so it is
+ * not in the Marketplace and there is nowhere else to send you for one.
  */
 export function ChatThemePicker({
   open,
@@ -40,11 +43,41 @@ export function ChatThemePicker({
   const unlocked = (t: ChatTheme) =>
     isUnlocked(t.tier, t.id, owned, isPremium);
 
+  /**
+   * Take a locked theme.
+   *
+   * A theme belongs to a chat, so it is not in the Marketplace and there is
+   * nowhere else to send someone for one — it is taken here. Premium is the
+   * exception: that is a subscription, and it is bought where subscriptions
+   * are. Inside the app nothing can be bought at all (Play's rules), and
+   * until payments are open the price is said rather than charged.
+   */
+  async function claim(theme: ChatTheme) {
+    if (theme.tier === "premium") {
+      onClose();
+      router.push("/premium");
+      return;
+    }
+    if (isNative()) {
+      toast(blockedReason("app"), "plain");
+      return;
+    }
+    setBusy(theme.id);
+    const result = await buyItem(theme.id);
+    setBusy(null);
+    if (result.ok) {
+      toast(`${theme.label} is yours`, "success");
+      router.refresh();
+      return;
+    }
+    if (result.reason === "not_configured") toast(blockedReason("soon"), "plain");
+    else toast(result.message ?? "Something went wrong", "error");
+  }
+
   async function pick(id: string | null, theme?: ChatTheme) {
     if (busy || id === current) return;
     if (theme && !unlocked(theme)) {
-      onClose();
-      router.push(theme.tier === "premium" ? "/premium" : "/marketplace/themes");
+      await claim(theme);
       return;
     }
     setBusy(id ?? "none");

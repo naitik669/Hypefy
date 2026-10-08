@@ -28,7 +28,6 @@ const WHERE: Record<Category, string> = {
   name: "On your name, wherever it is written.",
   bubble: "On every message you send.",
   nameplate: "Behind your row in people's messages.",
-  theme: "A look for one chat, set from inside it.",
 };
 
 /**
