@@ -144,6 +144,15 @@ describe("the thought over the face", () => {
     expect(small).toBeGreaterThan(big);
   });
 
+  it("they are a chain out of the face, not two dots in the air", () => {
+    // The large one tucks under the bubble's bottom corner (which sits
+    // OVERLAP = 9 below the top of the picture) and the small one overlaps
+    // it and rests on the picture's rim. Spaced apart, they stop reading as
+    // a thought coming out of anyone.
+    expect(src).toContain('top-[7px] h-[8px] w-[8px]');
+    expect(src).toContain('top-[14px] h-[5px] w-[5px]');
+  });
+
   it("they are the bubble's own colour, so the three read as one thing", () => {
     expect(src).toContain('const fill = faint ? "bg-surface" : "bg-elevated";');
   });

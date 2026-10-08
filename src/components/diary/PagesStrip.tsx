@@ -172,20 +172,27 @@ function Bubble({
 }
 
 /**
- * The two dots falling from the thought towards the one thinking it.
+ * The two dots rising from the face to the thought above it.
  *
- * Smaller the nearer the face, as a thought bubble's are, and in the
- * bubble's own colour so the three read as one thing. They stop short of
- * the picture: a dot ON a face needs an outline to survive the colours
- * underneath, and an outlined dark dot on a bright avatar stops looking
- * like a thought and starts looking like a hole.
+ * They are a chain, not decoration: the small one rests on the picture's
+ * rim, the large one tucks under the bubble's bottom corner, and each
+ * overlaps the next. Spaced apart instead, they read as two dots hanging
+ * in the air beside someone rather than a thought coming out of them,
+ * which is the whole job of a thought bubble's tail.
+ *
+ * Both sit in the margin left of the picture, in the bubble's own colour.
+ * On the face itself a dark dot needs an outline to survive the colours
+ * underneath, and an outlined dark dot on a bright avatar reads as a hole.
  */
 function Dots({ faint = false }: { faint?: boolean }) {
   const fill = faint ? "bg-surface" : "bg-elevated";
   return (
     <span aria-hidden>
-      <span className={`absolute -left-[7px] -top-[7px] h-[8px] w-[8px] rounded-full ${fill}`} />
-      <span className={`absolute -left-[11px] top-[3px] h-[5px] w-[5px] rounded-full ${fill}`} />
+      {/* Tucked under the bubble's bottom-left corner, which sits OVERLAP
+          below the top of the picture. */}
+      <span className={`absolute -left-[9px] top-[7px] h-[8px] w-[8px] rounded-full ${fill}`} />
+      {/* Overlapping the one above it and resting on the picture's rim. */}
+      <span className={`absolute -left-[3px] top-[14px] h-[5px] w-[5px] rounded-full ${fill}`} />
     </span>
   );
 }
