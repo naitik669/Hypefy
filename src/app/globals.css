@@ -1105,6 +1105,19 @@ html[data-dm-leave]::view-transition-old(root) {
   .animate-held-lift, .animate-held-tile { animation: none; }
 }
 
+/* Today's pages opening under the filter row. It grows into the space it
+   needs rather than sliding over the threads, so nothing above it moves. */
+@keyframes strip-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-strip-in {
+  animation: strip-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-strip-in { animation: none; }
+}
+
 /* The message a search found, once it has been scrolled to: a short wash
    of accent so the eye lands on it, then nothing. */
 @keyframes found {

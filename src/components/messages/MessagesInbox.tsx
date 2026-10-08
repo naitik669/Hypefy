@@ -28,6 +28,8 @@ import { createClient } from "@/lib/supabase/client";
 import { isEncrypted, openEnvelope, useEnvelopeReader } from "@/lib/e2ee/chat";
 import { STATUS_ENABLED } from "@/lib/status-feature";
 import { FloatingPages } from "@/components/diary/FloatingPages";
+import { PagesStrip, PagesTrigger, freshCount } from "@/components/diary/PagesStrip";
+import { loadSeen } from "@/lib/diary";
 import type { DiaryEntry } from "@/lib/diary";
 import { isEmojiReply } from "@/components/diary/PageReplyEmbed";
 import { Avatar } from "@/components/ui/Avatar";
@@ -261,6 +263,18 @@ export function MessagesInbox({
   }, [encryptedRows, peerIds, reader, currentUserId]);
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
+  /** Today's pages, laid out flat under the filter row. Closed to begin with. */
+  const [pagesOpen, setPagesOpen] = useState(false);
+  /**
+   * How many pages this device has not read, for the number on the arrow.
+   * Read after mount, like everywhere else that asks: it is browser-only
+   * storage, and the server has no idea what you have opened.
+   */
+  const [pagesFresh, setPagesFresh] = useState(0);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-time read of browser-only storage; see above
+    setPagesFresh(freshCount(pages, loadSeen()));
+  }, [pages]);
   /** What you typed in each chat and did not send, shown as its preview. */
   const drafts = useChatDrafts(currentUserId);
   /** Locking a first chat: the PIN is chosen, then the chat is locked. */
@@ -889,8 +903,11 @@ export function MessagesInbox({
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-1 pt-3">
+      {/* Filter tabs, with the Pages arrow riding the end of the row.
+          Not overflow-x-auto any more: the arrow is pushed to the right by
+          ml-auto, which needs a row that is exactly as wide as the screen.
+          Three pills and an arrow fit, so nothing was being scrolled to. */}
+      <div className="flex gap-2 px-4 pb-1 pt-3">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -916,6 +933,17 @@ export function MessagesInbox({
             )}
           </button>
         ))}
+
+        {/* Nothing to open is nothing to offer: with no pages at all the
+            arrow is not drawn, rather than opening an empty row. Your own
+            page counts, since the strip is also where you write one. */}
+        {pages.length > 0 && (
+          <PagesTrigger
+            open={pagesOpen}
+            count={pagesFresh}
+            onToggle={() => setPagesOpen((v) => !v)}
+          />
+        )}
       </div>
 
       {/* Locked chats: there when Messages opens, gone at the first scroll
@@ -924,6 +952,8 @@ export function MessagesInbox({
       {level === "normal" && vault.locked > 0 && tab === "all" && !q.trim() && (
         <LockedChatsRow count={vault.locked} unread={vault.unread} />
       )}
+
+      {pagesOpen && pages.length > 0 && <PagesStrip pages={pages} />}
 
       {/* Spotlight: a small deck of today's pages floating at the bottom
           right, shuffling itself; tap to open Spotlight on the one showing. */}
