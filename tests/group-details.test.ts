@@ -61,13 +61,36 @@ describe("the group on the chat details screen", () => {
     expect(members).toContain('i >= members.length - 2 ? "bottom-11" : "top-11"');
   });
 
-  it("the actions under the name are icons, each still named", () => {
+  it("the actions under the name wear their names, full width", () => {
     const qa = info.slice(info.indexOf("data-quick-actions"), info.indexOf("data-group-members"));
-    for (const label of ['label="View profile"', 'label="Chat theme"', 'label="Add people"']) expect(qa).toContain(label);
-    expect(qa).toContain('label={isMuted ? "Unmute notifications" : "Mute notifications"}');
-    const fn = info.slice(info.indexOf("function QuickAction("), info.indexOf("function PrivacyRow("));
-    expect(fn).toContain("aria-label={label}");
-    expect(fn).not.toContain("{label}\n");
+    for (const label of ['label="Chat theme"', 'label="Add people"']) expect(qa).toContain(label);
+    expect(qa.split("wide").length - 1).toBe(2);
+    const fn = info.slice(info.indexOf("function QuickAction("), info.indexOf("function MaybeProfileLink("));
+    expect(fn).toContain('wide ? "w-full gap-2.5 px-4 text-[15px] font-semibold" : "flex-1 justify-center"');
+    // Same height whether it is a square or a banner.
+    expect(fn).toContain("flex h-12 items-center rounded-2xl");
+  });
+
+  it("the face and the name are the way to a profile, so no button says so", () => {
+    const qa = info.slice(info.indexOf("data-quick-actions"), info.indexOf("data-group-members"));
+    expect(qa).not.toContain("View profile");
+    expect(info).toContain("function MaybeProfileLink(");
+    // Wrapped around the picture and the name, and only in a DM — a group
+    // has no one profile to go to.
+    expect(info.split("<MaybeProfileLink username={!isGroup ? peer?.username : null}").length).toBe(3);
+    expect(info).toContain("if (!username) return <>{children}</>;");
+  });
+
+  it("muting sits with the other things done to a chat, behind the dots", () => {
+    // Not a lit square among the actions: it belongs with block, report and
+    // delete, which are also done TO a chat rather than in it.
+    const qa = info.slice(info.indexOf("data-quick-actions"), info.indexOf("data-group-members"));
+    expect(qa).not.toContain("Mute");
+    expect(info).toContain('label={isMuted ? "Unmute notifications" : "Mute notifications"}');
+    const menu = info.slice(info.indexOf("<FloatingMenu"), info.indexOf("</FloatingMenu>"));
+    expect(menu).toContain("icon={isMuted ? BellOff : Bell}");
+    // First, and the only one there that destroys nothing.
+    expect(menu.indexOf("isMuted ? BellOff : Bell")).toBeLessThan(menu.indexOf("icon={Ban}"));
   });
 
   it("Add, from the icon or the strip, opens the list with the search ready", () => {

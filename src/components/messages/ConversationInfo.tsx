@@ -26,7 +26,6 @@ import {
   Trash2,
   UserMinus,
   UserPlus,
-  UserCircle,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -84,26 +83,61 @@ function QuickAction({
   onClick,
   href,
   on = false,
+  wide = false,
 }: {
   icon: React.ReactNode;
-  /** Not shown. What the icon does, read out and shown on a long hover. */
+  /** What it does. Drawn when `wide`; otherwise read out and shown on hover. */
   label: string;
   onClick?: () => void;
   href?: string;
   /** Lit: the thing it names is switched on (muted). */
   on?: boolean;
+  /** Full width, with its name beside the icon rather than only in the label. */
+  wide?: boolean;
 }) {
-  const cls = `flex h-12 flex-1 items-center justify-center rounded-2xl transition-colors active:scale-[0.97] ${
-    on ? "bg-accent/15 text-accent" : "bg-surface text-foreground hover:bg-elevated"
-  }`;
+  const cls = `flex h-12 items-center rounded-2xl transition-colors active:scale-[0.97] ${
+    wide ? "w-full gap-2.5 px-4 text-[15px] font-semibold" : "flex-1 justify-center"
+  } ${on ? "bg-accent/15 text-accent" : "bg-surface text-foreground hover:bg-elevated"}`;
+  const body = wide ? (
+    <>
+      {icon}
+      {label}
+    </>
+  ) : (
+    icon
+  );
   return href ? (
     <Link href={href} aria-label={label} title={label} className={cls}>
-      {icon}
+      {body}
     </Link>
   ) : (
     <button type="button" onClick={onClick} aria-label={label} title={label} aria-pressed={on} className={cls}>
-      {icon}
+      {body}
     </button>
+  );
+}
+
+/** The face and the name, as a way to their profile — or plain, in a group. */
+function MaybeProfileLink({
+  username,
+  label,
+  className = "",
+  children,
+}: {
+  username: string | null | undefined;
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  if (!username) return <>{children}</>;
+  return (
+    <Link
+      href={`/u/${username}`}
+      aria-label={label}
+      className={`transition-opacity active:opacity-70 ${className}`}
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -466,7 +500,12 @@ export function ConversationInfo({
             />
           </label>
         ) : (
-          <Avatar name={title} hue={peer?.hue ?? 280} src={(isGroup ? photo : avatarUrl) ?? undefined} size={88} />
+          // A DM's face and name are the way to their profile. There used
+          // to be a View profile button under them saying so, which is a
+          // button for something the picture of a person already promises.
+          <MaybeProfileLink username={!isGroup ? peer?.username : null} label={`${title}'s profile`}>
+            <Avatar name={title} hue={peer?.hue ?? 280} src={(isGroup ? photo : avatarUrl) ?? undefined} size={88} />
+          </MaybeProfileLink>
         )}
         {editingName ? (
           <form
@@ -507,7 +546,9 @@ export function ConversationInfo({
           </form>
         ) : (
         <div className={`relative mt-1 flex max-w-full items-center gap-1 ${isGroup && isAdmin ? "pl-[4.5rem]" : "pl-9"}`}>
-          <h2 className="min-w-0 truncate text-lg font-extrabold">{title}</h2>
+          <MaybeProfileLink username={!isGroup ? peer?.username : null} label={`${title}'s profile`} className="min-w-0">
+            <h2 className="min-w-0 truncate text-lg font-extrabold">{title}</h2>
+          </MaybeProfileLink>
           {isGroup && isAdmin && (
             <button
               type="button"
@@ -529,6 +570,14 @@ export function ConversationInfo({
             <MoreHorizontal size={20} />
           </button>
           <FloatingMenu open={menuOpen} onClose={() => setMenuOpen(false)} className="absolute right-0 top-9 min-w-[210px] text-left">
+            <MenuItem
+              icon={isMuted ? BellOff : Bell}
+              label={isMuted ? "Unmute notifications" : "Mute notifications"}
+              onClick={() => {
+                setMenuOpen(false);
+                void toggleMute();
+              }}
+            />
             {!isGroup && (
               <MenuItem
                 icon={Ban}
@@ -571,7 +620,9 @@ export function ConversationInfo({
         </div>
         )}
         {!isGroup && peer?.username && (
-          <p className="text-sm text-muted">@{peer.username}</p>
+          <Link href={`/u/${peer.username}`} className="text-sm text-muted transition-colors hover:text-foreground">
+            @{peer.username}
+          </Link>
         )}
         {isGroup && (
           <p className="text-sm text-muted">
@@ -580,19 +631,17 @@ export function ConversationInfo({
         )}
       </div>
 
-      {/* What you reach for most, one tap each. Icons only. */}
-      <div className="mt-4 flex gap-2 px-4" data-quick-actions>
-        {!isGroup && peer?.username && (
-          <QuickAction icon={<UserCircle size={22} />} label="View profile" href={`/u/${peer.username}`} />
+      {/* One thing you do to a chat from here, and it says so.
+          Three icon-only squares sat here before: a profile, a bell and a
+          palette. The profile is the face above, the bell belongs with the
+          other things done TO a chat behind the dots, and a lone unlabelled
+          palette is a guess. The same height, the full width, with a word
+          on it. */}
+      <div className="mt-4 flex flex-col gap-2 px-4" data-quick-actions>
+        <QuickAction icon={<Palette size={20} />} label="Chat theme" onClick={() => setThemeOpen(true)} wide />
+        {isGroup && isAdmin && (
+          <QuickAction icon={<UserPlus size={20} />} label="Add people" onClick={startAdding} wide />
         )}
-        <QuickAction
-          icon={isMuted ? <BellOff size={22} /> : <Bell size={22} />}
-          label={isMuted ? "Unmute notifications" : "Mute notifications"}
-          on={isMuted}
-          onClick={toggleMute}
-        />
-        <QuickAction icon={<Palette size={22} />} label="Chat theme" onClick={() => setThemeOpen(true)} />
-        {isGroup && isAdmin && <QuickAction icon={<UserPlus size={22} />} label="Add people" onClick={startAdding} />}
       </div>
 
       {/* Who is in the group. A strip of faces until "See all", when the
