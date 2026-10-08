@@ -213,6 +213,7 @@ export function MessagesInbox({
   currentUserId,
   children,
   pages = [],
+  me,
   renderedAt,
   level = "normal",
   vault = NO_VAULT,
@@ -224,6 +225,8 @@ export function MessagesInbox({
   children?: React.ReactNode;
   /** Today's pages you can see, yours included — for the card floating over the inbox. */
   pages?: DiaryEntry[];
+  /** You, for the pages strip's slot when you have not written one. */
+  me?: { name: string; hue: number; avatarUrl: string | null };
   /** Which list this is: the inbox, the locked chats, or the Vault's hidden ones. */
   level?: ChatLevel;
   /** How many chats are behind the PIN, and whether any is unread. Never who. */
@@ -953,7 +956,7 @@ export function MessagesInbox({
         <LockedChatsRow count={vault.locked} unread={vault.unread} />
       )}
 
-      {pagesOpen && pages.length > 0 && <PagesStrip pages={pages} />}
+      {pagesOpen && pages.length > 0 && <PagesStrip pages={pages} me={me} />}
 
       {/* Spotlight: a small deck of today's pages floating at the bottom
           right, shuffling itself; tap to open Spotlight on the one showing. */}

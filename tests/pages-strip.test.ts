@@ -106,11 +106,26 @@ describe("the strip", () => {
     expect(links()[1].getAttribute("aria-label")).toBe("Aman's page: gym at 7");
   });
 
-  it("unread keeps a ring; read does not", async () => {
-    localStorage.setItem("hypefy:diary:seen", JSON.stringify({ a: "2026-10-08T10:00:00Z" }));
+  it("no face wears a ring", async () => {
     await mount([page("a"), page("b")]);
-    const rings = host.querySelectorAll(".ring-accent");
-    expect(rings).toHaveLength(1);
+    expect(host.querySelectorAll(".ring-accent")).toHaveLength(0);
+    // What is new is still said, by the number on the arrow and by the
+    // order — unseen pages sort to the front.
+    expect(src).toContain("storyOrder(pages, fresh)");
+  });
+
+  it("with no page of your own the slot is your own face, not an empty tile", async () => {
+    const { PagesStrip } = await import("@/components/diary/PagesStrip");
+    await act(async () =>
+      root.render(
+        createElement(PagesStrip, {
+          pages: [page("a")],
+          me: { name: "Crazie", hue: 90, avatarUrl: null },
+        }),
+      ),
+    );
+    // The initial of your name, where the dashed square used to be.
+    expect(links()[0].textContent).toContain("C");
   });
 });
 
@@ -133,19 +148,22 @@ describe("the thought over the face", () => {
     expect(src).toContain('const fill = faint ? "bg-surface" : "bg-elevated";');
   });
 
-  it("nothing lands on the picture", () => {
-    // An outlined dark dot on a bright avatar stops reading as a thought
-    // and starts reading as a hole punched in the face.
-    expect(src).toContain("const DROP = 17;");
-    expect(src).not.toContain("ring-2 ring-background");
-    expect(src).not.toContain("marginBottom: -");
+  it("sits over the picture, with its words kept out of that band", () => {
+    expect(src).toContain("const OVERLAP = 9;");
+    expect(src).toContain("marginBottom: -OVERLAP, paddingBottom: OVERLAP + 3");
   });
 
-  it("every face keeps the unread ring's room, used or not", () => {
-    // Spent on nothing when read; without it an unread cell stood taller
-    // and its name sat out of line with the rest of the row.
-    expect(src.split("p-[2px] ring-[1.5px]")).toHaveLength(3);
-    expect(src).toContain('fresh ? "ring-accent" : "ring-transparent"');
+  it("the dots get a margin of their own to fall down", () => {
+    // At the cell's full width they were squeezed between the bubble and
+    // the face and came out as two specks.
+    expect(src).toContain("const CELL = 74;");
+    expect(src).toContain("const BUBBLE = 64;");
+    expect(src).toContain("ml-auto");
+  });
+
+  it("no face wears a ring, so none needs room kept for one", () => {
+    expect(src).not.toContain("ring-accent");
+    expect(src).not.toContain("p-[2px] ring-[1.5px]");
   });
 
   it("is always two lines tall, so every name in the row sits level", () => {
@@ -160,7 +178,7 @@ describe("the thought over the face", () => {
 
   it("the bubble is wider than the face it sits on", () => {
     expect(src).toContain("const FACE = 52;");
-    expect(src).toContain("const CELL = 66;");
+    expect(src).toContain("const BUBBLE = 64;");
   });
 });
 
@@ -178,7 +196,7 @@ describe("the arrow on the filter row", () => {
 
   it("the strip opens under the row, and starts closed", () => {
     expect(inbox).toContain("const [pagesOpen, setPagesOpen] = useState(false);");
-    expect(inbox).toContain("{pagesOpen && pages.length > 0 && <PagesStrip pages={pages} />}");
+    expect(inbox).toContain("{pagesOpen && pages.length > 0 && <PagesStrip pages={pages} me={me} />}");
   });
 
   it("reads what you have opened the same way the deck does", () => {

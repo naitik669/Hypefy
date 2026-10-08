@@ -29,6 +29,21 @@ export default async function MessagesPage() {
   ]);
   const pages = toDiaryEntries(notes as never);
 
+  // Named once, typed once. Both the header and the pages strip want the
+  // same four fields, and each reading them straight off the row meant a
+  // cast per field at each call site.
+  const profile = me as {
+    display_name: string | null;
+    username: string | null;
+    avatar_hue: number | null;
+    avatar_url: string | null;
+  } | null;
+  const mine = {
+    name: profile?.display_name ?? profile?.username ?? "You",
+    hue: profile?.avatar_hue ?? 280,
+    avatarUrl: profile?.avatar_url ?? null,
+  };
+
   // Locked and hidden chats are left out here, on the server: they are not in
   // this page's payload at all, only counted (see load-rows.ts and 0115).
   const [rows, { data: overviewRows }] = await Promise.all([
@@ -44,10 +59,10 @@ export default async function MessagesPage() {
       <div>
       <MessagesHeader
         currentUserId={user.id}
-        name={(me as any)?.display_name ?? (me as any)?.username ?? "You"}
-        username={(me as any)?.username ?? null}
-        avatarUrl={(me as any)?.avatar_url ?? null}
-        hue={(me as any)?.avatar_hue ?? 280}
+        name={mine.name}
+        username={profile?.username ?? null}
+        avatarUrl={mine.avatarUrl}
+        hue={mine.hue}
       />
       {/* Pulled down and held, Messages opens the Vault. Only for someone
           who has hidden a chat: for everyone else a pull is just a pull. */}
@@ -56,7 +71,14 @@ export default async function MessagesPage() {
             corner, and nothing to say what it is. A note points at it for
             people who have not posted there lately, a few times at most. */}
         <SpotlightPointer ownPageAt={pages.find((p) => p.isSelf)?.createdAt ?? null} />
-        <MessagesInbox rows={rows} currentUserId={user.id} pages={pages} renderedAt={renderStamp()} vault={vault} />
+        <MessagesInbox
+          rows={rows}
+          currentUserId={user.id}
+          pages={pages}
+          me={mine}
+          renderedAt={renderStamp()}
+          vault={vault}
+        />
       </PullToRefresh>
       </div>
     </ViewTransition>
