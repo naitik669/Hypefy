@@ -1401,6 +1401,27 @@ export type Database = {
           },
         ]
       }
+      shot_views: {
+        Row: {
+          created_at: string
+          shot_id: string
+          viewed_on: string
+          viewer_id: string
+        }
+        Insert: {
+          created_at?: string
+          shot_id: string
+          viewed_on?: string
+          viewer_id: string
+        }
+        Update: {
+          created_at?: string
+          shot_id?: string
+          viewed_on?: string
+          viewer_id?: string
+        }
+        Relationships: []
+      }
       post_views: {
         Row: {
           created_at: string
@@ -3190,6 +3211,8 @@ export type Database = {
         }[]
       }
       my_private_profile: { Args: never; Returns: Json }
+      forget_views: { Args: { p_kind?: string }; Returns: number }
+      forget_one_view: { Args: { p_kind: string; p_id: string }; Returns: undefined }
       set_archived: { Args: { p_kind: string; p_id: string; p_archived: boolean }; Returns: undefined }
       set_comments_off: { Args: { p_kind: string; p_id: string; p_off: boolean }; Returns: undefined }
       edit_comment: { Args: { p_id: string; p_body: string }; Returns: undefined }

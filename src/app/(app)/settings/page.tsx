@@ -97,9 +97,9 @@ const LISTS = [
   },
   { href: "/hypers", label: "Hypers", sub: "Your closest people", icon: Star },
   {
-    href: "/settings/activity",
-    label: "Your activity",
-    sub: "What you hyped and said",
+    href: "/activity",
+    label: "Your interactions",
+    sub: "What you hyped, said, watched and rehyped",
     icon: History,
   },
   {

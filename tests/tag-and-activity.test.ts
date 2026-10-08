@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { cleanTag, findTag, splitTop, tagHref, type TagPost } from "@/lib/tag-lookup";
-import { inOrder, loadYourActivity, toActivityComment } from "@/lib/your-activity";
 
 /**
- * A page per hashtag, and a page of what you have hyped and said.
+ * A page per hashtag.
  */
 
 /** A stand-in database: answers per table, and records what it was asked. */
@@ -119,66 +118,3 @@ describe("finding what is under a tag", () => {
   });
 });
 
-describe("your activity", () => {
-  it("keeps the order things were hyped in, and drops what has since gone", () => {
-    const rows = [{ id: "b" }, { id: "a" }];
-    expect(inOrder(["a", "gone", "b"], rows)).toEqual([{ id: "a" }, { id: "b" }]);
-  });
-
-  it("says where a comment is", () => {
-    expect(toActivityComment({ id: "c1", body: " nice ", post_id: "p1", shot_id: null, created_at: "t" })).toEqual({
-      id: "c1",
-      body: "nice",
-      href: "/p/p1",
-      on: "post",
-      at: "t",
-    });
-    expect(toActivityComment({ id: "c2", body: "wow", post_id: null, shot_id: "s1", created_at: "t" })!.href).toBe("/shots/s1");
-  });
-
-  it("leaves out a comment with no words or no home", () => {
-    expect(toActivityComment({ id: "c", body: "  ", post_id: "p", shot_id: null, created_at: "t" })).toBeNull();
-    expect(toActivityComment({ id: "c", body: "x", post_id: null, shot_id: null, created_at: "t" })).toBeNull();
-  });
-
-  it("reads only this person's hypes and live comments", async () => {
-    const db = fakeDb({
-      hypes: {
-        data: [
-          { target_type: "shot", target_id: "s1" },
-          { target_type: "post", target_id: "p2" },
-          { target_type: "post", target_id: "p1" },
-        ],
-      },
-      posts: { data: [{ id: "p1" }, { id: "p2" }] },
-      shots: { data: [{ id: "s1" }] },
-      comments: { data: [{ id: "c1", body: "hi", post_id: "p1", shot_id: null, created_at: "t" }] },
-    });
-    const out = await loadYourActivity(db as never, "me");
-    const hypes = db.asked.find((a) => a.table === "hypes")!;
-    expect(hypes.calls).toContainEqual(["eq", "user_id", "me"]);
-    expect(hypes.calls).toContainEqual(["in", "target_type", ["post", "shot"]]);
-    const comments = db.asked.find((a) => a.table === "comments")!;
-    expect(comments.calls).toContainEqual(["eq", "user_id", "me"]);
-    expect(comments.calls).toContainEqual(["is", "deleted_at", null]);
-    expect(comments.calls).toContainEqual(["is", "removed_at", null]);
-    // Most recently hyped first.
-    expect(out.hypedPosts.map((p) => p.id)).toEqual(["p2", "p1"]);
-    expect(out.hypedShots.map((s) => s.id)).toEqual(["s1"]);
-    expect(out.comments).toHaveLength(1);
-  });
-
-  it("asks for no posts or Shots when nothing was hyped", async () => {
-    const db = fakeDb({});
-    const out = await loadYourActivity(db as never, "me");
-    expect(db.asked.map((a) => a.table).sort()).toEqual(["comments", "hypes"]);
-    expect(out).toEqual({ hypedPosts: [], hypedShots: [], comments: [] });
-  });
-
-  it("is in Settings, and only for someone signed in", () => {
-    expect(readFileSync("src/app/(app)/settings/page.tsx", "utf8")).toContain('href: "/settings/activity"');
-    const page = readFileSync("src/app/(app)/settings/activity/page.tsx", "utf8");
-    expect(page).toContain('if (!user) redirect("/signin");');
-    expect(page).toContain("loadYourActivity(supabase, user.id)");
-  });
-});

@@ -7,6 +7,7 @@ import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizon
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { setArchived, setCommentsOff } from "@/lib/post-controls";
+import { WATCH_MS, recordWatch } from "@/lib/watched";
 import { RehypeIcon } from "@/components/ui/RehypeIcon";
 import { isRehyped, setRehype, type DeckPerson } from "@/lib/rehype";
 import { useRehypeDeck } from "@/lib/use-rehype-deck";
@@ -585,6 +586,14 @@ function ReelCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [track, reel.id],
   );
+  // Watched: the one on screen, playing, for a beat. See lib/watched for
+  // why mounting is not watching and why it is counted once a day.
+  useEffect(() => {
+    if (!isActive || !playing || !currentUserId) return;
+    const t = setTimeout(() => void recordWatch(supabase, reel.id, currentUserId), WATCH_MS);
+    return () => clearTimeout(t);
+  }, [isActive, playing, reel.id, currentUserId, supabase]);
+
   useEffect(() => {
     if (!track || !isActive || !playing || muted) return;
     return claimPreview(track, { loop: true, audible: true });
