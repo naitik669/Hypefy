@@ -114,25 +114,38 @@ describe("the strip", () => {
   });
 });
 
-describe("the bubble over the face", () => {
-  it("drops onto the picture rather than floating above it", () => {
-    expect(src).toContain("const OVERLAP = 10;");
-    expect(src).toContain("marginBottom: -OVERLAP");
+describe("the thought over the face", () => {
+  it("is a thought, not speech: dots rather than a point", () => {
+    expect(src).toContain("function Dots(");
+    expect(src).toContain("rounded-full");
+    // No tail of any kind left over from the speech-bubble version.
+    expect(src).not.toContain("rotate-45");
   });
 
-  it("keeps its words clear of the overlap", () => {
-    // A second line running into the picture was cut off by its top edge.
-    expect(src).toContain("paddingBottom: OVERLAP + 3");
+  it("the dots shrink as they near the face", () => {
+    const big = src.indexOf("h-[8px] w-[8px]");
+    const small = src.indexOf("h-[5px] w-[5px]");
+    expect(big).toBeGreaterThan(-1);
+    expect(small).toBeGreaterThan(big);
   });
 
-  it("interrupts the unread ring cleanly where the tail crosses it", () => {
-    // Without a knockout in the page's own colour the ring looks sliced.
-    expect(src.match(/ring-2 ring-background/g) ?? []).toHaveLength(2);
+  it("they are the bubble's own colour, so the three read as one thing", () => {
+    expect(src).toContain('const fill = faint ? "bg-surface" : "bg-elevated";');
   });
 
-  it("has no seam where the point meets the body", () => {
-    expect(src).toContain("rotate-45 rounded-[2px]");
-    expect(src).not.toContain("border-border bg-elevated");
+  it("nothing lands on the picture", () => {
+    // An outlined dark dot on a bright avatar stops reading as a thought
+    // and starts reading as a hole punched in the face.
+    expect(src).toContain("const DROP = 17;");
+    expect(src).not.toContain("ring-2 ring-background");
+    expect(src).not.toContain("marginBottom: -");
+  });
+
+  it("every face keeps the unread ring's room, used or not", () => {
+    // Spent on nothing when read; without it an unread cell stood taller
+    // and its name sat out of line with the rest of the row.
+    expect(src.split("p-[2px] ring-[1.5px]")).toHaveLength(3);
+    expect(src).toContain('fresh ? "ring-accent" : "ring-transparent"');
   });
 
   it("is always two lines tall, so every name in the row sits level", () => {

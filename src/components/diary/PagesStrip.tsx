@@ -17,13 +17,14 @@ const FACE = 52;
  */
 const CELL = 66;
 /**
- * How far the bubble sits over the face.
+ * The gap the thought-dots cross, from the bubble down to the face.
  *
- * It used to float clear above it, which read as a label printed over
- * someone rather than something they said. Dropping it until its lower edge
- * and tail cross the top of the picture is what makes it theirs.
+ * Everything stays clear of the picture. Sinking the bubble onto the face
+ * meant the words had to dodge its top edge and the tail sliced through the
+ * unread ring; landing a dot on the face instead just punched a dark hole
+ * in it. The trail reads on the dark ground, so it stays there.
  */
-const OVERLAP = 10;
+const DROP = 17;
 
 /**
  * Today's pages as a row of faces, each with what they wrote over it.
@@ -63,11 +64,20 @@ export function PagesStrip({ pages }: { pages: DiaryEntry[] }) {
           style={{ width: CELL }}
         >
           <Bubble faint>add a page…</Bubble>
+          {/* The same padded, ringed wrapper every face has, spending its
+              ring on nothing — without it this tile stood 4px shorter and
+              "You" sat above every other name in the row. */}
           <span
-            className="relative flex items-center justify-center rounded-[30%] border border-dashed border-border bg-surface text-faint"
-            style={{ width: FACE, height: FACE }}
+            className="relative rounded-[34%] p-[2px] ring-[1.5px] ring-transparent"
+            style={{ marginTop: DROP }}
           >
-            <Plus size={18} strokeWidth={2.4} />
+            <span
+              className="flex items-center justify-center rounded-[30%] border border-dashed border-border bg-surface text-faint"
+              style={{ width: FACE, height: FACE }}
+            >
+              <Plus size={18} strokeWidth={2.4} />
+            </span>
+            <Dots faint />
           </span>
           <span className="mt-1 w-full truncate text-center text-[10px] font-semibold text-muted">You</span>
         </Link>
@@ -92,10 +102,16 @@ function Cell({ page, fresh = false, label }: { page: DiaryEntry; fresh?: boolea
       <Bubble track={!!page.track}>{pageText(page.text)}</Bubble>
       <span
         // Unread keeps a ring, with a gap between it and the picture so it
-        // reads as a ring rather than a border the avatar grew.
-        className={`relative rounded-[34%] ${fresh ? "p-[2px] ring-[1.5px] ring-accent" : ""}`}
+        // reads as a ring rather than a border the avatar grew. Read pages
+        // keep the ring's room and spend it on nothing: without that, an
+        // unread cell stood 4px taller and its name sat out of line.
+        className={`relative rounded-[34%] p-[2px] ring-[1.5px] ${
+          fresh ? "ring-accent" : "ring-transparent"
+        }`}
+        style={{ marginTop: DROP }}
       >
         <Avatar name={page.name} hue={page.hue} src={page.avatarUrl ?? undefined} size={FACE} />
+        <Dots />
       </span>
       <span className="mt-1 w-full truncate text-center text-[10px] font-semibold text-muted">{name}</span>
     </Link>
@@ -103,12 +119,12 @@ function Cell({ page, fresh = false, label }: { page: DiaryEntry; fresh?: boolea
 }
 
 /**
- * What they wrote, in a bubble over their face.
+ * What they wrote, as a thought over their face.
  *
- * No border and no shadow: the tail is a child painted in the bubble's own
- * colour, so the two read as one shape with no seam where the point meets
- * the body. Two lines at most — a page is a glance, and the whole of it is
- * one tap away on Spotlight.
+ * A thought, not speech: no point, no border, no shadow — just the words on
+ * a solid slab, with two shrinking dots below carrying it down to whoever
+ * thought it. Two lines at most, since a page is a glance and the whole of
+ * it is one tap away on Spotlight.
  */
 function Bubble({
   children,
@@ -121,18 +137,9 @@ function Bubble({
 }) {
   return (
     <span
-      // Over the picture, not above it: z-10 puts it in front of the face,
-      // which comes after it in the DOM.
-      // ring-background is a knockout, not decoration: the tail crosses the
-      // unread ring below, and without a gap in the ring's own colour the
-      // ring looks sliced rather than interrupted.
-      className={`relative z-10 w-full rounded-[11px] py-1 pl-1.5 text-center text-[9.5px] font-semibold leading-[1.25] ring-2 ring-background ${
+      className={`relative w-full rounded-[13px] py-1.5 pl-1.5 text-center text-[9.5px] font-semibold leading-[1.25] ${
         track ? "pr-3.5" : "pr-1.5"
       } ${faint ? "bg-surface text-faint" : "bg-elevated text-foreground/90"}`}
-      // The overlap is padding, never text: the bottom of the bubble sits
-      // over the face, and a second line running into it was being cut off
-      // by the picture's top edge.
-      style={{ marginBottom: -OVERLAP, paddingBottom: OVERLAP + 3 }}
     >
       {/* Always two lines tall, even for a page of two words. A bubble that
           shrank to its content made its whole cell shorter, and that one
@@ -146,12 +153,25 @@ function Bubble({
       {/* In the corner, with room kept for it by the padding above. Inline
           after the words, a long page clamped the mark away with them. */}
       {track && <Music size={8} className="absolute right-1 top-1.5 text-accent" aria-hidden />}
-      <span
-        aria-hidden
-        className={`absolute -bottom-[3px] left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 rounded-[2px] ring-2 ring-background ${
-          faint ? "bg-surface" : "bg-elevated"
-        }`}
-      />
+    </span>
+  );
+}
+
+/**
+ * The two dots falling from the thought towards the one thinking it.
+ *
+ * Smaller the nearer the face, as a thought bubble's are, and in the
+ * bubble's own colour so the three read as one thing. They stop short of
+ * the picture: a dot ON a face needs an outline to survive the colours
+ * underneath, and an outlined dark dot on a bright avatar stops looking
+ * like a thought and starts looking like a hole.
+ */
+function Dots({ faint = false }: { faint?: boolean }) {
+  const fill = faint ? "bg-surface" : "bg-elevated";
+  return (
+    <span aria-hidden>
+      <span className={`absolute -top-[15px] left-[20px] h-[8px] w-[8px] rounded-full ${fill}`} />
+      <span className={`absolute -top-[6px] left-[15px] h-[5px] w-[5px] rounded-full ${fill}`} />
     </span>
   );
 }
