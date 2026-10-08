@@ -80,7 +80,9 @@ describe("pinning a comment", () => {
 
   it("it is the author of the post who decides, not the author of the comment", () => {
     expect(sql).toContain("raise exception 'Only the author can pin a comment'");
-    expect(read("src/components/feed/CommentsSheet.tsx")).toContain("{currentUserId === postOwnerId && (");
+    const sheet = read("src/components/feed/CommentsSheet.tsx");
+    expect(sheet).toContain("const isPostOwner = !!currentUserId && currentUserId === postOwnerId;");
+    expect(sheet).toContain("if (isPostOwner) {");
   });
 
   it("one at a time: pinning a second lets go of the first", () => {

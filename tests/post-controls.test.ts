@@ -173,10 +173,11 @@ describe("where it is reached from", () => {
   it("a comment can be rewritten, and says so afterwards", () => {
     const sheet = read("src/components/feed/CommentsSheet.tsx");
     expect(sheet).toContain('supabase.rpc("edit_comment", { p_id: id, p_body: body })');
-    expect(sheet).toContain('label="Edit"');
+    expect(sheet).toContain('label: "Edit"');
     expect(sheet).toContain('wasEdited(node.created_at, node.updated_at) && " · edited"');
-    // A photo or GIF comment has no words to rewrite.
-    expect(sheet).toContain("actionNode.user_id === currentUserId && !mediaBody(actionNode.body) && (");
+    // Yours, and words — a photo or GIF comment has nothing to rewrite.
+    expect(sheet).toContain("if (own && words) {");
+    expect(sheet).toContain('const words = !mediaBody(node.body) && node.body.trim() !== "";');
   });
 
   it("a shut thread offers no composer, but its author can still answer", () => {

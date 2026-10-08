@@ -65,16 +65,24 @@ import { readDraft, writeDraft } from "@/lib/chat-drafts";
 import { mediaUrlsOf, prefetchChatMedia } from "@/lib/chat-media-url";
 import { SharedShotCard } from "@/components/messages/SharedShotCard";
 import { SharedPostCard, sharedSlide } from "@/components/messages/SharedPostCard";
+import {
+  ForwardedCommentOverlay,
+  ForwardedLabel,
+  type ForwardedComment,
+} from "@/components/messages/ForwardedComment";
+import { EmbedLabel } from "@/components/ui/EmbedLabel";
 import { PeekFor } from "@/components/feed/PeekFor";
 
 type PostPreview = {
   id: string;
+  /** Whose post it is — read so a forwarded comment's label can say "your post". */
+  user_id?: string | null;
   caption: string | null;
   image_url: string | null;
   image_urls?: string[] | null;
   aspect_ratio?: number | null;
 };
-type ShotPreview = { id: string; media_url: string; poster_url?: string | null; caption: string | null };
+type ShotPreview = { id: string; user_id?: string | null; media_url: string; poster_url?: string | null; caption: string | null };
 type ShareProfile = {
   username: string | null;
   display_name: string | null;
@@ -107,6 +115,10 @@ export type ChatMsg = {
     page?: unknown;
     /** A shared post: which of its photos was shared (send_message, 0110). */
     slide?: number;
+    /** A forwarded comment on that post or Shot (send_message, 0134). Only
+     *  the id: the words are read live, so an edit follows it and a deleted
+     *  one says so, rather than the chat keeping a copy for ever. */
+    comment_id?: string;
   } | null;
   /** Client-only: set on optimistic messages before server confirms */
   _status?: "pending" | "failed";
@@ -260,7 +272,7 @@ const MSG_PAGE = 30;
 export const SEARCH_REACH_PAGES = 12;
 /** Select used for both the initial server load and client pagination. */
 const MSG_SELECT =
-  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, post:posts(id, caption, image_url, image_urls, aspect_ratio, profiles!posts_user_id_fkey(username, display_name, avatar_hue, avatar_url)), shot:shots(id, media_url, poster_url, caption, profiles(username, display_name, avatar_hue, avatar_url))";
+  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, post:posts(id, user_id, caption, image_url, image_urls, aspect_ratio, profiles!posts_user_id_fkey(username, display_name, avatar_hue, avatar_url)), shot:shots(id, user_id, media_url, poster_url, caption, profiles(username, display_name, avatar_hue, avatar_url))";
 
 /** Flatten Supabase's nested post/shot+profile joins into ChatMsg shape. */
 function mapMessageRow(m: any): ChatMsg {
@@ -654,6 +666,81 @@ export function RealChatView({
     messages.forEach((x) => m.set(x.id, x));
     return m;
   }, [messages]);
+
+  /**
+   * The comments that forwarded messages point at, by id.
+   *
+   * A miss is kept as null on purpose: a comment that was deleted, or that
+   * this reader cannot see, has to be remembered as answered or the effect
+   * would ask again on every render. Which is also why the ids already asked
+   * for live in a ref — it keeps them out of the dependencies.
+   */
+  const [fwdComments, setFwdComments] = useState<Record<string, ForwardedComment | null>>({});
+  const fwdAsked = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const want = [...new Set(messages.map((m) => m.metadata?.comment_id).filter((id): id is string => !!id))]
+      .filter((id) => !fwdAsked.current.has(id));
+    if (want.length === 0) return;
+    want.forEach((id) => fwdAsked.current.add(id));
+
+    let alive = true;
+    void (async () => {
+      const { data } = await supabase
+        .from("comments")
+        .select("id, body, user_id, profiles(display_name, username, avatar_hue, avatar_url)")
+        .in("id", want)
+        .is("deleted_at", null)
+        .is("removed_at", null);
+      if (!alive) return;
+      const found: Record<string, ForwardedComment | null> = {};
+      want.forEach((id) => {
+        found[id] = null;
+      });
+      (data ?? []).forEach((row) => {
+        found[row.id] = {
+          id: row.id,
+          body: row.body,
+          authorId: row.user_id,
+          author: one(row.profiles),
+        };
+      });
+      setFwdComments((prev) => ({ ...prev, ...found }));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [messages, supabase]);
+
+  /**
+   * A shared post or Shot with the comment someone forwarded laid over it,
+   * and the line above saying who forwarded whose comment on what. Content
+   * that was shared on its own passes straight through, unchanged.
+   */
+  function withForwarded(m: ChatMsg, kind: "post" | "shot", card: React.ReactNode) {
+    const commentId = m.metadata?.comment_id;
+    if (!commentId) return card;
+    const mine = m.sender_id === currentUserId;
+    const comment = fwdComments[commentId] ?? null;
+    const content = kind === "post" ? m.post : m.shot;
+    const contentAuthor = kind === "post" ? m.postProfile : m.shotProfile;
+    return (
+      <>
+        <EmbedLabel align={mine ? "end" : "start"}>
+          <ForwardedLabel
+            mine={mine}
+            senderUsername={members?.[m.sender_id]?.username ?? other.username}
+            commentAuthorUsername={comment?.author?.username}
+            commentIsYours={comment?.authorId === currentUserId}
+            contentAuthorUsername={contentAuthor?.username}
+            contentIsYours={content?.user_id === currentUserId}
+            kind={kind}
+          />
+        </EmbedLabel>
+        <ForwardedCommentOverlay comment={comment}>{card}</ForwardedCommentOverlay>
+      </>
+    );
+  }
 
   // emoji Ã¢â€ â€™ { count, mine } per message
   const reactionsByMsg = useMemo(() => {
@@ -2050,18 +2137,21 @@ export function RealChatView({
                           </span>
                         </div>
                       ) : m.kind === "post" && m.post ? (
+                        withForwarded(m, "post",
                         <SharedPostCard
                           post={m.post}
                           author={m.postProfile ?? null}
                           slide={m.metadata?.slide}
+                          showCaption={!m.metadata?.comment_id}
                           onPointerDown={(e) => onPressStart(m, e, (rect) => setPeek({ msg: m, rect }))}
                           onPointerUp={onPressEnd}
                           onPointerMove={onPressEnd}
                           onPointerLeave={onPressEnd}
                           onClick={(e) => { if (suppressClick.current) { e.preventDefault(); suppressClick.current = false; } }}
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
-                        />
+                        />)
                       ) : m.kind === "shot" && m.shot ? (
+                        withForwarded(m, "shot",
                         <SharedShotCard
                           shot={m.shot}
                           author={m.shotProfile ?? null}
@@ -2071,7 +2161,7 @@ export function RealChatView({
                           onPointerLeave={onPressEnd}
                           onClick={(e) => { if (suppressClick.current) { e.preventDefault(); suppressClick.current = false; } }}
                           onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
-                        />
+                        />)
                       ) : m.kind === "page_reply" && pageSnapshot(m.metadata) ? (
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}

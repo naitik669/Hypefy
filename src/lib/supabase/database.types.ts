@@ -3049,6 +3049,7 @@ export type Database = {
       send_message: {
         Args: {
           p_body?: string
+          p_comment_id?: string
           p_conversation_id: string
           p_kind?: string
           p_metadata?: Json
@@ -3232,6 +3233,7 @@ export type Database = {
       forget_one_view: { Args: { p_kind: string; p_id: string }; Returns: undefined }
       set_archived: { Args: { p_kind: string; p_id: string; p_archived: boolean }; Returns: undefined }
       set_comments_off: { Args: { p_kind: string; p_id: string; p_off: boolean }; Returns: undefined }
+      delete_comment: { Args: { p_id: string }; Returns: boolean }
       edit_comment: { Args: { p_id: string; p_body: string }; Returns: undefined }
       my_archive: {
         Args: never

@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
 import {
   Star,
   Loader2,
@@ -22,13 +21,16 @@ import {
   Pin,
   PinOff,
   Image as ImageIcon,
+  MoreHorizontal,
+  Forward as SendIcon2,
   X,
 } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { setCommentPinned, wasEdited } from "@/lib/post-controls";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
+import { HeldCommentMenu, type HeldAction } from "@/components/feed/HeldCommentMenu";
+import { ShareSheet } from "@/components/feed/ShareSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
 import Link from "next/link";
 import { Avatar } from "@/components/ui/Avatar";
@@ -234,12 +236,14 @@ export function CommentsSheet({
   } | null>(null);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
-  const [actionOn, setActionOn] = useState<{
-    node: Node;
-    threadId: string;
-    x: number;
-    y: number;
-  } | null>(null);
+  /**
+   * The held comment, if one is held. No coordinates: the comment lifts to
+   * the middle of the screen rather than a menu opening where the thumb
+   * happened to be.
+   */
+  const [actionOn, setActionOn] = useState<{ node: Node; threadId: string } | null>(null);
+  /** The comment being forwarded to someone, if any. */
+  const [forwarding, setForwarding] = useState<string | null>(null);
 
   const threads = useMemo(() => threadOf(items), [items]);
 
@@ -432,18 +436,14 @@ export function CommentsSheet({
       });
 
       const cancel = scheduleUndoable(async () => {
-        // .select() is load-bearing: without it the update runs
-        // return=minimal, and an update matching NO rows is not an error —
-        // so an RLS refusal arrived as success, the comment left the list,
-        // and came back on reopen. Asking for the row makes "did anything
-        // change" answerable.
-        const { data, error } = await supabase
-          .from("comments")
-          .update({ deleted_at: new Date().toISOString() })
-          .eq("id", id)
-          .select("id");
+        // Through delete_comment (0134) rather than writing the column: the
+        // table's own rule is "your own comment only", and the author of the
+        // post may take a comment off it too. The function answers whether
+        // anything changed, so a refusal cannot arrive looking like success
+        // the way a zero-row update did.
+        const { data, error } = await supabase.rpc("delete_comment", { p_id: id });
 
-        if (error || !data || data.length === 0) {
+        if (error || data !== true) {
           showToast(error?.message ?? "Couldn't delete that comment.");
           setItems(restore);
         }
@@ -482,8 +482,7 @@ export function CommentsSheet({
   );
 
   const longPress = useCallback(
-    (node: Node, threadId: string, x: number, y: number) =>
-      setActionOn({ node, threadId, x, y }),
+    (node: Node, threadId: string) => setActionOn({ node, threadId }),
     []
   );
 
@@ -610,6 +609,112 @@ export function CommentsSheet({
   }, [editing, supabase, showToast]);
 
   const actionNode = actionOn?.node;
+
+  /**
+   * What you can do to the comment you are holding.
+   *
+   * Ordered by how often it is wanted, with anything destructive last. The
+   * two that depend on who you are:
+   *
+   *   Pin ...... only the author of the post, since it is their post the
+   *              comment would be pinned to.
+   *   Delete ... the comment's own author, or the author of the post, who
+   *              can now take a comment off their own post instead of
+   *              reporting it to us and waiting. They still see Report as
+   *              well: taking something off your post and telling us about
+   *              it are different acts, and someone may want both.
+   */
+  const heldActions = useMemo<HeldAction[]>(() => {
+    const node = actionOn?.node;
+    const threadId = actionOn?.threadId;
+    if (!node || !threadId) return [];
+    const close = () => setActionOn(null);
+    const own = node.user_id === currentUserId;
+    const isPostOwner = !!currentUserId && currentUserId === postOwnerId;
+    const words = !mediaBody(node.body) && node.body.trim() !== "";
+    const out: HeldAction[] = [];
+
+    if (node.profiles?.username) {
+      out.push({
+        key: "reply",
+        icon: CornerUpLeft,
+        label: "Reply",
+        run: () => {
+          startReply(threadId, node.profiles!.username!);
+          close();
+        },
+      });
+    }
+    out.push({
+      key: "forward",
+      icon: SendIcon2,
+      label: "Forward",
+      run: () => {
+        setForwarding(node.id);
+        close();
+      },
+    });
+    if (words) {
+      out.push({
+        key: "copy",
+        icon: Copy,
+        label: "Copy",
+        run: () => {
+          navigator.clipboard?.writeText(node.body).catch(() => {});
+          close();
+        },
+      });
+    }
+    if (isPostOwner) {
+      out.push({
+        key: "pin",
+        icon: node.pinned_at ? PinOff : Pin,
+        label: node.pinned_at ? "Unpin" : "Pin",
+        run: () => {
+          void pin(node);
+          close();
+        },
+      });
+    }
+    if (own && words) {
+      out.push({
+        key: "edit",
+        icon: Pencil,
+        label: "Edit",
+        run: () => {
+          setEditing({ id: node.id, text: node.body });
+          close();
+        },
+      });
+    }
+    if (!own) {
+      out.push({
+        key: "report",
+        icon: Flag,
+        // Not marked dangerous: reporting costs the reader nothing and
+        // undoes nothing. Two red tiles side by side would also make the
+        // one that really does remove something easy to hit by accident.
+        label: "Report",
+        run: () => {
+          report(node.id);
+          close();
+        },
+      });
+    }
+    if (own || isPostOwner) {
+      out.push({
+        key: "delete",
+        icon: Trash2,
+        label: "Delete",
+        danger: true,
+        run: () => {
+          void remove(node.id);
+          close();
+        },
+      });
+    }
+    return out;
+  }, [actionOn, currentUserId, postOwnerId, startReply, pin, report, remove]);
   /** The author shut this thread: what is here stays, nothing new arrives. */
   const [commentsOff, setCommentsOff] = useState(false);
   useEffect(() => {
@@ -717,99 +822,30 @@ export function CommentsSheet({
         <ZoomViewer src={zoomSrc} onClose={() => setZoomSrc(null)} />
       )}
 
-      {/* Long-press actions, anchored at the press point. Portalled to
-          <body>: the sheet's entrance transform is a containing block, so a
-          fixed menu inside it anchors to the sheet rather than the screen. */}
-      {actionOn &&
-        actionNode &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <FloatingMenu
-            open
-            onClose={() => setActionOn(null)}
-            origin="top-left"
-            className="fixed w-44"
-            zIndex={220}
-            style={{
-              // Clamped so a press near the bottom or right edge does not
-              // open the menu off the screen.
-              left: Math.min(
-                actionOn.x,
-                (typeof window !== "undefined" ? window.innerWidth : 400) - 192
-              ),
-              top: Math.min(
-                actionOn.y,
-                (typeof window !== "undefined" ? window.innerHeight : 800) - 210
-              ),
-            }}
-          >
-            {actionNode.profiles?.username && (
-              <MenuItem
-                icon={CornerUpLeft}
-                label="Reply"
-                onClick={() => {
-                  startReply(
-                    actionOn.threadId,
-                    actionNode.profiles!.username!
-                  );
-                  setActionOn(null);
-                }}
-              />
-            )}
-            {!mediaBody(actionNode.body) && actionNode.body.trim() !== "" && (
-              <MenuItem
-                icon={Copy}
-                label="Copy"
-                onClick={() => {
-                  navigator.clipboard?.writeText(actionNode.body).catch(() => {});
-                  setActionOn(null);
-                }}
-              />
-            )}
-            {actionNode.user_id !== currentUserId && (
-              <MenuItem
-                icon={Flag}
-                label="Report"
-                onClick={() => {
-                  report(actionNode.id);
-                  setActionOn(null);
-                }}
-              />
-            )}
-            {currentUserId === postOwnerId && (
-              <MenuItem
-                icon={actionNode.pinned_at ? PinOff : Pin}
-                label={actionNode.pinned_at ? "Unpin this comment" : "Pin to the top"}
-                onClick={() => {
-                  void pin(actionNode);
-                  setActionOn(null);
-                }}
-              />
-            )}
-            {actionNode.user_id === currentUserId && !mediaBody(actionNode.body) && (
-              <MenuItem
-                icon={Pencil}
-                label="Edit"
-                onClick={() => {
-                  setEditing({ id: actionNode.id, text: actionNode.body });
-                  setActionOn(null);
-                }}
-              />
-            )}
-            {actionNode.user_id === currentUserId && (
-              <MenuItem
-                icon={Trash2}
-                label="Delete"
-                danger
-                onClick={() => {
-                  void remove(actionNode.id);
-                  setActionOn(null);
-                }}
-              />
-            )}
-          </FloatingMenu>,
-          document.body
-        )}
+      {/* The held comment, lifted out of the thread with its actions under
+          it. Which actions there are depends on who is holding it: the
+          author of the post can pin a comment and take it off their post,
+          where someone passing through can only report it. */}
+      {actionOn && actionNode && (
+        <HeldCommentMenu
+          comment={actionNode}
+          onClose={() => setActionOn(null)}
+          actions={heldActions}
+        />
+      )}
+
+      {/* Forwarding sends the post or Shot the comment was left on, with the
+          comment named over it — a comment with nothing around it says very
+          little about what it was replying to. */}
+      {forwarding && (
+        <ShareSheet
+          open
+          onClose={() => setForwarding(null)}
+          postId={postId}
+          targetType={targetType}
+          commentId={forwarding}
+        />
+      )}
     </>
   );
 }
@@ -1072,7 +1108,7 @@ function Composer({
 type RowHandlers = {
   onHype: (n: Node) => void;
   onReply: (threadId: string, username: string) => void;
-  onLongPress: (n: Node, threadId: string, x: number, y: number) => void;
+  onLongPress: (n: Node, threadId: string) => void;
   onZoom: (src: string) => void;
   /** The comment being rewritten right now, if it is this one. */
   editing: { id: string; text: string } | null;
@@ -1225,7 +1261,7 @@ const Row = memo(function Row({
             cancel();
             timer.current = setTimeout(() => {
               timer.current = null;
-              onLongPress(node, threadId, point.current.x, point.current.y);
+              onLongPress(node, threadId);
             }, HOLD_MS);
           }}
           onPointerUp={cancel}
@@ -1242,7 +1278,7 @@ const Row = memo(function Row({
           }}
           onContextMenu={(e) => {
             e.preventDefault();
-            onLongPress(node, threadId, e.clientX, e.clientY);
+            onLongPress(node, threadId);
           }}
         >
           <div className="flex min-w-0 items-center gap-1.5">
@@ -1367,11 +1403,22 @@ const Row = memo(function Row({
               <Flag size={11} /> Reported
             </span>
           )}
-          {/* Report and Delete both live in the long-press menu. Report was
-              a permanent button on every comment by someone else — the one
-              thing you rarely want, taking the same weight as Reply, on every
-              row of the thread. Once reported, the row says so and stops
-              offering it. */}
+
+          {/* Everything else — reply, forward, copy, pin, edit, report,
+              delete — is behind this and behind a hold, which open the same
+              thing. Holding is the quicker way once you know it; nothing in
+              a thread told you it was there, so there is a button too.
+              Report used to be a permanent button on every comment by
+              someone else: the one thing you rarely want, at the same weight
+              as Reply, on every row. */}
+          <button
+            type="button"
+            aria-label="Comment options"
+            onClick={() => onLongPress(node, threadId)}
+            className="-my-1 ml-auto flex h-6 w-6 items-center justify-center rounded-full text-faint transition-colors hover:text-muted active:bg-surface"
+          >
+            <MoreHorizontal size={15} />
+          </button>
         </div>
       </div>
     </div>

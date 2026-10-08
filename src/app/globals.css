@@ -1084,6 +1084,27 @@ html[data-dm-leave]::view-transition-old(root) {
   .animate-scrim-in { animation: none; }
 }
 
+/* A held comment, lifted clear of the thread it sits in: it rises a little
+   and settles in the middle of the screen, and its actions come in just
+   behind it so the eye reads the comment first and the row second. */
+@keyframes held-lift {
+  from { transform: translateY(14px) scale(0.96); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.animate-held-lift {
+  animation: held-lift 0.2s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+@keyframes held-tile {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.animate-held-tile {
+  animation: held-tile 0.18s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-held-lift, .animate-held-tile { animation: none; }
+}
+
 /* The message a search found, once it has been scrolled to: a short wash
    of accent so the eye lands on it, then nothing. */
 @keyframes found {

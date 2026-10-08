@@ -56,12 +56,19 @@ export function SharedPostCard({
   post,
   author,
   slide,
+  showCaption = true,
   ...linkProps
 }: {
   post: SharedPost;
   author: SharedShotAuthor;
   /** Which photo was shared, from the message. The first when absent. */
   slide?: number;
+  /**
+   * Off when something else is hanging off the card's bottom edge — a
+   * forwarded comment takes the caption's place, and both at once would
+   * leave the caption under the bubble, half-read.
+   */
+  showCaption?: boolean;
 } & Omit<React.ComponentProps<typeof Link>, "href">) {
   const at = sharedSlide(post.image_urls, slide);
   const image = post.image_urls?.[at] || post.image_urls?.[0] || post.image_url || null;
@@ -122,7 +129,7 @@ export function SharedPostCard({
       )}
 
       {/* The caption under the photo. A words-only post already shows them. */}
-      {image && post.caption && (
+      {showCaption && image && post.caption && (
         <p className="line-clamp-2 px-0.5 pb-0.5 pt-2 text-[12.5px] leading-snug text-foreground/85">
           {post.caption}
         </p>

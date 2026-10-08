@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Music } from "lucide-react";
 import { SpotlightIcon } from "@/components/diary/SpotlightIcon";
 import { Avatar } from "@/components/ui/Avatar";
+import { EmbedLabel } from "@/components/ui/EmbedLabel";
 import { diaryTheme, fillSize } from "@/components/diary/DiaryPage";
 import { DIARY_HOURS, pageText } from "@/lib/diary";
 
@@ -206,7 +207,7 @@ export function PageReplyEmbed({
 
   return (
     <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
-      <span className="mb-1.5 px-1 text-[11px] font-semibold text-muted">{what}</span>
+      <EmbedLabel align={mine ? "end" : "start"}>{what}</EmbedLabel>
 
       <div className={`relative ${emoji ? "mb-2" : ""}`}>
         {over ? (

@@ -99,6 +99,7 @@ export function ShareSheet({
   imageUrls,
   /** Which image was visible when share was opened — pre-selects that slot */
   initialImageIdx = 0,
+  commentId,
 }: {
   open: boolean;
   onClose: () => void;
@@ -106,6 +107,16 @@ export function ShareSheet({
   targetType?: "post" | "shot";
   imageUrls?: string[];
   initialImageIdx?: number;
+  /**
+   * Forwarding one comment on this post or Shot rather than sharing the
+   * thing itself. The content still travels — a comment on its own means
+   * nothing — but it arrives with the comment named over it.
+   *
+   * It also narrows the sheet to sending: a link, WhatsApp, a Show or a
+   * Ghost Share would all carry the post and silently drop the comment,
+   * which is the one thing the sender picked.
+   */
+  commentId?: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const showToast = useToast();
@@ -396,10 +407,12 @@ export function ShareSheet({
           ? await supabase.rpc("send_message", {
               p_conversation_id: convId, p_body: undefined, p_kind: "shot",
               p_post_id: undefined, p_shot_id: postId, p_reply_to_id: undefined,
+              p_comment_id: commentId,
             })
           : await supabase.rpc("send_message", {
               p_conversation_id: convId, p_body: undefined, p_kind: "post",
               p_post_id: postId, p_reply_to_id: undefined, p_metadata: metadata,
+              p_comment_id: commentId,
             });
         if (sendErr) return false;
         // What you wrote goes after the post, as its own message — the way it
@@ -457,7 +470,7 @@ export function ShareSheet({
         {showAdded ? "Added to your Show" : "Add this one to your Show"}
       </button>
     </div>
-  ) : sent.size > 0 ? (
+  ) : sent.size > 0 || commentId ? (
     // The same height as the row of options it replaces, so picking someone
     // changes what is at the bottom and not where the bottom is. The first
     // version stacked names, a message box and a full-width button — twice
@@ -482,10 +495,16 @@ export function ShareSheet({
           ))}
         </div>
         <p className="min-w-0 flex-1 truncate text-[13px] text-muted">
-          <span className="font-semibold text-foreground">
-            {pickedNames.slice(0, 2).join(", ")}
-          </span>
-          {pickedNames.length > 2 && ` and ${pickedNames.length - 2} more`}
+          {pickedNames.length === 0 ? (
+            "Choose who to forward it to"
+          ) : (
+            <>
+              <span className="font-semibold text-foreground">
+                {pickedNames.slice(0, 2).join(", ")}
+              </span>
+              {pickedNames.length > 2 && ` and ${pickedNames.length - 2} more`}
+            </>
+          )}
         </p>
       </div>
       <div className="flex items-center gap-2">
@@ -500,8 +519,8 @@ export function ShareSheet({
         <button
           type="button"
           onClick={() => void sendToSelected()}
-          disabled={sendingDm}
-          aria-label={`Send to ${sent.size}`}
+          disabled={sendingDm || sent.size === 0}
+          aria-label={commentId ? `Forward to ${sent.size}` : `Send to ${sent.size}`}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[30%] bg-accent text-accent-ink transition-transform active:scale-[0.94] disabled:opacity-60"
         >
           {sendingDm ? (
@@ -574,7 +593,7 @@ export function ShareSheet({
         onPlaced={() => setGhost((g) => ({ ...g, used: g.used + 1 }))}
       />
     )}
-    <BottomSheet open={open} onClose={onClose} title="Send to" size="tall" footer={footer}>
+    <BottomSheet open={open} onClose={onClose} title={commentId ? "Forward to" : "Send to"} size="tall" footer={footer}>
       {picking ? (
         <div className="pb-2">
           <p className="mb-3 text-center text-[13px] text-muted">
