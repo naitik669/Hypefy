@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Chat } from "@phosphor-icons/react";
 import { Check, ChevronDown, Loader2, Plus, Star } from "lucide-react";
@@ -122,18 +121,23 @@ export function AccountDropdown({
           whatever was beneath it, and tapping a conversation to dismiss the
           panel would close it AND open that chat. This sits above that
           catcher, takes both halves of the tap, and is dark enough to say
-          the thread list is not listening. */}
-      {open &&
-        createPortal(
-          <div
-            data-account-scrim
-            aria-hidden
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={close}
-            className="animate-scrim-in fixed inset-0 z-[195] bg-black/45"
-          />,
-          document.body,
-        )}
+          the thread list is not listening.
+
+          Rendered here rather than portalled to <body>. The header around
+          this is `sticky z-20`, which is a stacking context: every z inside
+          it, the panel's 200 included, resolves within level 20. A scrim at
+          195 on the body therefore sat above the whole header and dimmed the
+          panel it was meant to sit behind. In here, 195 lands where it was
+          always meant to — over the catcher at 190, under the panel. */}
+      {open && (
+        <div
+          data-account-scrim
+          aria-hidden
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={close}
+          className="animate-scrim-in fixed inset-0 z-[195] bg-black/45"
+        />
+      )}
 
       <FloatingMenu
         open={open}

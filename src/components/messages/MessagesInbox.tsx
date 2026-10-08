@@ -937,16 +937,17 @@ export function MessagesInbox({
           </button>
         ))}
 
-        {/* Nothing to open is nothing to offer: with no pages at all the
-            arrow is not drawn, rather than opening an empty row. Your own
-            page counts, since the strip is also where you write one. */}
-        {pages.length > 0 && (
-          <PagesTrigger
-            open={pagesOpen}
-            count={pagesFresh}
-            onToggle={() => setPagesOpen((v) => !v)}
-          />
-        )}
+        {/* Always offered, even on a day when nobody has written anything.
+            It used to be hidden until there was a page to read, which meant
+            the one person it mattered most to — someone whose circle has no
+            pages yet, and who could start one — was the one person who
+            never saw it. With nothing to read the row is just your own
+            slot, inviting you to write. */}
+        <PagesTrigger
+          open={pagesOpen}
+          count={pagesFresh}
+          onToggle={() => setPagesOpen((v) => !v)}
+        />
       </div>
 
       {/* Locked chats: there when Messages opens, gone at the first scroll
@@ -956,7 +957,7 @@ export function MessagesInbox({
         <LockedChatsRow count={vault.locked} unread={vault.unread} />
       )}
 
-      {pagesOpen && pages.length > 0 && <PagesStrip pages={pages} me={me} />}
+      {pagesOpen && <PagesStrip pages={pages} me={me} />}
 
       {/* Spotlight: a small deck of today's pages floating at the bottom
           right, shuffling itself; tap to open Spotlight on the one showing. */}

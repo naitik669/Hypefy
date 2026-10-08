@@ -198,14 +198,16 @@ describe("the arrow on the filter row", () => {
     expect(src).toContain("count === 1 ? \"page\" : \"pages\"");
   });
 
-  it("is not drawn when there is nothing to open", () => {
-    expect(inbox).toContain("{pages.length > 0 && (");
+  it("is offered even on a day when nobody has written anything", () => {
+    // Hidden until there was something to read, the one person who could
+    // start the day's first page never saw it.
     expect(inbox).toContain("<PagesTrigger");
+    expect(inbox).not.toContain("{pages.length > 0 && (");
   });
 
   it("the strip opens under the row, and starts closed", () => {
     expect(inbox).toContain("const [pagesOpen, setPagesOpen] = useState(false);");
-    expect(inbox).toContain("{pagesOpen && pages.length > 0 && <PagesStrip pages={pages} me={me} />}");
+    expect(inbox).toContain("{pagesOpen && <PagesStrip pages={pages} me={me} />}");
   });
 
   it("reads what you have opened the same way the deck does", () => {
