@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, UserCheck, Link2, Flag, Trash2, Pencil, Star, Ban, EyeOff, VolumeX, Archive, MessageCircle, MessageCircleOff } from "lucide-react";
-import { setArchived, setCommentsOff } from "@/lib/post-controls";
+import { UserPlus, UserCheck, Link2, Flag, Trash2, Pencil, Star, Ban, EyeOff, VolumeX, Archive, MessageCircle, MessageCircleOff, Pin, PinOff } from "lucide-react";
+import { setArchived, setCommentsOff, setPinned } from "@/lib/post-controls";
 import { hideContent, muteUser, QUIET_COPY } from "@/lib/feed-quiet";
 import { createClient } from "@/lib/supabase/client";
 import { ReportSheet } from "@/components/ui/ReportSheet";
@@ -53,18 +53,22 @@ export function PostActionsSheet({
   const isOwn = postUserId === currentUserId;
   /** Whether this post is taking comments. Only its author is told. */
   const [commentsOff, setCommentsOffState] = useState(false);
-  const [ownerBusy, setOwnerBusy] = useState<"archive" | "comments" | null>(null);
+  const [isPinned, setIsPinned] = useState(false);
+  const [ownerBusy, setOwnerBusy] = useState<"archive" | "comments" | "pin" | null>(null);
 
   useEffect(() => {
     if (!open || !isOwn) return;
     let alive = true;
     void supabase
       .from("posts")
-      .select("comments_off")
+      .select("comments_off, pinned_at")
       .eq("id", postId)
       .maybeSingle()
       .then(({ data }) => {
-        if (alive) setCommentsOffState(!!(data as { comments_off?: boolean } | null)?.comments_off);
+        const row = data as { comments_off?: boolean; pinned_at?: string | null } | null;
+        if (!alive) return;
+        setCommentsOffState(!!row?.comments_off);
+        setIsPinned(!!row?.pinned_at);
       });
     return () => {
       alive = false;
@@ -83,6 +87,21 @@ export function PostActionsSheet({
     // It leaves every feed at once, so take it off this screen too.
     onDelete?.();
     toast("Moved to your archive", "plain", { label: "Settings", onClick: () => router.push("/settings/archive") });
+    router.refresh();
+  }
+
+  async function togglePinned() {
+    const next = !isPinned;
+    setOwnerBusy("pin");
+    const problem = await setPinned(supabase, postId, next);
+    setOwnerBusy(null);
+    if (problem) {
+      toast(problem, "error");
+      return;
+    }
+    setIsPinned(next);
+    onClose();
+    toast(next ? "Pinned to your profile" : "Unpinned");
     router.refresh();
   }
 
@@ -277,6 +296,12 @@ export function PostActionsSheet({
           <>
             <MenuDivider />
             <MenuItem icon={Pencil} label="Edit post" onClick={() => { onClose(); onEdit?.(); }} />
+            <MenuItem
+              icon={isPinned ? PinOff : Pin}
+              label={isPinned ? "Unpin from profile" : "Pin to profile"}
+              pending={ownerBusy === "pin"}
+              onClick={() => void togglePinned()}
+            />
             <MenuItem
               icon={commentsOff ? MessageCircleOff : MessageCircle}
               label={commentsOff ? "Turn comments on" : "Turn comments off"}

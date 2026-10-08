@@ -1072,6 +1072,19 @@ html[data-dm-leave]::view-transition-old(root) {
 .animate-coach-ring {
   animation: coach-ring 1.8s ease-in-out infinite;
 }
+/* The message a search found, once it has been scrolled to: a short wash
+   of accent so the eye lands on it, then nothing. */
+@keyframes found {
+  0%, 70% { background-color: rgb(163 230 53 / 0.16); }
+  100% { background-color: transparent; }
+}
+.animate-found {
+  animation: found 2.2s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-found { animation: none; background-color: rgb(163 230 53 / 0.16); }
+}
+
 /* A read receipt arriving under a message: "Sent" becoming "Seen", or a
    reader's face coming down to the message they have just read. */
 @keyframes receipt-in {

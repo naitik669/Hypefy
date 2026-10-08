@@ -4,9 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock, AlertCircle } from "lucide-react";
+import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock, AlertCircle, Search } from "lucide-react";
 import { SendIcon, ShareIcon } from "@/components/ui/ShareIcon";
 import { FACES_SHOWN, lastMine, readMarkers, receiptFor } from "@/lib/chat-receipts";
+import { ChatSearch, type FoundMessage } from "@/components/messages/ChatSearch";
 import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { useGroupCall } from "@/components/calls/GroupCallProvider";
@@ -250,6 +251,13 @@ function fileSize(bytes: number): string {
 
 /** How many messages per page (initial load + each scroll-up chunk). */
 const MSG_PAGE = 30;
+/**
+ * How many older pages to fetch while reaching for a search result.
+ *
+ * Bounded on purpose: a match from two years back would otherwise pull the
+ * whole chat into the page to scroll to one line.
+ */
+export const SEARCH_REACH_PAGES = 12;
 /** Select used for both the initial server load and client pagination. */
 const MSG_SELECT =
   "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, post:posts(id, caption, image_url, image_urls, aspect_ratio, profiles!posts_user_id_fkey(username, display_name, avatar_hue, avatar_url)), shot:shots(id, media_url, poster_url, caption, profiles(username, display_name, avatar_hue, avatar_url))";
@@ -488,6 +496,9 @@ export function RealChatView({
   const showToast = useToast();
   const [callChooser, setCallChooser] = useState(false);
   const [headerMenu, setHeaderMenu] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  /** The found message being scrolled to, so it can be lit when it lands. */
+  const [foundId, setFoundId] = useState<string | null>(null);
   const [voiceMode, setVoiceMode] = useState(false);
   const [starBurstId, setStarBurstId] = useState<string | null>(null);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
@@ -799,6 +810,31 @@ export function RealChatView({
         x.id === msgId ? { ...x, shot: { id: d.id, media_url: d.media_url, poster_url: d.poster_url, caption: d.caption }, shotProfile: pr } : x,
       ),
     );
+  }
+
+  /**
+   * Go to a message a search found.
+   *
+   * It may be older than anything loaded, so history is fetched a page at a
+   * time until it is — up to a bound, after which the reader is told rather
+   * than left watching a spinner.
+   */
+  async function goToMessage(found: FoundMessage) {
+    setSearchOpen(false);
+    for (let page = 0; page <= SEARCH_REACH_PAGES; page++) {
+      const el = document.querySelector(`[data-msg-id="${found.id}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setFoundId(found.id);
+        setTimeout(() => setFoundId(null), 2200);
+        return;
+      }
+      if (!hasMore) break;
+      await loadOlder();
+      // Let the prepended page paint before looking for it.
+      await new Promise((r) => setTimeout(r, 60));
+    }
+    showToast("That message is further back than this can reach.");
   }
 
   /** Fetch the next older page and prepend it, preserving scroll position. */
@@ -1808,6 +1844,14 @@ export function RealChatView({
             onClose={() => setHeaderMenu(false)}
             className="absolute right-1 top-12 w-52"
           >
+            <MenuItem
+              icon={Search}
+              label="Find a message"
+              onClick={() => {
+                setHeaderMenu(false);
+                setSearchOpen(true);
+              }}
+            />
             {!isGroup && other.username && (
               <MenuItem icon={UserCircle} label="View profile" onClick={() => { setHeaderMenu(false); router.push(`/u/${other.username}`); }} />
             )}
@@ -1899,7 +1943,13 @@ export function RealChatView({
               const isNew = !seenAtLoadRef.current.has(m.id);
 
               return (
-                <div key={m.id} className={isNew ? "animate-msg-in" : undefined}>
+                <div
+                  key={m.id}
+                  data-msg-id={m.id}
+                  className={`${isNew ? "animate-msg-in" : ""} ${
+                    foundId === m.id ? "animate-found rounded-2xl" : ""
+                  }`}
+                >
                   {i === firstUnreadIndex && (
                     <div ref={unreadDividerRef} className="flex items-center gap-2 py-2">
                       <span className="h-px flex-1 bg-accent/30" />
@@ -2404,6 +2454,16 @@ export function RealChatView({
         )}
         </div>
       </div>
+
+      {searchOpen && (
+        <ChatSearch
+          conversationId={conversationId}
+          nameOf={(id) => (id === currentUserId ? "You" : senderName(id))}
+          dayLabel={(iso) => `${dayLabel(iso)}, ${timeLabel(iso)}`}
+          onOpen={(m) => void goToMessage(m)}
+          onClose={() => setSearchOpen(false)}
+        />
+      )}
 
       {/* Composer */}
       <div className="border-t border-border/60 bg-background px-3 py-2 pb-[calc(var(--sab)+8px)]">

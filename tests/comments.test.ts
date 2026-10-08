@@ -11,6 +11,7 @@ function node(id: string, parent: string | null = null): Node {
     image_url: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: null,
+    pinned_at: null,
     parent_id: parent,
     hyped: false,
     hypeCount: 0,

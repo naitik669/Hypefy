@@ -20,14 +20,19 @@ vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     from: () => {
       let before: string | null = null;
+      // The grid also asks, once, for this profile's pinned posts. That is
+      // not a page, so it is answered separately and not counted as one.
+      let pinned = false;
       const q: Record<string, unknown> = {};
       q.select = () => q;
       q.eq = () => q;
       q.order = () => q;
       q.limit = () => q;
+      q.not = () => ((pinned = true), q);
       q.lt = (_c: string, v: string) => ((before = v), q);
       q.maybeSingle = async () => ({ data: null });
       q.then = (res: (v: unknown) => void) => {
+        if (pinned) return res({ data: [], error: null });
         pages.calls.push(before);
         res({ data: pages.rows(before), error: null });
       };

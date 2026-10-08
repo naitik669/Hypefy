@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getPrivateProfile } from "@/lib/profile";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PrivacySettings } from "@/components/settings/PrivacySettings";
 import { BlockedList } from "@/components/settings/BlockedList";
@@ -16,11 +17,16 @@ export default async function PrivacySettingsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_private, dm_privacy, show_activity, hide_read_receipts, show_hypes")
-    .eq("id", user.id)
-    .maybeSingle();
+  // The mention rule is nobody else's business, so it is not a column
+  // anyone can read — it comes with the rest of this person's own fields.
+  const [{ data: profile }, mine] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("is_private, dm_privacy, show_activity, hide_read_receipts, show_hypes")
+      .eq("id", user.id)
+      .maybeSingle(),
+    getPrivateProfile(supabase),
+  ]);
 
   return (
     <>
@@ -37,6 +43,7 @@ export default async function PrivacySettingsPage() {
           initialShowActivity={(profile as any)?.show_activity ?? true}
           initialHideReadReceipts={!!(profile as any)?.hide_read_receipts}
           initialShowHypes={(profile as any)?.show_hypes ?? true}
+          initialMentionPrivacy={mine?.mentionPrivacy ?? "everyone"}
         />
 
         {/* Two-factor moved to its own page. Left as a pointer rather than

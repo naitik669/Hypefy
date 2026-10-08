@@ -175,6 +175,8 @@ export type PrivateProfile = {
   notifPrefs: Record<string, unknown>;
   /** How many people joined with their invite. */
   referralCount: number;
+  /** Who may reach them by writing @them. */
+  mentionPrivacy: "everyone" | "following" | "nobody";
 };
 
 /** What my_private_profile() hands back, read without trusting its shape. */
@@ -188,6 +190,8 @@ export function parsePrivateProfile(raw: unknown): PrivateProfile | null {
     suspensionReason: typeof r.suspension_reason === "string" ? r.suspension_reason : null,
     notifPrefs: prefs && typeof prefs === "object" && !Array.isArray(prefs) ? (prefs as Record<string, unknown>) : {},
     referralCount: typeof r.referral_count === "number" ? r.referral_count : 0,
+    mentionPrivacy:
+      r.mention_privacy === "following" || r.mention_privacy === "nobody" ? r.mention_privacy : "everyone",
   };
 }
 

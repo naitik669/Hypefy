@@ -339,6 +339,7 @@ export type Database = {
           hype_count: number
           id: string
           image_url: string | null
+          pinned_at: string | null
           parent_id: string | null
           post_id: string | null
           removal_reason: string | null
@@ -355,6 +356,7 @@ export type Database = {
           hype_count?: number
           id?: string
           image_url?: string | null
+          pinned_at?: string | null
           parent_id?: string | null
           post_id?: string | null
           removal_reason?: string | null
@@ -371,6 +373,7 @@ export type Database = {
           hype_count?: number
           id?: string
           image_url?: string | null
+          pinned_at?: string | null
           parent_id?: string | null
           post_id?: string | null
           removal_reason?: string | null
@@ -1462,6 +1465,7 @@ export type Database = {
           hype_count: number
           id: string
           image_url: string | null
+          pinned_at: string | null
           image_urls: string[]
           mentions: string[]
           poll: Json | null
@@ -1486,6 +1490,7 @@ export type Database = {
           hype_count?: number
           id?: string
           image_url?: string | null
+          pinned_at?: string | null
           image_urls?: string[]
           mentions?: string[]
           poll?: Json | null
@@ -1510,6 +1515,7 @@ export type Database = {
           hype_count?: number
           id?: string
           image_url?: string | null
+          pinned_at?: string | null
           image_urls?: string[]
           mentions?: string[]
           poll?: Json | null
@@ -1626,6 +1632,7 @@ export type Database = {
           is_admin: boolean
           is_premium: boolean
           is_private: boolean
+          mention_privacy: string
           is_verified: boolean
           last_seen_at: string | null
           name_font: string | null
@@ -1671,6 +1678,7 @@ export type Database = {
           is_admin?: boolean
           is_premium?: boolean
           is_private?: boolean
+          mention_privacy?: string
           is_verified?: boolean
           last_seen_at?: string | null
           name_font?: string | null
@@ -1716,6 +1724,7 @@ export type Database = {
           is_admin?: boolean
           is_premium?: boolean
           is_private?: boolean
+          mention_privacy?: string
           is_verified?: boolean
           last_seen_at?: string | null
           name_font?: string | null
@@ -3211,6 +3220,14 @@ export type Database = {
         }[]
       }
       my_private_profile: { Args: never; Returns: Json }
+      set_post_pinned: { Args: { p_id: string; p_pinned: boolean }; Returns: undefined }
+      set_comment_pinned: { Args: { p_id: string; p_pinned: boolean }; Returns: undefined }
+      mention_allowed: { Args: { p_target: string; p_actor: string }; Returns: boolean }
+      max_pinned_posts: { Args: never; Returns: number }
+      search_messages: {
+        Args: { p_conversation_id: string; p_q: string; p_limit?: number }
+        Returns: { id: string; sender_id: string; body: string | null; created_at: string }[]
+      }
       forget_views: { Args: { p_kind?: string }; Returns: number }
       forget_one_view: { Args: { p_kind: string; p_id: string }; Returns: undefined }
       set_archived: { Args: { p_kind: string; p_id: string; p_archived: boolean }; Returns: undefined }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Play } from "lucide-react";
+import { Pin, Play } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { GridPeek } from "@/components/feed/GridPeek";
 import { RichPostText } from "@/components/ui/RichPostText";
@@ -21,6 +21,9 @@ import { repairPoster } from "@/lib/poster-repair";
 
 /** How many arrive at a time. */
 export const PROFILE_PAGE = 30;
+
+/** What a profile shows above the rest. Matches max_pinned_posts() (0133). */
+export const MAX_PINNED = 3;
 
 /**
  * A list that loads its next page when its end scrolls into view.
@@ -117,6 +120,28 @@ export function PostsGrid({
   empty: React.ReactNode;
 }) {
   const supabase = useMemo(() => createClient(), []);
+
+  // Pinned posts are asked for separately rather than sorted into the grid:
+  // the grid pages by time, and a pinned post from last year would otherwise
+  // only appear once the reader had scrolled back to last year.
+  const [pinned, setPinned] = useState<PostRow[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void supabase
+      .from("posts")
+      .select("id, user_id, image_url, image_urls, caption, created_at, aspect_ratio, hype_count, comment_count")
+      .eq("user_id", userId)
+      .not("pinned_at", "is", null)
+      .order("pinned_at", { ascending: false })
+      .limit(MAX_PINNED)
+      .then(({ data }) => {
+        if (alive) setPinned((data ?? []) as PostRow[]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [supabase, userId]);
+
   const load = useCallback(
     async (before: string | null) => {
       let q = supabase
@@ -134,13 +159,17 @@ export function PostsGrid({
   const { items, more, sentinel } = usePaged(load);
 
   if (items === null) return <GridSkeleton />;
-  if (items.length === 0) return <>{empty}</>;
+  if (items.length === 0 && pinned.length === 0) return <>{empty}</>;
+
+  // A pinned post is shown once, at the top, not again in its own place.
+  const pinnedIds = new Set(pinned.map((p) => p.id));
+  const rest = items.filter((p) => !pinnedIds.has(p.id));
 
   return (
     <div>
       <div className={GRID_WRAP}>
         <div className={GRID}>
-          {items.map((p) => {
+          {[...pinned, ...rest].map((p) => {
             const cover = p.image_urls?.[0] ?? p.image_url ?? null;
             const count = p.image_urls?.length ?? 0;
             return (
@@ -173,6 +202,15 @@ export function PostsGrid({
                   {count > 1 && (
                     <span className="absolute right-1.5 top-1.5 rounded-md bg-black/55 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
                       {count}
+                    </span>
+                  )}
+                  {pinnedIds.has(p.id) && (
+                    <span
+                      className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-md bg-black/55 text-white backdrop-blur-sm"
+                      aria-label="Pinned to the profile"
+                      title="Pinned"
+                    >
+                      <Pin size={11} fill="currentColor" strokeWidth={0} aria-hidden />
                     </span>
                   )}
                 </Link>

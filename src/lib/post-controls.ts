@@ -49,7 +49,12 @@ const SORRY = {
   archive: "Couldn't archive that. Try again.",
   unarchive: "Couldn't put that back. Try again.",
   comments: "Couldn't change comments for that. Try again.",
+  pin: "Couldn't pin that. Try again.",
+  unpin: "Couldn't unpin that. Try again.",
 } as const;
+
+/** How many posts one profile may pin. Matches max_pinned_posts() (0133). */
+export const MAX_PINNED_POSTS = 3;
 
 /** Archive one of your own, or put it back. Returns null, or what went wrong. */
 export async function setArchived(
@@ -71,6 +76,36 @@ export async function setCommentsOff(
 ): Promise<string | null> {
   const { error } = await supabase.rpc("set_comments_off", { p_kind: kind, p_id: id, p_off: off });
   return error ? SORRY.comments : null;
+}
+
+/**
+ * Pin one of your own posts to the top of your profile, or unpin it.
+ *
+ * The cap is the server's to enforce, and the message it sends back when it
+ * is reached says which number it is — so that one is passed through rather
+ * than replaced with ours.
+ */
+export async function setPinned(
+  supabase: SupabaseClient,
+  id: string,
+  pinned: boolean,
+): Promise<string | null> {
+  const { error } = await supabase.rpc("set_post_pinned", { p_id: id, p_pinned: pinned });
+  if (!error) return null;
+  if (pinned && /can pin/i.test(error.message ?? "")) {
+    return `You can pin ${MAX_PINNED_POSTS} posts. Unpin one first.`;
+  }
+  return pinned ? SORRY.pin : SORRY.unpin;
+}
+
+/** Pin a comment to the top of your own post or Shot, or unpin it. */
+export async function setCommentPinned(
+  supabase: SupabaseClient,
+  id: string,
+  pinned: boolean,
+): Promise<boolean> {
+  const { error } = await supabase.rpc("set_comment_pinned", { p_id: id, p_pinned: pinned });
+  return !error;
 }
 
 /** Everything the signed-in person has archived, newest first. */

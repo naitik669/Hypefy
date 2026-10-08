@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/client";
 import { SettingToggle } from "@/components/settings/SettingToggle";
 import { useToast } from "@/components/ui/ToastProvider";
 
+/** Who may reach you by writing @you. */
+export type MentionPrivacy = "everyone" | "following" | "nobody";
+
 export function PrivacySettings({
   userId,
   initialIsPrivate,
@@ -12,6 +15,7 @@ export function PrivacySettings({
   initialShowActivity,
   initialHideReadReceipts,
   initialShowHypes,
+  initialMentionPrivacy,
 }: {
   userId: string;
   initialIsPrivate: boolean;
@@ -19,11 +23,13 @@ export function PrivacySettings({
   initialShowActivity: boolean;
   initialHideReadReceipts: boolean;
   initialShowHypes: boolean;
+  initialMentionPrivacy: MentionPrivacy;
 }) {
   const supabase = createClient();
   const toast = useToast();
   const [isPrivate, setIsPrivate] = useState(initialIsPrivate);
   const [dmPrivacy, setDmPrivacy] = useState(initialDmPrivacy);
+  const [mentionPrivacy, setMentionPrivacy] = useState(initialMentionPrivacy);
   const [showActivity, setShowActivity] = useState(initialShowActivity);
   const [hideReceipts, setHideReceipts] = useState(initialHideReadReceipts);
   const [showHypes, setShowHypes] = useState(initialShowHypes);
@@ -42,6 +48,7 @@ export function PrivacySettings({
     patch: {
       is_private?: boolean;
       dm_privacy?: string;
+      mention_privacy?: string;
       show_activity?: boolean;
       hide_read_receipts?: boolean;
       show_hypes?: boolean;
@@ -91,6 +98,12 @@ export function PrivacySettings({
     if (!(await save("dm", { dm_privacy: next }))) setDmPrivacy(prev);
   }
 
+  async function setMention(next: MentionPrivacy) {
+    const prev = mentionPrivacy;
+    setMentionPrivacy(next);
+    if (!(await save("mention", { mention_privacy: next }))) setMentionPrivacy(prev);
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <section>
@@ -136,34 +149,66 @@ export function PrivacySettings({
         </div>
       </section>
 
-      <section>
-        <p className="mb-2 px-1 text-xs font-bold uppercase tracking-widest text-faint">
-          Who can message you
-        </p>
-        <div className="flex flex-col gap-2">
-          {(
-            [
-              {
-                value: "everyone",
-                label: "Everyone",
-                sub: "Strangers land in Requests until you approve",
-              },
-              {
-                value: "following",
-                label: "People you follow",
-                sub: "Only accounts you follow can start a chat",
-              },
-            ] as const
-          ).map((opt) => (
+      <Chooser
+        title="Who can message you"
+        value={dmPrivacy}
+        busy={pending === "dm"}
+        onPick={(v) => setDm(v as "everyone" | "following")}
+        options={[
+          { value: "everyone", label: "Everyone", sub: "Strangers land in Requests until you approve" },
+          { value: "following", label: "People you follow", sub: "Only accounts you follow can start a chat" },
+        ]}
+      />
+
+      {/* What a mention costs the person mentioned is the notification, so
+          that is what this governs. The @ still reads as written: deciding
+          otherwise would mean asking this setting for every name in every
+          post, on every render. */}
+      <Chooser
+        title="Who can notify you by mentioning you"
+        value={mentionPrivacy}
+        busy={pending === "mention"}
+        onPick={(v) => setMention(v as MentionPrivacy)}
+        options={[
+          { value: "everyone", label: "Everyone", sub: "Anyone who writes @you sends you a notification" },
+          { value: "following", label: "People you follow", sub: "Only from accounts you follow" },
+          { value: "nobody", label: "No one", sub: "You are never notified about a mention" },
+        ]}
+      />
+    </div>
+  );
+}
+
+/** One setting with a few answers, only one of them true at a time. */
+function Chooser({
+  title,
+  value,
+  options,
+  busy,
+  onPick,
+}: {
+  title: string;
+  value: string;
+  options: readonly { value: string; label: string; sub: string }[];
+  busy: boolean;
+  onPick: (value: string) => void;
+}) {
+  return (
+    <section>
+      <p className="mb-2 px-1 text-xs font-bold uppercase tracking-widest text-faint">{title}</p>
+      <div role="radiogroup" aria-label={title} className="flex flex-col gap-2">
+        {options.map((opt) => {
+          const on = value === opt.value;
+          return (
             <button
               key={opt.value}
               type="button"
-              disabled={pending === "dm"}
-              onClick={() => setDm(opt.value)}
+              role="radio"
+              aria-checked={on}
+              disabled={busy}
+              onClick={() => onPick(opt.value)}
               className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors disabled:opacity-50 ${
-                dmPrivacy === opt.value
-                  ? "border-accent/40 bg-accent/[0.06]"
-                  : "border-border bg-surface"
+                on ? "border-accent/40 bg-accent/[0.06]" : "border-border bg-surface"
               }`}
             >
               <div className="min-w-0 flex-1">
@@ -171,18 +216,17 @@ export function PrivacySettings({
                 <p className="text-xs text-muted">{opt.sub}</p>
               </div>
               <span
+                aria-hidden
                 className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${
-                  dmPrivacy === opt.value
-                    ? "border-accent bg-accent text-accent-ink"
-                    : "border-border text-transparent"
+                  on ? "border-accent bg-accent text-accent-ink" : "border-border text-transparent"
                 }`}
               >
                 ✓
               </span>
             </button>
-          ))}
-        </div>
-      </section>
-    </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

@@ -63,10 +63,33 @@ describe("private profile columns", () => {
     expect(parsePrivateProfile(null)).toBeNull();
     expect(parsePrivateProfile("x")).toBeNull();
     expect(parsePrivateProfile([])).toBeNull();
-    expect(parsePrivateProfile({})).toEqual({ dateOfBirth: null, isAdmin: false, suspensionReason: null, notifPrefs: {}, referralCount: 0 });
+    expect(parsePrivateProfile({})).toEqual({
+      dateOfBirth: null,
+      isAdmin: false,
+      suspensionReason: null,
+      notifPrefs: {},
+      referralCount: 0,
+      mentionPrivacy: "everyone",
+    });
     expect(
-      parsePrivateProfile({ date_of_birth: "2008-08-28", is_admin: true, suspension_reason: "spam", notif_prefs: { hypes: false }, referral_count: 3 }),
-    ).toEqual({ dateOfBirth: "2008-08-28", isAdmin: true, suspensionReason: "spam", notifPrefs: { hypes: false }, referralCount: 3 });
+      parsePrivateProfile({
+        date_of_birth: "2008-08-28",
+        is_admin: true,
+        suspension_reason: "spam",
+        notif_prefs: { hypes: false },
+        referral_count: 3,
+        mention_privacy: "nobody",
+      }),
+    ).toEqual({
+      dateOfBirth: "2008-08-28",
+      isAdmin: true,
+      suspensionReason: "spam",
+      notifPrefs: { hypes: false },
+      referralCount: 3,
+      mentionPrivacy: "nobody",
+    });
+    // A rule that is not one of the three reads as the open default.
+    expect(parsePrivateProfile({ mention_privacy: "sometimes" })!.mentionPrivacy).toBe("everyone");
     // "true" is not true: nobody becomes an admin by a string.
     expect(parsePrivateProfile({ is_admin: "true" })!.isAdmin).toBe(false);
   });

@@ -19,12 +19,14 @@ import {
   Copy,
   Check,
   Pencil,
+  Pin,
+  PinOff,
   Image as ImageIcon,
   X,
 } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
-import { wasEdited } from "@/lib/post-controls";
+import { setCommentPinned, wasEdited } from "@/lib/post-controls";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
 import { ReportSheet } from "@/components/ui/ReportSheet";
@@ -110,6 +112,8 @@ type Node = {
   body: string;
   /** When the words were last changed, for the "edited" mark. */
   updated_at: string | null;
+  /** The author of the post put this one at the top. */
+  pinned_at: string | null;
   /** A photo posted with the comment (0087), separate from the body. */
   image_url: string | null;
   created_at: string;
@@ -170,6 +174,9 @@ export function threadOf(items: Node[]): { root: Node; replies: Node[] }[] {
     if (list) list.push(c);
     else replies.set(root.id, [c]);
   }
+  // The one the author pinned reads first, whenever it was written.
+  // Everything else keeps the order it was posted in.
+  roots.sort((a, b) => (a.pinned_at ? 0 : 1) - (b.pinned_at ? 0 : 1));
   return roots.map((root) => ({ root, replies: replies.get(root.id) ?? [] }));
 }
 
@@ -251,7 +258,7 @@ export function CommentsSheet({
       let q = supabase
         .from("comments")
         .select(
-          "id, user_id, body, image_url, created_at, updated_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
+          "id, user_id, body, image_url, created_at, updated_at, pinned_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
         )
         .eq(targetType === "shot" ? "shot_id" : "post_id", postId)
         .is("deleted_at", null)
@@ -290,6 +297,7 @@ export function CommentsSheet({
         image_url: (c.image_url as string | null) ?? null,
         created_at: c.created_at as string,
         updated_at: (c.updated_at as string | null) ?? null,
+        pinned_at: (c.pinned_at as string | null) ?? null,
         parent_id: (c.parent_id as string | null) ?? null,
         hyped: hyped.has(c.id as string),
         hypeCount: (c.hype_count as number) ?? 0,
@@ -518,7 +526,7 @@ export function CommentsSheet({
       const { data: row } = await supabase
         .from("comments")
         .select(
-          "id, user_id, body, image_url, created_at, updated_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
+          "id, user_id, body, image_url, created_at, updated_at, pinned_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
         )
         .eq("id", data)
         .single();
@@ -534,6 +542,7 @@ export function CommentsSheet({
             image_url: (r.image_url as string | null) ?? null,
             created_at: r.created_at as string,
             updated_at: (r.updated_at as string | null) ?? null,
+            pinned_at: (r.pinned_at as string | null) ?? null,
             parent_id: (r.parent_id as string | null) ?? null,
             hyped: false,
             hypeCount: 0,
@@ -555,6 +564,29 @@ export function CommentsSheet({
   /** The comment being rewritten, and the words so far. */
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+
+  const pin = useCallback(
+    async (node: Node) => {
+      const next = !node.pinned_at;
+      const ok = await setCommentPinned(supabase, node.id, next);
+      if (!ok) {
+        showToast("Couldn't pin that comment.");
+        return;
+      }
+      // One at a time: pinning a second replaces the first.
+      setItems((prev) =>
+        prev.map((n) =>
+          n.id === node.id
+            ? { ...n, pinned_at: next ? new Date().toISOString() : null }
+            : n.pinned_at
+              ? { ...n, pinned_at: null }
+              : n,
+        ),
+      );
+      showToast(next ? "Pinned to the top" : "Unpinned");
+    },
+    [supabase, showToast],
+  );
 
   const saveEdit = useCallback(async () => {
     if (!editing) return;
@@ -740,6 +772,16 @@ export function CommentsSheet({
                 label="Report"
                 onClick={() => {
                   report(actionNode.id);
+                  setActionOn(null);
+                }}
+              />
+            )}
+            {currentUserId === postOwnerId && (
+              <MenuItem
+                icon={actionNode.pinned_at ? PinOff : Pin}
+                label={actionNode.pinned_at ? "Unpin this comment" : "Pin to the top"}
+                onClick={() => {
+                  void pin(actionNode);
                   setActionOn(null);
                 }}
               />
@@ -1214,6 +1256,15 @@ const Row = memo(function Row({
               · {timeAgoShort(node.created_at)}
               {wasEdited(node.created_at, node.updated_at) && " · edited"}
             </span>
+            {node.pinned_at && (
+              <span
+                className="flex shrink-0 items-center gap-0.5 rounded-pill bg-accent/15 px-1.5 py-px text-[10px] font-bold text-accent"
+                data-pinned-comment
+              >
+                <Pin size={9} fill="currentColor" strokeWidth={0} aria-hidden />
+                Pinned
+              </span>
+            )}
           </div>
 
           {/* A photo, if there is one, then whatever was said about it.
