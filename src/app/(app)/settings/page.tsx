@@ -3,6 +3,7 @@ import { CookiePreferencesButton } from "@/components/consent/ConsentBanner";
 import {
   LibraryBig,
   History,
+  Archive,
   UserCircle,
   Shield,
   ShieldCheck,
@@ -100,6 +101,12 @@ const LISTS = [
     label: "Your activity",
     sub: "What you hyped and said",
     icon: History,
+  },
+  {
+    href: "/settings/archive",
+    label: "Archive",
+    sub: "Posts and Shots you took off without deleting",
+    icon: Archive,
   },
   {
     href: "/requests",

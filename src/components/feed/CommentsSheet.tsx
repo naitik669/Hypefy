@@ -17,11 +17,14 @@ import {
   Trash2,
   CornerUpLeft,
   Copy,
+  Check,
+  Pencil,
   Image as ImageIcon,
   X,
 } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
+import { wasEdited } from "@/lib/post-controls";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
 import { ReportSheet } from "@/components/ui/ReportSheet";
@@ -105,6 +108,8 @@ type Node = {
   id: string;
   user_id: string;
   body: string;
+  /** When the words were last changed, for the "edited" mark. */
+  updated_at: string | null;
   /** A photo posted with the comment (0087), separate from the body. */
   image_url: string | null;
   created_at: string;
@@ -246,7 +251,7 @@ export function CommentsSheet({
       let q = supabase
         .from("comments")
         .select(
-          "id, user_id, body, image_url, created_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
+          "id, user_id, body, image_url, created_at, updated_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
         )
         .eq(targetType === "shot" ? "shot_id" : "post_id", postId)
         .is("deleted_at", null)
@@ -284,6 +289,7 @@ export function CommentsSheet({
         body: c.body as string,
         image_url: (c.image_url as string | null) ?? null,
         created_at: c.created_at as string,
+        updated_at: (c.updated_at as string | null) ?? null,
         parent_id: (c.parent_id as string | null) ?? null,
         hyped: hyped.has(c.id as string),
         hypeCount: (c.hype_count as number) ?? 0,
@@ -512,7 +518,7 @@ export function CommentsSheet({
       const { data: row } = await supabase
         .from("comments")
         .select(
-          "id, user_id, body, image_url, created_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
+          "id, user_id, body, image_url, created_at, updated_at, parent_id, hype_count, profiles(display_name, username, avatar_hue, avatar_url, is_verified, is_premium, name_font, name_glow, avatar_decoration)"
         )
         .eq("id", data)
         .single();
@@ -527,6 +533,7 @@ export function CommentsSheet({
             body: r.body as string,
             image_url: (r.image_url as string | null) ?? null,
             created_at: r.created_at as string,
+            updated_at: (r.updated_at as string | null) ?? null,
             parent_id: (r.parent_id as string | null) ?? null,
             hyped: false,
             hypeCount: 0,
@@ -545,7 +552,49 @@ export function CommentsSheet({
     [replyTo, targetType, postId, postOwnerId, supabase, showToast]
   );
 
+  /** The comment being rewritten, and the words so far. */
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const saveEdit = useCallback(async () => {
+    if (!editing) return;
+    const body = editing.text.trim();
+    const { id } = editing;
+    if (!body) {
+      showToast("A comment can't be empty.");
+      return;
+    }
+    setSavingEdit(true);
+    const { error } = await supabase.rpc("edit_comment", { p_id: id, p_body: body });
+    setSavingEdit(false);
+    if (error) {
+      showToast("Couldn't save that change.");
+      return;
+    }
+    setItems((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, body, updated_at: new Date().toISOString() } : n)),
+    );
+    setEditing(null);
+  }, [editing, supabase, showToast]);
+
   const actionNode = actionOn?.node;
+  /** The author shut this thread: what is here stays, nothing new arrives. */
+  const [commentsOff, setCommentsOff] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    void supabase
+      .from(targetType === "shot" ? "shots" : "posts")
+      .select("comments_off")
+      .eq("id", postId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (alive) setCommentsOff(!!(data as { comments_off?: boolean } | null)?.comments_off);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open, postId, targetType, supabase]);
 
   return (
     <>
@@ -558,12 +607,18 @@ export function CommentsSheet({
         reportTop={reportTop}
         dim={dim}
         footer={
-          <Composer
-            replyTo={replyTo}
-            currentUserId={currentUserId}
-            onCancelReply={() => setReplyTo(null)}
-            onSubmit={submit}
-          />
+          commentsOff && currentUserId !== postOwnerId ? (
+            <p className="px-4 py-3.5 text-center text-xs font-semibold text-muted" data-comments-off>
+              Comments are off for this one.
+            </p>
+          ) : (
+            <Composer
+              replyTo={replyTo}
+              currentUserId={currentUserId}
+              onCancelReply={() => setReplyTo(null)}
+              onSubmit={submit}
+            />
+          )
         }
         title={`Comments · ${total ?? items.length}`}
       >
@@ -589,6 +644,11 @@ export function CommentsSheet({
                 onLongPress={longPress}
                 onZoom={zoom}
                 focusId={focusCommentId}
+                editing={editing}
+                onEditChange={(text) => setEditing((e) => (e ? { ...e, text } : e))}
+                onEditSave={() => void saveEdit()}
+                onEditCancel={() => setEditing(null)}
+                savingEdit={savingEdit}
               />
             ))}
 
@@ -680,6 +740,16 @@ export function CommentsSheet({
                 label="Report"
                 onClick={() => {
                   report(actionNode.id);
+                  setActionOn(null);
+                }}
+              />
+            )}
+            {actionNode.user_id === currentUserId && !mediaBody(actionNode.body) && (
+              <MenuItem
+                icon={Pencil}
+                label="Edit"
+                onClick={() => {
+                  setEditing({ id: actionNode.id, text: actionNode.body });
                   setActionOn(null);
                 }}
               />
@@ -962,6 +1032,12 @@ type RowHandlers = {
   onReply: (threadId: string, username: string) => void;
   onLongPress: (n: Node, threadId: string, x: number, y: number) => void;
   onZoom: (src: string) => void;
+  /** The comment being rewritten right now, if it is this one. */
+  editing: { id: string; text: string } | null;
+  onEditChange: (text: string) => void;
+  onEditSave: () => void;
+  onEditCancel: () => void;
+  savingEdit: boolean;
 };
 
 const Thread = memo(function Thread({
@@ -1034,6 +1110,11 @@ const Row = memo(function Row({
   onReply,
   onLongPress,
   onZoom,
+  editing,
+  onEditChange,
+  onEditSave,
+  onEditCancel,
+  savingEdit,
 }: {
   node: Node;
   threadId: string;
@@ -1131,6 +1212,7 @@ const Row = memo(function Row({
             {node.profiles?.is_verified && <VerifiedBadge className="h-3 w-3 shrink-0" />}
             <span className="text-xs text-faint">
               · {timeAgoShort(node.created_at)}
+              {wasEdited(node.created_at, node.updated_at) && " · edited"}
             </span>
           </div>
 
@@ -1154,7 +1236,45 @@ const Row = memo(function Row({
             </button>
           )}
 
-          {!mediaBody(node.body) && node.body.trim() !== "" && (
+          {editing?.id === node.id ? (
+            <form
+              data-editing-comment
+              className="mt-1 flex items-center gap-1.5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                onEditSave();
+              }}
+              // The hold-to-act listener is on the wrapper; typing is not a hold.
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <input
+                autoFocus
+                value={editing.text}
+                onChange={(e) => onEditChange(e.target.value.slice(0, 1000))}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") onEditCancel();
+                }}
+                aria-label="Edit your comment"
+                className="h-9 min-w-0 flex-1 rounded-xl bg-surface px-3 text-sm outline-none"
+              />
+              <button
+                type="submit"
+                disabled={savingEdit || !editing.text.trim()}
+                aria-label="Save"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-ink disabled:opacity-60"
+              >
+                {savingEdit ? <Loader2 size={15} className="animate-spin" /> : <Check size={16} strokeWidth={2.6} />}
+              </button>
+              <button
+                type="button"
+                onClick={onEditCancel}
+                aria-label="Cancel"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface text-muted"
+              >
+                <X size={16} />
+              </button>
+            </form>
+          ) : !mediaBody(node.body) && node.body.trim() !== "" ? (
             <ExpandableText
               className="mt-0.5 text-sm leading-snug text-foreground/90"
               clampClass="line-clamp-4"
@@ -1166,7 +1286,7 @@ const Row = memo(function Row({
                 <RichPostText text={node.body} />
               </p>
             </ExpandableText>
-          )}
+          ) : null}
         </div>
 
         <div className="mt-1.5 flex items-center gap-4">

@@ -3190,6 +3190,20 @@ export type Database = {
         }[]
       }
       my_private_profile: { Args: never; Returns: Json }
+      set_archived: { Args: { p_kind: string; p_id: string; p_archived: boolean }; Returns: undefined }
+      set_comments_off: { Args: { p_kind: string; p_id: string; p_off: boolean }; Returns: undefined }
+      edit_comment: { Args: { p_id: string; p_body: string }; Returns: undefined }
+      my_archive: {
+        Args: never
+        Returns: {
+          kind: string
+          id: string
+          caption: string | null
+          thumb: string | null
+          media_url: string | null
+          archived_at: string
+        }[]
+      }
       storage_paths_of: {
         Args: { p_user: string }
         Returns: { bucket_id: string; name: string }[]

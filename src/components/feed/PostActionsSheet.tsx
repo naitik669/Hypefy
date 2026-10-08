@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, UserCheck, Link2, Flag, Trash2, Pencil, Star, Ban, EyeOff, VolumeX } from "lucide-react";
+import { UserPlus, UserCheck, Link2, Flag, Trash2, Pencil, Star, Ban, EyeOff, VolumeX, Archive, MessageCircle, MessageCircleOff } from "lucide-react";
+import { setArchived, setCommentsOff } from "@/lib/post-controls";
 import { hideContent, muteUser, QUIET_COPY } from "@/lib/feed-quiet";
 import { createClient } from "@/lib/supabase/client";
 import { ReportSheet } from "@/components/ui/ReportSheet";
@@ -50,6 +51,54 @@ export function PostActionsSheet({
   const router = useRouter();
   const toast = useToast();
   const isOwn = postUserId === currentUserId;
+  /** Whether this post is taking comments. Only its author is told. */
+  const [commentsOff, setCommentsOffState] = useState(false);
+  const [ownerBusy, setOwnerBusy] = useState<"archive" | "comments" | null>(null);
+
+  useEffect(() => {
+    if (!open || !isOwn) return;
+    let alive = true;
+    void supabase
+      .from("posts")
+      .select("comments_off")
+      .eq("id", postId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (alive) setCommentsOffState(!!(data as { comments_off?: boolean } | null)?.comments_off);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open, isOwn, postId, supabase]);
+
+  async function archive() {
+    setOwnerBusy("archive");
+    const problem = await setArchived(supabase, "post", postId, true);
+    setOwnerBusy(null);
+    if (problem) {
+      toast(problem, "error");
+      return;
+    }
+    onClose();
+    // It leaves every feed at once, so take it off this screen too.
+    onDelete?.();
+    toast("Moved to your archive", "plain", { label: "Settings", onClick: () => router.push("/settings/archive") });
+    router.refresh();
+  }
+
+  async function toggleComments() {
+    const next = !commentsOff;
+    setOwnerBusy("comments");
+    const problem = await setCommentsOff(supabase, "post", postId, next);
+    setOwnerBusy(null);
+    if (problem) {
+      toast(problem, "error");
+      return;
+    }
+    setCommentsOffState(next);
+    onClose();
+    toast(next ? "Comments are off for this post" : "Comments are back on");
+  }
 
   const [following, setFollowing] = useState(false);
   const [followPending, setFollowPending] = useState(false);
@@ -228,6 +277,19 @@ export function PostActionsSheet({
           <>
             <MenuDivider />
             <MenuItem icon={Pencil} label="Edit post" onClick={() => { onClose(); onEdit?.(); }} />
+            <MenuItem
+              icon={commentsOff ? MessageCircleOff : MessageCircle}
+              label={commentsOff ? "Turn comments on" : "Turn comments off"}
+              pending={ownerBusy === "comments"}
+              onClick={() => void toggleComments()}
+            />
+            <MenuItem
+              icon={Archive}
+              label="Archive"
+              sub="Only you can see it"
+              pending={ownerBusy === "archive"}
+              onClick={() => void archive()}
+            />
             <MenuItem icon={Trash2} label="Delete post" danger onClick={deletePost} />
           </>
         )}

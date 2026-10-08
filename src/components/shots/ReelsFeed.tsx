@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, EyeOff } from "lucide-react";
+import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, EyeOff, Pencil, Archive, MessageCircle, MessageCircleOff } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { setArchived, setCommentsOff } from "@/lib/post-controls";
 import { RehypeIcon } from "@/components/ui/RehypeIcon";
 import { isRehyped, setRehype, type DeckPerson } from "@/lib/rehype";
 import { useRehypeDeck } from "@/lib/use-rehype-deck";
@@ -787,7 +789,11 @@ function ReelCard({
     cardRouter.refresh();
   }
   const [inShowcase, setInShowcase] = useState(false);
-  const [ownerAction, setOwnerAction] = useState<"delete" | "showcase" | null>(
+  /** Rewriting the caption, with the words so far. */
+  const [editCaption, setEditCaption] = useState<string | null>(null);
+  const [savingCaption, setSavingCaption] = useState(false);
+  const [shotCommentsOff, setShotCommentsOff] = useState(false);
+  const [ownerAction, setOwnerAction] = useState<"delete" | "showcase" | "archive" | "comments" | null>(
     null
   );
   const [deleted, setDeleted] = useState(false);
@@ -1085,6 +1091,73 @@ function ReelCard({
       .map((p) => decodeURIComponent(p.split("?")[0]));
 
     if (paths.length) await supabase.storage.from("shot-media").remove(paths);
+  }
+
+  /** A caption just rewritten here, so the change shows without a reload.
+   *  Tied to the Shot it belongs to, so moving to the next one drops it. */
+  const [rewritten, setRewritten] = useState<{ id: string; caption: string | null } | null>(null);
+  const caption = rewritten?.id === reel.id ? rewritten.caption : (reel.caption ?? null);
+
+  // Whether this Shot is taking comments. Asked for only by its author, when
+  // they open their own menu.
+  useEffect(() => {
+    if (!ownerMenuOpen || !isOwner) return;
+    let alive = true;
+    void supabase
+      .from("shots")
+      .select("comments_off")
+      .eq("id", reel.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (alive) setShotCommentsOff(!!(data as { comments_off?: boolean } | null)?.comments_off);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [ownerMenuOpen, isOwner, reel.id, supabase]);
+
+  async function saveCaption() {
+    if (editCaption === null) return;
+    const next = editCaption.trim();
+    setSavingCaption(true);
+    const { error } = await supabase.from("shots").update({ caption: next || null }).eq("id", reel.id).select("id");
+    setSavingCaption(false);
+    if (error) {
+      showToast("Couldn't save that caption.");
+      return;
+    }
+    setRewritten({ id: reel.id, caption: next || null });
+    setEditCaption(null);
+    showToast("Caption saved");
+  }
+
+  async function archiveShot() {
+    setOwnerAction("archive");
+    const problem = await setArchived(supabase, "shot", reel.id, true);
+    setOwnerAction(null);
+    if (problem) {
+      showToast(problem);
+      return;
+    }
+    setOwnerMenuOpen(false);
+    // Off every feed at once, this one included.
+    setDeleted(true);
+    showToast("Moved to your archive");
+    onBack();
+  }
+
+  async function toggleShotComments() {
+    const next = !shotCommentsOff;
+    setOwnerAction("comments");
+    const problem = await setCommentsOff(supabase, "shot", reel.id, next);
+    setOwnerAction(null);
+    if (problem) {
+      showToast(problem);
+      return;
+    }
+    setShotCommentsOff(next);
+    setOwnerMenuOpen(false);
+    showToast(next ? "Comments are off for this Shot" : "Comments are back on");
   }
 
   async function toggleShotShowcase() {
@@ -1464,7 +1537,7 @@ function ReelCard({
             onOpen={() => setHypedBySheet(true)}
           />
         )}
-        {reel.caption && !commentsOpen && (
+        {caption && !commentsOpen && (
           <ExpandableText
             clampClass="line-clamp-2"
             className="text-sm text-white/90 drop-shadow"
@@ -1660,6 +1733,36 @@ function ReelCard({
         />
       )}
 
+      {editCaption !== null && (
+        <BottomSheet open onClose={() => setEditCaption(null)} title="Edit caption">
+          <form
+            className="flex flex-col gap-3 pb-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveCaption();
+            }}
+          >
+            <textarea
+              autoFocus
+              value={editCaption}
+              onChange={(e) => setEditCaption(e.target.value.slice(0, 300))}
+              rows={3}
+              aria-label="Caption"
+              placeholder="Say something about it…"
+              className="input w-full resize-none"
+            />
+            <p className="text-right text-[11px] text-faint">{editCaption.length}/300</p>
+            <button
+              type="submit"
+              disabled={savingCaption}
+              className="flex h-12 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink disabled:opacity-60"
+            >
+              {savingCaption ? <Loader2 size={16} className="animate-spin" /> : "Save caption"}
+            </button>
+          </form>
+        </BottomSheet>
+      )}
+
       {/* Owner actions menu — same pattern as ShowViewer */}
       {ownerMenuOpen && (
         <>
@@ -1724,6 +1827,67 @@ function ReelCard({
                     ? "Remove from your profile highlights"
                     : "Pin to your profile highlights"}
                 </p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
+            <button
+              type="button"
+              onClick={() => {
+                setOwnerMenuOpen(false);
+                setEditCaption(caption ?? "");
+              }}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5"
+            >
+              <Pencil size={20} className="text-foreground" />
+              <div>
+                <p className="text-sm font-semibold">Edit caption</p>
+                <p className="text-xs text-muted">Change the words under it</p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
+            <button
+              type="button"
+              disabled={ownerAction !== null}
+              onClick={() => void toggleShotComments()}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5 disabled:opacity-50"
+            >
+              {ownerAction === "comments" ? (
+                <Loader2 size={20} className="animate-spin text-accent" />
+              ) : shotCommentsOff ? (
+                <MessageCircleOff size={20} className="text-foreground" />
+              ) : (
+                <MessageCircle size={20} className="text-foreground" />
+              )}
+              <div>
+                <p className="text-sm font-semibold">
+                  {shotCommentsOff ? "Turn comments on" : "Turn comments off"}
+                </p>
+                <p className="text-xs text-muted">
+                  {shotCommentsOff ? "Let people reply again" : "What is already here stays"}
+                </p>
+              </div>
+            </button>
+
+            <div className="mx-4 h-px bg-border" />
+
+            <button
+              type="button"
+              disabled={ownerAction !== null}
+              onClick={() => void archiveShot()}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/5 disabled:opacity-50"
+            >
+              {ownerAction === "archive" ? (
+                <Loader2 size={20} className="animate-spin text-accent" />
+              ) : (
+                <Archive size={20} className="text-foreground" />
+              )}
+              <div>
+                <p className="text-sm font-semibold">Archive</p>
+                <p className="text-xs text-muted">Off everything, kept for you</p>
               </div>
             </button>
 
