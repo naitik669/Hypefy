@@ -190,9 +190,9 @@ function Dots({ faint = false }: { faint?: boolean }) {
     <span aria-hidden>
       {/* Tucked under the bubble's bottom-left corner, which sits OVERLAP
           below the top of the picture. */}
-      <span className={`absolute -left-[9px] top-[7px] h-[8px] w-[8px] rounded-full ${fill}`} />
+      <span className={`absolute -left-[6px] top-[7px] h-[8px] w-[8px] rounded-full ${fill}`} />
       {/* Overlapping the one above it and resting on the picture's rim. */}
-      <span className={`absolute -left-[3px] top-[14px] h-[5px] w-[5px] rounded-full ${fill}`} />
+      <span className={`absolute -left-[1px] top-[14px] h-[5px] w-[5px] rounded-full ${fill}`} />
     </span>
   );
 }
