@@ -83,15 +83,18 @@ describe("a nameplate worn in a list", () => {
   const src = read("src/components/ui/Nameplate.tsx");
   const inbox = read("src/components/messages/MessagesInbox.tsx");
 
-  it("ends before the row's own marks, and the inbox says by how much", () => {
-    expect(src).toContain("export const PLATE_FADE_PX = 88;");
+  it("thins away across the row rather than stopping short of it", () => {
+    // Clearing a wide band outright read as the plate ending early and
+    // leaving a bare chunk at the end of the row. Almost nothing is
+    // cleared now; the long fade below does the work.
+    expect(src).toContain("export const PLATE_FADE_PX = 14;");
     expect(inbox).toContain("fadeRight={PLATE_FADE_PX}");
   });
 
   it("fades out in pixels, so the art is never resized or clipped", () => {
     // Holding it in a narrower box instead cut the motif off mid-stroke and
     // left a straight seam down the row.
-    expect(src).toContain("const RAMP_PX = 130;");
+    expect(src).toContain("const RAMP_PX = 215;");
     expect(src).toContain("calc(100% - ${fadeRight + RAMP_PX * (1 - at)}px)");
     expect(src).toContain('overflow: "visible"');
   });
@@ -109,8 +112,12 @@ describe("a nameplate worn in a list", () => {
     alphas.forEach((a, i) => {
       if (i === 0) return;
       expect(a).toBeLessThan(alphas[i - 1]);
-      expect(alphas[i - 1] - a).toBeLessThan(0.25);
+      expect(alphas[i - 1] - a).toBeLessThan(0.15);
     });
+    // Nearly spent by the time the row's own marks begin, so they are
+    // legible without the plate ever having stopped.
+    const atMarks = alphas[Math.round(alphas.length * 0.78)];
+    expect(atMarks).toBeLessThan(0.12);
   });
 
   it("the motif thins at both ends, so it never meets the fade head-on", () => {

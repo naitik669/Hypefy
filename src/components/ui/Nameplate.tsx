@@ -46,10 +46,18 @@ const MOTIF_MASK =
  * people. The plate now ends before that column and tapers into it, the
  * way a banner behind a list has to.
  */
-export const PLATE_FADE_PX = 88;
+export const PLATE_FADE_PX = 14;
 
-/** How long the fade is, in pixels, before that clear space begins. */
-const RAMP_PX = 130;
+/**
+ * How long the fade is, in pixels, before that clear space begins.
+ *
+ * Long, and it starts early. The first attempt cleared 88px outright and
+ * faded across 130 — which read as the plate stopping short and leaving a
+ * bare chunk at the end of the row. Nothing is cleared outright now: the
+ * plate runs the whole width and simply thins to nothing, so there is no
+ * point where it ends and no empty space where it used to.
+ */
+const RAMP_PX = 215;
 
 /**
  * The fade's shape, as [how far along, how opaque].
@@ -59,10 +67,15 @@ const RAMP_PX = 130;
  * long the ramp is — which is why lengthening it alone never helped. These
  * stops ease away from 1 and level off into 0, so there is no point along
  * the plate where the rate of change jumps.
+ *
+ * The tail is deliberately long and very faint: by the time the row's own
+ * marks begin, the plate is down around a twentieth of its strength, which
+ * leaves them legible without the plate ever having stopped.
  */
 const FADE_STOPS: readonly [number, number][] = [
-  [0, 1], [0.18, 0.94], [0.34, 0.82], [0.48, 0.65],
-  [0.62, 0.45], [0.74, 0.28], [0.85, 0.14], [0.94, 0.05], [1, 0],
+  [0, 1], [0.08, 0.95], [0.16, 0.87], [0.24, 0.76], [0.32, 0.64],
+  [0.4, 0.52], [0.48, 0.41], [0.56, 0.31], [0.64, 0.22], [0.72, 0.15],
+  [0.79, 0.1], [0.86, 0.06], [0.92, 0.03], [0.96, 0.012], [1, 0],
 ];
 
 /**
