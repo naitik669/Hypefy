@@ -5,16 +5,19 @@ import Link from "next/link";
 import { Plus, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { upsertSavedAccount } from "@/lib/saved-accounts";
+import { AccountDropdown } from "@/components/messages/AccountDropdown";
 
 /**
  * Messages header: the screen title, the call log, and starting a new chat.
  *
- * It used to carry an account switcher on the title. Switching accounts is not
- * what tapping the name of the screen you are already on should do, and nothing
- * signalled that it would. Account switching lives in one place now — hold the
- * profile tab — which is also where people already look for it.
+ * The title carries the account switcher again. It was taken out once because
+ * nothing signalled that tapping the name of the screen you are already on
+ * would change who you are — so this time it is a word with an arrow beside
+ * it, which is a control rather than a title that secretly does something.
+ * Holding the profile tab still works and reads from the same list.
  */
 export function MessagesHeader({
+  currentUserId,
   name,
   username,
   avatarUrl,
@@ -55,13 +58,10 @@ export function MessagesHeader({
   // simply slides under it.
   return (
     <header className="sticky top-0 z-20 flex h-[calc(4rem+var(--sat))] items-center justify-between bg-background px-4 pt-[var(--sat)]">
-      {/* No `truncate` and no `leading-none`: together they clipped the word.
-          truncate sets overflow:hidden, leading-none sets line-height to the
-          font size, and "Messages" has a descender — so the tail of the g was
-          cut off. The word is fixed and never needs truncating anyway. */}
-      <h1 className="text-[28px] font-extrabold leading-tight tracking-tight">
-        Messages
-      </h1>
+      {/* No truncate and no leading-none on the word: together they clipped
+          it, because "Messages" has a descender. It is fixed and never needs
+          truncating anyway. */}
+      <AccountDropdown currentUserId={currentUserId} title="Messages" />
 
       <div className="flex shrink-0 items-center gap-1.5">
         {/* Call log was previously reachable only by tapping a call
