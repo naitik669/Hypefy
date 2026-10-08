@@ -22,6 +22,12 @@ type Person = {
  * follow + who follows them) since Hypers is meant to be a subset of people
  * you already know, not a stranger-discovery surface like PeopleToFollow.
  */
+/**
+ * How many of each direction to ask for. The prompt offers a short list, so
+ * a page of the most recent connections either way is more than it can show.
+ */
+const CANDIDATES = 60;
+
 export function AddHypersPrompt({ currentUserId }: { currentUserId: string }) {
   const supabase = createClient();
   const router = useRouter();
@@ -32,15 +38,23 @@ export function AddHypersPrompt({ currentUserId }: { currentUserId: string }) {
   useEffect(() => {
     let active = true;
     (async () => {
+      // Newest connections first, and only a page of each. This asked for
+      // every follow in both directions with a profile joined onto each —
+      // the whole of someone's graph pulled to the phone to offer them a
+      // handful of names.
       const [{ data: following }, { data: followers }] = await Promise.all([
         supabase
           .from("follows")
-          .select("profiles:profiles!follows_following_id_fkey(id, display_name, username, avatar_hue, avatar_url)")
-          .eq("follower_id", currentUserId),
+          .select("created_at, profiles:profiles!follows_following_id_fkey(id, display_name, username, avatar_hue, avatar_url)")
+          .eq("follower_id", currentUserId)
+          .order("created_at", { ascending: false })
+          .limit(CANDIDATES),
         supabase
           .from("follows")
-          .select("profiles:profiles!follows_follower_id_fkey(id, display_name, username, avatar_hue, avatar_url)")
-          .eq("following_id", currentUserId),
+          .select("created_at, profiles:profiles!follows_follower_id_fkey(id, display_name, username, avatar_hue, avatar_url)")
+          .eq("following_id", currentUserId)
+          .order("created_at", { ascending: false })
+          .limit(CANDIDATES),
       ]);
 
       const byId = new Map<string, Person>();

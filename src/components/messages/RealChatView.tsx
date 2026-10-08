@@ -999,12 +999,17 @@ export function RealChatView({
         (max, m) => (m.created_at > max ? m.created_at : max),
         "1970-01-01T00:00:00Z",
       );
+      // Nothing on screen leaves that reduce at 1970, which asked for every
+      // message the thread has ever held. Capped at a page either way: a
+      // catch-up is for what arrived while you were away, and the history
+      // above it is what scrolling up is for.
       supabase
         .from("messages")
         .select(MSG_SELECT)
         .eq("conversation_id", conversationId)
         .gt("created_at", latest)
         .order("created_at", { ascending: true })
+        .limit(MSG_PAGE)
         .then(({ data }) => {
           const rows = (data ?? []).map(mapMessageRow);
           if (!rows.length) return;
