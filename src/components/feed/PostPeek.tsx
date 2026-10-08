@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Star, Bookmark, MoreHorizontal } from "lucide-react";
+import { Star, Bookmark, MoreHorizontal, Volume2, VolumeX } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
@@ -142,6 +142,23 @@ export function PostPeek({
   const [hypeBurst, setHypeBurst] = useState(0);
   const [saveBurst, setSaveBurst] = useState(0);
   const [rehypePulse, setRehypePulse] = useState(0);
+  /**
+   * The held Shot's sound.
+   *
+   * Starts off, and not only because autoplay needs it to: the card this
+   * was held open from may be playing the same Shot underneath, and two
+   * copies a beat apart is worse than a silent one. Turning it on is a tap,
+   * which is also the gesture the browser wants before it will make noise.
+   */
+  const [muted, setMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Set on the element rather than left to the attribute: React does not
+  // reliably update `muted` on a video that is already playing.
+  useEffect(() => {
+    const el = videoRef.current;
+    if (el) el.muted = muted;
+  }, [muted]);
   /** Taking a hype back snaps the star in two, as on the feed. */
   const [broke, setBroke] = useState(false);
   useEffect(() => {
@@ -259,17 +276,35 @@ export function PostPeek({
             style={peekPhotoBox(aspectRatio)}
           >
             {videoSrc ? (
-              // Muted: the card underneath may still own the sound, and two
-              // copies of the same Shot out of sync is worse than a silent one.
-              <video
-                src={videoSrc}
-                poster={src || undefined}
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="absolute inset-0 h-full w-full object-cover"
-              />
+              <>
+                <video
+                  ref={videoRef}
+                  src={videoSrc}
+                  poster={src || undefined}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    swallow(e);
+                    haptics.tap();
+                    setMuted((m) => !m);
+                  }}
+                  // The hold that opened this is still down; a tap here must
+                  // not also read as the double-tap that hypes.
+                  onPointerDown={swallow}
+                  aria-label={muted ? "Unmute" : "Mute"}
+                  aria-pressed={!muted}
+                  data-peek-mute
+                  className="absolute right-2.5 top-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-transform active:scale-90"
+                >
+                  {muted ? <VolumeX size={17} strokeWidth={2.2} /> : <Volume2 size={17} strokeWidth={2.2} />}
+                </button>
+              </>
             ) : (
               <OptimizedImage
                 src={src}

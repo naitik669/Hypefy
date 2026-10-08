@@ -195,3 +195,94 @@ describe("the peek, design F", () => {
     expect((await open({ targetType: "shot", videoSrc: "s.mp4" })).getAttribute("aria-label")).toBe("Shot preview");
   });
 });
+
+/**
+ * A held Shot plays in the peek, and its sound is a tap away. It starts
+ * silent: the card it was held open from may be playing the same Shot
+ * underneath, and the browser wants a gesture before it makes any noise.
+ */
+describe("sound in a held Shot", () => {
+  let root: Root;
+  let host: HTMLDivElement;
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+  });
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    host.remove();
+  });
+
+  async function openShot(videoSrc?: string) {
+    const { PostPeek } = await import("@/components/feed/PostPeek");
+    await act(async () =>
+      root.render(
+        createElement(PostPeek, {
+          src: "https://example.invalid/poster.jpg",
+          videoSrc,
+          aspectRatio: 0.5625,
+          postId: "s1",
+          targetType: "shot",
+          caption: null,
+          hyped: false,
+          hypeCount: 0,
+          commentCount: 0,
+          saved: false,
+          onHype() {},
+          onComment() {},
+          onShare() {},
+          onSave() {},
+          onClose() {},
+        }),
+      ),
+    );
+  }
+
+  const button = () => document.querySelector<HTMLButtonElement>("[data-peek-mute]");
+  const video = () => document.querySelector("video");
+
+  it("starts silent, and says that tapping will unmute", async () => {
+    await openShot("https://example.invalid/clip.mp4");
+    expect(button()).not.toBeNull();
+    expect(button()!.getAttribute("aria-label")).toBe("Unmute");
+    expect(button()!.getAttribute("aria-pressed")).toBe("false");
+    expect(video()!.muted).toBe(true);
+  });
+
+  it("a tap turns the sound on, and another turns it off", async () => {
+    await openShot("https://example.invalid/clip.mp4");
+    await act(async () => button()!.click());
+    expect(video()!.muted).toBe(false);
+    expect(button()!.getAttribute("aria-label")).toBe("Mute");
+    expect(button()!.getAttribute("aria-pressed")).toBe("true");
+
+    await act(async () => button()!.click());
+    expect(video()!.muted).toBe(true);
+    expect(button()!.getAttribute("aria-label")).toBe("Unmute");
+  });
+
+  it("a held photo has no sound to offer, so no button", async () => {
+    await openShot(undefined);
+    expect(video()).toBeNull();
+    expect(button()).toBeNull();
+  });
+
+  it("tapping it does not also hype, the way a double tap on the photo would", async () => {
+    const hype = vi.fn();
+    const { PostPeek } = await import("@/components/feed/PostPeek");
+    await act(async () =>
+      root.render(
+        createElement(PostPeek, {
+          src: "p.jpg", videoSrc: "c.mp4", aspectRatio: 0.5625, postId: "s1", targetType: "shot",
+          caption: null, hyped: false, hypeCount: 0, commentCount: 0, saved: false,
+          onHype: hype, onComment() {}, onShare() {}, onSave() {}, onClose() {},
+        }),
+      ),
+    );
+    await act(async () => button()!.click());
+    await act(async () => button()!.click());
+    expect(hype).not.toHaveBeenCalled();
+  });
+});
