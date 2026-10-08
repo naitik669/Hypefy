@@ -10,7 +10,7 @@ export type HeldAction = {
   key: string;
   icon: LucideIcon;
   label: string;
-  /** Deleting and reporting are drawn apart from the rest. */
+  /** Deleting is drawn apart from the rest. */
   danger?: boolean;
   run: () => void;
 };
@@ -27,18 +27,25 @@ export type HeldComment = {
   } | null;
 };
 
+/** The widest the lifted comment and its options go, as the post peek does. */
+const MAX_W = "440px";
+
 /**
  * A held comment, lifted out of the thread.
  *
- * The thread blurs away behind it and the comment itself settles in the
- * middle of the screen with its actions beneath — so the thing being acted
- * on is in front of you, rather than a menu covering it. A comment held near
- * the bottom of the sheet used to open a menu that ran off the screen and
- * hid the comment it was about; nothing here depends on where the press was.
+ * Built like the peek a held post opens: the screen darkens, the thing you
+ * held sits in the middle at the full width it can have, and the options are
+ * bare — icon and word on the dark, with nothing drawn around them. An
+ * earlier version boxed each option in its own tile, which left most of the
+ * screen empty around a small grid and made six options read as a keypad.
  *
- * Actions are icons with their words under them, three to a row. Which ones
- * there are is the caller's business — this only draws them, and marks the
- * dangerous ones.
+ * Down a column rather than across, because the options are words of
+ * different lengths: in a row they either wrap raggedly or get cut to fit,
+ * and a column lets each one say what it is.
+ *
+ * Nothing depends on where the press was. A comment held near the bottom of
+ * the sheet used to open a menu that ran off the screen and covered the very
+ * comment it was about.
  */
 export function HeldCommentMenu({
   comment,
@@ -59,7 +66,7 @@ export function HeldCommentMenu({
       role="dialog"
       aria-modal="true"
       aria-label="Comment options"
-      className="fixed inset-0 z-[220] flex items-center justify-center px-7"
+      className="fixed inset-0 z-[220] flex items-center justify-center p-4"
     >
       {/* The thread is still there, just out of focus — which is what says
           this is about one comment rather than a new screen. */}
@@ -67,19 +74,19 @@ export function HeldCommentMenu({
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="animate-scrim-in absolute inset-0 bg-black/55 backdrop-blur-md"
+        className="animate-scrim-in absolute inset-0 bg-black/70 backdrop-blur-md"
       />
 
-      <div className="animate-held-lift relative w-full max-w-[340px]">
-        <div className="rounded-[20px] bg-elevated p-3.5 shadow-[0_18px_44px_rgba(0,0,0,0.6)]">
-          <div className="flex items-center gap-2">
+      <div className="animate-held-lift relative flex w-full flex-col gap-4" style={{ maxWidth: MAX_W }}>
+        <div className="rounded-[20px] bg-elevated p-4 shadow-[0_18px_44px_rgba(0,0,0,0.6)]">
+          <div className="flex items-center gap-2.5">
             <Avatar
               name={name}
               hue={comment.profiles?.avatar_hue ?? 200}
               src={comment.profiles?.avatar_url ?? undefined}
-              size={26}
+              size={30}
             />
-            <span className="min-w-0 truncate text-[13px] font-bold">{name}</span>
+            <span className="min-w-0 truncate text-sm font-bold">{name}</span>
           </div>
 
           {comment.image_url && (
@@ -89,35 +96,35 @@ export function HeldCommentMenu({
             <img
               src={comment.image_url}
               alt=""
-              className="mt-2.5 max-h-[38vh] w-full rounded-[14px] object-cover"
+              className="mt-3 max-h-[34vh] w-full rounded-[14px] object-cover"
             />
           )}
 
           {body !== "" ? (
-            <p className="mt-2 max-h-[30vh] overflow-y-auto whitespace-pre-wrap break-words text-sm leading-snug text-foreground/90">
+            <p className="mt-2.5 max-h-[32vh] overflow-y-auto whitespace-pre-wrap break-words text-[15px] leading-relaxed text-foreground/90">
               {body}
             </p>
           ) : (
             !comment.image_url && (
-              <p className="mt-2 flex items-center gap-1.5 text-sm italic text-faint">
-                <ImageIcon size={14} /> A picture
+              <p className="mt-2.5 flex items-center gap-1.5 text-[15px] italic text-faint">
+                <ImageIcon size={15} /> A picture
               </p>
             )
           )}
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        <div className="flex flex-col">
           {actions.map((a, i) => (
             <button
               key={a.key}
               type="button"
               onClick={a.run}
               style={{ animationDelay: `${40 + i * 22}ms` }}
-              className={`animate-held-tile flex h-[66px] flex-col items-center justify-center gap-1 rounded-[16px] bg-elevated text-[10.5px] font-bold transition-transform active:scale-[0.94] ${
-                a.danger ? "text-danger" : "text-muted"
+              className={`animate-held-tile flex items-center gap-4 rounded-2xl px-2 py-3 text-left text-[15px] font-semibold transition-transform active:scale-[0.98] ${
+                a.danger ? "text-danger" : "text-white/90"
               }`}
             >
-              <a.icon size={19} strokeWidth={2.1} />
+              <a.icon size={21} strokeWidth={2.1} className="shrink-0" />
               {a.label}
             </button>
           ))}

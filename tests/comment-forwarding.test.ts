@@ -213,7 +213,7 @@ describe("the menu a held comment opens", () => {
 
   it("lifts the comment to the middle, with the thread blurred behind", () => {
     expect(src).toContain("fixed inset-0 z-[220] flex items-center justify-center");
-    expect(src).toContain("bg-black/55 backdrop-blur-md");
+    expect(src).toContain("bg-black/70 backdrop-blur-md");
     expect(src).toContain("animate-held-lift");
   });
 
@@ -225,14 +225,30 @@ describe("the menu a held comment opens", () => {
     expect(src).not.toContain("clientX");
   });
 
-  it("actions are icons with their words under them, three to a row", () => {
-    expect(src).toContain("grid grid-cols-3 gap-2");
-    expect(src).toContain("<a.icon size={19}");
+  it("options run down a column, bare, as the post peek's do", () => {
+    // No tile around each one: boxing six options left most of the screen
+    // empty around a small grid and made them read as a keypad.
+    expect(src).toContain('<div className="flex flex-col">');
+    expect(src).toContain("<a.icon size={21}");
     expect(src).toContain("animationDelay: `${40 + i * 22}ms`");
+    expect(src).not.toContain("grid-cols-3");
+    expect(src).not.toContain("bg-elevated text-[10.5px]");
   });
 
-  it("the dangerous ones are marked as such", () => {
-    expect(src).toContain('a.danger ? "text-danger" : "text-muted"');
+  it("the comment takes the width it can have", () => {
+    expect(src).toContain('const MAX_W = "440px";');
+    expect(src).toContain('className="animate-held-lift relative flex w-full flex-col gap-4" style={{ maxWidth: MAX_W }}');
+  });
+
+  it("only what removes something is marked dangerous", () => {
+    expect(src).toContain('a.danger ? "text-danger" : "text-white/90"');
+    // Reporting costs the reader nothing and undoes nothing, so only
+    // Delete carries the mark. Two reds side by side also make the one that
+    // really removes something easy to hit by accident.
+    const report = sheet.slice(sheet.indexOf('key: "report"'), sheet.indexOf('key: "delete"'));
+    expect(report).toContain('label: "Report",');
+    expect(report).not.toContain("danger: true");
+    expect(sheet.slice(sheet.indexOf('key: "delete"'))).toContain("danger: true");
   });
 
   it("holding is not the only way in", () => {
