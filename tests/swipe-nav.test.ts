@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import {
   lockAxis,
@@ -128,5 +129,33 @@ describe("gestureBlocked", () => {
 
   it("allows an ordinary touch with nothing open", () => {
     expect(gestureBlocked(0, null)).toBe(false);
+  });
+});
+
+/**
+ * The rehype deck owns its own sideways drag.
+ *
+ * Pulling a face off the stack is a horizontal gesture over the picture. The
+ * gallery behind it only claims that gesture when it has more than one image
+ * to move between, so on a single-image post nothing stood the tab swipe
+ * down and dragging a face changed tab instead.
+ */
+describe("dragging a rehyped face", () => {
+  it("the deck says the sideways drag is its own", () => {
+    const src = readFileSync("src/components/feed/RehypeDeck.tsx", "utf8");
+    expect(src).toContain('data-hswipe=""');
+  });
+
+  it("so the tab swipe stands down over it, whatever the post holds", () => {
+    const deck = document.createElement("div");
+    deck.setAttribute("data-hswipe", "");
+    const face = document.createElement("button");
+    deck.appendChild(face);
+    document.body.appendChild(deck);
+    try {
+      expect(inHorizontalScroller(face)).toBe(true);
+    } finally {
+      deck.remove();
+    }
   });
 });

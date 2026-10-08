@@ -268,6 +268,11 @@ export function RehypeDeck({
       ref={group}
       role="group"
       aria-label={names.length ? `Rehyped by ${names.join(", ")}` : undefined}
+      // Dragging a face sideways is this deck's gesture, not the app's. The
+      // gallery behind only claims the sideways drag when it has more than
+      // one image to move between, so on a single-image post nothing stood
+      // the tab swipe down and pulling a face off changed tab instead.
+      data-hswipe=""
       className="rehype-deck pointer-events-auto relative shrink-0"
       style={{ width: size + (columns - 1) * step, height }}
       // A touch that starts on the deck belongs to the deck, never to the

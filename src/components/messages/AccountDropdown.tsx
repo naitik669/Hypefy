@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Chat } from "@phosphor-icons/react";
 import { Check, ChevronDown, Loader2, Plus, Star } from "lucide-react";
@@ -41,6 +42,9 @@ export function AccountDropdown({
   const [counts, setCounts] = useState<Record<string, UnreadResult>>({});
   const [loading, setLoading] = useState(false);
   const [switching, setSwitching] = useState<string | null>(null);
+  function close() {
+    setOpen(false);
+  }
 
   /**
    * Open it, and go and find what is waiting on the other accounts.
@@ -52,7 +56,7 @@ export function AccountDropdown({
   function toggle() {
     haptics.tap();
     if (open) {
-      setOpen(false);
+      close();
       return;
     }
     const list = getSavedAccounts();
@@ -112,15 +116,32 @@ export function AccountDropdown({
         />
       </button>
 
+      {/* While this is open the rest of the screen is out of play.
+          FloatingMenu lays its own catcher underneath, but that one closes on
+          pointerdown and then unmounts — so the click that follows lands on
+          whatever was beneath it, and tapping a conversation to dismiss the
+          panel would close it AND open that chat. This sits above that
+          catcher, takes both halves of the tap, and is dark enough to say
+          the thread list is not listening. */}
+      {open &&
+        createPortal(
+          <div
+            data-account-scrim
+            aria-hidden
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={close}
+            className="animate-scrim-in fixed inset-0 z-[195] bg-black/45"
+          />,
+          document.body,
+        )}
+
       <FloatingMenu
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={close}
         origin="top-left"
         className="absolute left-0 top-11 w-[17rem]"
       >
-        {mine && (
-          <Row account={mine} current onPick={() => setOpen(false)} />
-        )}
+        {mine && <Row account={mine} current onPick={close} />}
         {others.map((a) => (
           <Row
             key={a.userId}
@@ -134,7 +155,7 @@ export function AccountDropdown({
         <button
           type="button"
           onClick={() => {
-            setOpen(false);
+            close();
             router.push("/signin?add=1");
           }}
           className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04]"
@@ -182,13 +203,13 @@ function Row({
           <span className="mt-0.5 flex items-center gap-2.5 text-[11px] font-bold text-accent">
             {unread.chats > 0 && (
               <span className="flex items-center gap-1" aria-label={`${unread.chats} unread chats`}>
-                <Chat size={13} weight="fill" aria-hidden />
+                <Chat size={13} aria-hidden />
                 {unread.chats}
               </span>
             )}
             {unread.activity > 0 && (
               <span className="flex items-center gap-1" aria-label={`${unread.activity} new activity`}>
-                <Star size={12} fill="currentColor" strokeWidth={0} aria-hidden />
+                <Star size={12} strokeWidth={2.4} aria-hidden />
                 {unread.activity}
               </span>
             )}

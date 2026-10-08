@@ -1,5 +1,13 @@
-import { describe, it, expect } from "vitest";
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createElement, act } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { readFileSync } from "node:fs";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push() {}, refresh() {} }) }));
+vi.mock("@/components/ui/ToastProvider", () => ({ useToast: () => () => {} }));
+vi.mock("@/lib/haptics", () => ({ haptics: { tap() {}, select() {}, success() {} } }));
+vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ auth: { setSession: async () => ({ error: null }) } }) }));
 import { hasAny, unreadFor, unreadForAll, type Asker } from "@/lib/account-unread";
 import type { SavedAccount } from "@/lib/saved-accounts";
 
@@ -110,13 +118,26 @@ describe("the arrow on the title", () => {
     expect(src).toContain('open ? "rotate-180 text-accent" : ""');
   });
 
-  it("uses the app's own chat and activity marks, each with its number", () => {
+  it("uses the app's own chat and activity marks, drawn as outlines, each with its number", () => {
     expect(src).toContain('import { Chat } from "@phosphor-icons/react";');
-    expect(src).toContain("<Chat size={13} weight=\"fill\" aria-hidden />");
-    expect(src).toContain("<Star size={12} fill=\"currentColor\" strokeWidth={0} aria-hidden />");
+    // Outline, like every other icon in the app. Phosphor's default weight
+    // is the outline one, so saying nothing is saying outline.
+    expect(src).toContain("<Chat size={13} aria-hidden />");
+    expect(src).toContain("<Star size={12} strokeWidth={2.4} aria-hidden />");
+    expect(src).not.toContain('weight="fill"');
+    expect(src).not.toContain('fill="currentColor"');
     // The digits are read out as what they count, not left as bare numbers.
     expect(src).toContain("aria-label={`${unread.chats} unread chats`}");
     expect(src).toContain("aria-label={`${unread.activity} new activity`}");
+  });
+
+  it("puts the rest of the screen out of play while it is open", () => {
+    expect(src).toContain("data-account-scrim");
+    expect(src).toContain("bg-black/45");
+    // Both halves of a tap: the pointerdown is swallowed so FloatingMenu's
+    // own catcher never unmounts mid-gesture, and the click closes it.
+    expect(src).toContain("onPointerDown={(e) => e.stopPropagation()}");
+    expect(src).toContain("onClick={close}");
   });
 
   it("asks for the counts when it opens, not when the page loads", () => {
@@ -127,7 +148,7 @@ describe("the arrow on the title", () => {
   });
 
   it("the account you are on is marked, and is not something to switch to", () => {
-    expect(src).toContain("<Row account={mine} current onPick={() => setOpen(false)} />");
+    expect(src).toContain("<Row account={mine} current onPick={close} />");
     expect(src).toContain("others.map((a) => (");
   });
 
@@ -144,5 +165,88 @@ describe("the arrow on the title", () => {
     const header = read("src/components/messages/MessagesHeader.tsx");
     expect(header).toContain('<AccountDropdown currentUserId={currentUserId} title="Messages" />');
     expect(header).not.toContain("Account switching lives in one place now");
+  });
+});
+
+/**
+ * A tap meant to close it must close it, and must not do anything else.
+ *
+ * FloatingMenu's own catcher closes on pointerdown and then unmounts, so the
+ * click that follows lands on whatever was beneath — the title (closing and
+ * reopening in one tap), or a conversation row (opening that chat). The
+ * scrim above it takes both halves of the tap instead.
+ */
+describe("tapping away from the panel", () => {
+  let root: Root;
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    localStorage.setItem(
+      "hypefy_accounts",
+      JSON.stringify([
+        { userId: "me", email: "a@b.c", displayName: "Me", username: "me", avatarHue: 1, avatarUrl: null, accessToken: "t", refreshToken: "r" },
+      ]),
+    );
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+  });
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    document.body.innerHTML = "";
+    localStorage.clear();
+  });
+
+  const panel = () => document.querySelector('[role="menu"]');
+  const scrim = () => document.querySelector<HTMLElement>("[data-account-scrim]");
+  const title = () => document.querySelector<HTMLButtonElement>("[data-account-dropdown]")!;
+
+  async function mount() {
+    const { AccountDropdown } = await import("@/components/messages/AccountDropdown");
+    await act(async () => root.render(createElement(AccountDropdown, { currentUserId: "me", title: "Messages" })));
+  }
+
+  it("opens on a tap, and lays the scrim over everything else", async () => {
+    await mount();
+    expect(panel()).toBeNull();
+    expect(scrim()).toBeNull();
+    await act(async () => title().click());
+    expect(panel()).not.toBeNull();
+    expect(scrim()).not.toBeNull();
+    expect(title().getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("a tap on the scrim closes it", async () => {
+    await mount();
+    await act(async () => title().click());
+    await act(async () => scrim()!.click());
+    expect(panel()).toBeNull();
+    expect(scrim()).toBeNull();
+    expect(title().getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("holds through the pointerdown and goes on the click", async () => {
+    await mount();
+    await act(async () => title().click());
+    // The half-gesture must change nothing. A panel that vanishes on
+    // pointerdown hands the click that follows to whatever was underneath.
+    await act(async () => {
+      scrim()!.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    });
+    expect(panel()).not.toBeNull();
+    expect(scrim()).not.toBeNull();
+    await act(async () => scrim()!.click());
+    expect(panel()).toBeNull();
+  });
+
+  it("tapping the title again closes it, and leaves it closed", async () => {
+    await mount();
+    await act(async () => title().click());
+    // The scrim covers the title too, so the tap lands there.
+    await act(async () => scrim()!.click());
+    expect(panel()).toBeNull();
+    await act(async () => title().click());
+    expect(panel()).not.toBeNull();
   });
 });
