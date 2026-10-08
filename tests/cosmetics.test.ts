@@ -73,6 +73,49 @@ describe("who gets styled", () => {
   });
 });
 
+/**
+ * A plate has to sit behind a row without taking it over. The inbox draws
+ * its own marks on the right — the time, the pin, the mute bell, the unread
+ * count — and the artwork used to be at its loudest exactly there.
+ */
+describe("a nameplate worn in a list", () => {
+  const read = (p: string) => readFileSync(p, "utf8").split("\r\n").join("\n");
+  const src = read("src/components/ui/Nameplate.tsx");
+  const inbox = read("src/components/messages/MessagesInbox.tsx");
+
+  it("ends before the row's own marks, and the inbox says by how much", () => {
+    expect(src).toContain("export const PLATE_FADE_PX = 88;");
+    expect(inbox).toContain("fadeRight={PLATE_FADE_PX}");
+  });
+
+  it("fades out in pixels, so the art is never resized or clipped", () => {
+    // Holding it in a narrower box instead cut the motif off mid-stroke and
+    // left a straight seam down the row.
+    expect(src).toContain("calc(100% - ${fadeRight + 76}px)");
+    expect(src).toContain("calc(100% - ${fadeRight}px)");
+    expect(src).toContain('overflow: "visible"');
+  });
+
+  it("the wash holds its strength instead of climbing into the fade", () => {
+    // At its darkest exactly where it was cut away, a plate ended on a line
+    // rather than fading out.
+    expect(src).toContain("DAMP}) 70%");
+    expect(src).toContain("DAMP}) 100%");
+  });
+
+  it("every plate is damped, so a column of them is not a shouting match", () => {
+    expect(src).toContain("const DAMP = 0.68;");
+    expect(src).toContain("strength * DAMP");
+  });
+
+  it("a plate shown on its own is untouched", () => {
+    // The Marketplace and Your style show one at a time, where full
+    // strength and art to the edge is the point.
+    expect(src).toContain("fadeRight = 0,");
+    expect(src).toContain("taper ? { WebkitMaskImage: taper, maskImage: taper } : undefined");
+  });
+});
+
 describe("the catalogue", () => {
   const sql = ["0076_billing", "0078_bubble_styles", "0079_more_cosmetics", "0082_nameplates_gif_banners"]
     .map((m) => readFileSync(`supabase/migrations/${m}.sql`, "utf8"))

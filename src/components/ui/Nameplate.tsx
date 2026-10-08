@@ -33,23 +33,67 @@ export function NameplateRow({
 }
 
 /**
+ * Where a plate stops when it is worn in a list that has its own marks on
+ * the right — the time, the pin, the mute bell, the unread count.
+ *
+ * The art was at its loudest exactly there. A row would show a wall of
+ * pixel hearts with "4h" somewhere inside it, and a column of rows each
+ * shouting in a different colour read as noise rather than as several
+ * people. The plate now ends before that column and tapers into it, the
+ * way a banner behind a list has to.
+ */
+export const PLATE_FADE_PX = 88;
+
+/**
  * A nameplate's artwork, filling its (positioned) parent: a wash of colour
  * and a motif at the right that fade out towards the left, so the name and
  * message preview over it stay readable. Decorative only.
+ *
+ * `fadeRight` holds all of it inside a band that stops that many pixels
+ * short of the right edge and fades out across the last half of that band,
+ * so nothing drawn on the right has art behind it.
  */
-export function Nameplate({ id, className = "" }: { id: string | null | undefined; className?: string }) {
+export function Nameplate({
+  id,
+  className = "",
+  fadeRight = 0,
+}: {
+  id: string | null | undefined;
+  className?: string;
+  /** Pixels of clear space to leave at the right, for a row's own marks. */
+  fadeRight?: number;
+}) {
   const art = id ? PLATES[id] : undefined;
   if (!art) return null;
+  // In pixels off the right edge, not as a share of an inset box. Holding
+  // the art in a narrower box instead CLIPPED it: the motif is drawn to the
+  // edge of its own viewBox, so a shorter box cut the streaks off mid-stroke
+  // and left a straight seam down the row. Nothing is resized here — it is
+  // the same artwork, faded out before the marks on the right.
+  const taper = fadeRight
+    ? `linear-gradient(90deg, #000 0%, #000 calc(100% - ${fadeRight + 76}px), transparent calc(100% - ${fadeRight}px))`
+    : undefined;
   return (
-    <span aria-hidden className={`pointer-events-none absolute overflow-hidden ${className}`}>
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute overflow-hidden ${className}`}
+      style={taper ? { WebkitMaskImage: taper, maskImage: taper } : undefined}
+    >
       <span className="absolute inset-0" style={{ background: art.wash }} />
+      {/* The motif ends where the taper does, so it lands in the middle of
+          the row rather than under the marks on the right. overflow visible
+          because the shapes are drawn past the edge of their own viewBox —
+          clipping them there is what cut the streaks off mid-stroke. The
+          plate's own overflow-hidden still keeps them inside the row. */}
       <svg
         viewBox="0 0 200 60"
         preserveAspectRatio="xMaxYMid meet"
-        className="absolute inset-y-0 right-0 h-full w-full"
+        className="absolute inset-y-0 left-0 h-full"
         style={{
-          WebkitMaskImage: "linear-gradient(90deg, transparent 40%, #000 88%)",
-          maskImage: "linear-gradient(90deg, transparent 40%, #000 88%)",
+          width: fadeRight ? `calc(100% - ${fadeRight}px)` : "100%",
+          overflow: "visible",
+          WebkitMaskImage: "linear-gradient(90deg, transparent 18%, #000 62%)",
+          maskImage: "linear-gradient(90deg, transparent 18%, #000 62%)",
         }}
       >
         {art.motif}
@@ -58,9 +102,22 @@ export function Nameplate({ id, className = "" }: { id: string | null | undefine
   );
 }
 
-/** The wash fades from nothing at the left edge to its colour at the right. */
+/**
+ * The wash fades from nothing at the left edge to its colour at the right.
+ *
+ * DAMP is why a list of them is readable. Each plate was tuned on its own,
+ * against one row, where a strong wash looks rich; eight in a column, each
+ * a different hue at full strength, is the chaos this pulls back from.
+ */
+const DAMP = 0.68;
+/**
+ * It reaches full strength at 70% and holds, rather than still climbing at
+ * the right edge. Climbing into the taper put the wash at its darkest
+ * exactly where it was being cut away, which is what made the plate end on
+ * a visible line instead of fading out.
+ */
 const wash = (rgb: string, strength = 0.42) =>
-  `linear-gradient(90deg, rgba(${rgb},0) 0%, rgba(${rgb},${strength * 0.35}) 45%, rgba(${rgb},${strength}) 100%)`;
+  `linear-gradient(90deg, rgba(${rgb},0) 0%, rgba(${rgb},${strength * DAMP * 0.35}) 45%, rgba(${rgb},${strength * DAMP}) 70%, rgba(${rgb},${strength * DAMP}) 100%)`;
 
 const spark = (x: number, y: number, r: number) =>
   `M${x} ${y - r} Q${x + r * 0.2} ${y - r * 0.2} ${x + r} ${y} Q${x + r * 0.2} ${y + r * 0.2} ${x} ${y + r} Q${x - r * 0.2} ${y + r * 0.2} ${x - r} ${y} Q${x - r * 0.2} ${y - r * 0.2} ${x} ${y - r}Z`;

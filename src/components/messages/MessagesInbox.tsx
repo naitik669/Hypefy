@@ -38,7 +38,7 @@ import { DisplayName } from "@/components/ui/DisplayName";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { visibleDecoration } from "@/lib/cosmetics";
 import { visibleNameplate } from "@/lib/nameplates";
-import { Nameplate } from "@/components/ui/Nameplate";
+import { Nameplate, PLATE_FADE_PX } from "@/components/ui/Nameplate";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyInbox } from "@/components/messages/EmptyInbox";
 import { EmptyScene } from "@/components/empty/EmptyScene";
@@ -761,7 +761,11 @@ export function MessagesInbox({
         >
           {/* Their nameplate, behind the row */}
           {!r.isGroup && r.cosmetics && (
-            <Nameplate id={visibleNameplate(r.cosmetics)} className="inset-x-2 inset-y-1 rounded-2xl" />
+            <Nameplate
+              id={visibleNameplate(r.cosmetics)}
+              className="inset-x-2 inset-y-1 rounded-2xl"
+              fadeRight={PLATE_FADE_PX}
+            />
           )}
           <div className="relative shrink-0">
             {r.isGroup ? (
