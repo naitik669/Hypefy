@@ -45,6 +45,7 @@ export function NoteEditorSheet({
   me,
   title = "Leave a note",
   subtitle = "your circle sees it for 24 hours",
+  noun = "note",
 }: {
   open: boolean;
   onClose: () => void;
@@ -54,6 +55,12 @@ export function NoteEditorSheet({
   /** The same row is a "note" on a profile and a "Diary" in Messages. */
   title?: string;
   subtitle?: string;
+  /**
+   * What this row is called where the editor was opened from — it is an
+   * UpDate in Messages and a note on a profile. The buttons say it, so a
+   * composer titled "Your UpDate" does not then offer to share a note.
+   */
+  noun?: string;
 }) {
   const toast = useToast();
   const supabase = createClient();
@@ -112,15 +119,15 @@ export function NoteEditorSheet({
     const cancel = scheduleUndoable(async () => {
       const { error } = await supabase.rpc("clear_note");
       if (error) {
-        toast("Couldn't remove your note. Try again.", "error");
+        toast(`Couldn't remove your ${noun}. Try again.`, "error");
         onSaved(was);
       }
     });
     onSaved(null);
     onClose();
-    toast("Note removed", "plain", {
+    toast(`${noun[0].toUpperCase()}${noun.slice(1)} removed`, "plain", {
       label: "Undo",
-      detail: was?.text?.trim() || "Your note",
+      detail: was?.text?.trim() || `Your ${noun}`,
       thumb: { src: me?.avatarUrl ?? null, name: me?.name ?? "Note", hue: me?.hue ?? null },
       onClick: () => {
         cancel();
@@ -276,7 +283,7 @@ export function NoteEditorSheet({
             disabled={(!draft.text.trim() && !draft.emoji) || busy}
             className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-accent text-sm font-bold text-accent-ink transition-transform active:scale-[0.99] disabled:opacity-40"
           >
-            {busy ? <Loader2 size={16} className="animate-spin" /> : "Share note"}
+            {busy ? <Loader2 size={16} className="animate-spin" /> : `Share ${noun}`}
           </button>
           {current && (
             <button
@@ -285,7 +292,7 @@ export function NoteEditorSheet({
               disabled={busy}
               className="py-2 text-center text-[13px] font-semibold text-muted transition-colors hover:text-danger disabled:opacity-50"
             >
-              Remove current note
+              Remove current {noun}
             </button>
           )}
         </div>

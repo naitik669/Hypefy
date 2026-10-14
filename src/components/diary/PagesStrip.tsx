@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronDown, Music, Plus } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { loadSeen, pageText, storyOrder, unseen, type DiaryEntry } from "@/lib/diary";
+import { NoteEditorSheet, type MyNote } from "@/components/notes/NoteEditorSheet";
 
 /** The face. */
 const FACE = 64;
@@ -70,16 +71,61 @@ export function PagesStrip({
     setFresh(new Set(unseen(pages, loadSeen()).map((e) => e.userId)));
   }, [pages]);
 
-  const mine = pages.find((p) => p.isSelf) ?? null;
+  const serverMine = pages.find((p) => p.isSelf) ?? null;
   const others = useMemo(() => storyOrder(pages, fresh), [pages, fresh]);
+
+  /**
+   * Yours is written in a popup over this row, never by leaving for
+   * Spotlight. Writing an UpDate and reading other people's are different
+   * acts, and sending someone to another screen to do the first was what
+   * made the two feel like one feature.
+   */
+  const [composing, setComposing] = useState(false);
+  /**
+   * What the save said, until the server catches up.
+   *
+   * `undefined` means "nothing written this session, use the server's".
+   * null is a real value — it is how a cleared UpDate is held — so the two
+   * cannot share one slot.
+   */
+  const [justSaved, setJustSaved] = useState<MyNote | undefined>(undefined);
+
+  const current: MyNote =
+    justSaved !== undefined
+      ? justSaved
+      : serverMine
+        ? { text: serverMine.text, audience: serverMine.audience, track: serverMine.track }
+        : null;
+
+  // The row draws from the save the moment it lands, so the bubble changes
+  // under your thumb rather than after a round trip.
+  const mine: DiaryEntry | null = current
+    ? {
+        ...(serverMine ?? {
+          userId: "me",
+          isSelf: true,
+          name: me?.name ?? "You",
+          username: null,
+          hue: me?.hue ?? 280,
+          avatarUrl: me?.avatarUrl ?? null,
+          createdAt: new Date().toISOString(),
+          color: null,
+          imageUrl: null,
+        }),
+        text: current.text,
+        audience: current.audience,
+        track: current.track,
+      }
+    : null;
 
   return (
     <div className="no-scrollbar animate-strip-in flex gap-4 overflow-x-auto px-4 pb-1.5 pt-3">
       {mine ? (
-        <Cell page={mine} label="You" />
+        <Cell page={mine} label="You" onPress={() => setComposing(true)} />
       ) : (
-        <Link
-          href="/messages/spotlight"
+        <button
+          type="button"
+          onClick={() => setComposing(true)}
           aria-label="Write your UpDate"
           className="group flex shrink-0 flex-col items-end transition-transform active:scale-95"
           style={{ width: CELL }}
@@ -105,31 +151,63 @@ export function PagesStrip({
             <Dots faint />
           </span>
           <span className="mt-1.5 truncate text-center text-[11px] font-semibold text-muted" style={{ width: FACE }}>You</span>
-        </Link>
+        </button>
       )}
 
       {others.map((p) => (
         <Cell key={p.userId} page={p} />
       ))}
+
+      <NoteEditorSheet
+        open={composing}
+        onClose={() => setComposing(false)}
+        current={current}
+        onSaved={setJustSaved}
+        me={me}
+        title="Your UpDate"
+        subtitle="everyone you talk to sees it for 24 hours"
+        noun="UpDate"
+      />
     </div>
   );
 }
 
-function Cell({ page, label }: { page: DiaryEntry; label?: string }) {
+function Cell({
+  page,
+  label,
+  /** Yours: opens the composer here instead of leaving for Spotlight. */
+  onPress,
+}: {
+  page: DiaryEntry;
+  label?: string;
+  onPress?: () => void;
+}) {
   const name = label ?? page.name.split(" ")[0];
-  return (
-    <Link
-      href={`/messages/spotlight?page=${encodeURIComponent(page.userId)}`}
-      aria-label={`${label ? "Your UpDate" : `${page.name}'s UpDate`}: ${pageText(page.text)}`}
-      className="flex shrink-0 flex-col items-end transition-transform active:scale-95"
-      style={{ width: CELL }}
-    >
+  const body = (
+    <>
       <Bubble track={!!page.track}>{pageText(page.text)}</Bubble>
       <span className="relative mr-[3px]">
         <Avatar name={page.name} hue={page.hue} src={page.avatarUrl ?? undefined} size={FACE} />
         <Dots />
       </span>
       <span className="mt-1.5 truncate text-center text-[11px] font-semibold text-muted" style={{ width: FACE }}>{name}</span>
+    </>
+  );
+  const shell = "flex shrink-0 flex-col items-end transition-transform active:scale-95";
+  const label_ = `${label ? "Your UpDate" : `${page.name}'s UpDate`}: ${pageText(page.text)}`;
+
+  return onPress ? (
+    <button type="button" onClick={onPress} aria-label={`${label_}. Edit`} className={shell} style={{ width: CELL }}>
+      {body}
+    </button>
+  ) : (
+    <Link
+      href={`/messages/spotlight?page=${encodeURIComponent(page.userId)}`}
+      aria-label={label_}
+      className={shell}
+      style={{ width: CELL }}
+    >
+      {body}
     </Link>
   );
 }

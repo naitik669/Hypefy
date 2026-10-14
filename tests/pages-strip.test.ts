@@ -13,6 +13,10 @@ import type { DiaryEntry } from "@/lib/diary";
  * so the two surfaces can never disagree about who is new.
  */
 
+// The row is what these mount; the composer it can open has its own
+// dependencies (a Supabase client, toasts) that say nothing about the row.
+vi.mock("@/components/notes/NoteEditorSheet", () => ({ NoteEditorSheet: () => null }));
+
 vi.mock("next/link", () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
     createElement("a", { href, ...rest }, children),
@@ -80,20 +84,27 @@ describe("the strip", () => {
 
   it("yours comes first, then everyone else", async () => {
     await mount([page("me", { isSelf: true, name: "Me" }), page("a", { name: "Aman" })]);
-    expect(links()[0].getAttribute("href")).toBe("/messages/spotlight?page=me");
-    expect(links()).toHaveLength(2);
+    // Only theirs is a link; yours opens the composer.
+    expect(links()).toHaveLength(1);
+    expect(links()[0].getAttribute("href")).toBe("/messages/spotlight?page=a");
+    expect(
+      [...host.querySelectorAll("button")].some((b) => /Your UpDate/.test(b.getAttribute("aria-label") ?? "")),
+    ).toBe(true);
   });
 
-  it("each face opens Spotlight on that page, not on the screen in general", async () => {
-    // [0] is your own slot, which is always first.
+  it("someone else's face opens Spotlight on their page", async () => {
     await mount([page("a")]);
-    expect(links()[1].getAttribute("href")).toBe("/messages/spotlight?page=a");
+    expect(links()[0].getAttribute("href")).toBe("/messages/spotlight?page=a");
   });
 
-  it("with no page of your own the slot invites you to write one", async () => {
+  it("with none of your own the slot invites you to write one, in place", async () => {
     await mount([page("a")]);
     expect(host.textContent).toContain("add yours…");
-    expect(links()[0].getAttribute("href")).toBe("/messages/spotlight");
+    // A button, not a link: writing yours must not leave for Spotlight.
+    expect(links().every((l) => l.getAttribute("href") !== "/messages/spotlight")).toBe(true);
+    expect(
+      [...host.querySelectorAll("button")].some((b) => b.getAttribute("aria-label") === "Write your UpDate"),
+    ).toBe(true);
   });
 
   it("a page of only a photo still says something", async () => {
@@ -103,7 +114,7 @@ describe("the strip", () => {
 
   it("what they wrote is read out with whose it is", async () => {
     await mount([page("a", { name: "Aman", text: "gym at 7" })]);
-    expect(links()[1].getAttribute("aria-label")).toBe("Aman's UpDate: gym at 7");
+    expect(links()[0].getAttribute("aria-label")).toBe("Aman's UpDate: gym at 7");
   });
 
   it("no face wears a ring", async () => {
@@ -124,8 +135,43 @@ describe("the strip", () => {
         }),
       ),
     );
-    // The initial of your name, where the dashed square used to be.
-    expect(links()[0].textContent).toContain("C");
+    // The initial of your name, where the dashed square used to be. On
+    // the button that opens the composer, since yours is no longer a link.
+    const own = [...host.querySelectorAll("button")].find(
+      (x) => x.getAttribute("aria-label") === "Write your UpDate",
+    );
+    expect(own?.textContent).toContain("C");
+  });
+});
+
+describe("writing your own", () => {
+  it("opens a popup here rather than sending you to Spotlight", () => {
+    // Leaving for another screen to write one is what made UpDates and
+    // Spotlight pages feel like the same feature.
+    expect(src).toContain("<NoteEditorSheet");
+    expect(src).toContain("const [composing, setComposing] = useState(false);");
+    expect(src).toContain("onClick={() => setComposing(true)}");
+  });
+
+  it("is the bubble and the face themselves, with words, emoji and a song", () => {
+    const editor = read("src/components/notes/NoteEditorSheet.tsx");
+    expect(editor).toContain("Pick emoji");
+    expect(editor).toContain("TrackPicker");
+    expect(editor).toContain('supabase.rpc("set_note"');
+  });
+
+  it("says UpDate on its buttons, not note", () => {
+    expect(src).toContain('noun="UpDate"');
+    const editor = read("src/components/notes/NoteEditorSheet.tsx");
+    expect(editor).toContain("`Share ${noun}`");
+    expect(editor).not.toContain('"Share note"');
+  });
+
+  it("the row shows the save before the server has caught up", () => {
+    // null is a real value — a cleared UpDate — so it cannot double as
+    // "nothing written this session".
+    expect(src).toContain("const [justSaved, setJustSaved] = useState<MyNote | undefined>(undefined);");
+    expect(src).toContain("justSaved !== undefined");
   });
 });
 
