@@ -3,11 +3,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { readFileSync } from "node:fs";
-import { freshCount } from "@/components/diary/PagesStrip";
 import type { DiaryEntry } from "@/lib/diary";
 
 /**
- * Today's pages laid out flat under the filter row, behind an arrow.
+ * Today's UpDates, laid out under the filter row.
  *
  * The same rows the Spotlight deck shuffles — read through the same helpers,
  * so the two surfaces can never disagree about who is new.
@@ -42,22 +41,6 @@ const page = (userId: string, over: Partial<DiaryEntry> = {}): DiaryEntry => ({
   color: null,
   imageUrl: null,
   ...over,
-});
-
-describe("how many pages are waiting", () => {
-  it("counts the ones this device has not opened", () => {
-    const pages = [page("a"), page("b"), page("c")];
-    expect(freshCount(pages, {})).toBe(3);
-    expect(freshCount(pages, { a: "2026-10-08T10:00:00Z" })).toBe(2);
-  });
-
-  it("a page they have rewritten since you read it counts again", () => {
-    expect(freshCount([page("a")], { a: "2026-10-07T09:00:00Z" })).toBe(1);
-  });
-
-  it("your own never counts — you wrote it", () => {
-    expect(freshCount([page("me", { isSelf: true }), page("a")], {})).toBe(1);
-  });
 });
 
 describe("the strip", () => {
@@ -286,31 +269,58 @@ describe("what they are called here", () => {
   });
 });
 
-describe("the arrow on the filter row", () => {
-  it("says how many are waiting, and which way it points", () => {
-    expect(src).toContain("aria-expanded={open}");
-    expect(src).toContain('open ? "rotate-180 text-accent" : ""');
-    expect(src).toContain("count === 1 ? \"UpDate\" : \"UpDates\"");
+describe("the row under the tabs", () => {
+  it("is simply there — no arrow, nothing to fold away", () => {
+    expect(inbox).toContain("<PagesStrip pages={pages} me={me} />");
+    expect(inbox).not.toContain("PagesTrigger");
+    expect(inbox).not.toContain("pagesOpen");
+    expect(src).not.toContain("export function PagesTrigger");
   });
 
-  it("is offered even on a day when nobody has written anything", () => {
-    // Hidden until there was something to read, the one person who could
-    // start the day's first page never saw it.
-    expect(inbox).toContain("<PagesTrigger");
-    expect(inbox).not.toContain("{pages.length > 0 && (");
+  it("starts where the search field above it starts", () => {
+    // Padded by the page gutter minus the gap a cell leaves before its
+    // bubble; a plain px-4 set the whole row a cell's inset to the right
+    // of everything else on the screen.
+    expect(src).toContain("const GUTTER = 16;");
+    expect(src).toContain("style={{ paddingLeft: GUTTER - (CELL - BUBBLE) }}");
   });
 
-  it("the row is open to begin with, and the arrow folds it away", () => {
-    // Behind an arrow it was a feature you had to already know about.
-    expect(inbox).toContain("const [pagesOpen, setPagesOpen] = useState(true);");
-    expect(inbox).toContain("{pagesOpen && <PagesStrip pages={pages} me={me} />}");
-  });
-
-  it("reads what you have opened the same way the deck does", () => {
-    // Both go through loadSeen + unseen, so neither can call someone new
-    // while the other calls them read.
+  it("still agrees with the deck about who is new", () => {
     expect(src).toContain("unseen(pages, loadSeen())");
-    expect(inbox).toContain("freshCount(pages, loadSeen())");
     expect(read("src/components/diary/FloatingPages.tsx")).toContain("unseen(pages, loadSeen())");
+  });
+});
+
+/**
+ * Filters narrow what the three tabs leave. They are deliberately all
+ * "show me fewer": any combination is a subset of the tab, so there is no
+ * pair that means something surprising.
+ */
+describe("the filters beside the tabs", () => {
+  it("each one only ever narrows, and they stack", () => {
+    expect(inbox).toContain("for (const f of filters) list = list.filter(ROW_FILTERS[f].keep);");
+    expect(inbox).toContain('groups: { label: "Groups only", keep: (r) => r.isGroup }');
+    expect(inbox).toContain('pinned: { label: "Pinned", keep: (r) => r.pinned }');
+    expect(inbox).toContain('muted: { label: "Muted", keep: (r) => r.muted }');
+  });
+
+  it("the list is recomputed when they change", () => {
+    const deps = inbox.slice(inbox.indexOf("}, [rows, tab, q, readIds"));
+    expect(deps.slice(0, 120)).toContain("filters");
+  });
+
+  it("the pill says how many are on, and lights when any is", () => {
+    expect(inbox).toContain('filters.size > 0 ? "bg-accent/15 text-accent" : "bg-surface text-muted"');
+    expect(inbox).toContain("{filters.size}");
+  });
+
+  it("each is a checkbox a screen reader can read the state of", () => {
+    expect(inbox).toContain('role="menuitemcheckbox"');
+    expect(inbox).toContain("aria-checked={on}");
+  });
+
+  it("they can all be dropped at once, and that is only offered when some are on", () => {
+    expect(inbox).toContain("{filters.size > 0 && (");
+    expect(inbox).toContain("Clear filters");
   });
 });

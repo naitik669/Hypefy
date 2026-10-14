@@ -7,6 +7,8 @@ import {
   Search,
   Users,
   Check,
+  ChevronDown,
+  SlidersHorizontal,
   Ban,
   Loader2,
   BellOff,
@@ -28,8 +30,7 @@ import { createClient } from "@/lib/supabase/client";
 import { isEncrypted, openEnvelope, useEnvelopeReader } from "@/lib/e2ee/chat";
 import { STATUS_ENABLED } from "@/lib/status-feature";
 import { FloatingPages } from "@/components/diary/FloatingPages";
-import { PagesStrip, PagesTrigger, freshCount } from "@/components/diary/PagesStrip";
-import { loadSeen } from "@/lib/diary";
+import { PagesStrip } from "@/components/diary/PagesStrip";
 import type { DiaryEntry } from "@/lib/diary";
 import { isEmojiReply } from "@/components/diary/PageReplyEmbed";
 import { Avatar } from "@/components/ui/Avatar";
@@ -40,6 +41,7 @@ import { visibleDecoration } from "@/lib/cosmetics";
 import { visibleNameplate } from "@/lib/nameplates";
 import { Nameplate, PLATE_FADE_PX } from "@/components/ui/Nameplate";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { FloatingMenu } from "@/components/ui/FloatingMenu";
 import { EmptyInbox } from "@/components/messages/EmptyInbox";
 import { EmptyScene } from "@/components/empty/EmptyScene";
 import { EnvelopeArt, KnockArt } from "@/components/empty/scenes";
@@ -47,6 +49,14 @@ import { PresenceDot } from "@/components/presence/PresenceDot";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { removeChat, useRemovedChats } from "@/lib/chat-removal";
 import { useToast } from "@/components/ui/ToastProvider";
+
+/** Narrowings offered beside the tabs. Each ANDs with the others. */
+type RowFilter = "groups" | "pinned" | "muted";
+const ROW_FILTERS: Record<RowFilter, { label: string; keep: (r: InboxRow) => boolean }> = {
+  groups: { label: "Groups only", keep: (r) => r.isGroup },
+  pinned: { label: "Pinned", keep: (r) => r.pinned },
+  muted: { label: "Muted", keep: (r) => r.muted },
+};
 
 export type InboxRow = {
   id: string;
@@ -267,23 +277,19 @@ export function MessagesInbox({
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
   /**
-   * Today's UpDates, laid out under the filter row — open to begin with.
-   *
-   * Behind an arrow they were a feature you had to already know about: the
-   * row is the point, not the arrow. The arrow stays so it can be folded
-   * away, and that is the one thing it is for now.
+   * Narrowing the list beyond the three tabs. Each one ANDs with the rest,
+   * so the result is only ever smaller and there is no combination that
+   * means something surprising.
    */
-  const [pagesOpen, setPagesOpen] = useState(true);
-  /**
-   * How many pages this device has not read, for the number on the arrow.
-   * Read after mount, like everywhere else that asks: it is browser-only
-   * storage, and the server has no idea what you have opened.
-   */
-  const [pagesFresh, setPagesFresh] = useState(0);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-time read of browser-only storage; see above
-    setPagesFresh(freshCount(pages, loadSeen()));
-  }, [pages]);
+  const [filters, setFilters] = useState<Set<RowFilter>>(() => new Set());
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const toggleFilter = (f: RowFilter) =>
+    setFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(f)) next.delete(f);
+      else next.add(f);
+      return next;
+    });
   /** What you typed in each chat and did not send, shown as its preview. */
   const drafts = useChatDrafts(currentUserId);
   /** Locking a first chat: the PIN is chosen, then the chat is locked. */
@@ -670,6 +676,7 @@ export function MessagesInbox({
         : tab === "requests"
         ? rows.filter((r) => isPendingRequest(r))
         : rows.filter((r) => !isPendingRequest(r) && !removedIds.has(r.id));
+    for (const f of filters) list = list.filter(ROW_FILTERS[f].keep);
     const query = q.trim().toLowerCase();
     if (query) {
       list = list.filter(
@@ -681,7 +688,7 @@ export function MessagesInbox({
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, tab, q, readIds, approvedIds, removedIds, contentMatches]);
+  }, [rows, tab, q, readIds, approvedIds, removedIds, contentMatches, filters]);
 
   // Split "All" tab into Pinned + Unread + rest
   const pinnedRows = tab === "all" ? filtered.filter((r) => r.pinned) : [];
@@ -947,17 +954,75 @@ export function MessagesInbox({
           </button>
         ))}
 
-        {/* Always offered, even on a day when nobody has written anything.
-            It used to be hidden until there was something to read, which
-            meant the one person it mattered most to — someone whose circle
-            has written nothing yet, and who could write the first — was the
-            one person who never saw it. With nothing to read the row is
-            just your own slot, inviting you to write. */}
-        <PagesTrigger
-          open={pagesOpen}
-          count={pagesFresh}
-          onToggle={() => setPagesOpen((v) => !v)}
-        />
+        <div className="relative ml-auto self-center">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={filtersOpen}
+            data-filters
+            className={`flex items-center gap-1.5 rounded-[14px] px-3 py-1.5 text-xs font-bold transition-colors ${
+              filters.size > 0 ? "bg-accent/15 text-accent" : "bg-surface text-muted"
+            }`}
+          >
+            <SlidersHorizontal size={13} strokeWidth={2.4} />
+            Filters
+            {filters.size > 0 && (
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-black text-accent-ink">
+                {filters.size}
+              </span>
+            )}
+            <ChevronDown
+              size={13}
+              strokeWidth={2.8}
+              aria-hidden
+              className={`transition-transform duration-200 ${filtersOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          <FloatingMenu
+            open={filtersOpen}
+            onClose={() => setFiltersOpen(false)}
+            origin="top-right"
+            className="absolute right-0 top-10 min-w-[190px]"
+          >
+            {(Object.keys(ROW_FILTERS) as RowFilter[]).map((f) => {
+              const on = filters.has(f);
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={on}
+                  onClick={() => toggleFilter(f)}
+                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm font-semibold transition-colors hover:bg-white/[0.04]"
+                >
+                  <span
+                    aria-hidden
+                    className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[6px] border-[1.5px] ${
+                      on ? "border-accent bg-accent text-accent-ink" : "border-border text-transparent"
+                    }`}
+                  >
+                    <Check size={12} strokeWidth={3.2} />
+                  </span>
+                  {ROW_FILTERS[f].label}
+                </button>
+              );
+            })}
+            {filters.size > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilters(new Set());
+                  setFiltersOpen(false);
+                }}
+                className="mt-1 flex w-full items-center gap-3 border-t border-border px-3 py-2.5 text-left text-sm font-semibold text-muted transition-colors hover:bg-white/[0.04]"
+              >
+                Clear filters
+              </button>
+            )}
+          </FloatingMenu>
+        </div>
       </div>
 
       {/* Locked chats: there when Messages opens, gone at the first scroll
@@ -967,7 +1032,7 @@ export function MessagesInbox({
         <LockedChatsRow count={vault.locked} unread={vault.unread} />
       )}
 
-      {pagesOpen && <PagesStrip pages={pages} me={me} />}
+      <PagesStrip pages={pages} me={me} />
 
       {/* Spotlight: a small deck of today's pages floating at the bottom
           right, shuffling itself; tap to open Spotlight on the one showing. */}

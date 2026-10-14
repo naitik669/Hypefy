@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, Music, Plus } from "lucide-react";
+import { Music, Plus } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { loadSeen, pageText, storyOrder, unseen, type DiaryEntry } from "@/lib/diary";
 import { NoteEditorSheet, type MyNote } from "@/components/notes/NoteEditorSheet";
@@ -26,6 +26,8 @@ const CELL = 90;
  * came out as two specks, and the thought stopped reading as a thought.
  */
 const BUBBLE = 78;
+/** The page gutter every other row on the screen starts at. */
+const GUTTER = 16;
 /**
  * How far the thought sits over the face.
  *
@@ -120,7 +122,14 @@ export function PagesStrip({
     : null;
 
   return (
-    <div className="no-scrollbar animate-strip-in flex gap-4 overflow-x-auto px-4 pb-1.5 pt-3">
+    // Left padding is the page gutter MINUS the gap a cell leaves before
+    // its bubble, so the first bubble starts exactly where the search field
+    // above it does. A plain px-4 put the row a cell's worth of inset to
+    // the right of everything else on the screen.
+    <div
+      className="no-scrollbar animate-strip-in flex gap-4 overflow-x-auto pb-1.5 pr-4 pt-3"
+      style={{ paddingLeft: GUTTER - (CELL - BUBBLE) }}
+    >
       {mine ? (
         <Cell page={mine} label="You" onPress={() => setComposing(true)} />
       ) : (
@@ -255,48 +264,3 @@ function Bubble({
   );
 }
 
-/**
- * The arrow that opens the strip, at the end of the filter row.
- *
- * It says how many pages are waiting rather than just "Pages", because the
- * strip is worth opening only when someone has written something — and with
- * nothing there at all it is not drawn.
- */
-export function PagesTrigger({
-  open,
-  count,
-  onToggle,
-}: {
-  open: boolean;
-  count: number;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-expanded={open}
-      aria-label={`${count} new ${count === 1 ? "UpDate" : "UpDates"}. ${open ? "Hide" : "Show"}`}
-      data-pages-trigger
-      className="ml-auto flex shrink-0 items-center gap-1 self-center pl-2 pr-1 text-xs font-bold text-muted transition-colors active:text-accent"
-    >
-      <span className={open ? "text-accent" : ""}>UpDates</span>
-      {count > 0 && (
-        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-black text-accent-ink">
-          {count}
-        </span>
-      )}
-      <ChevronDown
-        size={15}
-        strokeWidth={3}
-        aria-hidden
-        className={`transition-transform duration-200 ${open ? "rotate-180 text-accent" : ""}`}
-      />
-    </button>
-  );
-}
-
-/** Unread pages, for the number on the arrow. Exported for tests. */
-export function freshCount(pages: DiaryEntry[], seen: Record<string, string>): number {
-  return unseen(pages, seen).length;
-}
