@@ -43,6 +43,76 @@ function fmt(s: number) {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 }
 
+/** One song, in any of the picker's lists. */
+function SongRow({
+  track: t,
+  playing,
+  marked,
+  onPick,
+}: {
+  track: Track;
+  playing: boolean;
+  marked: boolean;
+  onPick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className={`flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left transition-colors ${
+        marked ? "bg-accent/[0.06]" : "hover:bg-white/[0.04]"
+      }`}
+    >
+      <span
+        role="button"
+        tabIndex={0}
+        aria-label={playing ? "Pause preview" : "Play preview"}
+        onClick={(e) => {
+          e.stopPropagation();
+          playPreview(t, { audible: true });
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            e.stopPropagation();
+            playPreview(t, { audible: true });
+          }
+        }}
+        className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface"
+      >
+        {t.artwork ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={t.artwork} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center text-faint">
+            <Music size={16} />
+          </span>
+        )}
+        <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-white">
+          {playing ? <Pause size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
+        </span>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{t.title}</span>
+        <span className="block truncate text-xs text-muted">{t.artist}</span>
+      </span>
+      {/* A ring rather than the word "Add", which was ten lime blocks down
+          the edge of a list meant to be read — and which said the same
+          thing on every row. The ring fills into a tick on the song you are
+          choosing, so backing out of the snippet step shows you where you
+          were. */}
+      <span
+        aria-hidden
+        className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-accent transition-colors ${
+          marked ? "bg-accent text-accent-ink" : "text-accent"
+        }`}
+      >
+        {marked ? <Check size={15} strokeWidth={3} /> : <Plus size={15} strokeWidth={2.6} />}
+      </span>
+    </button>
+  );
+}
+
 /**
  * Song search sheet (iTunes via /api/music): type to search, tap artwork to
  * hear the 30s preview, tap the row to pick — then choose which part of the
@@ -89,6 +159,7 @@ export function TrackPicker({
   const [focused, setFocused] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
   const [allRecent, setAllRecent] = useState(false);
+  const [allForYou, setAllForYou] = useState(false);
   useEffect(() => {
     if (!open) return;
     let live = true;
@@ -128,7 +199,13 @@ export function TrackPicker({
         // and left in it counted as content, so the "nothing saved yet"
         // notice never got its turn and the sheet closed up to nothing.
         ? [{ title: null, items: shelf.saved }].filter((g) => g.items.length > 0)
-        : [{ title: "Trending on Hypefy", items: shelf.trending }].filter((g) => g.items.length > 0);
+        // For you lays its own songs out above Browse, so there is nothing
+        // left for the list underneath to draw.
+        : [];
+
+  /** How many songs For you offers before "See more". */
+  const FOR_YOU_SHOWN = 4;
+  const forYou = allForYou ? shelf.trending : shelf.trending.slice(0, FOR_YOU_SHOWN);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const scrubTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -181,6 +258,7 @@ export function TrackPicker({
       setTab("foryou");
       setFocused(false);
       setAllRecent(false);
+      setAllForYou(false);
     } else {
       setTimeout(() => inputRef.current?.focus(), 250);
     }
@@ -398,19 +476,61 @@ export function TrackPicker({
                 </>
               )}
 
+              {forYou.length > 0 && (
+                <>
+                  <div className="flex items-center justify-between px-1 pb-1 pt-3">
+                    <p className="text-xs font-bold uppercase tracking-widest text-faint">For you</p>
+                    {shelf.trending.length > FOR_YOU_SHOWN && (
+                      <button
+                        type="button"
+                        onClick={() => setAllForYou((v) => !v)}
+                        className="text-[11px] font-semibold text-accent"
+                      >
+                        {allForYou ? "Show less" : "See more"}
+                      </button>
+                    )}
+                  </div>
+                  {forYou.map((t) => (
+                    <SongRow
+                      key={t.id}
+                      track={t}
+                      playing={playingId === t.id}
+                      marked={marked === t.id}
+                      onPick={() => openSnippet(t)}
+                    />
+                  ))}
+                </>
+              )}
+
               <p className="px-1 pb-1.5 pt-3 text-xs font-bold uppercase tracking-widest text-faint">Browse</p>
               <div className="grid grid-cols-2 gap-2">
-                {SOUND_CATEGORIES.map((c) => (
-                  <button
-                    key={c.label}
-                    type="button"
-                    onClick={() => setQuery(c.query)}
-                    className="flex h-[52px] items-end rounded-[14px] px-3 pb-2 text-left text-[13px] font-bold text-accent-ink transition-transform active:scale-[0.97]"
-                    style={{ background: `linear-gradient(135deg, ${c.from}, ${c.to})` }}
-                  >
-                    {c.label}
-                  </button>
-                ))}
+                {SOUND_CATEGORIES.map((c, i) => {
+                  // Real artwork, faint, under the colour. There are no
+                  // category pictures to ship and inventing six would date
+                  // badly; what is being played on Hypefy is already here,
+                  // changes on its own, and reads as texture at this size.
+                  const art = shelf.trending[i % Math.max(1, shelf.trending.length)]?.artwork;
+                  return (
+                    <button
+                      key={c.label}
+                      type="button"
+                      onClick={() => setQuery(c.query)}
+                      className="relative flex h-[62px] items-end overflow-hidden rounded-[14px] px-3 pb-2 text-left text-[13px] font-bold text-accent-ink transition-transform active:scale-[0.97]"
+                      style={{ background: `linear-gradient(135deg, ${c.from}, ${c.to})` }}
+                    >
+                      {art && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={art}
+                          alt=""
+                          aria-hidden
+                          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-20 mix-blend-overlay"
+                        />
+                      )}
+                      <span className="relative">{c.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </>
           )}
@@ -441,66 +561,15 @@ export function TrackPicker({
                     {g.title}
                   </p>
                 )}
-            {g.items.map((t) => {
-              const playing = playingId === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => openSnippet(t)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left transition-colors ${
-                    marked === t.id ? "bg-accent/[0.06]" : "hover:bg-white/[0.04]"
-                  }`}
-                >
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    aria-label={playing ? "Pause preview" : "Play preview"}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      playPreview(t, { audible: true });
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        playPreview(t, { audible: true });
-                      }
-                    }}
-                    className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-surface"
-                  >
-                    {t.artwork ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={t.artwork} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center text-faint">
-                        <Music size={16} />
-                      </span>
-                    )}
-                    <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-white">
-                      {playing ? <Pause size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
-                    </span>
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">{t.title}</span>
-                    <span className="block truncate text-xs text-muted">{t.artist}</span>
-                  </span>
-                  {/* A ring rather than the word "Add", which was ten lime
-                      blocks down the edge of a list meant to be read — and
-                      which said the same thing on every row. The ring fills
-                      into a tick on the song you are choosing, so backing
-                      out of the snippet step shows you where you were. */}
-                  <span
-                    aria-hidden
-                    className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-accent transition-colors ${
-                      marked === t.id ? "bg-accent text-accent-ink" : "text-accent"
-                    }`}
-                  >
-                    {marked === t.id ? <Check size={15} strokeWidth={3} /> : <Plus size={15} strokeWidth={2.6} />}
-                  </span>
-                </button>
-              );
-            })}
+            {g.items.map((t) => (
+              <SongRow
+                key={t.id}
+                track={t}
+                playing={playingId === t.id}
+                marked={marked === t.id}
+                onPick={() => openSnippet(t)}
+              />
+            ))}
               </Fragment>
             ))}
           </div>
@@ -514,10 +583,10 @@ export function TrackPicker({
             variant="compact"
           />
         ) : browsing ? (
-          // For you always has the grid under it, so there is nothing
-          // missing to announce — a "search for a song" notice below a
-          // full page of things to tap reads as a page that failed.
-          <p className="px-1 pb-1 pt-4 text-center text-[11px] text-faint">
+          // For you lays out songs and a grid of its own, so there is
+          // nothing missing to announce — a "search for a song" notice
+          // below a full page of things to tap reads as a page that failed.
+          <p className="px-1 pb-1 pt-3 text-center text-[11px] text-faint">
             30-second previews provided by Apple Music
           </p>
         ) : (

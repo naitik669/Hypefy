@@ -104,6 +104,30 @@ describe("what the picker shows when", () => {
     expect(src).toContain("recent.length > RECENT_SHOWN ?");
   });
 
+  it("For you opens on songs, with Browse beneath them", () => {
+    // It used to end on "search for a song to attach" — a page of nothing
+    // under a box you had already decided not to type in.
+    expect(src).toContain("const FOR_YOU_SHOWN = 4;");
+    expect(src).toContain("const forYou = allForYou ? shelf.trending : shelf.trending.slice(0, FOR_YOU_SHOWN);");
+    expect(src.indexOf('<p className="text-xs font-bold uppercase tracking-widest text-faint">For you</p>'))
+      .toBeLessThan(src.indexOf(">Browse</p>"));
+    expect(src).toContain("{allForYou ? \"Show less\" : \"See more\"}");
+  });
+
+  it("a browse tile carries artwork under its colour", () => {
+    expect(src).toContain("opacity-20 mix-blend-overlay");
+    expect(src).toContain("shelf.trending[i % Math.max(1, shelf.trending.length)]?.artwork");
+    // Decorative: it is texture, never something to read.
+    expect(src).toContain('alt=""');
+  });
+
+  it("every list draws the same row", () => {
+    expect(src).toContain("function SongRow(");
+    // Two places draw songs: the shared list (results, trending, saved)
+    // and For you's own.
+    expect(src.split("<SongRow").length - 1).toBe(2);
+  });
+
   it("a search is remembered once it has run, not once per keystroke", () => {
     const debounced = src.slice(src.indexOf("debounceRef.current = setTimeout"));
     expect(debounced).toContain("setRecent(rememberSearch(q));");

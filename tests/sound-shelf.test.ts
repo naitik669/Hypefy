@@ -175,7 +175,9 @@ describe("the sound shelf", () => {
     // for the search field answers with trending too.
     const src = readFileSync("src/components/music/TrackPicker.tsx", "utf8");
     expect(src).toContain('{ title: null, items: shelf.saved }');
-    expect(src).toContain('{ title: "Trending on Hypefy", items: shelf.trending }');
+    // For you lays trending out itself, above Browse, so the shared list
+    // below it has nothing left to draw for that tab.
+    expect(src).toContain("const forYou = allForYou ? shelf.trending : shelf.trending.slice(0, FOR_YOU_SHOWN);");
     expect(src).toContain('{ title: "Trending now", items: shelf.trending }');
     expect(src).toContain(".filter((g) => g.items.length > 0)");
   });
