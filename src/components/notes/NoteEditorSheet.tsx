@@ -88,7 +88,7 @@ export function NoteEditorSheet({
   const [busy, setBusy] = useState(false);
   const [stripOpen, setStripOpen] = useState(false);
   const [promptAt, setPromptAt] = useState(0);
-  const textRef = useRef<HTMLInputElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
 
   // Re-seed from the saved note each time the modal opens.
   useEffect(() => {
@@ -171,28 +171,40 @@ export function NoteEditorSheet({
 {/* The bubble, which IS the input — the same slab the row draws, so
               what you type here is the thing your circle sees. No border, no
               point: a thought, with its dots falling to your face below. */}
-          <div className="relative w-full max-w-[280px]">
-            <div className={`flex items-center gap-2 rounded-[20px] px-4 py-3.5 ${THOUGHT_SHELL}`}>
-              <button
-                type="button"
-                aria-label="Pick emoji"
-                onClick={() => setStripOpen((v) => !v)}
-                className={`shrink-0 text-[24px] leading-none transition-transform active:scale-90 ${draft.emoji ? "" : "opacity-30 grayscale"}`}
-              >
-                {draft.emoji || "🙂"}
-              </button>
-              <input
+          {/* Narrow, and the words centred and wrapping — the row's slab
+              grown, not a composer. Full width with the text left of a big
+              emoji, it was the shape of a message box, which is the one
+              shape an UpDate must not have. */}
+          <div className="relative w-[186px]">
+            <div className={`relative rounded-[20px] px-3 pb-3 pt-2.5 ${THOUGHT_SHELL}`}>
+              <textarea
                 ref={textRef}
+                rows={2}
                 value={draft.text}
-                onChange={(e) => setDraft({ ...draft, text: e.target.value.slice(0, MAX_TEXT) })}
+                onChange={(e) => setDraft({ ...draft, text: e.target.value.replace(/\n/g, "").slice(0, MAX_TEXT) })}
                 onFocus={() => setStripOpen(false)}
                 placeholder={PROMPTS[promptAt]}
                 autoFocus={!current}
                 aria-label="Your UpDate"
-                className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold tracking-[-0.01em] outline-none placeholder:font-medium placeholder:text-faint"
+                // Room kept at the right for the emoji, or a full line of
+                // words runs underneath it.
+                className="w-full resize-none bg-transparent pl-2 pr-5 text-center text-[13px] font-semibold leading-[1.35] outline-none placeholder:font-medium placeholder:text-faint"
               />
+              {/* Top-right, where a row puts its song mark. On the left it
+                  sat in front of the words like a sender's face, and the
+                  whole card then read as a message rather than a thought. */}
+              <button
+                type="button"
+                aria-label="Pick emoji"
+                onClick={() => setStripOpen((v) => !v)}
+                className={`absolute right-1.5 top-1 text-[15px] leading-none transition-transform active:scale-90 ${draft.emoji ? "" : "opacity-25 grayscale"}`}
+              >
+                {draft.emoji || "🙂"}
+              </button>
               {draft.text.length > MAX_TEXT - 10 && (
-                <span className="shrink-0 text-[10px] tabular-nums text-faint">{MAX_TEXT - draft.text.length}</span>
+                <span className="absolute bottom-1 right-2 text-[10px] tabular-nums text-faint">
+                  {MAX_TEXT - draft.text.length}
+                </span>
               )}
             </div>
             <ThoughtDots where="stage" />
