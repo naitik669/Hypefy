@@ -26,6 +26,35 @@ const COMMIT_RATIO = 0.28;
 const FLICK_VELOCITY = 0.45;
 /** Below this the gesture is treated as a scroll and released to the page. */
 const AXIS_LOCK_PX = 10;
+/**
+ * How far back the finger must travel to change which tab is being reached
+ * for, once a direction is set.
+ *
+ * Without it, the direction flipped the instant the finger crossed its
+ * starting point — and since the destination is a mounted screen, every
+ * crossing tore one down and built another in the middle of the gesture.
+ * A swipe that hesitated, or simply wobbled, did that several times and
+ * stuck on each. Nothing about the drag itself is damped: only the choice
+ * of which neighbour is waiting.
+ */
+const REVERSE_PX = 28;
+
+/** Which way a drag is reaching: 1 the next tab, -1 the previous, 0 undecided. */
+export type Reach = 0 | 1 | -1;
+
+/**
+ * The neighbour this drag is reaching for, held steady across a wobble.
+ *
+ * The first clear movement decides. After that it takes a real reversal —
+ * the finger past REVERSE_PX the other way — to change it, so crossing back
+ * over the start by a pixel does not swap the screen being pulled in.
+ */
+export function heldReach(ddx: number, held: Reach, reverse = REVERSE_PX): Reach {
+  const want: Reach = ddx < 0 ? 1 : ddx > 0 ? -1 : 0;
+  if (want === 0 || want === held) return held;
+  if (held === 0) return want;
+  return Math.abs(ddx) >= reverse ? want : held;
+}
 
 /**
  * Which axis this gesture belongs to, or null while it is still ambiguous.
@@ -114,11 +143,16 @@ export function inHorizontalScroller(start: EventTarget | null): boolean {
     // Explicit opt-out first: a JS carousel says so, since nothing about its
     // computed style gives it away.
     if (el.hasAttribute(HSWIPE_ATTR)) return true;
-    const style = getComputedStyle(el);
-    const scrolls =
-      (style.overflowX === "auto" || style.overflowX === "scroll") &&
-      el.scrollWidth > el.clientWidth + 4;
-    if (scrolls) return true;
+    // Measure before asking for style. Every ancestor of a touch used to
+    // get a getComputedStyle — a style resolution apiece, down a tree that
+    // is a dozen deep inside a feed card, at the start of every gesture.
+    // Almost none of them overflow, and that is two cheap reads to rule
+    // out, so the expensive question is only asked of the few that could
+    // possibly answer yes.
+    if (el.scrollWidth > el.clientWidth + 4) {
+      const overflowX = getComputedStyle(el).overflowX;
+      if (overflowX === "auto" || overflowX === "scroll") return true;
+    }
     el = el.parentElement;
   }
   return false;
@@ -193,6 +227,8 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
   const axis = useRef<null | "x" | "y">(null);
   const ignore = useRef(false);
   const dx = useRef(0);
+  /** Which neighbour this drag is reaching for. See heldReach. */
+  const reach = useRef<Reach>(0);
 
   // Once the route arrives the stand-in is no longer standing in for
   // anything — read that off the pathname rather than clearing it in an
@@ -216,19 +252,22 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
   }
 
   function paint(x: number, transition = "none") {
+    // Only what changed. Every frame of a drag came through here and set
+    // transition to the same "none" it already held, on two elements — a
+    // style write apiece that the browser has to take seriously.
+    const set = (el: HTMLElement, t: string, transform: string) => {
+      if (el.style.transition !== t) el.style.transition = t;
+      if (el.style.transform !== transform) el.style.transform = transform;
+    };
     const el = baseEl();
-    if (el) {
-      el.style.transition = transition;
-      el.style.transform = x ? `translate3d(${x}px,0,0)` : "";
-    }
+    if (el) set(el, transition, x ? `translate3d(${x}px,0,0)` : "");
     const inc = incomingEl.current;
     if (inc) {
       // A page width from wherever the finger has taken the current one, on
       // the side it comes from: at rest exactly off-screen, at full travel
       // exactly in place.
       const from = inc.dataset.side === "right" ? pageWidth() : -pageWidth();
-      inc.style.transition = transition;
-      inc.style.transform = `translate3d(${x + from}px,0,0)`;
+      set(inc, transition, `translate3d(${x + from}px,0,0)`);
     }
   }
 
@@ -346,6 +385,7 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     start.current = { x: t.clientX, y: t.clientY, t: Date.now() };
     axis.current = null;
     dx.current = 0;
+    reach.current = 0;
     // A swipe landing on top of the last one: put the pages where they were
     // heading so this drag starts from rest rather than from mid-flight.
     if (holding.current) {
@@ -383,14 +423,19 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     }
     if (axis.current !== "x") return;
 
+    // Which neighbour is being reached for, decided once and then held —
+    // see heldReach for why this is not simply the sign of ddx.
+    const dir = heldReach(ddx, reach.current);
+    reach.current = dir;
+
     // Resistance at the ends, so the first and last tabs feel like edges
     // rather than a broken gesture.
-    const toNext = ddx < 0;
-    const atEdge = (ddx > 0 && !canPrev) || (toNext && !canNext);
+    const atEdge = (dir === -1 && !canPrev) || (dir === 1 && !canNext);
     const x = atEdge ? ddx * 0.25 : ddx;
-    // Mount the destination once per direction, not per frame.
-    const dest = atEdge ? null : (TABS[toNext ? index + 1 : index - 1] as TabPath);
-    const want = dest ? { tab: dest, side: toNext ? ("right" as const) : ("left" as const), from: here } : null;
+    // Mounted once per gesture now, rather than whenever the finger
+    // crossed back over where it started.
+    const dest = atEdge || dir === 0 ? null : (TABS[index + dir] as TabPath);
+    const want = dest ? { tab: dest, side: dir === 1 ? ("right" as const) : ("left" as const), from: here } : null;
     if (want?.tab !== incoming?.tab || want?.side !== incoming?.side) setIncoming(want);
     dx.current = x;
     paint(x);
@@ -399,9 +444,11 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
   function onTouchEnd() {
     if (axis.current !== "x") {
       axis.current = null;
+      reach.current = 0;
       return;
     }
     axis.current = null;
+    reach.current = 0;
 
     const width = window.innerWidth || 1;
     const outcome = swipeOutcome({

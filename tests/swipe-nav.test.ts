@@ -6,6 +6,8 @@ import {
   swipeOutcome,
   inHorizontalScroller,
   gestureBlocked,
+  heldReach,
+  type Reach,
 } from "@/components/layout/SwipeNav";
 
 /**
@@ -157,5 +159,79 @@ describe("dragging a rehyped face", () => {
     } finally {
       deck.remove();
     }
+  });
+});
+
+/**
+ * Which neighbour a drag is reaching for.
+ *
+ * This is not cosmetic: the destination is a whole mounted screen, so every
+ * change of mind tears one down and builds another in the middle of the
+ * gesture. Read as the bare sign of the movement, a swipe that wobbled
+ * across its own starting point did that several times and stuck on each.
+ */
+describe("heldReach", () => {
+  it("the first clear movement decides", () => {
+    expect(heldReach(-20, 0)).toBe(1);
+    expect(heldReach(20, 0)).toBe(-1);
+  });
+
+  it("exactly nowhere decides nothing", () => {
+    expect(heldReach(0, 0)).toBe(0);
+    expect(heldReach(0, 1)).toBe(1);
+  });
+
+  it("holds through a wobble back over the start", () => {
+    let held: Reach = heldReach(-40, 0);
+    expect(held).toBe(1);
+    // The finger drifts back past where it began — but only just.
+    held = heldReach(-1, held);
+    expect(held).toBe(1);
+    held = heldReach(5, held);
+    expect(held).toBe(1);
+    held = heldReach(20, held);
+    expect(held).toBe(1);
+  });
+
+  it("gives way to a real reversal", () => {
+    expect(heldReach(30, 1)).toBe(-1);
+    expect(heldReach(-30, -1)).toBe(1);
+  });
+
+  it("the turn is the same distance either way", () => {
+    expect(heldReach(27, 1)).toBe(1);
+    expect(heldReach(28, 1)).toBe(-1);
+    expect(heldReach(-27, -1)).toBe(-1);
+    expect(heldReach(-28, -1)).toBe(1);
+  });
+
+  it("once turned, it stays turned without re-crossing", () => {
+    let held: Reach = heldReach(-40, 0);
+    held = heldReach(40, held);
+    expect(held).toBe(-1);
+    expect(heldReach(5, held)).toBe(-1);
+  });
+});
+
+describe("the cost of a gesture", () => {
+  const src = readFileSync("src/components/layout/SwipeNav.tsx", "utf8").split("\r\n").join("\n");
+
+  it("the tab being pulled in is chosen once, not per frame", () => {
+    expect(src).toContain("const dir = heldReach(ddx, reach.current);");
+    expect(src).not.toContain("const toNext = ddx < 0;");
+  });
+
+  it("a frame writes only the styles that changed", () => {
+    expect(src).toContain("if (el.style.transition !== t) el.style.transition = t;");
+    expect(src).toContain("if (el.style.transform !== transform) el.style.transform = transform;");
+  });
+
+  it("an ancestor is measured before its style is resolved", () => {
+    // getComputedStyle on every parent of the touch, at the start of every
+    // gesture, down a tree a dozen deep inside a feed card.
+    const walk = src.slice(src.indexOf("export function inHorizontalScroller"));
+    expect(walk.indexOf("el.scrollWidth > el.clientWidth + 4")).toBeLessThan(
+      walk.indexOf("getComputedStyle(el).overflowX"),
+    );
   });
 });
