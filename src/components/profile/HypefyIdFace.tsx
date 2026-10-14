@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
-import { FlipStrip } from "@/components/profile/CardFlip";
-import { HypefyMark } from "@/components/ui/HypefyMark";
+import { HypefyWordmark } from "@/components/ui/HypefyMark";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
+import { CardPlate, PlateFoot, Well } from "@/components/profile/CardPlate";
 import { hypefyQrDataUrl } from "@/lib/hypefy-qr";
-import { hypefyId, memberSince, prettyUrl } from "@/lib/profile-card";
+import { pronounLabel } from "@/lib/profile";
+import { anthemLine, memberNumber, memberSince, prettyUrl } from "@/lib/profile-card";
+import { remarkFor } from "@/lib/card-remarks";
 import type { ProfileCardData } from "@/components/profile/ProfileCard";
 
 /**
@@ -15,100 +17,108 @@ import type { ProfileCardData } from "@/components/profile/ProfileCard";
  * Read as a credential rather than a second profile. The front answers who
  * someone is and is mostly a photograph; this answers what their account is
  * — the code that opens it, the number that names it, the date it started —
- * and is mostly type. That difference is the reason to turn the card over,
- * and it is why the type here is monospaced and set in rows: a document,
- * not a page.
+ * and is mostly type, set in rows with their labels. That difference is the
+ * reason to turn the card over.
  *
- * It is also the face that gets saved to someone's photos, so everything on
- * it has to survive leaving the app. No live Follow button, no links that
- * stop working, nothing that only means something while you are signed in.
+ * The code sits in the same well the photograph does on the front, so both
+ * sides are plainly the same object. It is drawn light on near-black: a
+ * white tile on a matte black plate looks like a sticker left on it.
+ *
+ * Nothing here stops meaning something once it leaves the app. No Follow,
+ * no links, and no follower count — a card saved in March claiming twelve
+ * followers reads badly by June. The number, the month and the song all
+ * stay true.
  */
 export function HypefyIdFace({
   data,
   url,
-  background,
   onSave,
   saving,
   onFlip,
 }: {
   data: ProfileCardData;
   url: string;
-  background: string;
   onSave: () => void;
   saving: "idle" | "working" | "done" | "failed";
   onFlip: () => void;
 }) {
   const qr = useHypefyQr(url);
+  const no = memberNumber(data.memberNo);
   const since = memberSince(data.joinedAt);
+  const anthem = anthemLine(data.anthem);
+  const pronouns = pronounLabel(data.pronouns);
+  const remark = remarkFor({
+    userId: data.userId,
+    tags: data.tags,
+    interests: data.interests ?? [],
+    hasAnthem: !!anthem,
+    memberNo: data.memberNo ?? null,
+  });
 
   return (
-    <div
-      className="overflow-hidden rounded-[28px] border border-white/10 p-2.5 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.85)]"
-      style={{ background }}
-    >
-      <div className="flex flex-col gap-3.5 rounded-[20px] border border-white/[0.07] bg-[linear-gradient(180deg,rgba(0,0,0,0.42),rgba(0,0,0,0.12))] p-4">
-        <header className="flex items-center gap-2">
-          <HypefyMark size={19} />
-          <span className="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white/90">
+    <CardPlate>
+      <div className="relative flex flex-1 flex-col px-4 pt-4">
+{/* Just the words, at the top right. The mark used to sit on the left of
+    this row and now lives in the middle of the code, which is the one
+    place on the back it has a job to do. */}
+        <header className="flex items-center">
+          <span className="ml-auto font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/85">
             Hypefy ID
-          </span>
-          <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">
-            {data.verified ? "Verified" : "Member"}
           </span>
         </header>
 
-        {/* The code, on white with its quiet zone, inside a lime hairline —
-            the bright lime of the brand lives in the frame and the badge,
-            never in the modules. See hypefy-qr.ts for why. */}
-        <div className="flex flex-col items-center gap-2.5">
-          <div className="rounded-[22px] bg-[linear-gradient(140deg,rgba(190,242,100,0.9),rgba(101,163,13,0.35))] p-[1.5px]">
-            <div className="rounded-[21px] bg-white p-2.5">
-              {qr ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={qr} alt={`QR code opening ${prettyUrl(url)}`} className="h-[186px] w-[186px]" />
-              ) : (
-                <div className="h-[186px] w-[186px]" aria-hidden />
-              )}
-            </div>
+        <Well className="mt-3.5">
+          <div className="flex items-center justify-center bg-white p-3.5">
+            {qr ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={qr} alt={`QR code opening ${prettyUrl(url)}`} className="h-[196px] w-[196px]" />
+            ) : (
+              <div className="h-[196px] w-[196px]" aria-hidden />
+            )}
           </div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Scan to open</p>
-        </div>
+        </Well>
 
-        <div className="min-w-0">
+        <div className="mt-3.5 min-w-0">
           <div className="flex items-center gap-1.5">
-            <h3 className="min-w-0 truncate text-xl font-extrabold leading-tight tracking-tight">
-              {data.name}
-            </h3>
-            {data.verified && <VerifiedStar className="h-[17px] w-[17px] shrink-0" />}
+            <h3 className="min-w-0 truncate text-[19px] font-extrabold leading-tight tracking-tight">{data.name}</h3>
+            {data.verified && <VerifiedStar className="h-4 w-4 shrink-0" />}
           </div>
-          {data.username && <p className="font-mono text-[12px] text-white/50">@{data.username}</p>}
+          {/* Pronouns are a row below, not here. The front sets them beside
+              the handle because it is a profile; the back is a document, and
+              saying the same thing twice on one small face is sloppy. */}
+          {data.username && <p className="font-mono text-[11.5px] text-white/45">@{data.username}</p>}
         </div>
 
-        <dl className="flex flex-col gap-0 border-y border-white/10 py-1">
-          <Row label="ID" value={hypefyId(data.userId)} />
+        <dl className="mt-3 border-t border-white/10">
+          {no && <Row label="Member" value={no.split("").join(" ")} strong />}
           {since && <Row label="Since" value={since} />}
-          <Row
-            label="Standing"
-            value={`${data.stats.followers.toLocaleString()} followers · ${data.stats.posts.toLocaleString()} posts`}
-          />
+          {pronouns && <Row label="Pronouns" value={pronouns} />}
+          {/* Dimmer than the facts around it, but not lowercased: these
+              are sentences now, and forcing the case ate the capital. */}
+          <Row label="Remarks" value={remark} lower />
+          {anthem && <Row label="Anthem" value={anthem} />}
         </dl>
 
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={saving === "working"}
-          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-extrabold text-accent-ink transition active:scale-[0.98] disabled:opacity-60"
-        >
-          <Download size={16} strokeWidth={2.6} />
-          {SAVE_LABEL[saving]}
-        </button>
+        <div className="mt-auto flex flex-col items-center gap-3 pb-3 pt-5">
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving === "working"}
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-xl text-[13px] font-extrabold text-white/85 transition active:scale-[0.98] disabled:opacity-60"
+            style={{
+              background: "rgba(255,255,255,0.06)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.6)",
+            }}
+          >
+            <Download size={15} strokeWidth={2.6} />
+            {SAVE_LABEL[saving]}
+          </button>
+          <HypefyWordmark className="text-[15px] font-extrabold tracking-tight text-white/85" />
+        </div>
+      </div>
 
-        <p className="truncate text-center font-mono text-[10px] text-white/30">{prettyUrl(url)}</p>
-      </div>
-      <div className="px-2">
-        <FlipStrip side="back" onFlip={onFlip} />
-      </div>
-    </div>
+      <PlateFoot side="back" onFlip={onFlip} />
+    </CardPlate>
   );
 }
 
@@ -119,13 +129,25 @@ const SAVE_LABEL: Record<"idle" | "working" | "done" | "failed", string> = {
   failed: "Could not save",
 };
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({
+  label,
+  value,
+  strong = false,
+  lower = false,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+  lower?: boolean;
+}) {
   return (
-    <div className="flex items-baseline gap-3 py-1.5">
-      <dt className="w-[74px] shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">
-        {label}
-      </dt>
-      <dd className="min-w-0 flex-1 truncate font-mono text-[12px] font-semibold tabular-nums text-white/85">
+    <div className="flex items-baseline gap-3 border-b border-white/10 py-[7px]">
+      <dt className="w-[66px] shrink-0 font-mono text-[9px] uppercase tracking-[0.16em] text-white/35">{label}</dt>
+      <dd
+        className={`min-w-0 flex-1 truncate font-mono tabular-nums ${
+          strong ? "text-[13px] font-bold tracking-[0.06em] text-white" : "text-[11.5px] font-semibold text-white/85"
+        } ${lower ? "text-white/70" : ""}`}
+      >
         {value}
       </dd>
     </div>

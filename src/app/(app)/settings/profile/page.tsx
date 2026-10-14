@@ -31,7 +31,7 @@ export default async function EditProfilePage() {
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-bold">Profile card</span>
-            <span className="block text-xs text-muted">Layout, colour and links</span>
+            <span className="block text-xs text-muted">Your links on the card</span>
           </span>
           <ChevronRight size={18} className="shrink-0 text-muted" />
         </Link>
@@ -47,6 +47,7 @@ export default async function EditProfilePage() {
           bannerId: profile?.bannerId ?? DEFAULT_BANNER_ID,
           bannerUrl: profile?.bannerUrl ?? null,
           profileTags: profile?.profileTags ?? [],
+          pronouns: profile?.pronouns ?? null,
           interests: profile?.interests ?? [],
           accentId: profile?.accentId ?? null,
           isPremium: profile?.isPremium ?? false,

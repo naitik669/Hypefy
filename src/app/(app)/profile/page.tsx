@@ -67,6 +67,7 @@ export default async function ProfilePage() {
       <ProfileHeader
         name={name}
         username={profile?.username ?? null}
+        pronouns={profile?.pronouns ?? null}
         bio={bio}
         tags={profileTags}
         hue={hue}

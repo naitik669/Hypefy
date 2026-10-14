@@ -146,6 +146,7 @@ export default async function PublicProfilePage({
       <ProfileHeader
         name={name}
         username={profile.username}
+        pronouns={profile.pronouns}
         bio={profile.bio}
         tags={tags}
         hue={hue}

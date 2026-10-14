@@ -70,6 +70,10 @@ export default async function ProfileCardRoute({
         avatarUrl: (profile.avatar_url as string) ?? null,
         verified: (profile.is_verified as boolean) ?? false,
         joinedAt: (profile.created_at as string) ?? null,
+        memberNo: (profile.member_no as number) ?? null,
+        interests: (profile.interests as string[]) ?? [],
+        pronouns: (profile.pronouns as string) ?? null,
+        anthem: profile.anthem ?? null,
         stats,
         isOwn: user?.id === profile.id,
       }}

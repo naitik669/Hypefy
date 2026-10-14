@@ -1,15 +1,10 @@
 "use client";
 
 import { paintHypefyQr } from "@/lib/hypefy-qr";
-import { MARK_BOX, MARK_DOT, MARK_LETTER } from "@/lib/hypefy-mark";
-import {
-  CARD_INK,
-  cardTheme,
-  hypefyId,
-  memberSince,
-  prettyUrl,
-  type CardTheme,
-} from "@/lib/profile-card";
+import { WELL_RADIUS } from "@/components/profile/CardPlate";
+import { pronounLabel } from "@/lib/profile";
+import { anthemLine, memberNumber, memberSince, prettyUrl } from "@/lib/profile-card";
+import { remarkFor } from "@/lib/card-remarks";
 
 /**
  * The Hypefy ID, drawn as a picture you can keep.
@@ -18,12 +13,14 @@ import {
  * DOM, which means a library, a second layout engine and a set of rules
  * about which CSS survives; this draws the same design directly, which is
  * more code here and no new dependency, and it means the saved image is a
- * fixed size at a fixed density however the card happened to be laid out on
- * the screen it was saved from.
+ * fixed size at a fixed density however the card happened to be laid out
+ * on the screen it was saved from.
  *
  * The cost is that this file and HypefyIdFace are a pair: a change to one
- * is a change to both. They are kept honest by sharing the theme, the mark
- * and the QR painter, so what can drift is spacing, not identity.
+ * is a change to both. What keeps them honest is that everything with
+ * meaning — the mark, the code, the member number, the line about the
+ * person — comes from the same modules, so what can drift is spacing, not
+ * identity.
  */
 
 /** The design is laid out at this width and scaled up on the way out. */
@@ -35,19 +32,23 @@ type IdCardInput = {
   username: string | null;
   userId: string;
   url: string;
-  themeId?: string | null;
   joinedAt?: string | null;
+  memberNo?: number | null;
+  interests?: string[];
+  tags: string[];
+  anthem?: unknown;
+  pronouns?: string | null;
   verified: boolean;
-  followers: number;
-  posts: number;
+  /** The painted edge. The owner's accent, resolved by the caller. */
+  accent?: string;
 };
 
-/* ── Layout ──────────────────────────────────────────────────────────────── */
-
-const PAD = 10; // the card's own frame
-const INNER = 16; // the panel's padding
-const QR = 186;
-const QR_FRAME = QR + 2 * 10 + 2 * 2; // white padding, then the lime hairline
+const PAD = 16;
+const QR = 196;
+/** The well: a 2px rim and a 1px groove around whatever sits in it. */
+const WELL = 3;
+const QR_BOX = QR + 2 * 14 + 2 * WELL;
+const ROW = 23;
 
 /**
  * Where everything sits, as a plain object.
@@ -61,33 +62,19 @@ export function idCardLayout(rows: number): {
   height: number;
   header: number;
   qrTop: number;
-  caption: number;
   name: number;
   handle: number;
   rulesTop: number;
   rowHeight: number;
   footer: number;
 } {
-  const header = PAD + INNER + 14;
-  const qrTop = header + 12 + 16;
-  const caption = qrTop + QR_FRAME + 18;
-  const name = caption + 26;
-  const handle = name + 18;
-  const rulesTop = handle + 18;
-  const rowHeight = 26;
-  const footer = rulesTop + rows * rowHeight + 2 + 24;
-  return {
-    width: W,
-    height: footer + 12 + INNER + PAD,
-    header,
-    qrTop,
-    caption,
-    name,
-    handle,
-    rulesTop,
-    rowHeight,
-    footer,
-  };
+  const header = PAD + 12;
+  const qrTop = header + 14;
+  const name = qrTop + QR_BOX + 32;
+  const handle = name + 17;
+  const rulesTop = handle + 14;
+  const footer = rulesTop + rows * ROW + 36;
+  return { width: W, height: footer + 18, header, qrTop, name, handle, rulesTop, rowHeight: ROW, footer };
 }
 
 /* ── Painting ────────────────────────────────────────────────────────────── */
@@ -111,40 +98,6 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   else ctx.rect(x, y, w, h);
 }
 
-/** The theme's background: the same two blooms over the same ink ramp as the CSS. */
-function paintBackground(ctx: CanvasRenderingContext2D, theme: CardTheme, w: number, h: number) {
-  const ink = ctx.createLinearGradient(0, 0, 0, h);
-  ink.addColorStop(0, CARD_INK[0]);
-  ink.addColorStop(0.62, CARD_INK[1]);
-  ink.addColorStop(1, CARD_INK[2]);
-  ctx.fillStyle = ink;
-  ctx.fillRect(0, 0, w, h);
-
-  const bloom = ctx.createRadialGradient(w * 0.06, h * 0.86, 0, w * 0.06, h * 0.86, w * 1.18);
-  bloom.addColorStop(0, `rgba(${theme.bloom.join(",")},0.42)`);
-  bloom.addColorStop(0.62, "rgba(0,0,0,0)");
-  ctx.fillStyle = bloom;
-  ctx.fillRect(0, 0, w, h);
-
-  const counter = ctx.createRadialGradient(w * 1.04, -h * 0.06, 0, w * 1.04, -h * 0.06, w * 0.86);
-  counter.addColorStop(0, `rgba(${theme.counter.join(",")},0.3)`);
-  counter.addColorStop(0.6, "rgba(0,0,0,0)");
-  ctx.fillStyle = counter;
-  ctx.fillRect(0, 0, w, h);
-}
-
-function paintMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
-  const k = size / MARK_BOX;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(k, k);
-  ctx.fillStyle = "#ffffff";
-  for (const r of MARK_LETTER) ctx.fillRect(r.x, r.y, r.w, r.h);
-  ctx.fillStyle = "#a3e635";
-  ctx.fillRect(MARK_DOT.x, MARK_DOT.y, MARK_DOT.w, MARK_DOT.h);
-  ctx.restore();
-}
-
 /** Monospaced small caps with the letter-spacing the DOM uses. */
 function tracked(
   ctx: CanvasRenderingContext2D,
@@ -166,11 +119,27 @@ function tracked(
 
 /** Draw the ID onto a canvas, sized to fit. Returns the canvas. */
 export function drawHypefyId(input: IdCardInput): HTMLCanvasElement {
-  const theme = cardTheme(input.themeId);
+  const no = memberNumber(input.memberNo);
   const since = memberSince(input.joinedAt);
-  const rows = since ? 3 : 2;
-  const L = idCardLayout(rows);
+  const anthem = anthemLine(input.anthem);
+  const pronouns = pronounLabel(input.pronouns);
+  const remark = remarkFor({
+    userId: input.userId,
+    tags: input.tags,
+    interests: input.interests ?? [],
+    hasAnthem: !!anthem,
+    memberNo: input.memberNo ?? null,
+  });
+  const entries: [string, string, "plain" | "strong" | "lower"][] = [];
+  if (no) entries.push(["MEMBER", no.split("").join(" "), "strong"]);
+  if (since) entries.push(["SINCE", since, "plain"]);
+  if (pronouns) entries.push(["PRONOUNS", pronouns, "plain"]);
+  entries.push(["REMARKS", remark, "lower"]);
+  if (anthem) entries.push(["ANTHEM", anthem, "plain"]);
+
+  const L = idCardLayout(entries.length);
   const f = families();
+  const accent = input.accent ?? "#a3e635";
 
   const canvas = document.createElement("canvas");
   canvas.width = L.width * SCALE;
@@ -179,108 +148,104 @@ export function drawHypefyId(input: IdCardInput): HTMLCanvasElement {
   if (!ctx) throw new Error("no 2d context");
   ctx.scale(SCALE, SCALE);
 
-  // The card, clipped to its own corners so the background does not square
-  // off the rounding.
-  roundRect(ctx, 0, 0, L.width, L.height, 28);
+  // The plate, clipped to its own corners.
+  roundRect(ctx, 0, 0, L.width, L.height, 24);
   ctx.save();
   ctx.clip();
-  paintBackground(ctx, theme, L.width, L.height);
-  ctx.restore();
+  ctx.fillStyle = "#0b0b0c";
+  ctx.fillRect(0, 0, L.width, L.height);
 
-  // The panel the contents sit on.
-  roundRect(ctx, PAD, PAD, L.width - PAD * 2, L.height - PAD * 2, 20);
-  const panel = ctx.createLinearGradient(0, PAD, 0, L.height - PAD);
-  panel.addColorStop(0, "rgba(0,0,0,0.42)");
-  panel.addColorStop(1, "rgba(0,0,0,0.12)");
-  ctx.fillStyle = panel;
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.07)";
-  ctx.lineWidth = 1;
-  ctx.stroke();
+  // The brush. Invisible until it is gone.
+  ctx.fillStyle = "rgba(255,255,255,0.014)";
+  for (let x = 0; x < L.width; x += 3) ctx.fillRect(x, 0, 1, L.height);
 
-  const left = PAD + INNER;
-  const right = L.width - PAD - INNER;
+  // The edges that make it a plate rather than a rectangle.
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  ctx.fillRect(0, 0, L.width, 1);
+  ctx.fillStyle = "rgba(0,0,0,0.8)";
+  ctx.fillRect(0, L.height - 4, L.width, 1);
+  // The painted edge.
+  ctx.fillStyle = accent;
+  ctx.fillRect(0, L.height - 3, L.width, 3);
 
-  // Header
-  paintMark(ctx, left, L.header - 14, 19);
+  const left = PAD;
+  const right = L.width - PAD;
   ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
-  ctx.font = `700 11px ${f.mono}`;
-  tracked(ctx, "HYPEFY ID", left + 27, L.header + 1, 2);
-  ctx.fillStyle = "rgba(255,255,255,0.35)";
-  ctx.font = `400 10px ${f.mono}`;
-  tracked(ctx, input.verified ? "VERIFIED" : "MEMBER", right, L.header + 1, 1.4, "right");
 
-  // The code, in its lime hairline on white.
-  const qrX = (L.width - QR_FRAME) / 2;
-  const lime = ctx.createLinearGradient(qrX, L.qrTop, qrX + QR_FRAME, L.qrTop + QR_FRAME);
-  lime.addColorStop(0, "rgba(190,242,100,0.9)");
-  lime.addColorStop(1, "rgba(101,163,13,0.35)");
-  roundRect(ctx, qrX, L.qrTop, QR_FRAME, QR_FRAME, 22);
-  ctx.fillStyle = lime;
+  // Header: the words alone, at the right.
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.font = `700 10px ${f.mono}`;
+  tracked(ctx, "HYPEFY ID", right, L.header, 2, "right");
+
+  // The code, in the same well the photograph sits in on the front: a
+  // light rim, a black groove, then the tile.
+  const qrX = (L.width - QR_BOX) / 2;
+  roundRect(ctx, qrX, L.qrTop, QR_BOX, QR_BOX, WELL_RADIUS);
+  ctx.fillStyle = "rgba(255,255,255,0.11)";
   ctx.fill();
-  roundRect(ctx, qrX + 2, L.qrTop + 2, QR_FRAME - 4, QR_FRAME - 4, 21);
+  roundRect(ctx, qrX + 2, L.qrTop + 2, QR_BOX - 4, QR_BOX - 4, WELL_RADIUS - 2);
+  ctx.fillStyle = "#000000";
+  ctx.fill();
+  roundRect(ctx, qrX + WELL, L.qrTop + WELL, QR_BOX - WELL * 2, QR_BOX - WELL * 2, WELL_RADIUS - 3);
+  ctx.save();
+  ctx.clip();
   ctx.fillStyle = "#ffffff";
-  ctx.fill();
-  ctx.save();
-  ctx.translate(qrX + 12, L.qrTop + 12);
+  ctx.fillRect(qrX, L.qrTop, QR_BOX, QR_BOX);
+  ctx.translate(qrX + WELL + 14, L.qrTop + WELL + 14);
   paintHypefyQr(ctx, input.url, QR);
-  ctx.restore();
-
-  ctx.fillStyle = "rgba(255,255,255,0.4)";
-  ctx.font = `400 10px ${f.mono}`;
-  ctx.save();
-  ctx.textAlign = "left";
-  const capWidth = [..."SCAN TO OPEN"].reduce((n, c) => n + ctx.measureText(c).width + 2.2, 0) - 2.2;
-  tracked(ctx, "SCAN TO OPEN", (L.width - capWidth) / 2, L.caption, 2.2);
   ctx.restore();
 
   // Who
   ctx.fillStyle = "#ffffff";
-  ctx.font = `800 20px ${f.sans}`;
-  // The seal is not drawn beside the name here the way it is on screen —
-  // the header already says VERIFIED, and a second mark in a picture that
-  // leaves the app is a claim with nothing behind it.
+  ctx.font = `800 19px ${f.sans}`;
   ctx.fillText(clip(ctx, input.name, right - left), left, L.name);
   if (input.username) {
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.font = `400 12px ${f.mono}`;
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.font = `400 11.5px ${f.mono}`;
     ctx.fillText(`@${input.username}`, left, L.handle);
   }
 
-  // The rows, between two hairlines.
+  // The record, each row under its own rule.
   const rule = (y: number) => {
-    ctx.strokeStyle = "rgba(255,255,255,0.1)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(left, y);
-    ctx.lineTo(right, y);
-    ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.1)";
+    ctx.fillRect(left, y, right - left, 1);
   };
   rule(L.rulesTop);
-  const entries: [string, string][] = [["ID", hypefyId(input.userId)]];
-  if (since) entries.push(["SINCE", since.toUpperCase()]);
-  entries.push([
-    "STANDING",
-    `${input.followers.toLocaleString()} FOLLOWERS · ${input.posts.toLocaleString()} POSTS`,
-  ]);
-  entries.forEach(([label, value], i) => {
-    const y = L.rulesTop + L.rowHeight * i + 18;
+  entries.forEach(([label, value, kind], i) => {
+    const y = L.rulesTop + ROW * i + 16;
     ctx.fillStyle = "rgba(255,255,255,0.35)";
-    ctx.font = `400 10px ${f.mono}`;
+    ctx.font = `400 9px ${f.mono}`;
     tracked(ctx, label, left, y, 1.4);
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.font = `600 12px ${f.mono}`;
-    ctx.fillText(clip(ctx, value, right - left - 74), left + 74, y);
+    if (kind === "strong") {
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `700 13px ${f.mono}`;
+    } else if (kind === "lower") {
+      // The one line in the person's voice rather than the document's.
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.font = `600 11.5px ${f.mono}`;
+    } else {
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = `600 11.5px ${f.mono}`;
+    }
+    ctx.fillText(clip(ctx, value, right - left - 66), left + 66, y);
+    rule(L.rulesTop + ROW * (i + 1));
   });
-  rule(L.rulesTop + entries.length * L.rowHeight + 2);
 
-  // The address, so the card still says where it goes if the code will not scan.
+  // The wordmark, and the address so the card still says where it goes if
+  // the code will not scan.
   ctx.fillStyle = "rgba(255,255,255,0.3)";
-  ctx.font = `400 10px ${f.mono}`;
-  const addr = prettyUrl(input.url);
-  ctx.fillText(addr, (L.width - ctx.measureText(addr).width) / 2, L.footer);
+  ctx.font = `400 9.5px ${f.mono}`;
+  ctx.fillText(prettyUrl(input.url), left, L.footer);
+  ctx.font = `800 15px ${f.sans}`;
+  const mark = "Hypefy";
+  const dotW = ctx.measureText(".").width;
+  const markW = ctx.measureText(mark).width + dotW;
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.fillText(mark, right - markW, L.footer + 1);
+  ctx.fillStyle = accent;
+  ctx.fillText(".", right - dotW, L.footer + 1);
 
+  ctx.restore();
   return canvas;
 }
 

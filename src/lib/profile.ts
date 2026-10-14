@@ -27,6 +27,8 @@ export type Profile = {
   /** Profile-surface accent; see ./profile-accent.ts. */
   accentId: string | null;
   profileTags: string[];
+  /** One of PRONOUNS, or null for not said. */
+  pronouns: string | null;
   profileCompleted: boolean;
   isVerified: boolean;
   isPremium: boolean;
@@ -114,6 +116,23 @@ export const PROFILE_TAGS = [
   "Meme Creator",
 ] as const;
 
+/**
+ * What someone may put beside their handle.
+ *
+ * A fixed list, matched by a check constraint in migration 0137. Five
+ * entries cover nearly everyone and fit on a card without wrapping; a
+ * public free-text field would be another moderation surface. Adding a
+ * sixth is one line here and one in the constraint.
+ */
+export const PRONOUNS = ["he/him", "she/her", "they/them", "he/they", "she/they"] as const;
+
+export type Pronouns = (typeof PRONOUNS)[number];
+
+/** Null for anything not on the list, so a retired value never reaches a card. */
+export function pronounLabel(value?: string | null): string | null {
+  return (PRONOUNS as readonly string[]).includes(value ?? "") ? (value as string) : null;
+}
+
 export const INTERESTS = [
   "Memes",
   "Music",
@@ -165,7 +184,7 @@ export function hueFromId(id: string): number {
  * be read. `select("*")` on profiles is refused by the database.
  */
 export const PUBLIC_PROFILE_COLUMNS =
-  "id, username, display_name, bio, avatar_url, avatar_hue, banner_id, banner_url, current_vibe, interests, profile_completed, created_at, updated_at, profile_tags, is_private, dm_privacy, last_seen_at, show_activity, is_verified, anthem, hide_read_receipts, card_layout, card_theme, accent_id, suspended_at, suspended_until, is_premium, badge_revoked, name_font, name_glow, avatar_decoration, bubble_style, nameplate, banner_color_1, banner_color_2, profile_colors, show_hypes";
+  "id, username, display_name, bio, avatar_url, avatar_hue, banner_id, banner_url, current_vibe, interests, profile_completed, created_at, updated_at, profile_tags, is_private, dm_privacy, last_seen_at, show_activity, is_verified, anthem, hide_read_receipts, card_layout, card_theme, accent_id, suspended_at, suspended_until, is_premium, badge_revoked, name_font, name_glow, avatar_decoration, bubble_style, nameplate, banner_color_1, banner_color_2, profile_colors, show_hypes, member_no, pronouns";
 
 /** The signed-in person's own private fields. */
 export type PrivateProfile = {
@@ -217,6 +236,7 @@ function mapProfile(row: any, mine: PrivateProfile | null): Profile {
     interests: row.interests ?? [],
     accentId: (row as { accent_id?: string | null }).accent_id ?? null,
     profileTags: row.profile_tags ?? [],
+    pronouns: pronounLabel(row.pronouns),
     profileCompleted: row.profile_completed ?? false,
     isVerified: row.is_verified ?? false,
     isPremium: row.is_premium ?? false,

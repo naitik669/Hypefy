@@ -26,6 +26,7 @@ import { SharedFollowsLine } from "@/components/profile/SharedFollowsLine";
 export function ProfileHeader({
   name,
   username,
+  pronouns = null,
   bio,
   tags,
   hue,
@@ -50,6 +51,8 @@ export function ProfileHeader({
 }: {
   name: string;
   username: string | null;
+  /** One of PRONOUNS, or null. Beside the handle, in the same quiet grey. */
+  pronouns?: string | null;
   bio: string | null;
   tags: string[];
   hue: number;
@@ -159,7 +162,13 @@ export function ProfileHeader({
               </WebOnly>
             )}
           </span>
-          {username && <p className="mt-0.5 text-sm text-muted">@{username}</p>}
+          {(username || pronouns) && (
+            <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted">
+              {username && <span>@{username}</span>}
+              {username && pronouns && <span aria-hidden className="text-faint">·</span>}
+              {pronouns && <span>{pronouns}</span>}
+            </p>
+          )}
           <AnthemChip
             anthem={anthem}
             editable={anthemEditable}

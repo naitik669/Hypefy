@@ -5,15 +5,18 @@ import { ArrowLeft, GripVertical, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { scheduleUndoable } from "@/lib/undoable";
-import { CARD_THEMES, MAX_LINKS, cardSwatch, type ProfileLink } from "@/lib/profile-card";
+import { MAX_LINKS, type ProfileLink } from "@/lib/profile-card";
 
 /**
- * Owner-only editing for the profile card: the link buttons and the colour.
+ * Owner-only editing for the profile card: the link buttons.
  *
- * The layout picker is gone. Seven layouts meant seven half-finished cards
- * and a card you met on someone else's profile was a different object each
- * time; the one that held up at every photo shape is now the card. What is
- * left to choose are the two things that say something about the person.
+ * The layout and colour pickers are both gone. Seven layouts meant the card
+ * you met on someone else's profile was a different object every time, and
+ * six background gradients meant six ways for it to look like every other
+ * dark-mode card. The card is one black plate now, and the only colour on
+ * it — the painted edge along the foot — takes the accent its owner already
+ * chose in Edit profile. Asking twice for the same decision is how a
+ * settings screen grows.
  *
  * Writes go straight to Supabase under RLS — the owner policies on
  * profile_links and profiles are what authorise them, so there is no
@@ -24,14 +27,12 @@ import { CARD_THEMES, MAX_LINKS, cardSwatch, type ProfileLink } from "@/lib/prof
 export function ProfileCardEditor({
   userId,
   links,
-  themeId,
   onChange,
   onDone,
 }: {
   userId: string;
   links: ProfileLink[];
-  themeId: string;
-  onChange: (next: { links?: ProfileLink[]; themeId?: string }) => void;
+  onChange: (next: { links: ProfileLink[] }) => void;
   onDone: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -118,12 +119,6 @@ export function ProfileCardEditor({
     });
   }
 
-  async function saveColour(id: string) {
-    onChange({ themeId: id });
-    const { error: err } = await supabase.from("profiles").update({ card_theme: id }).eq("id", userId);
-    if (err) setError("Could not save the card colour.");
-  }
-
   return (
     <div className="animate-rise flex flex-col gap-5 rounded-[28px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-2xl">
       <div className="flex items-center gap-2">
@@ -137,27 +132,6 @@ export function ProfileCardEditor({
         </button>
         <span className="text-sm font-bold">Edit card</span>
       </div>
-
-      {/* Colour */}
-      <section className="flex flex-col gap-2">
-        <p className="text-xs font-bold tracking-widest text-faint uppercase">Colour</p>
-        <div className="flex flex-wrap gap-2">
-          {CARD_THEMES.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => saveColour(t.id)}
-              aria-label={t.label}
-              aria-pressed={themeId === t.id}
-              title={t.label}
-              style={{ background: cardSwatch(t) }}
-              className={`h-10 w-10 rounded-xl border-2 transition ${
-                themeId === t.id ? "border-accent" : "border-white/10"
-              }`}
-            />
-          ))}
-        </div>
-      </section>
 
       {/* Links */}
       <section className="flex flex-col gap-2">

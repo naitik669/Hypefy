@@ -1621,6 +1621,8 @@ export type Database = {
           bubble_style: string | null
           card_layout: string
           card_theme: string
+          member_no: number | null
+          pronouns: string | null
           created_at: string
           current_vibe: string | null
           date_of_birth: string | null
@@ -1667,6 +1669,8 @@ export type Database = {
           bubble_style?: string | null
           card_layout?: string
           card_theme?: string
+          member_no?: number | null
+          pronouns?: string | null
           created_at?: string
           current_vibe?: string | null
           date_of_birth?: string | null
@@ -1713,6 +1717,8 @@ export type Database = {
           bubble_style?: string | null
           card_layout?: string
           card_theme?: string
+          member_no?: number | null
+          pronouns?: string | null
           created_at?: string
           current_vibe?: string | null
           date_of_birth?: string | null

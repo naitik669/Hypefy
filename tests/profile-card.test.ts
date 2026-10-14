@@ -1,46 +1,79 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
-  CARD_THEMES,
-  DEFAULT_THEME,
-  cardBackground,
-  cardSwatch,
-  cardTheme,
-  hypefyId,
+  anthemLine,
+  memberNumber,
   memberSince,
   prettyUrl,
   profileUrl,
   safeHref,
 } from "@/lib/profile-card";
-import { badgeSpan, isFinderModule, isUnderBadge } from "@/lib/hypefy-qr";
+import { remarkFor, type RemarkSource } from "@/lib/card-remarks";
+import { badgeSpan, isFinderModule, isUnderBadge, QR_PALETTE } from "@/lib/hypefy-qr";
 import { idCardLayout } from "@/lib/card-image";
-import { MARK_BOX, MARK_DOT, MARK_LETTER } from "@/lib/hypefy-mark";
+import { MARK_BOX, MARK_DOT, MARK_H, MARK_LETTER, MARK_LOCKUP } from "@/lib/hypefy-mark";
 
 const read = (p: string) => readFileSync(p, "utf8").split("\r\n").join("\n");
 const card = read("src/components/profile/ProfileCard.tsx");
+const plate = read("src/components/profile/CardPlate.tsx");
 const front = read("src/components/profile/ProfileCardFaces.tsx");
 const back = read("src/components/profile/HypefyIdFace.tsx");
 const flip = read("src/components/profile/CardFlip.tsx");
 const editor = read("src/components/profile/ProfileCardEditor.tsx");
+const lib = read("src/lib/profile-card.ts");
 
 /**
- * The profile card: one object, two faces.
+ * The profile card: one machined black plate with two faces.
  */
 
-describe("one card, not seven", () => {
+describe("one card, one plate", () => {
   it("there is a single front, and no layout left to choose", () => {
-    // Seven layouts meant seven half-finished cards, and the card you met
-    // on someone else's profile was a different object each time.
     expect(front).toContain("export function CardFront");
     expect(front).not.toContain("CardFaceFor");
     expect(card).not.toContain("card_layout");
     expect(editor).not.toContain("CARD_LAYOUTS");
-    expect(read("src/lib/profile-card.ts")).not.toContain("CardLayout");
+    expect(lib).not.toContain("CardLayout");
   });
 
-  it("the front is the framed one — a photo in a frame, card showing round it", () => {
-    expect(front).toContain('className={`block ${shape}`}');
-    expect(front).toContain('aspect-[1/1.05] w-full overflow-hidden rounded-[20px]');
+  it("no gradient anywhere on it", () => {
+    // A coloured bloom over an ink ramp is what every dark-mode card in
+    // every app looks like; it read as a default rather than as ours.
+    expect(lib).not.toContain("radial-gradient");
+    expect(plate).not.toContain("radial-gradient");
+    expect(front).not.toContain("radial-gradient");
+    expect(back).not.toContain("radial-gradient");
+    // The brush is a repeating 1px rule, not a wash.
+    expect(plate).toContain("repeating-linear-gradient(90deg");
+  });
+
+  it("the colour picker went with the gradients", () => {
+    expect(editor).not.toContain("CARD_THEMES");
+    expect(editor).not.toContain("card_theme");
+    expect(card).not.toContain("card_theme");
+  });
+
+  it("the one piece of colour is the painted edge, and it takes the owner's accent", () => {
+    expect(plate).toContain('className="absolute inset-x-0 bottom-0 h-[3px] bg-accent"');
+    // The card portals to body, so it re-applies the owner's accent itself.
+    expect(card).toContain("accentVars(data.accentId)");
+  });
+
+  it("both faces are the same plate", () => {
+    expect(front).toContain("<CardPlate>");
+    expect(back).toContain("<CardPlate>");
+    expect(front).toContain("<PlateFoot side=\"front\"");
+    expect(back).toContain("<PlateFoot side=\"back\"");
+  });
+
+  it("the photo and the code sit in the same well, on the same corner", () => {
+    // A superellipse was tried and bowed its sides outward, which at this
+    // size reads as an app icon stuck on the card.
+    expect(plate).toContain("export const WELL_RADIUS = 20");
+    expect(plate).not.toContain("SQUIRCLE");
+    expect(front).toContain("<Well>");
+    expect(back).toContain("<Well className=");
+    // The saved image uses the same number, not one that looks close.
+    expect(read("src/lib/card-image.ts")).toContain("WELL_RADIUS");
   });
 });
 
@@ -49,28 +82,23 @@ describe("everything the card does is on the card", () => {
     expect(card).not.toContain("Customise card");
     expect(card).not.toContain("QR code");
     expect(card).not.toContain("View photo");
-    expect(card).not.toContain("function Action");
   });
 
-  it("share is a button over the photo", () => {
-    expect(front).toContain("onClick={onShare}");
-    expect(front).toContain("absolute right-2.5 top-2.5");
-    expect(front).toContain("<ShareIcon");
+  it("share sits under the Follow button, as a node graph", () => {
+    expect(front).toContain("<ShareNodesIcon");
+    expect(front).toContain('<div className="flex justify-end">');
+    // Not over the photograph: a card exists to be screenshotted, and it
+    // ended up in every screenshot of one.
+    expect(front).not.toContain("absolute right-2.5 top-2.5");
   });
 
-  it("the photo still opens itself, so nothing was lost with the button", () => {
+  it("the photo still opens itself", () => {
     expect(front).toContain('aria-label="View photo"');
     expect(card).toContain("setPhotoOpen(true)");
   });
 
-  it("both faces carry the strip that turns the card over", () => {
-    expect(front).toContain('<FlipStrip side="front"');
-    expect(back).toContain('<FlipStrip side="back"');
-  });
-
   it("customising still has a way in, from Edit profile rather than from here", () => {
-    // ?edit=1 on the card route; the editor pane is otherwise unreachable.
-    expect(card).toContain('startEditing && data.isOwn');
+    expect(card).toContain("startEditing && data.isOwn");
     expect(card).toContain("<ProfileCardEditor");
   });
 });
@@ -83,15 +111,27 @@ describe("the flip", () => {
     expect(flip).toContain('backfaceVisibility: "hidden"');
   });
 
-  it("the card's height travels with the turn", () => {
-    // A shorter back used to snap into place after the rotation finished.
+  it("follows a finger, and lets go of a vertical drag", () => {
+    expect(flip).toContain("onTouchStart");
+    expect(flip).toContain('g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y"');
+    expect(flip).toContain('if (g.axis !== "x") return;');
+    expect(flip).toContain("drag * 180");
+  });
+
+  it("a short flick turns it as surely as a long drag", () => {
+    expect(flip).toContain("travelled >= COMMIT || speed >= FLICK");
+  });
+
+  it("neither face can be dragged past flat", () => {
+    expect(flip).toContain("flipped ? Math.min(0, Math.max(-1, raw)) : Math.max(0, Math.min(1, raw))");
+  });
+
+  it("a card does not change size when you turn it over", () => {
+    expect(flip).toContain("Math.max(a.offsetHeight, b.offsetHeight)");
     expect(flip).toContain("ResizeObserver");
-    expect(flip).toContain("transition-[height]");
   });
 
   it("the face pointing away cannot be tapped or read", () => {
-    // backface-visibility hides it; it does not stop a finger landing on a
-    // link that is facing the other way.
     expect(flip).toContain("inert={hidden}");
   });
 
@@ -111,31 +151,136 @@ describe("the flip", () => {
   });
 });
 
-describe("the colours", () => {
-  it("every theme is the same recipe with two hues swapped in", () => {
-    for (const t of CARD_THEMES) {
-      const css = cardBackground(t);
-      expect(css).toContain(t.bloom.join(","));
-      expect(css).toContain(t.counter.join(","));
-      // The light sits low, where the card actually shows below the photo.
-      expect(css).toContain("at 6% 86%");
+describe("the member number", () => {
+  it("is padded to four, so it reads as a place in a queue", () => {
+    expect(memberNumber(1)).toBe("0001");
+    expect(memberNumber(2)).toBe("0002");
+    expect(memberNumber(1234)).toBe("1234");
+    expect(memberNumber(99999)).toBe("99999");
+  });
+
+  it("is simply absent before onboarding is finished", () => {
+    // A credential with a blank field on it looks broken, not pending.
+    expect(memberNumber(null)).toBeNull();
+    expect(memberNumber(undefined)).toBeNull();
+    expect(memberNumber(0)).toBeNull();
+  });
+
+  it("the database assigns it, and nobody awards themselves 0001", () => {
+    const m = read("supabase/migrations/0136_member_number.sql");
+    expect(m).toContain("profiles_member_no_seq");
+    expect(m).toContain("where profile_completed");
+    expect(m).toContain("new.member_no   := old.member_no;");
+    // The preserve trigger resets it, so the assigning trigger has to sort
+    // after it — triggers of one timing fire in alphabetical order.
+    expect(m).toContain("profiles_zz_assign_member_no");
+    expect(m).toContain("grant select (member_no)");
+    expect(m).not.toContain("grant update (member_no)");
+  });
+
+  it("the column is granted and listed, or it cannot be read at all", () => {
+    expect(read("src/lib/profile.ts")).toContain("member_no");
+  });
+});
+
+describe("the remark", () => {
+  const base: RemarkSource = { userId: "a", tags: [], interests: [], hasAnthem: false, memberNo: null };
+
+  it("the same person always gets the same line", () => {
+    const s = { ...base, userId: "f7de5612-3fd9-41cb-9e0a-089c0a704576", hasAnthem: true };
+    const once = remarkFor(s);
+    expect(remarkFor(s)).toBe(once);
+    expect(remarkFor(s)).toBe(once);
+  });
+
+  it("the strongest thing about a profile is what gets said", () => {
+    // A musician with an anthem is read as a musician, not as a student.
+    const s = { ...base, userId: "x", tags: ["Student"], hasAnthem: true };
+    expect(remarkFor(s)).toMatch(/^This user (plays it out loud|has a song picked out|holds the aux|keeps the sound on|will send you the track).$/);
+  });
+
+  it("reads tags and interests alike", () => {
+    expect(remarkFor({ ...base, tags: ["Founder"] })).not.toBe(remarkFor({ ...base, tags: [] }));
+    expect(remarkFor({ ...base, interests: ["Startups"], userId: "q" })).toBe(
+      remarkFor({ ...base, tags: ["Founder"], userId: "q" }),
+    );
+  });
+
+  it("an empty profile still gets a line", () => {
+    expect(remarkFor(base)).toMatch(/^This user (is new here|is figuring it out|just arrived|has not filled this in yet).$/);
+  });
+
+  it("being early is itself a fact worth saying", () => {
+    expect(remarkFor({ ...base, userId: "z", memberNo: 2 })).toMatch(
+      /^This user (was here before most|found it first|got in early).$/,
+    );
+  });
+
+  it("every line carries its own subject, so none needs a pronoun to agree with", () => {
+    // Pronouns are a profile field now, and using them here would mean
+    // writing each line twice for the verb — and guessing for anyone who
+    // leaves the field unset.
+    const src = read("src/lib/card-remarks.ts");
+    expect(src).toContain('const SUBJECT = "This user"');
+    for (const s of [base, { ...base, hasAnthem: true }, { ...base, tags: ["Designer"] }]) {
+      expect(remarkFor(s).startsWith("This user ")).toBe(true);
+      expect(remarkFor(s).endsWith(".")).toBe(true);
     }
   });
 
-  it("the swatch in the picker is that recipe in a square", () => {
-    const t = cardTheme("lime");
-    expect(cardSwatch(t)).toContain(t.bloom.join(","));
+  it("two people are not handed the same words by accident", () => {
+    // uuids share most of their alphabet and all of their length, so a
+    // character sum clusters them hard. Spread across a realistic set.
+    const ids = Array.from({ length: 60 }, (_, i) => `f7de5612-3fd9-41cb-9e0a-0897a0704${String(i).padStart(3, "0")}`);
+    const got = new Set(ids.map((userId) => remarkFor({ ...base, userId, hasAnthem: true })));
+    expect(got.size).toBeGreaterThanOrEqual(4);
   });
 
-  it("a colour chosen before the palette was rebuilt is carried over, not reset", () => {
-    expect(cardTheme("lime-pulse").id).toBe("lime");
-    expect(cardTheme("purple-night").id).toBe("violet");
-    expect(cardTheme("rainbow-glow").id).toBe("bloom");
+  it("is set lowercase against the uppercase labels", () => {
+    const lines = read("src/lib/card-remarks.ts").match(/"[a-z][^"]*."/g) ?? [];
+    expect(lines.length).toBeGreaterThan(30);
+    expect(back).toContain('<Row label="Remarks" value={remark} lower />');
+  });
+});
+
+describe("what the ID says", () => {
+  it("says the month and the year, never the day", () => {
+    expect(memberSince("2026-06-02T10:22:00Z")).toBe("JUNE 2026");
+    expect(memberSince(null)).toBeNull();
+    expect(memberSince("not a date")).toBeNull();
   });
 
-  it("anything unrecognised falls back rather than throwing", () => {
-    expect(cardTheme(null).id).toBe(DEFAULT_THEME);
-    expect(cardTheme("a-colour-from-the-future").id).toBe(DEFAULT_THEME);
+  it("the anthem is the song and who made it", () => {
+    expect(anthemLine({ title: "Die For You", artist: "The Weeknd" })).toBe("Die For You — The Weeknd");
+    expect(anthemLine({ title: "Untitled" })).toBe("Untitled");
+    expect(anthemLine({ artist: "Nobody" })).toBeNull();
+    expect(anthemLine(null)).toBeNull();
+    expect(anthemLine("a string")).toBeNull();
+  });
+
+  it("carries nothing that stops being true once it leaves the app", () => {
+    // It is the face that gets saved to someone's photos. A card from June
+    // claiming twelve followers reads badly by October.
+    expect(back).not.toContain("FollowButton");
+    expect(back).not.toContain("stats.followers");
+    expect(back).not.toContain("stats.posts");
+  });
+
+  it("the wordmark signs the bottom of it", () => {
+    expect(back).toContain("<HypefyWordmark");
+  });
+
+  it("the header is the words alone, at the right", () => {
+    // The mark used to sit on the left of that row; it is in the middle of
+    // the code now, which is the one place on the back it has a job.
+    expect(back).toContain("Hypefy ID");
+    expect(back).not.toContain("<HypefyMark");
+  });
+
+  it("pronouns are a row here and a handle line on the front, never both", () => {
+    expect(back).toContain('<Row label="Pronouns"');
+    expect(front).toContain("function HandleLine");
+    expect(back).not.toContain("function HandleLine");
   });
 });
 
@@ -152,19 +297,14 @@ describe("the QR", () => {
   it("the badge is centred, whatever size the code comes out", () => {
     for (const n of [21, 25, 29, 33, 41, 57, 77]) {
       const { from, to } = badgeSpan(n);
-      // Equal clearance either side, or the badge sits visibly off-centre
-      // in a grid it was punched out of.
       expect(from).toBe(n - 1 - to);
     }
   });
 
   it("the badge stays well inside what error correction level H can lose", () => {
-    // H recovers about 30%. Anything near that and a scuffed screen or a
-    // bad angle is the difference between scanning and not.
     for (const n of [21, 33, 57]) {
       const { from, to } = badgeSpan(n);
-      const covered = ((to - from + 1) ** 2 / n ** 2) * 100;
-      expect(covered).toBeLessThan(12);
+      expect(((to - from + 1) ** 2 / n ** 2) * 100).toBeLessThan(12);
     }
   });
 
@@ -175,79 +315,86 @@ describe("the QR", () => {
     expect(isUnderBadge(n - 1, n - 1, n)).toBe(false);
   });
 
-  it("the dark modules are dark — the lime is spent on the badge and the frame", () => {
-    // Bright lime modules on black is an inverted code at about 2:1 and a
-    // good share of scanners decline it. See the note in hypefy-qr.ts.
-    const src = read("src/lib/hypefy-qr.ts");
-    expect(src).toContain('errorCorrectionLevel: "H"');
-    expect(src).toContain('from: "#4d7c0f"');
-    expect(src).toContain('field: "#ffffff"');
-    expect(src).not.toContain('from: "#a3e635"');
+  it("is dark on light — the polarity every scanner ever written agrees on", () => {
+    // A light-on-dark code looked better against the plate, but it is an
+    // inverted symbol and a share of older scanner apps flatly refuse one.
+    expect(QR_PALETTE.field).toBe("#ffffff");
+    expect(QR_PALETTE.module).toBe("#0a0a0a");
+    expect(read("src/lib/hypefy-qr.ts")).toContain('errorCorrectionLevel: "H"');
+  });
+
+  it("the mark in the badge is centred on the H, not on the lockup", () => {
+    // The full stop pulls the lockup's box right, so centring that puts
+    // the letter visibly left of middle.
+    expect(read("src/lib/hypefy-qr.ts")).toContain("MARK_H.w");
+    expect(read("src/lib/hypefy-qr.ts")).not.toContain("MARK_LOCKUP");
   });
 });
 
-describe("the ID itself", () => {
-  it("is the account's own id, in fours, so it can be read aloud", () => {
-    expect(hypefyId("3f7a5612-9c04-4b1d-8e22-77ab1290cdef")).toBe("3F7A 5612 9C04");
+describe("the mark", () => {
+  it("is the measured logo, not a redrawing of it", () => {
+    // From public/icons/icon-512.png: stems 43 across, crossbar 36 deep,
+    // the dot a 29-square on the letter's baseline, scaled by 24/202.
+    expect(MARK_LETTER).toHaveLength(3);
+    const [leftStem, crossbar, rightStem] = MARK_LETTER;
+    expect(leftStem.w).toBeCloseTo(rightStem.w, 3);
+    expect(leftStem.h).toBeCloseTo(rightStem.h, 3);
+    expect(leftStem.x).toBe(0);
+    expect(rightStem.x + rightStem.w).toBeCloseTo(crossbar.w, 2);
+    expect(crossbar.y).toBeGreaterThan(leftStem.y);
+    expect(crossbar.y + crossbar.h).toBeLessThan(leftStem.y + leftStem.h);
   });
 
-  it("says the month and the year, never the day", () => {
-    expect(memberSince("2026-03-04T10:22:00Z")).toBe("March 2026");
-    expect(memberSince(null)).toBeNull();
-    expect(memberSince("not a date")).toBeNull();
+  it("the full stop sits on the letter's baseline, to its right", () => {
+    const baseline = Math.max(...MARK_LETTER.map((r) => r.y + r.h));
+    expect(MARK_DOT.y + MARK_DOT.h).toBeCloseTo(baseline, 2);
+    expect(MARK_DOT.x).toBeGreaterThan(Math.max(...MARK_LETTER.map((r) => r.x + r.w)));
   });
 
-  it("carries nothing that stops meaning something once it leaves the app", () => {
-    // It is the face that gets saved to someone's photos.
-    expect(back).not.toContain("FollowButton");
-    expect(back).not.toContain("Links");
+  it("the lockup is what anything placing it centres on, not the box", () => {
+    // Scaled against the box, the mark covered about 40% of the badge it
+    // was given and sat visibly off to one side.
+    const inkRight = Math.max(MARK_DOT.x + MARK_DOT.w, ...MARK_LETTER.map((r) => r.x + r.w));
+    expect(MARK_LOCKUP.w).toBeCloseTo(inkRight, 2);
+    expect(MARK_LOCKUP.h).toBeCloseTo(MARK_LETTER[0].h, 3);
+    // Centred in the box: equal margin above and below.
+    expect(MARK_LOCKUP.y).toBeCloseTo((MARK_BOX - MARK_LOCKUP.h) / 2, 2);
+  });
+
+  it("MARK_H is the letter without the dot, which is what the badge centres on", () => {
+    const crossbar = MARK_LETTER[1];
+    expect(MARK_H.w).toBeCloseTo(crossbar.w, 3);
+    expect(MARK_H.w).toBeLessThan(MARK_LOCKUP.w);
+    expect(MARK_H.h).toBeCloseTo(MARK_LOCKUP.h, 3);
   });
 });
 
 describe("the saved image and the face on screen", () => {
-  it("are drawn from the same theme, mark and code", () => {
+  it("are drawn from the same mark, code, number and line", () => {
     const img = read("src/lib/card-image.ts");
-    expect(img).toContain('from "@/lib/profile-card"');
     expect(img).toContain("paintHypefyQr");
-    expect(img).toContain("MARK_LETTER");
-    expect(img).toContain("CARD_INK");
+    expect(img).toContain("remarkFor");
+    expect(img).toContain("memberNumber");
+    expect(img).toContain("anthemLine");
+    expect(img).toContain("pronounLabel");
   });
 
   it("the layout is worked out before anything is painted, because a canvas is sized first", () => {
-    const three = idCardLayout(3);
+    const four = idCardLayout(4);
     const two = idCardLayout(2);
-    expect(three.width).toBe(380);
-    expect(three.height).toBeGreaterThan(two.height);
-    // Everything in order down the card.
-    expect(three.header).toBeLessThan(three.qrTop);
-    expect(three.qrTop).toBeLessThan(three.caption);
-    expect(three.caption).toBeLessThan(three.name);
-    expect(three.name).toBeLessThan(three.rulesTop);
-    expect(three.rulesTop).toBeLessThan(three.footer);
-    expect(three.footer).toBeLessThan(three.height);
+    expect(four.width).toBe(380);
+    expect(four.height).toBeGreaterThan(two.height);
+    expect(four.header).toBeLessThan(four.qrTop);
+    expect(four.qrTop).toBeLessThan(four.name);
+    expect(four.name).toBeLessThan(four.rulesTop);
+    expect(four.rulesTop).toBeLessThan(four.footer);
+    expect(four.footer).toBeLessThan(four.height);
   });
 
   it("goes through the share sheet on a phone, where Save image lives", () => {
     const img = read("src/lib/card-image.ts");
     expect(img).toContain("navigator.canShare");
-    expect(img).toContain('a.download = file.name');
-  });
-});
-
-describe("the mark", () => {
-  it("is geometry, so the DOM and the canvas cannot draw two different logos", () => {
-    expect(MARK_LETTER).toHaveLength(3);
-    for (const r of [...MARK_LETTER, MARK_DOT]) {
-      expect(r.x).toBeGreaterThanOrEqual(0);
-      expect(r.x + r.w).toBeLessThanOrEqual(MARK_BOX);
-      expect(r.y + r.h).toBeLessThanOrEqual(MARK_BOX);
-    }
-  });
-
-  it("the full stop sits on the letter's baseline, to its right", () => {
-    const baseline = Math.max(...MARK_LETTER.map((r) => r.y + r.h));
-    expect(MARK_DOT.y + MARK_DOT.h).toBeCloseTo(baseline, 1);
-    expect(MARK_DOT.x).toBeGreaterThan(Math.max(...MARK_LETTER.map((r) => r.x + r.w)));
+    expect(img).toContain("a.download = file.name");
   });
 });
 

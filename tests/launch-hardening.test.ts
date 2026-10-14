@@ -23,6 +23,31 @@ function sources(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+/**
+ * Every column of profiles granted to the API roles, across every
+ * migration.
+ *
+ * 0130 revoked the table-wide read and granted the columns of the day by
+ * name; its own comment says a column added later is not readable until it
+ * is granted "here in the same way", and in practice that has meant a
+ * grant in the migration that adds the column (member_no in 0136,
+ * pronouns in 0137). Reading only 0130 made this guard fail the moment
+ * anyone followed that instruction — which is worse than not having it,
+ * because the fix looks like deleting the test.
+ */
+function grantedProfileColumns(): string[] {
+  const dir = "supabase/migrations";
+  const cols = new Set<string>();
+  for (const name of readdirSync(dir).sort()) {
+    if (!name.endsWith(".sql")) continue;
+    const sql = read(join(dir, name));
+    for (const m of sql.matchAll(/grant select \(([^)]+)\) on public\.profiles/g)) {
+      for (const c of m[1].split(",")) cols.add(c.trim());
+    }
+  }
+  return [...cols];
+}
+
 describe("private profile columns", () => {
   const m130 = read("supabase/migrations/0130_private_profile_columns.sql");
 
@@ -31,14 +56,18 @@ describe("private profile columns", () => {
     expect(m130).toMatch(/grant select \([^)]+\) on public\.profiles to anon, authenticated;/);
   });
 
-  it("no private column is in the grant", () => {
-    const granted = m130.match(/grant select \(([^)]+)\)/)![1].split(",").map((c) => c.trim());
+  it("no private column is in any grant, in any migration", () => {
+    const granted = grantedProfileColumns();
     for (const col of PRIVATE) expect(granted).not.toContain(col);
   });
 
   it("the app asks for exactly the columns the database grants", () => {
-    const granted = m130.match(/grant select \(([^)]+)\)/)![1].split(",").map((c) => c.trim()).sort();
-    expect(PUBLIC_PROFILE_COLUMNS.split(",").map((c) => c.trim()).sort()).toEqual(granted);
+    // Both ways round on purpose. A column in the list but not granted is
+    // a select that fails and takes the whole profile read with it; a
+    // column granted but not listed is a field nobody can see.
+    expect(PUBLIC_PROFILE_COLUMNS.split(",").map((c) => c.trim()).sort()).toEqual(
+      grantedProfileColumns().sort(),
+    );
   });
 
   it("nothing in the app reads a private column, or every column, off the table", () => {

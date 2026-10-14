@@ -8,7 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ProfileBanner } from "@/components/profile/ProfileBanner";
 import { BannerPicker } from "@/components/profile/BannerPicker";
 import { ImageCropper } from "@/components/post/ImageCropper";
-import { PROFILE_TAGS, DEFAULT_BANNER_ID } from "@/lib/profile";
+import { PROFILE_TAGS, PRONOUNS, DEFAULT_BANNER_ID } from "@/lib/profile";
 import { InterestPills } from "@/components/profile/InterestPills";
 import { AccentPicker } from "@/components/profile/AccentPicker";
 import { updateProfile } from "@/app/(app)/settings/profile/actions";
@@ -30,6 +30,7 @@ export function EditProfileForm({
     bannerId: string;
     bannerUrl: string | null;
     profileTags: string[];
+    pronouns: string | null;
     interests: string[];
     accentId: string | null;
     /** Premium members can upload a GIF banner. */
@@ -50,6 +51,7 @@ export function EditProfileForm({
   );
   const [bannerUrl, setBannerUrl] = useState<string | null>(initial.bannerUrl);
   const [tags, setTags] = useState<string[]>(initial.profileTags);
+  const [pronouns, setPronouns] = useState<string | null>(initial.pronouns);
   const [interests, setInterests] = useState<string[]>(initial.interests);
   const [accentId, setAccentId] = useState<string | null>(initial.accentId);
 
@@ -216,6 +218,7 @@ export function EditProfileForm({
         displayName,
         bio,
         profileTags: tags,
+        pronouns,
         interests,
         accentId,
         avatarHue,
@@ -436,6 +439,36 @@ export function EditProfileForm({
                 }`}
               >
                 {tag}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+
+      {/* Pronouns */}
+      <Field label="Pronouns">
+        <p className="mb-2 -mt-0.5 text-xs text-muted">
+          Shown beside your name. Leave it off if you would rather not say.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {PRONOUNS.map((p) => {
+            const on = pronouns === p;
+            return (
+              <button
+                key={p}
+                type="button"
+                // Tapping the one already on turns it off, so there is no
+                // "none" pill taking up a slot and no way to get stuck with
+                // an answer you only meant to try.
+                onClick={() => setPronouns(on ? null : p)}
+                aria-pressed={on}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  on
+                    ? "border-accent bg-accent text-accent-ink"
+                    : "border-border bg-surface text-foreground hover:bg-elevated"
+                }`}
+              >
+                {p}
               </button>
             );
           })}

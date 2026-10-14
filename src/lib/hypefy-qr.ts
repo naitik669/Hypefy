@@ -1,29 +1,26 @@
 "use client";
 
 import QRCode from "qrcode";
-import { MARK_BOX, MARK_DOT, MARK_LETTER } from "@/lib/hypefy-mark";
+import { MARK_DOT, MARK_H, MARK_LETTER } from "@/lib/hypefy-mark";
 
 /**
  * The Hypefy QR: the code for a profile, drawn rather than generated.
  *
- * The library hands back a matrix of light and dark squares and a picture of
- * the same thing; this takes the matrix and paints it, because the brand is
- * in how it is painted — rounded modules, rounded eyes, a gradient through
- * the dark, and the mark sitting in a punched-out badge at the centre.
+ * The library hands back a matrix of light and dark squares and a picture
+ * of the same thing; this takes the matrix and paints it, because the brand
+ * is in how it is painted — modules nearly touching, eyes as rounded
+ * squares, and the mark in a punched-out badge at the centre.
  *
- * Two constraints are not negotiable and shape everything below.
+ * Dark on light, which is the polarity the spec assumes and every scanner
+ * ever written agrees on. A light-on-dark code was tried and looked better
+ * against the card, but it is an inverted symbol: modern phone cameras cope
+ * and a share of older single-purpose scanner apps flatly refuse, and a
+ * code that does not scan is not a code. The tile is set into the plate's
+ * own well so it reads as inlaid rather than stuck on.
  *
- * First, a scanner thresholds on brightness, so the dark modules have to be
- * genuinely dark on a genuinely light field. Lime (#a3e635) is a light
- * colour: bright lime modules on black is an inverted code at about 2:1, and
- * a good share of scanners simply decline it. So the gradient runs through
- * the dark greens — lime-700 down to near-black — which still reads as green
- * at a glance, and the bright lime is spent on the badge and the frame
- * around the code, where it costs nothing.
- *
- * Second, the badge is damage. It is covered by error correction level H,
- * which can lose about 30% of the code; the badge is held near 9% of the
- * area so there is room left for a scuffed screen and a bad angle.
+ * The badge is damage. It is covered by error correction level H, which
+ * can lose about 30% of the code; the badge is held near 9% of the area so
+ * there is room left for a scuffed screen and a bad angle.
  */
 
 /** A finder pattern — the big square in three corners — is 7 modules across. */
@@ -70,26 +67,33 @@ function box(path: Path2D, x: number, y: number, w: number, h: number, r: number
   else path.rect(x, y, w, h);
 }
 
-type Palette = {
-  /** The light field the code sits on. */
+export type QrPalette = {
+  /** The field the code sits on. */
   field: string;
-  /** The dark modules, from the top-left corner to the bottom-right. */
-  from: string;
-  mid: string;
-  to: string;
-  /** The badge behind the mark. */
-  badgeFrom: string;
-  badgeTo: string;
+  /** The modules and the eyes. */
+  module: string;
+  /** The badge behind the mark, and the mark's own colour on it. */
+  badge: string;
+  badgeInk: string;
 };
 
-export const QR_PALETTE: Palette = {
+/** Black on white, with the badge in the same ink as the modules. */
+export const QR_PALETTE: QrPalette = {
   field: "#ffffff",
-  from: "#4d7c0f",
-  mid: "#2d5209",
-  to: "#16320a",
-  badgeFrom: "#bef264",
-  badgeTo: "#65a30d",
+  module: "#0a0a0a",
+  badge: "#0a0a0a",
+  badgeInk: "#ffffff",
 };
+
+/**
+ * How much of its cell a module fills, and how round its corners are.
+ *
+ * Nearly the whole cell, barely rounded. Round dots with air between them
+ * were tried first and read as decoration; a code is a grid, and the grid
+ * is what makes it legible as one at a glance.
+ */
+const FILL = 0.94;
+const ROUND = 0.22;
 
 /**
  * Paint a Hypefy QR onto a canvas context, filling a px × px square whose
@@ -103,7 +107,7 @@ export function paintHypefyQr(
   ctx: CanvasRenderingContext2D,
   url: string,
   px: number,
-  palette: Palette = QR_PALETTE,
+  palette: QrPalette = QR_PALETTE,
 ): void {
   const qr = QRCode.create(url, { errorCorrectionLevel: "H" });
   const size = qr.modules.size;
@@ -119,28 +123,20 @@ export function paintHypefyQr(
   box(field, 0, 0, px, px, px * 0.07);
   ctx.fill(field);
 
-  const dark = ctx.createLinearGradient(o, o, o + size * m, o + size * m);
-  dark.addColorStop(0, palette.from);
-  dark.addColorStop(0.45, palette.mid);
-  dark.addColorStop(1, palette.to);
-  ctx.fillStyle = dark;
-
-  // Every ordinary module in one path, filled once, so the gradient runs
-  // across the code rather than restarting inside each square.
+  ctx.fillStyle = palette.module;
+  const inset = ((1 - FILL) / 2) * m;
   const modules = new Path2D();
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       if (!data[y * size + x]) continue;
       if (isFinderModule(x, y, size)) continue;
       if (isUnderBadge(x, y, size)) continue;
-      // Inset slightly: touching modules read as a solid blob, and the gap
-      // is what makes a dotted code look drawn rather than pixelated.
-      box(modules, o + x * m + m * 0.08, o + y * m + m * 0.08, m * 0.84, m * 0.84, m * 0.3);
+      box(modules, o + x * m + inset, o + y * m + inset, m * FILL, m * FILL, m * ROUND);
     }
   }
   ctx.fill(modules);
 
-  // The three eyes, drawn as rings rather than module-by-module. A finder
+  // The three eyes, drawn as rings rather than module by module. A finder
   // pattern is a fixed shape in every code, so it can be a shape.
   const eyes = new Path2D();
   for (const [cx, cy] of [
@@ -151,10 +147,10 @@ export function paintHypefyQr(
     const x = o + cx * m;
     const y = o + cy * m;
     const s = FINDER * m;
-    box(eyes, x, y, s, s, m * 2);
-    // Cut the middle back out with the opposite winding, then fill the pupil.
-    box(eyes, x + m, y + m, s - m * 2, s - m * 2, m * 1.4);
-    box(eyes, x + m * 2, y + m * 2, s - m * 4, s - m * 4, m * 0.9);
+    box(eyes, x, y, s, s, m * 1.9);
+    // Cut the middle back out with the even-odd rule, then fill the pupil.
+    box(eyes, x + m, y + m, s - m * 2, s - m * 2, m * 1.3);
+    box(eyes, x + m * 2, y + m * 2, s - m * 4, s - m * 4, m * 0.85);
   }
   ctx.fill(eyes, "evenodd");
 
@@ -162,13 +158,13 @@ export function paintHypefyQr(
   ctx.restore();
 }
 
-/** The lime badge and the mark inside it, where the modules were cleared. */
+/** The badge and the mark inside it, where the modules were cleared. */
 function paintBadge(
   ctx: CanvasRenderingContext2D,
   o: number,
   m: number,
   size: number,
-  palette: Palette,
+  palette: QrPalette,
 ): void {
   const { from, to } = badgeSpan(size);
   const x = o + from * m;
@@ -176,24 +172,26 @@ function paintBadge(
   const side = (to - from + 1) * m;
 
   const badge = new Path2D();
-  box(badge, x, y, side, side, side * 0.28);
-  const lime = ctx.createLinearGradient(x, y, x + side, y + side);
-  lime.addColorStop(0, palette.badgeFrom);
-  lime.addColorStop(1, palette.badgeTo);
-  ctx.fillStyle = lime;
+  box(badge, x, y, side, side, side * 0.26);
+  ctx.fillStyle = palette.badge;
   ctx.fill(badge);
 
-  // The mark, scaled from its 24-unit box into the badge with a margin.
-  const inset = side * 0.14;
-  const scale = (side - inset * 2) / MARK_BOX;
+  /*
+   * The mark, centred on the H.
+   *
+   * Not on the lockup: the full stop pulls the lockup's box three units
+   * right, so centring that puts the letter visibly left of middle. The eye
+   * reads the H as the object and the dot as punctuation hanging off it.
+   * The H is centred and the dot sits in the right-hand margin, which is
+   * why the margins here are not equal.
+   */
+  const hWidth = side * 0.52;
+  const k = hWidth / MARK_H.w;
   ctx.save();
-  ctx.translate(x + inset, y + inset);
-  ctx.scale(scale, scale);
-  ctx.fillStyle = "#0a0a0a";
+  ctx.translate(x + (side - hWidth) / 2, y + (side - MARK_H.h * k) / 2 - MARK_H.y * k);
+  ctx.scale(k, k);
+  ctx.fillStyle = palette.badgeInk;
   for (const r of MARK_LETTER) ctx.fillRect(r.x, r.y, r.w, r.h);
-  // On lime, the full stop reads as a hole rather than a dot unless it is
-  // darker still than the letter.
-  ctx.fillStyle = "#1a2e05";
   ctx.fillRect(MARK_DOT.x, MARK_DOT.y, MARK_DOT.w, MARK_DOT.h);
   ctx.restore();
 }

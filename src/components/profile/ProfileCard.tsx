@@ -11,14 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { AvatarPreview } from "@/components/ui/AvatarPreview";
 import { saveHypefyId } from "@/lib/card-image";
-import {
-  CARD_THEMES,
-  DEFAULT_THEME,
-  cardBackground,
-  cardTheme,
-  profileUrl,
-  type ProfileLink,
-} from "@/lib/profile-card";
+import { profileUrl, type ProfileLink } from "@/lib/profile-card";
 import { ProfileCardEditor } from "@/components/profile/ProfileCardEditor";
 
 export type ProfileCardData = {
@@ -34,6 +27,14 @@ export type ProfileCardData = {
   verified: boolean;
   /** When the account started, for the ID's "since". Omitted where the caller has no date. */
   joinedAt?: string | null;
+  /** Their place in the join order, for the ID's number. Null until onboarding is finished. */
+  memberNo?: number | null;
+  /** Their interests, which the ID's one line about them is partly read from. */
+  interests?: string[];
+  /** One of PRONOUNS, or null for not said. */
+  pronouns?: string | null;
+  /** The song on their profile, as stored: { title, artist, artwork }. */
+  anthem?: unknown;
   /** Name font and glow, when the owner has them. */
   cosmetics?: { is_premium?: boolean | null; name_font?: string | null; name_glow?: string | null };
   stats: { posts: number; followers: number; following: number };
@@ -71,7 +72,6 @@ export function ProfileCard({
   const editing = startEditing && data.isOwn;
   const [pane, setPane] = useState<"card" | "edit">(editing ? "edit" : "card");
   const [links, setLinks] = useState<ProfileLink[]>([]);
-  const [themeId, setThemeId] = useState<string>(DEFAULT_THEME);
   const [loading, setLoading] = useState(true);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [follow, setFollow] = useState<Follow>(null);
@@ -90,13 +90,12 @@ export function ProfileCard({
   }, []);
 
   const load = useCallback(async () => {
-    const [linkRes, profRes, userRes] = await Promise.all([
+    const [linkRes, userRes] = await Promise.all([
       supabase
         .from("profile_links")
         .select("id, label, url, position")
         .eq("user_id", data.userId)
         .order("position", { ascending: true }),
-      supabase.from("profiles").select("card_theme").eq("id", data.userId).single(),
       supabase.auth.getUser(),
     ]);
 
@@ -116,8 +115,6 @@ export function ProfileCard({
     }
 
     setLinks((linkRes.data as ProfileLink[] | null) ?? []);
-    const row = profRes.data as { card_theme?: string } | null;
-    if (row?.card_theme) setThemeId(row.card_theme);
     setLoading(false);
   }, [supabase, data.userId]);
 
@@ -126,8 +123,6 @@ export function ProfileCard({
   }, [load]);
 
   const url = profileUrl(data.username);
-  const theme = cardTheme(themeId);
-  const background = cardBackground(theme);
 
   async function share() {
     // navigator.share is the native sheet on mobile; clipboard is the
@@ -157,11 +152,13 @@ export function ProfileCard({
       username: data.username,
       userId: data.userId,
       url,
-      themeId,
       joinedAt: data.joinedAt,
+      memberNo: data.memberNo ?? null,
+      interests: data.interests ?? [],
+      tags: data.tags,
+      anthem: data.anthem,
+      pronouns: data.pronouns ?? null,
       verified: data.verified,
-      followers: data.stats.followers,
-      posts: data.stats.posts,
     });
     setSaving(result === "failed" ? "failed" : "done");
     setTimeout(() => setSaving("idle"), 2200);
@@ -202,12 +199,12 @@ export function ProfileCard({
           {pane === "card" ? (
             <FlipCard
               flipped={flipped}
+              onToggle={() => setFlipped((v) => !v)}
               label={flipped ? `${data.name}'s Hypefy ID` : `${data.name}'s profile card`}
               front={
                 <CardFront
                   data={data}
                   links={links}
-                  background={background}
                   loading={loading}
                   follow={follow}
                   onPhoto={() => setPhotoOpen(true)}
@@ -220,7 +217,6 @@ export function ProfileCard({
                 <HypefyIdFace
                   data={data}
                   url={url}
-                  background={background}
                   onSave={save}
                   saving={saving}
                   onFlip={() => setFlipped(false)}
@@ -231,11 +227,7 @@ export function ProfileCard({
             <ProfileCardEditor
               userId={data.userId}
               links={links}
-              themeId={themeId}
-              onChange={(next) => {
-                if (next.links) setLinks(next.links);
-                if (next.themeId) setThemeId(next.themeId);
-              }}
+              onChange={(next) => setLinks(next.links)}
               onDone={() => setPane("card")}
             />
           )}
@@ -255,4 +247,3 @@ export function ProfileCard({
   );
 }
 
-export { CARD_THEMES };

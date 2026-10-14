@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { sanitizeInterests } from "@/lib/profile";
+import { pronounLabel, sanitizeInterests } from "@/lib/profile";
 import { ACCENTS, DEFAULT_ACCENT_ID } from "@/lib/profile-accent";
 
 export type UpdateProfileInput = {
@@ -10,6 +10,8 @@ export type UpdateProfileInput = {
   displayName: string;
   bio: string;
   profileTags: string[];
+  /** One of PRONOUNS, or null. Anything else is dropped rather than rejected. */
+  pronouns?: string | null;
   interests?: string[];
   accentId?: string | null;
   avatarHue: number;
@@ -43,6 +45,9 @@ export async function updateProfile(
       display_name: input.displayName.trim(),
       bio: input.bio.trim() || null,
       profile_tags: input.profileTags,
+      // Dropped rather than rejected, like accent_id below: a stale client
+      // sending a retired value should save the rest of the edit.
+      pronouns: pronounLabel(input.pronouns),
       interests: sanitizeInterests(input.interests ?? []),
       // Fall back rather than reject: a stale client sending a retired
       // accent should still save the rest of the edit.
