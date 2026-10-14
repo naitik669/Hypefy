@@ -266,8 +266,14 @@ export function MessagesInbox({
   }, [encryptedRows, peerIds, reader, currentUserId]);
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
-  /** Today's pages, laid out flat under the filter row. Closed to begin with. */
-  const [pagesOpen, setPagesOpen] = useState(false);
+  /**
+   * Today's UpDates, laid out under the filter row — open to begin with.
+   *
+   * Behind an arrow they were a feature you had to already know about: the
+   * row is the point, not the arrow. The arrow stays so it can be folded
+   * away, and that is the one thing it is for now.
+   */
+  const [pagesOpen, setPagesOpen] = useState(true);
   /**
    * How many pages this device has not read, for the number on the arrow.
    * Read after mount, like everywhere else that asks: it is browser-only
@@ -942,11 +948,11 @@ export function MessagesInbox({
         ))}
 
         {/* Always offered, even on a day when nobody has written anything.
-            It used to be hidden until there was a page to read, which meant
-            the one person it mattered most to — someone whose circle has no
-            pages yet, and who could start one — was the one person who
-            never saw it. With nothing to read the row is just your own
-            slot, inviting you to write. */}
+            It used to be hidden until there was something to read, which
+            meant the one person it mattered most to — someone whose circle
+            has written nothing yet, and who could write the first — was the
+            one person who never saw it. With nothing to read the row is
+            just your own slot, inviting you to write. */}
         <PagesTrigger
           open={pagesOpen}
           count={pagesFresh}

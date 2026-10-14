@@ -92,7 +92,7 @@ describe("the strip", () => {
 
   it("with no page of your own the slot invites you to write one", async () => {
     await mount([page("a")]);
-    expect(host.textContent).toContain("add a page…");
+    expect(host.textContent).toContain("add yours…");
     expect(links()[0].getAttribute("href")).toBe("/messages/spotlight");
   });
 
@@ -103,7 +103,7 @@ describe("the strip", () => {
 
   it("what they wrote is read out with whose it is", async () => {
     await mount([page("a", { name: "Aman", text: "gym at 7" })]);
-    expect(links()[1].getAttribute("aria-label")).toBe("Aman's page: gym at 7");
+    expect(links()[1].getAttribute("aria-label")).toBe("Aman's UpDate: gym at 7");
   });
 
   it("no face wears a ring", async () => {
@@ -138,8 +138,8 @@ describe("the thought over the face", () => {
   });
 
   it("the dots shrink as they near the face", () => {
-    const big = src.indexOf("h-[8px] w-[8px]");
-    const small = src.indexOf("h-[5px] w-[5px]");
+    const big = src.indexOf("h-[10px] w-[10px]");
+    const small = src.indexOf("h-[6px] w-[6px]");
     expect(big).toBeGreaterThan(-1);
     expect(small).toBeGreaterThan(big);
   });
@@ -149,8 +149,8 @@ describe("the thought over the face", () => {
     // OVERLAP = 9 below the top of the picture) and the small one overlaps
     // it and rests on the picture's rim. Spaced apart, they stop reading as
     // a thought coming out of anyone.
-    expect(src).toContain('top-[7px] h-[8px] w-[8px]');
-    expect(src).toContain('top-[14px] h-[5px] w-[5px]');
+    expect(src).toContain('top-[8px] h-[10px] w-[10px]');
+    expect(src).toContain('top-[17px] h-[6px] w-[6px]');
   });
 
   it("they are the bubble's own colour, so the three read as one thing", () => {
@@ -158,15 +158,15 @@ describe("the thought over the face", () => {
   });
 
   it("sits over the picture, with its words kept out of that band", () => {
-    expect(src).toContain("const OVERLAP = 9;");
+    expect(src).toContain("const OVERLAP = 11;");
     expect(src).toContain("marginBottom: -OVERLAP, paddingBottom: OVERLAP + 3");
   });
 
   it("the dots get a margin of their own to fall down", () => {
     // At the cell's full width they were squeezed between the bubble and
     // the face and came out as two specks.
-    expect(src).toContain("const CELL = 74;");
-    expect(src).toContain("const BUBBLE = 64;");
+    expect(src).toContain("const CELL = 90;");
+    expect(src).toContain("const BUBBLE = 78;");
     expect(src).toContain("ml-auto");
   });
 
@@ -181,13 +181,23 @@ describe("the thought over the face", () => {
   });
 
   it("a song is marked without costing a line or landing on a word", () => {
-    expect(src).toContain('track ? "pr-3.5" : "pr-1.5"');
-    expect(src).toContain('className="absolute right-1 top-1.5 text-accent"');
+    expect(src).toContain('track ? "pr-4" : "pr-2"');
+    expect(src).toContain('className="absolute right-1.5 top-2 text-accent"');
   });
 
   it("the bubble is wider than the face it sits on", () => {
-    expect(src).toContain("const FACE = 52;");
-    expect(src).toContain("const BUBBLE = 64;");
+    expect(src).toContain("const FACE = 64;");
+    expect(src).toContain("const BUBBLE = 78;");
+  });
+});
+
+describe("what they are called here", () => {
+  it("UpDates in Messages, though Spotlight still calls them pages", () => {
+    // Same rows, same 24 hours. Spotlight is somewhere you go to read; this
+    // is a line across the top of your chats, and is named for that.
+    expect(src).toContain("UpDates");
+    expect(src).toContain('aria-label="Write your UpDate"');
+    expect(read("src/components/diary/FloatingPages.tsx")).not.toContain("UpDate");
   });
 });
 
@@ -195,7 +205,7 @@ describe("the arrow on the filter row", () => {
   it("says how many are waiting, and which way it points", () => {
     expect(src).toContain("aria-expanded={open}");
     expect(src).toContain('open ? "rotate-180 text-accent" : ""');
-    expect(src).toContain("count === 1 ? \"page\" : \"pages\"");
+    expect(src).toContain("count === 1 ? \"UpDate\" : \"UpDates\"");
   });
 
   it("is offered even on a day when nobody has written anything", () => {
@@ -205,8 +215,9 @@ describe("the arrow on the filter row", () => {
     expect(inbox).not.toContain("{pages.length > 0 && (");
   });
 
-  it("the strip opens under the row, and starts closed", () => {
-    expect(inbox).toContain("const [pagesOpen, setPagesOpen] = useState(false);");
+  it("the row is open to begin with, and the arrow folds it away", () => {
+    // Behind an arrow it was a feature you had to already know about.
+    expect(inbox).toContain("const [pagesOpen, setPagesOpen] = useState(true);");
     expect(inbox).toContain("{pagesOpen && <PagesStrip pages={pages} me={me} />}");
   });
 

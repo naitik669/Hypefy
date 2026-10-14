@@ -7,7 +7,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { loadSeen, pageText, storyOrder, unseen, type DiaryEntry } from "@/lib/diary";
 
 /** The face. */
-const FACE = 52;
+const FACE = 64;
 /**
  * The cell, which is wider than the face.
  *
@@ -15,7 +15,7 @@ const FACE = 52;
  * so a page gets a few more words before it has to trail off. At the face's
  * own width most pages read "bored out of…", which is not worth a row.
  */
-const CELL = 74;
+const CELL = 90;
 /**
  * The thought itself, narrower than the cell and pushed to its right edge.
  *
@@ -23,7 +23,7 @@ const CELL = 74;
  * nowhere for them to go: squeezed between the bubble and the face they
  * came out as two specks, and the thought stopped reading as a thought.
  */
-const BUBBLE = 64;
+const BUBBLE = 78;
 /**
  * How far the thought sits over the face.
  *
@@ -33,10 +33,15 @@ const BUBBLE = 64;
  * as a hole punched in it, and the margin is the one place they stay the
  * bubble's own colour.
  */
-const OVERLAP = 9;
+const OVERLAP = 11;
 
 /**
- * Today's pages as a row of faces, each with what they wrote over it.
+ * Today's UpDates: a row of faces, each with what they wrote over it.
+ *
+ * The same rows Spotlight calls pages — one per person, gone in 24 hours —
+ * under the name they go by in Messages. Spotlight is somewhere you go to
+ * read; this is a line across the top of your chats saying what the people
+ * you talk to are up to, so it is named for that and not for the table.
  *
  * The same rows the Spotlight deck shuffles through, laid out flat: at a
  * glance you see who has written something and roughly what, rather than
@@ -69,17 +74,17 @@ export function PagesStrip({
   const others = useMemo(() => storyOrder(pages, fresh), [pages, fresh]);
 
   return (
-    <div className="no-scrollbar animate-strip-in flex gap-3.5 overflow-x-auto px-4 pb-1 pt-2.5">
+    <div className="no-scrollbar animate-strip-in flex gap-4 overflow-x-auto px-4 pb-1.5 pt-3">
       {mine ? (
         <Cell page={mine} label="You" />
       ) : (
         <Link
           href="/messages/spotlight"
-          aria-label="Write your page"
+          aria-label="Write your UpDate"
           className="group flex shrink-0 flex-col items-end transition-transform active:scale-95"
           style={{ width: CELL }}
         >
-          <Bubble faint>add a page…</Bubble>
+          <Bubble faint>add yours…</Bubble>
           {/* Your own face, not an empty tile. A dashed square the size of a
               person said "something is missing here"; your face with a plus
               on its corner says the row is already yours to write in. */}
@@ -94,12 +99,12 @@ export function PagesStrip({
                 <Plus size={18} strokeWidth={2.4} />
               </span>
             )}
-            <span className="absolute -bottom-0.5 -right-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-accent text-accent-ink ring-2 ring-background">
-              <Plus size={12} strokeWidth={3.2} />
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-[21px] w-[21px] items-center justify-center rounded-full bg-accent text-accent-ink ring-2 ring-background">
+              <Plus size={14} strokeWidth={3.2} />
             </span>
             <Dots faint />
           </span>
-          <span className="mt-1 truncate text-center text-[10px] font-semibold text-muted" style={{ width: FACE }}>You</span>
+          <span className="mt-1.5 truncate text-center text-[11px] font-semibold text-muted" style={{ width: FACE }}>You</span>
         </Link>
       )}
 
@@ -115,7 +120,7 @@ function Cell({ page, label }: { page: DiaryEntry; label?: string }) {
   return (
     <Link
       href={`/messages/spotlight?page=${encodeURIComponent(page.userId)}`}
-      aria-label={`${label ? "Your page" : `${page.name}'s page`}: ${pageText(page.text)}`}
+      aria-label={`${label ? "Your UpDate" : `${page.name}'s UpDate`}: ${pageText(page.text)}`}
       className="flex shrink-0 flex-col items-end transition-transform active:scale-95"
       style={{ width: CELL }}
     >
@@ -124,7 +129,7 @@ function Cell({ page, label }: { page: DiaryEntry; label?: string }) {
         <Avatar name={page.name} hue={page.hue} src={page.avatarUrl ?? undefined} size={FACE} />
         <Dots />
       </span>
-      <span className="mt-1 truncate text-center text-[10px] font-semibold text-muted" style={{ width: FACE }}>{name}</span>
+      <span className="mt-1.5 truncate text-center text-[11px] font-semibold text-muted" style={{ width: FACE }}>{name}</span>
     </Link>
   );
 }
@@ -149,8 +154,8 @@ function Bubble({
   return (
     <span
       // z-10 so it sits in front of the face, which follows it in the DOM.
-      className={`relative z-10 ml-auto rounded-[13px] pt-1.5 pl-1.5 text-center text-[9.5px] font-semibold leading-[1.25] ${
-        track ? "pr-3.5" : "pr-1.5"
+      className={`relative z-10 ml-auto rounded-[15px] pt-2 pl-2 text-center text-[11px] font-semibold leading-[1.25] ${
+        track ? "pr-4" : "pr-2"
       } ${faint ? "bg-surface text-faint" : "bg-elevated text-foreground/90"}`}
       // The band that covers the picture is padding, never words.
       style={{ width: BUBBLE, marginBottom: -OVERLAP, paddingBottom: OVERLAP + 3 }}
@@ -166,7 +171,7 @@ function Bubble({
       </span>
       {/* In the corner, with room kept for it by the padding above. Inline
           after the words, a long page clamped the mark away with them. */}
-      {track && <Music size={8} className="absolute right-1 top-1.5 text-accent" aria-hidden />}
+      {track && <Music size={9} className="absolute right-1.5 top-2 text-accent" aria-hidden />}
     </span>
   );
 }
@@ -190,9 +195,9 @@ function Dots({ faint = false }: { faint?: boolean }) {
     <span aria-hidden>
       {/* Tucked under the bubble's bottom-left corner, which sits OVERLAP
           below the top of the picture. */}
-      <span className={`absolute -left-[6px] top-[7px] h-[8px] w-[8px] rounded-full ${fill}`} />
+      <span className={`absolute -left-[7px] top-[8px] h-[10px] w-[10px] rounded-full ${fill}`} />
       {/* Overlapping the one above it and resting on the picture's rim. */}
-      <span className={`absolute -left-[1px] top-[14px] h-[5px] w-[5px] rounded-full ${fill}`} />
+      <span className={`absolute -left-[1px] top-[17px] h-[6px] w-[6px] rounded-full ${fill}`} />
     </span>
   );
 }
@@ -218,11 +223,11 @@ export function PagesTrigger({
       type="button"
       onClick={onToggle}
       aria-expanded={open}
-      aria-label={`${count} ${count === 1 ? "page" : "pages"} today. ${open ? "Hide" : "Show"}`}
+      aria-label={`${count} new ${count === 1 ? "UpDate" : "UpDates"}. ${open ? "Hide" : "Show"}`}
       data-pages-trigger
       className="ml-auto flex shrink-0 items-center gap-1 self-center pl-2 pr-1 text-xs font-bold text-muted transition-colors active:text-accent"
     >
-      <span className={open ? "text-accent" : ""}>Pages</span>
+      <span className={open ? "text-accent" : ""}>UpDates</span>
       {count > 0 && (
         <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-black text-accent-ink">
           {count}
