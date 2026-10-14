@@ -176,7 +176,14 @@ describe("the arrow on the title", () => {
  * reopening in one tap), or a conversation row (opening that chat). The
  * scrim above it takes both halves of the tap instead.
  */
-describe("tapping away from the panel", () => {
+/**
+ * Given room to finish. These mount React into jsdom, which is the slowest
+ * thing this suite does; run alone the four take about seven seconds, but
+ * under the full suite they share a machine with every other jsdom file and
+ * have intermittently passed the 30s default. The timeout is about what
+ * else is running, not about the panel.
+ */
+describe("tapping away from the panel", { timeout: 120_000 }, () => {
   let root: Root;
   let host: HTMLDivElement;
 

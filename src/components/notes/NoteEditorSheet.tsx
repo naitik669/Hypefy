@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Globe2, Star, Dices, Music } from "lucide-react";
+import { Loader2, Globe2, Star, Music } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CenterModal } from "@/components/ui/CenterModal";
 import { Avatar } from "@/components/ui/Avatar";
@@ -11,10 +11,10 @@ import { type Track } from "@/lib/music";
 import {
   splitStatus,
   joinStatus,
-  DICE_POOL,
   EMOJI_STRIP,
   type StatusValue,
 } from "@/components/ui/StatusComposer";
+import { THOUGHT_SHELL, ThoughtDots } from "@/components/diary/ThoughtBubble";
 import { haptics } from "@/lib/haptics";
 import { scheduleUndoable } from "@/lib/undoable";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -23,12 +23,29 @@ import { useToast } from "@/components/ui/ToastProvider";
 const MAX = 60;
 const MAX_TEXT = MAX - 3; // leave room for "<emoji> "
 
-const NOTE_PRESETS: StatusValue[] = [
-  { emoji: "🤫", text: "ask me about today" },
-  { emoji: "🎧", text: "song on repeat" },
-  { emoji: "🍕", text: "who's hungry" },
-  { emoji: "🌙", text: "can't sleep, talk?" },
+/**
+ * What the empty bubble asks you, one at a time.
+ *
+ * These replace a row of preset chips and a dice. Both wrote FOR you, which
+ * is a strange thing to do to a one-line status — you then had to delete
+ * someone else's words to write your own. A prompt that changes while the
+ * bubble is empty suggests without filling anything in.
+ */
+const PROMPTS = [
+  "share your thought…",
+  "bored today?",
+  "are you hyped up?",
+  "what's the mood?",
+  "on repeat right now?",
+  "up to anything?",
+  "how's today going?",
+  "anyone around?",
+  "say something…",
+  "what's new?",
 ];
+
+/** How long each prompt sits before the next. */
+const PROMPT_MS = 2600;
 
 export type MyNote = { text: string; audience: "mutual" | "close"; track: Track | null } | null;
 
@@ -70,9 +87,8 @@ export function NoteEditorSheet({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [stripOpen, setStripOpen] = useState(false);
-  const [rollCount, setRollCount] = useState(0);
+  const [promptAt, setPromptAt] = useState(0);
   const textRef = useRef<HTMLInputElement>(null);
-  const lastRollRef = useRef(-1);
 
   // Re-seed from the saved note each time the modal opens.
   useEffect(() => {
@@ -81,20 +97,24 @@ export function NoteEditorSheet({
       setAudience(current?.audience ?? "mutual");
       setTrack(current?.track ?? null);
       setStripOpen(false);
-      setRollCount(0);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  function roll() {
-    haptics.tap();
-    let i = Math.floor(Math.random() * DICE_POOL.length);
-    if (i === lastRollRef.current) i = (i + 1) % DICE_POOL.length;
-    lastRollRef.current = i;
-    setDraft({ emoji: DICE_POOL[i].emoji, text: DICE_POOL[i].text.slice(0, MAX_TEXT) });
-    setRollCount((c) => c + 1); // re-keys the bubble + dice so both animate
-    setStripOpen(false);
-  }
+  /**
+   * The prompt changes while there is nothing written. It stops the moment
+   * you type: a placeholder moving under your own words is a distraction,
+   * and once there are words it is not shown anyway.
+   *
+   * Someone who has asked for less motion gets one prompt and keeps it.
+   */
+  const empty = draft.text.trim() === "";
+  useEffect(() => {
+    if (!open || !empty) return;
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const id = setInterval(() => setPromptAt((i) => (i + 1) % PROMPTS.length), PROMPT_MS);
+    return () => clearInterval(id);
+  }, [open, empty]);
 
   async function post() {
     const value = joinStatus(draft).slice(0, MAX);
@@ -140,7 +160,7 @@ export function NoteEditorSheet({
     <CenterModal open={open} onClose={onClose} title={title} subtitle={subtitle}>
       <div className="flex flex-col gap-4">
         {/* ── The stage: your note exactly as your circle sees it ── */}
-        <div className="relative flex flex-col items-center overflow-hidden rounded-3xl bg-surface/60 px-4 pb-6 pt-8">
+        <div className="relative flex flex-col items-center overflow-hidden rounded-3xl bg-background/60 px-4 pb-6 pt-8">
           {/* Soft spotlight pulling focus to the bubble + avatar */}
           <div
             aria-hidden
@@ -148,52 +168,38 @@ export function NoteEditorSheet({
             style={{ background: "radial-gradient(ellipse 75% 60% at 50% 42%, rgba(163,230,53,0.055), transparent 70%)" }}
           />
 
-          {/* Thought bubble — this IS the input; it idles like it's floating */}
-          <div className="animate-bubble-float relative w-full max-w-[280px]">
-            <div key={rollCount} className={rollCount ? "animate-roll-in" : undefined}>
-              <div className="flex items-center gap-2 rounded-[22px] rounded-bl-md border border-white/[0.09] bg-elevated px-3.5 py-3 shadow-[0_14px_36px_rgba(0,0,0,0.45)]">
-                <button
-                  type="button"
-                  aria-label="Pick emoji"
-                  onClick={() => setStripOpen((v) => !v)}
-                  className={`shrink-0 text-[24px] leading-none transition-transform active:scale-90 ${draft.emoji ? "" : "opacity-30 grayscale"}`}
-                >
-                  {draft.emoji || "🙂"}
-                </button>
-                <input
-                  ref={textRef}
-                  value={draft.text}
-                  onChange={(e) => setDraft({ ...draft, text: e.target.value.slice(0, MAX_TEXT) })}
-                  onFocus={() => setStripOpen(false)}
-                  placeholder="say something…"
-                  autoFocus={!current}
-                  aria-label="Note text"
-                  className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold tracking-[-0.01em] outline-none placeholder:font-medium placeholder:text-faint"
-                />
-                {draft.text.length > MAX_TEXT - 10 && (
-                  <span className="shrink-0 text-[10px] tabular-nums text-faint">{MAX_TEXT - draft.text.length}</span>
-                )}
-              </div>
-              {/* Bubble tail — steps down toward the avatar */}
-              <span className="absolute -bottom-2.5 left-1/2 h-3 w-3 -translate-x-5 rounded-full border border-white/[0.09] bg-elevated" />
-              <span className="absolute -bottom-5 left-1/2 h-1.5 w-1.5 -translate-x-2 rounded-full border border-white/[0.09] bg-elevated" />
+{/* The bubble, which IS the input — the same slab the row draws, so
+              what you type here is the thing your circle sees. No border, no
+              point: a thought, with its dots falling to your face below. */}
+          <div className="relative w-full max-w-[280px]">
+            <div className={`flex items-center gap-2 rounded-[20px] px-4 py-3.5 ${THOUGHT_SHELL}`}>
+              <button
+                type="button"
+                aria-label="Pick emoji"
+                onClick={() => setStripOpen((v) => !v)}
+                className={`shrink-0 text-[24px] leading-none transition-transform active:scale-90 ${draft.emoji ? "" : "opacity-30 grayscale"}`}
+              >
+                {draft.emoji || "🙂"}
+              </button>
+              <input
+                ref={textRef}
+                value={draft.text}
+                onChange={(e) => setDraft({ ...draft, text: e.target.value.slice(0, MAX_TEXT) })}
+                onFocus={() => setStripOpen(false)}
+                placeholder={PROMPTS[promptAt]}
+                autoFocus={!current}
+                aria-label="Your UpDate"
+                className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold tracking-[-0.01em] outline-none placeholder:font-medium placeholder:text-faint"
+              />
+              {draft.text.length > MAX_TEXT - 10 && (
+                <span className="shrink-0 text-[10px] tabular-nums text-faint">{MAX_TEXT - draft.text.length}</span>
+              )}
             </div>
-
-            {/* Dice — perched on the bubble's shoulder, tumbles on each roll */}
-            <button
-              type="button"
-              onClick={roll}
-              aria-label="Random note"
-              className="absolute -right-2.5 -top-3.5 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background text-muted shadow-lg transition-colors hover:text-foreground"
-            >
-              <span key={rollCount} className={rollCount ? "animate-dice-spin" : undefined}>
-                <Dices size={17} />
-              </span>
-            </button>
+            <ThoughtDots where="stage" />
           </div>
 
-          {/* Your pfp under the bubble */}
-          <div className="relative mt-5">
+          {/* Your face, where the dots land. */}
+          <div className="relative mt-[18px]">
             <Avatar name={me?.name ?? "You"} hue={me?.hue ?? 280} size={64} src={me?.avatarUrl ?? undefined} />
           </div>
 
@@ -235,24 +241,6 @@ export function NoteEditorSheet({
             ))}
           </div>
         )}
-
-        {/* Suggestions */}
-        <div className="flex flex-wrap justify-center gap-1.5">
-          {NOTE_PRESETS.map((p) => (
-            <button
-              key={p.text}
-              type="button"
-              onClick={() => {
-                haptics.select();
-                setDraft({ emoji: p.emoji, text: p.text.slice(0, MAX_TEXT) });
-                setStripOpen(false);
-              }}
-              className="rounded-pill border border-border bg-surface px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-white/20 hover:text-foreground"
-            >
-              {p.emoji} {p.text}
-            </button>
-          ))}
-        </div>
 
         {/* Audience — quiet segmented control */}
         <div className="flex rounded-2xl border border-border bg-surface p-1">

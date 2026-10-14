@@ -25,6 +25,8 @@ vi.mock("next/link", () => ({
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const src = read("src/components/diary/PagesStrip.tsx");
 const inbox = read("src/components/messages/MessagesInbox.tsx");
+/** The shape itself lives in one place now, used by the row and the composer. */
+const shape = read("src/components/diary/ThoughtBubble.tsx");
 
 const page = (userId: string, over: Partial<DiaryEntry> = {}): DiaryEntry => ({
   userId,
@@ -158,6 +160,32 @@ describe("writing your own", () => {
     expect(editor).toContain("Pick emoji");
     expect(editor).toContain("TrackPicker");
     expect(editor).toContain('supabase.rpc("set_note"');
+    // The row's own slab, not a bordered box with a speech corner.
+    expect(editor).toContain("THOUGHT_SHELL");
+    expect(editor).toContain('<ThoughtDots where="stage" />');
+    expect(editor).not.toContain("rounded-bl-md");
+  });
+
+  it("nothing writes the words for you", () => {
+    const editor = read("src/components/notes/NoteEditorSheet.tsx");
+    // The preset chips and the dice both filled the field in, so you then
+    // had to delete someone else's words to write your own.
+    expect(editor).not.toContain("NOTE_PRESETS");
+    expect(editor).not.toContain("DICE_POOL");
+    expect(editor).not.toContain("Dices");
+  });
+
+  it("the empty bubble asks a different thing every few seconds", () => {
+    const editor = read("src/components/notes/NoteEditorSheet.tsx");
+    expect(editor).toContain("const PROMPTS = [");
+    for (const p of ["share your thought…", "bored today?", "are you hyped up?"]) {
+      expect(editor).toContain(p);
+    }
+    expect(editor).toContain("placeholder={PROMPTS[promptAt]}");
+    // It stops once there are words, and never starts for someone who has
+    // asked for less motion.
+    expect(editor).toContain("if (!open || !empty) return;");
+    expect(editor).toContain('matchMedia?.("(prefers-reduced-motion: reduce)")');
   });
 
   it("says UpDate on its buttons, not note", () => {
@@ -177,15 +205,26 @@ describe("writing your own", () => {
 
 describe("the thought over the face", () => {
   it("is a thought, not speech: dots rather than a point", () => {
-    expect(src).toContain("function Dots(");
-    expect(src).toContain("rounded-full");
+    expect(shape).toContain("export function ThoughtDots(");
+    expect(shape).toContain("rounded-full");
     // No tail of any kind left over from the speech-bubble version.
-    expect(src).not.toContain("rotate-45");
+    expect(shape).not.toContain("rotate-45");
+    expect(src).not.toContain("function Dots(");
+  });
+
+  it("the row and the composer draw the same shape, from one definition", () => {
+    // They were two hand-built bubbles, which is why the popup never
+    // looked like the row.
+    expect(src).toContain('from "@/components/diary/ThoughtBubble"');
+    expect(read("src/components/notes/NoteEditorSheet.tsx")).toContain(
+      'from "@/components/diary/ThoughtBubble"',
+    );
+    expect(shape).toContain('where?: "row" | "stage"');
   });
 
   it("the dots shrink as they near the face", () => {
-    const big = src.indexOf("h-[10px] w-[10px]");
-    const small = src.indexOf("h-[6px] w-[6px]");
+    const big = shape.indexOf("h-[10px] w-[10px]");
+    const small = shape.indexOf("h-[6px] w-[6px]");
     expect(big).toBeGreaterThan(-1);
     expect(small).toBeGreaterThan(big);
   });
@@ -195,12 +234,12 @@ describe("the thought over the face", () => {
     // OVERLAP = 9 below the top of the picture) and the small one overlaps
     // it and rests on the picture's rim. Spaced apart, they stop reading as
     // a thought coming out of anyone.
-    expect(src).toContain('top-[8px] h-[10px] w-[10px]');
-    expect(src).toContain('top-[17px] h-[6px] w-[6px]');
+    expect(shape).toContain('top-[8px] h-[10px] w-[10px]');
+    expect(shape).toContain('top-[17px] h-[6px] w-[6px]');
   });
 
   it("they are the bubble's own colour, so the three read as one thing", () => {
-    expect(src).toContain('const fill = faint ? "bg-surface" : "bg-elevated";');
+    expect(shape).toContain('const fill = faint ? "bg-surface" : "bg-elevated";');
   });
 
   it("sits over the picture, with its words kept out of that band", () => {

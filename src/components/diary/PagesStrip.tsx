@@ -6,6 +6,7 @@ import { ChevronDown, Music, Plus } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { loadSeen, pageText, storyOrder, unseen, type DiaryEntry } from "@/lib/diary";
 import { NoteEditorSheet, type MyNote } from "@/components/notes/NoteEditorSheet";
+import { ThoughtDots } from "@/components/diary/ThoughtBubble";
 
 /** The face. */
 const FACE = 64;
@@ -148,7 +149,7 @@ export function PagesStrip({
             <span className="absolute -bottom-0.5 -right-0.5 flex h-[21px] w-[21px] items-center justify-center rounded-full bg-accent text-accent-ink ring-2 ring-background">
               <Plus size={14} strokeWidth={3.2} />
             </span>
-            <Dots faint />
+            <ThoughtDots faint />
           </span>
           <span className="mt-1.5 truncate text-center text-[11px] font-semibold text-muted" style={{ width: FACE }}>You</span>
         </button>
@@ -188,7 +189,7 @@ function Cell({
       <Bubble track={!!page.track}>{pageText(page.text)}</Bubble>
       <span className="relative mr-[3px]">
         <Avatar name={page.name} hue={page.hue} src={page.avatarUrl ?? undefined} size={FACE} />
-        <Dots />
+        <ThoughtDots />
       </span>
       <span className="mt-1.5 truncate text-center text-[11px] font-semibold text-muted" style={{ width: FACE }}>{name}</span>
     </>
@@ -250,32 +251,6 @@ function Bubble({
       {/* In the corner, with room kept for it by the padding above. Inline
           after the words, a long page clamped the mark away with them. */}
       {track && <Music size={9} className="absolute right-1.5 top-2 text-accent" aria-hidden />}
-    </span>
-  );
-}
-
-/**
- * The two dots rising from the face to the thought above it.
- *
- * They are a chain, not decoration: the small one rests on the picture's
- * rim, the large one tucks under the bubble's bottom corner, and each
- * overlaps the next. Spaced apart instead, they read as two dots hanging
- * in the air beside someone rather than a thought coming out of them,
- * which is the whole job of a thought bubble's tail.
- *
- * Both sit in the margin left of the picture, in the bubble's own colour.
- * On the face itself a dark dot needs an outline to survive the colours
- * underneath, and an outlined dark dot on a bright avatar reads as a hole.
- */
-function Dots({ faint = false }: { faint?: boolean }) {
-  const fill = faint ? "bg-surface" : "bg-elevated";
-  return (
-    <span aria-hidden>
-      {/* Tucked under the bubble's bottom-left corner, which sits OVERLAP
-          below the top of the picture. */}
-      <span className={`absolute -left-[7px] top-[8px] h-[10px] w-[10px] rounded-full ${fill}`} />
-      {/* Overlapping the one above it and resting on the picture's rim. */}
-      <span className={`absolute -left-[1px] top-[17px] h-[6px] w-[6px] rounded-full ${fill}`} />
     </span>
   );
 }
