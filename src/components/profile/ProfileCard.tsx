@@ -2,33 +2,24 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 import { accentVars } from "@/lib/profile-accent";
-import {
-  X,
-  Link2,
-  QrCode,
-  Pencil,
-  Download,
-  Share2,
-  Image as ImageIcon,
-} from "lucide-react";
-import { CardFaceFor, type Follow } from "@/components/profile/ProfileCardFaces";
+import { CardFront, type Follow } from "@/components/profile/ProfileCardFaces";
+import { HypefyIdFace } from "@/components/profile/HypefyIdFace";
+import { FlipCard } from "@/components/profile/CardFlip";
 import { createClient } from "@/lib/supabase/client";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { AvatarPreview } from "@/components/ui/AvatarPreview";
-import { bannerGradient } from "@/lib/profile";
+import { saveHypefyId } from "@/lib/card-image";
 import {
-  CARD_LAYOUTS,
   CARD_THEMES,
-  DEFAULT_LAYOUT,
   DEFAULT_THEME,
-  type CardLayout,
-  type ProfileLink,
-  isCardLayout,
+  cardBackground,
+  cardTheme,
   profileUrl,
+  type ProfileLink,
 } from "@/lib/profile-card";
 import { ProfileCardEditor } from "@/components/profile/ProfileCardEditor";
-import { ProfileCardQr } from "@/components/profile/ProfileCardQr";
 
 export type ProfileCardData = {
   /** Owner's accent. The card portals to body, so it re-applies it itself. */
@@ -41,20 +32,30 @@ export type ProfileCardData = {
   hue: number;
   avatarUrl: string | null | undefined;
   verified: boolean;
+  /** When the account started, for the ID's "since". Omitted where the caller has no date. */
+  joinedAt?: string | null;
   /** Name font and glow, when the owner has them. */
   cosmetics?: { is_premium?: boolean | null; name_font?: string | null; name_glow?: string | null };
   stats: { posts: number; followers: number; following: number };
   isOwn: boolean;
 };
 
-type Pane = "card" | "edit" | "qr";
+type Saving = "idle" | "working" | "done" | "failed";
 
 /**
- * The card behind an expanded avatar.
+ * The card behind an expanded avatar: one object with two faces.
  *
- * Tapping a profile photo used to open the raw image. It now opens this:
- * the identity, the links, and a QR that resolves to the public profile.
- * The photo is still reachable, just no longer the default.
+ * The front is the person and the back is their Hypefy ID. Everything the
+ * card does is on the card — share over the photo, turn over at the foot,
+ * save on the back — rather than in a row of pills underneath it. A card
+ * exists to be screenshotted and sent, and the pills were in every
+ * screenshot, reading like part of the browser rather than part of the
+ * thing.
+ *
+ * Customising is not here either. It has its own way in, from Edit profile,
+ * because it is a thing the owner does once and everyone else never does,
+ * and it was taking the loudest position on a surface that is mostly looked
+ * at by other people.
  */
 export function ProfileCard({
   data,
@@ -67,13 +68,16 @@ export function ProfileCard({
   startEditing?: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
-  const [pane, setPane] = useState<Pane>(startEditing && data.isOwn ? "edit" : "card");
+  const editing = startEditing && data.isOwn;
+  const [pane, setPane] = useState<"card" | "edit">(editing ? "edit" : "card");
   const [links, setLinks] = useState<ProfileLink[]>([]);
-  const [layout, setLayout] = useState<CardLayout>(DEFAULT_LAYOUT);
-  const [theme, setTheme] = useState<string>(DEFAULT_THEME);
+  const [themeId, setThemeId] = useState<string>(DEFAULT_THEME);
   const [loading, setLoading] = useState(true);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [follow, setFollow] = useState<Follow>(null);
+  const [flipped, setFlipped] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [saving, setSaving] = useState<Saving>("idle");
 
   useOverlayBackButton(true, onClose);
 
@@ -92,11 +96,7 @@ export function ProfileCard({
         .select("id, label, url, position")
         .eq("user_id", data.userId)
         .order("position", { ascending: true }),
-      supabase
-        .from("profiles")
-        .select("card_layout, card_theme")
-        .eq("id", data.userId)
-        .single(),
+      supabase.from("profiles").select("card_theme").eq("id", data.userId).single(),
       supabase.auth.getUser(),
     ]);
 
@@ -116,13 +116,8 @@ export function ProfileCard({
     }
 
     setLinks((linkRes.data as ProfileLink[] | null) ?? []);
-
-    const row = profRes.data as {
-      card_layout?: string;
-      card_theme?: string;
-    } | null;
-    if (isCardLayout(row?.card_layout)) setLayout(row.card_layout);
-    if (row?.card_theme) setTheme(row.card_theme);
+    const row = profRes.data as { card_theme?: string } | null;
+    if (row?.card_theme) setThemeId(row.card_theme);
     setLoading(false);
   }, [supabase, data.userId]);
 
@@ -131,7 +126,46 @@ export function ProfileCard({
   }, [load]);
 
   const url = profileUrl(data.username);
-  const gradient = bannerGradient(theme);
+  const theme = cardTheme(themeId);
+  const background = cardBackground(theme);
+
+  async function share() {
+    // navigator.share is the native sheet on mobile; clipboard is the
+    // desktop fallback. Both can reject (dismissed, no permission), which
+    // is not an error worth surfacing.
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `${data.name} on Hypefy`, url });
+        return;
+      } catch {
+        /* dismissed */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShared(true);
+      setTimeout(() => setShared(false), 1600);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
+  async function save() {
+    setSaving("working");
+    const result = await saveHypefyId({
+      name: data.name,
+      username: data.username,
+      userId: data.userId,
+      url,
+      themeId,
+      joinedAt: data.joinedAt,
+      verified: data.verified,
+      followers: data.stats.followers,
+      posts: data.stats.posts,
+    });
+    setSaving(result === "failed" ? "failed" : "done");
+    setTimeout(() => setSaving("idle"), 2200);
+  }
 
   if (typeof document === "undefined") return null;
 
@@ -147,12 +181,7 @@ export function ProfileCard({
       aria-label={`${data.name}'s profile card`}
     >
       {/* Dismiss by tapping the backdrop, matching the photo viewer it replaced. */}
-      <button
-        type="button"
-        aria-label="Close"
-        onClick={onClose}
-        className="absolute inset-0 cursor-default"
-      />
+      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 cursor-default" />
 
       <div className="relative z-10 flex items-center justify-between px-4 py-3">
         <span className="text-sm font-extrabold tracking-tight">
@@ -170,72 +199,45 @@ export function ProfileCard({
 
       <div className="relative z-10 flex flex-1 items-start justify-center overflow-y-auto px-5 pb-10">
         <div className="w-full max-w-[380px]">
-          {pane === "card" && (
-            <CardFaceFor
-              layout={layout}
-              data={data}
-              links={links}
-              gradient={gradient}
-              loading={loading}
-              follow={follow}
-              url={url}
-              onPhoto={() => setPhotoOpen(true)}
+          {pane === "card" ? (
+            <FlipCard
+              flipped={flipped}
+              label={flipped ? `${data.name}'s Hypefy ID` : `${data.name}'s profile card`}
+              front={
+                <CardFront
+                  data={data}
+                  links={links}
+                  background={background}
+                  loading={loading}
+                  follow={follow}
+                  onPhoto={() => setPhotoOpen(true)}
+                  onShare={share}
+                  shared={shared}
+                  onFlip={() => setFlipped(true)}
+                />
+              }
+              back={
+                <HypefyIdFace
+                  data={data}
+                  url={url}
+                  background={background}
+                  onSave={save}
+                  saving={saving}
+                  onFlip={() => setFlipped(false)}
+                />
+              }
             />
-          )}
-
-          {pane === "qr" && (
-            <ProfileCardQr
-              url={url}
-              name={data.name}
-              username={data.username}
-              onBack={() => setPane("card")}
-            />
-          )}
-
-          {pane === "edit" && data.isOwn && (
+          ) : (
             <ProfileCardEditor
               userId={data.userId}
               links={links}
-              layout={layout}
-              theme={theme}
+              themeId={themeId}
               onChange={(next) => {
                 if (next.links) setLinks(next.links);
-                if (next.layout) setLayout(next.layout);
-                if (next.theme) setTheme(next.theme);
+                if (next.themeId) setThemeId(next.themeId);
               }}
               onDone={() => setPane("card")}
             />
-          )}
-
-          {pane === "card" && (
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              {/* On your own card, customising is the thing you came to do,
-                  so it leads, in lime. It was a grey pill in the middle of
-                  the row, and nobody found it. */}
-              {data.isOwn && (
-                <button
-                  type="button"
-                  onClick={() => setPane("edit")}
-                  className="flex items-center gap-1.5 rounded-pill bg-accent px-4 py-2 text-xs font-extrabold text-accent-ink transition active:scale-95"
-                >
-                  <Pencil size={14} />
-                  Customise card
-                </button>
-              )}
-              <Action
-                icon={QrCode}
-                label="QR code"
-                onClick={() => setPane("qr")}
-              />
-              {data.avatarUrl && (
-                <Action
-                  icon={ImageIcon}
-                  label="View photo"
-                  onClick={() => setPhotoOpen(true)}
-                />
-              )}
-              <ShareAction url={url} name={data.name} />
-            </div>
           )}
         </div>
       </div>
@@ -253,58 +255,4 @@ export function ProfileCard({
   );
 }
 
-function Action({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: typeof QrCode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-1.5 rounded-pill border border-white/10 bg-white/[0.06] px-3.5 py-2 text-xs font-semibold text-foreground transition active:scale-95 hover:bg-white/10"
-    >
-      <Icon size={14} />
-      {label}
-    </button>
-  );
-}
-
-function ShareAction({ url, name }: { url: string; name: string }) {
-  const [copied, setCopied] = useState(false);
-
-  async function share() {
-    // navigator.share is the native sheet on mobile; clipboard is the
-    // desktop fallback. Both can reject (user dismissed, no permission),
-    // which is not an error worth surfacing.
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: `${name} on Hypefy`, url });
-        return;
-      } catch {
-        /* dismissed */
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } catch {
-      /* clipboard unavailable */
-    }
-  }
-
-  return (
-    <Action
-      icon={copied ? Link2 : Share2}
-      label={copied ? "Copied" : "Share"}
-      onClick={share}
-    />
-  );
-}
-
-export { CARD_LAYOUTS, CARD_THEMES };
+export { CARD_THEMES };

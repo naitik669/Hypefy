@@ -69,6 +69,7 @@ export default async function ProfileCardRoute({
         hue: (profile.avatar_hue as number) ?? hueFromId(profile.id as string),
         avatarUrl: (profile.avatar_url as string) ?? null,
         verified: (profile.is_verified as boolean) ?? false,
+        joinedAt: (profile.created_at as string) ?? null,
         stats,
         isOwn: user?.id === profile.id,
       }}

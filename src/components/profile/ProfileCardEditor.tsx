@@ -5,17 +5,15 @@ import { ArrowLeft, GripVertical, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { scheduleUndoable } from "@/lib/undoable";
-import {
-  CARD_LAYOUTS,
-  CARD_THEMES,
-  MAX_LINKS,
-  type CardLayout,
-  type ProfileLink,
-} from "@/lib/profile-card";
+import { CARD_THEMES, MAX_LINKS, cardSwatch, type ProfileLink } from "@/lib/profile-card";
 
 /**
- * Owner-only editing for the profile card: the link buttons, the layout
- * and the colour.
+ * Owner-only editing for the profile card: the link buttons and the colour.
+ *
+ * The layout picker is gone. Seven layouts meant seven half-finished cards
+ * and a card you met on someone else's profile was a different object each
+ * time; the one that held up at every photo shape is now the card. What is
+ * left to choose are the two things that say something about the person.
  *
  * Writes go straight to Supabase under RLS — the owner policies on
  * profile_links and profiles are what authorise them, so there is no
@@ -26,20 +24,14 @@ import {
 export function ProfileCardEditor({
   userId,
   links,
-  layout,
-  theme,
+  themeId,
   onChange,
   onDone,
 }: {
   userId: string;
   links: ProfileLink[];
-  layout: CardLayout;
-  theme: string;
-  onChange: (next: {
-    links?: ProfileLink[];
-    layout?: CardLayout;
-    theme?: string;
-  }) => void;
+  themeId: string;
+  onChange: (next: { links?: ProfileLink[]; themeId?: string }) => void;
   onDone: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -126,13 +118,10 @@ export function ProfileCardEditor({
     });
   }
 
-  async function saveLook(next: { layout?: CardLayout; theme?: string }) {
-    onChange(next);
-    const patch: { card_layout?: CardLayout; card_theme?: string } = {};
-    if (next.layout) patch.card_layout = next.layout;
-    if (next.theme) patch.card_theme = next.theme;
-    const { error: err } = await supabase.from("profiles").update(patch).eq("id", userId);
-    if (err) setError("Could not save the card style.");
+  async function saveColour(id: string) {
+    onChange({ themeId: id });
+    const { error: err } = await supabase.from("profiles").update({ card_theme: id }).eq("id", userId);
+    if (err) setError("Could not save the card colour.");
   }
 
   return (
@@ -149,30 +138,7 @@ export function ProfileCardEditor({
         <span className="text-sm font-bold">Edit card</span>
       </div>
 
-      {/* Layout */}
-      <section className="flex flex-col gap-2">
-        <p className="text-xs font-bold tracking-widest text-faint uppercase">Layout</p>
-        <div className="grid grid-cols-3 gap-2">
-          {CARD_LAYOUTS.map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              onClick={() => saveLook({ layout: l.id })}
-              aria-pressed={layout === l.id}
-              title={l.hint}
-              className={`rounded-xl border px-2 py-2.5 text-xs font-semibold transition ${
-                layout === l.id
-                  ? "border-accent bg-accent/10 text-accent"
-                  : "border-white/10 bg-white/[0.04] text-muted hover:text-foreground"
-              }`}
-            >
-              {l.label}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* Theme */}
+      {/* Colour */}
       <section className="flex flex-col gap-2">
         <p className="text-xs font-bold tracking-widest text-faint uppercase">Colour</p>
         <div className="flex flex-wrap gap-2">
@@ -180,13 +146,13 @@ export function ProfileCardEditor({
             <button
               key={t.id}
               type="button"
-              onClick={() => saveLook({ theme: t.id })}
+              onClick={() => saveColour(t.id)}
               aria-label={t.label}
-              aria-pressed={theme === t.id}
+              aria-pressed={themeId === t.id}
               title={t.label}
-              style={{ background: t.gradient }}
+              style={{ background: cardSwatch(t) }}
               className={`h-10 w-10 rounded-xl border-2 transition ${
-                theme === t.id ? "border-accent" : "border-white/10"
+                themeId === t.id ? "border-accent" : "border-white/10"
               }`}
             />
           ))}
