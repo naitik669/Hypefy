@@ -106,24 +106,30 @@ select:focus-visible {
   display: none;
 }
 
-/* Shared form input style (profile setup, etc.) */
-.input {
-  width: 100%;
-  min-height: 3rem;
-  border-radius: 1rem;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
-  color: var(--color-foreground);
-  outline: none;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
-}
-.input::placeholder {
-  color: var(--color-faint);
-}
-.input:focus {
-  border-color: rgba(255, 255, 255, 0.22);
+/* Shared form input style (profile setup, etc.).
+   In @layer components so a utility beside it wins. Unlayered, this sat
+   after Tailwind's own output and its padding shorthand beat every pl-*
+   put next to it — which is why a field with a leading search icon had its
+   placeholder printed underneath the icon. */
+@layer components {
+  .input {
+    width: 100%;
+    min-height: 3rem;
+    border-radius: 1rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: var(--color-foreground);
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .input::placeholder {
+    color: var(--color-faint);
+  }
+  .input:focus {
+    border-color: rgba(255, 255, 255, 0.22);
+  }
 }
 
 body {
