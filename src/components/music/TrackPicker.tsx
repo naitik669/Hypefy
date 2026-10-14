@@ -3,7 +3,14 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { EMPTY_SHELF, loadSoundShelf, type SoundShelf } from "@/lib/sound-shelf";
-import { Music, Search, Play, Pause, ChevronLeft, Check, Plus } from "lucide-react";
+import {
+  forgetSearches,
+  loadRecentSearches,
+  rememberSearch,
+  RECENT_SHOWN,
+} from "@/lib/recent-searches";
+import { SOUND_CATEGORIES } from "@/lib/sound-categories";
+import { Music, Search, Play, Pause, ChevronLeft, Check, Plus, Clock, X } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Waveform } from "@/components/music/Waveform";
@@ -72,6 +79,16 @@ export function TrackPicker({
    * under it made every Shot start from a blank.
    */
   const [shelf, setShelf] = useState<SoundShelf>(EMPTY_SHELF);
+  /** Which half of the picker you are on while nothing is being searched. */
+  const [tab, setTab] = useState<"foryou" | "saved">("foryou");
+  /**
+   * The field has the caret. An empty field that has been tapped shows
+   * what is trending rather than the shelves — you reached for search, so
+   * the answer to "search for what?" is the first thing to offer.
+   */
+  const [focused, setFocused] = useState(false);
+  const [recent, setRecent] = useState<string[]>([]);
+  const [allRecent, setAllRecent] = useState(false);
   useEffect(() => {
     if (!open) return;
     let live = true;
@@ -87,16 +104,31 @@ export function TrackPicker({
       live = false;
     };
   }, [open]);
-  const idle = !loading && !searched && tracks.length === 0;
-  const groups: { title: string | null; items: Track[] }[] =
-    tracks.length > 0
-      ? [{ title: null, items: tracks }]
-      : idle
-        ? [
-            { title: "Your sounds", items: shelf.saved },
-            { title: "Trending on Hypefy", items: shelf.trending },
-          ].filter((g) => g.items.length > 0)
-        : [];
+  useEffect(() => {
+    if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-time read of browser-only storage
+    setRecent(loadRecentSearches());
+  }, [open]);
+
+  /**
+   * What the body is showing. Results win over everything; an empty field
+   * with the caret in it shows trending; otherwise the shelves.
+   */
+  const typed = query.trim().length >= 2;
+  const showResults = typed || loading;
+  const showTrending = !showResults && focused;
+  const browsing = !showResults && !showTrending;
+
+  const groups: { title: string | null; items: Track[] }[] = showResults
+    ? [{ title: null, items: tracks }]
+    : showTrending
+      ? [{ title: "Trending now", items: shelf.trending }].filter((g) => g.items.length > 0)
+      : tab === "saved"
+        // Filtered like the rest: a group holding no songs is not a group,
+        // and left in it counted as content, so the "nothing saved yet"
+        // notice never got its turn and the sheet closed up to nothing.
+        ? [{ title: null, items: shelf.saved }].filter((g) => g.items.length > 0)
+        : [{ title: "Trending on Hypefy", items: shelf.trending }].filter((g) => g.items.length > 0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const scrubTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -123,6 +155,9 @@ export function TrackPicker({
       } finally {
         setSearched(true);
         setLoading(false);
+        // Kept only once it ran, so every half-typed letter on the way to
+        // a word does not become its own entry in the list.
+        setRecent(rememberSearch(q));
       }
     }, 350);
     return () => clearTimeout(debounceRef.current);
@@ -143,6 +178,9 @@ export function TrackPicker({
       setSnippet(null);
       setMarked(null);
       setStart(0);
+      setTab("foryou");
+      setFocused(false);
+      setAllRecent(false);
     } else {
       setTimeout(() => inputRef.current?.focus(), 250);
     }
@@ -282,12 +320,106 @@ export function TrackPicker({
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setFocused(true)}
           placeholder="Search songs or artists…"
-          className="input pl-10"
+          className="input pl-10 pr-10"
         />
+        {(query || focused) && (
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={() => {
+              setQuery("");
+              setFocused(false);
+              inputRef.current?.blur();
+            }}
+            className="absolute right-3 top-1/2 -mt-1.5 -translate-y-1/2 text-faint transition-colors hover:text-foreground"
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
 
-      <div className="flex min-h-[280px] flex-col pb-2">
+      {browsing && (
+        <div className="pb-1">
+          {/* Two halves: what to play, and what you kept. */}
+          <div className="flex rounded-[13px] bg-surface p-[3px]" role="tablist" aria-label="Songs">
+            {([["foryou", "For you"], ["saved", "Saved"]] as const).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                role="tab"
+                aria-selected={tab === k}
+                onClick={() => setTab(k)}
+                className={`flex-1 rounded-[10px] py-1.5 text-xs font-bold transition-colors ${
+                  tab === k ? "bg-elevated text-foreground" : "text-muted"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {tab === "foryou" && (
+            <>
+              {recent.length > 0 && (
+                <>
+                  <div className="flex items-center justify-between px-1 pb-1 pt-3">
+                    <p className="text-xs font-bold uppercase tracking-widest text-faint">Recent</p>
+                    {recent.length > RECENT_SHOWN ? (
+                      <button
+                        type="button"
+                        onClick={() => setAllRecent((v) => !v)}
+                        className="text-[11px] font-semibold text-accent"
+                      >
+                        {allRecent ? "Show less" : "See more"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setRecent(forgetSearches())}
+                        className="text-[11px] font-semibold text-faint"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {(allRecent ? recent : recent.slice(0, RECENT_SHOWN)).map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => setQuery(q)}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-1 py-2 text-left transition-colors hover:bg-white/[0.04]"
+                    >
+                      <Clock size={14} className="shrink-0 text-faint" />
+                      <span className="min-w-0 flex-1 truncate text-sm text-foreground/85">{q}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+
+              <p className="px-1 pb-1.5 pt-3 text-xs font-bold uppercase tracking-widest text-faint">Browse</p>
+              <div className="grid grid-cols-2 gap-2">
+                {SOUND_CATEGORIES.map((c) => (
+                  <button
+                    key={c.label}
+                    type="button"
+                    onClick={() => setQuery(c.query)}
+                    className="flex h-[52px] items-end rounded-[14px] px-3 pb-2 text-left text-[13px] font-bold text-accent-ink transition-transform active:scale-[0.97]"
+                    style={{ background: `linear-gradient(135deg, ${c.from}, ${c.to})` }}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* For you brings its own height in the grid above; everything else
+          holds the sheet open so it does not snap shut between states. */}
+      <div className={`flex flex-col pb-2 ${browsing && tab === "foryou" ? "" : "min-h-[280px]"}`}>
         {loading ? (
           <div className="flex flex-col gap-1 pt-1">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -372,8 +504,22 @@ export function TrackPicker({
               </Fragment>
             ))}
           </div>
-        ) : searched ? (
+        ) : showResults && searched ? (
           <EmptyState icon={Music} title="No songs found" text="Try a different title or artist." variant="compact" />
+        ) : browsing && tab === "saved" ? (
+          <EmptyState
+            icon={Music}
+            title="Nothing saved yet"
+            text="Save a sound from a Shot and it waits here."
+            variant="compact"
+          />
+        ) : browsing ? (
+          // For you always has the grid under it, so there is nothing
+          // missing to announce — a "search for a song" notice below a
+          // full page of things to tap reads as a page that failed.
+          <p className="px-1 pb-1 pt-4 text-center text-[11px] text-faint">
+            30-second previews provided by Apple Music
+          </p>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
             <Music size={28} className="text-faint" />

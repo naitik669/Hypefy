@@ -170,9 +170,13 @@ describe("the sound shelf", () => {
   });
 
   it("is what the song picker shows before anything is typed", () => {
+    // The two halves split what used to be one stack of shelves: saved
+    // sounds are their own tab now, trending backs For you, and reaching
+    // for the search field answers with trending too.
     const src = readFileSync("src/components/music/TrackPicker.tsx", "utf8");
-    expect(src).toContain('{ title: "Your sounds", items: shelf.saved }');
+    expect(src).toContain('{ title: null, items: shelf.saved }');
     expect(src).toContain('{ title: "Trending on Hypefy", items: shelf.trending }');
+    expect(src).toContain('{ title: "Trending now", items: shelf.trending }');
     expect(src).toContain(".filter((g) => g.items.length > 0)");
   });
 });
