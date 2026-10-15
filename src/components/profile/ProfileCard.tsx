@@ -186,7 +186,13 @@ export function ProfileCard({
       {/* Dismiss by tapping the backdrop, matching the photo viewer it replaced. */}
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 cursor-default" />
 
-      <div className="relative z-10 flex items-center justify-between px-4 py-3">
+      {/* Clear of the system bars. This is a fixed inset-0 overlay, so it
+          covers the whole window including whatever the status bar and the
+          gesture bar sit over — and the card below sizes itself to what is
+          left, so without these it was measuring space it could not have.
+          On Android the status bar does not overlay the web view and --sat
+          is zero, which is why only the bottom was visibly wrong there. */}
+      <div className="relative z-10 flex items-center justify-between px-4 pb-3 pt-[max(0.75rem,var(--sat))]">
         <span className="text-sm font-extrabold tracking-tight">
           Hypefy<span className="text-accent">.</span>
         </span>
@@ -200,7 +206,7 @@ export function ProfileCard({
         </button>
       </div>
 
-      <div className="relative z-10 flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-5 pb-6">
+      <div className="relative z-10 flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-5 pb-[max(1.5rem,var(--sab))]">
         <div className="flex max-h-full w-full max-w-[380px]">
           {pane === "card" ? (
             <FlipCard

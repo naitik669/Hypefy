@@ -620,3 +620,31 @@ describe("the back face is flat at rest too", () => {
     expect(flip).toContain("opacity: reduced && away ? 0 : 1");
   });
 });
+
+describe("the card clears the phone's system bars", () => {
+  it("reserves the safe areas rather than measuring space it cannot have", () => {
+    // The overlay is fixed inset-0, so it covers the whole window —
+    // including whatever the status bar and the gesture bar sit over. The
+    // card sizes itself to what is left, so without these it was laying
+    // itself out into room that was not there: measured 24px of the card
+    // under the gesture bar at 360x640 and at 360x800.
+    expect(card).toContain("pt-[max(0.75rem,var(--sat))]");
+    expect(card).toContain("pb-[max(1.5rem,var(--sab))]");
+    expect(card).not.toContain("justify-between px-4 py-3");
+    expect(card).not.toContain("overflow-y-auto px-5 pb-6");
+  });
+
+  it("uses the project's variables, not env() directly", () => {
+    // globals.css explains why: Capacitor writes --safe-area-inset-* in
+    // the same step that lays the web view out, and an older WebView's
+    // own env() copy goes stale when the layout changes after launch.
+    expect(card).not.toContain("env(safe-area-inset");
+  });
+
+  it("falls back to the spacing the website already had", () => {
+    // max() with the old values, so with no safe areas — every browser
+    // on a desktop — the layout is byte-for-byte what it was.
+    expect(card).toContain("max(0.75rem,");
+    expect(card).toContain("max(1.5rem,");
+  });
+});
