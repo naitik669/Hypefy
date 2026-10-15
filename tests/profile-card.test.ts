@@ -122,15 +122,43 @@ describe("the flip", () => {
     expect(flip).toContain("onTouchStart");
     expect(flip).toContain('g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y"');
     expect(flip).toContain('if (g.axis !== "x") return;');
-    expect(flip).toContain("drag * 180");
+    expect(flip).toContain("(half + drag) * 180");
   });
 
   it("a short flick turns it as surely as a long drag", () => {
-    expect(flip).toContain("travelled >= COMMIT || speed >= FLICK");
+    expect(flip).toContain("travelled < COMMIT && speed < FLICK");
   });
 
-  it("neither face can be dragged past flat", () => {
-    expect(flip).toContain("flipped ? Math.min(0, Math.max(-1, raw)) : Math.max(0, Math.min(1, raw))");
+  it("turns either way, from either side", () => {
+    // It was clamped to one direction per face — left from the front,
+    // right from the back — so half of every attempt to turn it did
+    // nothing, by a rule nobody was told.
+    expect(flip).toContain("setDrag(Math.max(-1, Math.min(1, raw)));");
+    expect(flip).toContain("onTurn(drag < 0 ? -1 : 1)");
+  });
+
+  it("counts half-turns rather than holding a flag", () => {
+    // 180 and -180 look the same at rest and are a revolution apart in
+    // between, so a boolean would spin a right-turned card all the way
+    // back round the moment it settled.
+    expect(flip).toContain("half: number");
+    expect(flip).toContain("((half % 2) + 2) % 2 === 1");
+    expect(card).toContain("setHalf((h) => h + dir)");
+  });
+
+  it("the lift is for the button, not the finger", () => {
+    // A finger is already holding the card; lifting it on release reads
+    // as the card bouncing out of your grip.
+    expect(flip).toContain("turnedByFinger.current = true;");
+    expect(flip).toContain("if (turnedByFinger.current) {");
+  });
+
+  it("the guard against a swipe's own click expires on its own", () => {
+    // It used to clear only when the click it suppressed actually
+    // arrived. When one never came, the flag ate the next tap on the
+    // card — the flip button, share, a link.
+    expect(flip).toContain("swipeExpiry");
+    expect(flip).toContain("swiped.current = false;");
   });
 
   it("a card does not change size when you turn it over", () => {

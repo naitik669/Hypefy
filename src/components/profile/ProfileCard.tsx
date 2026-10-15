@@ -75,7 +75,13 @@ export function ProfileCard({
   const [loading, setLoading] = useState(true);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [follow, setFollow] = useState<Follow>(null);
-  const [flipped, setFlipped] = useState(false);
+  /**
+   * Half-turns taken, signed. The card turns either way under a finger, so
+   * which side is showing is the parity of this rather than a flag — see
+   * FlipCard.
+   */
+  const [half, setHalf] = useState(0);
+  const flipped = ((half % 2) + 2) % 2 === 1;
   const [shared, setShared] = useState(false);
   const [saving, setSaving] = useState<Saving>("idle");
 
@@ -198,8 +204,8 @@ export function ProfileCard({
         <div className="w-full max-w-[380px]">
           {pane === "card" ? (
             <FlipCard
-              flipped={flipped}
-              onToggle={() => setFlipped((v) => !v)}
+              half={half}
+              onTurn={(dir) => setHalf((h) => h + dir)}
               label={flipped ? `${data.name}'s Hypefy ID` : `${data.name}'s profile card`}
               front={
                 <CardFront
@@ -210,7 +216,7 @@ export function ProfileCard({
                   onPhoto={() => setPhotoOpen(true)}
                   onShare={share}
                   shared={shared}
-                  onFlip={() => setFlipped(true)}
+                  onFlip={() => setHalf((h) => h + 1)}
                 />
               }
               back={
@@ -219,7 +225,7 @@ export function ProfileCard({
                   url={url}
                   onSave={save}
                   saving={saving}
-                  onFlip={() => setFlipped(false)}
+                  onFlip={() => setHalf((h) => h + 1)}
                 />
               }
             />

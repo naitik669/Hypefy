@@ -40,14 +40,23 @@ const AXIS_LOCK_PX = 10;
  * overlay stack, and gestureBlocked refuses while anything is open.
  */
 export function FlipCard({
-  flipped,
-  onToggle,
+  half,
+  onTurn,
   front,
   back,
   label,
 }: {
-  flipped: boolean;
-  onToggle: () => void;
+  /**
+   * How many half-turns the card has taken, counting a turn to the left as
+   * positive and one to the right as negative.
+   *
+   * A boolean cannot express this. The card can be turned either way, and
+   * if "flipped" were simply true then a card turned to the right would
+   * snap a full circle the moment it settled, because 180 and -180 look
+   * the same at rest and are a whole revolution apart in between.
+   */
+  half: number;
+  onTurn: (dir: 1 | -1) => void;
   front: ReactNode;
   back: ReactNode;
   /** Announced to a screen reader, which gets no perspective. */
@@ -56,6 +65,8 @@ export function FlipCard({
   const inner = useRef<HTMLDivElement>(null);
   const reduced = usePrefersReducedMotion();
   const mounted = useRef(false);
+  // Negative counts have to land on the same parity as positive ones.
+  const flipped = ((half % 2) + 2) % 2 === 1;
 
   /** How far through a turn the finger has taken it, -1 to 1. Zero when nobody is touching. */
   const [drag, setDrag] = useState(0);
@@ -70,6 +81,9 @@ export function FlipCard({
    * gesture was a scroll, and this one is neither axis it knows about.
    */
   const swiped = useRef(false);
+  const swipeExpiry = useRef<number | null>(null);
+  /** Set just before a swipe commits, so the lift below can sit that one out. */
+  const turnedByFinger = useRef(false);
 
   /**
    * The lift, started by hand.
@@ -79,6 +93,12 @@ export function FlipCard({
    * directions. Clearing it, forcing a reflow and setting it back is the
    * way to say "again" — and doing it here rather than in the style means
    * it does not also fire on mount, when there has been no turn.
+   *
+   * Only on a button press. Pressing a button is asking for the card to be
+   * turned and watching it happen, and the lift is what makes that read as
+   * an object rather than a transition. A finger is already holding the
+   * card: it has not left your hand, so lifting it on release reads as the
+   * card bouncing out of your grip.
    */
   useEffect(() => {
     const el = inner.current;
@@ -87,11 +107,21 @@ export function FlipCard({
       mounted.current = true;
       return;
     }
+    if (turnedByFinger.current) {
+      turnedByFinger.current = false;
+      // Cleared rather than just skipped: an animation left on the element
+      // by an earlier button press is still there, and leaving it would
+      // let it replay the moment anything else touches the style.
+      el.style.animation = "none";
+      return;
+    }
     if (reduced) return;
     el.style.animation = "none";
     void el.offsetWidth;
     el.style.animation = `card-lift ${FLIP_MS}ms ${EASE}`;
-  }, [flipped, reduced]);
+  }, [half, reduced]);
+
+  useEffect(() => () => window.clearTimeout(swipeExpiry.current ?? undefined), []);
 
   function onClickCapture(e: React.MouseEvent) {
     if (!swiped.current) return;
@@ -102,6 +132,7 @@ export function FlipCard({
 
   function onTouchStart(e: React.TouchEvent) {
     swiped.current = false;
+    window.clearTimeout(swipeExpiry.current ?? undefined);
     const t = e.touches[0];
     gesture.current = {
       x: t.clientX,
@@ -126,22 +157,36 @@ export function FlipCard({
       if (g.axis === "x") swiped.current = true;
     }
     if (g.axis !== "x") return;
-    // Dragging left turns it forward. Clamped so neither face can be pushed
-    // past flat into a rotation it would then have to unwind.
+    // Either way. The card used to be clamped to one direction per side —
+    // left from the front, right from the back — so half of every attempt
+    // to turn it did nothing at all, and which half depended on a rule
+    // nobody was told. Capped at one half-turn so a long drag cannot wind
+    // it round more than the one face it is uncovering.
     const raw = -dx / g.w;
-    setDrag(flipped ? Math.min(0, Math.max(-1, raw)) : Math.max(0, Math.min(1, raw)));
+    setDrag(Math.max(-1, Math.min(1, raw)));
   }
 
   function onTouchEnd() {
     const g = gesture.current;
     gesture.current = null;
+    // The click this is guarding against follows within a frame or two of
+    // the release. Past that it is not coming, and holding the guard open
+    // would cost the card its next tap.
+    window.clearTimeout(swipeExpiry.current ?? undefined);
+    swipeExpiry.current = window.setTimeout(() => {
+      swiped.current = false;
+    }, 400);
     if (!g || g.axis !== "x") return;
     const travelled = Math.abs(drag);
     // A short flick counts as much as a long drag: the card should not need
     // to be dragged a third of the way across to turn over.
     const speed = (travelled / Math.max(1, Date.now() - g.t)) * 1000;
     setDrag(0);
-    if (travelled >= COMMIT || speed >= FLICK) onToggle();
+    if (travelled < COMMIT && speed < FLICK) return;
+    // The turn carries on the way the finger was already going, so the
+    // rotation it has already shown never has to be unwound.
+    turnedByFinger.current = true;
+    onTurn(drag < 0 ? -1 : 1);
   }
 
   const dragging = drag !== 0;
@@ -150,7 +195,7 @@ export function FlipCard({
       // it is removed and the faces cross-fade instead.
       { transform: "none", transition: `opacity ${FLIP_MS / 3}ms linear` }
     : {
-        transform: `rotateY(${(flipped ? 180 : 0) + drag * 180}deg)`,
+        transform: `rotateY(${(half + drag) * 180}deg)`,
         transition: dragging ? "none" : `transform ${FLIP_MS}ms ${EASE}`,
       };
 
