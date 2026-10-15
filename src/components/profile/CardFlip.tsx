@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
-/** The flip, and the height change underneath it, share one duration. */
+/** How long the turn takes, and the lift that runs alongside it. */
 const FLIP_MS = 680;
 /**
  * Slow at both ends, quick through the middle.
@@ -53,10 +53,7 @@ export function FlipCard({
   /** Announced to a screen reader, which gets no perspective. */
   label: string;
 }) {
-  const frontRef = useRef<HTMLDivElement>(null);
-  const backRef = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState<number | null>(null);
   const reduced = usePrefersReducedMotion();
   const mounted = useRef(false);
 
@@ -73,26 +70,6 @@ export function FlipCard({
    * gesture was a scroll, and this one is neither axis it knows about.
    */
   const swiped = useRef(false);
-
-  /**
-   * One height for both faces: the taller of the two.
-   *
-   * A card does not change size when you turn it over. Measuring only the
-   * side on show made it grow and shrink mid-rotation, which reads as a
-   * layout settling rather than as an object moving.
-   */
-  useLayoutEffect(() => {
-    const a = frontRef.current;
-    const b = backRef.current;
-    if (!a || !b) return;
-    const measure = () => setHeight(Math.max(a.offsetHeight, b.offsetHeight));
-    measure();
-    // Faces grow after mount — a photo loads, the code appears, a bio wraps.
-    const ro = new ResizeObserver(measure);
-    ro.observe(a);
-    ro.observe(b);
-    return () => ro.disconnect();
-  }, []);
 
   /**
    * The lift, started by hand.
@@ -179,25 +156,28 @@ export function FlipCard({
 
   return (
     <div
-      style={{ perspective: 1900, height: height ?? undefined }}
-      className="transition-[height] duration-[680ms] ease-[cubic-bezier(0.58,0.02,0.22,1)]"
+      style={{ perspective: 1900 }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       onTouchCancel={onTouchEnd}
       onClickCapture={onClickCapture}
     >
+      {/* One grid cell holding both faces. The row is as tall as the
+          taller of them and stretches the other to match, so the card
+          cannot change size when you turn it over and nothing has to be
+          measured to make that true. */}
       <div
         ref={inner}
-        className="relative h-full"
+        className="grid"
         style={{ transformStyle: "preserve-3d", ...motion }}
         aria-live="polite"
         aria-label={label}
       >
-        <Face hidden={flipped} reduced={reduced} ref={frontRef}>
+        <Face hidden={flipped} reduced={reduced}>
           {front}
         </Face>
-        <Face hidden={!flipped} reduced={reduced} back ref={backRef}>
+        <Face hidden={!flipped} reduced={reduced} back>
           {back}
         </Face>
       </div>
@@ -208,36 +188,32 @@ export function FlipCard({
 /**
  * One side.
  *
- * The front stays in the flow so the card has a height before anything has
- * been measured; the back is laid over it. Both are taken out of the reader
- * and out of reach while they face away — backface-visibility keeps the
- * mirrored face off the screen, but it does not stop a finger landing on a
- * link that is pointing away from it.
+ * Both sit in the same grid cell, so both are exactly as tall as the
+ * taller one. Each is taken out of the reader and out of reach while it
+ * faces away — backface-visibility keeps the mirrored face off the screen,
+ * but it does not stop a finger landing on a link pointing away from it.
  */
 function Face({
   children,
   hidden,
   reduced,
   back = false,
-  ref,
 }: {
   children: ReactNode;
   hidden: boolean;
   reduced: boolean;
   back?: boolean;
-  ref: React.Ref<HTMLDivElement>;
 }) {
   return (
     <div
-      ref={ref}
       inert={hidden}
       style={{
+        gridArea: "1 / 1",
         backfaceVisibility: "hidden",
         WebkitBackfaceVisibility: "hidden",
         transform: back && !reduced ? "rotateY(180deg)" : undefined,
         opacity: reduced && hidden ? 0 : 1,
       }}
-      className={back ? "absolute inset-x-0 top-0 h-full" : ""}
     >
       {children}
     </div>

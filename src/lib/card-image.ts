@@ -70,7 +70,7 @@ export function idCardLayout(rows: number): {
 } {
   const header = PAD + 12;
   const qrTop = header + 14;
-  const name = qrTop + QR_BOX + 32;
+  const name = qrTop + QR_BOX + 38;
   const handle = name + 17;
   const rulesTop = handle + 14;
   const footer = rulesTop + rows * ROW + 36;
@@ -134,6 +134,7 @@ export function drawHypefyId(input: IdCardInput): HTMLCanvasElement {
   if (no) entries.push(["MEMBER", no.split("").join(" "), "strong"]);
   if (since) entries.push(["SINCE", since, "plain"]);
   if (pronouns) entries.push(["PRONOUNS", pronouns, "plain"]);
+  if (input.tags.length > 0) entries.push(["ROLES", input.tags.join(" · ").toUpperCase(), "plain"]);
   entries.push(["REMARKS", remark, "lower"]);
   if (anthem) entries.push(["ANTHEM", anthem, "plain"]);
 
@@ -154,10 +155,6 @@ export function drawHypefyId(input: IdCardInput): HTMLCanvasElement {
   ctx.clip();
   ctx.fillStyle = "#0b0b0c";
   ctx.fillRect(0, 0, L.width, L.height);
-
-  // The brush. Invisible until it is gone.
-  ctx.fillStyle = "rgba(255,255,255,0.014)";
-  for (let x = 0; x < L.width; x += 3) ctx.fillRect(x, 0, 1, L.height);
 
   // The edges that make it a plate rather than a rectangle.
   ctx.fillStyle = "rgba(255,255,255,0.14)";
@@ -194,6 +191,14 @@ export function drawHypefyId(input: IdCardInput): HTMLCanvasElement {
   ctx.translate(qrX + WELL + 14, L.qrTop + WELL + 14);
   paintHypefyQr(ctx, input.url, QR);
   ctx.restore();
+
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.font = `400 9px ${f.mono}`;
+  {
+    const cap = "SCAN TO OPEN";
+    const w = [...cap].reduce((n, c) => n + ctx.measureText(c).width + 2.2, 0) - 2.2;
+    tracked(ctx, cap, (L.width - w) / 2, L.qrTop + QR_BOX + 14, 2.2);
+  }
 
   // Who
   ctx.fillStyle = "#ffffff";

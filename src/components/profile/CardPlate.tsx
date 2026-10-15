@@ -16,10 +16,14 @@ export const WELL_RADIUS = 20;
 /**
  * The card itself: a machined black plate, used by both faces.
  *
- * Nothing on it is a gradient. What makes it read as an object rather than
- * a dark rectangle is the edges — a light hairline along the top inside
- * edge and a dark one along the bottom, which is how a milled plate catches
- * a room light — and a brush so fine you only notice it when it is gone.
+ * Nothing on it is a gradient and nothing on it is a texture. What makes
+ * it read as an object rather than a dark rectangle is the edges alone: a
+ * light hairline along the top inside edge and a dark one along the
+ * bottom, which is how a milled plate catches a room light.
+ *
+ * A fine vertical brush was tried across the whole face. On a photograph
+ * and behind small mono type it did not read as machining, it read as
+ * banding on a bad screen — so the plate is flat and the edges do the work.
  *
  * The one piece of colour is the painted edge along the foot, and it takes
  * the owner's accent. They picked that colour once already; a card does not
@@ -36,11 +40,6 @@ export function CardPlate({ children }: { children: ReactNode }) {
           "inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -1px 0 rgba(0,0,0,0.8), 0 30px 70px -24px rgba(0,0,0,0.95)",
       }}
     >
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.014) 0 1px, transparent 1px 3px)" }}
-      />
       {children}
       <span aria-hidden className="absolute inset-x-0 bottom-0 h-[3px] bg-accent" />
     </div>
@@ -60,10 +59,31 @@ export function Well({ children, className = "" }: { children: ReactNode; classN
   return (
     <div
       className={className}
-      style={{ borderRadius: r, overflow: "hidden", background: "rgba(255,255,255,0.11)", padding: 2 }}
+      style={{
+        borderRadius: r,
+        overflow: "hidden",
+        background: "rgba(255,255,255,0.11)",
+        padding: 2,
+        display: "flex",
+        flexDirection: "column",
+      }}
     >
-      <div style={{ borderRadius: r - 2, overflow: "hidden", background: "#000", padding: 1 }}>
-        <div style={{ borderRadius: r - 3, overflow: "hidden" }}>{children}</div>
+      <div
+        style={{
+          borderRadius: r - 2,
+          overflow: "hidden",
+          background: "#000",
+          padding: 1,
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+        }}
+      >
+        <div
+          style={{ borderRadius: r - 3, overflow: "hidden", display: "flex", flexDirection: "column", flex: 1 }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

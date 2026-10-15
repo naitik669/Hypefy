@@ -77,8 +77,11 @@ export function HypefyIdFace({
             )}
           </div>
         </Well>
+        <p className="mt-2 text-center font-mono text-[9px] uppercase tracking-[0.24em] text-white/35">
+          Scan to open
+        </p>
 
-        <div className="mt-3.5 min-w-0">
+        <div className="mt-3 min-w-0">
           <div className="flex items-center gap-1.5">
             <h3 className="min-w-0 truncate text-[19px] font-extrabold leading-tight tracking-tight">{data.name}</h3>
             {data.verified && <VerifiedStar className="h-4 w-4 shrink-0" />}
@@ -93,13 +96,18 @@ export function HypefyIdFace({
           {no && <Row label="Member" value={no.split("").join(" ")} strong />}
           {since && <Row label="Since" value={since} />}
           {pronouns && <Row label="Pronouns" value={pronouns} />}
+          {data.tags.length > 0 && <Row label="Roles" value={data.tags.join(" · ").toUpperCase()} />}
           {/* Dimmer than the facts around it, but not lowercased: these
               are sentences now, and forcing the case ate the capital. */}
           <Row label="Remarks" value={remark} lower />
           {anthem && <Row label="Anthem" value={anthem} />}
         </dl>
 
-        <div className="mt-auto flex flex-col items-center gap-3 pb-3 pt-5">
+        {/* The address, so the card still says where it goes to anyone
+            holding a screenshot of it with no camera to hand. */}
+        <p className="mt-3 truncate text-center font-mono text-[9.5px] text-white/30">{prettyUrl(url)}</p>
+
+        <div className="mt-auto flex flex-col items-center gap-3 pb-3 pt-4">
           <button
             type="button"
             onClick={onSave}

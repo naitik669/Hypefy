@@ -42,8 +42,13 @@ describe("one card, one plate", () => {
     expect(plate).not.toContain("radial-gradient");
     expect(front).not.toContain("radial-gradient");
     expect(back).not.toContain("radial-gradient");
-    // The brush is a repeating 1px rule, not a wash.
-    expect(plate).toContain("repeating-linear-gradient(90deg");
+  });
+
+  it("and no texture either — the edges do the work alone", () => {
+    // A fine vertical brush read as banding on a bad screen rather than
+    // as machining, behind a photograph and small mono type alike.
+    expect(plate).not.toContain("repeating-linear-gradient");
+    expect(read("src/lib/card-image.ts")).not.toContain("The brush");
   });
 
   it("the colour picker went with the gradients", () => {
@@ -70,7 +75,7 @@ describe("one card, one plate", () => {
     // size reads as an app icon stuck on the card.
     expect(plate).toContain("export const WELL_RADIUS = 20");
     expect(plate).not.toContain("SQUIRCLE");
-    expect(front).toContain("<Well>");
+    expect(front).toContain("<Well className=");
     expect(back).toContain("<Well className=");
     // The saved image uses the same number, not one that looks close.
     expect(read("src/lib/card-image.ts")).toContain("WELL_RADIUS");
@@ -84,9 +89,11 @@ describe("everything the card does is on the card", () => {
     expect(card).not.toContain("View photo");
   });
 
-  it("share sits under the Follow button, as a node graph", () => {
+  it("share sits under the Follow button, as a node graph and nothing else", () => {
     expect(front).toContain("<ShareNodesIcon");
     expect(front).toContain('<div className="flex justify-end">');
+    // The word beside it said nothing the icon had not already.
+    expect(front).not.toContain('{shared ? "Copied" : "Share"}');
     // Not over the photograph: a card exists to be screenshotted, and it
     // ended up in every screenshot of one.
     expect(front).not.toContain("absolute right-2.5 top-2.5");
@@ -127,8 +134,21 @@ describe("the flip", () => {
   });
 
   it("a card does not change size when you turn it over", () => {
-    expect(flip).toContain("Math.max(a.offsetHeight, b.offsetHeight)");
-    expect(flip).toContain("ResizeObserver");
+    // Both faces are laid into one grid cell: the row is as tall as the
+    // taller and stretches the other to match. Measuring them instead
+    // could not work — a face has to be stretched to be the same size and
+    // left alone to report what size it needs, and not both at once.
+    expect(flip).toContain('className="grid"');
+    expect(flip).toContain('gridArea: "1 / 1"');
+    expect(flip).not.toContain("ResizeObserver");
+    expect(flip).not.toContain("offsetHeight");
+  });
+
+  it("the photograph takes whatever height the back does not need", () => {
+    // The back carries six rows and the front does not, so without this
+    // the front had a band of empty plate above its foot.
+    expect(front).toContain("flex flex-1 p-2.5");
+    expect(front).toContain('const shape = "w-full flex-1 min-h-[300px]"');
   });
 
   it("the face pointing away cannot be tapped or read", () => {
@@ -268,6 +288,18 @@ describe("what the ID says", () => {
 
   it("the wordmark signs the bottom of it", () => {
     expect(back).toContain("<HypefyWordmark");
+  });
+
+  it("it is a record, not a caption: the code, the caption, six rows and the address", () => {
+    expect(back).toContain("Scan to open");
+    expect(back).toContain('<Row label="Member"');
+    expect(back).toContain('<Row label="Since"');
+    expect(back).toContain('<Row label="Pronouns"');
+    expect(back).toContain('<Row label="Roles"');
+    expect(back).toContain('<Row label="Remarks"');
+    expect(back).toContain('<Row label="Anthem"');
+    // The address, for anyone holding a screenshot with no camera to hand.
+    expect(back).toContain("prettyUrl(url)");
   });
 
   it("the header is the words alone, at the right", () => {

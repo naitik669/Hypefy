@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGrid, Users } from "lucide-react";
+import { Check, LayoutGrid, Users } from "lucide-react";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { DisplayName } from "@/components/ui/DisplayName";
@@ -42,8 +42,8 @@ export type FaceProps = {
 export function CardFront({ data, links, loading, follow, onPhoto, onShare, shared, onFlip }: FaceProps) {
   return (
     <CardPlate>
-      <div className="relative p-2.5">
-        <Well>
+      <div className="relative flex flex-1 p-2.5">
+        <Well className="flex-1">
           <Photo data={data} onPhoto={onPhoto} />
         </Well>
       </div>
@@ -96,16 +96,17 @@ export function CardFront({ data, links, loading, follow, onPhoto, onShare, shar
           )}
         </div>
 
-        {/* Under the Follow button, on the same edge. */}
+        {/* Under the Follow button, on the same edge. The glyph alone —
+            the word beside it said nothing the icon had not already, and
+            a card is a thing you look at rather than read. */}
         <div className="flex justify-end">
           <button
             type="button"
             onClick={onShare}
             aria-label={shared ? "Link copied" : "Share this card"}
-            className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-bold uppercase tracking-wider text-white/55 transition hover:bg-white/[0.06] hover:text-white/80 active:scale-95"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-white/55 transition hover:bg-white/[0.06] hover:text-white/85 active:scale-90"
           >
-            {shared ? "Copied" : "Share"}
-            <ShareNodesIcon size={16} />
+            {shared ? <Check size={17} strokeWidth={2.6} /> : <ShareNodesIcon size={17} />}
           </button>
         </div>
 
@@ -132,7 +133,10 @@ function HandleLine({ data }: { data: ProfileCardData }) {
 
 /** Their photo, or their colour and initial when there is none. */
 function Photo({ data, onPhoto }: { data: ProfileCardData; onPhoto: () => void }) {
-  const shape = "aspect-[1/1.02] w-full";
+  // A floor, not a fixed height: it fills whatever the card has spare, and
+  // never collapses on a card whose owner has written a long bio and eight
+  // links underneath it.
+  const shape = "w-full flex-1 min-h-[300px]";
   if (!data.avatarUrl) {
     return (
       <div
