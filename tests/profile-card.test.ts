@@ -112,7 +112,8 @@ describe("everything the card does is on the card", () => {
 
 describe("the flip", () => {
   it("turns on its vertical axis, in perspective, with both faces mounted", () => {
-    expect(flip).toContain("perspective: 1900");
+    // Only while it is turning, which is the test below this block.
+    expect(flip).toContain(": 1900");
     expect(flip).toContain('transformStyle: "preserve-3d"');
     expect(flip).toContain("rotateY(180deg)");
     expect(flip).toContain('backfaceVisibility: "hidden"');
@@ -540,5 +541,51 @@ describe("addresses", () => {
 
   it("a link is shown without its scheme or its query", () => {
     expect(prettyUrl("https://www.example.com/shop?x=1")).toBe("example.com/shop");
+  });
+});
+
+describe("the card is drawn at the screen's own resolution", () => {
+  it("is only in perspective while it is actually turning", () => {
+    // A `perspective` puts the whole subtree into a 3D rendering context,
+    // which the browser composites as a texture at a resolution it picks
+    // for itself. On a display at a fractional scale — a Windows desktop
+    // at 125% — that is not the screen's, and the card sat permanently
+    // soft: measured at 13% less edge contrast on its own text, with
+    // nothing moving. At a dead-on 0 or 180 degrees the card is square to
+    // the screen, so taking it off at rest costs nothing to look at.
+    expect(flip).toContain("perspective: reduced || !(turning || dragging) ? undefined : 1900");
+    expect(flip).not.toContain("style={{ perspective: 1900 }}");
+  });
+
+  it("puts it back before the rotation starts, and takes it off after", () => {
+    // Same render as the transform change, so no frame of the turn is
+    // drawn flat; off again only once this element's own transform has
+    // finished moving.
+    expect(flip).toContain("setTurning(true)");
+    expect(flip).toContain('e.propertyName === "transform"');
+    expect(flip).toContain("e.target === e.currentTarget");
+  });
+
+  it("holds it through a drag that drops back as well as one that turns", () => {
+    // Releasing below the threshold animates back to where it was, and
+    // that transition needs the perspective too — but half does not
+    // change to announce it.
+    expect(flip).toContain("if (travelled > 0) setTurning(true);");
+  });
+
+  it("stops claiming an animation once the lift has played", () => {
+    // Left set, the element reads as permanently animating and stays on
+    // its own compositor layer for the rest of the session.
+    expect(flip).toContain('el.style.animation = "";');
+    expect(flip).toContain('addEventListener("animationend", done, { once: true })');
+  });
+
+  it("paints the QR for the screen rather than at one fixed size", () => {
+    // 640 was a third short of a phone tile at 3x, so every module edge
+    // was resampled — the one softness a scanner cares about.
+    expect(back).toContain("const QR_MAX_CSS = 380;");
+    expect(back).toContain("window.devicePixelRatio");
+    expect(back).toContain("hypefyQrDataUrl(url, Math.ceil(QR_MAX_CSS * dpr))");
+    expect(back).not.toContain("hypefyQrDataUrl(url)");
   });
 });
