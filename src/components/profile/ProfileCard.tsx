@@ -37,6 +37,17 @@ export type ProfileCardData = {
   anthem?: unknown;
   /** Name font and glow, when the owner has them. */
   cosmetics?: { is_premium?: boolean | null; name_font?: string | null; name_glow?: string | null };
+  /**
+   * What the ID's REMARKS reads them by, beyond what they typed.
+   *
+   * All optional. A caller that cannot supply them gets an earlier-era
+   * line rather than a broken one — see card-remarks. lastSeenAt is only
+   * ever used through showActivity, which is the profile's own toggle.
+   */
+  lastSeenAt?: string | null;
+  showActivity?: boolean;
+  /** The frame they chose to wear, which is fair game because they chose it. */
+  avatarDecoration?: string | null;
   stats: { posts: number; followers: number; following: number };
   isOwn: boolean;
 };
@@ -165,6 +176,13 @@ export function ProfileCard({
       anthem: data.anthem,
       pronouns: data.pronouns ?? null,
       verified: data.verified,
+      // The same signals the screen reads, so the saved rows match it.
+      posts: data.stats.posts,
+      hypers: data.stats.followers,
+      lastSeenAt: data.lastSeenAt ?? null,
+      showActivity: data.showActivity,
+      frame: data.avatarDecoration ?? null,
+      isPremium: data.cosmetics?.is_premium ?? false,
     });
     setSaving(result === "failed" ? "failed" : "done");
     setTimeout(() => setSaving("idle"), 2200);

@@ -8,7 +8,14 @@ import {
   profileUrl,
   safeHref,
 } from "@/lib/profile-card";
-import { remarkFor, traitsOf, type RemarkSource } from "@/lib/card-remarks";
+import {
+  eraOf,
+  PREDICATE_CHARS,
+  remarkRows,
+  traitsOf,
+  VALUE_CHARS,
+  type RemarkSource,
+} from "@/lib/card-remarks";
 import { badgeSpan, isFinderModule, isUnderBadge, QR_PALETTE } from "@/lib/hypefy-qr";
 import { idCardLayout } from "@/lib/card-image";
 import { MARK_BOX, MARK_DOT, MARK_H, MARK_LETTER, MARK_LOCKUP } from "@/lib/hypefy-mark";
@@ -257,107 +264,209 @@ describe("the member number", () => {
 });
 
 describe("the remark", () => {
-  const base: RemarkSource = { userId: "a", tags: [], interests: [], hasAnthem: false, memberNo: null };
+  const NOW = Date.parse("2026-10-15T20:00:00Z");
+  const ago = (d: number) => new Date(NOW - d * 864e5).toISOString();
+  /** A timestamp at a given hour in IST, which is the clock the line reads. */
+  const at = (hour: number) => new Date(NOW - (NOW % 864e5) + (hour - 5.5) * 36e5).toISOString();
+  const base: RemarkSource = {
+    userId: "a",
+    tags: [],
+    interests: [],
+    hasAnthem: false,
+    memberNo: null,
+    now: NOW,
+  };
+  /** Someone with enough history that every rule is in play. */
+  const lively = (over: Partial<RemarkSource> = {}): RemarkSource => ({
+    ...base,
+    userId: "lively",
+    tags: ["Founder", "Artist"],
+    interests: ["Startups", "Art", "Music"],
+    hasAnthem: true,
+    joinedAt: ago(200),
+    posts: 30,
+    hypers: 80,
+    ...over,
+  });
+  const text = (s: RemarkSource) =>
+    remarkRows(s)
+      .map((r) => r.value)
+      .join(" / ");
+
+  it("fits the column it is drawn in", () => {
+    // The value column is 208px and the mono face runs 6.32px to the
+    // character, both measured on the live card; past that the row
+    // truncates with an ellipsis rather than wrapping. This is the
+    // constraint the whole two-row format exists to satisfy.
+    expect(VALUE_CHARS).toBe(32);
+    expect(PREDICATE_CHARS).toBe(22);
+    let checked = 0;
+    for (let i = 0; i < 400; i++) {
+      for (const s of [
+        { ...base, userId: `u${i}` },
+        { ...base, userId: `u${i}`, interests: ["Music"], joinedAt: ago(3) },
+        lively({ userId: `u${i}`, lastSeenAt: at(3), frame: "deco-bolt", memberNo: 2 }),
+        lively({ userId: `u${i}`, posts: 0, hypers: 400, joinedAt: ago(45) }),
+        { ...base, userId: `u${i}`, tags: ["Editor"], joinedAt: ago(500), posts: 2, hypers: 30 },
+      ]) {
+        for (const epoch of [0, 1, 2, 3, 4]) {
+          for (const row of remarkRows({ ...s, epoch })) {
+            expect(row.value.length).toBeLessThanOrEqual(VALUE_CHARS);
+            checked++;
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(5000);
+  });
 
   it("the same person always gets the same line", () => {
-    const s = { ...base, userId: "f7de5612-3fd9-41cb-9e0a-089c0a704576", hasAnthem: true };
-    const once = remarkFor(s);
-    expect(remarkFor(s)).toBe(once);
-    expect(remarkFor(s)).toBe(once);
+    // The screen and the saved image are drawn moments apart from the
+    // same function, and must not disagree.
+    const s = lively({ epoch: 9 });
+    const once = text(s);
+    expect(text(s)).toBe(once);
+    expect(text(s)).toBe(once);
   });
 
-  it("the strongest thing about a profile is what gets said", () => {
-    // A musician with an anthem is read as a musician, not as a student.
-    const s = { ...base, userId: "x", tags: ["Student"], hasAnthem: true };
-    expect(remarkFor(s)).toMatch(/^This user (plays it out loud|has a song picked out|holds the aux|keeps the sound on|will send you the track).$/);
-  });
-
-  it("reads tags and interests alike", () => {
-    expect(remarkFor({ ...base, tags: ["Founder"] })).not.toBe(remarkFor({ ...base, tags: [] }));
-    expect(remarkFor({ ...base, interests: ["Startups"], userId: "q" })).toBe(
-      remarkFor({ ...base, tags: ["Founder"], userId: "q" }),
+  it("moves on, and not all on the same day", () => {
+    const s = lively();
+    const overAYear = new Set(Array.from({ length: 13 }, (_, c) => text({ ...s, epoch: c })));
+    expect(overAYear.size).toBeGreaterThan(4);
+    // Staggered per account: two accounts do not turn over together.
+    const starts = new Set(
+      Array.from({ length: 24 }, (_, i) => text(lively({ userId: `stag${i}` }))),
     );
+    expect(starts.size).toBeGreaterThan(5);
   });
 
-  it("an empty profile still gets a line", () => {
-    expect(remarkFor(base)).toMatch(/^This user (is new here|is figuring it out|just arrived|has not filled this in yet).$/);
+  it("reads two people differently", () => {
+    const spread = new Set(Array.from({ length: 40 }, (_, i) => text(lively({ userId: `u${i}`, epoch: 7 }))));
+    expect(spread.size).toBeGreaterThan(8);
   });
 
-  it("being early is itself a fact worth saying", () => {
-    expect(remarkFor({ ...base, userId: "z", memberNo: 2 })).toMatch(
-      /^This user (was here before most|found it first|got in early).$/,
+  it("reports a gap as two rows, and anything else as one", () => {
+    // The pair is the voice: what was declared against what was seen.
+    const rows = remarkRows(lively({ userId: "pairy", lastSeenAt: at(3), epoch: 1 }));
+    expect(rows.length === 1 || rows.length === 2).toBe(true);
+    const pairs = Array.from({ length: 30 }, (_, i) =>
+      remarkRows(lively({ userId: `p${i}`, lastSeenAt: at(3) })),
     );
-  });
-
-  it("every line carries its own subject, so none needs a pronoun to agree with", () => {
-    // Pronouns are a profile field now, and using them here would mean
-    // writing each line twice for the verb — and guessing for anyone who
-    // leaves the field unset.
-    const src = read("src/lib/card-remarks.ts");
-    expect(src).toContain('const SUBJECT = "This user"');
-    for (const s of [base, { ...base, hasAnthem: true }, { ...base, tags: ["Designer"] }]) {
-      expect(remarkFor(s).startsWith("This user ")).toBe(true);
-      expect(remarkFor(s).endsWith(".")).toBe(true);
+    expect(pairs.some((r) => r.length === 2)).toBe(true);
+    for (const r of pairs) {
+      if (r.length === 2) expect(r.map((x) => x.label)).toEqual(["Declared", "Observed"]);
+      else expect(r[0].label).toBe("Remarks");
     }
   });
 
-  it("everything on a profile counts, not just the first thing that matched", () => {
-    // An earlier version took whichever trait matched first, so a founder
-    // who also makes music was only ever a musician, and a long carefully
-    // filled profile read exactly like a bare one.
-    const ranked = traitsOf({
-      ...base,
-      userId: "n",
-      tags: ["Founder", "Artist"],
-      interests: ["Startups", "Memes"],
-      hasAnthem: true,
+  it("single rows all name their subject and end in a stop", () => {
+    for (let i = 0; i < 200; i++) {
+      for (const rows of [remarkRows({ ...base, userId: `s${i}` }), remarkRows(lively({ userId: `s${i}` }))]) {
+        if (rows.length !== 1) continue;
+        expect(rows[0].value.startsWith("This user ")).toBe(true);
+        expect(rows[0].value.endsWith(".")).toBe(true);
+      }
+    }
+  });
+
+  it("never prints a count", () => {
+    // Bands, not numbers: a saved card saying "a few" ages gracefully and
+    // one saying "7" does not. The member number and the one clock hour
+    // are the only digits allowed out.
+    for (let i = 0; i < 300; i++) {
+      for (const s of [
+        lively({ userId: `n${i}`, posts: 7, hypers: 143 }),
+        lively({ userId: `n${i}`, posts: 0, hypers: 1200, joinedAt: ago(40) }),
+        { ...base, userId: `n${i}`, tags: ["Writer"], joinedAt: ago(300), posts: 3, hypers: 55 },
+      ]) {
+        for (const epoch of [0, 1, 2]) {
+          const v = text({ ...s, epoch }).replace("3am", "").replace(/\b0\d{3}\b/, "");
+          expect(v).not.toMatch(/\d/);
+        }
+      }
+    }
+  });
+
+  it("will not read the clock when the profile says not to", () => {
+    // show_activity is the profile's own toggle. Using last_seen_at for
+    // someone who switched it off would publish exactly what they hid.
+    const seen = lively({ userId: "clock", lastSeenAt: at(3) });
+    const hidden = { ...seen, showActivity: false };
+    const nocturnal = ["awake at 3am", "nocturnal", "keeps odd hours", "still awake"];
+    let sawIt = false;
+    for (let e = 0; e < 12; e++) {
+      if (nocturnal.some((p) => text({ ...seen, epoch: e }).includes(p))) sawIt = true;
+      for (const p of nocturnal) expect(text({ ...hidden, epoch: e })).not.toContain(p);
+    }
+    expect(sawIt).toBe(true);
+  });
+
+  it("will not call someone nocturnal on the strength of a stale timestamp", () => {
+    const stale = lively({ userId: "clock", lastSeenAt: ago(60) });
+    for (let e = 0; e < 12; e++) {
+      expect(text({ ...stale, epoch: e })).not.toContain("3am");
+    }
+  });
+
+  it("earns the right to say things", () => {
+    expect(eraOf({ ...base, interests: ["Music"], joinedAt: ago(3) }, NOW)).toBe("arrival");
+    expect(eraOf({ ...base, joinedAt: ago(900) }, NOW)).toBe("veteran");
+    expect(eraOf({ ...base, tags: ["Gamer"], joinedAt: ago(20) }, NOW)).toBe("settling");
+    expect(eraOf({ ...base, tags: ["Gamer"], joinedAt: ago(40), posts: 5 }, NOW)).toBe("regular");
+    expect(eraOf({ ...base, tags: ["Gamer"], joinedAt: ago(400), posts: 5 }, NOW)).toBe("veteran");
+  });
+
+  it("does not roast a three-day-old account", () => {
+    // A roast needs material, and the one card where a burn would land
+    // badly is somebody's first week.
+    const sharp = ["hypes, rarely posts", "excellent frame", "posts about one", "awake at 3am", "attends, does not file"];
+    for (let i = 0; i < 300; i++) {
+      const s = {
+        ...base,
+        userId: `new${i}`,
+        interests: ["Music"],
+        joinedAt: ago(2),
+        posts: 0,
+        hypers: 0,
+        frame: "deco-x",
+        lastSeenAt: at(3),
+      };
+      for (let e = 0; e < 5; e++) {
+        for (const p of sharp) expect(text({ ...s, epoch: e })).not.toContain(p);
+      }
+    }
+  });
+
+  it("does not tell a year-old empty profile that it just arrived", () => {
+    const old = { ...base, userId: "bare", joinedAt: ago(400), posts: 5 };
+    expect(eraOf(old, NOW)).toBe("veteran");
+    const over = new Set(Array.from({ length: 8 }, (_, e) => text({ ...old, epoch: e })));
+    for (const line of over) expect(line).not.toContain("just arrived");
+    expect(over.size).toBeGreaterThan(2);
+  });
+
+  it("says something about a blank new profile rather than nothing", () => {
+    const rows = remarkRows({ ...base, userId: "blank", joinedAt: ago(1) });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].value.length).toBeGreaterThan(12);
+  });
+
+  it("counts a tag and an interest for the same thing twice", () => {
+    expect(traitsOf({ ...base, tags: ["Musician"], interests: ["Music"] })[0]).toEqual({
+      key: "music",
+      score: 4,
     });
-    expect(ranked.length).toBeGreaterThan(3);
-    // Founder + Startups is two mentions of the same thing, so it outranks
-    // a single one; an anthem counts for more still than either alone.
-    expect(ranked[0].key).toBe("build");
-    expect(ranked[0].score).toBe(4);
-    expect(ranked.find((t) => t.key === "music")?.score).toBe(3);
-  });
-
-  it("a tie is broken by the account, not by the order the traits are written in", () => {
-    // Otherwise everyone with the same two interests gets the same one of
-    // them, for ever.
-    const of = (userId: string) => traitsOf({ ...base, userId, tags: ["Designer", "Writer"] })[0].key;
-    const picks = new Set(["a", "b", "c", "d", "e", "f", "g", "h"].map(of));
-    expect(picks.size).toBe(2);
-  });
-
-  it("moves on with the week, and holds still within one", () => {
-    const s = { ...base, userId: "f7de5612", tags: ["Developer"], interests: ["Coding"] };
-    expect(remarkFor({ ...s, epoch: 100 })).toBe(remarkFor({ ...s, epoch: 100 }));
-    const overAYear = new Set(Array.from({ length: 52 }, (_, w) => remarkFor({ ...s, epoch: 100 + w })));
-    expect(overAYear.size).toBeGreaterThan(2);
-  });
-
-  it("pairs two things sometimes, and not every time", () => {
-    const s = { ...base, tags: ["Developer", "Designer"] };
-    const lines = Array.from({ length: 40 }, (_, i) => remarkFor({ ...s, userId: `u${i}`, epoch: 7 }));
-    const paired = lines.filter((l) => l.includes(" and "));
-    // Always pairing would be its own formula — every card the same shape.
-    expect(paired.length).toBeGreaterThan(0);
-    expect(paired.length).toBeLessThan(lines.length);
-  });
-
-  it("two people are not handed the same words by accident", () => {
-    // uuids share most of their alphabet and all of their length, so a
-    // character sum clusters them hard. Spread across a realistic set.
-    const ids = Array.from({ length: 60 }, (_, i) => `f7de5612-3fd9-41cb-9e0a-0897a0704${String(i).padStart(3, "0")}`);
-    const got = new Set(ids.map((userId) => remarkFor({ ...base, userId, hasAnthem: true })));
-    expect(got.size).toBeGreaterThanOrEqual(4);
+    // An anthem is worth more than either: it is the one you go and find.
+    expect(traitsOf({ ...base, hasAnthem: true })[0]).toEqual({ key: "music", score: 3 });
   });
 
   it("is set lowercase against the uppercase labels", () => {
-    const lines = read("src/lib/card-remarks.ts").match(/"[a-z][^"]*."/g) ?? [];
-    expect(lines.length).toBeGreaterThan(30);
-    expect(back).toContain('<Row label="Remarks" value={remark} lower />');
+    const written = read("src/lib/card-remarks.ts").match(/"[a-z][^"]*"/g) ?? [];
+    expect(written.length).toBeGreaterThan(60);
+    expect(back).toContain("{remark.map((row) => (");
   });
 });
+
 
 describe("what the ID says", () => {
   it("says the month and the year, never the day", () => {
@@ -378,8 +487,11 @@ describe("what the ID says", () => {
     // It is the face that gets saved to someone's photos. A card from June
     // claiming twelve followers reads badly by October.
     expect(back).not.toContain("FollowButton");
-    expect(back).not.toContain("stats.followers");
-    expect(back).not.toContain("stats.posts");
+    // The counts are read, but only ever as bands, and only by the line —
+    // they reach remarkRows and nothing else. The test that no digit
+    // survives to the card is over in "the remark".
+    expect(back).not.toContain("{data.stats.followers}");
+    expect(back).not.toContain("{data.stats.posts}");
   });
 
   it("the wordmark signs the bottom of it", () => {
@@ -392,7 +504,8 @@ describe("what the ID says", () => {
     expect(back).toContain('<Row label="Since"');
     expect(back).toContain('<Row label="Pronouns"');
     expect(back).toContain('<Row label="Roles"');
-    expect(back).toContain('<Row label="Remarks"');
+    // One Remarks row, or the Declared/Observed pair that replaces it.
+    expect(back).toContain("{remark.map((row) => (");
     expect(back).toContain('<Row label="Anthem"');
     // The address, for anyone holding a screenshot with no camera to hand.
     expect(back).toContain("prettyUrl(url)");
@@ -501,7 +614,7 @@ describe("the saved image and the face on screen", () => {
   it("are drawn from the same mark, code, number and line", () => {
     const img = read("src/lib/card-image.ts");
     expect(img).toContain("paintHypefyQr");
-    expect(img).toContain("remarkFor");
+    expect(img).toContain("remarkRows");
     expect(img).toContain("memberNumber");
     expect(img).toContain("anthemLine");
     expect(img).toContain("pronounLabel");

@@ -4,7 +4,7 @@ import { paintHypefyQr } from "@/lib/hypefy-qr";
 import { WELL_RADIUS } from "@/components/profile/CardPlate";
 import { pronounLabel } from "@/lib/profile";
 import { anthemLine, memberNumber, memberSince, prettyUrl } from "@/lib/profile-card";
-import { remarkFor } from "@/lib/card-remarks";
+import { remarkRows } from "@/lib/card-remarks";
 
 /**
  * The Hypefy ID, drawn as a picture you can keep.
@@ -41,6 +41,13 @@ type IdCardInput = {
   verified: boolean;
   /** The painted edge. The owner's accent, resolved by the caller. */
   accent?: string;
+  /** What REMARKS reads them by. Optional; see card-remarks. */
+  posts?: number;
+  hypers?: number;
+  lastSeenAt?: string | null;
+  showActivity?: boolean;
+  frame?: string | null;
+  isPremium?: boolean;
 };
 
 const PAD = 16;
@@ -123,19 +130,29 @@ export function drawHypefyId(input: IdCardInput): HTMLCanvasElement {
   const since = memberSince(input.joinedAt);
   const anthem = anthemLine(input.anthem);
   const pronouns = pronounLabel(input.pronouns);
-  const remark = remarkFor({
+  // The same rows the screen draws, from the same function, so a saved
+  // card and the card it was saved from cannot disagree.
+  const remark = remarkRows({
     userId: input.userId,
     tags: input.tags,
     interests: input.interests ?? [],
     hasAnthem: !!anthem,
     memberNo: input.memberNo ?? null,
+    joinedAt: input.joinedAt ?? null,
+    posts: input.posts,
+    hypers: input.hypers,
+    lastSeenAt: input.lastSeenAt ?? null,
+    showActivity: input.showActivity,
+    frame: input.frame ?? null,
+    isPremium: input.isPremium,
+    verified: input.verified,
   });
   const entries: [string, string, "plain" | "strong" | "lower"][] = [];
   if (no) entries.push(["MEMBER", no.split("").join(" "), "strong"]);
   if (since) entries.push(["SINCE", since, "plain"]);
   if (pronouns) entries.push(["PRONOUNS", pronouns, "plain"]);
   if (input.tags.length > 0) entries.push(["ROLES", input.tags.join(" · ").toUpperCase(), "plain"]);
-  entries.push(["REMARKS", remark, "lower"]);
+  for (const row of remark) entries.push([row.label.toUpperCase(), row.value, "lower"]);
   if (anthem) entries.push(["ANTHEM", anthem, "plain"]);
 
   const L = idCardLayout(entries.length);

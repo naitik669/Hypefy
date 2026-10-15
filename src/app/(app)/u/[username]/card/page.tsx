@@ -74,6 +74,13 @@ export default async function ProfileCardRoute({
         interests: (profile.interests as string[]) ?? [],
         pronouns: (profile.pronouns as string) ?? null,
         anthem: profile.anthem ?? null,
+        // Read by the ID's REMARKS row. All already in the select above;
+        // show_activity travels with last_seen_at because it is what says
+        // whether last_seen_at is ours to use.
+        lastSeenAt: (profile.last_seen_at as string) ?? null,
+        showActivity: (profile.show_activity as boolean) ?? true,
+        avatarDecoration: (profile.avatar_decoration as string) ?? null,
+        cosmetics: { is_premium: (profile.is_premium as boolean) ?? false },
         stats,
         isOwn: user?.id === profile.id,
       }}

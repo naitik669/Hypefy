@@ -8,7 +8,7 @@ import { CardPlate, PlateFoot, Well } from "@/components/profile/CardPlate";
 import { hypefyQrDataUrl } from "@/lib/hypefy-qr";
 import { pronounLabel } from "@/lib/profile";
 import { anthemLine, memberNumber, memberSince, prettyUrl } from "@/lib/profile-card";
-import { remarkFor } from "@/lib/card-remarks";
+import { remarkRows } from "@/lib/card-remarks";
 import type { ProfileCardData } from "@/components/profile/ProfileCard";
 
 /**
@@ -59,12 +59,20 @@ export function HypefyIdFace({
   const since = memberSince(data.joinedAt);
   const anthem = anthemLine(data.anthem);
   const pronouns = pronounLabel(data.pronouns);
-  const remark = remarkFor({
+  const remark = remarkRows({
     userId: data.userId,
     tags: data.tags,
     interests: data.interests ?? [],
     hasAnthem: !!anthem,
     memberNo: data.memberNo ?? null,
+    joinedAt: data.joinedAt ?? null,
+    posts: data.stats.posts,
+    hypers: data.stats.followers,
+    lastSeenAt: data.lastSeenAt ?? null,
+    showActivity: data.showActivity,
+    frame: data.avatarDecoration ?? null,
+    isPremium: data.cosmetics?.is_premium ?? false,
+    verified: data.verified,
   });
 
   return (
@@ -116,8 +124,12 @@ export function HypefyIdFace({
           {pronouns && <Row label="Pronouns" value={pronouns} />}
           {data.tags.length > 0 && <Row label="Roles" value={data.tags.join(" · ").toUpperCase()} />}
           {/* Dimmer than the facts around it, but not lowercased: these
-              are sentences now, and forcing the case ate the capital. */}
-          <Row label="Remarks" value={remark} lower />
+              are sentences now, and forcing the case ate the capital.
+              One row, or a declared/observed pair when there is a gap
+              worth reporting — see card-remarks. */}
+          {remark.map((row) => (
+            <Row key={row.label} label={row.label} value={row.value} lower />
+          ))}
           {anthem && <Row label="Anthem" value={anthem} />}
         </dl>
 
