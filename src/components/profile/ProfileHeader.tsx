@@ -27,6 +27,9 @@ export function ProfileHeader({
   name,
   username,
   pronouns = null,
+  memberNo = null,
+  joinedAt = null,
+  interests = [],
   bio,
   tags,
   hue,
@@ -53,6 +56,10 @@ export function ProfileHeader({
   username: string | null;
   /** One of PRONOUNS, or null. Beside the handle, in the same quiet grey. */
   pronouns?: string | null;
+  /** For the Hypefy ID behind the avatar: the number, the date, the line. */
+  memberNo?: number | null;
+  joinedAt?: string | null;
+  interests?: string[];
   bio: string | null;
   tags: string[];
   hue: number;
@@ -120,11 +127,16 @@ export function ProfileHeader({
                 userId,
                 name,
                 username,
+                pronouns,
                 bio,
                 tags,
+                interests,
                 hue,
                 avatarUrl,
                 verified,
+                joinedAt,
+                memberNo,
+                anthem,
                 stats,
                 isOwn: currentUserId === userId,
               }}

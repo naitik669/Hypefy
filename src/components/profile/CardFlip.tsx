@@ -201,6 +201,7 @@ export function FlipCard({
 
   return (
     <div
+      className="max-h-full min-h-0 w-full"
       style={{ perspective: 1900 }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -214,7 +215,7 @@ export function FlipCard({
           measured to make that true. */}
       <div
         ref={inner}
-        className="grid"
+        className="grid h-full max-h-full min-h-0"
         style={{ transformStyle: "preserve-3d", ...motion }}
         aria-live="polite"
         aria-label={label}
@@ -254,6 +255,7 @@ function Face({
       inert={hidden}
       style={{
         gridArea: "1 / 1",
+        minHeight: 0,
         backfaceVisibility: "hidden",
         WebkitBackfaceVisibility: "hidden",
         transform: back && !reduced ? "rotateY(180deg)" : undefined,

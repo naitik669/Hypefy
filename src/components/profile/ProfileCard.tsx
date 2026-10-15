@@ -200,8 +200,8 @@ export function ProfileCard({
         </button>
       </div>
 
-      <div className="relative z-10 flex flex-1 items-start justify-center overflow-y-auto px-5 pb-10">
-        <div className="w-full max-w-[380px]">
+      <div className="relative z-10 flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-5 pb-6">
+        <div className="flex max-h-full w-full max-w-[380px]">
           {pane === "card" ? (
             <FlipCard
               half={half}

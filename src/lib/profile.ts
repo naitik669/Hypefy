@@ -29,6 +29,10 @@ export type Profile = {
   profileTags: string[];
   /** One of PRONOUNS, or null for not said. */
   pronouns: string | null;
+  /** Their place in the join order, for the Hypefy ID. Null before onboarding ends. */
+  memberNo: number | null;
+  /** When the account started, for the ID's "since". */
+  joinedAt: string | null;
   profileCompleted: boolean;
   isVerified: boolean;
   isPremium: boolean;
@@ -237,6 +241,8 @@ function mapProfile(row: any, mine: PrivateProfile | null): Profile {
     accentId: (row as { accent_id?: string | null }).accent_id ?? null,
     profileTags: row.profile_tags ?? [],
     pronouns: pronounLabel(row.pronouns),
+    memberNo: typeof row.member_no === "number" ? row.member_no : null,
+    joinedAt: row.created_at ?? null,
     profileCompleted: row.profile_completed ?? false,
     isVerified: row.is_verified ?? false,
     isPremium: row.is_premium ?? false,

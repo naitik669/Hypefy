@@ -8,7 +8,7 @@ import {
   profileUrl,
   safeHref,
 } from "@/lib/profile-card";
-import { remarkFor, type RemarkSource } from "@/lib/card-remarks";
+import { remarkFor, traitsOf, type RemarkSource } from "@/lib/card-remarks";
 import { badgeSpan, isFinderModule, isUnderBadge, QR_PALETTE } from "@/lib/hypefy-qr";
 import { idCardLayout } from "@/lib/card-image";
 import { MARK_BOX, MARK_DOT, MARK_H, MARK_LETTER, MARK_LOCKUP } from "@/lib/hypefy-mark";
@@ -166,7 +166,7 @@ describe("the flip", () => {
     // taller and stretches the other to match. Measuring them instead
     // could not work — a face has to be stretched to be the same size and
     // left alone to report what size it needs, and not both at once.
-    expect(flip).toContain('className="grid"');
+    expect(flip).toContain('className="grid h-full');
     expect(flip).toContain('gridArea: "1 / 1"');
     expect(flip).not.toContain("ResizeObserver");
     expect(flip).not.toContain("offsetHeight");
@@ -175,8 +175,32 @@ describe("the flip", () => {
   it("the photograph takes whatever height the back does not need", () => {
     // The back carries six rows and the front does not, so without this
     // the front had a band of empty plate above its foot.
-    expect(front).toContain("flex flex-1 p-2.5");
-    expect(front).toContain('const shape = "w-full flex-1 min-h-[300px]"');
+    expect(front).toContain("flex min-h-0 flex-1 p-2.5");
+    expect(front).toContain('const shape = "w-full flex-1 [min-height:170px]"');
+  });
+
+  it("the card is capped to the screen, and the big things give up height first", () => {
+    // It used to be 746px tall whatever the phone, so a 667px one scrolled
+    // a card. The photograph and the code are the two things that can lose
+    // a hundred pixels and still do their job.
+    expect(card).toContain("flex max-h-full w-full max-w-[380px]");
+    expect(flip).toContain("max-h-full min-h-0 w-full");
+    expect(plate).toContain("flex h-full min-h-0 flex-col");
+    expect(back).toContain("[min-height:150px]");
+  });
+
+  it("the code stays square however little room is left", () => {
+    // Letting the well stretch and only the code shrink turned the tile
+    // into a wide white strip with a stamp in the middle.
+    expect(back).toContain('<Well className="aspect-square h-full max-w-full">');
+  });
+
+  it("nothing above the foot claims the slack with an auto margin", () => {
+    // An auto margin eats all free space before flex-grow is consulted, so
+    // the block above the foot was quietly taking every spare pixel the
+    // photograph and the code were trying to grow into.
+    expect(plate).not.toContain("mt-auto");
+    expect(back).not.toContain("mt-auto");
   });
 
   it("the face pointing away cannot be tapped or read", () => {
@@ -274,6 +298,49 @@ describe("the remark", () => {
       expect(remarkFor(s).startsWith("This user ")).toBe(true);
       expect(remarkFor(s).endsWith(".")).toBe(true);
     }
+  });
+
+  it("everything on a profile counts, not just the first thing that matched", () => {
+    // An earlier version took whichever trait matched first, so a founder
+    // who also makes music was only ever a musician, and a long carefully
+    // filled profile read exactly like a bare one.
+    const ranked = traitsOf({
+      ...base,
+      userId: "n",
+      tags: ["Founder", "Artist"],
+      interests: ["Startups", "Memes"],
+      hasAnthem: true,
+    });
+    expect(ranked.length).toBeGreaterThan(3);
+    // Founder + Startups is two mentions of the same thing, so it outranks
+    // a single one; an anthem counts for more still than either alone.
+    expect(ranked[0].key).toBe("build");
+    expect(ranked[0].score).toBe(4);
+    expect(ranked.find((t) => t.key === "music")?.score).toBe(3);
+  });
+
+  it("a tie is broken by the account, not by the order the traits are written in", () => {
+    // Otherwise everyone with the same two interests gets the same one of
+    // them, for ever.
+    const of = (userId: string) => traitsOf({ ...base, userId, tags: ["Designer", "Writer"] })[0].key;
+    const picks = new Set(["a", "b", "c", "d", "e", "f", "g", "h"].map(of));
+    expect(picks.size).toBe(2);
+  });
+
+  it("moves on with the week, and holds still within one", () => {
+    const s = { ...base, userId: "f7de5612", tags: ["Developer"], interests: ["Coding"] };
+    expect(remarkFor({ ...s, epoch: 100 })).toBe(remarkFor({ ...s, epoch: 100 }));
+    const overAYear = new Set(Array.from({ length: 52 }, (_, w) => remarkFor({ ...s, epoch: 100 + w })));
+    expect(overAYear.size).toBeGreaterThan(2);
+  });
+
+  it("pairs two things sometimes, and not every time", () => {
+    const s = { ...base, tags: ["Developer", "Designer"] };
+    const lines = Array.from({ length: 40 }, (_, i) => remarkFor({ ...s, userId: `u${i}`, epoch: 7 }));
+    const paired = lines.filter((l) => l.includes(" and "));
+    // Always pairing would be its own formula — every card the same shape.
+    expect(paired.length).toBeGreaterThan(0);
+    expect(paired.length).toBeLessThan(lines.length);
   });
 
   it("two people are not handed the same words by accident", () => {

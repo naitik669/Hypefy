@@ -147,6 +147,9 @@ export default async function PublicProfilePage({
         name={name}
         username={profile.username}
         pronouns={profile.pronouns}
+        memberNo={(profile as { member_no?: number | null }).member_no ?? null}
+        joinedAt={(profile as { created_at?: string | null }).created_at ?? null}
+        interests={(profile.interests as string[]) ?? []}
         bio={profile.bio}
         tags={tags}
         hue={hue}

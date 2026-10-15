@@ -57,7 +57,7 @@ export function HypefyIdFace({
 
   return (
     <CardPlate>
-      <div className="relative flex flex-1 flex-col px-4 pt-4">
+      <div className="relative flex min-h-0 flex-1 flex-col px-4 pt-4">
 {/* Just the words, at the top right. The mark used to sit on the left of
     this row and now lives in the middle of the code, which is the one
     place on the back it has a job to do. */}
@@ -67,23 +67,29 @@ export function HypefyIdFace({
           </span>
         </header>
 
-        <Well className="mt-3.5">
-          <div className="flex items-center justify-center bg-white p-3.5">
-            {qr ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={qr} alt={`QR code opening ${prettyUrl(url)}`} className="h-[196px] w-[196px]" />
-            ) : (
-              <div className="h-[196px] w-[196px]" aria-hidden />
-            )}
-          </div>
-        </Well>
+        <div className="mt-3.5 flex flex-1 justify-center [min-height:150px]">
+          <Well className="aspect-square h-full max-w-full">
+            <div className="flex min-h-0 flex-1 items-center justify-center bg-white p-[6%]">
+              {qr ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={qr}
+                  alt={`QR code opening ${prettyUrl(url)}`}
+                  className="h-full w-full object-contain"
+                />
+              ) : (
+                <div className="h-full w-full" aria-hidden />
+              )}
+            </div>
+          </Well>
+        </div>
         <p className="mt-2 text-center font-mono text-[9px] uppercase tracking-[0.24em] text-white/35">
           Scan to open
         </p>
 
-        <div className="mt-3 min-w-0">
+        <div className="mt-2.5 min-w-0">
           <div className="flex items-center gap-1.5">
-            <h3 className="min-w-0 truncate text-[19px] font-extrabold leading-tight tracking-tight">{data.name}</h3>
+            <h3 className="min-w-0 truncate text-[18px] font-extrabold leading-tight tracking-tight">{data.name}</h3>
             {data.verified && <VerifiedStar className="h-4 w-4 shrink-0" />}
           </div>
           {/* Pronouns are a row below, not here. The front sets them beside
@@ -103,16 +109,16 @@ export function HypefyIdFace({
           {anthem && <Row label="Anthem" value={anthem} />}
         </dl>
 
-        {/* The address, so the card still says where it goes to anyone
-            holding a screenshot of it with no camera to hand. */}
-        <p className="mt-3 truncate text-center font-mono text-[9.5px] text-white/30">{prettyUrl(url)}</p>
-
-        <div className="mt-auto flex flex-col items-center gap-3 pb-3 pt-4">
+        {/* No address here: it is a line of small type under a code that
+            does the same job better, and the room is worth more to the
+            code. The saved image keeps it — a picture that has left the
+            app has no camera to hand. */}
+        <div className="flex flex-col items-center gap-2.5 pb-2.5 pt-3">
           <button
             type="button"
             onClick={onSave}
             disabled={saving === "working"}
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-xl text-[13px] font-extrabold text-white/85 transition active:scale-[0.98] disabled:opacity-60"
+            className="flex h-9 w-full items-center justify-center gap-2 rounded-xl text-[13px] font-extrabold text-white/85 transition active:scale-[0.98] disabled:opacity-60"
             style={{
               background: "rgba(255,255,255,0.06)",
               boxShadow: "inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.6)",
@@ -149,7 +155,7 @@ function Row({
   lower?: boolean;
 }) {
   return (
-    <div className="flex items-baseline gap-3 border-b border-white/10 py-[7px]">
+    <div className="flex items-baseline gap-3 border-b border-white/10 py-[5px]">
       <dt className="w-[66px] shrink-0 font-mono text-[9px] uppercase tracking-[0.16em] text-white/35">{label}</dt>
       <dd
         className={`min-w-0 flex-1 truncate font-mono tabular-nums ${

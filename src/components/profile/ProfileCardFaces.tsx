@@ -42,8 +42,8 @@ export type FaceProps = {
 export function CardFront({ data, links, loading, follow, onPhoto, onShare, shared, onFlip }: FaceProps) {
   return (
     <CardPlate>
-      <div className="relative flex flex-1 p-2.5">
-        <Well className="flex-1">
+      <div className="relative flex min-h-0 flex-1 p-2.5">
+        <Well className="min-h-0 flex-1">
           <Photo data={data} onPhoto={onPhoto} />
         </Well>
       </div>
@@ -133,10 +133,10 @@ function HandleLine({ data }: { data: ProfileCardData }) {
 
 /** Their photo, or their colour and initial when there is none. */
 function Photo({ data, onPhoto }: { data: ProfileCardData; onPhoto: () => void }) {
-  // A floor, not a fixed height: it fills whatever the card has spare, and
-  // never collapses on a card whose owner has written a long bio and eight
-  // links underneath it.
-  const shape = "w-full flex-1 min-h-[300px]";
+  // It fills whatever the card has spare and gives height back when the
+  // screen is short. The floor is low enough to survive a small phone and
+  // high enough that the photograph is still the subject.
+  const shape = "w-full flex-1 [min-height:170px]";
   if (!data.avatarUrl) {
     return (
       <div

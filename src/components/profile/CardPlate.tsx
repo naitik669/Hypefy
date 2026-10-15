@@ -32,7 +32,7 @@ export const WELL_RADIUS = 20;
 export function CardPlate({ children }: { children: ReactNode }) {
   return (
     <div
-      className="relative flex h-full flex-col overflow-hidden rounded-[24px]"
+      className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[24px]"
       style={{
         background: "#0b0b0c",
         border: "1px solid rgba(255,255,255,0.09)",
@@ -99,7 +99,7 @@ export function Well({ children, className = "" }: { children: ReactNode; classN
 export function PlateFoot({ side, onFlip }: { side: "front" | "back"; onFlip: () => void }) {
   return (
     <div
-      className="relative mt-auto flex items-center gap-2 border-t border-white/[0.08] px-4 py-3"
+      className="relative flex items-center gap-2 border-t border-white/[0.08] px-4 py-2.5"
       style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.045)" }}
     >
       <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.22em] text-white/55">

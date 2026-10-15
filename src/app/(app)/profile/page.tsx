@@ -68,6 +68,9 @@ export default async function ProfilePage() {
         name={name}
         username={profile?.username ?? null}
         pronouns={profile?.pronouns ?? null}
+        memberNo={profile?.memberNo ?? null}
+        joinedAt={profile?.joinedAt ?? null}
+        interests={profile?.interests ?? []}
         bio={bio}
         tags={profileTags}
         hue={hue}
