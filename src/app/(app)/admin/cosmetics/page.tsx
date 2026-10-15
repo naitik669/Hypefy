@@ -25,7 +25,7 @@ export default async function AdminCosmeticsPage() {
 
   const { data: products } = await supabase
     .from("products")
-    .select("id, kind, tier, name, price_paise, active, sort, asset_path, scale, offset_x, offset_y")
+    .select("id, kind, tier, name, price_paise, active, sort, asset_path, scale, offset_x, offset_y, rotation")
     .order("kind", { ascending: true })
     .order("sort", { ascending: true });
 

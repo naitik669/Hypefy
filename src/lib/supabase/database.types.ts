@@ -1551,6 +1551,7 @@ export type Database = {
           scale: number
           offset_x: number
           offset_y: number
+          rotation: number
           sort: number
           tier: string
         }
@@ -1564,6 +1565,7 @@ export type Database = {
           scale?: number
           offset_x?: number
           offset_y?: number
+          rotation?: number
           sort?: number
           tier: string
         }
@@ -1577,6 +1579,7 @@ export type Database = {
           scale?: number
           offset_x?: number
           offset_y?: number
+          rotation?: number
           sort?: number
           tier?: string
         }
@@ -2640,6 +2643,7 @@ export type Database = {
           p_name: string
           p_offset_x?: number
           p_offset_y?: number
+          p_rotation?: number
           p_scale?: number
           p_tier: string
         }

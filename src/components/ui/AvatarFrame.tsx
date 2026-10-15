@@ -50,7 +50,7 @@ export function AvatarFrame({ id, wearer, size, children }: Props) {
   const catalog = useFrameCatalog();
   // An explicit id wins and skips the tier check: that is what a preview is.
   const asset: FrameAsset | null = id
-    ? (catalog[id] ?? { id, label: id, tier: "premium", url: null, scale: 1, offsetX: 0, offsetY: 0 })
+    ? (catalog[id] ?? { id, label: id, tier: "premium", url: null, scale: 1, offsetX: 0, offsetY: 0, rotation: 0 })
     : wearableFrame(wearer, catalog);
 
   if (!asset) return <>{children}</>;
@@ -67,7 +67,7 @@ export function AvatarFrame({ id, wearer, size, children }: Props) {
           aria-hidden
           draggable={false}
           className="pointer-events-none absolute max-w-none select-none"
-          style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
+          style={{ left: box.left, top: box.top, width: box.width, height: box.height, transform: box.transform }}
         />
       </span>
     );

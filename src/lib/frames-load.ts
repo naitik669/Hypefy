@@ -18,7 +18,7 @@ export async function loadFrames(): Promise<FrameCatalog> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("products")
-    .select("id, name, tier, asset_path, scale, offset_x, offset_y")
+    .select("id, name, tier, asset_path, scale, offset_x, offset_y, rotation")
     .eq("kind", "avatar_decoration")
     .eq("active", true)
     .order("sort", { ascending: true });
@@ -35,6 +35,7 @@ export async function loadFrames(): Promise<FrameCatalog> {
       scale: number | string | null;
       offset_x: number | string | null;
       offset_y: number | string | null;
+      rotation: number | string | null;
     };
     // The code-drawn ones have to stay in the catalogue, not just the
     // uploads: the tier check downstream reads from here, so a frame
@@ -50,6 +51,7 @@ export async function loadFrames(): Promise<FrameCatalog> {
       scale: Number(r.scale ?? 1) || 1,
       offsetX: Number(r.offset_x ?? 0) || 0,
       offsetY: Number(r.offset_y ?? 0) || 0,
+      rotation: Number(r.rotation ?? 0) || 0,
     };
   }
   return catalog;

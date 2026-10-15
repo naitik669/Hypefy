@@ -18,6 +18,7 @@ const asset = (over: Partial<FrameCatalog[string]> = {}): FrameCatalog[string] =
   scale: 1,
   offsetX: 0,
   offsetY: 0,
+  rotation: 0,
   ...over,
 });
 

@@ -86,12 +86,15 @@ export default async function AppLayout({
   // suspended_until in the past means it has elapsed — the triggers already
   // treat it that way, and this has to agree or the two would disagree about
   // who is suspended.
+  // The admin desk is a tool, not a feed: it gets the whole window.
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  const column = pathname.startsWith("/admin") ? "max-w-[1400px]" : "max-w-[480px]";
+
   const suspendedNow =
     !!profile.suspendedAt &&
     (!profile.suspendedUntil || new Date(profile.suspendedUntil) > new Date());
 
   if (suspendedNow) {
-    const pathname = (await headers()).get("x-pathname") ?? "";
     // The routes a suspended person must keep: how to appeal, what the rules
     // are, and how to export or delete their account.
     const allowed = ["/help", "/settings/account", "/guidelines"];
@@ -171,7 +174,7 @@ export default async function AppLayout({
             <VaultAutoLock />
             <EncryptionSetup userId={user!.id} />
             <InstallPrompt />
-            <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
+            <div className={`relative mx-auto flex min-h-dvh w-full flex-col bg-background ${column}`}>
               <TabScrollTop />
               {/* Wraps only the scrolling content, never the nav — the bar
                   has to stay put while the page slides under the finger. */}

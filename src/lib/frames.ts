@@ -24,6 +24,8 @@ export type FrameAsset = {
   /** Offset from centre, in avatar widths. */
   offsetX: number;
   offsetY: number;
+  /** Degrees clockwise, about the art's own centre. */
+  rotation: number;
 };
 
 export type FrameCatalog = Record<string, FrameAsset>;
@@ -48,14 +50,17 @@ export const FRAME_REACH = 0.5;
  */
 export function framePlacement(
   size: number,
-  asset: Pick<FrameAsset, "scale" | "offsetX" | "offsetY">,
-): { width: number; height: number; left: number; top: number } {
+  asset: Pick<FrameAsset, "scale" | "offsetX" | "offsetY"> & { rotation?: number },
+): { width: number; height: number; left: number; top: number; transform?: string } {
   const span = size * (1 + 2 * FRAME_REACH) * asset.scale;
   return {
     width: span,
     height: span,
     left: size / 2 - span / 2 + asset.offsetX * size,
     top: size / 2 - span / 2 + asset.offsetY * size,
+    // About the art's own centre, which is where the box already is, so
+    // rotation composes with the other two without touching them.
+    transform: asset.rotation ? `rotate(${asset.rotation}deg)` : undefined,
   };
 }
 

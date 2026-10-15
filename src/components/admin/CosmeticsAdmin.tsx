@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { framePlacement } from "@/lib/frames";
+import { FramePlacer, LIMITS, type Placement } from "@/components/admin/FramePlacer";
 
 export type ProductRow = {
   id: string;
@@ -17,6 +18,7 @@ export type ProductRow = {
   scale: number;
   offset_x: number;
   offset_y: number;
+  rotation: number;
 };
 
 /**
@@ -58,7 +60,7 @@ const TIERS = ["free", "premium", "shop"] as const;
  */
 const MAX_BYTES = 512 * 1024;
 /** The sizes an avatar is actually drawn at: a comment, a chat row, a profile. */
-const PREVIEW_SIZES = [24, 56, 150];
+const PREVIEW_SIZES = [24, 40, 56];
 
 /**
  * The cosmetics desk.
@@ -90,9 +92,8 @@ export function CosmeticsAdmin({
   const [id, setId] = useState("");
   const [label, setLabel] = useState("");
   const [tier, setTier] = useState<"free" | "premium">("premium");
-  const [scale, setScale] = useState(1);
-  const [offsetX, setOffsetX] = useState(0);
-  const [offsetY, setOffsetY] = useState(0);
+  const [place, setPlace] = useState<Placement>({ scale: 1, offsetX: 0, offsetY: 0, rotation: 0 });
+  const set = (patch: Partial<Placement>) => setPlace((p) => ({ ...p, ...patch }));
   /** A local object URL while placing, so there is nothing to undo if you give up. */
   const [draftUrl, setDraftUrl] = useState<string | null>(null);
   const [draftFile, setDraftFile] = useState<File | null>(null);
@@ -141,9 +142,10 @@ export function CosmeticsAdmin({
       p_name: label.trim(),
       p_tier: tier,
       p_asset_path: path,
-      p_scale: scale,
-      p_offset_x: offsetX,
-      p_offset_y: offsetY,
+      p_scale: place.scale,
+      p_offset_x: place.offsetX,
+      p_offset_y: place.offsetY,
+      p_rotation: place.rotation,
     });
     setBusy(false);
     if (error) return setNote(`Could not save: ${error.message}`);
@@ -152,7 +154,8 @@ export function CosmeticsAdmin({
     setRows((prev) => {
       const row: ProductRow = {
         id, kind: "avatar_decoration", tier, name: label.trim(), price_paise: null,
-        active: true, sort: 999, asset_path: path, scale, offset_x: offsetX, offset_y: offsetY,
+        active: true, sort: 999, asset_path: path, scale: place.scale,
+        offset_x: place.offsetX, offset_y: place.offsetY, rotation: place.rotation,
       };
       return prev.some((r) => r.id === id) ? prev.map((r) => (r.id === id ? row : r)) : [...prev, row];
     });
@@ -201,7 +204,7 @@ export function CosmeticsAdmin({
   const shown = draftUrl ?? (savedPath ? `${bucketBase}${savedPath}` : null);
 
   return (
-    <div className="flex flex-col gap-6 px-4 pb-24 pt-3">
+    <div className="flex flex-col gap-6 px-4 pb-24 pt-3 lg:px-6">
       {note && (
         <p role="status" className="rounded-xl border border-border bg-surface px-3 py-2 text-sm">
           {note}
@@ -226,65 +229,108 @@ export function CosmeticsAdmin({
         />
 
         {shown && (
-          <>
-            <div className="flex flex-wrap items-end gap-6 rounded-xl border border-border bg-elevated p-4">
-              {PREVIEW_SIZES.map((size) => {
-                const box = framePlacement(size, { scale, offsetX, offsetY });
-                return (
-                  <span key={size} className="flex flex-col items-center gap-2">
-                    <span className="relative inline-block" style={{ width: size, height: size }}>
-                      <AvatarImg url={preview.avatarUrl} name={preview.name} hue={preview.hue} size={size} />
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={shown}
-                        alt=""
-                        aria-hidden
-                        className="pointer-events-none absolute max-w-none"
-                        style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
-                      />
-                    </span>
-                    <span className="font-mono text-[10px] text-faint">{size}px</span>
-                  </span>
-                );
-              })}
+          // Two columns once there is room: the thing you are dragging and
+          // the thing you are judging it by, side by side rather than one
+          // scrolled off the top of the other.
+          <div className="flex flex-col gap-5">
+            <div className="grid gap-5 lg:grid-cols-[440px_minmax(260px,360px)] lg:justify-start">
+            <div className="flex flex-col gap-3">
+              <FramePlacer
+                src={shown}
+                value={place}
+                onChange={setPlace}
+                avatar={{ url: preview.avatarUrl, hue: preview.hue, name: preview.name }}
+                stage={420}
+              />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Slider label="Size" value={place.scale} min={LIMITS.scale[0]} max={LIMITS.scale[1]} step={0.01} onChange={(v) => set({ scale: v })} />
+                <Slider label="Turn" value={place.rotation} min={LIMITS.rotation[0]} max={LIMITS.rotation[1]} step={1} onChange={(v) => set({ rotation: v })} />
+                <Slider label="Left / right" value={place.offsetX} min={LIMITS.offset[0]} max={LIMITS.offset[1]} step={0.005} onChange={(v) => set({ offsetX: v })} />
+                <Slider label="Up / down" value={place.offsetY} min={LIMITS.offset[0]} max={LIMITS.offset[1]} step={0.005} onChange={(v) => set({ offsetY: v })} />
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlace({ scale: 1, offsetX: 0, offsetY: 0, rotation: 0 })}
+                className="self-start rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted"
+              >
+                Reset placement
+              </button>
             </div>
 
-            <Slider label="Scale" value={scale} min={0.25} max={3} step={0.01} onChange={setScale} />
-            <Slider label="Left / right" value={offsetX} min={-1} max={1} step={0.005} onChange={setOffsetX} />
-            <Slider label="Up / down" value={offsetY} min={-1} max={1} step={0.005} onChange={setOffsetY} />
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Id" value={id} onChange={setId} mono placeholder="deco-something" />
+                <Field label="Name" value={label} onChange={setLabel} placeholder="Something" />
+              </div>
+              {idClash && <p className="text-xs text-danger">{id} is taken. Edit it below instead.</p>}
 
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Id" value={id} onChange={setId} mono placeholder="deco-something" />
-              <Field label="Name" value={label} onChange={setLabel} placeholder="Something" />
+              <div className="flex flex-wrap items-center gap-2">
+                {(["free", "premium"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTier(t)}
+                    aria-pressed={tier === t}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
+                      tier === t ? "border-accent bg-accent text-accent-ink" : "border-border bg-surface text-foreground"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+                <span className="text-[11px] text-faint">Paid frames wait for payments to go live.</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={publish}
+                disabled={busy}
+                className="h-11 rounded-xl bg-accent text-sm font-extrabold text-accent-ink transition active:scale-[0.99] disabled:opacity-50"
+              >
+                {busy ? "Publishing…" : "Publish"}
+              </button>
+              </div>
             </div>
-            {idClash && <p className="text-xs text-danger">{id} is taken. Edit it below instead.</p>}
 
-            <div className="flex items-center gap-2">
-              {(["free", "premium"] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTier(t)}
-                  aria-pressed={tier === t}
-                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
-                    tier === t ? "border-accent bg-accent text-accent-ink" : "border-border bg-surface text-foreground"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-              <span className="text-[11px] text-faint">Paid frames wait for payments to go live.</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={publish}
-              disabled={busy}
-              className="h-11 rounded-xl bg-accent text-sm font-extrabold text-accent-ink transition active:scale-[0.99] disabled:opacity-50"
-            >
-              {busy ? "Publishing…" : "Publish"}
-            </button>
-          </>
+              {/* The answer to "will this do?", which is never the stage —
+                  the stage is big and a comment row is 24 pixels. */}
+              <div className="rounded-xl border border-border bg-elevated p-4 lg:w-fit">
+                <p className="pb-3 text-xs font-bold tracking-widest text-faint uppercase">As people see it</p>
+                <div className="flex items-end gap-5 overflow-x-auto pb-1">
+                  {PREVIEW_SIZES.map((size) => {
+                    const box = framePlacement(size, place);
+                    // The cell holds the whole frame, so a scaled-up design
+                    // shows its real edge instead of being cut by the panel.
+                    const cell = Math.max(size, Math.ceil(box.width));
+                    const inset = (cell - size) / 2;
+                    return (
+                      <span key={size} className="flex shrink-0 flex-col items-center gap-2">
+                        <span className="relative inline-block" style={{ width: cell, height: cell }}>
+                          <span className="absolute" style={{ left: inset, top: inset }}>
+                            <AvatarImg url={preview.avatarUrl} name={preview.name} hue={preview.hue} size={size} />
+                          </span>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={shown}
+                            alt=""
+                            aria-hidden
+                            className="pointer-events-none absolute max-w-none"
+                            style={{
+                              left: inset + box.left,
+                              top: inset + box.top,
+                              width: box.width,
+                              height: box.height,
+                              transform: box.transform,
+                            }}
+                          />
+                        </span>
+                        <span className="font-mono text-[10px] text-faint">{size}px</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+          </div>
         )}
       </section>
 
@@ -313,14 +359,15 @@ export function CosmeticsAdmin({
             .sort((a, b) => a.kind.localeCompare(b.kind) || a.sort - b.sort);
           if (inSection.length === 0) return null;
           return (
-            <div key={section.id} className="flex flex-col gap-1.5">
-              <p className="flex items-baseline gap-2 pt-1 text-xs font-bold tracking-widest text-faint uppercase">
+            <div key={section.id} className="flex flex-col gap-1.5 lg:grid lg:grid-cols-[180px_minmax(0,1fr)] lg:items-start lg:gap-x-4">
+              <p className="flex items-baseline gap-2 pt-1 text-xs font-bold tracking-widest text-faint uppercase lg:sticky lg:top-3">
                 {section.label}
                 <span className="font-mono text-[10px] normal-case tracking-normal">
                   {inSection.filter((x) => x.active).length}/{inSection.length} live
                 </span>
               </p>
 
+              <div className="flex flex-col gap-1.5">
               {inSection.map((row) => (
                 <div
                   key={row.id}
@@ -407,6 +454,7 @@ export function CosmeticsAdmin({
                   )}
                 </div>
               ))}
+              </div>
             </div>
           );
         })}
