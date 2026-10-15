@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
 import { gestureBlocked } from "@/components/layout/SwipeNav";
 import { clampPinch, PINCH_MAX, reelSwipeOutcome } from "@/components/shots/ReelsFeed";
 import { clampZoom, ownsSwipe, ZOOM_MAX, ZOOM_MIN } from "@/components/feed/FeedCard";
@@ -168,5 +169,46 @@ describe("reelSwipeOutcome", () => {
     expect(reelSwipeOutcome({ ...base, axis: "y", dy: -300 })).toBe("next");
     expect(reelSwipeOutcome({ ...base, first: false, axis: "y", dy: 300 })).toBe("prev");
     expect(reelSwipeOutcome({ ...base, axis: "y", dy: -20 })).toBe("stay");
+  });
+});
+
+describe("pinching a feed photo zooms the photo, not a copy of it", () => {
+  const feed = readFileSync("src/components/feed/FeedCard.tsx", "utf8").split("\r\n").join("\n");
+
+  it("makes no second image to zoom instead", () => {
+    // It used to portal a copy of the photo over the card and grow that,
+    // which showed as a duplicate the moment the two came apart — a pan,
+    // or the page scrolling under a gesture that still allows pan-y.
+    expect(feed).not.toContain("PinchLayer");
+    expect(feed).not.toContain("pinchRect");
+    expect(existsSync("src/components/feed/PinchLayer.tsx")).toBe(false);
+  });
+
+  it("grows the slide the photo is already in", () => {
+    expect(feed).toContain("translate3d(${pinch.x}px, ${pinch.y}px, 0) scale(${pinch.scale})");
+    expect(feed).toContain("zooming && i === imgIdx");
+  });
+
+  it("lets it out of the card for the length of the gesture, and puts it back", () => {
+    // content-visibility implies paint containment, so the wrapper clips
+    // whatever the gallery asks for. It is only there to skip work for
+    // cards nobody is looking at, and the pinched card is on screen.
+    expect(feed).toContain("function letPhotoOut(open: boolean)");
+    expect(feed).toContain('getComputedStyle(el).contentVisibility !== "auto"');
+    expect(feed).toContain('el.style.contentVisibility = open ? "visible" : "";');
+    expect(feed).toContain("letPhotoOut(true)");
+    expect(feed).toContain("letPhotoOut(false)");
+  });
+
+  it("unclips the carousel only while zoomed, and hides what that would reveal", () => {
+    // Without the clip the next photo in the strip sits beside this one.
+    expect(feed).toContain('{ overflow: "visible", zIndex: 60, borderRadius: 16 }');
+    expect(feed).toContain('zooming && i !== imgIdx ? { visibility: "hidden" as const }');
+  });
+
+  it("dims from inside the card rather than over the whole app", () => {
+    // A child of the gallery shares its stacking context: above every
+    // other card, below this one. A portal could not be both.
+    expect(feed).toContain('className="pointer-events-none fixed inset-0 bg-black"');
   });
 });

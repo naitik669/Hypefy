@@ -14,7 +14,6 @@ import { timeAgoShort } from "@/lib/time";
 import { CommentsSheet } from "@/components/feed/CommentsSheet";
 import { FeedImpression } from "@/components/feed/FeedImpression";
 import { PostPeek } from "@/components/feed/PostPeek";
-import { PinchLayer } from "@/components/feed/PinchLayer";
 import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
 import { ShareSheet } from "@/components/feed/ShareSheet";
 import { ShareButton } from "@/components/feed/QuickShare";
@@ -218,8 +217,8 @@ export function FeedCard({
    *   double-tap     → Hype
    *   swipe sideways → next / previous image
    *   hold           → peek: the photo lifts and STAYS, until tapped away
-   *   pinch          → the photo lifts clear of the card and grows past its
-   *                    borders; zoom and pan, springing back on release
+   *   pinch          → the photo itself grows past the card's borders;
+   *                    zoom and pan, springing back on release
    *
    * Hold and pinch are deliberately different answers. Holding asks "what is
    * that?" and wants the whole picture for a second; pinching asks "what is
@@ -241,17 +240,47 @@ export function FeedCard({
   /** Live pinch transform. Identity when idle, so nothing is composited. */
   const [pinch, setPinch] = useState({ scale: 1, x: 0, y: 0 });
   const [pinching, setPinching] = useState(false);
-  /**
-   * Where the photo was on screen when the pinch began, so the lifted copy
-   * can start exactly on top of it. Null means no pinch is in flight.
+/**
+   * The photo is zoomed, or on its way back from being zoomed.
+   *
+   * It used to be a rect, because the zoom was a copy of the photo
+   * portalled over the card and the copy had to be placed exactly on top
+   * of the original. It is not a copy any more — the photo in the post is
+   * the thing that grows — so all that is left to know is whether to
+   * relax what would otherwise clip it.
    */
-  const [pinchRect, setPinchRect] = useState<{
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-  } | null>(null);
+  const [zooming, setZooming] = useState(false);
   const galleryRef = useRef<HTMLDivElement | null>(null);
+  /** The virtualisation wrapper, while it is being held open. */
+  const uncontained = useRef<HTMLElement | null>(null);
+
+  /**
+   * Let the photo out of the card, and put it back.
+   *
+   * The feed virtualises with `content-visibility: auto`, which implies
+   * paint containment: the wrapper clips its contents to its own box
+   * whatever the gallery inside it asks for, and raising z-index does not
+   * help because a contained ancestor is the end of the line. That is why
+   * this used to be done with a copy in a portal.
+   *
+   * It does not have to be. The containment belongs to one ancestor and
+   * is only there to skip work for cards nobody is looking at — and the
+   * card being pinched is, by definition, the one card on screen. So it
+   * is turned off for the length of the gesture and turned back on after.
+   * Nothing moves when it goes: contain-intrinsic-size only stands in for
+   * a subtree that is being skipped, and this one is not.
+   */
+  function letPhotoOut(open: boolean) {
+    if (open) {
+      let el: HTMLElement | null = galleryRef.current?.parentElement ?? null;
+      while (el && getComputedStyle(el).contentVisibility !== "auto") el = el.parentElement;
+      uncontained.current = el;
+    }
+    const el = uncontained.current;
+    if (!el) return;
+    el.style.contentVisibility = open ? "visible" : "";
+    if (!open) uncontained.current = null;
+  }
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinchFrom = useRef<{
     dist: number;
@@ -285,15 +314,8 @@ export function FeedCard({
       clearTimeout(settleTimer.current);
       settleTimer.current = null;
     }
-    const box = galleryRef.current?.getBoundingClientRect();
-    if (box) {
-      setPinchRect({
-        left: box.left,
-        top: box.top,
-        width: box.width,
-        height: box.height,
-      });
-    }
+    letPhotoOut(true);
+    setZooming(true);
     pinchFrom.current = twoFingerState(t);
     setPinch({ scale: 1, x: 0, y: 0 });
     setPinching(true);
@@ -307,12 +329,13 @@ export function FeedCard({
     // leaving it parked at 3× would mean every scroll past it starts in a
     // state nobody chose, and there is no obvious way back to normal.
     setPinch({ scale: 1, x: 0, y: 0 });
-    // Held one beat past the spring so the lifted copy is not yanked away
-    // mid-animation — dropping it on release makes the photo snap rather
-    // than settle.
+    // Held one beat past the spring, so the card does not close around
+    // the photo mid-animation — clipping it on release makes it snap
+    // rather than settle.
     settleTimer.current = setTimeout(() => {
       settleTimer.current = null;
-      setPinchRect(null);
+      letPhotoOut(false);
+      setZooming(false);
     }, 260);
   }
 
@@ -804,8 +827,31 @@ export function FeedCard({
             WebkitTouchCallout: "none",
             WebkitUserSelect: "none",
             userSelect: "none",
+            // Only while zoomed. The rest of the time the carousel needs
+            // its clip, or the next photo in the strip shows beside this
+            // one, and the card needs to stay flat in the stack.
+            ...(zooming
+              ? { overflow: "visible", zIndex: 60, borderRadius: 16 }
+              : null),
           }}
         >
+          {/* The backdrop, dimming everything the photo is growing over.
+              A child of the gallery rather than a portal, so it sits in
+              the same stacking context as the photo: above every other
+              card, below this one. It fades in with the zoom rather than
+              snapping on, so a gentle pinch does not flash the screen
+              dark for a gesture that was barely a gesture. */}
+          {zooming && (
+            <div
+              aria-hidden
+              className="pointer-events-none fixed inset-0 bg-black"
+              style={{
+                opacity: Math.min(Math.max(pinch.scale - 1, 0) / 1.2, 1) * 0.72,
+                transition: pinching ? "none" : "opacity 240ms ease-out",
+              }}
+            />
+          )}
+
           {/* Transform-based slide — no native scroll so velocity cannot skip frames */}
           <div
             className="flex transition-transform duration-300 ease-out will-change-transform"
@@ -821,7 +867,25 @@ export function FeedCard({
               <div
                 key={i}
                 className="relative w-full shrink-0 select-none"
-                style={{ aspectRatio: String(feedRatio(post.aspect_ratio)) }}
+                style={{
+                  aspectRatio: String(feedRatio(post.aspect_ratio)),
+                  // The one being pinched carries the gesture. The others
+                  // are hidden for its duration: with the gallery's clip
+                  // off they would otherwise spill out beside it.
+                  ...(zooming && i !== imgIdx ? { visibility: "hidden" as const } : null),
+                  ...(zooming && i === imgIdx
+                    ? {
+                        zIndex: 1,
+                        transform: `translate3d(${pinch.x}px, ${pinch.y}px, 0) scale(${pinch.scale})`,
+                        // Tracks the fingers exactly while they are down;
+                        // springs home on its own once they leave.
+                        transition: pinching
+                          ? "none"
+                          : "transform 240ms cubic-bezier(0.16,1,0.3,1)",
+                        willChange: "transform",
+                      }
+                    : null),
+                }}
               >
                 <OptimizedImage
                   src={src}
@@ -1129,21 +1193,6 @@ export function FeedCard({
           onShare={() => setShareOpen(true)}
           onSave={toggleSave}
           onClose={() => setPeekSrc(null)}
-        />
-      )}
-
-      {/* Pinched. Lifted out of the card because it cannot grow past it in
-          place: the feed virtualises with content-visibility, which paints
-          with containment, so a card clips its own contents whatever the
-          gallery asks for. */}
-      {pinchRect && images[imgIdx] && (
-        <PinchLayer
-          src={images[imgIdx]}
-          rect={pinchRect}
-          scale={pinch.scale}
-          x={pinch.x}
-          y={pinch.y}
-          settling={!pinching}
         />
       )}
 
