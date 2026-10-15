@@ -158,3 +158,39 @@ describe("clearing the shelf", () => {
     expect(migration).toContain("id <> 'deco-bolt'");
   });
 });
+
+describe("the catalogue is readable", () => {
+  it("is split into frames, chat bubbles and everything else", () => {
+    // The list was one flat run of sixty-five rows with no idea what most
+    // of them were.
+    expect(admin).toContain('label: "Frames"');
+    expect(admin).toContain('label: "Chat bubbles"');
+    expect(admin).toContain('label: "Others"');
+  });
+
+  it("names each kind in words, not in column values", () => {
+    expect(admin).toContain('avatar_decoration: "Frame"');
+    expect(admin).toContain('bubble_style: "Chat bubble"');
+    expect(admin).toContain('name_glow: "Name glow"');
+    // The raw column value should not be what anyone reads.
+    expect(admin).not.toContain('{row.kind.replace(/_/g, " ")}');
+  });
+
+  it("every item can be renamed, retiered, reordered and retired", () => {
+    expect(admin).toContain("<CommitField");
+    expect(admin).toContain("update(row, { tier: t })");
+    expect(admin).toContain("move(row, -1)");
+    expect(admin).toContain("update(row, { active: !row.active })");
+  });
+
+  it("a rename is one write, not one per keystroke", () => {
+    // Each change here goes straight to the database, unlike the upload
+    // form where nothing is written until Publish.
+    expect(admin).toContain("onBlur={commit}");
+    expect(admin).toContain("if (next && next !== value) onCommit(next)");
+  });
+
+  it("reordering swaps with a neighbour rather than renumbering the lot", () => {
+    expect(admin).toContain("const swap = siblings[i + dir]");
+  });
+});

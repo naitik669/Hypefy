@@ -19,6 +19,34 @@ export type ProductRow = {
   offset_y: number;
 };
 
+/**
+ * What each kind is called, in words.
+ *
+ * The list said "avatar_decoration" and "bubble_style", which are column
+ * values, not names of things. Nobody could tell what most of the
+ * catalogue was.
+ */
+const KIND_LABEL: Record<string, string> = {
+  avatar_decoration: "Frame",
+  bubble_style: "Chat bubble",
+  chat_theme: "Chat theme",
+  name_font: "Name font",
+  name_glow: "Name glow",
+  nameplate: "Nameplate",
+};
+
+/**
+ * Three shelves, as asked. Everything that is not a frame or a bubble goes
+ * in Others, sorted so its kinds cluster rather than interleave.
+ */
+const SECTIONS: { id: string; label: string; holds: (kind: string) => boolean }[] = [
+  { id: "frames", label: "Frames", holds: (k) => k === "avatar_decoration" },
+  { id: "bubbles", label: "Chat bubbles", holds: (k) => k === "bubble_style" },
+  { id: "others", label: "Others", holds: (k) => k !== "avatar_decoration" && k !== "bubble_style" },
+];
+
+const TIERS = ["free", "premium", "shop"] as const;
+
 /** Big enough for any drawn frame, small enough that nobody ships a photo as SVG. */
 const MAX_BYTES = 256 * 1024;
 /** The sizes an avatar is actually drawn at: a comment, a chat row, a profile. */
@@ -120,6 +148,31 @@ export function CosmeticsAdmin({
       };
       return prev.some((r) => r.id === id) ? prev.map((r) => (r.id === id ? row : r)) : [...prev, row];
     });
+  }
+
+  const [open, setOpen] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+
+  /**
+   * Move one place within its own kind.
+   *
+   * Sort is per-kind, so moving is a swap with the neighbour above or
+   * below rather than a renumber of the whole catalogue — which would be
+   * sixty-five writes to move one item one place.
+   */
+  async function move(row: ProductRow, dir: -1 | 1) {
+    const siblings = rows.filter((x) => x.kind === row.kind).sort((a, b) => a.sort - b.sort);
+    const i = siblings.findIndex((x) => x.id === row.id);
+    const swap = siblings[i + dir];
+    if (!swap) return;
+    setRows((prev) =>
+      prev.map((x) =>
+        x.id === row.id ? { ...x, sort: swap.sort } : x.id === swap.id ? { ...x, sort: row.sort } : x,
+      ),
+    );
+    const a = await supabase.rpc("admin_update_product", { p_id: row.id, p_sort: swap.sort });
+    const b = await supabase.rpc("admin_update_product", { p_id: swap.id, p_sort: row.sort });
+    if (a.error || b.error) setNote("Could not reorder.");
   }
 
   async function update(row: ProductRow, patch: Partial<ProductRow>) {
@@ -227,32 +280,128 @@ export function CosmeticsAdmin({
         )}
       </section>
 
-      {/* ── Everything in the catalogue ──────────────────────────────── */}
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-extrabold">Catalogue</h2>
-        {rows.map((row) => (
-          <div
-            key={row.id}
-            className={`flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 ${
-              row.active ? "" : "opacity-50"
-            }`}
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold">{row.name}</span>
-              <span className="block truncate font-mono text-[10px] text-faint">
-                {row.id} · {row.kind.replace(/_/g, " ")} · {row.tier}
-                {row.asset_path ? " · uploaded" : " · drawn"}
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={() => update(row, { active: !row.active })}
-              className="shrink-0 rounded-lg border border-border px-2.5 py-1 text-[11px] font-bold"
-            >
-              {row.active ? "Retire" : "Restore"}
-            </button>
-          </div>
-        ))}
+      {/* ── Everything in the catalogue, on three shelves ────────────── */}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-extrabold">Catalogue</h2>
+          <span className="text-xs text-faint">{rows.length} items</span>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Find…"
+            className="ml-auto h-8 w-32 rounded-lg border border-white/5 bg-white/[0.06] px-2.5 text-xs outline-none placeholder:text-faint focus:border-white/25"
+          />
+        </div>
+
+        {SECTIONS.map((section) => {
+          const inSection = rows
+            .filter((x) => section.holds(x.kind))
+            .filter(
+              (x) =>
+                !q.trim() ||
+                `${x.name} ${x.id} ${KIND_LABEL[x.kind] ?? x.kind}`.toLowerCase().includes(q.trim().toLowerCase()),
+            )
+            // Kinds cluster, then each kind keeps its own order.
+            .sort((a, b) => a.kind.localeCompare(b.kind) || a.sort - b.sort);
+          if (inSection.length === 0) return null;
+          return (
+            <div key={section.id} className="flex flex-col gap-1.5">
+              <p className="flex items-baseline gap-2 pt-1 text-xs font-bold tracking-widest text-faint uppercase">
+                {section.label}
+                <span className="font-mono text-[10px] normal-case tracking-normal">
+                  {inSection.filter((x) => x.active).length}/{inSection.length} live
+                </span>
+              </p>
+
+              {inSection.map((row) => (
+                <div
+                  key={row.id}
+                  className={`rounded-xl border border-border bg-surface ${row.active ? "" : "opacity-55"}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpen(open === row.id ? null : row.id)}
+                    aria-expanded={open === row.id}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold">{row.name}</span>
+                      <span className="block truncate font-mono text-[10px] text-faint">
+                        {KIND_LABEL[row.kind] ?? row.kind} · {row.tier}
+                        {row.asset_path ? " · uploaded" : " · drawn"}
+                        {row.active ? "" : " · retired"}
+                      </span>
+                    </span>
+                    <span aria-hidden className="shrink-0 text-xs text-faint">
+                      {open === row.id ? "−" : "Edit"}
+                    </span>
+                  </button>
+
+                  {open === row.id && (
+                    <div className="flex flex-col gap-2.5 border-t border-border px-3 py-3">
+                      <CommitField label="Name" value={row.name} onCommit={(v) => update(row, { name: v })} />
+
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-muted">Tier</span>
+                        <div className="flex gap-1.5">
+                          {TIERS.map((t) => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => update(row, { tier: t })}
+                              aria-pressed={row.tier === t}
+                              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
+                                row.tier === t
+                                  ? "border-accent bg-accent text-accent-ink"
+                                  : "border-border bg-surface text-foreground"
+                              }`}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+                        {row.tier === "shop" && (
+                          <span className="text-[11px] text-faint">
+                            Nobody can buy a Shop item until payments go live.
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <span className="mr-auto text-xs text-muted">Order in {KIND_LABEL[row.kind] ?? row.kind}s</span>
+                        <button
+                          type="button"
+                          onClick={() => move(row, -1)}
+                          aria-label="Move up"
+                          className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-bold"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => move(row, 1)}
+                          aria-label="Move down"
+                          className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-bold"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => update(row, { active: !row.active })}
+                          className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-bold"
+                        >
+                          {row.active ? "Retire" : "Restore"}
+                        </button>
+                      </div>
+
+                      <p className="font-mono text-[10px] text-faint">{row.id}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })}
       </section>
     </div>
   );
@@ -286,6 +435,56 @@ function Slider({
         className="min-w-0 flex-1 accent-[var(--color-accent)]"
       />
       <span className="w-12 shrink-0 text-right font-mono tabular-nums text-faint">{value.toFixed(2)}</span>
+    </label>
+  );
+}
+
+/**
+ * A field that saves when you leave it, not as you type.
+ *
+ * The upload form's Field reports every keystroke, which is right there —
+ * nothing is written until Publish. Here each change is a database write,
+ * so reporting per keystroke would be one write per letter of a rename.
+ */
+function CommitField({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string;
+  value: string;
+  onCommit: (s: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  // The row can change under us — another edit, a reorder — so follow it
+  // whenever this field is not the thing being edited.
+  const [focused, setFocused] = useState(false);
+  if (!focused && draft !== value) setDraft(value);
+
+  const commit = () => {
+    setFocused(false);
+    const next = draft.trim();
+    if (next && next !== value) onCommit(next);
+    else setDraft(value);
+  };
+
+  return (
+    <label className="flex flex-col gap-1 text-xs">
+      <span className="text-muted">{label}</span>
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") {
+            setDraft(value);
+            e.currentTarget.blur();
+          }
+        }}
+        className="h-10 w-full rounded-xl border border-white/5 bg-white/[0.06] px-3 text-sm outline-none transition placeholder:text-faint focus:border-white/25"
+      />
     </label>
   );
 }
