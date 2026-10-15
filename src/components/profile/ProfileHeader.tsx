@@ -6,7 +6,6 @@ import { accentVars } from "@/lib/profile-accent";
 import { FollowStats } from "@/components/profile/FollowStats";
 import { VerifiedBadgeButton } from "@/components/billing/VerifiedBadgeButton";
 import { DisplayName } from "@/components/ui/DisplayName";
-import { visibleDecoration } from "@/lib/cosmetics";
 import { HyperStar } from "@/components/ui/HyperStar";
 import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { AnthemChip } from "@/components/profile/AnthemChip";
@@ -120,7 +119,7 @@ export function ProfileHeader({
               avatarUrl={avatarUrl}
               hasActiveShow={hasActiveShow}
               showId={entryShowId}
-              decoration={cosmetics ? visibleDecoration(cosmetics) : null}
+              wearer={cosmetics}
               card={{
                 cosmetics: cosmetics ?? undefined,
                 accentId,

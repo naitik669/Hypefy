@@ -13,7 +13,7 @@ export default async function MarketCategoryPage({ params }: { params: Promise<{
   const page = categoryPage((await params).category);
   if (!page) notFound();
   const data = await loadMarketplace();
-  const items = buildItems(data.prices).filter((i) => i.category === page.category);
+  const items = buildItems(data.prices, data.uploadedFrames).filter((i) => i.category === page.category);
   return (
     <>
       <PageHeader title={page.label} showBack />

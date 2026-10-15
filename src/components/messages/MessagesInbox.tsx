@@ -37,7 +37,6 @@ import { Avatar } from "@/components/ui/Avatar";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { DisplayName } from "@/components/ui/DisplayName";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
-import { visibleDecoration } from "@/lib/cosmetics";
 import { visibleNameplate } from "@/lib/nameplates";
 import { Nameplate, PLATE_FADE_PX } from "@/components/ui/Nameplate";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -784,7 +783,7 @@ export function MessagesInbox({
             {r.isGroup ? (
               <GroupAvatar />
             ) : (
-              <AvatarFrame id={r.cosmetics ? visibleDecoration(r.cosmetics) : null} size={52}>
+              <AvatarFrame wearer={r.cosmetics} size={52}>
               <Avatar
                 name={r.name}
                 hue={r.hue}

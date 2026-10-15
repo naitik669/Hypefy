@@ -22,7 +22,7 @@ export default async function MarketplacePage() {
   return (
     <>
       <PageHeader title="Marketplace" showBack />
-      <MarketBrowse items={buildItems(data.prices)} columns={2} browse {...data} />
+      <MarketBrowse items={buildItems(data.prices, data.uploadedFrames)} columns={2} browse {...data} />
     </>
   );
 }

@@ -36,7 +36,6 @@ import Link from "next/link";
 import { Avatar } from "@/components/ui/Avatar";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
-import { visibleDecoration } from "@/lib/cosmetics";
 import { ZoomViewer } from "@/components/ui/ZoomViewer";
 import { GifPicker } from "@/components/messages/GifPicker";
 import { formatCount } from "@/lib/format";
@@ -1243,7 +1242,7 @@ const Row = memo(function Row({
         aria-label={`${name}'s profile`}
         className="shrink-0 transition-transform active:scale-95"
       >
-        <AvatarFrame id={node.profiles ? visibleDecoration(node.profiles) : null} size={size}>
+        <AvatarFrame wearer={node.profiles} size={size}>
           <Avatar
             name={name}
             hue={hue}

@@ -41,7 +41,20 @@ afterEach(async () => {
 async function render(props: { owned?: string[]; wear?: string | null; premium?: boolean } = {}) {
   const { StyleEditor } = await import("@/components/billing/StyleEditor");
   await act(async () =>
-    root.render(createElement(StyleEditor, { me: { ...ME, is_premium: !!props.premium }, owned: props.owned ?? [], wear: props.wear ?? null })),
+    root.render(
+      createElement(StyleEditor, {
+        me: { ...ME, is_premium: !!props.premium },
+        owned: props.owned ?? [],
+        wear: props.wear ?? null,
+        // Crown is an uploaded frame now: 0138 left Bolt as the only one
+        // drawn in code. Passing it here is the path a real upload takes
+        // to reach this shelf.
+        frames: [
+          { id: "deco-crown", label: "Crown", tier: "shop" as const },
+          { id: "deco-halo", label: "Halo", tier: "premium" as const },
+        ],
+      }),
+    ),
   );
 }
 const button = (text: string) => [...host.querySelectorAll("button")].find((b) => b.textContent?.trim() === text || b.textContent?.includes(text));
@@ -64,7 +77,10 @@ describe("Your style", () => {
 
   it("shows Premium items to Premium members", async () => {
     await render({ premium: true });
+    // An uploaded Premium frame unlocks with the plan exactly as a drawn
+    // one does — the shelf does not care which it is.
     expect(button("Halo")).toBeTruthy();
+    expect(button("Bolt")).toBeTruthy();
   });
 
   it("changes the card without saving, then saves only what changed", async () => {

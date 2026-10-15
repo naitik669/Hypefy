@@ -9,6 +9,8 @@ import { CallProvider } from "@/components/calls/CallProvider";
 import { GroupCallProvider } from "@/components/calls/GroupCallProvider";
 import { UploadProvider, ShotUploadCard } from "@/components/upload/UploadProvider";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { FrameCatalogProvider } from "@/components/ui/FrameCatalogProvider";
+import { loadFrames } from "@/lib/frames-load";
 import { ConnectionNotice } from "@/components/native/ConnectionNotice";
 import { ReturnToDestination } from "@/components/native/ReturnToDestination";
 import { NativeShell } from "@/components/native/NativeShell";
@@ -44,10 +46,12 @@ export default async function AppLayout({
   // chrome, and only signed-in-but-incomplete users go to /setup-profile.
   if (!user) {
     return (
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
-        <TabScrollTop />
-        <div className="flex-1">{children}</div>
-      </div>
+      <FrameCatalogProvider frames={await loadFrames()}>
+        <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
+          <TabScrollTop />
+          <div className="flex-1">{children}</div>
+        </div>
+      </FrameCatalogProvider>
     );
   }
 
@@ -149,6 +153,7 @@ export default async function AppLayout({
   }
 
   return (
+    <FrameCatalogProvider frames={await loadFrames()}>
     <ToastProvider>
       <CallProvider userId={user!.id}>
         <GroupCallProvider userId={user!.id}>
@@ -186,5 +191,6 @@ export default async function AppLayout({
         </GroupCallProvider>
       </CallProvider>
     </ToastProvider>
+    </FrameCatalogProvider>
   );
 }

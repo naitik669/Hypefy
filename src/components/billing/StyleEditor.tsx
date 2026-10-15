@@ -54,13 +54,27 @@ const TABS: { id: Tab; label: string }[] = [
  * own. Picking changes the card at once; nothing is stored until Save.
  * Finding new things is the Marketplace's job, one tap away.
  */
-export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[]; wear?: string | null }) {
+export function StyleEditor({
+  me,
+  owned,
+  wear,
+  frames = [],
+}: {
+  me: StyleMe;
+  owned: string[];
+  wear?: string | null;
+  /** Uploaded frames. The code catalogue holds only Bolt. */
+  frames?: { id: string; label: string; tier: Tier }[];
+}) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const toast = useToast();
 
   const premium = me.is_premium;
   const has = (id: string, tier: Tier) => unlocked(tier, id, owned, premium);
+  // Drawn and uploaded, in one shelf: which of the two a frame is, is not
+  // a distinction anybody choosing one should have to see.
+  const allFrames = [...DECORATIONS, ...frames];
 
   const initial: Look = {
     name_font: me.name_font,
@@ -70,7 +84,7 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
     nameplate: me.nameplate,
   };
   const [saved, setSaved] = useState<Look>(initial);
-  const [draft, setDraft] = useState<Look>(() => withWorn(initial, wear, has));
+  const [draft, setDraft] = useState<Look>(() => withWorn(initial, wear, has, frames));
   const [tab, setTab] = useState<Tab>(() => tabFor(wear));
   const [saving, setSaving] = useState(false);
 
@@ -176,11 +190,11 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
         </div>
 
         {tab === "frames" && (
-          <Shelf empty={DECORATIONS.every((d) => !has(d.id, d.tier)) ? "frames" : null}>
+          <Shelf empty={allFrames.every((d) => !has(d.id, d.tier)) ? "frames" : null}>
             <Tile on={!draft.avatar_decoration} label="None" onClick={() => set({ avatar_decoration: null })}>
               <Avatar name={name} hue={me.avatar_hue ?? 200} size={40} src={me.avatar_url ?? undefined} />
             </Tile>
-            {DECORATIONS.filter((d) => has(d.id, d.tier)).map((d) => (
+            {allFrames.filter((d) => has(d.id, d.tier)).map((d) => (
               <Tile key={d.id} on={draft.avatar_decoration === d.id} label={d.label} onClick={() => set({ avatar_decoration: d.id })}>
                 <AvatarFrame id={d.id} size={44}>
                   <Avatar name={name} hue={me.avatar_hue ?? 200} size={44} src={me.avatar_url ?? undefined} />
@@ -273,9 +287,14 @@ export function StyleEditor({ me, owned, wear }: { me: StyleMe; owned: string[];
 }
 
 /** Put an owned item from the Marketplace's "Wear" straight onto the draft. */
-export function withWorn(look: Look, id: string | null | undefined, has: (id: string, tier: Tier) => boolean): Look {
+export function withWorn(
+  look: Look,
+  id: string | null | undefined,
+  has: (id: string, tier: Tier) => boolean,
+  frames: { id: string; label: string; tier: Tier }[] = [],
+): Look {
   if (!id) return look;
-  const d = DECORATIONS.find((x) => x.id === id);
+  const d = [...DECORATIONS, ...frames].find((x) => x.id === id);
   if (d && has(d.id, d.tier)) return { ...look, avatar_decoration: d.id };
   const f = NAME_FONTS.find((x) => x.id === id);
   if (f && has(f.id, f.tier)) return { ...look, name_font: f.id };

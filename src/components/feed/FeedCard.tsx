@@ -28,7 +28,6 @@ import type { HypeProof } from "@/lib/hype-proof";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { DisplayName } from "@/components/ui/DisplayName";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
-import { visibleDecoration } from "@/lib/cosmetics";
 import { HyperStar } from "@/components/ui/HyperStar";
 import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { formatCount } from "@/lib/format";
@@ -742,7 +741,7 @@ export function FeedCard({
           aria-label={showId ? `Watch ${name}'s Show` : `${name}'s profile`}
           className="shrink-0 transition-transform active:scale-95"
         >
-          <AvatarFrame id={profile ? visibleDecoration(profile) : null} size={40}>
+          <AvatarFrame wearer={profile} size={40}>
             <Avatar
               name={name}
               hue={hue}

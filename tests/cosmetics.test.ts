@@ -16,13 +16,15 @@ const { NAMEPLATE_ART_IDS } = await import("@/components/ui/Nameplate");
  */
 
 describe("who gets styled", () => {
-  const styled = { name_font: "font-script", name_glow: "glow-blue", avatar_decoration: "deco-halo" };
+  // Bolt is the only frame still drawn in code; the other ten were
+  // retired in 0138 when frames became something an admin uploads.
+  const styled = { name_font: "font-script", name_glow: "glow-blue", avatar_decoration: "deco-bolt" };
 
   it("styles a Premium member's name and avatar", () => {
     const s = nameStyle({ ...styled, is_premium: true });
     expect(s?.fontFamily).toBeTruthy();
     expect(s?.textShadow).toContain("#3897f0");
-    expect(visibleDecoration({ ...styled, is_premium: true })).toBe("deco-halo");
+    expect(visibleDecoration({ ...styled, is_premium: true })).toBe("deco-bolt");
   });
 
   it("never changes the name's size, whichever font", () => {
@@ -40,8 +42,12 @@ describe("who gets styled", () => {
     expect(visibleDecoration({ ...styled, is_premium: false })).toBeNull();
   });
 
-  it("keeps a bought Shop decoration without Premium", () => {
-    expect(visibleDecoration({ avatar_decoration: "deco-crown", is_premium: false })).toBe("deco-crown");
+  it("draws nothing for a frame that has been retired", () => {
+    // Retiring one takes it out of the code catalogue and marks its row
+    // inactive; nobody's profile is touched, so the id lingers and has to
+    // resolve to nothing rather than to a gap.
+    expect(visibleDecoration({ avatar_decoration: "deco-crown", is_premium: true })).toBeNull();
+    expect(visibleDecoration({ avatar_decoration: "deco-halo", is_premium: true })).toBeNull();
   });
 
   it("ignores ids it does not know", () => {
@@ -159,6 +165,13 @@ describe("the catalogue", () => {
     seeded.delete(m[1]);
   }
   for (const id of ["banner-aurora", "banner-gold", "banner-holo"]) seeded.delete(id);
+  // 0138 retires every frame but Bolt: a catalogue only a developer could
+  // add to was the problem the uploader exists to solve, and the uploaded
+  // ones are in the database rather than in code, so they are not checked
+  // for a drawing here.
+  for (const [id, v] of [...seeded]) {
+    if (v.kind === "avatar_decoration" && id !== "deco-bolt") seeded.delete(id);
+  }
 
   const inCode: [string, string, string][] = [
     ...NAME_FONTS.map((f) => [f.id, "name_font", f.tier] as [string, string, string]),

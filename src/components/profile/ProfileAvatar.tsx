@@ -26,7 +26,7 @@ export function ProfileAvatar({
   hasActiveShow = false,
   showId,
   card,
-  decoration = null,
+  wearer = null,
 }: {
   name: string;
   hue: number;
@@ -36,8 +36,12 @@ export function ProfileAvatar({
   showId?: string | null;
   /** Omitted on surfaces with no profile context; expanding is then a no-op. */
   card?: ProfileCardData;
-  /** A decoration the owner can wear right now (see visibleDecoration). */
-  decoration?: string | null;
+  /**
+   * Whose frame to draw. AvatarFrame resolves it against the catalogue and
+   * checks the tier, so a server component can pass this straight through
+   * without knowing what any of the ids mean.
+   */
+  wearer?: { avatar_decoration?: string | null; is_premium?: boolean | null } | null;
 }) {
   const router = useRouter();
   const [cardOpen, setCardOpen] = useState(false);
@@ -92,7 +96,7 @@ export function ProfileAvatar({
       >
         {/* No green Show ring on profiles; Home's row shows who has a Show.
             Tapping the photo still opens it. */}
-        <AvatarFrame id={decoration} size={size}>
+        <AvatarFrame wearer={wearer} size={size}>
           <AvatarImg url={avatarUrl} name={name} hue={hue} size={size} className="rounded-[26px] ring-4 ring-background" />
         </AvatarFrame>
       </button>

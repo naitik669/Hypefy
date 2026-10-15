@@ -43,7 +43,6 @@ import { resolveBubble } from "@/lib/bubble-styles";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { DisplayName } from "@/components/ui/DisplayName";
-import { visibleDecoration } from "@/lib/cosmetics";
 import { MediaFolder, AlbumViewer } from "@/components/messages/MediaFolder";
 import { MediaPicker, type MediaPickerApi, type PickEntry } from "@/components/messages/MediaPicker";
 import {
@@ -1889,7 +1888,7 @@ export function RealChatView({
         ) : (
           <Link href={`/messages/${conversationId}/info`} className="flex min-w-0 flex-1 items-center gap-3">
             <div className="relative shrink-0">
-              <AvatarFrame id={other.cosmetics ? visibleDecoration(other.cosmetics) : null} size={36}>
+              <AvatarFrame wearer={other.cosmetics} size={36}>
                 <Avatar name={other.name} hue={other.hue} size={36} src={other.avatarUrl ?? undefined} />
               </AvatarFrame>
               <PresenceDot lastSeenAt={otherLastSeen} size="sm" />

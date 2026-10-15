@@ -26,6 +26,28 @@ import {
  * marked, and the Android app shows nothing to buy.
  */
 
+/**
+ * Frames that stand in for uploads.
+ *
+ * Only Bolt is drawn in code now, so the shelves need something else to
+ * sort, own and wear. These are the ten that 0138 retired, which keeps the
+ * suite's expectations about counts and prices intact while sending every
+ * one of them through buildItems' second argument — the same path a real
+ * uploaded frame takes to reach a shelf.
+ */
+const UPLOADED = [
+  { id: "deco-halo", label: "Halo", tier: "premium" as const },
+  { id: "deco-sparkle", label: "Sparkle", tier: "premium" as const },
+  { id: "deco-flames", label: "Flames", tier: "shop" as const },
+  { id: "deco-crown", label: "Crown", tier: "shop" as const },
+  { id: "deco-hearts", label: "Hearts", tier: "shop" as const },
+  { id: "deco-holo", label: "Holo foil", tier: "shop" as const },
+  { id: "deco-8bit", label: "8-bit", tier: "shop" as const },
+  { id: "deco-petals", label: "Petals", tier: "premium" as const },
+  { id: "deco-hypestar", label: "Hype star", tier: "premium" as const },
+  { id: "deco-gilded", label: "Gilded", tier: "shop" as const },
+];
+
 const PRICES = {
   "deco-flames": 4900, "deco-crown": 4900, "deco-hearts": 4900,
   "theme-arcade": 7900, "theme-candy": 7900,
@@ -33,7 +55,7 @@ const PRICES = {
 };
 
 describe("filter and sort", () => {
-  const items = buildItems(PRICES);
+  const items = buildItems(PRICES, UPLOADED);
 
   it("filters to one category", () => {
     const bubbles = filterAndSort(items, "bubble", "featured");
@@ -111,7 +133,7 @@ describe("the Marketplace as places", () => {
   });
 
   it("shows a real item from each category on the home", () => {
-    const items = buildItems(PRICES);
+    const items = buildItems(PRICES, UPLOADED);
     for (const page of CATEGORY_PAGES) {
       const show = showcaseOf(page, items);
       expect(show?.category, page.slug).toBe(page.category);
@@ -121,14 +143,14 @@ describe("the Marketplace as places", () => {
   });
 
   it("falls back to the first item if a showcase has left the catalogue", () => {
-    const items = buildItems(PRICES);
+    const items = buildItems(PRICES, UPLOADED);
     const gone = { ...categoryPage("frames")!, showcase: "deco-retired" };
     expect(showcaseOf(gone, items)?.category).toBe("frame");
   });
 });
 
 describe("what the button on an item does", () => {
-  const items = buildItems(PRICES);
+  const items = buildItems(PRICES, UPLOADED);
   const crown = items.find((i) => i.id === "deco-crown")!;
   const halo = items.find((i) => i.id === "deco-halo")!;
 
@@ -232,7 +254,7 @@ describe("the Marketplace pages", () => {
     await act(async () =>
       root.render(
         createElement(MarketBrowse, {
-          items: buildItems(PRICES).filter((i) => i.category === page.category),
+          items: buildItems(PRICES, UPLOADED).filter((i) => i.category === page.category),
           columns: page.columns, configured: true, isPremium: false, owned, prices: PRICES, me: ME,
           userId: "me", worn: { ...NOTHING_WORN, ...worn },
         }),
@@ -251,7 +273,7 @@ describe("the Marketplace pages", () => {
     await act(async () =>
       root.render(
         createElement(MarketBrowse, {
-          items: buildItems(PRICES), columns: 3, browse: true, configured: true, isPremium: false,
+          items: buildItems(PRICES, UPLOADED), columns: 3, browse: true, configured: true, isPremium: false,
           owned, prices: PRICES, me: ME, userId: "me", worn: NOTHING_WORN,
         }),
       ),
@@ -262,7 +284,7 @@ describe("the Marketplace pages", () => {
     await home();
     // Every item, of every kind, in one grid.
     const { buildItems } = await import("@/lib/marketplace");
-    expect(host.querySelectorAll("li")).toHaveLength(buildItems(PRICES).length);
+    expect(host.querySelectorAll("li")).toHaveLength(buildItems(PRICES, UPLOADED).length);
     expect(host.querySelector('input[aria-label="Search the marketplace"]')).toBeTruthy();
     for (const shelf of ["all", "free", "premium", "yours"]) {
       expect(host.querySelector(`[data-shelf="${shelf}"]`)).toBeTruthy();
@@ -303,7 +325,7 @@ describe("the Marketplace pages", () => {
     await act(async () => (host.querySelector('[data-shelf="yours"]') as HTMLElement).click());
     // Free things are everyone's, so they count as yours.
     const { buildItems } = await import("@/lib/marketplace");
-    const free = buildItems(PRICES).filter((i) => i.tier === "free").length;
+    const free = buildItems(PRICES, UPLOADED).filter((i) => i.tier === "free").length;
     expect(host.querySelectorAll("li")).toHaveLength(free);
 
     await act(async () => root.unmount());

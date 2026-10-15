@@ -23,7 +23,11 @@ export type MarketItem = {
 
 export type SortId = "featured" | "price-low" | "price-high" | "premium";
 
-export function buildItems(prices: Record<string, number> = {}): MarketItem[] {
+export function buildItems(
+  prices: Record<string, number> = {},
+  /** Frames that came from the uploader rather than from code. */
+  uploaded: { id: string; label: string; tier: Tier }[] = [],
+): MarketItem[] {
   let rank = 0;
   const item = (id: string, label: string, category: Category, tier: Tier): MarketItem => ({
     id,
@@ -39,6 +43,7 @@ export function buildItems(prices: Record<string, number> = {}): MarketItem[] {
     // a person, so it is chosen in the chat it is for — the shop could sell
     // you one and then have nowhere to send you. See ChatThemePicker.
     ...DECORATIONS.map((d) => item(d.id, d.label, "frame", d.tier)),
+    ...uploaded.map((d) => item(d.id, d.label, "frame", d.tier)),
     ...BUBBLE_STYLES.map((b) => item(b.id, b.label, "bubble", b.tier)),
     ...NAME_FONTS.map((f) => item(f.id, f.label, "name", f.tier)),
     ...NAME_GLOWS.map((g) => item(g.id, `${g.label} glow`, "name", g.tier)),

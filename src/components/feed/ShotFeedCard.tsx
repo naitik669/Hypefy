@@ -26,7 +26,6 @@ import { HypeParticles } from "@/components/feed/HypeParticles";
 import { useToast } from "@/components/ui/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { hypeResult } from "@/lib/supabase/typed";
-import { visibleDecoration } from "@/lib/cosmetics";
 import { formatCount } from "@/lib/format";
 import { timeAgoShort } from "@/lib/time";
 import { haptics } from "@/lib/haptics";
@@ -619,7 +618,7 @@ export function ShotFeedCard({
           aria-label={showId ? `Watch ${name}'s Show` : `${name}'s profile`}
           className="shrink-0 transition-transform active:scale-95"
         >
-          <AvatarFrame id={profile ? visibleDecoration(profile) : null} size={40}>
+          <AvatarFrame wearer={profile} size={40}>
             <Avatar
               name={name}
               hue={profile?.avatar_hue ?? 280}

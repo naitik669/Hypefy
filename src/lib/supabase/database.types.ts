@@ -1547,6 +1547,10 @@ export type Database = {
           kind: string
           name: string
           price_paise: number | null
+          asset_path: string | null
+          scale: number
+          offset_x: number
+          offset_y: number
           sort: number
           tier: string
         }
@@ -1556,6 +1560,10 @@ export type Database = {
           kind: string
           name: string
           price_paise?: number | null
+          asset_path?: string | null
+          scale?: number
+          offset_x?: number
+          offset_y?: number
           sort?: number
           tier: string
         }
@@ -1565,6 +1573,10 @@ export type Database = {
           kind?: string
           name?: string
           price_paise?: number | null
+          asset_path?: string | null
+          scale?: number
+          offset_x?: number
+          offset_y?: number
           sort?: number
           tier?: string
         }
@@ -2621,7 +2633,29 @@ export type Database = {
         Args: { p_days?: number; p_reason?: string; p_user_id: string }
         Returns: undefined
       }
+      admin_save_frame: {
+        Args: {
+          p_asset_path: string
+          p_id: string
+          p_name: string
+          p_offset_x?: number
+          p_offset_y?: number
+          p_scale?: number
+          p_tier: string
+        }
+        Returns: undefined
+      }
       admin_unsuspend_user: { Args: { p_user_id: string }; Returns: undefined }
+      admin_update_product: {
+        Args: {
+          p_active?: boolean | null
+          p_id: string
+          p_name?: string | null
+          p_sort?: number | null
+          p_tier?: string | null
+        }
+        Returns: undefined
+      }
       age_ok: { Args: never; Returns: boolean }
       api_rate_limit: { Args: { p_action: string }; Returns: undefined }
       approve_follow_request: {

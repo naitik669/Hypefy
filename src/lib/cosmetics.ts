@@ -40,19 +40,19 @@ export const NAME_GLOWS: NameGlow[] = [
 
 export type Decoration = { id: string; label: string; tier: Tier; pricePaise?: number };
 
-export const DECORATIONS: Decoration[] = [
-  { id: "deco-halo", label: "Halo", tier: "premium" },
-  { id: "deco-sparkle", label: "Sparkle", tier: "premium" },
-  { id: "deco-flames", label: "Flames", tier: "shop", pricePaise: 4900 },
-  { id: "deco-crown", label: "Crown", tier: "shop", pricePaise: 4900 },
-  { id: "deco-hearts", label: "Hearts", tier: "shop", pricePaise: 4900 },
-  { id: "deco-holo", label: "Holo foil", tier: "shop", pricePaise: 7900 },
-  { id: "deco-8bit", label: "8-bit", tier: "shop", pricePaise: 4900 },
-  { id: "deco-bolt", label: "Bolt", tier: "premium" },
-  { id: "deco-petals", label: "Petals", tier: "premium" },
-  { id: "deco-hypestar", label: "Hype star", tier: "premium" },
-  { id: "deco-gilded", label: "Gilded", tier: "shop", pricePaise: 9900 },
-];
+/**
+ * The frames still drawn by hand, which is now one.
+ *
+ * The other ten were retired when frames became something an admin can
+ * upload: a catalogue only a developer could add to was the problem the
+ * uploader exists to solve, and two ways of doing one thing is worse than
+ * either. Their rows live on in `products` as inactive, so an id anyone
+ * once wore still resolves to something.
+ *
+ * Uploaded frames are not listed here at all. They come from the database
+ * through loadFrames(), and the two meet in one catalogue — see lib/frames.
+ */
+export const DECORATIONS: Decoration[] = [{ id: "deco-bolt", label: "Bolt", tier: "premium" }];
 
 /** Whoever wears it: may this item be drawn? */
 export function canShow(tier: Tier | undefined, isPremium: boolean): boolean {
@@ -95,7 +95,14 @@ export function nameStyle(
   return Object.keys(style).length ? style : undefined;
 }
 
-/** The decoration someone may wear right now, if any. */
+/**
+ * The code-drawn decoration someone may wear right now, if any.
+ *
+ * Knows nothing about uploaded frames, which is why avatars no longer go
+ * through it: AvatarFrame resolves the whole catalogue itself, from a
+ * context the layout fills. Kept for the places that only deal in the
+ * hand-drawn set, such as the style picker's own preview.
+ */
 export function visibleDecoration(
   p: { avatar_decoration?: string | null; is_premium?: boolean | null },
 ): string | null {
