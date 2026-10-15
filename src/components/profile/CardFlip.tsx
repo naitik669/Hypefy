@@ -66,28 +66,38 @@ export function FlipCard({
   const reduced = usePrefersReducedMotion();
   const mounted = useRef(false);
   // Negative counts have to land on the same parity as positive ones.
-  const flipped = ((half % 2) + 2) % 2 === 1;
+  const flipped = odd(half);
 
   /**
-   * Whether the card is in perspective right now.
+   * Whether the card is in three dimensions right now.
    *
-   * It is not, at rest, and that is the whole point. A `perspective` on
-   * the wrapper puts everything under it into a 3D rendering context,
-   * which the browser composites as a texture — and chooses the texture's
-   * resolution for itself. On a display at a fractional scale, a Windows
-   * desktop at 125% being the common one, that resolution is not the
-   * screen's, so the card was permanently a slightly soft photograph of
-   * itself: measurably, about 13% less edge contrast on its own text,
-   * with nothing moving and nothing to blame on screen.
+   * It is not, at rest, and that is the whole point. A perspective and a
+   * preserved 3D context put the card into a layer the browser
+   * composites as a texture, at a resolution it chooses for itself. On a
+   * display at a fractional scale — a Windows desktop at 125% being the
+   * common one — that resolution is not the screen's, and the card sat
+   * permanently a little soft, with nothing moving and nothing on screen
+   * to blame. Measured on its own text: 5.45 mean edge contrast against
+   * 6.16 with the 3D off.
    *
-   * Taking it off while the card sits still costs nothing to look at. At
-   * a dead-on 0 or 180 degrees the card is a plane parallel to the
-   * screen, and perspective does not change a plane it is square to — it
-   * only does anything once the card is turning, which is exactly when
-   * this puts it back.
+   * Dropping it at rest costs nothing to look at, because at a dead-on 0
+   * or 180 degrees the card is a plane square to the screen and there is
+   * no projection left to do. It comes back the moment anything turns.
    */
   const [prevHalf, setPrevHalf] = useState(half);
   const [turning, setTurning] = useState(false);
+  /**
+   * The turn the card is resting on, which the flat state absorbs.
+   *
+   * Without this the card could only go flat facing one way. At rest the
+   * rotation has to be gone from the DOM entirely — a rotateY(180deg)
+   * left on the back face is a 3D transform like any other, and was
+   * exactly why the back stayed soft after the front came good. So a
+   * finished turn is folded into here instead: the inner returns to no
+   * rotation at all, and the face now looking at you is simply the one
+   * that is not hidden.
+   */
+  const [base, setBase] = useState(half);
   if (prevHalf !== half) {
     setPrevHalf(half);
     setTurning(true);
@@ -228,19 +238,26 @@ export function FlipCard({
   }
 
   const dragging = drag !== 0;
+  const spatial = !reduced && (turning || dragging);
+  /** Which way the card is resting, and so which face the turn starts from. */
+  const baseFlipped = odd(base);
   const motion = reduced
     ? // The rotation is the whole effect, so there is nothing to soften —
       // it is removed and the faces cross-fade instead.
       { transform: "none", transition: `opacity ${FLIP_MS / 3}ms linear` }
     : {
-        transform: `rotateY(${(half + drag) * 180}deg)`,
-        transition: dragging ? "none" : `transform ${FLIP_MS}ms ${EASE}`,
+        // Measured from the resting turn, not from zero, so a card
+        // resting on its back turns by a half like any other rather
+        // than winding all the way round to where it already is.
+        transform: spatial ? `rotateY(${(half - base + drag) * 180}deg)` : "none",
+        transition: dragging || !spatial ? "none" : `transform ${FLIP_MS}ms ${EASE}`,
+        transformStyle: (spatial ? "preserve-3d" : "flat") as "preserve-3d" | "flat",
       };
 
   return (
     <div
       className="max-h-full min-h-0 w-full"
-      style={{ perspective: reduced || !(turning || dragging) ? undefined : 1900 }}
+      style={{ perspective: spatial ? 1900 : undefined }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
@@ -254,21 +271,27 @@ export function FlipCard({
       <div
         ref={inner}
         className="grid h-full max-h-full min-h-0"
-        style={{ transformStyle: "preserve-3d", ...motion }}
-        // The turn is over, so the perspective can come back off and the
-        // card can be drawn at the screen's own resolution again. Only
-        // this element's own transform: a transition finishing somewhere
-        // inside a face says nothing about the card having settled.
+        style={motion}
+        // The turn is over, so the 3D can come off and the card can be
+        // drawn at the screen's own resolution again. Folding the turn
+        // into the base and dropping out of 3D happen in one commit, and
+        // the two cancel exactly — the inner loses a half turn at the
+        // same moment the face it was showing loses its own — so there
+        // is no frame in between to see. Only this element's transform
+        // counts: one finishing inside a face says nothing about the
+        // card having settled.
         onTransitionEnd={(e) => {
-          if (e.target === e.currentTarget && e.propertyName === "transform") setTurning(false);
+          if (e.target !== e.currentTarget || e.propertyName !== "transform") return;
+          setTurning(false);
+          setBase(half);
         }}
         aria-live="polite"
         aria-label={label}
       >
-        <Face hidden={flipped} reduced={reduced}>
+        <Face away={flipped} reduced={reduced} spatial={spatial} rotated={spatial && baseFlipped}>
           {front}
         </Face>
-        <Face hidden={!flipped} reduced={reduced} back>
+        <Face away={!flipped} reduced={reduced} spatial={spatial} rotated={spatial && !baseFlipped}>
           {back}
         </Face>
       </div>
@@ -281,35 +304,54 @@ export function FlipCard({
  *
  * Both sit in the same grid cell, so both are exactly as tall as the
  * taller one. Each is taken out of the reader and out of reach while it
- * faces away — backface-visibility keeps the mirrored face off the screen,
- * but it does not stop a finger landing on a link pointing away from it.
+ * faces away — the browser keeps the mirrored face off the screen, but it
+ * does not stop a finger landing on a link pointing away from it.
+ *
+ * Which of the two carries the half turn depends on the side the card is
+ * resting on, not on which one is nominally the back: the turn always
+ * starts from no rotation at all, so the face you are already looking at
+ * is the one left upright.
  */
 function Face({
   children,
-  hidden,
+  away,
   reduced,
-  back = false,
+  spatial,
+  rotated,
 }: {
   children: ReactNode;
-  hidden: boolean;
+  /** Facing away from the viewer once the current turn has landed. */
+  away: boolean;
   reduced: boolean;
-  back?: boolean;
+  /** The card is mid-turn, so the faces are arranged in three dimensions. */
+  spatial: boolean;
+  rotated: boolean;
 }) {
   return (
     <div
-      inert={hidden}
+      inert={away}
       style={{
         gridArea: "1 / 1",
         minHeight: 0,
-        backfaceVisibility: "hidden",
-        WebkitBackfaceVisibility: "hidden",
-        transform: back && !reduced ? "rotateY(180deg)" : undefined,
-        opacity: reduced && hidden ? 0 : 1,
+        // Only while turning. At rest there is no rotation for it to act
+        // on, and leaving it set is what keeps the card in a composited
+        // layer and soft — hiding the spare face flatly costs nothing
+        // and leaves the card as ordinary two-dimensional DOM.
+        backfaceVisibility: spatial ? "hidden" : undefined,
+        WebkitBackfaceVisibility: spatial ? "hidden" : undefined,
+        transform: rotated ? "rotateY(180deg)" : undefined,
+        visibility: !spatial && !reduced && away ? "hidden" : undefined,
+        opacity: reduced && away ? 0 : 1,
       }}
     >
       {children}
     </div>
   );
+}
+
+/** Whether a half-turn count lands on the back, counting either way round. */
+function odd(n: number): boolean {
+  return ((n % 2) + 2) % 2 === 1;
 }
 
 function usePrefersReducedMotion(): boolean {

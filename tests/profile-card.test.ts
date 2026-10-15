@@ -113,17 +113,17 @@ describe("everything the card does is on the card", () => {
 describe("the flip", () => {
   it("turns on its vertical axis, in perspective, with both faces mounted", () => {
     // Only while it is turning, which is the test below this block.
-    expect(flip).toContain(": 1900");
-    expect(flip).toContain('transformStyle: "preserve-3d"');
+    expect(flip).toContain("perspective: spatial ? 1900 : undefined");
+    expect(flip).toContain('"preserve-3d"');
     expect(flip).toContain("rotateY(180deg)");
-    expect(flip).toContain('backfaceVisibility: "hidden"');
+    expect(flip).toContain('backfaceVisibility: spatial ? "hidden" : undefined');
   });
 
   it("follows a finger, and lets go of a vertical drag", () => {
     expect(flip).toContain("onTouchStart");
     expect(flip).toContain('g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y"');
     expect(flip).toContain('if (g.axis !== "x") return;');
-    expect(flip).toContain("(half + drag) * 180");
+    expect(flip).toContain("(half - base + drag) * 180");
   });
 
   it("a short flick turns it as surely as a long drag", () => {
@@ -143,7 +143,7 @@ describe("the flip", () => {
     // between, so a boolean would spin a right-turned card all the way
     // back round the moment it settled.
     expect(flip).toContain("half: number");
-    expect(flip).toContain("((half % 2) + 2) % 2 === 1");
+    expect(flip).toContain("((n % 2) + 2) % 2 === 1");
     expect(card).toContain("setHalf((h) => h + dir)");
   });
 
@@ -205,7 +205,7 @@ describe("the flip", () => {
   });
 
   it("the face pointing away cannot be tapped or read", () => {
-    expect(flip).toContain("inert={hidden}");
+    expect(flip).toContain("inert={away}");
   });
 
   it("the lift is restarted by hand, because CSS plays the same animation once", () => {
@@ -553,8 +553,14 @@ describe("the card is drawn at the screen's own resolution", () => {
     // soft: measured at 13% less edge contrast on its own text, with
     // nothing moving. At a dead-on 0 or 180 degrees the card is square to
     // the screen, so taking it off at rest costs nothing to look at.
-    expect(flip).toContain("perspective: reduced || !(turning || dragging) ? undefined : 1900");
+    expect(flip).toContain("const spatial = !reduced && (turning || dragging);");
     expect(flip).not.toContain("style={{ perspective: 1900 }}");
+    // And the 3D context itself goes with it, which is what the back
+    // face needed: it carried a rotateY(180deg) of its own on top of
+    // the inner's, so it stayed soft after the front came good.
+    expect(flip).toContain('(spatial ? "preserve-3d" : "flat")');
+    expect(flip).toContain("backfaceVisibility: spatial ? \"hidden\" : undefined");
+    expect(flip).not.toContain('transform: back && !reduced ? "rotateY(180deg)" : undefined');
   });
 
   it("puts it back before the rotation starts, and takes it off after", () => {
@@ -562,8 +568,8 @@ describe("the card is drawn at the screen's own resolution", () => {
     // drawn flat; off again only once this element's own transform has
     // finished moving.
     expect(flip).toContain("setTurning(true)");
-    expect(flip).toContain('e.propertyName === "transform"');
-    expect(flip).toContain("e.target === e.currentTarget");
+    expect(flip).toContain('e.propertyName !== "transform"');
+    expect(flip).toContain("e.target !== e.currentTarget");
   });
 
   it("holds it through a drag that drops back as well as one that turns", () => {
@@ -587,5 +593,30 @@ describe("the card is drawn at the screen's own resolution", () => {
     expect(back).toContain("window.devicePixelRatio");
     expect(back).toContain("hypefyQrDataUrl(url, Math.ceil(QR_MAX_CSS * dpr))");
     expect(back).not.toContain("hypefyQrDataUrl(url)");
+  });
+});
+
+describe("the back face is flat at rest too", () => {
+  it("folds a finished turn into the resting side instead of carrying it", () => {
+    // The back used to sit under a permanent rotateY(180deg) of its own,
+    // on top of the inner's — two 3D transforms stacked — so it stayed
+    // soft after the front came good. Measured on its mono rows: 3.49
+    // mean edge contrast before, 4.70 after, at a 1.25 pixel ratio.
+    expect(flip).toContain("setBase(half)");
+    expect(flip).toContain("const [base, setBase] = useState(half)");
+    // Which face carries the half turn follows the side being rested on,
+    // so a turn always starts from no rotation at all.
+    expect(flip).toContain("rotated={spatial && baseFlipped}");
+    expect(flip).toContain("rotated={spatial && !baseFlipped}");
+  });
+
+  it("hides the spare face flatly when there is no rotation to hide it", () => {
+    expect(flip).toContain("visibility: !spatial && !reduced && away ? \"hidden\" : undefined");
+  });
+
+  it("still cross-fades rather than turning for reduced motion", () => {
+    // visibility would kill the fade, so it is only used when the card
+    // is genuinely flat and not in the reduced-motion path.
+    expect(flip).toContain("opacity: reduced && away ? 0 : 1");
   });
 });
