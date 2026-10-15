@@ -194,3 +194,20 @@ describe("the catalogue is readable", () => {
     expect(admin).toContain("const swap = siblings[i + dir]");
   });
 });
+
+describe("the upload cap", () => {
+  it("is half a megabyte, and the form says so", () => {
+    expect(admin).toContain("const MAX_BYTES = 512 * 1024;");
+    expect(admin).toContain("The cap is ${MAX_BYTES / 1024}KB");
+  });
+
+  it("is enforced by the bucket, not only by the form", () => {
+    // 0138 created the bucket with neither a size limit nor a mime
+    // allowlist, which every other bucket in the project has — so the
+    // constant above was a convenience, and the bucket would have taken a
+    // video named .svg.
+    const m = read("supabase/migrations/0139_cosmetics_bucket_limits.sql");
+    expect(m).toContain("file_size_limit = 512 * 1024");
+    expect(m).toContain("'image/svg+xml'");
+  });
+});

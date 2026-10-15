@@ -47,8 +47,16 @@ const SECTIONS: { id: string; label: string; holds: (kind: string) => boolean }[
 
 const TIERS = ["free", "premium", "shop"] as const;
 
-/** Big enough for any drawn frame, small enough that nobody ships a photo as SVG. */
-const MAX_BYTES = 256 * 1024;
+/**
+ * The cap on an uploaded frame.
+ *
+ * 256KB turned out to be tight for real artwork — a frame with gradients
+ * and a few hundred paths passes it easily. The browser caches one copy
+ * per frame however many avatars wear it, so the cost is a single download
+ * a session rather than one per avatar, which is what makes half a
+ * megabyte reasonable here and would not make it reasonable per post.
+ */
+const MAX_BYTES = 512 * 1024;
 /** The sizes an avatar is actually drawn at: a comment, a chat row, a profile. */
 const PREVIEW_SIZES = [24, 56, 150];
 
