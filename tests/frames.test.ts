@@ -114,9 +114,44 @@ describe("an uploaded SVG never becomes script", () => {
     expect(frameComp).not.toContain("dangerouslySetInnerHTML");
   });
 
-  it("only SVG, and only a small one, gets as far as the upload", () => {
-    expect(admin).toContain('file.type !== "image/svg+xml"');
+  it("only SVG or PNG, and only a small one, gets as far as the upload", () => {
+    expect(admin).toContain('file.type === "image/png"');
+    expect(admin).toContain('file.type === "image/svg+xml"');
+    expect(admin).toContain("if (!png && !svg) {");
     expect(admin).toContain("MAX_BYTES");
+  });
+
+  it("is uploaded under its own type, not a hardcoded one", () => {
+    // The bucket's allowlist checks what is declared, so a PNG sent as
+    // image/svg+xml is refused — and would draw as a broken image even
+    // if the bucket let it through.
+    expect(admin).toContain('contentType: png ? "image/png" : "image/svg+xml"');
+    expect(admin).toContain('${png ? "png" : "svg"}');
+    expect(admin).not.toContain('contentType: "image/svg+xml",');
+  });
+});
+
+describe("a PNG is pixels, and the form says so", () => {
+  it("warns when it is too small for a profile", () => {
+    // The biggest avatar is the profile's 84px and the art spans twice
+    // that before scale, so a PNG under 512 shows on a phone.
+    expect(admin).toContain("const PNG_MIN = 512;");
+    expect(admin).toContain("const PNG_IDEAL = 1024;");
+    expect(admin).toContain("It will soften on a profile");
+  });
+
+  it("warns about shape before sharpness, because the box is square", () => {
+    expect(admin).toContain("It will be stretched to a square");
+    const body = admin.slice(admin.indexOf("function measure("));
+    expect(body.indexOf("stretched to a square")).toBeLessThan(body.indexOf("soften on a profile"));
+  });
+
+  it("warns rather than refuses", () => {
+    // A frame meant for comment rows may genuinely not need more, and
+    // that is a judgement about the artwork, not a rule for the form.
+    const body = admin.slice(admin.indexOf("function measure("), admin.indexOf("async function publish"));
+    expect(body).not.toContain("return setNote");
+    expect(body).not.toContain("setDraftFile(null)");
   });
 });
 

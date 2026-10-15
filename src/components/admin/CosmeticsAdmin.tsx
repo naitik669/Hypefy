@@ -60,6 +60,18 @@ const TIERS = ["free", "premium", "shop"] as const;
 const MAX_BYTES = 512 * 1024;
 
 /**
+ * The widest a frame is ever drawn.
+ *
+ * The largest avatar in the app is the profile's 84px, and the art spans
+ * twice the avatar before scale. Times three for a phone's pixel ratio,
+ * and a PNG wants about 500px square at scale 1 — so 1024 covers being
+ * scaled up later, which is the whole point of the placer.
+ */
+const PNG_IDEAL = 1024;
+/** Below this a PNG will visibly soften on a profile. */
+const PNG_MIN = 512;
+
+/**
  * The cosmetics desk.
  *
  * Two jobs. Upload a frame and say where it sits over an avatar — which is
@@ -100,19 +112,58 @@ export function CosmeticsAdmin({
   const taken = useMemo(() => new Set(rows.map((r) => r.id)), [rows]);
   const idClash = id.length > 0 && taken.has(id) && savedPath === null;
 
+  /**
+   * SVG or PNG.
+   *
+   * A PNG does not become an SVG by being uploaded — it stays pixels, and
+   * the placer can scale it up past what it has. That is the only real
+   * difference between the two here, so the form measures a PNG and says
+   * so rather than letting a soft frame reach a profile unnoticed.
+   */
   function choose(file: File | undefined) {
     setNote(null);
     if (!file) return;
-    if (file.type !== "image/svg+xml" && !file.name.endsWith(".svg")) {
-      return setNote("Frames have to be SVG.");
+    const png = file.type === "image/png" || /\.png$/i.test(file.name);
+    const svg = file.type === "image/svg+xml" || /\.svg$/i.test(file.name);
+    if (!png && !svg) {
+      return setNote("Frames have to be SVG or PNG.");
     }
     if (file.size > MAX_BYTES) {
       return setNote(`That is ${Math.round(file.size / 1024)}KB. The cap is ${MAX_BYTES / 1024}KB.`);
     }
+    const url = URL.createObjectURL(file);
     setDraftFile(file);
-    setDraftUrl(URL.createObjectURL(file));
+    setDraftUrl(url);
     setSavedPath(null);
-    if (!id) setId(`deco-${file.name.replace(/\.svg$/i, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30)}`);
+    if (!id) {
+      setId(`deco-${file.name.replace(/\.(svg|png)$/i, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30)}`);
+    }
+    if (png) measure(url);
+  }
+
+  /**
+   * How big the pixels actually are.
+   *
+   * Only a warning: a small PNG still publishes, because a frame meant
+   * for comment rows may genuinely not need more, and that is a judgement
+   * about the artwork rather than a rule the form should enforce.
+   */
+  function measure(url: string) {
+    const img = new Image();
+    img.onload = () => {
+      const dims = `${img.naturalWidth}×${img.naturalHeight}`;
+      // Shape first: the art box is square, so a wider-than-tall PNG is
+      // stretched into it, which looks worse than softness does.
+      if (img.naturalWidth !== img.naturalHeight) {
+        setNote(`That PNG is ${dims}. It will be stretched to a square — crop it square first.`);
+      } else if (img.naturalWidth < PNG_MIN) {
+        setNote(
+          `That PNG is ${dims}. It will soften on a profile — ${PNG_IDEAL}px square is the ` +
+            `comfortable size. An SVG has no such limit.`,
+        );
+      }
+    };
+    img.src = url;
   }
 
   async function publish() {
@@ -125,9 +176,13 @@ export function CosmeticsAdmin({
     setBusy(true);
     // A new path each time, so a replaced frame is not served from a cache
     // that has the old one.
-    const path = `frames/${id}-${Date.now()}.svg`;
+    // The file's own type, not a hardcoded one: the bucket's allowlist
+    // checks what is declared, so a PNG sent as image/svg+xml is refused
+    // — and would render as a broken image even if it were not.
+    const png = draftFile.type === "image/png" || /\.png$/i.test(draftFile.name);
+    const path = `frames/${id}-${Date.now()}.${png ? "png" : "svg"}`;
     const up = await supabase.storage.from("cosmetics").upload(path, draftFile, {
-      contentType: "image/svg+xml",
+      contentType: png ? "image/png" : "image/svg+xml",
       cacheControl: "31536000",
     });
     if (up.error) {
@@ -244,15 +299,16 @@ export function CosmeticsAdmin({
       <section className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
         <h2 className="text-sm font-extrabold">New frame</h2>
         <p className="-mt-1 text-xs text-muted">
-          A square SVG. The avatar sits in the middle third; your art can use the whole square and
-          will reach half an avatar past it on every side. Colours have to be in the file — an
-          uploaded frame cannot read the theme.
+          A square SVG, or a PNG of at least {PNG_IDEAL}px. The avatar sits in the middle third;
+          your art can use the whole square and will reach half an avatar past it on every side.
+          Colours have to be in the file — an uploaded frame cannot read the theme. A PNG stays
+          pixels, so it softens if you scale it up past what it has; an SVG never does.
         </p>
 
         <input
           ref={fileInput}
           type="file"
-          accept=".svg,image/svg+xml"
+          accept=".svg,.png,image/svg+xml,image/png"
           onChange={(e) => choose(e.target.files?.[0])}
           className="text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-accent file:px-3 file:py-2 file:text-xs file:font-bold file:text-accent-ink"
         />
