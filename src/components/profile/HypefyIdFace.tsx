@@ -12,6 +12,18 @@ import { remarkFor } from "@/lib/card-remarks";
 import type { ProfileCardData } from "@/components/profile/ProfileCard";
 
 /**
+ * The widest the code is ever drawn, in CSS pixels.
+ *
+ * The card is capped at the app's own column and the code sits in a square
+ * tile inside that padding, so it does not pass about this. Multiplied by
+ * the screen's pixel ratio, it is what the canvas has to supply for the
+ * code to land one painted pixel on one real one.
+ */
+const QR_MAX_CSS = 380;
+/** Past this the canvas costs more than the sharpness is worth. */
+const QR_MAX_DPR = 4;
+
+/**
  * The back of the card: the Hypefy ID.
  *
  * Read as a credential rather than a second profile. The front answers who
@@ -178,7 +190,12 @@ function Row({
 function useHypefyQr(url: string): string | null {
   const [qr, setQr] = useState<{ url: string; data: string } | null>(null);
   useEffect(() => {
-    const data = hypefyQrDataUrl(url);
+    // Painted for this screen, not at one fixed size. At 640 the code was
+    // a bitmap being stretched: the tile is about 290 CSS pixels on a
+    // phone, which is 870 real ones at a 3x pixel ratio, so every module
+    // edge was resampled — the one kind of softness a scanner cares about.
+    const dpr = Math.min(QR_MAX_DPR, Math.max(1, window.devicePixelRatio || 1));
+    const data = hypefyQrDataUrl(url, Math.ceil(QR_MAX_CSS * dpr));
     // eslint-disable-next-line react-hooks/set-state-in-effect -- it is painted on a canvas, which only exists after mount
     if (data) setQr({ url, data });
   }, [url]);

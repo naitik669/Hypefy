@@ -119,6 +119,15 @@ export function FlipCard({
     el.style.animation = "none";
     void el.offsetWidth;
     el.style.animation = `card-lift ${FLIP_MS}ms ${EASE}`;
+    // And taken off again when it has played. A finished animation left on
+    // the element still reads as running to the compositor, which keeps
+    // the card on its own layer for the rest of the session — a texture
+    // the browser is free to sample rather than redraw.
+    const done = () => {
+      el.style.animation = "";
+    };
+    el.addEventListener("animationend", done, { once: true });
+    return () => el.removeEventListener("animationend", done);
   }, [half, reduced]);
 
   useEffect(() => () => window.clearTimeout(swipeExpiry.current ?? undefined), []);
