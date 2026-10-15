@@ -9,6 +9,9 @@ const frameComp = read("src/components/ui/AvatarFrame.tsx");
 const migration = read("supabase/migrations/0138_frame_assets.sql");
 const admin = read("src/components/admin/CosmeticsAdmin.tsx");
 const page = read("src/app/(app)/admin/cosmetics/page.tsx");
+const placement = read("src/components/admin/FramePlacement.tsx");
+const placer = read("src/components/admin/FramePlacer.tsx");
+const replace = read("supabase/migrations/0141_place_existing_frame.sql");
 
 const asset = (over: Partial<FrameCatalog[string]> = {}): FrameCatalog[string] => ({
   id: "deco-x",
@@ -210,5 +213,108 @@ describe("the upload cap", () => {
     const m = read("supabase/migrations/0139_cosmetics_bucket_limits.sql");
     expect(m).toContain("file_size_limit = 512 * 1024");
     expect(m).toContain("'image/svg+xml'");
+  });
+});
+
+describe("moving a frame that is already live", () => {
+  it("has its own narrow function rather than going through the upsert", () => {
+    // admin_save_frame would re-send name, tier and path, so a re-place
+    // would overwrite a rename made in another tab, and would refuse
+    // outright for a frame somebody had moved to the Shop tier.
+    expect(replace).toContain("create or replace function public.admin_place_frame");
+    for (const col of ["scale = p_scale", "offset_x = p_offset_x", "offset_y = p_offset_y", "rotation = p_rotation"]) {
+      expect(replace).toContain(col);
+    }
+    expect(replace).not.toContain("name =");
+    expect(replace).not.toContain("tier =");
+    expect(replace).not.toContain("asset_path =");
+  });
+
+  it("is admin-only and unreachable signed out", () => {
+    expect(replace).toContain("if not public.is_admin() then");
+    expect(replace).toContain("errcode = '42501'");
+    expect(replace).toContain("from public, anon");
+    expect(replace).toContain("to authenticated");
+  });
+
+  it("checks the same bounds the placer clamps to", () => {
+    // A definer function is reachable without the placer, so the limits
+    // cannot live only in the component.
+    expect(replace).toContain("p_scale < 0.25 or p_scale > 3");
+    expect(replace).toContain("abs(p_offset_x) > 1 or abs(p_offset_y) > 1");
+    expect(replace).toContain("abs(p_rotation) > 360");
+    expect(placer).toContain("scale: [0.25, 3]");
+    expect(placer).toContain("offset: [-1, 1]");
+  });
+
+  it("refuses a frame drawn in code, which has no artwork to move", () => {
+    expect(replace).toContain("kind = 'avatar_decoration' and asset_path is not null");
+    expect(replace).toContain("raise exception 'no uploaded frame with that id'");
+    // And the panel is not offered for one either.
+    expect(admin).toContain("{row.asset_path ? (");
+    expect(admin).toContain("there is no artwork to move");
+  });
+
+  it("starts from what the catalogue says and writes nothing until Save", () => {
+    expect(admin).toContain("scale: row.scale");
+    expect(admin).toContain("offsetX: row.offset_x");
+    expect(placement).toContain("useState<Placement>(saved)");
+    // The only write in the panel is the Save button's.
+    expect(placement).toContain("await onSave(place)");
+    expect(placement.split("await onSave(").length - 1).toBe(1);
+  });
+
+  it("opening another frame starts a fresh draft", () => {
+    // Keyed on the row, so React remounts instead of carrying the last
+    // frame's numbers over — which an effect syncing them would have to.
+    // Read the element itself: the row wrapper above is keyed too, so
+    // looking for the key anywhere in the file proves nothing.
+    const from = admin.indexOf("<FramePlacement");
+    const element = admin.slice(from, admin.indexOf("/>", from));
+    expect(from).toBeGreaterThan(-1);
+    expect(element).toContain("key={row.id}");
+    expect(placement).not.toContain("useEffect");
+  });
+
+  it("Save and Revert are dead until something actually moved", () => {
+    expect(placement).toContain("place.scale !== saved.scale");
+    expect(placement).toContain("place.rotation !== saved.rotation");
+    expect(placement).toContain("disabled={!moved || busy}");
+    expect(placement).toContain("onClick={() => setPlace(saved)}");
+  });
+
+  it("says out loud when a save is refused, and does not pretend it moved", () => {
+    expect(admin).toContain("Could not move ${row.name}");
+    // The refusal returns before setRows, so a frame nobody was allowed
+    // to move does not appear moved until the next load says otherwise.
+    const from = admin.indexOf("async function savePlacement");
+    const body = admin.slice(from, admin.indexOf("\n  }", from));
+    expect(body.indexOf("Could not move")).toBeLessThan(body.indexOf("setRows"));
+    expect(body).toContain("return false");
+  });
+});
+
+describe("the placer itself", () => {
+  it("fits the view so the handles are always reachable", () => {
+    // The art spans twice the avatar before any scaling, so the corner
+    // and the turn handle fall outside the stage at most real
+    // placements — clipped away if the canvas clips, drawn over the
+    // controls beside it if it does not.
+    expect(placer).toContain("const zoom = Math.min(1,");
+    expect(placer).toContain("HANDLE_MARGIN");
+    // Chrome is counter-scaled, so a handle stays the same size to the hand.
+    expect(placer).toContain("const u = 1 / zoom");
+  });
+
+  it("measures a gesture in the stage's own un-zoomed pixels", () => {
+    expect(placer).toContain("- stage / 2) * u + stage / 2");
+  });
+
+  it("offers all three gestures", () => {
+    for (const kind of ["move", "scale", "rotate"]) {
+      expect(placer).toContain(`begin("${kind}")`);
+    }
+    expect(placer).toContain('aria-label="Rotation"');
+    expect(placer).toContain('aria-label="Size"');
   });
 });

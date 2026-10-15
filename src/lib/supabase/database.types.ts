@@ -2636,6 +2636,16 @@ export type Database = {
         Args: { p_days?: number; p_reason?: string; p_user_id: string }
         Returns: undefined
       }
+      admin_place_frame: {
+        Args: {
+          p_id: string
+          p_offset_x: number
+          p_offset_y: number
+          p_rotation: number
+          p_scale: number
+        }
+        Returns: undefined
+      }
       admin_save_frame: {
         Args: {
           p_asset_path: string

@@ -2,9 +2,8 @@
 
 import { useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { AvatarImg } from "@/components/ui/AvatarImg";
-import { framePlacement } from "@/lib/frames";
 import { FramePlacer, LIMITS, type Placement } from "@/components/admin/FramePlacer";
+import { FramePlacement, PreviewRow, Slider } from "@/components/admin/FramePlacement";
 
 export type ProductRow = {
   id: string;
@@ -59,8 +58,6 @@ const TIERS = ["free", "premium", "shop"] as const;
  * megabyte reasonable here and would not make it reasonable per post.
  */
 const MAX_BYTES = 512 * 1024;
-/** The sizes an avatar is actually drawn at: a comment, a chat row, a profile. */
-const PREVIEW_SIZES = [24, 40, 56];
 
 /**
  * The cosmetics desk.
@@ -201,6 +198,38 @@ export function CosmeticsAdmin({
     }
   }
 
+  /**
+   * Move a frame that is already published.
+   *
+   * Its own RPC rather than admin_save_frame. That one is an upsert, so
+   * going through it would re-send the name and the tier — overwriting a
+   * rename made meanwhile, and failing outright on a frame somebody had
+   * moved to the Shop tier, which placing has no business caring about.
+   */
+  async function savePlacement(row: ProductRow, next: Placement): Promise<boolean> {
+    setNote(null);
+    const { error } = await supabase.rpc("admin_place_frame", {
+      p_id: row.id,
+      p_scale: next.scale,
+      p_offset_x: next.offsetX,
+      p_offset_y: next.offsetY,
+      p_rotation: next.rotation,
+    });
+    if (error) {
+      setNote(`Could not move ${row.name}: ${error.message}`);
+      return false;
+    }
+    setRows((prev) =>
+      prev.map((x) =>
+        x.id === row.id
+          ? { ...x, scale: next.scale, offset_x: next.offsetX, offset_y: next.offsetY, rotation: next.rotation }
+          : x,
+      ),
+    );
+    setNote(`${row.name} sits where you put it. Everyone wearing it sees the change.`);
+    return true;
+  }
+
   const shown = draftUrl ?? (savedPath ? `${bucketBase}${savedPath}` : null);
 
   return (
@@ -296,39 +325,7 @@ export function CosmeticsAdmin({
                   the stage is big and a comment row is 24 pixels. */}
               <div className="rounded-xl border border-border bg-elevated p-4 lg:w-fit">
                 <p className="pb-3 text-xs font-bold tracking-widest text-faint uppercase">As people see it</p>
-                <div className="flex items-end gap-5 overflow-x-auto pb-1">
-                  {PREVIEW_SIZES.map((size) => {
-                    const box = framePlacement(size, place);
-                    // The cell holds the whole frame, so a scaled-up design
-                    // shows its real edge instead of being cut by the panel.
-                    const cell = Math.max(size, Math.ceil(box.width));
-                    const inset = (cell - size) / 2;
-                    return (
-                      <span key={size} className="flex shrink-0 flex-col items-center gap-2">
-                        <span className="relative inline-block" style={{ width: cell, height: cell }}>
-                          <span className="absolute" style={{ left: inset, top: inset }}>
-                            <AvatarImg url={preview.avatarUrl} name={preview.name} hue={preview.hue} size={size} />
-                          </span>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={shown}
-                            alt=""
-                            aria-hidden
-                            className="pointer-events-none absolute max-w-none"
-                            style={{
-                              left: inset + box.left,
-                              top: inset + box.top,
-                              width: box.width,
-                              height: box.height,
-                              transform: box.transform,
-                            }}
-                          />
-                        </span>
-                        <span className="font-mono text-[10px] text-faint">{size}px</span>
-                      </span>
-                    );
-                  })}
-                </div>
+                <PreviewRow src={shown} place={place} preview={preview} />
               </div>
           </div>
         )}
@@ -449,6 +446,29 @@ export function CosmeticsAdmin({
                         </button>
                       </div>
 
+                      {row.asset_path ? (
+                        // Keyed on the row, so opening a different frame
+                        // mounts a fresh draft from that row's numbers
+                        // rather than carrying the last one over.
+                        <FramePlacement
+                          key={row.id}
+                          url={`${bucketBase}${row.asset_path}`}
+                          saved={{
+                            scale: row.scale,
+                            offsetX: row.offset_x,
+                            offsetY: row.offset_y,
+                            rotation: row.rotation,
+                          }}
+                          preview={preview}
+                          onSave={(next) => savePlacement(row, next)}
+                        />
+                      ) : (
+                        <p className="text-[11px] text-faint">
+                          Drawn in code, so there is no artwork to move. Its shape lives in
+                          AvatarFrame.
+                        </p>
+                      )}
+
                       <p className="font-mono text-[10px] text-faint">{row.id}</p>
                     </div>
                   )}
@@ -460,38 +480,6 @@ export function CosmeticsAdmin({
         })}
       </section>
     </div>
-  );
-}
-
-function Slider({
-  label,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (n: number) => void;
-}) {
-  return (
-    <label className="flex items-center gap-3 text-xs">
-      <span className="w-20 shrink-0 text-muted">{label}</span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="min-w-0 flex-1 accent-[var(--color-accent)]"
-      />
-      <span className="w-12 shrink-0 text-right font-mono tabular-nums text-faint">{value.toFixed(2)}</span>
-    </label>
   );
 }
 
