@@ -10,8 +10,8 @@ import { FlipCard } from "@/components/profile/CardFlip";
 import { createClient } from "@/lib/supabase/client";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { AvatarPreview } from "@/components/ui/AvatarPreview";
-import { saveHypefyId } from "@/lib/card-image";
-import { profileUrl, type ProfileLink } from "@/lib/profile-card";
+import { saveHypefyCard } from "@/lib/card-image";
+import { cardUrl, profileUrl, type ProfileLink } from "@/lib/profile-card";
 import { ProfileCardEditor } from "@/components/profile/ProfileCardEditor";
 
 export type ProfileCardData = {
@@ -140,6 +140,9 @@ export function ProfileCard({
   }, [load]);
 
   const url = profileUrl(data.username);
+  // Share sends the card, which unfurls as the ID. The code printed on
+  // the card still points at the profile, so a scan reaches the person.
+  const shareHref = cardUrl(data.username);
 
   async function share() {
     // navigator.share is the native sheet on mobile; clipboard is the
@@ -147,14 +150,14 @@ export function ProfileCard({
     // is not an error worth surfacing.
     if (navigator.share) {
       try {
-        await navigator.share({ title: `${data.name} on Hypefy`, url });
+        await navigator.share({ title: `${data.name} on Hypefy`, url: shareHref });
         return;
       } catch {
         /* dismissed */
       }
     }
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(shareHref);
       setShared(true);
       setTimeout(() => setShared(false), 1600);
     } catch {
@@ -164,7 +167,7 @@ export function ProfileCard({
 
   async function save() {
     setSaving("working");
-    const result = await saveHypefyId({
+    const result = await saveHypefyCard({
       name: data.name,
       username: data.username,
       userId: data.userId,
@@ -183,6 +186,12 @@ export function ProfileCard({
       showActivity: data.showActivity,
       frame: data.avatarDecoration ?? null,
       isPremium: data.cosmetics?.is_premium ?? false,
+      // The front half: the person, rather than their record.
+      avatarUrl: data.avatarUrl ?? null,
+      hue: data.hue,
+      bio: data.bio,
+      cosmetics: data.cosmetics ?? null,
+      stats: data.stats,
     });
     setSaving(result === "failed" ? "failed" : "done");
     setTimeout(() => setSaving("idle"), 2200);

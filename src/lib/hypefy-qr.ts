@@ -1,4 +1,8 @@
-"use client";
+// No "use client" here on purpose. The code is also drawn on the server,
+// for the picture a shared card link unfurls into, and the directive made
+// every export of this module unreachable from there. Nothing here runs at
+// import time; the canvas functions only touch a canvas when called, and
+// only client components call them.
 
 import QRCode from "qrcode";
 import { MARK_DOT, MARK_H, MARK_LETTER } from "@/lib/hypefy-mark";
@@ -28,7 +32,7 @@ const FINDER = 7;
 /** The badge's side, as a share of the code's width. Well inside what H recovers. */
 const BADGE_SHARE = 0.3;
 /** Light modules kept clear around the whole code, in modules. */
-const QUIET = 3;
+export const QUIET = 3;
 
 /** Whether a module belongs to one of the three corner finder patterns. */
 export function isFinderModule(x: number, y: number, size: number): boolean {
@@ -211,4 +215,84 @@ export function hypefyQrDataUrl(url: string, px = 640): string | null {
     // address is printed beside it and says the same thing.
     return null;
   }
+}
+
+/**
+ * The same code as an SVG string.
+ *
+ * For the link preview, which is rendered on the server by Satori and has
+ * no canvas to paint into. Drawn from the same matrix and the same rules
+ * as the painted version — finders as rings, modules as rounded squares,
+ * the badge centred on the H rather than on the lockup — so a code in a
+ * shared link is the code on the card, not an approximation of it.
+ */
+export function hypefyQrSvg(url: string, px = 560, palette: QrPalette = QR_PALETTE): string | null {
+  let qr: ReturnType<typeof QRCode.create>;
+  try {
+    qr = QRCode.create(url, { errorCorrectionLevel: "H" });
+  } catch {
+    return null;
+  }
+  const size = qr.modules.size;
+  const data = qr.modules.data;
+  const m = px / (size + QUIET * 2);
+  const o = QUIET * m;
+  const n = (v: number) => Math.round(v * 100) / 100;
+
+  const parts: string[] = [];
+  parts.push(`<rect width="${px}" height="${px}" rx="${n(px * 0.07)}" fill="${palette.field}"/>`);
+
+  const inset = ((1 - FILL) / 2) * m;
+  const cell = `width="${n(m * FILL)}" height="${n(m * FILL)}" rx="${n(m * ROUND)}"`;
+  let modules = "";
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (!data[y * size + x]) continue;
+      if (isFinderModule(x, y, size)) continue;
+      if (isUnderBadge(x, y, size)) continue;
+      modules += `<rect x="${n(o + x * m + inset)}" y="${n(o + y * m + inset)}" ${cell}/>`;
+    }
+  }
+  parts.push(`<g fill="${palette.module}">${modules}</g>`);
+
+  // The three eyes. Three stacked squares rather than one path cut by the
+  // even-odd rule the canvas uses: a fill rule applies within a single
+  // path, and these are separate elements, so evenodd left them solid
+  // black — a finder with no ring in it is a code nothing will scan.
+  const sq = (x: number, y: number, s: number, r: number, fill: string) =>
+    `<rect x="${n(x)}" y="${n(y)}" width="${n(s)}" height="${n(s)}" rx="${n(r)}" fill="${fill}"/>`;
+  let eyes = "";
+  for (const [cx, cy] of [
+    [0, 0],
+    [size - FINDER, 0],
+    [0, size - FINDER],
+  ]) {
+    const x = o + cx * m;
+    const y = o + cy * m;
+    const s = FINDER * m;
+    eyes +=
+      sq(x, y, s, m * 1.9, palette.module) +
+      sq(x + m, y + m, s - m * 2, m * 1.3, palette.field) +
+      sq(x + m * 2, y + m * 2, s - m * 4, m * 0.85, palette.module);
+  }
+  parts.push(eyes);
+
+  const { from, to } = badgeSpan(size);
+  const bx = o + from * m;
+  const side = (to - from + 1) * m;
+  parts.push(
+    `<rect x="${n(bx)}" y="${n(bx)}" width="${n(side)}" height="${n(side)}" rx="${n(side * 0.26)}" fill="${palette.badge}"/>`,
+  );
+
+  // The mark, centred on the H for the reason paintBadge gives.
+  const hWidth = side * 0.52;
+  const k = hWidth / MARK_H.w;
+  const tx = bx + (side - hWidth) / 2;
+  const ty = bx + (side - MARK_H.h * k) / 2 - MARK_H.y * k;
+  const rects = [...MARK_LETTER, MARK_DOT]
+    .map((r) => `<rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}"/>`)
+    .join("");
+  parts.push(`<g transform="translate(${n(tx)} ${n(ty)}) scale(${n(k)})" fill="${palette.badgeInk}">${rects}</g>`);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 ${px} ${px}">${parts.join("")}</svg>`;
 }

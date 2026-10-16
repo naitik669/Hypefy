@@ -2,6 +2,7 @@
 
 import { paintHypefyQr } from "@/lib/hypefy-qr";
 import { WELL_RADIUS } from "@/components/profile/CardPlate";
+import { nameStyle } from "@/lib/cosmetics";
 import { pronounLabel } from "@/lib/profile";
 import { anthemLine, memberNumber, memberSince, prettyUrl } from "@/lib/profile-card";
 import { remarkRows } from "@/lib/card-remarks";
@@ -41,6 +42,12 @@ type IdCardInput = {
   verified: boolean;
   /** The painted edge. The owner's accent, resolved by the caller. */
   accent?: string;
+  /** The front needs the person as well as the record. */
+  avatarUrl?: string | null;
+  hue?: number;
+  bio?: string | null;
+  cosmetics?: { is_premium?: boolean | null; name_font?: string | null; name_glow?: string | null } | null;
+  stats?: { posts: number; followers: number };
   /** What REMARKS reads them by. Optional; see card-remarks. */
   posts?: number;
   hypers?: number;
@@ -271,6 +278,270 @@ export function drawHypefyId(input: IdCardInput): HTMLCanvasElement {
   return canvas;
 }
 
+/**
+ * Load a picture the canvas may export.
+ *
+ * crossOrigin matters: without it the avatar taints the canvas and toBlob
+ * throws, which would turn Save into a silent failure. Supabase storage
+ * answers with Access-Control-Allow-Origin, so the request is honoured.
+ * A photo that will not load resolves null rather than rejecting, and the
+ * card falls back to the initial the app draws when there is no photo.
+ */
+function loadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+/**
+ * A font family canvas can actually use.
+ *
+ * The cosmetic faces are registered as `var(--font-name-pixel), monospace`
+ * — a custom property, which a stylesheet resolves and a canvas does not.
+ * Setting it on ctx.font silently failed and every saved card came out in
+ * the default face. Letting the document resolve it hands back the real
+ * family list, and the face is already loaded because the card on screen
+ * is using it.
+ */
+function resolveFamily(family: string | undefined, fallback: string): string {
+  if (!family) return fallback;
+  if (!family.includes("var(")) return family;
+  try {
+    const probe = document.createElement("span");
+    probe.style.fontFamily = family;
+    probe.style.position = "absolute";
+    probe.style.visibility = "hidden";
+    document.body.appendChild(probe);
+    const resolved = getComputedStyle(probe).fontFamily;
+    probe.remove();
+    return resolved || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Break text into at most this many lines, each trimmed to fit. */
+function wrap(ctx: CanvasRenderingContext2D, text: string, max: number, lines: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const out: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (ctx.measureText(next).width <= max) {
+      line = next;
+      continue;
+    }
+    if (line) out.push(line);
+    line = word;
+    if (out.length === lines) break;
+  }
+  if (line && out.length < lines) out.push(line);
+  return out.slice(0, lines).map((l) => clip(ctx, l, max));
+}
+
+const PHOTO_INSET = 10;
+const NAME_LINE = 26;
+const BIO_LINE = 19;
+
+/**
+ * The front of the card, as a picture.
+ *
+ * The twin of drawHypefyId, and the same bargain: painted rather than
+ * rasterised from the DOM, so it is a fixed size at a fixed density
+ * whatever screen it was saved from. It reads the owner's name font from
+ * the same place the card does, so a cosmetic face survives the export —
+ * canvas can use any family the document has already loaded.
+ *
+ * Async only because the photograph has to arrive first.
+ */
+export async function drawProfileFront(input: IdCardInput): Promise<HTMLCanvasElement> {
+  const f = families();
+  const accent = input.accent ?? "#a3e635";
+  const worn = nameStyle(input.cosmetics ?? {});
+  const nameFamily = resolveFamily(worn?.fontFamily as string | undefined, f.sans);
+  const nameWeight = (worn?.fontWeight as number | undefined) ?? 800;
+  const nameFont = `${worn?.fontStyle === "italic" ? "italic " : ""}${nameWeight} 22px ${nameFamily}`;
+  const photo = input.avatarUrl ? await loadImage(input.avatarUrl) : null;
+
+  const gauge = document.createElement("canvas").getContext("2d");
+  if (!gauge) throw new Error("no 2d context");
+  const textW = W - 2 * PAD;
+
+  // The badge sits beside the name, so the name has less room than the row.
+  gauge.font = nameFont;
+  const nameLines = wrap(gauge, input.name, textW - (input.verified ? 26 : 0), 2);
+  gauge.font = `400 13.5px ${f.sans}`;
+  const bioLines = input.bio?.trim() ? wrap(gauge, input.bio.trim(), textW, 2) : [];
+
+  const side = W - 2 * PHOTO_INSET;
+  let h = PHOTO_INSET + side + 16;
+  h += nameLines.length * NAME_LINE + 18;
+  if (bioLines.length) h += bioLines.length * BIO_LINE + 8;
+  if (input.tags.length) h += 30;
+  if (input.stats) h += 26;
+  const footTop = h + 10;
+  h = footTop + 30;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W * SCALE;
+  canvas.height = h * SCALE;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d context");
+  ctx.scale(SCALE, SCALE);
+
+  // The plate, clipped to its own corners — the same one the back uses.
+  roundRect(ctx, 0, 0, W, h, 24);
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = "#0b0b0c";
+  ctx.fillRect(0, 0, W, h);
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  ctx.fillRect(0, 0, W, 1);
+  ctx.fillStyle = "rgba(0,0,0,0.8)";
+  ctx.fillRect(0, h - 4, W, 1);
+  ctx.fillStyle = accent;
+  ctx.fillRect(0, h - 3, W, 3);
+
+  // The photograph, in the well the code sits in on the back.
+  roundRect(ctx, PHOTO_INSET, PHOTO_INSET, side, side, WELL_RADIUS);
+  ctx.fillStyle = "rgba(255,255,255,0.11)";
+  ctx.fill();
+  ctx.save();
+  roundRect(ctx, PHOTO_INSET + 2, PHOTO_INSET + 2, side - 4, side - 4, WELL_RADIUS - 2);
+  ctx.clip();
+  if (photo) {
+    // Cover, so a photo of any shape fills the square the way it does on
+    // screen rather than arriving letterboxed.
+    const scale = Math.max((side - 4) / photo.width, (side - 4) / photo.height);
+    const pw = photo.width * scale;
+    const ph = photo.height * scale;
+    ctx.drawImage(photo, PHOTO_INSET + 2 + (side - 4 - pw) / 2, PHOTO_INSET + 2 + (side - 4 - ph) / 2, pw, ph);
+  } else {
+    const hue = input.hue ?? 200;
+    const g = ctx.createLinearGradient(PHOTO_INSET, PHOTO_INSET, PHOTO_INSET + side, PHOTO_INSET + side);
+    g.addColorStop(0, `hsl(${hue} 70% 46%)`);
+    g.addColorStop(1, `hsl(${(hue + 50) % 360} 65% 30%)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(PHOTO_INSET, PHOTO_INSET, side, side);
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = `800 120px ${f.sans}`;
+    ctx.textAlign = "center";
+    ctx.fillText(input.name.trim()[0]?.toUpperCase() ?? "?", W / 2, PHOTO_INSET + side / 2 + 42);
+    ctx.textAlign = "left";
+  }
+  ctx.restore();
+
+  const left = PAD;
+  const right = W - PAD;
+  ctx.textBaseline = "alphabetic";
+  let y = PHOTO_INSET + side + 16 + 18;
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = nameFont;
+  for (const line of nameLines) {
+    ctx.fillText(line, left, y);
+    y += NAME_LINE;
+  }
+  if (input.verified) {
+    // A disc with a tick, which is what the star reads as at this size.
+    const bx = left + Math.min(ctx.measureText(nameLines[nameLines.length - 1] ?? "").width + 9, textW - 18);
+    const by = y - NAME_LINE - 7;
+    ctx.beginPath();
+    ctx.arc(bx + 8, by, 8, 0, Math.PI * 2);
+    ctx.fillStyle = "#2f7df6";
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(bx + 4.5, by);
+    ctx.lineTo(bx + 7, by + 3);
+    ctx.lineTo(bx + 11.5, by - 3.5);
+    ctx.stroke();
+  }
+
+  const handle = [input.username ? `@${input.username}` : null, pronounLabel(input.pronouns)]
+    .filter(Boolean)
+    .join("  ·  ");
+  if (handle) {
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.font = `400 11.5px ${f.mono}`;
+    ctx.fillText(clip(ctx, handle, textW), left, y - 4);
+  }
+  y += 14;
+
+  if (bioLines.length) {
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.font = `400 13.5px ${f.sans}`;
+    for (const line of bioLines) {
+      ctx.fillText(line, left, y);
+      y += BIO_LINE;
+    }
+    y += 8;
+  }
+
+  if (input.tags.length) {
+    ctx.font = `700 10.5px ${f.sans}`;
+    let x = left;
+    for (const tag of input.tags) {
+      const label = tag.toUpperCase();
+      const w = ctx.measureText(label).width + 16;
+      if (x + w > right) break;
+      roundRect(ctx, x, y - 11, w, 19, 6);
+      ctx.fillStyle = "rgba(255,255,255,0.05)";
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.fillText(label, x + 8, y + 2);
+      x += w + 6;
+    }
+    y += 30;
+  }
+
+  if (input.stats) {
+    ctx.font = `700 13px ${f.sans}`;
+    ctx.fillStyle = "#ffffff";
+    const hypers = String(input.stats.followers);
+    ctx.fillText(hypers, left, y);
+    const after = left + ctx.measureText(hypers).width + 5;
+    ctx.font = `600 10px ${f.mono}`;
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    tracked(ctx, "HYPERS", after, y, 1.4);
+    const second = after + ctx.measureText("HYPERS").width + 6 * 1.4 + 18;
+    ctx.font = `700 13px ${f.sans}`;
+    ctx.fillStyle = "#ffffff";
+    const posts = String(input.stats.posts);
+    ctx.fillText(posts, second, y);
+    // Measured before the font changes: asking the 10px face how wide a
+    // 13px numeral is put the label on top of it.
+    const afterPosts = second + ctx.measureText(posts).width + 6;
+    ctx.font = `600 10px ${f.mono}`;
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    tracked(ctx, "POSTS", afterPosts, y, 1.4);
+  }
+
+  // The foot: the address, and the mark, exactly as the back signs itself.
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.fillRect(left, footTop - 12, right - left, 1);
+  ctx.fillStyle = "rgba(255,255,255,0.3)";
+  ctx.font = `400 9.5px ${f.mono}`;
+  ctx.fillText(prettyUrl(input.url), left, footTop + 8);
+  ctx.font = `800 15px ${f.sans}`;
+  const mark = "Hypefy";
+  const dotW = ctx.measureText(".").width;
+  const markW = ctx.measureText(mark).width + dotW;
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.fillText(mark, right - markW, footTop + 9);
+  ctx.fillStyle = accent;
+  ctx.fillText(".", right - dotW, footTop + 9);
+
+  ctx.restore();
+  return canvas;
+}
+
 /** Trim to fit, with an ellipsis, rather than running off the card. */
 function clip(ctx: CanvasRenderingContext2D, text: string, max: number): string {
   if (ctx.measureText(text).width <= max) return text;
@@ -283,44 +554,63 @@ function clip(ctx: CanvasRenderingContext2D, text: string, max: number): string 
 
 export type SaveResult = "shared" | "downloaded" | "failed";
 
+async function toFile(canvas: HTMLCanvasElement, name: string): Promise<File | null> {
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  return blob ? new File([blob], name, { type: "image/png" }) : null;
+}
+
 /**
- * Hand the picture to the person.
+ * Hand both sides of the card to the person.
  *
- * On a phone this goes through the share sheet, which is where "Save image"
- * lives on both Android and iOS — writing straight to the gallery would
- * mean a native plugin and a store build, and the sheet also covers sending
- * it to someone, which is the other thing people do with it. On a desktop
- * browser there is no sheet, so it downloads.
+ * Two pictures, not one. The card has a front and a back and they say
+ * different things — the back is the credential, the front is the person
+ * — so saving only the back meant the half most people would actually
+ * post was the half you could not keep.
+ *
+ * On a phone this goes through the share sheet, which is where "Save
+ * image" lives on both Android and iOS — writing to the gallery would
+ * mean a native plugin and a store build, and the sheet also covers
+ * sending them to someone, which is the other thing people do with them.
+ * Sheets that take one file but not two get the back on its own rather
+ * than nothing. On a desktop browser there is no sheet, so both download.
  */
-export async function saveHypefyId(input: IdCardInput): Promise<SaveResult> {
-  let blob: Blob | null = null;
+export async function saveHypefyCard(input: IdCardInput): Promise<SaveResult> {
+  const stem = input.username ?? "card";
+  let files: File[];
   try {
-    const canvas = drawHypefyId(input);
-    blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    const [front, back] = await Promise.all([
+      drawProfileFront(input).then((c) => toFile(c, `hypefy-${stem}-front.png`)),
+      toFile(drawHypefyId(input), `hypefy-${stem}-id.png`),
+    ]);
+    files = [front, back].filter((x): x is File => x !== null);
   } catch {
     return "failed";
   }
-  if (!blob) return "failed";
+  if (files.length === 0) return "failed";
 
-  const file = new File([blob], `hypefy-id-${input.username ?? "card"}.png`, { type: "image/png" });
-
-  if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+  const canShare = typeof navigator.canShare === "function";
+  // Both if the sheet will take both; otherwise the ID alone, which is
+  // the one the button is named after.
+  const offer = canShare && navigator.canShare({ files }) ? files : files.slice(-1);
+  if (canShare && navigator.canShare({ files: offer })) {
     try {
-      await navigator.share({ files: [file], title: `${input.name} on Hypefy` });
+      await navigator.share({ files: offer, title: `${input.name} on Hypefy` });
       return "shared";
     } catch {
-      // Dismissed, or the sheet refused the file. Fall through to a download
+      // Dismissed, or the sheet refused them. Fall through to a download
       // rather than reporting a failure the person caused.
     }
   }
 
   try {
-    const href = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = href;
-    a.download = file.name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(href), 10_000);
+    for (const file of files) {
+      const href = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = file.name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(href), 10_000);
+    }
     return "downloaded";
   } catch {
     return "failed";

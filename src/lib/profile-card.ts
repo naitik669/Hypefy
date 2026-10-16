@@ -41,6 +41,18 @@ export function profileUrl(username: string | null): string {
 }
 
 /**
+ * The card itself, which is what Share on the card sends.
+ *
+ * A different address from the profile on purpose: this one unfurls as
+ * the Hypefy ID, so what a recipient sees in the message is the card
+ * rather than a title and a favicon. The code printed on the card still
+ * points at the profile, so a scan reaches the person either way.
+ */
+export function cardUrl(username: string | null): string {
+  return username ? `${APP_ORIGIN}/u/${username}/card` : APP_ORIGIN;
+}
+
+/**
  * Only http(s) survives. The database rejects anything else on write, but
  * rows predating that constraint — or a URL that slipped through a future
  * migration — must never reach an anchor's href as javascript: or data:.

@@ -16,7 +16,8 @@ import {
   VALUE_CHARS,
   type RemarkSource,
 } from "@/lib/card-remarks";
-import { badgeSpan, isFinderModule, isUnderBadge, QR_PALETTE } from "@/lib/hypefy-qr";
+import QRCode from "qrcode";
+import { badgeSpan, hypefyQrSvg, isFinderModule, isUnderBadge, QR_PALETTE, QUIET } from "@/lib/hypefy-qr";
 import { idCardLayout } from "@/lib/card-image";
 import { MARK_BOX, MARK_DOT, MARK_H, MARK_LETTER, MARK_LOCKUP } from "@/lib/hypefy-mark";
 
@@ -815,5 +816,132 @@ describe("the photograph is a picture, and the name is all of it", () => {
     const markup = (f: string) => f.split("\n").filter((l) => /className|class=/.test(l)).join("\n");
     expect(markup(plate)).not.toContain("mt-auto");
     expect(markup(front)).not.toContain("mt-auto");
+  });
+});
+
+describe("the code in a shared link", () => {
+  // The preview is rendered on the server, where there is no canvas, so
+  // the code is emitted as SVG. Same matrix, same rules — this checks it
+  // really is the same code and not an approximation of one.
+  const url = profileUrl("naitik");
+  const svg = hypefyQrSvg(url, 420) ?? "";
+  const qr = QRCode.create(url, { errorCorrectionLevel: "H" });
+  const size = qr.modules.size;
+  // Imported, not guessed: getting the quiet zone wrong made this test
+  // fail against an SVG that was right.
+  const m = 420 / (size + QUIET * 2);
+
+  // Everything up to the badge mark. The letter inside the badge is a
+  // group of rects in its own transformed coordinate space, which would
+  // otherwise read as modules sitting outside the code entirely.
+  const body = svg.slice(0, svg.indexOf("<g transform="));
+
+  /** Which modules the SVG actually painted, read back from its rects. */
+  const painted = new Set<string>();
+  for (const [, x, y, w] of body.matchAll(
+    /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)"/g,
+  ) as Iterable<RegExpMatchArray>) {
+    const cx = Number(x) + Number(w) / 2;
+    const cy = Number(y) + Number(w) / 2;
+    // Only the module grid: the finders and the badge are much larger.
+    if (Number(w) > m * 1.2) continue;
+    painted.add(`${Math.round((cx - QUIET * m) / m - 0.5)},${Math.round((cy - QUIET * m) / m - 0.5)}`);
+  }
+
+  it("paints every data module the matrix asks for, and no others", () => {
+    const expected = new Set<string>();
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (!qr.modules.data[y * size + x]) continue;
+        if (isFinderModule(x, y, size) || isUnderBadge(x, y, size)) continue;
+        expected.add(`${x},${y}`);
+      }
+    }
+    expect(expected.size).toBeGreaterThan(200);
+    const missing = [...expected].filter((k) => !painted.has(k));
+    const extra = [...painted].filter((k) => !expected.has(k));
+    expect({ missing: missing.slice(0, 5), extra: extra.slice(0, 5) }).toEqual({ missing: [], extra: [] });
+  });
+
+  it("gives each eye its ring, which an even-odd fill could not", () => {
+    // A fill rule applies within one path; these are separate elements,
+    // so the first attempt drew three solid squares and nothing would
+    // have scanned it. Each eye is three stacked squares instead, the
+    // middle one in the field colour.
+    // Three rings means three squares in the field colour that have a
+    // position of their own — the one background rect has no x.
+    const light = [...body.matchAll(/<rect x="[\d.]+" y="[\d.]+"[^>]*fill="([^"]+)"/g)].filter(
+      (r) => r[1].toLowerCase() === QR_PALETTE.field.toLowerCase(),
+    );
+    expect(light.length).toBe(3);
+    const big = [...body.matchAll(/<rect x="[\d.]+" y="[\d.]+" width="([\d.]+)"/g)].filter(
+      (r) => Number(r[1]) > m * 2,
+    );
+    expect(big.length).toBe(10); // nine for the eyes, one for the badge
+  });
+
+  it("is the profile it claims to be", () => {
+    expect(url).toBe("https://app.hypefy.chat/u/naitik");
+  });
+});
+
+describe("saving the card gives you both sides", () => {
+  const img = read("src/lib/card-image.ts");
+
+  it("paints the front as well as the back, and hands over both", () => {
+    // The card has two faces that say different things, and the one most
+    // people would post was the one you could not keep.
+    expect(img).toContain("export async function drawProfileFront");
+    expect(img).toContain("export async function saveHypefyCard");
+    expect(img).toContain("-front.png");
+    expect(img).toContain("-id.png");
+    expect(card).toContain("saveHypefyCard({");
+  });
+
+  it("falls back to the ID alone when a sheet will not take two", () => {
+    expect(img).toContain("files.slice(-1)");
+  });
+
+  it("loads the photograph in a way the canvas may export", () => {
+    // Without crossOrigin the avatar taints the canvas and toBlob throws,
+    // which would turn Save into a silent failure.
+    expect(img).toContain('img.crossOrigin = "anonymous"');
+    expect(img).toContain("onerror = () => resolve(null)");
+  });
+
+  it("resolves a cosmetic face before asking a canvas for it", () => {
+    // The faces are registered as var(--font-name-pixel), monospace. A
+    // canvas cannot resolve a custom property, so every saved card came
+    // out in the default face until the document resolved it first.
+    expect(img).toContain("function resolveFamily");
+    expect(img).toContain('family.includes("var(")');
+    expect(img).toContain("getComputedStyle(probe).fontFamily");
+  });
+});
+
+describe("sharing the card shares the card", () => {
+  it("sends the card's own address, not the profile's", () => {
+    expect(lib).toContain("export function cardUrl");
+    expect(lib).toContain("/u/${username}/card");
+    expect(card).toContain("const shareHref = cardUrl(data.username)");
+    expect(card).toContain("url: shareHref");
+    expect(card).toContain("writeText(shareHref)");
+  });
+
+  it("that address unfurls as the ID", () => {
+    const og = read("src/app/(app)/u/[username]/card/opengraph-image.tsx");
+    expect(og).toContain("export const size = { width: 1200, height: 630 }");
+    expect(og).toContain("hypefyQrSvg(");
+    expect(og).toContain("remarkRows({");
+    // The code still points at the person, so a scan is not a dead end.
+    expect(og).toContain("profileUrl(p.username as string)");
+  });
+
+  it("the code can be drawn where there is no canvas", () => {
+    // hypefy-qr used to be marked client-only, which made every export
+    // of it unreachable from the server that renders the preview.
+    const qr = read("src/lib/hypefy-qr.ts");
+    expect(qr.startsWith('"use client"')).toBe(false);
+    expect(qr).toContain("export function hypefyQrSvg");
   });
 });
