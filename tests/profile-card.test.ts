@@ -180,11 +180,14 @@ describe("the flip", () => {
     expect(flip).not.toContain("offsetHeight");
   });
 
-  it("the photograph takes whatever height the back does not need", () => {
-    // The back carries six rows and the front does not, so without this
-    // the front had a band of empty plate above its foot.
-    expect(front).toContain("flex min-h-0 flex-1 p-2.5");
-    expect(front).toContain('const shape = "w-full flex-1 [min-height:170px]"');
+  it("the block above the foot takes the height the back does not need", () => {
+    // The back carries more rows than the front, so the front has slack.
+    // It used to go to the photograph, which stretched it to 440px on a
+    // 320 card — a portrait panel rather than a picture. The photograph
+    // is square now and the block above the foot claims the rest, with
+    // grow rather than an auto margin for the reason below.
+    expect(front).toContain("relative flex grow flex-col gap-2.5 px-4 pb-1");
+    expect(front).toContain('const shape = "aspect-square w-full"');
   });
 
   it("the card is capped to the screen, and the big things give up height first", () => {
@@ -785,5 +788,32 @@ describe("the card cannot be wider than the phone", () => {
     const page = read("src/app/(app)/u/[username]/card/page.tsx");
     expect(page).toContain("name_font: (profile.name_font as string) ?? null");
     expect(page).toContain("name_glow: (profile.name_glow as string) ?? null");
+  });
+});
+
+describe("the photograph is a picture, and the name is all of it", () => {
+  it("is square rather than whatever height is spare", () => {
+    // It took all the card's slack, which on a tall phone meant 440px
+    // against 320 of width. Square is also the shape every avatar is
+    // cropped to, so nothing is lost to the sides.
+    expect(front).toContain('const shape = "aspect-square w-full"');
+    expect(front).not.toContain("[min-height:170px]");
+  });
+
+  it("the name wraps rather than losing its end to an ellipsis", () => {
+    // A cosmetic font can be half again as wide as the default: this
+    // one needed 303px of the 262 there are, so it showed as
+    // "NAITIK KUSH…". A name is the one thing on a card that should
+    // never be cut short.
+    expect(front).toContain("line-clamp-2 min-w-0 break-words");
+    expect(front).not.toContain('className="min-w-0 truncate"');
+  });
+
+  it("the foot stays the bottom edge without an auto margin", () => {
+    // Still none in the markup: it would take the slack before the code
+    // on the back face could grow into it. Comments may name it.
+    const markup = (f: string) => f.split("\n").filter((l) => /className|class=/.test(l)).join("\n");
+    expect(markup(plate)).not.toContain("mt-auto");
+    expect(markup(front)).not.toContain("mt-auto");
   });
 });

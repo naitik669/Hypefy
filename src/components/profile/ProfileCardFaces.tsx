@@ -42,17 +42,31 @@ export type FaceProps = {
 export function CardFront({ data, links, loading, follow, onPhoto, onShare, shared, onFlip }: FaceProps) {
   return (
     <CardPlate>
-      <div className="relative flex min-h-0 flex-1 p-2.5">
-        <Well className="min-h-0 flex-1">
+      <div className="relative flex min-h-0 shrink p-2.5">
+        <Well className="min-h-0 w-full">
           <Photo data={data} onPhoto={onPhoto} />
         </Well>
       </div>
 
-      <div className="relative flex flex-col gap-2.5 px-4 pb-1">
+      {/* grow, not mt-auto: an auto margin takes every spare pixel
+          before flex-grow is even consulted, which is what used to
+          starve the photograph. This only claims what is left once the
+          square photo above it has taken its share, which on the front
+          is whatever the taller back face is holding the card open by. */}
+      <div className="relative flex grow flex-col gap-2.5 px-4 pb-1">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <h2 className="flex min-w-0 text-[25px] font-extrabold leading-none tracking-tight">
-              <DisplayName name={data.name} profile={data.cosmetics} className="min-w-0 truncate" />
+            {/* Wraps rather than truncating. A name is the one thing on
+                the card that should never be cut short, and a cosmetic
+                font can be half again as wide as the default — this one
+                needs 303px of the 262 there are, so it lost its last
+                four letters to an ellipsis. */}
+            <h2 className="flex min-w-0 text-[22px] font-extrabold leading-[1.1] tracking-tight">
+              <DisplayName
+                name={data.name}
+                profile={data.cosmetics}
+                className="line-clamp-2 min-w-0 break-words"
+              />
             </h2>
             {data.verified && <VerifiedStar className="h-[18px] w-[18px] shrink-0" />}
           </div>
@@ -133,10 +147,12 @@ function HandleLine({ data }: { data: ProfileCardData }) {
 
 /** Their photo, or their colour and initial when there is none. */
 function Photo({ data, onPhoto }: { data: ProfileCardData; onPhoto: () => void }) {
-  // It fills whatever the card has spare and gives height back when the
-  // screen is short. The floor is low enough to survive a small phone and
-  // high enough that the photograph is still the subject.
-  const shape = "w-full flex-1 [min-height:170px]";
+  // Square, and only as big as it is wide. It used to take all the room
+  // the card had spare, which on a tall phone meant 440px against 320 of
+  // width — a portrait panel filling the card rather than a picture on
+  // one. Square is also the shape every avatar is cropped to, so nothing
+  // is lost to the sides any more.
+  const shape = "aspect-square w-full";
   if (!data.avatarUrl) {
     return (
       <div
