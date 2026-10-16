@@ -249,3 +249,38 @@ describe("a second finger always wins", () => {
     expect(unmount.slice(0, 120)).toContain("stopTracking()");
   });
 });
+
+describe("a pinch holds the page still and clears the furniture", () => {
+  const feed = readFileSync("src/components/feed/FeedCard.tsx", "utf8").split("\r\n").join("\n");
+
+  it("takes the scroll off the page for the length of the gesture", () => {
+    // The gallery is touch-action: pan-y so one finger still scrolls the
+    // feed — and that permission covers two as well, which Chrome honours
+    // on the compositor before any handler is asked. Cancelling the move
+    // cannot reach a scroll already handed over, so the feed slid away
+    // underneath while the photo was being zoomed on top of it.
+    expect(feed).toContain("function lockPage(on: boolean)");
+    expect(feed).toContain("lockPage(true)");
+    expect(feed).toContain("lockPage(false)");
+    expect(feed).toContain('html.style.overflow = "hidden"');
+  });
+
+  it("puts the page back exactly as it found it", () => {
+    // Saved and restored rather than cleared: the app sets overflow-x on
+    // these elements itself, and clearing would drop it.
+    expect(feed).toContain("pageLock.current = { html: html.style.overflow, body: document.body.style.overflow }");
+    expect(feed).toContain("html.style.overflow = pageLock.current.html");
+    expect(feed).toContain("document.body.style.overflow = pageLock.current.body");
+  });
+
+  it("releases it even if the card goes away mid-pinch", () => {
+    const unmount = feed.slice(feed.indexOf("if (settleTimer.current) clearTimeout"));
+    expect(unmount.slice(0, 160)).toContain("lockPage(false)");
+  });
+
+  it("hides the slide dots while the photo is bigger than its card", () => {
+    // They are pinned to the bottom of the card, so once the photo has
+    // grown past it they float in the middle of the picture.
+    expect(feed).toContain("{images.length > 1 && !zooming && (");
+  });
+});

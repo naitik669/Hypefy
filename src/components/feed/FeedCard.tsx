@@ -315,6 +315,36 @@ export function FeedCard({
     };
   }
 
+  /** What the page's overflow was before a pinch locked it. */
+  const pageLock = useRef<{ html: string; body: string } | null>(null);
+
+  /**
+   * Hold the feed still for the length of the pinch.
+   *
+   * The gallery is touch-action: pan-y so a finger on a photo still
+   * scrolls the feed, and that permission covers two fingers as well —
+   * Chrome scrolls them on the compositor, before any handler is asked,
+   * so cancelling the move cannot stop it. The page slid away underneath
+   * while the photo was being zoomed on top of it. Taking the scroll off
+   * the page for the gesture is the only thing that reaches a scroll
+   * already handed to the compositor; the same pair PostPeek uses, and
+   * the position survives it.
+   */
+  function lockPage(on: boolean) {
+    const html = document.documentElement;
+    if (on) {
+      if (pageLock.current) return;
+      pageLock.current = { html: html.style.overflow, body: document.body.style.overflow };
+      html.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+      return;
+    }
+    if (!pageLock.current) return;
+    html.style.overflow = pageLock.current.html;
+    document.body.style.overflow = pageLock.current.body;
+    pageLock.current = null;
+  }
+
   const pinchMove = useRef<((e: TouchEvent) => void) | null>(null);
   const pinchEnd = useRef<((e: TouchEvent) => void) | null>(null);
 
@@ -378,6 +408,7 @@ export function FeedCard({
       settleTimer.current = null;
     }
     letPhotoOut(true);
+    lockPage(true);
     setZooming(true);
     pinchFrom.current = twoFingerState(t);
     trackPinch();
@@ -389,6 +420,9 @@ export function FeedCard({
     if (!pinchFrom.current) return;
     pinchFrom.current = null;
     stopTracking();
+    // Straight away, not after the spring: the photo settling is no
+    // reason to keep the feed from moving.
+    lockPage(false);
     setPinching(false);
     // Springs back rather than staying zoomed. The photo lives in a feed —
     // leaving it parked at 3× would mean every scroll past it starts in a
@@ -408,6 +442,7 @@ export function FeedCard({
     () => () => {
       if (settleTimer.current) clearTimeout(settleTimer.current);
       stopTracking();
+      lockPage(false);
     },
     []
   );
@@ -1020,8 +1055,10 @@ export function FeedCard({
             <Maximize2 size={15} />
           </button>
 
-          {/* Multi-image position dots */}
-          {images.length > 1 && (
+          {/* Multi-image position dots. Not while zoomed: they are pinned
+              to the bottom of the card and the photo has grown past them,
+              so they end up floating in the middle of the picture. */}
+          {images.length > 1 && !zooming && (
             <div className="absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5">
               {images.map((_, i) => (
                 <button
