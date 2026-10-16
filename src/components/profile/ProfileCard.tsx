@@ -224,8 +224,29 @@ export function ProfileCard({
         </button>
       </div>
 
-      <div className="relative z-10 flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-5 pb-[max(1.5rem,var(--sab))]">
-        <div className="flex max-h-full w-full max-w-[380px]">
+      <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-5 pb-[max(1.5rem,var(--sab))]">
+        {/*
+          Card-shaped, not screen-shaped.
+
+          It used to take whatever height was going, which on a phone is
+          all of it: 785px against 380 of width, a ratio of 2.07 where a
+          credit card is 1.59. Floor to ceiling with nothing around it, it
+          stopped reading as an object you could hold and started reading
+          as a page — and on the app, where the status bar is already
+          taken out of the viewport, there was no margin left at all.
+
+          The aspect ratio sets the height from the width; max-h-full
+          still clamps it on a short screen, so it gets shorter rather
+          than overflowing. The content needs 476px at this width, so
+          there is room to spare either way.
+        */}
+        <div
+          className="flex w-full max-w-[380px]"
+          // Never the whole screen, never less than the ID needs, never
+          // more than there is. 88% is the margin; 530px is the point
+          // below which the back face starts clipping its own rows.
+          style={{ maxHeight: "min(100%, max(88%, 530px))" }}
+        >
           {pane === "card" ? (
             <FlipCard
               half={half}
