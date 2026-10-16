@@ -80,7 +80,14 @@ export default async function ProfileCardRoute({
         lastSeenAt: (profile.last_seen_at as string) ?? null,
         showActivity: (profile.show_activity as boolean) ?? true,
         avatarDecoration: (profile.avatar_decoration as string) ?? null,
-        cosmetics: { is_premium: (profile.is_premium as boolean) ?? false },
+        // The whole set, not just the flag: this route is the card people
+        // share, and without the font and glow it was a different card
+        // from the one in the app.
+        cosmetics: {
+          is_premium: (profile.is_premium as boolean) ?? false,
+          name_font: (profile.name_font as string) ?? null,
+          name_glow: (profile.name_glow as string) ?? null,
+        },
         stats,
         isOwn: user?.id === profile.id,
       }}

@@ -191,10 +191,10 @@ describe("the flip", () => {
     // It used to be 746px tall whatever the phone, so a 667px one scrolled
     // a card. The photograph and the code are the two things that can lose
     // a hundred pixels and still do their job.
-    expect(card).toContain('maxHeight: "min(100%, max(88%, 530px))"');
+    expect(card).toContain("flex max-h-full w-full min-w-0 max-w-[380px]");
     expect(flip).toContain("max-h-full min-h-0 w-full");
     expect(plate).toContain("flex h-full min-h-0 flex-col");
-    expect(back).toContain("[min-height:88px]");
+    expect(back).toContain("[min-height:130px]");
   });
 
   it("the code stays square however little room is left", () => {
@@ -762,25 +762,28 @@ describe("the card clears the phone's system bars", () => {
   });
 });
 
-describe("the card is an object on the screen, not the screen", () => {
-  it("never takes the whole height, and never less than the ID needs", () => {
-    // Filling the screen is what made it read as too large in the app,
-    // where the status bar is already out of the viewport and --sat is
-    // forced to 0, so the safe-area padding bought nothing. Measured at
-    // 360x800: 630px tall with 103 above and 67 below, where it used to
-    // be 716 with 24. The 530 floor is the point below which the back
-    // face starts clipping its own rows.
-    expect(card).toContain('maxHeight: "min(100%, max(88%, 530px))"');
-    expect(card).toContain("items-center");
-    expect(card).not.toContain("items-start justify-center overflow-y-auto");
+
+describe("the card cannot be wider than the phone", () => {
+  it("min-width 0 all the way down, or max-width means nothing", () => {
+    // A flex or grid item's automatic minimum is its content's, and
+    // min-width beats max-width. One unbreakable thing wider than the
+    // screen — a long display name in a cosmetic font did it — and the
+    // card ignored max-w-[380px] and grew to fit. Measured at 360px: the
+    // plate came out 377 wide, so the right-hand side of both faces was
+    // off the edge. The vertical twin of this was fixed long ago, which
+    // is why min-h-0 is everywhere here and min-w-0 was nowhere.
+    expect(card).toContain("flex max-h-full w-full min-w-0 max-w-[380px]");
+    expect(flip).toContain("max-h-full min-h-0 w-full min-w-0");
+    expect(flip).toContain("grid h-full max-h-full min-h-0 min-w-0");
+    expect(flip).toContain("minWidth: 0,");
   });
 
-  it("lets the code shrink far enough that a short phone still fits", () => {
-    // The back is about 500px of fixed rows; the code is the only part
-    // that can give. At the 88% cap it is 131px on a common phone and
-    // 220 on a large one, against 292 when the card filled the screen —
-    // the price of the margin, and the reason the floor is this low.
-    const back = read("src/components/profile/HypefyIdFace.tsx");
-    expect(back).toContain("[min-height:88px]");
+  it("the shared card shows the font the app shows", () => {
+    // This route passed only is_premium, so the one card people actually
+    // send someone was missing the name font and glow the owner chose —
+    // and it was the reason the width bug never showed up in testing.
+    const page = read("src/app/(app)/u/[username]/card/page.tsx");
+    expect(page).toContain("name_font: (profile.name_font as string) ?? null");
+    expect(page).toContain("name_glow: (profile.name_glow as string) ?? null");
   });
 });

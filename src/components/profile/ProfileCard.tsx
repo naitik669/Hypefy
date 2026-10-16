@@ -224,29 +224,20 @@ export function ProfileCard({
         </button>
       </div>
 
-      <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-5 pb-[max(1.5rem,var(--sab))]">
+      <div className="relative z-10 flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-5 pb-[max(1.5rem,var(--sab))]">
         {/*
-          Card-shaped, not screen-shaped.
+          min-w-0 is the whole point of this element.
 
-          It used to take whatever height was going, which on a phone is
-          all of it: 785px against 380 of width, a ratio of 2.07 where a
-          credit card is 1.59. Floor to ceiling with nothing around it, it
-          stopped reading as an object you could hold and started reading
-          as a page — and on the app, where the status bar is already
-          taken out of the viewport, there was no margin left at all.
-
-          The aspect ratio sets the height from the width; max-h-full
-          still clamps it on a short screen, so it gets shorter rather
-          than overflowing. The content needs 476px at this width, so
-          there is room to spare either way.
+          A flex item's min-width is auto, which resolves to its
+          content's minimum — and min-width beats max-width. So a card
+          holding one unbreakable thing wider than the phone, a long
+          display name in a cosmetic font being the one that did it,
+          ignored max-w-[380px] and grew to fit it. On a 360px screen
+          the plate came out 377 wide and the right-hand side of both
+          faces was simply off the edge: the turn glyph, the end of the
+          name, half of Save ID.
         */}
-        <div
-          className="flex w-full max-w-[380px]"
-          // Never the whole screen, never less than the ID needs, never
-          // more than there is. 88% is the margin; 530px is the point
-          // below which the back face starts clipping its own rows.
-          style={{ maxHeight: "min(100%, max(88%, 530px))" }}
-        >
+        <div className="flex max-h-full w-full min-w-0 max-w-[380px]">
           {pane === "card" ? (
             <FlipCard
               half={half}

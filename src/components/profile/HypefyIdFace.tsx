@@ -87,7 +87,11 @@ export function HypefyIdFace({
           </span>
         </header>
 
-        <div className="mt-3.5 flex flex-1 justify-center [min-height:88px]">
+        {/* The floor only binds on a short phone. Everywhere else the code
+            takes the slack and is far bigger than this; here it gives up the
+            last few pixels so the rows below it are not cut off instead —
+            which is what the ID losing its Anthem row looked like. */}
+        <div className="mt-3.5 flex flex-1 justify-center [min-height:130px]">
           <Well className="aspect-square h-full max-w-full">
             <div className="flex min-h-0 flex-1 items-center justify-center bg-white p-[6%]">
               {qr ? (

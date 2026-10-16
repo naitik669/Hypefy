@@ -256,7 +256,7 @@ export function FlipCard({
 
   return (
     <div
-      className="max-h-full min-h-0 w-full"
+      className="max-h-full min-h-0 w-full min-w-0"
       style={{ perspective: spatial ? 1900 : undefined }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -270,7 +270,7 @@ export function FlipCard({
           measured to make that true. */}
       <div
         ref={inner}
-        className="grid h-full max-h-full min-h-0"
+        className="grid h-full max-h-full min-h-0 min-w-0"
         style={motion}
         // The turn is over, so the 3D can come off and the card can be
         // drawn at the screen's own resolution again. Folding the turn
@@ -333,6 +333,10 @@ function Face({
       style={{
         gridArea: "1 / 1",
         minHeight: 0,
+        // And minWidth, for the same reason: a grid item's automatic
+        // minimum is its content's, which overrides the width the card
+        // was given and pushes the far side off the screen.
+        minWidth: 0,
         // Only while turning. At rest there is no rotation for it to act
         // on, and leaving it set is what keeps the card in a composited
         // layer and soft — hiding the spare face flatly costs nothing
