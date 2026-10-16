@@ -50,6 +50,17 @@ const FAN_STEP = 50;
 const FAN = 0.62;
 /** Movement beyond this makes it a drag rather than a tap. */
 const TAP_PX = 6;
+/**
+ * How far a face may drift from its seat, in face widths, before it starts
+ * to go — and how far before it is gone.
+ *
+ * Leaving the photograph was the only way to lose one, and on a tall
+ * picture that is most of a screen of dragging for something the gesture
+ * says you are already done with. Carrying a face well clear of where it
+ * sits is the same intention, expressed with less of the arm.
+ */
+const DRIFT_FADE = 2;
+const DRIFT_GONE = 3.6;
 
 type Vec = { x: number; y: number };
 type Motion = "rise" | "pop" | "idle" | "leave";
@@ -125,6 +136,12 @@ export type Box = { left: number; top: number; right: number; bottom: number };
  * the post below — it belongs to the picture, so it leaves with it.
  * Exported for tests.
  */
+export function fadeDrift(offset: Vec, size: number): number {
+  const away = Math.hypot(offset.x, offset.y) / size;
+  if (away <= DRIFT_FADE) return 1;
+  return Math.max(0, 1 - (away - DRIFT_FADE) / (DRIFT_GONE - DRIFT_FADE));
+}
+
 export function fadeOutside(face: Box, bounds: Box | null, over: number): number {
   if (!bounds) return 1;
   const out = Math.max(
@@ -258,9 +275,17 @@ export function RehypeDeck({
   // go knows which ones have left for good.
   const shownAll = faces.map((f, i) => {
     if (!drag) return 1;
-    const top = height - lift(f.seat) - size + (layout?.offsets[i].y ?? 0);
-    const left = seats[i].x + (layout?.offsets[i].x ?? 0);
-    return fadeOutside({ left, top, right: left + size, bottom: top + size }, box, size * 0.5);
+    const offset = layout?.offsets[i] ?? { x: 0, y: 0 };
+    const top = height - lift(f.seat) - size + offset.y;
+    const left = seats[i].x + offset.x;
+    // Whichever says it has gone first: off the picture, or simply far
+    // from where it belongs. Once the row has gathered they all travel
+    // with the held one, so the whole bubble goes together, which is
+    // what carrying it away looks like it should do.
+    return Math.min(
+      fadeOutside({ left, top, right: left + size, bottom: top + size }, box, size * 0.5),
+      fadeDrift(offset, size),
+    );
   });
 
   return (
@@ -275,9 +300,21 @@ export function RehypeDeck({
       data-hswipe=""
       className="rehype-deck pointer-events-auto relative shrink-0"
       style={{ width: size + (columns - 1) * step, height }}
-      // A touch that starts on the deck belongs to the deck, never to the
-      // gallery's swipe or double-tap-to-Hype underneath it.
+      /*
+       * A touch that starts on the deck belongs to the deck, never to the
+       * gallery's swipe or double-tap-to-Hype underneath it — and never to
+       * the tab swipe either.
+       *
+       * All three, not just the start. Holding only the start left the tab
+       * swipe seeing moves for a gesture it had never seen begin, so it
+       * measured them against wherever the last touch happened to start,
+       * decided that was a long sideways drag, and changed page while a
+       * face was being carried across the photo.
+       */
       onTouchStart={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
+      onTouchCancel={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
       {faces.map((f, i) => {

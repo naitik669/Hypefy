@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { DECK_SEATS, fetchDeck, fetchMe, seatDeck, setRehype, type DeckPerson } from "@/lib/rehype";
-import { dragLayout, fadeOutside, reconcileFaces } from "@/components/feed/RehypeDeck";
+import { readFileSync } from "node:fs";
+import { dragLayout, fadeDrift, fadeOutside, reconcileFaces } from "@/components/feed/RehypeDeck";
 
 /**
  * The rehype deck: three faces at most, ranked by how much you interact with
@@ -481,5 +482,67 @@ describe("RehypeDeck", () => {
     expect(faces()).toHaveLength(4);
     await endAll();
     expect(faces().map((f) => f.getAttribute("aria-label")!.split(" ")[0])).toEqual(["A", "B", "C"]);
+  });
+});
+
+describe("a face carried away from its seat", () => {
+  const SIZE = 36;
+
+  it("is whole while it is near where it belongs", () => {
+    expect(fadeDrift({ x: 0, y: 0 }, SIZE)).toBe(1);
+    expect(fadeDrift({ x: 40, y: 20 }, SIZE)).toBe(1);
+  });
+
+  it("thins out as it is carried further", () => {
+    // Starts going at two face widths, gone by three and a half.
+    const near = fadeDrift({ x: SIZE * 2.4, y: 0 }, SIZE);
+    const far = fadeDrift({ x: SIZE * 3.1, y: 0 }, SIZE);
+    expect(near).toBeLessThan(1);
+    expect(far).toBeLessThan(near);
+    expect(far).toBeGreaterThan(0);
+  });
+
+  it("is gone once it is well clear, in any direction", () => {
+    expect(fadeDrift({ x: SIZE * 4, y: 0 }, SIZE)).toBe(0);
+    expect(fadeDrift({ x: 0, y: -SIZE * 4 }, SIZE)).toBe(0);
+    // Diagonals count their real distance, not the larger axis.
+    expect(fadeDrift({ x: SIZE * 3, y: SIZE * 3 }, SIZE)).toBe(0);
+  });
+
+  it("scales with the face, so a small deck is not harder to clear", () => {
+    expect(fadeDrift({ x: 24 * 4, y: 0 }, 24)).toBe(0);
+    expect(fadeDrift({ x: 24 * 4, y: 0 }, 72)).toBe(1);
+  });
+
+  it("does not take the others before the row has gathered", () => {
+    // Under the gather distance the rest only lean a little, so dragging
+    // one face must not quietly drop the whole deck.
+    const seats = [
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+      { x: 40, y: 0 },
+    ];
+    const { gathered, offsets } = dragLayout(seats, 0, { x: 50, y: 0 });
+    expect(gathered).toBe(false);
+    expect(fadeDrift(offsets[1], SIZE)).toBe(1);
+    expect(fadeDrift(offsets[2], SIZE)).toBe(1);
+  });
+});
+
+describe("the deck keeps its gesture to itself", () => {
+  const deck = readFileSync("src/components/feed/RehypeDeck.tsx", "utf8").split("\r\n").join("\n");
+
+  it("holds the whole touch, not only its first event", () => {
+    // Stopping the start alone left the tab swipe seeing moves for a
+    // gesture it never saw begin: it measured them from wherever the
+    // last touch started, read a long sideways drag, and changed page
+    // while a face was being carried across the photo.
+    for (const on of ["onTouchStart", "onTouchMove", "onTouchEnd", "onTouchCancel"]) {
+      expect(deck).toContain(`${on}={(e) => e.stopPropagation()}`);
+    }
+  });
+
+  it("still says it owns sideways drags", () => {
+    expect(deck).toContain('data-hswipe=""');
   });
 });

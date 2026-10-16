@@ -95,20 +95,51 @@ export function useMentionHashtag(value: string, cursorPos: number) {
       } else {
         const q = t.query.toLowerCase();
         if (!q) { setSuggestions([]); return; }
+        // Names as well as handles. Nobody remembers everyone's username,
+        // and the handle is often nothing like the name on the profile —
+        // typing what you call someone should find them. The trigger is
+        // \w* so the query cannot carry a comma or a bracket into the
+        // filter. Anywhere in the name, because a surname is a perfectly
+        // ordinary way to look for a person.
         const { data } = await supabase
           .from("profiles")
           .select("id, username, display_name, avatar_hue, avatar_url")
-          .ilike("username", `${q}%`)
-          .limit(8);
+          .eq("profile_completed", true)
+          .or(`username.ilike.${q}*,display_name.ilike.*${q}*`)
+          .limit(20);
+        // Handle first, then name-from-the-start, then the rest: typing
+        // someone's exact handle should not rank below a stranger whose
+        // surname happens to contain it.
+        type Row = {
+          id: string;
+          username: string | null;
+          display_name: string | null;
+          avatar_hue: number | null;
+          avatar_url: string | null;
+        };
+        const rank = (p: Row) => {
+          const u = (p.username ?? "").toLowerCase();
+          const d = (p.display_name ?? "").toLowerCase();
+          if (u === q) return 0;
+          if (u.startsWith(q)) return 1;
+          if (d.startsWith(q)) return 2;
+          return 3;
+        };
         setSuggestions(
-          (data ?? []).map((p: any) => ({
-            kind: "mention" as const,
-            id: p.id,
-            username: p.username,
-            display_name: p.display_name,
-            avatar_hue: p.avatar_hue ?? 280,
-            avatar_url: p.avatar_url,
-          })),
+          ((data ?? []) as Row[])
+            // A mention is a handle, so an account without one cannot be
+            // offered however well its name matches.
+            .filter((p): p is Row & { username: string } => !!p.username)
+            .sort((a, b) => rank(a) - rank(b) || a.username.length - b.username.length)
+            .slice(0, 8)
+            .map((p) => ({
+              kind: "mention" as const,
+              id: p.id,
+              username: p.username,
+              display_name: p.display_name,
+              avatar_hue: p.avatar_hue ?? 280,
+              avatar_url: p.avatar_url,
+            })),
         );
       }
     }, 180);

@@ -179,3 +179,42 @@ describe("finding a message", () => {
     expect(read("src/app/globals.css")).toContain(".animate-found { animation: none;");
   });
 });
+
+describe("finding someone to mention", () => {
+  const picker = read("src/components/ui/MentionHashtagPicker.tsx");
+
+  it("looks at the name as well as the handle", () => {
+    // Nobody remembers everyone's username, and a handle is often
+    // nothing like the name on the profile: typing what you call
+    // someone has to find them. "@kush" should reach "Naitik Kushwaha"
+    // whose handle is "naitik".
+    expect(picker).toContain("username.ilike.${q}*,display_name.ilike.*${q}*");
+    expect(picker).not.toContain('.ilike("username", `${q}%`)');
+  });
+
+  it("looks anywhere in the name, but only the start of a handle", () => {
+    // A surname is an ordinary way to look for a person; a handle is
+    // typed from its beginning.
+    expect(picker).toContain("display_name.ilike.*${q}*");
+    expect(picker).toContain("username.ilike.${q}*");
+  });
+
+  it("puts the handle you actually typed first", () => {
+    // Otherwise an exact handle ranks below a stranger whose surname
+    // happens to contain it.
+    expect(picker).toContain("if (u === q) return 0;");
+    expect(picker).toContain("if (u.startsWith(q)) return 1;");
+    expect(picker).toContain("if (d.startsWith(q)) return 2;");
+  });
+
+  it("offers only accounts that finished setting up", () => {
+    expect(picker).toContain('.eq("profile_completed", true)');
+  });
+
+  it("cannot have a filter broken by what was typed", () => {
+    // The query reaches an or() filter, where a comma or a bracket
+    // would change its meaning. The trigger is \w*, so it cannot carry
+    // either — this is the thing that keeps that true.
+    expect(picker).toContain(String.raw`const mentionMatch = before.match(/@(\w*)$/)`);
+  });
+});
