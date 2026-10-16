@@ -295,7 +295,16 @@ export function FeedCard({
     }
   }
 
-  function twoFingerState(t: React.TouchList) {
+  /**
+   * Two fingers, from a React event or a native one.
+   *
+   * It has to be both: a pinch that begins on the gallery is tracked on
+   * the window from then on, because at 4x the fingers are nowhere near
+   * the element they started on.
+   */
+  type Pointers = { length: number; [index: number]: { clientX: number; clientY: number } };
+
+  function twoFingerState(t: Pointers) {
     return {
       dist: Math.hypot(
         t[0].clientX - t[1].clientX,
@@ -306,7 +315,61 @@ export function FeedCard({
     };
   }
 
-  function beginPinch(t: React.TouchList) {
+  const pinchMove = useRef<((e: TouchEvent) => void) | null>(null);
+  const pinchEnd = useRef<((e: TouchEvent) => void) | null>(null);
+
+  /**
+   * Follow the fingers on the window, not on the photo.
+   *
+   * Tracking through the gallery's own handlers only worked while both
+   * fingers stayed over it. They do not: the photo grows to four times
+   * the card, so the fingers spreading it leave almost immediately, and
+   * a pinch that began on a peeked photo never touches the gallery at
+   * all. The window sees every one of them.
+   */
+  function trackPinch() {
+    stopTracking();
+    const move = (e: TouchEvent) => {
+      const from = pinchFrom.current;
+      if (!from || e.touches.length < 2) return;
+      // Two fingers here are ours. Without this the page scrolls under
+      // the gesture, which touch-action: pan-y permits and which drags
+      // the card out from under the photo being zoomed.
+      if (e.cancelable) e.preventDefault();
+      const now = twoFingerState(e.touches);
+      setPinch({
+        scale: clampZoom(now.dist / Math.max(1, from.dist)),
+        // Pan follows the midpoint, which is what makes it steerable
+        // rather than just growing from the centre.
+        x: now.midX - from.midX,
+        y: now.midY - from.midY,
+      });
+    };
+    const end = (e: TouchEvent) => {
+      // One finger lifted of two still leaves a finger down, but the
+      // pinch is over — there is nothing left to measure a distance
+      // between.
+      if (e.touches.length >= 2) return;
+      endPinch();
+    };
+    pinchMove.current = move;
+    pinchEnd.current = end;
+    window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("touchend", end);
+    window.addEventListener("touchcancel", end);
+  }
+
+  function stopTracking() {
+    if (pinchMove.current) window.removeEventListener("touchmove", pinchMove.current);
+    if (pinchEnd.current) {
+      window.removeEventListener("touchend", pinchEnd.current);
+      window.removeEventListener("touchcancel", pinchEnd.current);
+    }
+    pinchMove.current = null;
+    pinchEnd.current = null;
+  }
+
+  function beginPinch(t: Pointers) {
     clearHold();
     setPeekSrc(null);
     gestureConsumed.current = true;
@@ -317,6 +380,7 @@ export function FeedCard({
     letPhotoOut(true);
     setZooming(true);
     pinchFrom.current = twoFingerState(t);
+    trackPinch();
     setPinch({ scale: 1, x: 0, y: 0 });
     setPinching(true);
   }
@@ -324,6 +388,7 @@ export function FeedCard({
   function endPinch() {
     if (!pinchFrom.current) return;
     pinchFrom.current = null;
+    stopTracking();
     setPinching(false);
     // Springs back rather than staying zoomed. The photo lives in a feed —
     // leaving it parked at 3× would mean every scroll past it starts in a
@@ -342,9 +407,35 @@ export function FeedCard({
   useEffect(
     () => () => {
       if (settleTimer.current) clearTimeout(settleTimer.current);
+      stopTracking();
     },
     []
   );
+
+  /**
+   * A second finger beats the peek that is already open.
+   *
+   * Resting two fingers on a photo and then spreading them is an
+   * ordinary way to pinch, and it takes longer than the 350ms hold — so
+   * the peek would open first, and because it is a full-screen portal
+   * the second finger landed on it rather than on the gallery. The
+   * pinch never started: you got a copy of the photo sitting over the
+   * post, and no zoom, which is exactly what a pinch is not for.
+   *
+   * On the window, because by now the fingers are on the peek.
+   */
+  useEffect(() => {
+    if (!peekSrc) return;
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length < 2) return;
+      setPeekSrc(null);
+      beginPinch(e.touches);
+    };
+    window.addEventListener("touchstart", onStart);
+    return () => window.removeEventListener("touchstart", onStart);
+    // beginPinch closes over state setters and refs only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peekSrc]);
 
   function onGalleryTouchStart(e: React.TouchEvent) {
     // Something is open over the post — the share row, a sheet. The finger
@@ -376,19 +467,9 @@ export function FeedCard({
     if (overlayCount() > 0) return;
     if (e.touches.length > 1) {
       // A second finger can land after the first — start the pinch from
-      // wherever they are now, not from the single-finger origin.
+      // wherever they are now, not from the single-finger origin. The
+      // window takes it from there.
       if (!pinchFrom.current) beginPinch(e.touches);
-      else {
-        const now = twoFingerState(e.touches);
-        const from = pinchFrom.current;
-        setPinch({
-          scale: clampZoom(now.dist / Math.max(1, from.dist)),
-          // Pan follows the midpoint, which is what makes it steerable
-          // rather than just growing from the centre.
-          x: now.midX - from.midX,
-          y: now.midY - from.midY,
-        });
-      }
       return;
     }
 

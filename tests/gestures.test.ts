@@ -212,3 +212,40 @@ describe("pinching a feed photo zooms the photo, not a copy of it", () => {
     expect(feed).toContain('className="pointer-events-none fixed inset-0 bg-black"');
   });
 });
+
+describe("a second finger always wins", () => {
+  const feed = readFileSync("src/components/feed/FeedCard.tsx", "utf8").split("\r\n").join("\n");
+
+  it("a peek already open gives way to the pinch", () => {
+    // Resting two fingers and then spreading them takes longer than the
+    // 350ms hold, so the peek opened first — and being a full-screen
+    // portal it swallowed the second finger, leaving a copy of the photo
+    // over the post and no zoom at all. Reproduced: images in the
+    // document went 6 -> 7 and stayed there through the spread.
+    expect(feed).toContain("if (!peekSrc) return;");
+    expect(feed).toContain("if (e.touches.length < 2) return;");
+    expect(feed).toContain("setPeekSrc(null);\n      beginPinch(e.touches);");
+    expect(feed).toContain('window.addEventListener("touchstart", onStart)');
+  });
+
+  it("follows the fingers on the window, not on the photo", () => {
+    // At 4x the fingers are nowhere near the element they started on,
+    // and a pinch begun on a peeked photo never touches the gallery.
+    expect(feed).toContain("function trackPinch()");
+    expect(feed).toContain('window.addEventListener("touchmove", move, { passive: false })');
+    expect(feed).toContain("trackPinch();");
+    expect(feed).toContain("stopTracking();");
+  });
+
+  it("stops the page scrolling out from under the gesture", () => {
+    // touch-action: pan-y still lets two fingers scroll the feed, which
+    // drags the card away from the photo being zoomed.
+    expect(feed).toContain("if (e.cancelable) e.preventDefault();");
+  });
+
+  it("ends when there are no longer two fingers, and lets go of the window", () => {
+    expect(feed).toContain("if (e.touches.length >= 2) return;\n      endPinch();");
+    const unmount = feed.slice(feed.indexOf("if (settleTimer.current) clearTimeout"));
+    expect(unmount.slice(0, 120)).toContain("stopTracking()");
+  });
+});
