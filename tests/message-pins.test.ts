@@ -269,9 +269,14 @@ describe("who may pin, and how many", () => {
     expect(sql).toContain("create trigger guard_message_pins");
     expect(sql).toContain("raise exception 'Use set_message_pinned to pin a message'");
     expect(sql).toContain("perform set_config('hypefy.pinning', 'on', true);");
-    // Transaction-local, so the door does not stay open for the next
-    // statement on the same connection.
     expect(sql).toContain("current_setting('hypefy.pinning', true)");
+    // And closed again straight after the write. set_config(…, true) is local
+    // to the TRANSACTION, not to the call: opened at the top of the function
+    // it would leave every later statement in that transaction free to write
+    // the pin columns. A dry run against the real database did exactly that
+    // before this line existed.
+    expect(sql).toContain("perform set_config('hypefy.pinning', 'off', true);");
+    expect(sql.indexOf("'hypefy.pinning', 'on'")).toBeGreaterThan(sql.indexOf("raise exception 'Not your chat'"));
     expect(sql).toContain("revoke update (pinned_at, pinned_by) on public.messages from authenticated, anon;");
     expect(sql).toContain("revoke all on function public.set_message_pinned(uuid, boolean) from public, anon;");
     expect(sql).toContain("grant execute on function public.set_message_pinned(uuid, boolean) to authenticated;");

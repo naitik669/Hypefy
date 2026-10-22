@@ -39,9 +39,8 @@ returns integer language sql immutable as $$ select 30 $$;
  * or removed message simply stops being readable, and the board filters it
  * out, so no cleanup is needed here.
  *
- * Not the client's column to write: the direct grant is revoked below, so
- * this function is the only way in, and it is what enforces both membership
- * and the cap.
+ * Not the client's columns to write: the trigger below makes this function
+ * the only way in, and it is what enforces membership and the cap.
  */
 create or replace function public.set_message_pinned(p_id uuid, p_pinned boolean)
 returns void
@@ -52,8 +51,6 @@ as $$
 declare v_me uuid := (select auth.uid()); v_conv uuid; v_kind text; v_n int; v_count int;
 begin
   if v_me is null then raise exception 'Not authenticated'; end if;
-  -- Lets the guard below through, for this transaction only.
-  perform set_config('hypefy.pinning', 'on', true);
 
   select conversation_id, kind into v_conv, v_kind
     from public.messages
@@ -75,11 +72,19 @@ begin
     end if;
   end if;
 
+  -- Opened immediately before the write and closed straight after, not at the
+  -- top of the function. `set_config(…, true)` is local to the TRANSACTION,
+  -- not to the call: left open, every statement after this one in the same
+  -- transaction could write the pin columns freely. Measured — a direct
+  -- update after the rpc went through until this was narrowed.
+  perform set_config('hypefy.pinning', 'on', true);
   update public.messages
      set pinned_at = case when p_pinned then now() else null end,
          pinned_by = case when p_pinned then v_me else null end
    where id = p_id;
   get diagnostics v_n = row_count;
+  perform set_config('hypefy.pinning', 'off', true);
+
   if v_n = 0 then raise exception 'No such message'; end if;
 end $$;
 
