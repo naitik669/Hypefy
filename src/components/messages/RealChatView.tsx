@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock, AlertCircle, Search } from "lucide-react";
+import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock, AlertCircle, Search, Pin as PinIcon } from "lucide-react";
 import { SendIcon, ShareIcon } from "@/components/ui/ShareIcon";
 import { FACES_SHOWN, lastMine, readMarkers, receiptFor } from "@/lib/chat-receipts";
 import { ChatSearch, type FoundMessage } from "@/components/messages/ChatSearch";
@@ -36,6 +36,9 @@ import { PresenceDot } from "@/components/presence/PresenceDot";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
 import { one } from "@/lib/supabase/typed";
 import { ForwardSheet } from "@/components/messages/ForwardSheet";
+import { canPin, opensPinBoard } from "@/lib/chat-pins";
+import { gestureBlocked } from "@/components/layout/SwipeNav";
+import { overlayCount } from "@/lib/overlay-stack";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
 import { ChatAmbient } from "@/components/messages/ChatAmbient";
@@ -100,6 +103,8 @@ export type ChatMsg = {
   is_unsent: boolean;
   edited_at?: string | null;
   created_at: string;
+  /** When someone put this on the chat's pin board, if they did (0142). */
+  pinned_at?: string | null;
   post?: PostPreview | null;
   postProfile?: ShareProfile | null;
   shot?: ShotPreview | null;
@@ -271,7 +276,7 @@ const MSG_PAGE = 30;
 export const SEARCH_REACH_PAGES = 12;
 /** Select used for both the initial server load and client pagination. */
 const MSG_SELECT =
-  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, post:posts(id, user_id, caption, image_url, image_urls, aspect_ratio, profiles!posts_user_id_fkey(username, display_name, avatar_hue, avatar_url)), shot:shots(id, user_id, media_url, poster_url, caption, profiles(username, display_name, avatar_hue, avatar_url))";
+  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, pinned_at, post:posts(id, user_id, caption, image_url, image_urls, aspect_ratio, profiles!posts_user_id_fkey(username, display_name, avatar_hue, avatar_url)), shot:shots(id, user_id, media_url, poster_url, caption, profiles(username, display_name, avatar_hue, avatar_url))";
 
 /** Flatten Supabase's nested post/shot+profile joins into ChatMsg shape. */
 function mapMessageRow(m: any): ChatMsg {
@@ -445,6 +450,16 @@ export function RealChatView({
   // indirect-confession payoff lands as a quoted draft. Clears the param after.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    // Arriving from the pin board: go to the message it was tapped on, the
+    // same way a search result is reached, then drop the param so a reload
+    // or a back does not jump again.
+    const focus = params.get("m");
+    if (focus) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("m");
+      window.history.replaceState({}, "", url.toString());
+      void goToMessage({ id: focus } as FoundMessage);
+    }
     const prefill = params.get("prefill");
     if (prefill) {
       setText(prefill);
@@ -1804,6 +1819,54 @@ export function RealChatView({
     showToast(error ? "Report already sent" : "Report sent");
   }
 
+  /**
+   * Put a message on the chat's pin board, or take it off.
+   *
+   * Either side may pin either side's messages: the board belongs to the
+   * conversation, not to whoever spoke. Optimistic, and reverted on refusal —
+   * the only refusals are the cap and a message that has since gone, both of
+   * which the server words for the reader.
+   */
+  async function togglePin(m: ChatMsg) {
+    const next = !m.pinned_at;
+    haptics.select();
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, pinned_at: next ? new Date().toISOString() : null } : x)));
+    const { error } = await supabase.rpc("set_message_pinned", { p_id: m.id, p_pinned: next });
+    if (error) {
+      setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, pinned_at: m.pinned_at ?? null } : x)));
+      showToast(error.message.includes("can pin") ? error.message : "Couldn't pin that");
+      return;
+    }
+    showToast(next ? "Pinned" : "Unpinned");
+  }
+
+  /**
+   * Swipe left to the pin board.
+   *
+   * Only the release decides, so nothing is stolen from a vertical scroll
+   * part-way through, and the usual exclusions apply: not while a sheet or
+   * menu is open, and not over anything that handles its own sideways drags
+   * (a photo gallery inside a bubble).
+   */
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+
+  function onThreadTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0];
+    if (!t || e.touches.length > 1 || gestureBlocked(overlayCount(), e.target)) { swipe.current = null; return; }
+    swipe.current = { x: t.clientX, y: t.clientY };
+  }
+
+  function onThreadTouchEnd(e: React.TouchEvent) {
+    const start = swipe.current;
+    swipe.current = null;
+    const t = e.changedTouches[0];
+    if (!start || !t) return;
+    if (opensPinBoard(t.clientX - start.x, t.clientY - start.y)) {
+      haptics.tap();
+      router.push(`/messages/${conversationId}/pins`);
+    }
+  }
+
   function copy(m: ChatMsg) {
     if (m.body) { navigator.clipboard.writeText(m.body).catch(() => {}); showToast("Copied"); }
   }
@@ -1943,6 +2006,11 @@ export function RealChatView({
                 setSearchOpen(true);
               }}
             />
+            <MenuItem
+              icon={PinIcon}
+              label="Pinned"
+              onClick={() => { setHeaderMenu(false); router.push(`/messages/${conversationId}/pins`); }}
+            />
             {!isGroup && other.username && (
               <MenuItem icon={UserCircle} label="View profile" onClick={() => { setHeaderMenu(false); router.push(`/u/${other.username}`); }} />
             )}
@@ -1981,6 +2049,9 @@ export function RealChatView({
         ref={scrollContainerRef}
         onScroll={onMessagesScroll}
         data-chat-scroll
+        onTouchStart={onThreadTouchStart}
+        onTouchEnd={onThreadTouchEnd}
+        onTouchCancel={() => { swipe.current = null; }}
         className="relative isolate flex flex-1 flex-col-reverse overflow-y-auto px-4 py-4"
         style={theme ? { background: theme.background } : undefined}
         onClick={() => { if (gifPickerOpen) setGifPickerOpen(false); }}
@@ -2101,6 +2172,14 @@ export function RealChatView({
                       </span>
                     )}
                     <div className={`flex max-w-[80%] flex-col ${mine ? "items-end" : "items-start"}`}>
+                      {/* On the board, and said so here: otherwise the only
+                          way to know a message is pinned is to go and look. */}
+                      {m.pinned_at && (
+                        <span className="mb-0.5 flex items-center gap-1 px-1 text-[10px] font-bold uppercase tracking-widest text-faint">
+                          <PinIcon size={9} className="shrink-0" />
+                          Pinned
+                        </span>
+                      )}
                       {showSender && (
                         <span className="mb-0.5 px-1 text-[11px] font-semibold text-muted">{senderName(m.sender_id)}</span>
                       )}
@@ -2976,6 +3055,13 @@ export function RealChatView({
                     <CtxItem icon={<ShareIcon size={17} weight="bold" />} label="Forward" onClick={() => { setForwardMsg(menu.msg); setMenu(null); }} />
                   )}
                   {menu.msg.body && menu.msg.kind !== "album" && <CtxItem icon={<Copy size={17} />} label="Copy" onClick={() => { copy(menu.msg); setMenu(null); }} />}
+                  {canPin(menu.msg.kind, menu.msg.is_unsent) && !menu.msg.id.startsWith("temp-") && (
+                    <CtxItem
+                      icon={<PinIcon size={17} />}
+                      label={menu.msg.pinned_at ? "Unpin" : "Pin"}
+                      onClick={() => { togglePin(menu.msg); setMenu(null); }}
+                    />
+                  )}
                   {menu.msg.sender_id === currentUserId && menu.msg.kind === "text" && !menu.msg.is_unsent && (
                     <CtxItem icon={<Pencil size={17} />} label="Edit" onClick={() => { startEdit(menu.msg); setMenu(null); }} />
                   )}

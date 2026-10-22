@@ -946,6 +946,8 @@ export type Database = {
           edited_at: string | null
           id: string
           is_unsent: boolean
+          pinned_at?: string | null
+          pinned_by?: string | null
           kind: string
           metadata: Json
           post_id: string | null
@@ -964,6 +966,8 @@ export type Database = {
           edited_at?: string | null
           id?: string
           is_unsent?: boolean
+          pinned_at?: string | null
+          pinned_by?: string | null
           kind?: string
           metadata?: Json
           post_id?: string | null
@@ -982,6 +986,8 @@ export type Database = {
           edited_at?: string | null
           id?: string
           is_unsent?: boolean
+          pinned_at?: string | null
+          pinned_by?: string | null
           kind?: string
           metadata?: Json
           post_id?: string | null
@@ -3279,6 +3285,8 @@ export type Database = {
       set_comment_pinned: { Args: { p_id: string; p_pinned: boolean }; Returns: undefined }
       mention_allowed: { Args: { p_target: string; p_actor: string }; Returns: boolean }
       max_pinned_posts: { Args: never; Returns: number }
+      set_message_pinned: { Args: { p_id: string; p_pinned: boolean }; Returns: undefined }
+      max_pinned_messages: { Args: never; Returns: number }
       search_messages: {
         Args: { p_conversation_id: string; p_q: string; p_limit?: number }
         Returns: { id: string; sender_id: string; body: string | null; created_at: string }[]
