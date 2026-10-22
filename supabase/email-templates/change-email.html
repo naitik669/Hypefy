@@ -1,0 +1,87 @@
+<!--
+  Supabase → Authentication → Emails → Templates → "Change Email Address"
+
+  Sent by supabase.auth.updateUser({ email }) from Settings → Account.
+
+  With Secure email change on (the default) this template is sent TWICE —
+  once to the old address and once to the new one — and the change only
+  takes effect when BOTH links are followed. That is why the app says
+  "Check both inboxes" and why this copy names the two addresses instead of
+  saying "your email": the same words land in two places, and a reader has
+  to be able to tell which one they are looking at.
+
+  {{ .Email }} is the current address, {{ .NewEmail }} the requested one.
+
+  This is the account-takeover step. Whoever ends up holding the new
+  address owns the recovery path, so the warning at the bottom is the most
+  important line in any of these templates — it is the one chance the real
+  owner has to notice.
+-->
+<table
+  width="100%"
+  cellpadding="0"
+  cellspacing="0"
+  role="presentation"
+  style="background:#0a0a0a;padding:32px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;"
+>
+  <tr>
+    <td align="center">
+      <table
+        width="100%"
+        cellpadding="0"
+        cellspacing="0"
+        role="presentation"
+        style="max-width:420px;background:#141414;border:1px solid #2a2a2a;border-radius:20px;padding:32px;"
+      >
+        <tr>
+          <td>
+            <p style="margin:0;font-size:15px;font-weight:800;color:#ffffff;letter-spacing:-0.02em;">
+              Hypefy<span style="color:#a3e635;">.</span>
+            </p>
+
+            <h1 style="margin:20px 0 0;font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-0.02em;">
+              Confirm your new email
+            </h1>
+            <p style="margin:8px 0 0;font-size:14px;line-height:1.6;color:#8a8a8a;">
+              Someone asked to move this Hypefy account from
+              <span style="color:#ffffff;">{{ .Email }}</span> to
+              <span style="color:#ffffff;">{{ .NewEmail }}</span>.
+            </p>
+            <p style="margin:12px 0 0;font-size:14px;line-height:1.6;color:#8a8a8a;">
+              This link is one half of it. The same email has gone to the
+              other address, and nothing changes until both are confirmed.
+            </p>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:24px 0 0;">
+              <tr>
+                <td align="center" style="background:#a3e635;border-radius:100px;">
+                  <a
+                    href="{{ .ConfirmationURL }}"
+                    style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:800;color:#0a0a0a;text-decoration:none;letter-spacing:-0.01em;"
+                  >
+                    Confirm this change
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#8a8a8a;">
+              If the button doesn't work, paste this into your browser:
+              <br />
+              <span style="color:#a3e635;word-break:break-all;">{{ .ConfirmationURL }}</span>
+            </p>
+
+            <!-- Louder than the footer on the other templates, on purpose:
+                 this is the one email where ignoring it is the wrong advice. -->
+            <p style="margin:24px 0 0;padding:14px 16px;background:#0a0a0a;border:1px solid #2a2a2a;border-radius:14px;font-size:13px;line-height:1.6;color:#8a8a8a;">
+              <span style="color:#ffffff;font-weight:700;">Didn't ask for this?</span>
+              Don't follow the link, and change your password straight away —
+              someone may have your account open. Until both links are
+              followed, the address stays as it is.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

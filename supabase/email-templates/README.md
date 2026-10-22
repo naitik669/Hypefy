@@ -10,6 +10,7 @@ cannot sign in.
 | `magic-link.html` | **Magic Link** | two-step verification, and "Email me a code instead" |
 | `confirm-signup.html` | **Confirm signup** | a new account, and Resend on the check-email screen |
 | `reset-password.html` | **Reset Password** | "Forgot password" |
+| `change-email.html` | **Change Email Address** | Settings → Account → change email |
 
 ## Why Magic Link needs changing
 
@@ -37,8 +38,13 @@ design and must keep `{{ .ConfirmationURL }}`:
   a new account for a typed confirmation code. A code here would be an
   instruction nothing can carry out.
 
-The three remaining stock templates (Invite, Change Email Address,
-Reauthentication) are not reachable from anything the app calls today.
+**Change Email Address** is sent TWICE with Secure email change on — once
+to the old address, once to the new — and the change lands only when both
+links are followed. That is why its copy names both addresses: the same
+words arrive in two inboxes and the reader has to tell which is which.
+
+The two remaining stock templates (Invite, Reauthentication) are not
+reachable from anything the app calls today.
 
 ## Before any real volume
 
