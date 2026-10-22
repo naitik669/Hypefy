@@ -65,14 +65,13 @@ import { ChatImg, ChatLink, ChatVideo } from "@/components/messages/ChatMedia";
 import { readDraft, writeDraft } from "@/lib/chat-drafts";
 import { mediaUrlsOf, prefetchChatMedia } from "@/lib/chat-media-url";
 import { SharedShotCard } from "@/components/messages/SharedShotCard";
-import { SharedPostCard, sharedSlide } from "@/components/messages/SharedPostCard";
+import { SharedPostCard } from "@/components/messages/SharedPostCard";
 import {
   ForwardedCommentOverlay,
   ForwardedLabel,
   type ForwardedComment,
 } from "@/components/messages/ForwardedComment";
 import { EmbedLabel } from "@/components/ui/EmbedLabel";
-import { PeekFor } from "@/components/feed/PeekFor";
 
 type PostPreview = {
   id: string;
@@ -496,11 +495,6 @@ export function RealChatView({
     writeDraft(currentUserId, conversationId, text);
   }, [text, editing, currentUserId, conversationId]);
   const [menu, setMenu] = useState<{ msg: ChatMsg; rect: DOMRect } | null>(null);
-  /**
-   * A shared post or Shot held open. Holding one lifts it out, as it does in
-   * the feed; the message menu it used to open is the peek's last button.
-   */
-  const [peek, setPeek] = useState<{ msg: ChatMsg; rect: DOMRect } | null>(null);
   const [reportMsg, setReportMsg] = useState<ChatMsg | null>(null);
   const [forwardMsg, setForwardMsg] = useState<ChatMsg | null>(null);
   // Message id whose reaction list ("who reacted with what") is open
@@ -1852,7 +1846,7 @@ export function RealChatView({
   }
 
   // Long-press Ã¢â€ â€™ context menu
-  function onPressStart(m: ChatMsg, e: React.PointerEvent, onHold?: (rect: DOMRect) => void) {
+  function onPressStart(m: ChatMsg, e: React.PointerEvent) {
     if (m.is_unsent) return;
 
     // ── Double-tap → ⭐ star reaction ────────────────────────────────────────
@@ -1876,8 +1870,7 @@ export function RealChatView({
     pressTimer.current = setTimeout(() => {
       pressTimer.current = null;
       suppressClick.current = true;
-      if (onHold) onHold(rect);
-      else setMenu({ msg: m, rect });
+      setMenu({ msg: m, rect });
       if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
     }, 420);
   }
@@ -2205,7 +2198,7 @@ export function RealChatView({
                           slide={m.metadata?.slide}
                           showCaption={!m.metadata?.comment_id}
                           onMore={(rect) => setMenu({ msg: m, rect })}
-                          onPointerDown={(e) => onPressStart(m, e, (rect) => setPeek({ msg: m, rect }))}
+                          onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
                           onPointerMove={onPressEnd}
                           onPointerLeave={onPressEnd}
@@ -2218,7 +2211,7 @@ export function RealChatView({
                           shot={m.shot}
                           author={m.shotProfile ?? null}
                           onMore={(rect) => setMenu({ msg: m, rect })}
-                          onPointerDown={(e) => onPressStart(m, e, (rect) => setPeek({ msg: m, rect }))}
+                          onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
                           onPointerMove={onPressEnd}
                           onPointerLeave={onPressEnd}
@@ -2985,42 +2978,6 @@ export function RealChatView({
       )}
 
       {/* Long-press context menu (reactions + actions), anchored to the message */}
-      {peek && (peek.msg.post || peek.msg.shot) && (
-        <PeekFor
-          kind={peek.msg.shot ? "shot" : "post"}
-          currentUserId={currentUserId}
-          target={
-            peek.msg.shot
-              ? {
-                  id: peek.msg.shot.id,
-                  image: peek.msg.shot.poster_url ?? null,
-                  video: peek.msg.shot.media_url,
-                  aspect_ratio: 9 / 16,
-                  caption: peek.msg.shot.caption,
-                }
-              : {
-                  id: peek.msg.post!.id,
-                  // The photo that was shared, as the card in the chat shows it.
-                  image:
-                    peek.msg.post!.image_urls?.[sharedSlide(peek.msg.post!.image_urls, peek.msg.metadata?.slide)] ??
-                    peek.msg.post!.image_url,
-                  aspect_ratio: peek.msg.post!.aspect_ratio ?? null,
-                  caption: peek.msg.post!.caption,
-                }
-          }
-          onPin={canPin(peek.msg.kind, peek.msg.is_unsent) && !peek.msg.id.startsWith("temp-")
-            ? () => { void togglePin(peek.msg); setPeek(null); }
-            : undefined}
-          pinned={!!peek.msg.pinned_at}
-          onMore={() => {
-            const { msg, rect } = peek;
-            setPeek(null);
-            setMenu({ msg, rect });
-          }}
-          onClose={() => setPeek(null)}
-        />
-      )}
-
       {menu && (() => {
         const r = menu.rect;
         const mine = menu.msg.sender_id === currentUserId;

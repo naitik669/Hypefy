@@ -179,15 +179,11 @@ describe("the peek, design F", () => {
     expect(wrapper.className).not.toMatch(/bg-|rounded-3xl|shadow/);
   });
 
-  it("offers the message menu only where it is given one", async () => {
-    let peek = await open();
-    expect(peek.querySelector('[aria-label="More"]')).toBeFalsy();
-    let more = 0;
-    peek = await open({ onMore: () => more++ });
-    const btn = peek.querySelector('[aria-label="More"]') as HTMLButtonElement;
-    expect(btn).toBeTruthy();
-    await act(async () => btn.click());
-    expect(more).toBe(1);
+  it("carries no message menu: it is not opened from a chat any more", async () => {
+    // Holding a shared post or Shot in a chat used to open this, with the
+    // message's own menu hanging off it as a sixth button. A hold in a chat
+    // now opens that menu directly, so the peek is back to being the feed's.
+    expect((await open()).querySelector('[aria-label="More"]')).toBeFalsy();
   });
 
   it("names itself after what it is showing", async () => {

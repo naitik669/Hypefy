@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { canNavigate } from "@/components/layout/SwipeNav";
 import {
   MAX_PINNED_MESSAGES,
   PINNABLE_KINDS,
@@ -223,18 +224,29 @@ describe("holding an attachment offers to pin it", () => {
     }
   });
 
-  it("a shared post or Shot gets Pin where the hold actually lands", () => {
-    // Holding those two opens the peek, not the message's menu, so Pin has
-    // to be on the peek — otherwise pinning an attachment is the one pin
-    // that takes two taps.
-    expect(peek).toContain('<PeekAction label={pinned ? "Unpin" : "Pin"}');
-    expect(chat).toContain("pinned={!!peek.msg.pinned_at}");
-    expect(chat).toContain("void togglePin(peek.msg); setPeek(null);");
+  it("a hold in a chat opens the message's menu, not a preview", () => {
+    // Holding a shared post or Shot used to lift it out as the feed does,
+    // which spent the hold on a preview and left the message's own menu —
+    // reply, forward, pin, unsend — reachable only through a second tap.
+    // Every kind of message now answers a hold the same way.
+    expect(chat).not.toContain("PeekFor");
+    expect(chat).not.toContain("setPeek");
+    expect(chat).toContain("setMenu({ msg: m, rect });");
+    // One outcome, so the hold no longer takes a branch.
+    expect(chat).toContain("function onPressStart(m: ChatMsg, e: React.PointerEvent) {");
+  });
+
+  it("the peek goes back to being the feed's own", () => {
+    // Its chat-only actions go with it, rather than being left as props
+    // nothing passes.
+    expect(peek).not.toContain("onPin");
+    expect(peek).not.toContain("onMore");
+    expect(read("src/components/feed/PeekFor.tsx")).not.toContain("onMore");
   });
 
   it("a shared post or Shot carries its own three dots", () => {
-    // The hold is spent on the peek, so without these there is no way to
-    // reply to, forward, pin or unsend a shared post or Shot from the thread.
+    // A hold reaches the menu, and so does this: the dots are the visible
+    // way in, on the two cards whose hold used to do something else.
     const shot = read("src/components/messages/SharedShotCard.tsx");
     expect(shot).toContain("export function ShareMore");
     expect(shot).toContain('aria-label="More"');
@@ -249,12 +261,6 @@ describe("holding an attachment offers to pin it", () => {
     expect(shot).toContain("</Link>\n    {onMore && <ShareMore onMore={onMore} scrim />}");
     expect(shot).toContain("e.preventDefault();");
     expect(shot).toContain("e.stopPropagation();");
-  });
-
-  it("the peek keeps its Pin optional, so the feed never shows one", () => {
-    // The same peek opens from a grid tile, where there is no chat to pin to.
-    expect(peek).toContain("onPin?: () => void;");
-    expect(peek).toContain("{onPin && (");
   });
 
   it("a hold on a song does not start it playing", () => {
@@ -410,6 +416,50 @@ describe("the board on screen", () => {
   it("a name only where the side does not already say it", () => {
     // In a one-to-one chat the side is the name, so repeating it is noise.
     expect(board).toContain("isGroup && !pin.mine ? (people[pin.senderId]?.name ?? \"User\") : null");
+  });
+});
+
+describe("telling a pinch from a swipe", () => {
+  const swipeNav = read("src/components/layout/SwipeNav.tsx");
+
+  it("two fingers are never navigation", () => {
+    expect(canNavigate(false, 2, 0)).toBe(false);
+    expect(canNavigate(false, 1, 0)).toBe(true);
+  });
+
+  it("a gesture that has been a pinch stays dead, even back on one finger", () => {
+    // This is the bug: ignoring moves while two fingers are down leaves the
+    // drag armed, so when one finger lifts the moves resume measured from
+    // where the FIRST finger landed — and zooming a photo ended a tab away.
+    expect(canNavigate(true, 1, 0)).toBe(false);
+    expect(canNavigate(true, 0, 0)).toBe(false);
+  });
+
+  it("an open sheet owns the touch", () => {
+    expect(canNavigate(false, 1, 1)).toBe(false);
+  });
+
+  it("the tab swipe abandons the drag instead of merely skipping the move", () => {
+    expect(swipeNav).toContain("if (!canNavigate(sawMulti.current, e.touches.length, overlayCount())) {");
+    expect(swipeNav).toContain("if (e.touches.length > 1) sawMulti.current = true;");
+    // And it puts the page back rather than leaving it part-dragged.
+    expect(swipeNav).toContain("if (dx.current) paint(0, SETTLE);");
+  });
+
+  it("lifting one finger of a pinch commits nothing", () => {
+    // onTouchEnd fires per finger, so the first lift reached the commit.
+    expect(swipeNav).toContain("if (ignore.current) { axis.current = null; reach.current = 0; return; }");
+    // Cleared only once every finger is up, so the next touch starts clean.
+    expect(swipeNav).toContain("if (e.touches.length === 0) sawMulti.current = false;");
+  });
+
+  it("the pin board's drag follows the same rule, from the same function", () => {
+    // Two gestures with one rule between them, rather than two spellings of
+    // it that drift.
+    expect(pane).toContain('import { canNavigate } from "@/components/layout/SwipeNav";');
+    expect(pane).toContain("if (!canNavigate(d.multi, e.touches.length, 0)) {");
+    // And a second finger landing mid-drag settles the pane where it is.
+    expect(pane).toContain("setProgress(openRef.current ? 1 : 0);");
   });
 });
 

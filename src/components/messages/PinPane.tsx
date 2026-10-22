@@ -5,6 +5,7 @@ import { haptics } from "@/lib/haptics";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { PinBoard } from "@/components/messages/PinBoard";
 import { pinAxis, pinDragProgress, pinSwipeOutcome } from "@/lib/chat-pins";
+import { canNavigate } from "@/components/layout/SwipeNav";
 
 /**
  * The pin board as the chat's second pane.
@@ -23,7 +24,7 @@ import { pinAxis, pinDragProgress, pinSwipeOutcome } from "@/lib/chat-pins";
 
 const SETTLE = "transform 280ms cubic-bezier(0.16, 1, 0.3, 1)";
 
-type Drag = { x: number; y: number; at: number; axis: null | "x" | "y" };
+type Drag = { x: number; y: number; at: number; axis: null | "x" | "y"; multi: boolean };
 
 /**
  * The pane's state and the handlers both sides need.
@@ -90,14 +91,31 @@ export function usePinPane(threadScroller: React.RefObject<HTMLElement | null>) 
 
   function start(e: React.TouchEvent) {
     const t = e.touches[0];
-    if (!t || e.touches.length > 1) { drag.current = null; return; }
-    drag.current = { x: t.clientX, y: t.clientY, at: Date.now(), axis: null };
+    // A finger joining one already down is a pinch, not a swipe between
+    // panes. Settle wherever the pane is and let it go.
+    if (!t || e.touches.length > 1) {
+      if (drag.current) { setDragging(false); freeze(false); setProgress(openRef.current ? 1 : 0); }
+      drag.current = null;
+      return;
+    }
+    drag.current = { x: t.clientX, y: t.clientY, at: Date.now(), axis: null, multi: false };
   }
 
   function move(e: React.TouchEvent) {
     const d = drag.current;
     const t = e.touches[0];
     if (!d || !t) return;
+    // Same rule as the tab swipe: a pinch is never navigation, and a drag
+    // that has seen two fingers stays dead rather than resuming against a
+    // start point from before them.
+    if (!canNavigate(d.multi, e.touches.length, 0)) {
+      d.multi = true;
+      drag.current = null;
+      setDragging(false);
+      freeze(false);
+      setProgress(openRef.current ? 1 : 0);
+      return;
+    }
     const dx = t.clientX - d.x;
     const dy = t.clientY - d.y;
     if (d.axis === null) {

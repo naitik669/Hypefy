@@ -159,6 +159,31 @@ export function inHorizontalScroller(start: EventTarget | null): boolean {
 }
 
 /**
+ * May this gesture still become navigation?
+ *
+ * The order these are asked in is the whole rule, and it is the part that
+ * was loose before:
+ *
+ *  1. More than one finger is a PINCH, and a pinch belongs to whatever is
+ *     under it — the photo being zoomed, never the page it sits on.
+ *  2. An open sheet, or something that handles its own sideways drags, owns
+ *     the touch.
+ *  3. Clearly more sideways than up and down: navigation.
+ *  4. Anything else: the page scrolls.
+ *
+ * `sawMulti` is carried for the life of the gesture, and that is what
+ * matters. Merely ignoring moves while two fingers are down leaves the drag
+ * armed: when one finger lifts, moves resume measured from where the FIRST
+ * finger landed, before the pinch began. Zooming a photo with the second
+ * finger off to one side therefore ended the gesture a whole tab away. Once
+ * a gesture has been multi-touch it stays dead until every finger is up.
+ */
+export function canNavigate(sawMulti: boolean, touches: number, overlays: number): boolean {
+  if (sawMulti || touches > 1) return false;
+  return overlays === 0;
+}
+
+/**
  * Should this touch be released to whatever is under it?
  *
  * Split out from the handler so the rule is testable without a real gesture:
@@ -226,6 +251,8 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
   /** null = undecided, "x" = ours, "y" = the page's */
   const axis = useRef<null | "x" | "y">(null);
   const ignore = useRef(false);
+  /** Has this gesture ever had a second finger on it? See canNavigate. */
+  const sawMulti = useRef(false);
   const dx = useRef(0);
   /** Which neighbour this drag is reaching for. See heldReach. */
   const reach = useRef<Reach>(0);
@@ -380,7 +407,16 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
   if (!enabled) return <>{children}</>;
 
   function onTouchStart(e: React.TouchEvent) {
-    if (e.touches.length !== 1) return;
+    // A finger joining one already down turns this into a pinch. Kill the
+    // drag outright and put the page back, rather than leaving it armed to
+    // resume when one of them lifts.
+    if (e.touches.length !== 1) {
+      sawMulti.current = true;
+      ignore.current = true;
+      if (dx.current) { dx.current = 0; paint(0, SETTLE); setIncoming(null); }
+      return;
+    }
+    sawMulti.current = false;
     const t = e.touches[0];
     start.current = { x: t.clientX, y: t.clientY, t: Date.now() };
     axis.current = null;
@@ -403,13 +439,16 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
   }
 
   function onTouchMove(e: React.TouchEvent) {
-    if (ignore.current || e.touches.length !== 1) return;
-    // A sheet can open mid-drag — a long-press menu, say. Abandon the gesture
-    // rather than sliding the page under whatever just appeared.
-    if (overlayCount() > 0) {
+    if (ignore.current) return;
+    // A second finger, or a sheet opening mid-drag — a long-press menu,
+    // say. Either way the gesture is no longer ours: abandon it rather than
+    // sliding the page under whatever just took it.
+    if (!canNavigate(sawMulti.current, e.touches.length, overlayCount())) {
+      if (e.touches.length > 1) sawMulti.current = true;
       ignore.current = true;
       if (dx.current) paint(0, SETTLE);
       dx.current = 0;
+      setIncoming(null);
       return;
     }
     const t = e.touches[0];
@@ -441,7 +480,12 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     paint(x);
   }
 
-  function onTouchEnd() {
+  function onTouchEnd(e: React.TouchEvent) {
+    // Every finger gone: the next touch starts a clean gesture.
+    if (e.touches.length === 0) sawMulti.current = false;
+    // A pinch lifting one finger must not commit whatever the drag had
+    // accumulated before it became a pinch.
+    if (ignore.current) { axis.current = null; reach.current = 0; return; }
     if (axis.current !== "x") {
       axis.current = null;
       reach.current = 0;
