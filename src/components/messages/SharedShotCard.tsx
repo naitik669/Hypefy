@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/components/ui/Avatar";
 import { BLANK_POSTER } from "@/lib/blank-poster";
@@ -63,21 +64,25 @@ export type SharedShotAuthor = {
 export function SharedShotCard({
   shot,
   author,
+  onMore,
   ...linkProps
 }: {
   shot: SharedShot;
   author: SharedShotAuthor;
+  /** Opens the message's own menu. See ShareMore. */
+  onMore?: (rect: DOMRect) => void;
 } & Omit<React.ComponentProps<typeof Link>, "href">) {
   const [ratio, setRatio] = useState(TALLEST);
   const name = author?.username ?? author?.display_name ?? "Someone";
 
   return (
+    <div className="relative" style={{ width: SHOT_CARD_W }}>
     <Link
       href={`/shots/${shot.id}`}
       {...linkProps}
       aria-label={`Shot by ${name}`}
-      className="relative block overflow-hidden rounded-2xl bg-black"
-      style={{ width: SHOT_CARD_W, aspectRatio: String(ratio) }}
+      className="relative block w-full overflow-hidden rounded-2xl bg-black"
+      style={{ aspectRatio: String(ratio) }}
     >
       {shot.poster_url ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -105,13 +110,43 @@ export function SharedShotCard({
         width={17}
         height={17}
         aria-hidden
-        className="absolute right-2.5 top-2.5 fill-white drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.5)]"
+        className="absolute left-2.5 top-2.5 fill-white drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.5)]"
       >
         <path d={BOLT} />
       </svg>
 
       <ShareAuthor author={author} name={name} />
     </Link>
+    {onMore && <ShareMore onMore={onMore} scrim />}
+    </div>
+  );
+}
+
+/**
+ * The three dots on a shared post or Shot.
+ *
+ * Holding either of those opens the peek rather than the message's menu, so
+ * without this there is no way at all to reply to, forward, pin or unsend
+ * one from the thread — the hold is spent on something else. A sibling of
+ * the card's Link rather than a child of it, because a button inside an
+ * anchor is neither valid nor operable: the press would follow the link.
+ */
+export function ShareMore({ onMore, scrim = false }: { onMore: (rect: DOMRect) => void; scrim?: boolean }) {
+  return (
+    <button
+      type="button"
+      aria-label="More"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onMore(e.currentTarget.getBoundingClientRect());
+      }}
+      className={`absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full transition-transform active:scale-90 ${
+        scrim ? "bg-black/45 text-white" : "text-muted hover:text-foreground"
+      }`}
+    >
+      <MoreVertical size={15} />
+    </button>
   );
 }
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Avatar } from "@/components/ui/Avatar";
-import type { SharedShotAuthor } from "@/components/messages/SharedShotCard";
+import { ShareMore, type SharedShotAuthor } from "@/components/messages/SharedShotCard";
 
 /** The whole card, frame included. Wider than a shared Shot: posts are usually square or landscape. */
 export const POST_CARD_W = 200;
@@ -57,10 +57,13 @@ export function SharedPostCard({
   author,
   slide,
   showCaption = true,
+  onMore,
   ...linkProps
 }: {
   post: SharedPost;
   author: SharedShotAuthor;
+  /** Opens the message's own menu. See ShareMore. */
+  onMore?: (rect: DOMRect) => void;
   /** Which photo was shared, from the message. The first when absent. */
   slide?: number;
   /**
@@ -79,15 +82,16 @@ export function SharedPostCard({
   const hue = author?.avatar_hue ?? 200;
 
   return (
+    <div className="relative" style={{ width: POST_CARD_W }}>
     <Link
       // Opens on the photo that was shared.
       href={at > 0 ? `/p/${post.id}?slide=${at}` : `/p/${post.id}`}
       {...linkProps}
       aria-label={`Post by ${name}`}
-      className="block rounded-[18px] bg-surface p-2"
-      style={{ width: POST_CARD_W }}
+      className="block w-full rounded-[18px] bg-surface p-2"
     >
-      <div className="flex min-w-0 items-center gap-2 px-0.5 pb-2 pt-0.5">
+      {/* The dots sit over the right of this row, so the name stops short of them. */}
+      <div className={`flex min-w-0 items-center gap-2 px-0.5 pb-2 pt-0.5 ${onMore ? "pr-6" : ""}`}>
         <Avatar name={name} hue={hue} size={22} src={author?.avatar_url ?? undefined} className="shrink-0" />
         <span className="truncate text-[13px] font-semibold">{name}</span>
       </div>
@@ -135,5 +139,7 @@ export function SharedPostCard({
         </p>
       )}
     </Link>
+    {onMore && <ShareMore onMore={onMore} />}
+    </div>
   );
 }

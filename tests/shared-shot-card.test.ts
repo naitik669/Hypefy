@@ -71,10 +71,12 @@ describe("the card", () => {
     expect(card.textContent).toContain("maya");
   });
 
-  it("puts the bolt top-right and the name at the bottom, with no play button", async () => {
+  it("puts the bolt top-left and the name at the bottom, with no play button", async () => {
     const card = await render("https://x.test/p.jpg");
     const bolt = card.querySelector("svg") as SVGElement;
-    expect(bolt.getAttribute("class")).toContain("right-2.5");
+    // Top-LEFT since the three dots took the other corner: holding a shared
+    // Shot opens the peek, so the menu needs a control of its own on the card.
+    expect(bolt.getAttribute("class")).toContain("left-2.5");
     expect(bolt.getAttribute("class")).toContain("top-2.5");
     const name = [...card.querySelectorAll("span")].find((s) => s.textContent === "maya")!;
     expect(name.parentElement!.className).toContain("bottom-2");

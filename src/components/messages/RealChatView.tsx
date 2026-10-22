@@ -2204,6 +2204,7 @@ export function RealChatView({
                           author={m.postProfile ?? null}
                           slide={m.metadata?.slide}
                           showCaption={!m.metadata?.comment_id}
+                          onMore={(rect) => setMenu({ msg: m, rect })}
                           onPointerDown={(e) => onPressStart(m, e, (rect) => setPeek({ msg: m, rect }))}
                           onPointerUp={onPressEnd}
                           onPointerMove={onPressEnd}
@@ -2216,6 +2217,7 @@ export function RealChatView({
                         <SharedShotCard
                           shot={m.shot}
                           author={m.shotProfile ?? null}
+                          onMore={(rect) => setMenu({ msg: m, rect })}
                           onPointerDown={(e) => onPressStart(m, e, (rect) => setPeek({ msg: m, rect }))}
                           onPointerUp={onPressEnd}
                           onPointerMove={onPressEnd}

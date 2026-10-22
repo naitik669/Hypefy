@@ -232,6 +232,25 @@ describe("holding an attachment offers to pin it", () => {
     expect(chat).toContain("void togglePin(peek.msg); setPeek(null);");
   });
 
+  it("a shared post or Shot carries its own three dots", () => {
+    // The hold is spent on the peek, so without these there is no way to
+    // reply to, forward, pin or unsend a shared post or Shot from the thread.
+    const shot = read("src/components/messages/SharedShotCard.tsx");
+    expect(shot).toContain("export function ShareMore");
+    expect(shot).toContain('aria-label="More"');
+    expect(read("src/components/messages/SharedPostCard.tsx")).toContain("{onMore && <ShareMore onMore={onMore} />}");
+    expect(chat).toContain("onMore={(rect) => setMenu({ msg: m, rect })}");
+  });
+
+  it("the dots are beside the card's link, not inside it", () => {
+    // A button inside an anchor is neither valid nor operable: the press
+    // would follow the link to the post instead of opening the menu.
+    const shot = read("src/components/messages/SharedShotCard.tsx");
+    expect(shot).toContain("</Link>\n    {onMore && <ShareMore onMore={onMore} scrim />}");
+    expect(shot).toContain("e.preventDefault();");
+    expect(shot).toContain("e.stopPropagation();");
+  });
+
   it("the peek keeps its Pin optional, so the feed never shows one", () => {
     // The same peek opens from a grid tile, where there is no chat to pin to.
     expect(peek).toContain("onPin?: () => void;");
