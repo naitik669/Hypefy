@@ -8,6 +8,8 @@ cannot sign in.
 | File | Dashboard template | Used by |
 | --- | --- | --- |
 | `magic-link.html` | **Magic Link** | two-step verification, and "Email me a code instead" |
+| `confirm-signup.html` | **Confirm signup** | a new account, and Resend on the check-email screen |
+| `reset-password.html` | **Reset Password** | "Forgot password" |
 
 ## Why Magic Link needs changing
 
@@ -21,12 +23,30 @@ something that was never sent.
 
 Adding `{{ .Token }}` is the whole fix.
 
-## Leave the others alone
+## Codes vs links
 
-**Reset Password** must keep `{{ .ConfirmationURL }}`. That flow is
-link-based by design: the link carries the recovery code to
-`/auth/callback?next=/reset-password`, which is the only route to the
-set-a-new-password screen. Replacing it with a code would break recovery.
+Only **Magic Link** prints `{{ .Token }}`. The other two are link-based by
+design and must keep `{{ .ConfirmationURL }}`:
+
+- **Reset Password** — the link carries the recovery code to
+  `/auth/callback?next=/reset-password`, the only route to the
+  set-a-new-password screen. A code cannot reach it, so swapping one in
+  would break recovery outright.
+- **Confirm signup** — `signUp()` passes
+  `emailRedirectTo = <origin>/auth/callback`, and no screen in the app asks
+  a new account for a typed confirmation code. A code here would be an
+  instruction nothing can carry out.
+
+The three remaining stock templates (Invite, Change Email Address,
+Reauthentication) are not reachable from anything the app calls today.
+
+## Before any real volume
+
+These go out on Supabase's built-in sender, which is rate-limited to a
+handful of emails an hour and is documented as not for production. Sign-up,
+password reset and two-step codes all depend on it, so **custom SMTP has to
+be configured before launch** — Authentication → Emails → SMTP Settings.
+Until then, a busy hour silently stops people signing in.
 
 ## Worth checking while you're in there
 
