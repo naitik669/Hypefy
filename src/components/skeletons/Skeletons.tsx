@@ -207,7 +207,7 @@ const BUBBLES: { mine: boolean; width: string }[] = [
 
 export function ChatThreadSkeleton() {
   return (
-    <div aria-busy="true" aria-label="Loading" className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
+    <div aria-busy="true" aria-label="Loading" className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col overflow-hidden bg-background">
       <header className="flex h-[calc(3.5rem+var(--sat))] items-center gap-2 border-b border-border/60 chrome-bar px-2 pt-[var(--sat)]">
         <span className="flex h-10 w-10 items-center justify-center text-foreground">
           <ChevronLeft size={24} />

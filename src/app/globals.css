@@ -1989,3 +1989,45 @@ html[data-splash="off"] #hypefy-splash {
   background: conic-gradient(var(--color-accent) var(--pull-hold), var(--color-border) 0);
   animation: pull-hold-fill linear forwards;
 }
+
+/* ── The chat pin board ──────────────────────────────────────────────────
+   A card is pinned up rather than faded in: it drops the last few pixels
+   onto its pin and settles into its own lean. The lean is per-card and
+   comes from the message id, so it is passed in as --tilt rather than
+   baked into the keyframe, and the resting transform below has to agree
+   with the keyframe's `to` or the card jumps when the animation ends. */
+.pin-card {
+  transform: rotate(var(--tilt, 0deg));
+}
+@keyframes pin-up {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) rotate(0deg) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotate(var(--tilt, 0deg)) scale(1);
+  }
+}
+.animate-pin-up {
+  animation: pin-up 0.44s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* Pulling the pin drops the card, rather than vanishing it. */
+@keyframes pin-drop {
+  from {
+    opacity: 1;
+    transform: translateY(0) rotate(var(--tilt, 0deg));
+  }
+  to {
+    opacity: 0;
+    transform: translateY(30px) rotate(calc(var(--tilt, 0deg) + 8deg));
+  }
+}
+.animate-pin-drop {
+  animation: pin-drop 0.26s cubic-bezier(0.4, 0, 1, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pin-board * {
+    animation: none !important;
+  }
+}

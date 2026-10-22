@@ -27,7 +27,7 @@ describe("loading shapes", () => {
     const chat = readFileSync("src/components/messages/RealChatView.tsx", "utf8");
     const skeleton = readFileSync("src/components/skeletons/Skeletons.tsx", "utf8");
     for (const cls of [
-      "fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background",
+      "fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col overflow-hidden bg-background",
       "flex h-[calc(3.5rem+var(--sat))] items-center gap-2 border-b border-border/60 chrome-bar px-2 pt-[var(--sat)]",
     ]) {
       expect(chat, cls).toContain(cls);

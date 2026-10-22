@@ -36,9 +36,8 @@ import { PresenceDot } from "@/components/presence/PresenceDot";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
 import { one } from "@/lib/supabase/typed";
 import { ForwardSheet } from "@/components/messages/ForwardSheet";
-import { canPin, opensPinBoard } from "@/lib/chat-pins";
-import { gestureBlocked } from "@/components/layout/SwipeNav";
-import { overlayCount } from "@/lib/overlay-stack";
+import { canPin } from "@/lib/chat-pins";
+import { PinPane, usePinPane } from "@/components/messages/PinPane";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
 import { ChatAmbient } from "@/components/messages/ChatAmbient";
@@ -1841,31 +1840,12 @@ export function RealChatView({
   }
 
   /**
-   * Swipe left to the pin board.
+   * The chat and its pin board, as two panes moved between sideways.
    *
-   * Only the release decides, so nothing is stolen from a vertical scroll
-   * part-way through, and the usual exclusions apply: not while a sheet or
-   * menu is open, and not over anything that handles its own sideways drags
-   * (a photo gallery inside a bubble).
+   * The thread's scroller is handed over so the gesture can stop it
+   * scrolling while a sideways drag owns the finger.
    */
-  const swipe = useRef<{ x: number; y: number } | null>(null);
-
-  function onThreadTouchStart(e: React.TouchEvent) {
-    const t = e.touches[0];
-    if (!t || e.touches.length > 1 || gestureBlocked(overlayCount(), e.target)) { swipe.current = null; return; }
-    swipe.current = { x: t.clientX, y: t.clientY };
-  }
-
-  function onThreadTouchEnd(e: React.TouchEvent) {
-    const start = swipe.current;
-    swipe.current = null;
-    const t = e.changedTouches[0];
-    if (!start || !t) return;
-    if (opensPinBoard(t.clientX - start.x, t.clientY - start.y)) {
-      haptics.tap();
-      router.push(`/messages/${conversationId}/pins`);
-    }
-  }
+  const pinPane = usePinPane(scrollContainerRef);
 
   function copy(m: ChatMsg) {
     if (m.body) { navigator.clipboard.writeText(m.body).catch(() => {}); showToast("Copied"); }
@@ -1930,7 +1910,7 @@ export function RealChatView({
   }
 
   return (
-    <div data-chat-view className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
+    <div data-chat-view className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col overflow-hidden bg-background">
       {/* Header */}
       <header className="flex h-[calc(3.5rem+var(--sat))] items-center gap-2 border-b border-border/60 chrome-bar px-2 pt-[var(--sat)]">
         <button type="button" onClick={() => leaveChatAnimated(() => safeBack(router, "/messages"))} aria-label="Back"
@@ -2009,7 +1989,7 @@ export function RealChatView({
             <MenuItem
               icon={PinIcon}
               label="Pinned"
-              onClick={() => { setHeaderMenu(false); router.push(`/messages/${conversationId}/pins`); }}
+              onClick={() => { setHeaderMenu(false); pinPane.open(); }}
             />
             {!isGroup && other.username && (
               <MenuItem icon={UserCircle} label="View profile" onClick={() => { setHeaderMenu(false); router.push(`/u/${other.username}`); }} />
@@ -2049,9 +2029,7 @@ export function RealChatView({
         ref={scrollContainerRef}
         onScroll={onMessagesScroll}
         data-chat-scroll
-        onTouchStart={onThreadTouchStart}
-        onTouchEnd={onThreadTouchEnd}
-        onTouchCancel={() => { swipe.current = null; }}
+        {...pinPane.threadHandlers}
         className="relative isolate flex flex-1 flex-col-reverse overflow-y-auto px-4 py-4"
         style={theme ? { background: theme.background } : undefined}
         onClick={() => { if (gifPickerOpen) setGifPickerOpen(false); }}
@@ -3176,6 +3154,19 @@ export function RealChatView({
           onReported={() => showToast("Group reported")}
         />
       )}
+
+      {/* The pin board, as the chat's second pane. Last child, so it sits
+          over the thread rather than under the composer, and the thread
+          stays mounted behind it — which is what lets tapping a pinned card
+          close the pane and reach a message already on screen. */}
+      <PinPane
+        pane={pinPane}
+        conversationId={conversationId}
+        me={currentUserId}
+        people={isGroup ? Object.fromEntries((group?.members ?? []).map((m) => [m.id, { name: m.name }])) : { [other.id]: { name: other.name } }}
+        isGroup={isGroup}
+        onOpenMessage={(id) => void goToMessage({ id } as FoundMessage)}
+      />
 
     </div>
   );

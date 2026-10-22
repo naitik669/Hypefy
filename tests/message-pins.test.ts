@@ -3,12 +3,13 @@ import { readFileSync } from "node:fs";
 import {
   MAX_PINNED_MESSAGES,
   PINNABLE_KINDS,
-  PIN_SWIPE_PX,
   TILT_MAX,
   canPin,
   fileSize,
-  opensPinBoard,
+  pinAxis,
+  pinDragProgress,
   pinLabel,
+  pinSwipeOutcome,
   pinTilt,
   pinWhen,
   toPins,
@@ -23,6 +24,7 @@ import {
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const sql = read("supabase/migrations/0142_message_pins.sql");
 const board = read("src/components/messages/PinBoard.tsx");
+const pane = read("src/components/messages/PinPane.tsx");
 const chat = read("src/components/messages/RealChatView.tsx");
 
 const ME = "me-1";
@@ -81,7 +83,7 @@ describe("the order of the board", () => {
   });
 
   it("the board asks for no more than the cap allows", () => {
-    expect(read("src/app/(app)/messages/[threadId]/pins/page.tsx")).toContain(".limit(MAX_PINNED_MESSAGES)");
+    expect(board).toContain(".limit(MAX_PINNED_MESSAGES)");
   });
 });
 
@@ -296,18 +298,24 @@ describe("who may pin, and how many", () => {
 describe("the board reads only what is still there", () => {
   it("an unsent or removed message drops off on its own", () => {
     // No cleanup trigger: the query is what keeps the board honest.
-    const page = read("src/app/(app)/messages/[threadId]/pins/page.tsx");
-    expect(page).toContain('.eq("is_unsent", false)');
-    expect(page).toContain('.is("removed_at", null)');
-    expect(page).toContain('.not("pinned_at", "is", null)');
+    expect(board).toContain('.eq("is_unsent", false)');
+    expect(board).toContain('.is("removed_at", null)');
+    expect(board).toContain('.not("pinned_at", "is", null)');
   });
 
-  it("a stranger gets a 404, not an empty board", () => {
-    // RLS already returns nothing; an empty board would read as "they have
-    // not pinned anything".
-    expect(read("src/app/(app)/messages/[threadId]/pins/page.tsx")).toContain(
-      "if (!members?.some((m) => m.user_id === user.id)) notFound();",
-    );
+  it("a stranger sees nothing, because the row rule says so", () => {
+    // The board reads `messages` directly and RLS is what limits it to the
+    // reader's own conversations — there is no membership check in the
+    // component, and there must not need to be one.
+    expect(board).toContain('.from("messages")');
+    expect(board).toContain('.eq("conversation_id", conversationId)');
+  });
+
+  it("it is read when opened, not handed down", () => {
+    // The board is a pane of a chat that is already on screen, so there is
+    // nothing to pass it at render time.
+    expect(board).toContain("const [pins, setPins] = useState<Pin[] | null>(null);");
+    expect(board).toContain("pins === null ?");
   });
 });
 
@@ -324,20 +332,20 @@ describe("the board on screen", () => {
     expect(board).toContain("setPins(before);");
   });
 
-  it("tapping a card goes back to the message in the thread", () => {
-    expect(board).toContain("router.push(`/messages/${threadId}?m=${pin.id}`)");
-    // And the thread reaches it the same way a search result is reached.
-    expect(chat).toContain('const focus = params.get("m");');
-    expect(chat).toContain("void goToMessage({ id: focus } as FoundMessage);");
-    // The param is dropped, so a reload or a back does not jump again.
-    expect(chat).toContain('url.searchParams.delete("m");');
+  it("tapping a card closes the board onto the message", () => {
+    // The thread is still mounted behind the pane, so there is nothing to
+    // navigate to: the pane closes and the message is reached in place, the
+    // same way a search result is.
+    expect(board).toContain("onOpen={() => onOpenMessage?.(pin.id)}");
+    expect(pane).toContain("pane.close();");
+    expect(chat).toContain("onOpenMessage={(id) => void goToMessage({ id } as FoundMessage)}");
   });
 
   it("the side is what the layout actually does with it", () => {
     expect(board).toContain('const right = pin.side === "right";');
     expect(board).toContain('`flex ${right ? "justify-end" : "justify-start"}`');
     // The pin hangs on the outer corner, which is the side the card is on.
-    expect(board).toContain("...(right ? { right: 3 } : { left: 3 })");
+    expect(board).toContain("...(right ? { right: -2 } : { left: -2 })");
   });
 
   it("the thread is drawn solid, because a dashed one would smear", () => {
@@ -348,8 +356,36 @@ describe("the board on screen", () => {
   });
 
   it("an empty board invites the first pin rather than apologising", () => {
-    expect(board).toContain('title="Nothing pinned yet"');
-    expect(board).toContain("Hold a message in the chat and pin it");
+    expect(board).toContain("The board is empty");
+    expect(board).toContain("Hold anything in the chat");
+  });
+
+  it("an empty board is still a board", () => {
+    // One bare pin with its string and nothing on it says what the screen is
+    // for without a sentence doing the work.
+    const empty = board.slice(board.indexOf("function EmptyBoard"));
+    expect(empty.slice(0, 600)).toContain("rounded-full bg-accent/70");
+  });
+
+  it("a card leans on a variable, because the keyframes have to end on it", () => {
+    // A card whose resting transform disagreed with the animation's last
+    // frame would jump the moment the animation finished.
+    expect(board).toContain('["--tilt" as string]: `${pin.tilt}deg`');
+    const css = read("src/app/globals.css");
+    expect(css).toContain("transform: rotate(var(--tilt, 0deg));");
+    expect(css).toContain("transform: translateY(0) rotate(var(--tilt, 0deg)) scale(1);");
+    // And nothing animates for someone who asked for less motion.
+    expect(css).toContain(".pin-board * {");
+  });
+
+  it("pulling a pin drops the card rather than blinking it out", () => {
+    expect(board).toContain('falling ? "animate-pin-drop" : "animate-pin-up"');
+    expect(read("src/app/globals.css")).toContain("@keyframes pin-drop");
+  });
+
+  it("the string is drawn with a dip in it", () => {
+    // A straight hairline between two cards read as a stray border.
+    expect(board).toContain("Q ${(x1 + x2) / 2} ${100 + SAG}");
   });
 
   it("a name only where the side does not already say it", () => {
@@ -358,28 +394,65 @@ describe("the board on screen", () => {
   });
 });
 
-describe("swiping left to the board", () => {
-  it("leftward only — rightward over a chat reads as going back", () => {
-    expect(opensPinBoard(-PIN_SWIPE_PX, 0)).toBe(true);
-    expect(opensPinBoard(PIN_SWIPE_PX * 2, 0)).toBe(false);
+describe("moving sideways between the chat and the board", () => {
+  it("the board follows the finger, both ways", () => {
+    // Half a screen dragged left is half open; the same drag back from open
+    // is half closed. One expression, because the pane moves with the finger
+    // by the same amount whichever way it is going.
+    expect(pinDragProgress(-200, 400, false)).toBeCloseTo(0.5);
+    expect(pinDragProgress(200, 400, true)).toBeCloseTo(0.5);
+    // And never past either end, however far the finger goes.
+    expect(pinDragProgress(-9999, 400, false)).toBe(1);
+    expect(pinDragProgress(9999, 400, true)).toBe(0);
   });
 
-  it("a short drag is not a swipe", () => {
-    expect(opensPinBoard(-(PIN_SWIPE_PX - 1), 0)).toBe(false);
+  it("a short, slow drag falls back to where it started", () => {
+    const g = { width: 400, elapsed: 900, open: false };
+    expect(pinSwipeOutcome({ ...g, dx: -40 })).toBe("stay");
+    expect(pinSwipeOutcome({ ...g, dx: -200 })).toBe("open");
+  });
+
+  it("a flick commits before it has gone far", () => {
+    expect(pinSwipeOutcome({ dx: -60, width: 400, elapsed: 80, open: false })).toBe("open");
+    expect(pinSwipeOutcome({ dx: 60, width: 400, elapsed: 80, open: true })).toBe("close");
+  });
+
+  it("the wrong way does nothing at either end", () => {
+    // There is no third pane to the right of the chat, or left of the board.
+    expect(pinSwipeOutcome({ dx: 300, width: 400, elapsed: 200, open: false })).toBe("stay");
+    expect(pinSwipeOutcome({ dx: -300, width: 400, elapsed: 200, open: true })).toBe("stay");
   });
 
   it("a scroll that wandered sideways is left alone", () => {
     // Stealing a scroll is worse than missing a swipe — SwipeNav's own bias.
-    expect(opensPinBoard(-90, 80)).toBe(false);
-    expect(opensPinBoard(-90, 20)).toBe(true);
+    expect(pinAxis(90, 80)).toBe("y");
+    expect(pinAxis(90, 20)).toBe("x");
+    // And nothing is decided until the finger has committed to something.
+    expect(pinAxis(4, 4)).toBe(null);
   });
 
-  it("not while a sheet or a menu is open, and not over a gallery", () => {
-    expect(chat).toContain("gestureBlocked(overlayCount(), e.target)");
+  it("the drag stops both panes scrolling under the finger", () => {
+    // A React touch handler is passive, so the browser has already started
+    // scrolling by the time the axis is known; taking the overflow away is
+    // the only thing that reaches it.
+    expect(pane).toContain('el.style.overflowY = on ? "hidden" : ""');
+    expect(pane).toContain('querySelector<HTMLElement>("[data-pin-scroll]")');
+    expect(board).toContain("data-pin-scroll");
   });
 
   it("not a pinch", () => {
-    expect(chat).toContain("e.touches.length > 1");
+    expect(pane).toContain("e.touches.length > 1");
+  });
+
+  it("back closes the board before it leaves the chat", () => {
+    // Android's back button has to dismiss what is on top first.
+    expect(pane).toContain("useOverlayBackButton(mounted && isOpen, close)");
+  });
+
+  it("the thread stays mounted behind it", () => {
+    // Which is what lets a tapped card be reached in place.
+    expect(pane).toContain("if (!pane.mounted) return null;");
+    expect(chat).toContain("<PinPane");
   });
 
   it("the thread is the one screen with no sideways navigation of its own", () => {
@@ -393,7 +466,7 @@ describe("swiping left to the board", () => {
   it("there is also a way in that is not a gesture", () => {
     // A gesture nobody discovers is not a feature.
     expect(chat).toContain('label="Pinned"');
-    expect(chat).toContain("router.push(`/messages/${conversationId}/pins`)");
+    expect(chat).toContain("pinPane.open();");
   });
 });
 

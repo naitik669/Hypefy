@@ -124,13 +124,21 @@ const one = <T,>(v: unknown): T | null => ((Array.isArray(v) ? v[0] : v) as T | 
  * rather than casual, and a column of cards all leaning hard reads as a
  * mistake in the layout.
  */
-export const TILT_MAX = 2.6;
+export const TILT_MAX = 3;
 
 export function pinTilt(id: string): number {
-  // 0..1 from the hash, then spread across [-TILT_MAX, TILT_MAX] and held to
-  // one decimal so the transform string is stable and short.
-  const t = (hash(id) % 1000) / 999;
-  return Math.round((t * 2 - 1) * TILT_MAX * 10) / 10;
+  const h = hash(id);
+  // Size and direction come from different parts of the hash, so a run of
+  // ids cannot happen to lean the same way.
+  const mag = ((h >>> 8) % 1000) / 999;
+  // Parity of the high bytes, not the low bit. FNV-1a finishes by mixing the
+  // last character into the low end, so for ids that differ only near their
+  // end the low bit barely moves — a set of seven leaned the same way.
+  const dir = ((h >>> 16) ^ (h >>> 24)) & 1 ? 1 : -1;
+  // Never flat. Spreading evenly across the range put cards at 0.1°, which
+  // reads as a rotation that failed rather than as a card hanging straight,
+  // so the middle is pushed out and every card leans at least a little.
+  return Math.round(dir * (0.45 + 0.55 * mag) * TILT_MAX * 10) / 10;
 }
 
 /** "0:24". */
@@ -287,6 +295,54 @@ export const PIN_SWIPE_PX = 70;
  */
 export function opensPinBoard(dx: number, dy: number): boolean {
   return dx <= -PIN_SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.6;
+}
+
+/**
+ * The board is a pane beside the thread, not a page after it, so a drag has
+ * to be read the way SwipeNav reads a tab swipe: the pane follows the finger
+ * and the release decides whether it stays.
+ */
+/** Fraction of the screen the finger must cross to commit. */
+export const PIN_COMMIT_RATIO = 0.3;
+/** A fast flick commits early — px per ms. */
+export const PIN_FLICK = 0.45;
+
+/**
+ * How far open the pane is, 0 closed to 1 open, for a drag of `dx` px.
+ *
+ * One expression for both directions: opening drags left and closing drags
+ * right, so the pane always follows the finger by the same amount and only
+ * the starting point differs.
+ */
+export function pinDragProgress(dx: number, width: number, open: boolean): number {
+  const moved = -dx / Math.max(1, width);
+  return Math.min(1, Math.max(0, (open ? 1 : 0) + moved));
+}
+
+/** What a released drag should do. */
+export function pinSwipeOutcome(g: {
+  dx: number;
+  width: number;
+  elapsed: number;
+  open: boolean;
+}): "open" | "close" | "stay" {
+  const velocity = Math.abs(g.dx) / Math.max(1, g.elapsed);
+  const far = Math.abs(g.dx) > g.width * PIN_COMMIT_RATIO;
+  const flicked = velocity > PIN_FLICK && Math.abs(g.dx) > 40;
+  if (!far && !flicked) return "stay";
+  if (!g.open) return g.dx < 0 ? "open" : "stay";
+  return g.dx > 0 ? "close" : "stay";
+}
+
+/**
+ * Which axis this drag belongs to, or null while it is still ambiguous.
+ *
+ * Biased towards vertical, like SwipeNav: both panes scroll, and stealing a
+ * scroll is far more annoying than missing a swipe.
+ */
+export function pinAxis(dx: number, dy: number, threshold = 10): null | "x" | "y" {
+  if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return null;
+  return Math.abs(dx) > Math.abs(dy) * 1.4 ? "x" : "y";
 }
 
 /** The columns the pin board reads. */
