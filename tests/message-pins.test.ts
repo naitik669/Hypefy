@@ -199,6 +199,50 @@ describe("what may be pinned", () => {
   });
 });
 
+describe("holding an attachment offers to pin it", () => {
+  const peek = read("src/components/feed/PostPeek.tsx");
+
+  it("every pinnable kind can actually be held", () => {
+    // The menu is reached by a hold, so a bubble with no hold handler cannot
+    // be pinned however pinnable its kind is. A shared song was exactly that
+    // — the one message in the thread with no hold at all, so it could not
+    // be replied to, forwarded or unsent either.
+    const bubbles = chat.slice(chat.indexOf('m.kind === "post" && m.post'), chat.indexOf("{/* Reaction chips */}"));
+    // Split on the branch delimiter itself, so a `m.kind` mentioned inside a
+    // branch's own code cannot be mistaken for the start of the next one.
+    const branches = new Map<string, string>();
+    for (const chunk of bubbles.split(') : m.kind === "')) {
+      const kind = chunk.slice(0, chunk.indexOf('"'));
+      if (kind && !kind.includes("\n")) branches.set(kind, chunk);
+    }
+    for (const kind of ["music", "document", "album", "video", "voice", "page_reply"]) {
+      expect(branches.has(kind), `${kind} bubble`).toBe(true);
+      expect(branches.get(kind), `${kind} hold`).toContain("onPressStart(m, e");
+    }
+  });
+
+  it("a shared post or Shot gets Pin where the hold actually lands", () => {
+    // Holding those two opens the peek, not the message's menu, so Pin has
+    // to be on the peek — otherwise pinning an attachment is the one pin
+    // that takes two taps.
+    expect(peek).toContain('<PeekAction label={pinned ? "Unpin" : "Pin"}');
+    expect(chat).toContain("pinned={!!peek.msg.pinned_at}");
+    expect(chat).toContain("void togglePin(peek.msg); setPeek(null);");
+  });
+
+  it("the peek keeps its Pin optional, so the feed never shows one", () => {
+    // The same peek opens from a grid tile, where there is no chat to pin to.
+    expect(peek).toContain("onPin?: () => void;");
+    expect(peek).toContain("{onPin && (");
+  });
+
+  it("a hold on a song does not start it playing", () => {
+    // The chip is a player and handles its own tap first, so the guard has
+    // to run in the capture phase or the hold plays the song.
+    expect(chat).toContain("onClickCapture={(e) => { if (suppressClick.current) { e.preventDefault(); e.stopPropagation();");
+  });
+});
+
 describe("who may pin, and how many", () => {
   it("any member, including the other person's messages", () => {
     // The board belongs to the conversation, not to whoever spoke.

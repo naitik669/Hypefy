@@ -38,6 +38,8 @@ export function PeekFor({
   currentUserId,
   onClose,
   onMore,
+  onPin,
+  pinned,
 }: {
   target: PeekTarget;
   /** A Shot's hypes, saves, comments and rehypes live in their own tables. */
@@ -46,6 +48,9 @@ export function PeekFor({
   onClose: () => void;
   /** A sixth action, for a chat: the message's own menu. */
   onMore?: () => void;
+  /** Pin, for a chat: put this shared post or Shot on the chat's board. */
+  onPin?: () => void;
+  pinned?: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const toast = useToast();
@@ -194,6 +199,8 @@ export function PeekFor({
         onComment={() => setCommentsOpen(true)}
         onShare={() => setShareOpen(true)}
         onSave={() => void toggleSave()}
+        onPin={onPin}
+        pinned={pinned}
         onMore={onMore}
         onClose={onClose}
       />

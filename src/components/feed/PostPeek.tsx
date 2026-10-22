@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Star, Bookmark, MoreHorizontal, Volume2, VolumeX } from "lucide-react";
+import { Star, Bookmark, MoreHorizontal, Volume2, VolumeX, Pin } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
@@ -97,6 +97,8 @@ export function PostPeek({
   onComment,
   onShare,
   onSave,
+  onPin,
+  pinned = false,
   onMore,
   onClose,
 }: {
@@ -133,6 +135,14 @@ export function PostPeek({
    * the message's own menu (reply, react, forward, unsend), and now opens
    * this instead — so the menu has to stay one tap away.
    */
+  /**
+   * Pin, only in a chat: a shared post or Shot is the kind of thing people
+   * most want to keep, and holding it opens this rather than the message's
+   * own menu — so without it here, pinning an attachment would be the one
+   * pin that takes two taps.
+   */
+  onPin?: () => void;
+  pinned?: boolean;
   onMore?: () => void;
   onClose: () => void;
 }) {
@@ -400,6 +410,12 @@ export function PostPeek({
               fill={saved ? "currentColor" : "none"}
             />
           </PeekAction>
+
+          {onPin && (
+            <PeekAction label={pinned ? "Unpin" : "Pin"} active={pinned} onClick={onPin}>
+              <Pin size={23} strokeWidth={2.2} fill={pinned ? "currentColor" : "none"} />
+            </PeekAction>
+          )}
 
           {onMore && (
             <PeekAction label="More" onClick={onMore}>

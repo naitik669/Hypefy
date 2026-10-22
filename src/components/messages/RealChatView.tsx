@@ -2264,7 +2264,23 @@ export function RealChatView({
                         </div>
                       ) : m.kind === "music" && unpackTrack(m.body) ? (
                         // A song plays in the thread; no leaving for another app.
-                        <div className="w-[230px] max-w-full">
+                        //
+                        // The hold handlers are on the wrapper rather than the chip
+                        // because the chip is a player, not a bubble. Without them a
+                        // shared song was the one message in the thread that could
+                        // not be replied to, forwarded, unsent or pinned at all.
+                        // The click is stopped in the CAPTURE phase: the chip
+                        // handles its own tap first, so a bubble-phase guard would
+                        // run after the hold had already started playback.
+                        <div
+                          className="w-[230px] max-w-full"
+                          onPointerDown={(e) => onPressStart(m, e)}
+                          onPointerUp={onPressEnd}
+                          onPointerMove={onPressEnd}
+                          onPointerLeave={onPressEnd}
+                          onClickCapture={(e) => { if (suppressClick.current) { e.preventDefault(); e.stopPropagation(); suppressClick.current = false; } }}
+                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                        >
                           <TrackChip track={unpackTrack(m.body)!} />
                         </div>
                       ) : m.kind === "oneshot" ? (
@@ -3012,6 +3028,10 @@ export function RealChatView({
                   caption: peek.msg.post!.caption,
                 }
           }
+          onPin={canPin(peek.msg.kind, peek.msg.is_unsent) && !peek.msg.id.startsWith("temp-")
+            ? () => { void togglePin(peek.msg); setPeek(null); }
+            : undefined}
+          pinned={!!peek.msg.pinned_at}
           onMore={() => {
             const { msg, rect } = peek;
             setPeek(null);
