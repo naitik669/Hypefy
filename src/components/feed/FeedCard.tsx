@@ -139,6 +139,7 @@ export function FeedCard({
   initialSlide = 0,
   showId,
   proof,
+  priority,
 }: {
   post: FeedPost;
   currentUserId: string;
@@ -167,6 +168,12 @@ export function FeedCard({
    * URL, so a shared photo opens on that photo and not on the first.
    */
   initialSlide?: number;
+  /**
+   * This card's first photo is the page's largest contentful paint. Set by
+   * FeedList for the first card only: every other image stays lazy, and
+   * marking more than one defeats the point by making the browser race them.
+   */
+  priority?: boolean;
 }) {
   const supabase = createClient();
   const images = getImages(post);
@@ -1009,6 +1016,9 @@ export function FeedCard({
                   sizes="(max-width: 480px) 100vw, 448px"
                   className="object-cover"
                   draggable={false}
+                  // Only the photo actually on screen at load: the rest of
+                  // the gallery is off to the side behind a swipe.
+                  priority={priority && i === 0}
                 />
               </div>
             ))}

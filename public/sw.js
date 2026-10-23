@@ -25,6 +25,14 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== OFFLINE_CACHE).map((k) => caches.delete(k))))
+      // Navigation preload. The fetch handler below intercepts every
+      // navigation, which means the browser waits for this worker to boot
+      // before the request even leaves the device — tens to hundreds of
+      // milliseconds in front of every page, paid purely for a fallback
+      // that only matters offline. With preload on, the browser fires the
+      // navigation in parallel with that boot and hands us the response.
+      .then(() => self.registration.navigationPreload?.enable())
+      .catch(() => {})
       .then(() => self.clients.claim()),
   );
 });
@@ -34,14 +42,29 @@ self.addEventListener("activate", (event) => {
  * stale bundles); if it fails — i.e. the user is offline — fall back to the
  * cached branded offline page. All other requests (assets, API, RSC) pass
  * straight through to the network untouched.
+ *
+ * The network attempt is the preloaded response where there is one, which is
+ * the same request the browser already started; only a browser without
+ * navigation preload, or a navigation that began before activate enabled it,
+ * falls through to making it here.
  */
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET" || req.mode !== "navigate") return;
   event.respondWith(
-    fetch(req).catch(() =>
-      caches.match(OFFLINE_URL, { ignoreSearch: true }).then((res) => res ?? Response.error()),
-    ),
+    (async () => {
+      try {
+        // A preload that failed rejects rather than resolving, and it can
+        // also resolve to undefined when preload is off — both mean "ask
+        // for it the ordinary way".
+        const preloaded = await event.preloadResponse;
+        if (preloaded) return preloaded;
+        return await fetch(req);
+      } catch {
+        const cached = await caches.match(OFFLINE_URL, { ignoreSearch: true });
+        return cached ?? Response.error();
+      }
+    })(),
   );
 });
 

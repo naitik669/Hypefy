@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { currentUser } from "@/lib/auth-user";
 import { getProfile } from "@/lib/profile";
 
 /**
@@ -10,13 +11,11 @@ import { getProfile } from "@/lib/profile";
  */
 export default async function RootPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
 
   if (!user) redirect("/onboarding");
 
-  const profile = await getProfile(supabase);
+  const profile = await getProfile(supabase, user);
   if (!profile?.profileCompleted) redirect("/setup-profile");
 
   redirect("/home");

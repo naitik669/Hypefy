@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { currentUser } from "@/lib/auth-user";
 import { getProfile } from "@/lib/profile";
 import { IntroCarousel } from "@/components/onboarding/IntroCarousel";
 
@@ -11,12 +12,10 @@ import { IntroCarousel } from "@/components/onboarding/IntroCarousel";
  */
 export default async function OnboardingPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
 
   if (user) {
-    const profile = await getProfile(supabase);
+    const profile = await getProfile(supabase, user);
     redirect(profile?.profileCompleted ? "/home" : "/setup-profile");
   }
 

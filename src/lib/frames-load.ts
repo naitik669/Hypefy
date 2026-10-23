@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { DECORATIONS } from "@/lib/cosmetics";
 import { frameUrl, type FrameAsset, type FrameCatalog } from "@/lib/frames";
@@ -14,7 +15,7 @@ import { frameUrl, type FrameAsset, type FrameCatalog } from "@/lib/frames";
  * everywhere at once: the id stops resolving and the frame stops drawing,
  * without touching a single profile row.
  */
-export async function loadFrames(): Promise<FrameCatalog> {
+export const loadFrames = cache(async (): Promise<FrameCatalog> => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("products")
@@ -55,4 +56,4 @@ export async function loadFrames(): Promise<FrameCatalog> {
     };
   }
   return catalog;
-}
+});

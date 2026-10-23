@@ -9,6 +9,7 @@ import { ReelArt } from "@/components/empty/scenes";
 import { GridPeek } from "@/components/feed/GridPeek";
 import { GridSkeleton, ShotCover } from "@/components/profile/ProfileGrids";
 import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
+import { OptimizedImage } from "@/components/ui/OptimizedImage";
 
 /**
  * The Rehypes tab: what this person passed on to their followers.
@@ -238,8 +239,9 @@ export function RehypesGrid({
               {it.kind === "post" ? (
                 <Link href={`/p/${it.id}`} className="block h-full">
                   {it.cover ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={it.cover} alt={it.caption ?? "Post"} draggable={false} className="h-full w-full object-cover" />
+                    // Same reasoning as the profile grid: small tiles, many
+                    // of them, full-size originals before this.
+                    <OptimizedImage src={it.cover} alt={it.caption ?? "Post"} sizes="(max-width: 480px) 33vw, 160px" draggable={false} />
                   ) : (
                     <div className="flex h-full items-start bg-elevated p-2">
                       <p className="line-clamp-4 text-[10px] leading-snug text-muted">{it.caption}</p>

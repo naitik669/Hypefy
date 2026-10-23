@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { LibraryBig, Settings, BarChart3, IdCard } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { currentUser } from "@/lib/auth-user";
 import { getProfile, hueFromId } from "@/lib/profile";
 import { pageText } from "@/lib/diary";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
@@ -27,12 +28,12 @@ async function fetchStats(supabase: Awaited<ReturnType<typeof createClient>>, us
 
 export default async function ProfilePage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await currentUser();
   if (!user) return null;
 
   const nowIso = new Date().toISOString();
   const [profile, stats, activeShowsRes, myNoteRes] = await Promise.all([
-    getProfile(supabase),
+    getProfile(supabase, user),
     fetchStats(supabase, user.id),
     // Active Shows for the avatar ring (oldest = entry)
     supabase

@@ -68,7 +68,11 @@ export function OptimizedImage({
           alt={alt}
           className={`absolute inset-0 h-full w-full ${className} ${loadCls}`}
           draggable={draggable}
-          loading="lazy"
+          // The fallback has to honour priority too, or an LCP image on a
+          // host next/image cannot optimise is lazy-loaded — the one case
+          // where it matters most.
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : undefined}
           decoding="async"
           onLoad={() => setLoaded(true)}
         />

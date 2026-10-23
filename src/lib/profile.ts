@@ -257,13 +257,24 @@ function mapProfile(row: any, mine: PrivateProfile | null): Profile {
   };
 }
 
-/** Fetch the signed-in user's profile (server or client supabase client). */
+/**
+ * Fetch the signed-in user's profile (server or client supabase client).
+ *
+ * Pass `user` when the caller already has one. Server callers get it from
+ * `currentUser()`, which is cached for the request — without it this
+ * function makes its own `getUser()` call, and that is a round trip to
+ * GoTrue on top of the one the caller already paid for. This file is
+ * imported by client components, so it cannot reach for the cached helper
+ * itself.
+ */
 export async function getProfile(
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  user?: { id: string } | null,
 ): Promise<Profile | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  if (user === undefined) {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  }
   if (!user) return null;
 
   const [{ data }, mine] = await Promise.all([

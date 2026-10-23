@@ -1,17 +1,16 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { currentUser } from "@/lib/auth-user";
 import { getProfile, hueFromId } from "@/lib/profile";
 import { SetupStepper } from "@/components/onboarding/SetupStepper";
 
 export default async function SetupProfilePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
 
   if (!user) redirect("/signin");
 
-  const profile = await getProfile(supabase);
+  const profile = await getProfile(supabase, user);
 
   const initial = {
     displayName: profile?.displayName ?? "",

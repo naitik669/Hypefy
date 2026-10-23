@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { GridPeek } from "@/components/feed/GridPeek";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { GRID, GRID_WRAP } from "@/components/profile/postGrid";
+import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { repairPoster } from "@/lib/poster-repair";
 
@@ -190,8 +191,12 @@ export function PostsGrid({
               >
                 <Link href={fromProfile ? `/p/${p.id}?from=profile` : `/p/${p.id}`} className="block h-full">
                   {cover ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={cover} alt={p.caption ?? "Post"} draggable={false} className="h-full w-full object-cover" />
+                    // A grid tile is ~160 CSS px wide and there are dozens of
+                    // them; this used to load the full-size original for every
+                    // one, eagerly. next/image resizes and lazy-loads, and
+                    // falls back to a plain <img> for any host it cannot
+                    // optimise, so unexpected media still renders.
+                    <OptimizedImage src={cover} alt={p.caption ?? "Post"} sizes="(max-width: 480px) 33vw, 160px" draggable={false} />
                   ) : (
                     <div className="flex h-full items-start bg-elevated p-2">
                       <p className="line-clamp-4 text-[10px] leading-snug text-muted">
@@ -317,8 +322,7 @@ export function ShotsGrid({
  */
 export function ShotCover({ poster, media }: { poster: string | null; media: string }) {
   if (poster) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={poster} alt="" draggable={false} className="h-full w-full object-cover" />;
+    return <OptimizedImage src={poster} alt="" sizes="(max-width: 480px) 33vw, 160px" draggable={false} />;
   }
   return (
     <video

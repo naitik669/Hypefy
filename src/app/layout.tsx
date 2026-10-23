@@ -52,7 +52,10 @@ sessionStorage.setItem('hypefy_splash','1');
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  // No weight list. Plus Jakarta Sans is a variable font, and naming five
+  // static weights made next/font fetch five separate files where one
+  // covers the whole 200–800 axis. Every weight the app uses still
+  // resolves, and font-black (900) clamps to 800 exactly as it did before.
   display: "swap",
   // Render immediately with a system stack if the web font is slow/unavailable.
   fallback: [

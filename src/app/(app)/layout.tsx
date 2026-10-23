@@ -11,6 +11,7 @@ import { UploadProvider, ShotUploadCard } from "@/components/upload/UploadProvid
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { FrameCatalogProvider } from "@/components/ui/FrameCatalogProvider";
 import { loadFrames } from "@/lib/frames-load";
+import { currentUser } from "@/lib/auth-user";
 import { ConnectionNotice } from "@/components/native/ConnectionNotice";
 import { ReturnToDestination } from "@/components/native/ReturnToDestination";
 import { NativeShell } from "@/components/native/NativeShell";
@@ -36,9 +37,7 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
 
   // Anonymous visitors can land here on PUBLIC pages (/p, /u, /shots/[id]
   // via shared links — the middleware already guards the private routes).
@@ -59,11 +58,14 @@ export default async function AppLayout({
   // depend on the profile, and waiting for the profile first put a second
   // database round trip in front of the first byte of every page — most
   // visibly on a cold app launch, where it is the whole shell that waits.
-  const [profile, { data: unreadCount }, { data: vaultRows }] = await Promise.all([
-    getProfile(supabase),
+  const [profile, { data: unreadCount }, { data: vaultRows }, frames] = await Promise.all([
+    getProfile(supabase, user),
     supabase.rpc("unread_dm_count"),
     // Counts and one yes/no; never who. For the dot on the Messages tab.
     supabase.rpc("vault_overview"),
+    // In here rather than awaited in the JSX below, where it was a round
+    // trip of its own after all of these had already finished.
+    loadFrames(),
   ]);
 
   // No date of birth on file means we never actually asked — the Google button
@@ -156,7 +158,7 @@ export default async function AppLayout({
   }
 
   return (
-    <FrameCatalogProvider frames={await loadFrames()}>
+    <FrameCatalogProvider frames={frames}>
     <ToastProvider>
       <CallProvider userId={user!.id}>
         <GroupCallProvider userId={user!.id}>

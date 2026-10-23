@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { currentUser } from "@/lib/auth-user";
 import { getProfile } from "@/lib/profile";
 import { AgeCheck } from "@/components/auth/AgeCheck";
 
@@ -13,13 +14,11 @@ export const dynamic = "force-dynamic";
 
 export default async function AgeCheckPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   if (!user) redirect("/signin");
 
   // Already answered — nothing to ask.
-  const profile = await getProfile(supabase);
+  const profile = await getProfile(supabase, user);
   if (profile?.dateOfBirth) redirect("/home");
 
   return <AgeCheck />;

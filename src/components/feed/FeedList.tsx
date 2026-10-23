@@ -415,6 +415,8 @@ export function FeedList({
                 initialIsMutualHyper={mutualHyperSet.has(item.post.user_id)}
                 showId={showByUser[item.post.user_id]}
                 proof={postProof.get(item.post.id)}
+                // The first card above the fold carries the page LCP.
+                priority={i === 0}
               />
             </Reveal>
           )
