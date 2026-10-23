@@ -1,4 +1,4 @@
-export const metadata = { title: "Community Guidelines · Hypefy" };
+export const metadata = { title: "Community Guidelines" };
 
 export default function GuidelinesPage() {
   return (

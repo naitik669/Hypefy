@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Delete your account · Hypefy",
+  title: "Delete your account",
   description: "How to delete your Hypefy account and the data that goes with it.",
 };
 

@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Child Safety Standards · Hypefy",
+  title: "Child Safety Standards",
   description: "Hypefy's standards against child sexual abuse and exploitation, and how to report.",
 };
 

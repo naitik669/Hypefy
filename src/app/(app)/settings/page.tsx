@@ -221,6 +221,12 @@ export default async function SettingsPage() {
           <Link href="/child-safety" className="underline hover:text-muted">
             Child Safety
           </Link>
+          <span className="mx-2">·</span>
+          {/* Rule 3(2)(a) of the IT Rules 2021 wants the complaint mechanism
+              published prominently, not only named inside another document. */}
+          <Link href="/grievance" className="underline hover:text-muted">
+            Grievance Redressal
+          </Link>
         </p>
       </div>
     </>

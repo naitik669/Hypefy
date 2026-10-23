@@ -195,6 +195,9 @@ export default async function ExplorePage() {
         <Link href="/guidelines" className="underline">
           Guidelines
         </Link>
+        <Link href="/grievance" className="underline">
+          Grievance
+        </Link>
       </footer>
     </main>
   );

@@ -1,4 +1,4 @@
-export const metadata = { title: "Privacy Policy · Hypefy" };
+export const metadata = { title: "Privacy Policy" };
 
 export default function PrivacyPage() {
   return (
@@ -267,6 +267,14 @@ export default function PrivacyPage() {
           Taharpur, Moradabad, Uttar Pradesh 244001, India
         </li>
       </ul>
+      <p>
+        How to make a complaint, what to include, and how long we take is set
+        out in full in{" "}
+        <a href="/grievance" className="text-accent">
+          Grievance Redressal
+        </a>
+        .
+      </p>
     </>
   );
 }
