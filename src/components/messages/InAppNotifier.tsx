@@ -247,6 +247,22 @@ export function InAppNotifier({ currentUserId }: { currentUserId: string }) {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "message_reactions" }, ({ new: row }) => {
         handleReaction(row as Parameters<typeof handleReaction>[0]);
       })
+      // Mute and lock both live on this row, and both are read from a cache
+      // filled once at mount — this component lives in the layout, so that
+      // is the life of the session. Without this, locking a chat while the
+      // app is open kept showing its sender and a preview in a banner,
+      // which is the one thing the lock exists to prevent, and muting one
+      // kept producing toasts. Dropping the entry makes the next message
+      // read it again; the re-read also refreshes lockedIds through
+      // noteLevels, so a chat locked on another device is caught too.
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "conversation_members", filter: `user_id=eq.${currentUserId}` },
+        ({ new: row }) => {
+          const id = (row as { conversation_id?: string }).conversation_id;
+          if (id) membership.current.delete(id);
+        },
+      )
       .subscribe();
 
     return () => {
