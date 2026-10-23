@@ -15,7 +15,9 @@ import { createClient } from "@/lib/supabase/server";
  *
  * Returns a NextResponse to short-circuit with, or null when the caller may proceed.
  */
-export async function guardApi(action: "gifs" | "music" | "client_error" | "ice"): Promise<NextResponse | null> {
+export async function guardApi(
+  action: "gifs" | "music" | "client_error" | "ice" | "billing" | "oneshot" | "spotify",
+): Promise<NextResponse | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {

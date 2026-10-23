@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApi } from "@/lib/api-guard";
 import * as Sentry from "@sentry/nextjs";
 import { createClient as createSupabase } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
@@ -31,6 +32,9 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ messageId: string }> },
 ) {
+  const blocked = await guardApi("oneshot");
+  if (blocked) return blocked;
+
   const { messageId } = await params;
 
   // Cookie-authed client — identifies the caller so claim_oneshot runs with

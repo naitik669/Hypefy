@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guardApi } from "@/lib/api-guard";
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -16,6 +17,9 @@ export const runtime = "nodejs";
  * stays live to the trial's end.
  */
 export async function POST(req: Request) {
+  const blocked = await guardApi("billing");
+  if (blocked) return blocked;
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApi } from "@/lib/api-guard";
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -16,6 +17,9 @@ export const runtime = "nodejs";
  * Nothing is granted here — a pending row is not a plan.
  */
 export async function POST(req: NextRequest) {
+  const blocked = await guardApi("billing");
+  if (blocked) return blocked;
+
   const env = razorpayEnv();
   if (!env) return NextResponse.json({ error: "not_configured" }, { status: 503 });
 

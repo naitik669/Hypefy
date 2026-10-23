@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApi } from "@/lib/api-guard";
 import { createClient } from "@/lib/supabase/server";
 import { SPOTIFY_SCOPES, redirectUri, spotifyEnv } from "@/lib/spotify";
 
@@ -15,7 +16,14 @@ export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  // Before the rate-limit guard on purpose: this route is a redirect flow,
+  // and guardApi answers a signed-out caller with JSON. Someone who taps
+  // "Connect Spotify" while logged out should land on the sign-in page, not
+  // on a 401 body.
   if (!user) return NextResponse.redirect(new URL("/signin", req.nextUrl.origin));
+
+  const blocked = await guardApi("spotify");
+  if (blocked) return blocked;
 
   const { clientId } = spotifyEnv();
   if (!clientId) {

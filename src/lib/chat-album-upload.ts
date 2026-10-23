@@ -1,6 +1,7 @@
 "use client";
 
 import { fitWithin } from "@/lib/comment-photo";
+import { randomAlbumItemName } from "@/lib/object-name";
 import type { AlbumItem } from "@/lib/chat-album";
 
 /**
@@ -129,7 +130,6 @@ export async function uploadAlbumFiles(
   userId: string,
   { baseTimeoutMs = UPLOAD_BASE_MS }: { baseTimeoutMs?: number } = {},
 ): Promise<AlbumItem[] | null> {
-  const stamp = Date.now();
   let next = 0;
 
   async function one(entry: AlbumFile, i: number) {
@@ -143,7 +143,7 @@ export async function uploadAlbumFiles(
         entry.type === "video"
           ? file.name.split(".").pop() || "mp4"
           : contentType === "image/png" ? "png" : contentType === "image/gif" ? "gif" : contentType === "image/webp" ? "webp" : "jpg";
-      const path = `${userId}/${stamp}-${i}.${ext}`;
+      const path = randomAlbumItemName(userId, i, ext);
       const res = await withTimeout(bucket.upload(path, body, { contentType }), uploadTimeout(body.size, baseTimeoutMs));
       if (res === "timeout" || res.error) return;
       entry.url = bucket.getPublicUrl(path).data.publicUrl;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guardApi } from "@/lib/api-guard";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import * as Sentry from "@sentry/nextjs";
@@ -20,6 +21,9 @@ export const runtime = "nodejs";
  * to act on than an opaque error inside Spotify's player.
  */
 export async function GET() {
+  const blocked = await guardApi("spotify");
+  if (blocked) return blocked;
+
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });

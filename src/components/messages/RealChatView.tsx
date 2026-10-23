@@ -37,6 +37,7 @@ import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/compon
 import { one } from "@/lib/supabase/typed";
 import { ForwardSheet } from "@/components/messages/ForwardSheet";
 import { canPin } from "@/lib/chat-pins";
+import { randomObjectName } from "@/lib/object-name";
 import { PinPane, usePinPane } from "@/components/messages/PinPane";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
@@ -1366,7 +1367,7 @@ export function RealChatView({
     if (!user) { setVoiceMode(false); return; }
 
     const ext = blob.type.includes("ogg") ? "ogg" : "webm";
-    const path = `${user.id}/${Date.now()}.${ext}`;
+    const path = randomObjectName(user.id, ext);
 
     const { error: uploadErr } = await supabase.storage
       .from("voice-notes")
@@ -1667,7 +1668,7 @@ export function RealChatView({
 
     const ext = attachment.file.name.split(".").pop()
       ?? (attachment.type === "video" ? "mp4" : "jpg");
-    const path = `${currentUserId}/${Date.now()}.${ext}`;
+    const path = randomObjectName(currentUserId, ext);
     const isOneShot = attachment.viewOnce && attachment.type === "image";
 
     // OneShot goes to the private bucket (no public URL exists for it — the
