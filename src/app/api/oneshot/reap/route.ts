@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { createClient as createSupabase } from "@supabase/supabase-js";
+import { secretMatches } from "@/lib/api-guard";
 
 /**
  * POST /api/oneshot/reap
@@ -27,7 +28,7 @@ function adminClient() {
 }
 
 export async function POST(req: NextRequest) {
-  if (req.headers.get("x-oneshot-reap-secret") !== process.env.ONESHOT_REAP_SECRET) {
+  if (!secretMatches(req.headers.get("x-oneshot-reap-secret"), process.env.ONESHOT_REAP_SECRET)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {

@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { createClient as createSupabase } from "@supabase/supabase-js";
 import webpush from "web-push";
 import { sendFcm, fcmConfigured } from "@/lib/fcm";
+import { isPushEndpointAllowed, secretMatches } from "@/lib/api-guard";
 
 /**
  * POST /api/push — called by a Supabase pg_net trigger on notifications INSERT.
@@ -75,7 +76,7 @@ function pushUrl(n: { type: string; target_type: string | null; target_id: strin
 }
 
 export async function POST(req: NextRequest) {
-  if (req.headers.get("x-push-secret") !== process.env.PUSH_WEBHOOK_SECRET) {
+  if (!secretMatches(req.headers.get("x-push-secret"), process.env.PUSH_WEBHOOK_SECRET)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -138,6 +139,9 @@ export async function POST(req: NextRequest) {
     // ── Web push (browsers)
     ...(subs ?? []).map(async (sub) => {
       try {
+        // Rows here are written by the client and checked only for
+        // user_id, so the host is not something to take on trust.
+        if (!isPushEndpointAllowed(sub.endpoint)) return;
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
           payload,

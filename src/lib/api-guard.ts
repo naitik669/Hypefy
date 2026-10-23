@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
@@ -102,5 +103,59 @@ export async function attemptAllowed(
     return data;
   } catch {
     return !ipRateLimited(req, limit, windowSeconds * 1000);
+  }
+}
+
+/**
+ * Does a request's secret header match the configured one?
+ *
+ * Two things the `!==` it replaces got wrong.
+ *
+ * An unset or empty env var must never be a passing answer. `!==` left a
+ * window: with the variable set to the empty string, a caller sending an
+ * empty header matched it. A cron secret that has been cleared should fail
+ * closed, not open.
+ *
+ * And the comparison is constant-time. Over the internet a timing oracle on
+ * a string compare is a stretch, but these headers guard the two endpoints
+ * pg_cron calls — the push fan-out and the one-shot reaper — and the cost of
+ * being careful is one function.
+ *
+ * Lengths are compared first because timingSafeEqual throws on a mismatch;
+ * that leaks the length of the secret and nothing else.
+ */
+export function secretMatches(provided: string | null, expected: string | undefined): boolean {
+  if (!expected) return false;
+  if (!provided) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+/**
+ * The push services a subscription endpoint may point at.
+ *
+ * `push_subscriptions` rows are written by the client and checked only for
+ * `user_id`, and /api/push POSTs to whatever `endpoint` says. Without this
+ * an account could register any number of endpoints on any host and have
+ * the server fan out to them — a reflector, and a way to tie up functions
+ * on slow hosts. The payload is fixed and the scheme is HTTPS, so the reach
+ * is limited, but there is no reason to allow it at all.
+ */
+const PUSH_HOSTS = [
+  "android.googleapis.com",
+  "fcm.googleapis.com",
+  "updates.push.services.mozilla.com",
+  "web.push.apple.com",
+];
+
+export function isPushEndpointAllowed(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint);
+    if (url.protocol !== "https:") return false;
+    return PUSH_HOSTS.some((h) => url.hostname === h || url.hostname.endsWith(".notify.windows.com"));
+  } catch {
+    return false;
   }
 }

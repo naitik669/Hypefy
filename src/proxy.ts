@@ -61,7 +61,15 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except static assets and image optimization.
+     *
+     * The dot before the extension group is escaped, and that matters: as
+     * `.` it matched ANY character, so any path whose last segment merely
+     * ENDED in those letters skipped the proxy — and with it the invite
+     * gate, the session refresh and the two-factor redirect. Checked
+     * against the compiled regex: /tag/xpng, /api/oneshot/abc-png and
+     * /messages/1jpg all slipped through, and /tag/[tag] is a path any
+     * visitor chooses. Next's own docs escape it for this reason.
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
