@@ -438,8 +438,13 @@ export default function NotificationsPage() {
   // Realtime: new notifications appear at the top without a refresh
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    // Leaving the page before getUser() resolves used to leak the channel:
+    // cleanup ran while `channel` was still null, and the subscribe happened
+    // afterwards with nothing left to tear it down. Open and leave the page a
+    // few times and the socket carries that many dead subscriptions.
+    let cancelled = false;
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
+      if (!user || cancelled) return;
       channel = supabase
         .channel(`notifs-page-${user.id}`)
         .on(
@@ -462,7 +467,10 @@ export default function NotificationsPage() {
         )
         .subscribe();
     });
-    return () => { if (channel) supabase.removeChannel(channel); };
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

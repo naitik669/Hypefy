@@ -33,8 +33,17 @@ function normalize(data: unknown[] | null): FeedPost[] {
 
 /** Every tab except For You is just "posts from this id list", newest first. */
 type IdsTab = Exclude<FeedTab, "foryou">;
-type IdsListState = { posts: FeedPost[]; done: boolean; init: boolean };
-const EMPTY_IDS_STATE: IdsListState = { posts: [], done: false, init: false };
+type IdsListState = {
+  posts: FeedPost[];
+  done: boolean;
+  init: boolean;
+  /** The first page failed. Distinguishes "nothing to show" from "nothing
+   *  loaded": without it a failed first fetch left init false, which rendered
+   *  neither posts, nor an empty state, nor a spinner — a blank tab with no
+   *  way back short of a reload. */
+  failed: boolean;
+};
+const EMPTY_IDS_STATE: IdsListState = { posts: [], done: false, init: false, failed: false };
 
 /**
  * Home feed. The active tab (For You / Following / Hypers) comes
@@ -213,7 +222,7 @@ export function FeedList({
     const scopeIds = idsByTab[t];
 
     if (scopeIds.length === 0) {
-      setIdsState((prev) => ({ ...prev, [t]: { posts: [], done: true, init: true } }));
+      setIdsState((prev) => ({ ...prev, [t]: { posts: [], done: true, init: true, failed: false } }));
       return;
     }
 
@@ -233,14 +242,20 @@ export function FeedList({
     }
     const { data, error } = await query;
     // Same reasoning as the For You tail: a failed page must not latch `done`
-    // and turn a network blip into a permanent end-of-feed.
-    if (error) return;
+    // and turn a network blip into a permanent end-of-feed. A failed FIRST
+    // page is recorded, though, so the tab can say so and offer a retry.
+    if (error) {
+      if (current.length === 0) {
+        setIdsState((prev) => ({ ...prev, [t]: { ...prev[t], failed: true } }));
+      }
+      return;
+    }
     const fresh = normalize(data).filter((p) => !current.some((x) => x.id === p.id) && !blockedSet.has(p.user_id) && !hiddenPosts.has(p.id));
     const nowDone = (data?.length ?? 0) < PAGE_SIZE;
     const withState = fresh.length ? await withUserState(fresh) : fresh;
     setIdsState((prev) => ({
       ...prev,
-      [t]: { posts: [...prev[t].posts, ...withState], done: nowDone || prev[t].done, init: true },
+      [t]: { posts: [...prev[t].posts, ...withState], done: nowDone || prev[t].done, init: true, failed: false },
     }));
   }
 
@@ -261,7 +276,8 @@ export function FeedList({
 
   // Lazy-load the first page of an ids-tab the first time it's opened.
   useEffect(() => {
-    if (tab !== "foryou" && !idsStateRef.current[tab].init && !loadingRef.current) loadMore();
+    const st = idsStateRef.current;
+    if (tab !== "foryou" && !st[tab].init && !st[tab].failed && !loadingRef.current) loadMore();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -313,11 +329,31 @@ export function FeedList({
   // Zero Hypers picked takes priority over post content — otherwise a user's
   // own posts (always included in the scope query) would mask the empty state.
   const noHypersPicked = tab === "hypers" && hyperIds.length === 0;
+  const idsFailed = tab !== "foryou" && idsState[tab].failed && idsState[tab].posts.length === 0;
+
+  /** Retry the first page of the tab whose first page failed. */
+  function retryTab() {
+    const t = tabRef.current;
+    if (t === "foryou") return;
+    setIdsState((prev) => ({ ...prev, [t]: { ...prev[t], failed: false } }));
+    void loadMore();
+  }
 
   return (
     <div className="flex flex-col">
       {noHypersPicked ? (
         <AddHypersPrompt currentUserId={currentUserId} />
+      ) : idsFailed ? (
+        <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+          <p className="text-sm text-muted">That didn&apos;t load.</p>
+          <button
+            type="button"
+            onClick={retryTab}
+            className="rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground transition hover:bg-white/5 active:scale-95"
+          >
+            Try again
+          </button>
+        </div>
       ) : idsEmpty ? (
         tab === "following" ? (
           <PeopleToFollow
@@ -386,7 +422,7 @@ export function FeedList({
       )}
 
       {/* Sentinel + loading shimmer */}
-      {!activeDone && !idsEmpty && !noHypersPicked && (
+      {!activeDone && !idsEmpty && !idsFailed && !noHypersPicked && (
         <div ref={sentinelRef} className="px-4 py-6">
           {loading && (
             <div className="flex items-center gap-3">

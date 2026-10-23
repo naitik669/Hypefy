@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -28,6 +28,9 @@ import { LibraryBig, Search, Settings, ShoppingBag } from "lucide-react";
  * clutter. Ordered nearest-thumb-first: NavHoldMenu renders the stack in
  * reverse, so the first entry here is the one closest to the finger.
  */
+/** How long the unread refetch waits, so a burst of messages is one query. */
+const UNREAD_REFRESH_MS = 400;
+
 const HOME_SHORTCUTS: HoldAction[] = [
   { icon: Search, label: "Search", href: "/search" },
   // Marketplace took Activity's place. Activity has the bell in the top bar,
@@ -110,14 +113,51 @@ export function BottomNav({
   const profileActive = pathname.startsWith("/profile");
   const messagesActive = pathname.startsWith("/messages");
 
+  // Read inside the realtime handlers below, which are built once. The effect
+  // deliberately does not depend on the pathname — rebuilding the channel on
+  // every navigation would mean a resubscribe per page — so the handlers have
+  // to read the current value rather than the one captured at subscribe time.
+  const messagesActiveRef = useRef(messagesActive);
+  useEffect(() => {
+    messagesActiveRef.current = messagesActive;
+  }, [messagesActive]);
+
   // Clear badge immediately when viewing /messages
   useEffect(() => {
     if (messagesActive) setUnreadMsgs(0);
   }, [messagesActive]);
 
-  // Realtime: bump count on incoming messages, clear when I mark as read
+  /**
+   * Realtime: refetch the count when anything could have changed it.
+   *
+   * This used to do arithmetic — +1 per inserted message, -1 per last_read_at
+   * update — and the two could not agree with the number on screen. The badge
+   * counts CONVERSATIONS with something unread, skipping muted ones and ones
+   * where you spoke last (unread_dm_count, 0046). So five messages in one
+   * chat added five; a message in a muted chat added one; opening a thread
+   * with five unread subtracted one. The errors accumulated for as long as the
+   * app stayed open, in both directions, and only a reload cleared them.
+   *
+   * Asking the function is one cheap indexed call, and it is always right.
+   */
   useEffect(() => {
     const supabase = createClient();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let alive = true;
+
+    function refresh() {
+      // Coalesced: a burst of inserts in one chat is one query, not ten.
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        if (!alive || messagesActiveRef.current) return;
+        void supabase.rpc("unread_dm_count").then(({ data, error }) => {
+          if (!alive || error) return;
+          setUnreadMsgs((data as number | null) ?? 0);
+        });
+      }, UNREAD_REFRESH_MS);
+    }
+
     const ch = supabase
       .channel(`bottomnav-msgs:${currentUserId}`)
       .on(
@@ -125,9 +165,7 @@ export function BottomNav({
         { event: "INSERT", schema: "public", table: "messages" },
         (p) => {
           const m = p.new as { sender_id: string };
-          if (m.sender_id !== currentUserId && !messagesActive) {
-            setUnreadMsgs((n) => n + 1);
-          }
+          if (m.sender_id !== currentUserId && !messagesActiveRef.current) refresh();
         }
       )
       .on(
@@ -138,17 +176,16 @@ export function BottomNav({
           table: "conversation_members",
           filter: `user_id=eq.${currentUserId}`,
         },
-        (p) => {
-          // When last_read_at updates (opened a thread), decrement by 1
-          const m = p.new as { last_read_at: string | null };
-          if (m.last_read_at) setUnreadMsgs((n) => Math.max(0, n - 1));
-        }
+        // Opening, muting, or archiving a thread all land here, and all three
+        // change the answer.
+        () => refresh()
       )
       .subscribe();
     return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(ch);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
 
   return (

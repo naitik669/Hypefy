@@ -657,6 +657,16 @@ export function RealChatView({
   const suppressClick = useRef(false);
   const idsRef = useRef<string[]>([]);
   const messagesRef = useRef<ChatMsg[]>(initialMessages);
+  // hasMore mirrored into a ref for the same reason as messages: loadOlder is
+  // called in a loop by goToMessage, which cannot see state updated after the
+  // render the loop was created in.
+  const hasMoreRef = useRef(hasMore);
+  // Mirrored in an effect rather than during render. loadOlder also writes it
+  // directly the moment it runs out of history, so the loop in goToMessage
+  // never has to wait for a render to see that it is finished.
+  useEffect(() => {
+    hasMoreRef.current = hasMore;
+  }, [hasMore]);
   /** Tracks the last tap per message to detect double-tap (star reaction) */
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -694,13 +704,22 @@ export function RealChatView({
 
     let alive = true;
     void (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("comments")
         .select("id, body, user_id, profiles(display_name, username, avatar_hue, avatar_url)")
         .in("id", want)
         .is("deleted_at", null)
         .is("removed_at", null);
       if (!alive) return;
+      // A row this fetch did not return is recorded as null, which the overlay
+      // states as "This comment was deleted". On a failed fetch nothing comes
+      // back at all, so writing those nulls would say that about every
+      // forwarded comment in the thread. Leave them unknown and un-latch the
+      // ids instead: the next messages change asks again.
+      if (error) {
+        want.forEach((id) => fwdAsked.current.delete(id));
+        return;
+      }
       const found: Record<string, ForwardedComment | null> = {};
       want.forEach((id) => {
         found[id] = null;
@@ -729,7 +748,9 @@ export function RealChatView({
     const commentId = m.metadata?.comment_id;
     if (!commentId) return card;
     const mine = m.sender_id === currentUserId;
-    const comment = fwdComments[commentId] ?? null;
+    // Not coalesced to null: undefined means "still looking", and the overlay
+    // and the label both need to tell that apart from "deleted".
+    const comment = fwdComments[commentId];
     const content = kind === "post" ? m.post : m.shot;
     const contentAuthor = kind === "post" ? m.postProfile : m.shotProfile;
     return (
@@ -924,7 +945,7 @@ export function RealChatView({
         setTimeout(() => setFoundId(null), 2200);
         return;
       }
-      if (!hasMore) break;
+      if (!hasMoreRef.current) break;
       await loadOlder();
       // Let the prepended page paint before looking for it.
       await new Promise((r) => setTimeout(r, 60));
@@ -934,8 +955,15 @@ export function RealChatView({
 
   /** Fetch the next older page and prepend it, preserving scroll position. */
   async function loadOlder() {
-    if (loadingOlderRef.current || !hasMore) return;
-    const oldest = messages[0];
+    // Everything this reads comes from a ref. goToMessage pages back in a
+    // loop, awaiting this function each time; the closure it holds is from one
+    // render, so `messages[0]` stayed the first message as it was BEFORE any
+    // page was prepended. Every iteration after the first asked for the same
+    // page, the dedupe threw all of it away, and the jump never reached
+    // anything older than what was already on screen — which is what the pin
+    // board's "go to message" ran into.
+    if (loadingOlderRef.current || !hasMoreRef.current) return;
+    const oldest = messagesRef.current[0];
     if (!oldest) return;
     loadingOlderRef.current = true;
     setLoadingOlder(true);
@@ -955,7 +983,13 @@ export function RealChatView({
     }
 
     const older = (data ?? []).slice().reverse().map(mapMessageRow);
-    if (older.length < MSG_PAGE) setHasMore(false);
+    // Against the rows that came back, not the ones that survived the dedupe,
+    // and written to the ref as well as to state so the next loop iteration
+    // sees it without waiting for a render.
+    if ((data?.length ?? 0) < MSG_PAGE) {
+      hasMoreRef.current = false;
+      setHasMore(false);
+    }
 
     if (older.length > 0) {
       // Older history should appear instantly (no entrance animation).
@@ -964,7 +998,11 @@ export function RealChatView({
       setMessages((prev) => {
         const existing = new Set(prev.map((p) => p.id));
         const fresh = older.filter((o) => !existing.has(o.id));
-        return [...fresh, ...prev];
+        const next = [...fresh, ...prev];
+        // The ref too, now rather than on the next render: a caller awaiting
+        // this in a loop must see the new first message when it comes back.
+        messagesRef.current = next;
+        return next;
       });
 
       const ids = older.map((o) => o.id);

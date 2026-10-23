@@ -291,7 +291,14 @@ export function ReelsFeed({
     if (noMore || fetchingMore.current) return;
     if (activeIdx < items.length - 2) return;
     fetchingMore.current = true;
-    const oldest = reels[reels.length - 1]?.created_at;
+    // The oldest of all of them, not the last one in the array. Appending
+    // keeps the array in order today, but the new-shots check prepends, and a
+    // cursor that is merely "the last element" breaks the moment anything
+    // else reorders `reels`.
+    const oldest = reels.reduce<string | null>(
+      (min, r) => (min === null || r.created_at < min ? r.created_at : min),
+      null,
+    );
     if (!oldest) {
       fetchingMore.current = false;
       return;
@@ -304,22 +311,41 @@ export function ReelsFeed({
       .lt("created_at", oldest)
       .order("created_at", { ascending: false })
       .limit(10)
-      .then(({ data }) => {
-        const fresh = (data ?? []).map((s: any) => ({
-          ...s,
-          profiles: Array.isArray(s.profiles)
-            ? s.profiles[0] ?? null
-            : s.profiles,
-        })) as Reel[];
-        if (fresh.length < 10) setNoMore(true);
-        if (fresh.length > 0) {
-          setReels((prev) => [
-            ...prev,
-            ...fresh.filter((f) => !prev.some((p) => p.id === f.id)),
-          ]);
-        }
-        fetchingMore.current = false;
-      });
+      .then(
+        ({ data, error }) => {
+          // A failed page is not the end of the reel. `error` was not read
+          // here, so on failure `data` was null, the length check read
+          // 0 < 10, and `noMore` latched: the end card appeared and no
+          // further page was ever fetched, for the rest of the session.
+          // The same fix went into the home feed's tail (FeedList).
+          if (error) {
+            fetchingMore.current = false;
+            return;
+          }
+          const fresh = (data ?? []).map((s: any) => ({
+            ...s,
+            profiles: Array.isArray(s.profiles)
+              ? s.profiles[0] ?? null
+              : s.profiles,
+          })) as Reel[];
+          // Against what came back, not against what survived the dedupe:
+          // a short page means the table is exhausted, whereas a full page
+          // of rows we already hold means keep going.
+          if ((data?.length ?? 0) < 10) setNoMore(true);
+          if (fresh.length > 0) {
+            setReels((prev) => [
+              ...prev,
+              ...fresh.filter((f) => !prev.some((p) => p.id === f.id)),
+            ]);
+          }
+          fetchingMore.current = false;
+        },
+        // A rejection — the request never completing — used to leave the
+        // flag raised, which blocks every later page just as hard.
+        () => {
+          fetchingMore.current = false;
+        },
+      );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIdx, items.length, noMore]);
 
@@ -830,6 +856,13 @@ function ReelCard({
     }
   }, [isActive, sheetOpen]);
 
+  // Whether this reel is still the active one, readable from inside a
+  // promise that settles after the user has already swiped on.
+  const isActiveRef = useRef(isActive);
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
+
   // Autoplay the active reel; pause all others.
   // isActive is driven by the parent's JS-controlled index — no IntersectionObserver needed.
   useEffect(() => {
@@ -848,10 +881,19 @@ function ReelCard({
     if (isActive) {
       el.play()
         .then(() => setPlaying(true))
-        .catch(() => {
-          // Unmuted autoplay is blocked before the first user gesture (direct
-          // page load) — fall back to muted so the reel still starts, and sync
-          // the global toggle so the speaker icon tells the truth.
+        .catch((err: unknown) => {
+          // Only a real autoplay refusal counts.
+          //
+          // Swiping away before play() settles makes the else-branch below
+          // call pause(), and the spec rejects the pending play() with
+          // AbortError. Treating that as "autoplay blocked" turned an
+          // ordinary fast swipe into: mute the whole tab, then call play()
+          // again on a reel that is now off-screen — which then runs on
+          // forever, because the effect does not re-run for a slide that is
+          // no longer active. Fast swiping is how reels are used, so this
+          // fired constantly.
+          if ((err as DOMException | null)?.name !== "NotAllowedError") return;
+          if (!isActiveRef.current) return;
           if (!el.muted) {
             onAutoplayBlocked();
             el.muted = true;

@@ -73,6 +73,20 @@ export function CallProvider({ userId, children }: { userId: string; children: R
   const pendingIce = useRef<RTCIceCandidateInit[]>([]);
   const offerRef = useRef<RTCSessionDescriptionInit | null>(null);   // callee: stored remote offer
   const callRef = useRef<ActiveCall | null>(null);
+  /**
+   * Calls this tab has already seen an announcement for.
+   *
+   * Every call is announced twice — once by the caller's broadcast, once by
+   * the postgres_changes row as a backup — and both arrive here. Without
+   * this, the second one finds callRef already set by the first and marks
+   * the RINGING call busy: the caller is told "they're on another call"
+   * while the callee's phone is still ringing.
+   *
+   * Bounded, because a long session would otherwise hold every id it had
+   * ever seen. A few dozen is far more than the two announcements of one
+   * call need.
+   */
+  const announced = useRef<Set<string>>(new Set());
   const ringTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   callRef.current = call;
 
@@ -333,6 +347,14 @@ export function CallProvider({ userId, children }: { userId: string; children: R
     // 30s and read it as "no answer". 'busy' has always been in the status
     // CHECK and the caller's handler already tears the call down on it;
     // nothing wrote it. Now something does.
+    // Recorded before any await. The two announcements can land in the same
+    // tick, and a check that yielded first would let both through.
+    if (announced.current.has(info.id)) return;
+    announced.current.add(info.id);
+    if (announced.current.size > 50) {
+      announced.current.delete(announced.current.values().next().value as string);
+    }
+
     if (callRef.current) {
       await supabase.rpc("mark_call_busy", { p_call_id: info.id });
       return;

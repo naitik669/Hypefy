@@ -45,8 +45,16 @@ export function ForwardedCommentOverlay({
   comment,
   children,
 }: {
-  /** The comment, or null when it has since been deleted or is not visible. */
-  comment: ForwardedComment | null;
+  /**
+   * The comment; null once it is known to be deleted or not visible, and
+   * undefined while it is still being looked up.
+   *
+   * The three states are distinct on purpose. They used to be two, with
+   * undefined collapsed into null, so every forwarded comment announced
+   * "This comment was deleted" for the moment between paint and the fetch
+   * coming back — and said it for good if the fetch failed.
+   */
+  comment: ForwardedComment | null | undefined;
   /** The shared post or Shot card this hangs off. */
   children: React.ReactNode;
 }) {
@@ -103,8 +111,11 @@ export function ForwardedCommentOverlay({
                 </div>
               </div>
             </>
-          ) : (
+          ) : comment === null ? (
             <span className="relative text-[11px] italic text-faint">This comment was deleted</span>
+          ) : (
+            // Still loading. Says nothing rather than something untrue.
+            <span aria-hidden className="skeleton relative my-0.5 block h-3 w-28 rounded" />
           )}
         </div>
       </div>

@@ -149,9 +149,14 @@ export function GroupCallProvider({
       };
       pc.ontrack = (e) => setRemote(peerId, e.streams[0]);
       pc.onconnectionstatechange = () => {
-        if (
-          ["failed", "closed", "disconnected"].includes(pc!.connectionState)
-        ) {
+        // "disconnected" is not a death: it is what the spec reports for a
+        // blip — a tunnel, a handover between cells, Wi-Fi to mobile — and
+        // it usually returns to "connected" on its own. Tearing the peer
+        // down on it dropped someone out of a group call on any wobble, with
+        // no path back in because nothing re-offers. CallProvider, which
+        // handles the one-to-one case, has always listened only for the two
+        // terminal states; this is that same rule.
+        if (["failed", "closed"].includes(pc!.connectionState)) {
           pc!.close();
           peersRef.current.delete(peerId);
           dropRemote(peerId);

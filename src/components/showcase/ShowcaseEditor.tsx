@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Upload } from "lucide-react";
 import { Television } from "@phosphor-icons/react";
@@ -51,6 +51,21 @@ export function ShowcaseEditor({
   const [title, setTitle] = useState("");
   const [picks, setPicks] = useState<Pick[]>([]);
   const [busy, setBusy] = useState(false);
+
+  // The blob URLs behind the upload thumbnails. Leaving the editor without
+  // publishing used to keep every one of them for the life of the tab.
+  const picksRef = useRef<Pick[]>(picks);
+  useEffect(() => {
+    picksRef.current = picks;
+  }, [picks]);
+  useEffect(
+    () => () => {
+      picksRef.current.forEach((pick) => {
+        if (pick.kind === "upload") URL.revokeObjectURL(pick.thumb);
+      });
+    },
+    [],
+  );
 
   const indexOf = (kind: string, id: string) =>
     picks.findIndex((p) => p.kind === kind && p.id === id);

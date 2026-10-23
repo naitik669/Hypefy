@@ -65,6 +65,24 @@ export function MediaPicker({
   const [camera, setCamera] = useState(false);
   const galleryRef = useRef<HTMLInputElement>(null);
 
+  // Blob URLs minted for files picked here and then not sent. Sending hands
+  // the URL to the message on screen, which is why `finish` drops the entry
+  // instead of revoking it — but anything still sitting in `picked` when the
+  // chat closes has no other owner, and a session that opens the picker,
+  // changes its mind, and closes it repeatedly held every one of them.
+  const pickedRef = useRef<PickEntry[]>(picked);
+  useEffect(() => {
+    pickedRef.current = picked;
+  }, [picked]);
+  useEffect(
+    () => () => {
+      pickedRef.current.forEach((e) => {
+        if (e.file) URL.revokeObjectURL(e.preview);
+      });
+    },
+    [],
+  );
+
   const fromChat: PickEntry[] = recents.map((r) => ({ key: r.url, type: r.type, preview: r.url, url: r.url }));
   const entries = [...picked, ...fromChat.filter((c) => !picked.some((p) => p.key === c.key))];
   const byKey = new Map(entries.map((e) => [e.key, e]));
