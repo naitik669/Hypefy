@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useRef, useState } from "react"
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { hashImageFile } from "@/lib/media-hash-client";
 import { useToast } from "@/components/ui/ToastProvider";
 import type { Track } from "@/lib/music";
 import { capturePoster } from "@/lib/video-poster";
@@ -68,6 +69,39 @@ const UploadCtx = createContext<Ctx>({
 });
 export const useUpload = () => useContext(UploadCtx);
 
+/**
+ * Keep the perceptual hash of what was just posted, against the thing it was
+ * posted to, so a takedown can block it being posted again (0157).
+ *
+ * Never allowed to fail the upload. The post is already live by the time
+ * this runs; a fingerprint that does not write means a weaker blocklist
+ * later, which is not worth showing anybody an error over.
+ */
+async function recordFingerprints(
+  supabase: ReturnType<typeof createClient>,
+  targetType: "post" | "shot",
+  targetId: string,
+  urls: string[],
+  hashes: (string | null)[],
+): Promise<void> {
+  await Promise.all(
+    urls.map(async (url, i) => {
+      const hash = hashes[i];
+      if (!hash) return;
+      try {
+        await supabase.rpc("claim_media", {
+          p_target_type: targetType,
+          p_target_id: targetId,
+          p_url: url,
+          p_hash: hash,
+        });
+      } catch {
+        /* a weaker blocklist, not a failed post */
+      }
+    }),
+  );
+}
+
 export function UploadProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const router = useRouter();
@@ -93,6 +127,25 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setFailed(null);
     startTrickle();
     try {
+      // Hashed before anything is uploaded, so a picture that has already
+      // been taken down is refused in a second rather than after a minute on
+      // a phone uplink. A file that will not decode hashes to null, which
+      // means "we do not know" and must read as "let it through": refusing
+      // an upload over a decoder quirk is a far worse outcome than a miss.
+      const hashes = await Promise.all(a.files.map((f) => hashImageFile(f)));
+      for (const hash of hashes) {
+        if (!hash) continue;
+        const { data: blocked } = await supabase.rpc("check_media", { p_hash: hash });
+        if (blocked) {
+          stopTrickle();
+          setProgress(null);
+          // Deliberately not "this matches something we removed". Describing
+          // the rule is how someone works out what to change.
+          toast("That image can't be posted.", "error");
+          return;
+        }
+      }
+
       const urls: string[] = [];
       for (let i = 0; i < a.files.length; i++) {
         // Named and served as what it is: a photo posted in Auto is sent
@@ -123,10 +176,26 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
       // Scheduled → its own table (a pg_cron job publishes it when due); the
       // feed queries never see it, so nothing else changes.
-      const { error: insErr } = a.scheduledAt
-        ? await supabase.from("scheduled_posts").insert({ ...record, scheduled_at: a.scheduledAt })
-        : await supabase.from("posts").insert(record);
-      if (insErr) throw insErr;
+      if (a.scheduledAt) {
+        const { error: insErr } = await supabase
+          .from("scheduled_posts")
+          .insert({ ...record, scheduled_at: a.scheduledAt });
+        if (insErr) throw insErr;
+        // No fingerprints for a scheduled post: it becomes a row in `posts`
+        // with a different id when pg_cron publishes it, and there is nothing
+        // to attach them to until then. The pre-check above still ran.
+      } else {
+        const { data: created, error: insErr } = await supabase
+          .from("posts")
+          .insert(record)
+          .select("id")
+          .single();
+        if (insErr) throw insErr;
+        // Recorded after the post exists, so a takedown can find them. Not
+        // awaited as a group with the insert: a fingerprint that fails to
+        // write is a weaker blocklist later, not a post that failed now.
+        await recordFingerprints(supabase, "post", created.id, urls, hashes);
+      }
 
       stopTrickle();
       setProgress(100);

@@ -2694,6 +2694,11 @@ export type Database = {
       blocked_either_way: { Args: never; Returns: string[] }
       can_see_profile: { Args: { p_user: string }; Returns: boolean }
       capture_creator_daily_stats: { Args: never; Returns: undefined }
+      check_media: { Args: { p_hash: string }; Returns: boolean }
+      claim_media: {
+        Args: { p_target_type: string; p_target_id: string; p_url: string; p_hash: string }
+        Returns: boolean
+      }
       claim_oneshot: { Args: { p_message_id: string }; Returns: string }
       claim_referral: { Args: { p_ref_username: string }; Returns: boolean }
       clear_lock_pin: {
