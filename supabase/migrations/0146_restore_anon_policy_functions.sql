@@ -1,0 +1,34 @@
+-- Give `anon` back the two functions its own read policies call.
+--
+-- 0135 revoked EXECUTE on is_admin() and can_see_profile() from anon, to
+-- shrink what a signed-out caller can ask. Its reasoning is sound as far as
+-- it goes — "is_admin only ever answered false for them" — but both
+-- functions are called from inside the SELECT policies those same readers
+-- depend on, and a policy that calls a function the role cannot execute does
+-- not quietly evaluate to false. It raises, and the whole read fails.
+--
+-- So since 0135, signed out:
+--
+--   select from posts, shots, comments, shows  -> permission denied for function is_admin
+--   select from showcases, showcase_items      -> the same, plus can_see_profile
+--
+-- Measured, not inferred. As the anon role on the live database all three of
+-- posts, shots and comments raised `permission denied for function is_admin`.
+-- End to end, a signed-out profile page rendered its title and an EMPTY post
+-- grid for an account that has posts, and a post permalink did not resolve at
+-- all — its title fell back to the bare app name.
+--
+-- Which means every shared link has been dead for anyone not signed in, every
+-- public profile has looked empty, and Google's crawler and the AdSense
+-- reviewer have been seeing blank pages.
+--
+-- 0060's header already recorded this exact failure as the reason anon was
+-- granted EXECUTE in the first place. This restores it.
+--
+-- Nothing is exposed by doing so. is_admin() reads auth.uid(), which is null
+-- for anon, so it returns false; can_see_profile() answers whether an account
+-- is private, which the profile page shows anyway. The revoke never removed
+-- an answer — it only removed the ability to finish the query.
+
+grant execute on function public.is_admin() to anon;
+grant execute on function public.can_see_profile(uuid) to anon;
