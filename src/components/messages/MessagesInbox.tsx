@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -25,6 +25,11 @@ import {
 import { NO_VAULT, looksLikePin, markVaultOpen, type ChatLevel, type VaultOverview } from "@/lib/chat-vault";
 import { LockedChatsRow } from "@/components/vault/LockedChatsRow";
 import { useChatDrafts } from "@/lib/chat-drafts";
+import {
+  useMembershipUpdate,
+  useMessageInsert,
+  useReactionChange,
+} from "@/components/messages/MessageStream";
 import { ChatPinSetup } from "@/components/vault/ChatPinSetup";
 import { createClient } from "@/lib/supabase/client";
 import { isEncrypted, openEnvelope, useEnvelopeReader } from "@/lib/e2ee/chat";
@@ -483,93 +488,62 @@ export function MessagesInbox({
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [router]);
 
-  // Realtime: keep the inbox live without a manual refresh.
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const refresh = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => router.refresh(), 150);
-    };
-    const channel = supabase
-      .channel(`inbox-realtime:${currentUserId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages" },
-        (payload) => {
-          const m = payload.new as {
-            sender_id?: string;
-            conversation_id?: string;
-          };
-          if (m.sender_id === currentUserId) return;
-          // New incoming message: revoke the "already read" flag so the unread badge reappears.
-          if (m.conversation_id) {
-            setReadIds((prev) => {
-              if (!prev.has(m.conversation_id!)) return prev;
-              const next = new Set(prev);
-              next.delete(m.conversation_id!);
-              try {
-                sessionStorage.setItem(
-                  "hypefy:inbox:read",
-                  JSON.stringify([...next])
-                );
-              } catch {
-                /* ignore */
-              }
-              return next;
-            });
-          }
-          refresh();
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "message_reactions" },
-        refresh
-      )
-      // No subscription to `conversations`. It is not in the realtime
-      // publication, so this never fired — and it should not be added:
-      // last_message_at only changes because a message was inserted, which
-      // the messages subscription above already refreshes on. Publishing it
-      // would duplicate the busiest stream in the app to say nothing new.
-      // When my last_read_at updates (i.e. I opened the thread on another device / tab),
-      // mark that conversation as read locally so the badge clears immediately.
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "conversation_members",
-          filter: `user_id=eq.${currentUserId}`,
-        },
-        (payload) => {
-          const m = payload.new as {
-            conversation_id?: string;
-            last_read_at?: string;
-          };
-          if (m.conversation_id && m.last_read_at) {
-            setReadIds((prev) => {
-              const next = new Set(prev).add(m.conversation_id!);
-              try {
-                sessionStorage.setItem(
-                  "hypefy:inbox:read",
-                  JSON.stringify([...next])
-                );
-              } catch {
-                /* ignore */
-              }
-              return next;
-            });
-          }
-          refresh();
-        }
-      )
-      .subscribe();
-    return () => {
-      if (timer) clearTimeout(timer);
-      supabase.removeChannel(channel);
-    };
-  }, [supabase, currentUserId, router]);
+  /**
+   * Realtime: keep the inbox live without a manual refresh.
+   *
+   * The rows come from the shell's one channel (MessageStream). This used to
+   * open a third unfiltered `messages` subscription of its own, on top of
+   * BottomNav's and InAppNotifier's, so every message sent anywhere in the
+   * app was matched and RLS-checked three times over for this one reader.
+   */
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refresh = useCallback(() => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => router.refresh(), 150);
+  }, [router]);
 
+  useEffect(
+    () => () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    },
+    [],
+  );
+
+  /** Remember, and persist, which conversations look read on this device. */
+  const rememberRead = useCallback((id: string, read: boolean) => {
+    setReadIds((prev) => {
+      if (read === prev.has(id)) return prev;
+      const next = new Set(prev);
+      if (read) next.add(id);
+      else next.delete(id);
+      try {
+        sessionStorage.setItem("hypefy:inbox:read", JSON.stringify([...next]));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
+  useMessageInsert((row) => {
+    const m = row as { sender_id?: string; conversation_id?: string };
+    if (m.sender_id === currentUserId) return;
+    // New incoming message: revoke the "already read" flag so the unread
+    // badge reappears.
+    if (m.conversation_id) rememberRead(m.conversation_id, false);
+    refresh();
+  });
+
+  useReactionChange(() => refresh());
+
+  // When my last_read_at updates — I opened the thread on another device or
+  // tab — mark that conversation read locally so the badge clears at once.
+  // Never fired before 0155 published conversation_members.
+  useMembershipUpdate((row) => {
+    const m = row as { conversation_id?: string; last_read_at?: string };
+    if (m.conversation_id && m.last_read_at) rememberRead(m.conversation_id, true);
+    refresh();
+  });
   // Muted conversations never surface as unread (no badge, no Unread section)
   const isUnread = (r: InboxRow) => r.unread && !r.muted && !readIds.has(r.id);
   const isPendingRequest = (r: InboxRow) =>

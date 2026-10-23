@@ -139,7 +139,7 @@ describe("the messages badge", () => {
     // ones and ones you spoke in last (unread_dm_count, 0046). +1 per message
     // and -1 per read could not agree with that, and the error accumulated
     // for as long as the tab stayed open.
-    expect(nav).toContain('supabase.rpc("unread_dm_count")');
+    expect(nav).toContain('.rpc("unread_dm_count")');
     expect(nav).not.toContain("setUnreadMsgs((n) => n + 1)");
     expect(nav).not.toContain("setUnreadMsgs((n) => Math.max(0, n - 1))");
   });
@@ -149,14 +149,19 @@ describe("the messages badge", () => {
     // captured in the handler never changed after the first render.
     expect(nav).toContain("const messagesActiveRef = useRef(messagesActive);");
     expect(nav).toContain("messagesActiveRef.current = messagesActive;");
-    const handler = nav.slice(nav.indexOf('table: "messages" }'));
-    expect(handler.slice(0, 400)).toContain("!messagesActiveRef.current");
+    // The rows now arrive through the shell's one channel, so the guard sits
+    // in the handler registered with it rather than inside a .on() of its own.
+    const handler = nav.slice(nav.indexOf("useMessageInsert("));
+    expect(handler.slice(0, 300)).toContain("!messagesActiveRef.current");
   });
 
   it("coalesces a burst and cleans up its timer", () => {
     expect(nav).toContain("const UNREAD_REFRESH_MS = 400;");
-    expect(nav).toContain("if (timer) clearTimeout(timer);");
-    expect(nav).toContain("alive = false;");
+    expect(nav).toContain("if (refreshTimer.current) clearTimeout(refreshTimer.current);");
+    // The timer outlives any one row, so it is cleared on unmount.
+    // A pending refetch outlives the row that scheduled it, so it is
+    // cancelled on unmount — an effect whose whole body is its cleanup.
+    expect(nav).toContain("() => () => {");
   });
 });
 

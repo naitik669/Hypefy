@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -15,6 +15,7 @@ import {
 import { Avatar } from "@/components/ui/Avatar";
 import { AccountSwitchPad } from "@/components/layout/AccountSwitchPad";
 import { createClient } from "@/lib/supabase/client";
+import { useMembershipUpdate, useMessageInsert } from "@/components/messages/MessageStream";
 import { haptics } from "@/lib/haptics";
 import { NavHoldMenu, type HoldAction } from "@/components/layout/NavHoldMenu";
 import { ChatHoldMenu } from "@/components/layout/ChatHoldMenu";
@@ -140,53 +141,37 @@ export function BottomNav({
    *
    * Asking the function is one cheap indexed call, and it is always right.
    */
-  useEffect(() => {
-    const supabase = createClient();
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let alive = true;
-
-    function refresh() {
-      // Coalesced: a burst of inserts in one chat is one query, not ten.
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
-        if (!alive || messagesActiveRef.current) return;
-        void supabase.rpc("unread_dm_count").then(({ data, error }) => {
-          if (!alive || error) return;
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refresh = useCallback(() => {
+    // Coalesced: a burst of inserts in one chat is one query, not ten.
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => {
+      refreshTimer.current = null;
+      if (messagesActiveRef.current) return;
+      void createClient()
+        .rpc("unread_dm_count")
+        .then(({ data, error }) => {
+          if (error) return;
           setUnreadMsgs((data as number | null) ?? 0);
         });
-      }, UNREAD_REFRESH_MS);
-    }
+    }, UNREAD_REFRESH_MS);
+  }, []);
 
-    const ch = supabase
-      .channel(`bottomnav-msgs:${currentUserId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages" },
-        (p) => {
-          const m = p.new as { sender_id: string };
-          if (m.sender_id !== currentUserId && !messagesActiveRef.current) refresh();
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "conversation_members",
-          filter: `user_id=eq.${currentUserId}`,
-        },
-        // Opening, muting, or archiving a thread all land here, and all three
-        // change the answer.
-        () => refresh()
-      )
-      .subscribe();
-    return () => {
-      alive = false;
-      if (timer) clearTimeout(timer);
-      supabase.removeChannel(ch);
-    };
-  }, [currentUserId]);
+  useEffect(
+    () => () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    },
+    [],
+  );
+
+  // Rows come from the shell's one channel (MessageStream) rather than from a
+  // second unfiltered subscription of this component's own.
+  useMessageInsert((row) => {
+    if (row.sender_id !== currentUserId && !messagesActiveRef.current) refresh();
+  });
+  // Opening, muting or archiving a thread all land here, and all three change
+  // the answer.
+  useMembershipUpdate(() => refresh());
 
   return (
     <>

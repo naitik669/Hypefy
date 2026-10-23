@@ -56,8 +56,14 @@ describe("a locked chat says nothing about itself", () => {
     // lives in the layout, so that cache was the life of the session: lock
     // a chat while the app was open and its sender and preview kept
     // appearing in banners.
-    expect(notifier).toContain('table: "conversation_members"');
-    expect(notifier).toContain("filter: `user_id=eq.${currentUserId}`");
+    // Through the shell's shared channel since the four subscriptions were
+    // consolidated; the membership stream is the same rows.
+    expect(notifier).toContain("useMembershipUpdate(");
+    // And the subscription behind it is still scoped to this reader's own
+    // rows — it lives in the shared provider now, not here.
+    const stream = read("src/components/messages/MessageStream.tsx");
+    expect(stream).toContain('table: "conversation_members"');
+    expect(stream).toContain("filter: `user_id=eq.${userId}`");
     expect(notifier).toContain("membership.current.delete(id);");
   });
 

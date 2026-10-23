@@ -20,6 +20,7 @@ import { TabScrollTop } from "@/components/layout/TabScrollTop";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PresenceHeartbeat } from "@/components/presence/PresenceHeartbeat";
 import { InAppNotifier } from "@/components/messages/InAppNotifier";
+import { MessageStreamProvider } from "@/components/messages/MessageStream";
 import { VaultAutoLock } from "@/components/vault/VaultAutoLock";
 import { toVaultOverview } from "@/lib/chat-vault";
 import { EncryptionSetup } from "@/components/e2ee/EncryptionSetup";
@@ -163,6 +164,10 @@ export default async function AppLayout({
       <CallProvider userId={user!.id}>
         <GroupCallProvider userId={user!.id}>
           <UploadProvider>
+          {/* One realtime channel for the whole shell. BottomNav, the
+              notifier and the inbox each used to open their own, with an
+              unfiltered messages subscription in each. */}
+          <MessageStreamProvider userId={user!.id}>
             {/* A Shot keeps uploading after you have left the composer, and
                 lands you on the Shots feed — which is fixed and full-screen,
                 with nowhere to put an inline bar. */}
@@ -192,6 +197,7 @@ export default async function AppLayout({
                 lockedUnread={toVaultOverview(vaultRows).unread}
               />
             </div>
+          </MessageStreamProvider>
           </UploadProvider>
         </GroupCallProvider>
       </CallProvider>

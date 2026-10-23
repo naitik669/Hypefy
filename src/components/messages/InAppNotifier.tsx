@@ -2,12 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import { X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  useMembershipUpdate,
+  useMessageInsert,
+  useReactionChange,
+} from "@/components/messages/MessageStream";
 import { Avatar } from "@/components/ui/Avatar";
 import { openIncoming } from "@/lib/e2ee/chat";
 import { isEmojiReply } from "@/components/diary/PageReplyEmbed";
+
+/** The columns of a message row a banner is built from. */
+type MessageRow = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  body: string | null;
+  kind: string;
+};
+/** And of a reaction row. */
+type ReactionRow = { message_id: string; user_id: string; emoji: string };
 
 /** Human verbs for non-text message kinds — never surface raw URLs in a toast. */
 const KIND_VERB: Record<string, string> = {
@@ -126,8 +141,38 @@ export function InAppNotifier({ currentUserId }: { currentUserId: string }) {
     };
   }
 
+  /**
+   * The two handlers, as the effect below defines them.
+   *
+   * They close over the membership cache and the toast queue that the effect
+   * sets up, so they are published from inside it. Null while the effect has
+   * not run or has been torn down — a row arriving then has nothing to warm
+   * the cache from, and a banner without a name is the thing to avoid.
+   */
+  const onMessageRow = useRef<((row: MessageRow) => void) | null>(null);
+  const onReactionRow = useRef<((row: ReactionRow) => void) | null>(null);
+
+  useMessageInsert((row) => onMessageRow.current?.(row as unknown as MessageRow));
+  useReactionChange((row, event) => {
+    // The inbox wants every reaction event; a banner is only for a new one.
+    if (event === "INSERT") onReactionRow.current?.(row as unknown as ReactionRow);
+  });
+  // Mute and lock both live on this row, and both are read from a cache
+  // filled once at mount — this component lives in the layout, so that is
+  // the life of the session. Without this, locking a chat while the app is
+  // open kept showing its sender and a preview in a banner, which is the one
+  // thing the lock exists to prevent, and muting one kept producing toasts.
+  // Dropping the entry makes the next message read it again; the re-read
+  // also refreshes lockedIds through noteLevels, so a chat locked on another
+  // device is caught too.
+  //
+  // This never fired until 0155 published conversation_members.
+  useMembershipUpdate((row) => {
+    const id = (row as { conversation_id?: string }).conversation_id;
+    if (id) membership.current.delete(id);
+  });
+
   useEffect(() => {
-    let channel: RealtimeChannel | null = null;
     let active = true;
 
     // Warm the membership/mute cache so toasts can render without awaiting.
@@ -152,7 +197,7 @@ export function InAppNotifier({ currentUserId }: { currentUserId: string }) {
       });
     });
 
-    async function handleMessage(row: { id: string; conversation_id: string; sender_id: string; body: string | null; kind: string }) {
+    async function handleMessage(row: MessageRow) {
       if (!active || row.sender_id === currentUserId) return;
       if (pathRef.current === `/messages/${row.conversation_id}`) return; // viewing it
       const mem = await getMembership(row.conversation_id);
@@ -211,7 +256,7 @@ export function InAppNotifier({ currentUserId }: { currentUserId: string }) {
       });
     }
 
-    async function handleReaction(row: { message_id: string; user_id: string; emoji: string }) {
+    async function handleReaction(row: ReactionRow) {
       if (!active || row.user_id === currentUserId) return;
       const { data: msg } = await supabase
         .from("messages")
@@ -239,35 +284,16 @@ export function InAppNotifier({ currentUserId }: { currentUserId: string }) {
       });
     }
 
-    channel = supabase
-      .channel(`inapp-notify:${currentUserId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, ({ new: row }) => {
-        handleMessage(row as Parameters<typeof handleMessage>[0]);
-      })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "message_reactions" }, ({ new: row }) => {
-        handleReaction(row as Parameters<typeof handleReaction>[0]);
-      })
-      // Mute and lock both live on this row, and both are read from a cache
-      // filled once at mount — this component lives in the layout, so that
-      // is the life of the session. Without this, locking a chat while the
-      // app is open kept showing its sender and a preview in a banner,
-      // which is the one thing the lock exists to prevent, and muting one
-      // kept producing toasts. Dropping the entry makes the next message
-      // read it again; the re-read also refreshes lockedIds through
-      // noteLevels, so a chat locked on another device is caught too.
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "conversation_members", filter: `user_id=eq.${currentUserId}` },
-        ({ new: row }) => {
-          const id = (row as { conversation_id?: string }).conversation_id;
-          if (id) membership.current.delete(id);
-        },
-      )
-      .subscribe();
+    // Published to the hooks below rather than wired to a channel of this
+    // component's own: the shell keeps one subscription for everything
+    // (MessageStream), and these two closures are what it calls.
+    onMessageRow.current = handleMessage;
+    onReactionRow.current = handleReaction;
 
     return () => {
       active = false;
-      if (channel) supabase.removeChannel(channel);
+      onMessageRow.current = null;
+      onReactionRow.current = null;
       timers.current.forEach((tm) => clearTimeout(tm));
       timers.current.clear();
     };
