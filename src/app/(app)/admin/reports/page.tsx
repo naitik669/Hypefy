@@ -25,17 +25,21 @@ export default async function AdminReportsPage() {
   const { data: isAdmin, error: meErr } = await supabase.rpc("is_admin");
   if (meErr || isAdmin !== true) notFound();
 
-  const [{ data: content }, { data: messages }] = await Promise.all([
+  const [{ data: content }, { data: messages }, { data: sla }] = await Promise.all([
     supabase
       .from("reports")
-      .select("id, target_type, target_id, reason, details, status, created_at, reporter_id, reporter:profiles!reports_reporter_id_fkey(username, display_name)")
+      .select("id, target_type, target_id, reason, details, status, created_at, acknowledged_at, reporter_id, reporter:profiles!reports_reporter_id_fkey(username, display_name)")
       .order("created_at", { ascending: false })
       .limit(100),
     supabase
       .from("message_reports")
-      .select("id, message_id, conversation_id, reason, details, status, created_at, reporter:profiles!message_reports_reporter_id_fkey(username, display_name)")
+      .select("id, message_id, conversation_id, reason, details, status, created_at, acknowledged_at, reporter:profiles!message_reports_reporter_id_fkey(username, display_name)")
       .order("created_at", { ascending: false })
       .limit(100),
+    // Where the queue stands against the timeframes published on
+    // /grievance. Shown at the top, because a commitment nobody can see is
+    // a commitment nobody meets.
+    supabase.rpc("report_sla"),
   ]);
 
   // Resolve usernames for profile-target reports so "View target" links to a
@@ -150,6 +154,7 @@ export default async function AdminReportsPage() {
       reporter: r.reporter_id === null
         ? "unknown"
         : one(r.reporter)?.username ?? one(r.reporter)?.display_name ?? "unknown",
+      acknowledgedAt: r.acknowledged_at ?? null,
       ...decorate(r.target_id),
     })),
     ...(messages ?? []).map((r: any) => ({
@@ -163,6 +168,7 @@ export default async function AdminReportsPage() {
       status: r.status,
       at: r.created_at,
       reporter: one(r.reporter)?.username ?? one(r.reporter)?.display_name ?? "unknown",
+      acknowledgedAt: r.acknowledged_at ?? null,
       ...decorate(r.message_id),
     })),
   ].sort((a, b) => (a.at < b.at ? 1 : -1));
@@ -170,7 +176,7 @@ export default async function AdminReportsPage() {
   return (
     <>
       <PageHeader title="Reports queue" showBack />
-      <ReportsQueue rows={rows} />
+      <ReportsQueue rows={rows} sla={Array.isArray(sla) ? sla[0] ?? null : sla ?? null} />
     </>
   );
 }

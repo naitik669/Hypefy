@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ShieldCheck, Check, XCircle, Trash2, Ban, Undo2 } from "lucide-react";
+import { ShieldCheck, Check, XCircle, Trash2, Ban, Undo2, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -26,6 +26,8 @@ export type ReportRow = {
   status: string;
   at: string;
   reporter: string;
+  /** When a human first took this in hand. Null means nobody has. */
+  acknowledgedAt?: string | null;
 };
 
 /** Target types admin_remove_content knows how to take down. */
@@ -67,7 +69,49 @@ function timeAgo(iso: string) {
  * and writes to moderation_actions, so the queue cannot do anything the
  * database has not agreed to and every decision leaves a trail.
  */
-export function ReportsQueue({ rows }: { rows: ReportRow[] }) {
+/** What report_sla() returns: where the queue stands against /grievance. */
+export type ReportSla = {
+  open_total: number;
+  unacknowledged_over_24h: number;
+  open_over_15_days: number;
+  oldest_open_hours: number;
+};
+
+/**
+ * The published timeframes, against the queue as it actually is.
+ *
+ * /grievance commits to acknowledging within 24 hours and disposing within
+ * fifteen days. Those are promises somebody has to keep, and until now
+ * nothing showed whether they were being kept — so this sits at the top of
+ * the queue rather than in a report nobody opens.
+ *
+ * Silent when there is nothing to say. A banner that is always there is
+ * furniture, and stops being read.
+ */
+function SlaBanner({ sla }: { sla: ReportSla | null }) {
+  if (!sla || (sla.unacknowledged_over_24h === 0 && sla.open_over_15_days === 0)) return null;
+  const days = Math.floor(sla.oldest_open_hours / 24);
+  return (
+    <div className="mx-3 mb-3 rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3">
+      <p className="text-sm font-bold text-danger">Past the published timeframes</p>
+      <ul className="mt-1 flex flex-col gap-0.5 text-xs text-foreground/80">
+        {sla.unacknowledged_over_24h > 0 && (
+          <li>
+            {sla.unacknowledged_over_24h} not acknowledged within 24 hours
+          </li>
+        )}
+        {sla.open_over_15_days > 0 && (
+          <li>{sla.open_over_15_days} still open after 15 days</li>
+        )}
+        <li className="text-faint">
+          Oldest open report: {days > 0 ? `${days} days` : `${sla.oldest_open_hours} hours`}
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+export function ReportsQueue({ rows, sla = null }: { rows: ReportRow[]; sla?: ReportSla | null }) {
   const supabase = createClient();
   const toast = useToast();
   const [statusById, setStatusById] = useState<Map<string, string>>(
@@ -78,6 +122,9 @@ export function ReportsQueue({ rows }: { rows: ReportRow[] }) {
   );
   const [suspendedByAuthor, setSuspendedByAuthor] = useState<Map<string, boolean>>(
     () => new Map(rows.flatMap((r) => (r.authorId ? [[r.authorId, !!r.authorSuspended] as const] : []))),
+  );
+  const [ackedById, setAckedById] = useState<Map<string, boolean>>(
+    () => new Map(rows.map((r) => [r.id, !!r.acknowledgedAt])),
   );
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -94,6 +141,25 @@ export function ReportsQueue({ rows }: { rows: ReportRow[] }) {
     setBusy(null);
     if (error) {
       setStatusById((m) => new Map(m).set(r.id, prev));
+      toast(error.message, "error");
+    }
+  }
+
+  /**
+   * Take a report in hand, without deciding it yet.
+   *
+   * Idempotent in the database: the first admin to click owns it and a
+   * second click does not move the clock, because an acknowledgement time
+   * that drifts is not a measurement.
+   */
+  async function acknowledge(r: ReportRow) {
+    if (busy) return;
+    setBusy(r.id);
+    setAckedById((m) => new Map(m).set(r.id, true));
+    const { error } = await supabase.rpc("admin_acknowledge_report", { p_table: r.table, p_id: r.id });
+    setBusy(null);
+    if (error) {
+      setAckedById((m) => new Map(m).set(r.id, false));
       toast(error.message, "error");
     }
   }
@@ -288,6 +354,17 @@ export function ReportsQueue({ rows }: { rows: ReportRow[] }) {
               </button>
             ))}
 
+          {isOpen && !ackedById.get(r.id) && (
+            <button
+              type="button"
+              disabled={busy === r.id}
+              onClick={() => void acknowledge(r)}
+              className="flex items-center gap-1 rounded-pill border border-border px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:text-foreground disabled:opacity-50"
+            >
+              <Clock size={13} /> Acknowledge
+            </button>
+          )}
+
           {isOpen && (
             <>
               <button
@@ -315,6 +392,7 @@ export function ReportsQueue({ rows }: { rows: ReportRow[] }) {
 
   return (
     <div className="flex flex-col gap-4 px-4 pt-2 pb-10">
+      <SlaBanner sla={sla} />
       {open.length > 0 && (
         <section className="flex flex-col gap-2">
           <p className="px-1 text-xs font-bold uppercase tracking-widest text-faint">Open · {open.length}</p>

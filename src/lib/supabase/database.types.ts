@@ -2621,6 +2621,16 @@ export type Database = {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: undefined
       }
+      admin_acknowledge_report: { Args: { p_table: string; p_id: string }; Returns: undefined }
+      report_sla: {
+        Args: never
+        Returns: {
+          open_total: number
+          unacknowledged_over_24h: number
+          open_over_15_days: number
+          oldest_open_hours: number
+        }[]
+      }
       admin_remove_content: {
         Args: {
           p_reason?: string
