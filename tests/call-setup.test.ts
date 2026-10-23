@@ -111,7 +111,44 @@ describe("asking for them, from a call", () => {
     vi.stubGlobal("fetch", answer({ iceServers: [] }));
     expect((await getRtcConfig(NOW)).iceServers).toHaveLength(1);
   });
+  it("a refusal for asking too often still places the call", async () => {
+    // The endpoint is capped, so this is a real answer a caller can get.
+    // It has to degrade to the public finder, not fail the call.
+    vi.stubGlobal("fetch", answer({ error: "Rate limit exceeded, slow down." }, false));
+    expect((await getRtcConfig(NOW)).iceServers).toHaveLength(1);
+  });
 });
+
+describe("how often a caller may ask for relay credentials", () => {
+  const sql = readFileSync("supabase/migrations/0144_ice_rate_limit.sql", "utf8").replace(/\r\n/g, "\n");
+  const route = readFileSync("src/app/api/calls/ice/route.ts", "utf8");
+
+  it("is capped, because the login it hands out is spendable", () => {
+    // A relay carries other people's traffic at the owner's cost, so an
+    // uncapped mint is an invitation to collect credentials in a loop.
+    expect(route).toContain('await guardApi("ice")');
+    expect(sql).toContain("when 'ice'          then v_limit := 30;");
+  });
+
+  it("the cap sits far above what the browser actually asks for", () => {
+    // getRtcConfig keeps a config for KEEP_MS, so an ordinary caller asks
+    // about twice an hour per tab. If that cache ever goes, this cap is
+    // the thing that starts refusing real calls.
+    expect(KEEP_MS_FROM_SOURCE()).toBe(30 * 60 * 1000);
+  });
+
+  it("the limits stay server-side", () => {
+    // The raw primitive takes a limit as an argument; only the wrapper is
+    // exposed, so a client cannot raise its own cap.
+    expect(sql).toContain("revoke all on function public.api_rate_limit(text) from anon;");
+    expect(sql).toContain("raise exception 'Unknown rate-limit action: %'");
+  });
+});
+
+function KEEP_MS_FROM_SOURCE(): number {
+  const src = readFileSync("src/lib/call-setup.ts", "utf8");
+  return Number(/const KEEP_MS = (\d+) \* 60 \* 1000/.exec(src)![1]) * 60 * 1000;
+}
 
 describe("why a call could not start", () => {
   const named = (name: string) => Object.assign(new Error("x"), { name });

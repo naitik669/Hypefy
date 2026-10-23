@@ -3,7 +3,8 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Guard for the third-party proxy routes (/api/gifs, /api/music, /api/client-error).
+ * Guard for the third-party proxy routes (/api/gifs, /api/music, /api/client-error)
+ * and for /api/calls/ice, which mints relay credentials.
  *
  * These were previously open to the internet, so anyone could burn the Giphy
  * quota or drain the Sentry allowance. Requires a signed-in user, then applies
@@ -13,7 +14,7 @@ import { createClient } from "@/lib/supabase/server";
  *
  * Returns a NextResponse to short-circuit with, or null when the caller may proceed.
  */
-export async function guardApi(action: "gifs" | "music" | "client_error"): Promise<NextResponse | null> {
+export async function guardApi(action: "gifs" | "music" | "client_error" | "ice"): Promise<NextResponse | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
