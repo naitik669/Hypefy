@@ -588,6 +588,7 @@ function ShowScreen({
             e.stopPropagation();
             onPrev();
           }}
+          aria-label="Previous Show"
           className="pointer-events-auto absolute left-2 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
         >
           <ChevronLeft size={22} />
@@ -600,6 +601,7 @@ function ShowScreen({
             e.stopPropagation();
             onNext();
           }}
+          aria-label="Next Show"
           className="pointer-events-auto absolute right-2 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
         >
           <ChevronRight size={22} />

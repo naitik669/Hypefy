@@ -157,6 +157,23 @@ export function CameraCapture({
     else void takePhoto();
   }
 
+  /**
+   * The shutter, reached by keyboard or switch access.
+   *
+   * The button only had pointer handlers, so Enter, Space and every switch
+   * device did nothing at all: there was no way to take a picture without a
+   * finger. A click from a keyboard activation carries `detail === 0`, which
+   * is what separates it from the click a real tap fires after its own
+   * pointerup — that one has already been handled and must not shoot twice.
+   *
+   * Holding to record stays a pointer gesture. Video has another way in
+   * (the picker's gallery and File entries); taking a photo had none.
+   */
+  function onShutterClick(e: React.MouseEvent) {
+    if (e.detail !== 0 || !ready || recorderRef.current) return;
+    void takePhoto();
+  }
+
   function retake() {
     if (shot) URL.revokeObjectURL(shot.preview);
     setReady(false);
@@ -273,6 +290,7 @@ export function CameraCapture({
               onPointerDown={onShutterDown}
               onPointerUp={onShutterUp}
               onPointerCancel={onShutterUp}
+              onClick={onShutterClick}
               onContextMenu={(e) => e.preventDefault()}
               className="relative grid h-[76px] w-[76px] place-items-center rounded-full border-[5px] border-white disabled:opacity-40"
               style={{ touchAction: "none" }}

@@ -14,7 +14,20 @@
 
   --color-foreground: #ffffff; /* primary text */
   --color-muted: #8a8a8a; /* secondary text */
-  --color-faint: #555555; /* tertiary / inactive icons */
+  /*
+    Tertiary text and inactive icons. Was #555555, which is 2.66:1 on the app
+    background — well under the 4.5:1 AA needs for text, and it is used as
+    text in a few hundred places, so it was the single biggest accessibility
+    defect in the app.
+
+    #7f7f7f measures 4.94:1 on background and 4.60:1 on surface, so normal
+    text clears AA on both. On --color-elevated (sheets and raised cards) it
+    is 4.16:1: above the 3:1 bar for large text and UI components, under the
+    small-text bar. Closing that last gap needs #858585, and muted is
+    #8a8a8a — the two tokens would be the same colour and the hierarchy they
+    exist to express would be gone. Sheet body text should use muted.
+  */
+  --color-faint: #7f7f7f;
 
   --color-accent: #a3e635; /* brand: electric lime — deepened for calm on black */
   --color-accent-ink: #0a0a0a; /* text on accent fills */

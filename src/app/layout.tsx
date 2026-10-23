@@ -156,7 +156,14 @@ export const viewport: Viewport = {
   themeColor: "#0a0a0a",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // No maximumScale. Capping it at 1 disables pinch zoom entirely, which is
+  // the only way a low-vision reader can enlarge anything here — and an app
+  // whose smallest type is 10px cannot take that away. WCAG 1.4.4.
+  //
+  // The known cost: iOS Safari zooms in when a field whose text is under 16px
+  // takes focus, and `.input` is 14px. That is a nuisance, but a recoverable
+  // one — the reader can now pinch back out, which is exactly what the cap
+  // used to prevent. Raising form text to 16px would remove it as well.
   viewportFit: "cover",
 };
 

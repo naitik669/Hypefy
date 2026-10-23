@@ -1885,6 +1885,20 @@ export function RealChatView({
   }
 
   // Long-press Ã¢â€ â€™ context menu
+  /**
+   * Open a message's actions, anchored to the element they belong to.
+   *
+   * Shared by the hold and by the per-message button below, which is the
+   * only way anyone navigating by keyboard, switch or screen reader can get
+   * to Reply, Forward, Pin — or Report. A 420ms hold on a div that cannot
+   * take focus is unreachable by every one of them, and Report being
+   * unreachable is a safety problem before it is an accessibility one.
+   */
+  function openMenu(m: ChatMsg, el: HTMLElement) {
+    if (m.is_unsent) return;
+    setMenu({ msg: m, rect: el.getBoundingClientRect() });
+  }
+
   function onPressStart(m: ChatMsg, e: React.PointerEvent) {
     if (m.is_unsent) return;
 
@@ -2118,10 +2132,28 @@ export function RealChatView({
                 <div
                   key={m.id}
                   data-msg-id={m.id}
-                  className={`${isNew ? "animate-msg-in" : ""} ${
+                  className={`relative ${isNew ? "animate-msg-in" : ""} ${
                     foundId === m.id ? "animate-found rounded-2xl" : ""
                   }`}
                 >
+                  {/* The single-pointer way into a message's actions.
+                      Invisible until it takes focus, so the bubbles look
+                      exactly as they did, but it is in the tab order and
+                      screen readers announce it — the hold that opens the
+                      same menu is on a div with no role and no tabindex, so
+                      keyboard and switch users could reach none of it. */}
+                  {!m.is_unsent && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        const row = e.currentTarget.parentElement;
+                        if (row) openMenu(m, row);
+                      }}
+                      className="sr-only focus:not-sr-only focus:absolute focus:right-1 focus:top-1 focus:z-10 focus:rounded-full focus:bg-elevated focus:px-2.5 focus:py-1 focus:text-[11px] focus:font-bold focus:text-foreground focus:outline focus:outline-2 focus:outline-accent"
+                    >
+                      Message options
+                    </button>
+                  )}
                   {i === firstUnreadIndex && (
                     <div ref={unreadDividerRef} className="flex items-center gap-2 py-2">
                       <span className="h-px flex-1 bg-accent/30" />

@@ -464,6 +464,39 @@ export function ReelsFeed({
     setDrag(dy);
   }
 
+  /**
+   * Move one reel, without a finger.
+   *
+   * Paging the reel was a vertical swipe and nothing else, so a keyboard, a
+   * switch device or a screen reader could reach the first Shot and then
+   * stop — the rest of the feed did not exist for them. This is what the
+   * arrow keys and the two buttons below both call; the swipe keeps its own
+   * path because it also has to decide between next, previous and leaving.
+   */
+  function step(delta: 1 | -1) {
+    if (sheetOpen) return;
+    if (delta === 1) {
+      // On the end card, asking for more is what "next" means.
+      if (activeIdx === slides.length - 1) {
+        if (slides[activeIdx]?.kind === "end") void checkForNew();
+        return;
+      }
+      setActiveIdx((i) => i + 1);
+      return;
+    }
+    if (activeIdx > 0) setActiveIdx((i) => i - 1);
+  }
+
+  function onStageKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "ArrowDown" || e.key === "PageDown") {
+      e.preventDefault();
+      step(1);
+    } else if (e.key === "ArrowUp" || e.key === "PageUp") {
+      e.preventDefault();
+      step(-1);
+    }
+  }
+
   function onSwipeTouchEnd() {
     if (sheetOpen) return;
     const dy = drag ?? 0;
@@ -493,7 +526,36 @@ export function ReelsFeed({
       onTouchMove={onSwipeTouchMove}
       onTouchEnd={onSwipeTouchEnd}
       onTouchCancel={() => setDrag(null)}
+      onKeyDown={onStageKeyDown}
+      tabIndex={0}
+      role="region"
+      aria-roledescription="carousel"
+      aria-label="Shots"
+      // The outline would sit over the video on every tap; the two buttons
+      // below are what a keyboard lands on and they show their own.
+      style={{ outline: "none" }}
     >
+      {/* Paging without a finger. Invisible until focused, so the reel looks
+          untouched, but they are in the tab order and a screen reader reads
+          them — arrow keys do the same once the stage has focus. */}
+      <div className="absolute left-1/2 top-2 z-30 -translate-x-1/2">
+        <button
+          type="button"
+          onClick={() => step(-1)}
+          disabled={activeIdx === 0}
+          className="sr-only focus:not-sr-only focus:rounded-full focus:bg-black/85 focus:px-3 focus:py-1.5 focus:text-xs focus:font-bold focus:text-white focus:outline focus:outline-2 focus:outline-accent"
+        >
+          Previous Shot
+        </button>
+        <button
+          type="button"
+          onClick={() => step(1)}
+          className="sr-only focus:not-sr-only focus:ml-2 focus:rounded-full focus:bg-black/85 focus:px-3 focus:py-1.5 focus:text-xs focus:font-bold focus:text-white focus:outline focus:outline-2 focus:outline-accent"
+        >
+          Next Shot
+        </button>
+      </div>
+
       {/* Absolute-positioned reels: each fills the container, translated by index offset */}
       {slides.map((item, i) => (
         <div
