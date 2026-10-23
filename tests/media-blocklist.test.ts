@@ -56,6 +56,29 @@ describe("a malformed hash never blocks an upload", () => {
   });
 });
 
+describe("the function surface", () => {
+  const sql161 = read("supabase/migrations/0161_media_function_surface.sql");
+
+  it("nothing is reachable from the client that does not need to be", () => {
+    // is_media_blocked had a stray grant, and the trigger function was
+    // exposed by the default one. Found by re-reading the advisors after the
+    // day's migrations rather than assuming they were clean.
+    expect(sql161).toContain(
+      "revoke all on function public.is_media_blocked(bit) from public, anon, authenticated;",
+    );
+    expect(sql161).toContain(
+      "revoke all on function public.tg_harvest_removed_media() from public, anon, authenticated;",
+    );
+  });
+
+  it("and the two that are reachable are granted deliberately", () => {
+    expect(sql158).toContain("grant execute on function public.check_media(text) to authenticated;");
+    expect(sql158).toContain(
+      "grant execute on function public.claim_media(text, uuid, text, text) to authenticated;",
+    );
+  });
+});
+
 describe("the harvest loop", () => {
   const harvest = sql157.slice(sql157.indexOf("function public.tg_harvest_removed_media"));
 
