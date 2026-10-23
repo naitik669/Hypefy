@@ -174,6 +174,8 @@ live project and is **mirrored into the repo** as 30 files under
 | `capture-creator-daily-stats` | `10 0 * * *` | `select public.capture_creator_daily_stats();` |
 | `purge-expired-messages` | `0 * * * *` | `select public.purge_expired_messages();` |
 | `reap-oneshots` | `*/5 * * * *` | `select public.reap_oneshots();` |
+| `prune-retention` | `40 3 * * *` | `select public.prune_retention();` |
+| `verify-media-hashes` | `*/5 * * * *` | `select public.run_media_verification();` |
 
 ### Secrets in Supabase Vault (not in migration files)
 
@@ -191,6 +193,33 @@ select vault.create_secret(
   'x-oneshot-reap-secret header value for pg_net -> /api/oneshot/reap'
 );
 ```
+
+### Media verification — the one deploy step still outstanding
+
+`verify-media-hashes` is installed and active, and **does nothing at all
+until two independent copies of one secret exist**. That is deliberate: a
+cron job that cannot succeed fails silently every five minutes forever, and
+the noise sits exactly where a real failure would have been visible. The
+function returns early when the Vault secret is missing, so nothing is
+posted and nothing is logged.
+
+To turn it on:
+
+```sql
+select vault.create_secret(
+  '<random-64-char-hex>', 'moderation_verify_secret',
+  'x-moderation-secret header value for pg_net -> /api/moderation/verify'
+);
+```
+
+and set the **same value** as `MODERATION_VERIFY_SECRET` in the Vercel
+environment. Nothing in the database can check that the two match — they are
+independent copies, the same arrangement `oneshot_reap_secret` uses.
+
+Until both are set, uploaded images are hashed and checked against the
+blocklist using the hash the **client** supplied, which a crafted request can
+forge. The verification pass is what makes the stored hash authoritative; see
+`0157`–`0160` and `src/lib/media-hash.ts`.
 
 New schema changes should be authored as new numbered migration files and
 applied via the Supabase CLI or `apply_migration`, then `database.types.ts`
