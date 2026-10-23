@@ -2695,6 +2695,8 @@ export type Database = {
       can_see_profile: { Args: { p_user: string }; Returns: boolean }
       capture_creator_daily_stats: { Args: never; Returns: undefined }
       check_media: { Args: { p_hash: string }; Returns: boolean }
+      raise_media_report: { Args: { p_target_type: string; p_target_id: string }; Returns: undefined }
+      set_verified_hash: { Args: { p_id: string; p_hash: string }; Returns: undefined }
       claim_media: {
         Args: { p_target_type: string; p_target_id: string; p_url: string; p_hash: string }
         Returns: boolean

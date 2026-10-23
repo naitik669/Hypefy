@@ -28,7 +28,7 @@ export default async function AdminReportsPage() {
   const [{ data: content }, { data: messages }] = await Promise.all([
     supabase
       .from("reports")
-      .select("id, target_type, target_id, reason, details, status, created_at, reporter:profiles!reports_reporter_id_fkey(username, display_name)")
+      .select("id, target_type, target_id, reason, details, status, created_at, reporter_id, reporter:profiles!reports_reporter_id_fkey(username, display_name)")
       .order("created_at", { ascending: false })
       .limit(100),
     supabase
@@ -144,7 +144,12 @@ export default async function AdminReportsPage() {
       details: r.details,
       status: r.status,
       at: r.created_at,
-      reporter: one(r.reporter)?.username ?? one(r.reporter)?.display_name ?? "unknown",
+      // A null reporter_id is a system flag, not a missing person: the
+      // upload check raised it (0159). Saying "automated check" would read as a
+      // data problem rather than as what it is.
+      reporter: r.reporter_id === null
+        ? "unknown"
+        : one(r.reporter)?.username ?? one(r.reporter)?.display_name ?? "unknown",
       ...decorate(r.target_id),
     })),
     ...(messages ?? []).map((r: any) => ({
