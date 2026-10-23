@@ -171,7 +171,7 @@ export default async function AppLayout({
             <ConnectionNotice />
             <ReturnToDestination />
             <AppLockGate />
-            <PresenceHeartbeat />
+            <PresenceHeartbeat userId={user!.id} />
             <InAppNotifier currentUserId={user!.id} />
             <VaultAutoLock />
             <EncryptionSetup userId={user!.id} />

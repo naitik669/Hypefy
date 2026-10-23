@@ -18,3 +18,15 @@ export function presenceLabel(
   if (secs < 86400) return { status: "offline", online: false, text: `Active ${Math.floor(secs / 3600)}h ago` };
   return { status: "offline", online: false, text: `Active ${Math.floor(secs / 86400)}d ago` };
 }
+
+/**
+ * The broadcast channel a person announces their heartbeat on.
+ *
+ * One name, derived the same way by the sender (PresenceHeartbeat) and by
+ * whoever has their chat open (RealChatView). Presence does not travel
+ * through the database: see 0155 for why publishing `profiles` to realtime
+ * is the wrong repair for a dot that was never updating.
+ */
+export function presenceTopic(userId: string): string {
+  return `presence:${userId}`;
+}

@@ -526,11 +526,11 @@ export function MessagesInbox({
         { event: "*", schema: "public", table: "message_reactions" },
         refresh
       )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "conversations" },
-        refresh
-      )
+      // No subscription to `conversations`. It is not in the realtime
+      // publication, so this never fired — and it should not be added:
+      // last_message_at only changes because a message was inserted, which
+      // the messages subscription above already refreshes on. Publishing it
+      // would duplicate the busiest stream in the app to say nothing new.
       // When my last_read_at updates (i.e. I opened the thread on another device / tab),
       // mark that conversation as read locally so the badge clears immediately.
       .on(

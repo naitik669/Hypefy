@@ -30,7 +30,7 @@ import { useKeyboardInset } from "@/lib/useKeyboardInset";
 import { useToast } from "@/components/ui/ToastProvider";
 import { scheduleUndoable } from "@/lib/undoable";
 import { removeChat } from "@/lib/chat-removal";
-import { presenceLabel } from "@/lib/presence";
+import { presenceLabel, presenceTopic } from "@/lib/presence";
 import { haptics } from "@/lib/haptics";
 import { PresenceDot } from "@/components/presence/PresenceDot";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
@@ -1232,19 +1232,25 @@ export function RealChatView({
     };
   }, [conversationId, currentUserId, supabase]);
 
-  // Realtime: the other DM party's last_seen_at (presence). Plus a 30s ticker
-  // so "Active 4m ago" stays current without new events.
+  /**
+   * The other party's presence, plus a 30s ticker so "Active 4m ago" stays
+   * current without new events.
+   *
+   * This listened for `postgres_changes` on `profiles` and therefore heard
+   * nothing, ever: profiles is not in the realtime publication, so the dot
+   * showed whatever the server rendered at page load and never moved again.
+   * Publishing profiles would have fixed it at the cost of a WAL record per
+   * signed-in user per minute — see 0155. Their heartbeat announces itself on
+   * a channel instead, and this listens on the same name.
+   */
   useEffect(() => {
     if (isGroup || !other.id || other.showActivity === false) return;
     const ch = supabase
-      .channel(`presence:${other.id}`)
-      .on("postgres_changes",
-        { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${other.id}` },
-        (payload) => {
-          const row = payload.new as { last_seen_at?: string | null; show_activity?: boolean };
-          if (row.show_activity === false) { setOtherLastSeen(null); return; }
-          if (row.last_seen_at) setOtherLastSeen(row.last_seen_at);
-        })
+      .channel(presenceTopic(other.id))
+      .on("broadcast", { event: "beat" }, (msg) => {
+        const at = (msg.payload as { at?: string } | null)?.at;
+        if (at) setOtherLastSeen(at);
+      })
       .subscribe();
     const ticker = setInterval(() => forcePresenceTick((n) => n + 1), 30_000);
     return () => { supabase.removeChannel(ch); clearInterval(ticker); };
