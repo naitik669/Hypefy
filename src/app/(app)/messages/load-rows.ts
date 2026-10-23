@@ -26,10 +26,25 @@ export async function loadInboxRows(
   // my_chat_levels, not the columns: nobody may read locked_at or hidden_at
   // directly (0116), so that the other person in a chat cannot see that you
   // locked it.
+  // Scoped through the membership rather than left to the row rule.
+  //
+  // Selecting straight from conversations and trusting RLS looks
+  // equivalent and is not: the policy is is_conv_member(id), a SECURITY
+  // DEFINER function, so the planner can neither inline it nor use it as
+  // an index qual. It walks conversations newest-first calling that
+  // function — and a membership lookup inside it — once per row until it
+  // has found fifty you can see. Someone in twenty chats paid for a walk
+  // of nearly the whole table, growing with every conversation anyone
+  // else creates.
+  //
+  // The inner join starts from conversation_members instead, where
+  // conversation_members_user_idx makes your rows a direct lookup. RLS
+  // still applies; it just is not what finds the rows any more.
   const newestFifty = () =>
     supabase
       .from("conversations")
-      .select("id, last_message_at, type, title")
+      .select("id, last_message_at, type, title, conversation_members!inner(user_id)")
+      .eq("conversation_members.user_id", userId)
       .order("last_message_at", { ascending: false })
       .limit(50);
 
