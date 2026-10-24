@@ -227,6 +227,37 @@ regenerated and this doc updated.
 
 ## Indexes
 
+### The advisor's "unused index" list — do not act on it
+
+As of 2026-10-24 the performance advisor reports 33 unused indexes. **None of
+them should be dropped.** Counted properly:
+
+| | |
+|---|---|
+| used | 94 |
+| unused — foreign-key index | 26 |
+| unused — the query has not run yet | 8 |
+| unused — the table is empty | 3 |
+
+The 26 are the point. `pg_stat_user_indexes.idx_scan` counts index scans from
+query plans; enforcing `ON DELETE` does not show up there. Those indexes exist
+so that deleting an account does not sequential-scan every referencing table,
+which is why 0145 added ten and 0164 added six more. They will read as unused
+for as long as nobody deletes an account, and dropping them would undo both
+migrations and re-break a path 0147 already had to repair.
+
+The other 11 are untrafficked, not useless: trigram search, archived-post
+filters, live-Show lookups, and three added on 2026-10-23 for queries that
+have not run yet.
+
+Checked for the one case that *can* be judged without traffic — an index whose
+columns are a strict prefix of a wider one on the same table, and therefore
+redundant whatever the traffic. There are none.
+
+Re-derive this before acting on the lint again; `tests/fk-indexes.test.ts`
+holds the foreign-key half in place meanwhile.
+
+
 Hot-path indexes exist on: posts/shots `(created_at desc)` and `(user_id)`;
 notifications `(user_id, is_read, created_at desc)`; conversations
 `(last_message_at desc)`; conversation_members `(conversation_id, user_id)`;
