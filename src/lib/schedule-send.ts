@@ -13,35 +13,22 @@ export const MAX_AHEAD_MS = 90 * 24 * 60 * 60 * 1000;
 
 export type Preset = { id: string; label: string; at: Date };
 
-/** The next time today or tomorrow that the clock reads `hour`:00. */
-export function nextAt(hour: number, now: Date): Date {
-  const d = new Date(now);
-  d.setHours(hour, 0, 0, 0);
-  // Not `<=`: a preset for 9am generated at exactly 9am should mean
-  // tomorrow, because "9am" has already happened.
-  if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
-  return d;
-}
-
 /**
- * The shortlist, filtered to what is actually still ahead.
+ * The shortlist.
  *
- * "This evening" disappears after 6pm rather than silently meaning tomorrow
- * evening — a preset whose label stops being true is worse than one fewer
- * preset.
+ * Three offsets from now, not times of day. "In a day" is twenty-four hours
+ * from this moment, which needs no rule about what counts as morning and
+ * cannot be made untrue by the clock passing it — the earlier clock-based
+ * presets had to be filtered out as the day wore on, and a list that changes
+ * length depending on when you open it is a list you have to read each time.
  */
 export function presets(now: Date): Preset[] {
-  const inAnHour = new Date(now.getTime() + 60 * 60 * 1000);
-  const evening = nextAt(18, now);
-  const tomorrow = nextAt(9, now);
-
-  const out: Preset[] = [{ id: "hour", label: "In an hour", at: inAnHour }];
-  // Only when it is still today, and far enough off to be worth offering.
-  if (evening.getDate() === now.getDate() && evening.getTime() - now.getTime() > 30 * 60 * 1000) {
-    out.push({ id: "evening", label: "This evening", at: evening });
-  }
-  out.push({ id: "tomorrow", label: "Tomorrow morning", at: tomorrow });
-  return out.filter((p) => canSchedule(p.at, now) === null);
+  const after = (ms: number) => new Date(now.getTime() + ms);
+  return [
+    { id: "hour", label: "In an hour", at: after(60 * 60 * 1000) },
+    { id: "day", label: "In a day", at: after(24 * 60 * 60 * 1000) },
+    { id: "week", label: "In a week", at: after(7 * 24 * 60 * 60 * 1000) },
+  ].filter((p) => canSchedule(p.at, now) === null);
 }
 
 /**
@@ -60,25 +47,6 @@ export function canSchedule(at: Date | null, now: Date): string | null {
 }
 
 /**
- * The value a `datetime-local` input wants: the local clock, not UTC.
- *
- * toISOString would hand it UTC and the input would display the wrong time
- * for anyone not on GMT — and then read that wrong time back as the
- * intended one.
- */
-export function toLocalInput(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
-/** And back again. An empty or malformed value is null, never Invalid Date. */
-export function fromLocalInput(value: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-/**
  * How a scheduled time is read back to the sender.
  *
  * Today and tomorrow are named rather than dated, because "Today at 18:00"
@@ -94,4 +62,127 @@ export function describeWhen(at: Date, now: Date): string {
   if (sameDay(at, now)) return `Today at ${time}`;
   if (sameDay(at, tomorrow)) return `Tomorrow at ${time}`;
   return `${at.toLocaleDateString(undefined, { day: "numeric", month: "short" })} at ${time}`;
+}
+
+/* ── The calendar ──────────────────────────────────────────────────────── */
+
+/** One square in the month grid. */
+export type DayCell = {
+  date: Date;
+  /** False for the leading and trailing days borrowed from the neighbouring
+   *  months, which are shown greyed so the weeks line up. */
+  inMonth: boolean;
+  /** Before today, or past the 90-day horizon. Rendered, never pressable. */
+  disabled: boolean;
+  today: boolean;
+};
+
+/** Midnight on the day `d` falls in, local time. */
+export function startOfDay(d: Date): Date {
+  const out = new Date(d);
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
+
+/** Same calendar day, ignoring the clock. */
+export function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/**
+ * Move by whole months, without the 31st becoming the 1st.
+ *
+ * `setMonth` on the 31st of a month followed by a 30-day one rolls into the
+ * next month — January 31st + 1 would be March 3rd. Landing on the 1st first
+ * makes the arithmetic mean what it says, which is all this is used for:
+ * paging the grid.
+ */
+export function addMonths(d: Date, n: number): Date {
+  const out = new Date(d.getFullYear(), d.getMonth() + n, 1);
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
+
+/** "October 2026", in the reader's own language. */
+export function monthLabel(d: Date): string {
+  return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
+/** The last day that may be picked: the 90-day horizon the database enforces. */
+export function lastPickableDay(now: Date): Date {
+  return startOfDay(new Date(now.getTime() + MAX_AHEAD_MS));
+}
+
+/**
+ * Six weeks of squares for the month `month` falls in, Monday first.
+ *
+ * Always 42 cells, so the grid does not change height as the months are
+ * paged — a calendar that grows and shrinks under the thumb is a calendar
+ * whose buttons move while you are reaching for one.
+ */
+export function monthGrid(month: Date, now: Date): DayCell[] {
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  // getDay is Sunday-first; this app's weeks start on Monday.
+  const lead = (first.getDay() + 6) % 7;
+  const start = new Date(first);
+  start.setDate(first.getDate() - lead);
+  start.setHours(0, 0, 0, 0);
+
+  const today = startOfDay(now);
+  const last = lastPickableDay(now);
+
+  return Array.from({ length: 42 }, (_, i) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + i);
+    return {
+      date,
+      inMonth: date.getMonth() === month.getMonth(),
+      disabled: date.getTime() < today.getTime() || date.getTime() > last.getTime(),
+      today: sameDay(date, now),
+    };
+  });
+}
+
+/** Whether paging to this month could show anything pickable at all. */
+export function monthInRange(month: Date, now: Date): boolean {
+  const end = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59, 999);
+  return end.getTime() >= startOfDay(now).getTime() && month.getTime() <= lastPickableDay(now).getTime();
+}
+
+/* ── The clock ─────────────────────────────────────────────────────────── */
+
+/** Minutes offered, so a time is two taps rather than a scroll. */
+export const MINUTE_STEPS = [0, 15, 30, 45];
+
+/** That day at that time, local. */
+export function withTime(day: Date, hour: number, minute: number): Date {
+  const out = new Date(day);
+  out.setHours(hour, minute, 0, 0);
+  return out;
+}
+
+/**
+ * Which hours are still ahead on the chosen day.
+ *
+ * Every hour of a future day; only the ones not yet gone on today. An hour
+ * counts as available while any of its minute steps is still schedulable —
+ * otherwise the current hour disappears at :01 even though :15 is fine.
+ */
+export function hourOptions(day: Date, now: Date): { hour: number; disabled: boolean }[] {
+  return Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    disabled: !MINUTE_STEPS.some((m) => canSchedule(withTime(day, hour, m), now) === null),
+  }));
+}
+
+/** And which minutes within a chosen hour. */
+export function minuteOptions(day: Date, hour: number, now: Date): { minute: number; disabled: boolean }[] {
+  return MINUTE_STEPS.map((minute) => ({
+    minute,
+    disabled: canSchedule(withTime(day, hour, minute), now) !== null,
+  }));
 }

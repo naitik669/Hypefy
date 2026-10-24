@@ -156,3 +156,49 @@ describe("the composer", () => {
     expect(read("src/components/messages/ScheduledStrip.tsx")).toContain("async function cancel(");
   });
 });
+
+describe("the picker", () => {
+  const sheet = read("src/components/messages/ScheduleSendSheet.tsx");
+
+  it("offers the three offsets, then a calendar", () => {
+    expect(sheet).toContain("presets(now).map");
+    expect(sheet).toContain("Pick a date and time");
+  });
+
+  it("date comes first, then time — the coarser decision narrows the finer", () => {
+    // Which hours are even offered depends on which day was chosen.
+    expect(sheet).toContain('type Step = "presets" | "date" | "time"');
+    expect(sheet).toContain('setStep("time")');
+  });
+
+  it("each step walks back rather than closing and losing the typing", () => {
+    expect(sheet).toContain(
+      `step === "date" ? () => setStep("presets") : step === "time" ? () => setStep("date") : null`,
+    );
+    expect(sheet).toContain("<ChevronLeft size={18} />");
+  });
+
+  it("the calendar pages by month, and will not page out of range", () => {
+    expect(sheet).toContain("monthInRange(addMonths(month, -1), now)");
+    expect(sheet).toContain("monthInRange(addMonths(month, 1), now)");
+  });
+
+  it("a day that cannot be picked is shown but not pressable", () => {
+    // Rendered greyed rather than hidden, so the weeks still line up.
+    expect(sheet).toContain("disabled={cell.disabled}");
+  });
+
+  it("choosing an hour drops a minute that has since gone", () => {
+    // Otherwise :00 stays selected from a previous hour and the Send button
+    // sits disabled with nothing saying why.
+    expect(sheet).toContain("if (!free.some((m) => m.minute === minute)) setMinute(free[0]?.minute ?? 0);");
+  });
+
+  it("the confirm button says what it will do", () => {
+    expect(sheet).toContain("`Send ${describeWhen(chosen, now).toLowerCase()}`");
+  });
+
+  it("and refuses a time the database would refuse", () => {
+    expect(sheet).toContain("canSchedule(chosen, now) !== null");
+  });
+});
