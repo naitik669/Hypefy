@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 /**
  * The half of readiness that is state rather than configuration.
@@ -35,6 +35,22 @@ describe("it reports state the environment cannot see", () => {
     // was never created has to be as visible as one switched off.
     expect(sql).toContain("expected text[] := array[");
     expect(sql).toContain("'verify-media-hashes'");
+  });
+
+  it("and every cron job this repo creates is in that list", () => {
+    // Otherwise the check reports all-clear while a job nobody added sits
+    // missing. 0167 exists because 0166 added an eleventh job and the list
+    // did not grow with it — the same mistake, one migration apart.
+    // Taken from every cron.schedule() in the migrations, which is where a
+    // job actually comes into being — not from a doc that can fall behind.
+    const latest = read("supabase/migrations/0167_ops_readiness_scheduled_messages.sql");
+    const all = readdirSync("supabase/migrations")
+      .filter((f) => f.endsWith(".sql"))
+      .map((f) => read(`supabase/migrations/${f}`))
+      .join("\n");
+    const jobs = [...new Set([...all.matchAll(/cron\.schedule\(\s*'([a-z-]+)'/g)].map((m) => m[1]))];
+    expect(jobs.length).toBeGreaterThan(8);
+    for (const job of jobs) expect(latest, job).toContain(`'${job}'`);
     expect(sql).toContain("where not exists (");
   });
 

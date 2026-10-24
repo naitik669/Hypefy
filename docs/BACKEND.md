@@ -176,6 +176,7 @@ live project and is **mirrored into the repo** as 30 files under
 | `reap-oneshots` | `*/5 * * * *` | `select public.reap_oneshots();` |
 | `prune-retention` | `40 3 * * *` | `select public.prune_retention();` |
 | `verify-media-hashes` | `*/5 * * * *` | `select public.run_media_verification();` |
+| `deliver-scheduled-messages` | `* * * * *` | `select public.deliver_due_messages();` |
 
 ### Secrets in Supabase Vault (not in migration files)
 

@@ -2062,6 +2062,36 @@ export type Database = {
           },
         ]
       }
+      scheduled_messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          sender_id: string
+          body: string
+          reply_to_id: string | null
+          scheduled_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          sender_id: string
+          body: string
+          reply_to_id?: string | null
+          scheduled_at: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          sender_id?: string
+          body?: string
+          reply_to_id?: string | null
+          scheduled_at?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       scheduled_posts: {
         Row: {
           aspect_ratio: number | null
@@ -2717,6 +2747,15 @@ export type Database = {
       can_see_profile: { Args: { p_user: string }; Returns: boolean }
       capture_creator_daily_stats: { Args: never; Returns: undefined }
       check_media: { Args: { p_hash: string }; Returns: boolean }
+      schedule_message: {
+        Args: {
+          p_conversation_id: string
+          p_body: string
+          p_scheduled_at: string
+          p_reply_to_id?: string
+        }
+        Returns: string
+      }
       raise_media_report: { Args: { p_target_type: string; p_target_id: string }; Returns: undefined }
       set_verified_hash: { Args: { p_id: string; p_hash: string }; Returns: undefined }
       claim_media: {

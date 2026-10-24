@@ -31,6 +31,8 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { scheduleUndoable } from "@/lib/undoable";
 import { removeChat } from "@/lib/chat-removal";
 import { presenceLabel, presenceTopic } from "@/lib/presence";
+import { ScheduleSendSheet } from "@/components/messages/ScheduleSendSheet";
+import { ScheduledStrip } from "@/components/messages/ScheduledStrip";
 import { haptics } from "@/lib/haptics";
 import { PresenceDot } from "@/components/presence/PresenceDot";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
@@ -540,6 +542,15 @@ export function RealChatView({
   const pickerApi = useRef<MediaPickerApi>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const attachHold = useRef<{ timer: ReturnType<typeof setTimeout> | null; opened: boolean }>({ timer: null, opened: false });
+  /**
+   * Holding Send offers to send it later.
+   *
+   * The body is sealed at the moment of holding, the same way send() seals
+   * one — a scheduled message has to be readable by the same two devices as
+   * a live one, and the keys could change before it goes.
+   */
+  const [scheduleBody, setScheduleBody] = useState<string | null>(null);
+  const sendHold = useRef<{ timer: ReturnType<typeof setTimeout> | null; opened: boolean }>({ timer: null, opened: false });
   /** The full-screen viewer: an album, or a single photo as an album of one. */
   const [albumView, setAlbumView] = useState<{
     album: Album;
@@ -1312,6 +1323,22 @@ export function RealChatView({
    * one picked in the composer, and leaves the composer as it is — the
    * photo viewer's reply bar uses it. True when it went.
    */
+  function cancelSendHold() {
+    const h = sendHold.current;
+    if (h.timer) { clearTimeout(h.timer); h.timer = null; }
+  }
+
+  /** Hold Send: seal what is typed and ask when it should go. */
+  function openScheduleSheet() {
+    const body = text.trim();
+    if (!body) return;
+    const sealed = isGroup
+      ? null
+      : sealFor(reader, { plaintext: body, conversationId, myId: currentUserId, peerId: other.id });
+    haptics.tap();
+    setScheduleBody(sealed ?? body);
+  }
+
   async function send(override?: string, replyOverride?: ChatMsg): Promise<boolean> {
     if (editing && !replyOverride) { await saveEdit(); return true; }
     const body = (override ?? text).trim();
@@ -2821,6 +2848,9 @@ export function RealChatView({
           </div>
         )}
 
+        {/* What is queued to go in this thread. Sender-only, by RLS. */}
+        <ScheduledStrip conversationId={conversationId} />
+
         {voiceMode ? (
           /* ── Voice recorder ── replaces the input row entirely */
           <VoiceRecorder onSend={sendVoice} onCancel={() => setVoiceMode(false)} onStatusChange={emitRecording} />
@@ -2963,9 +2993,41 @@ export function RealChatView({
             {(text.trim() || attachment || editing) && (
               <button
                 type="button"
-                onClick={editing || text.trim() ? () => void send() : sendAttachment}
+                // Scheduling is for a typed message: there is nothing to
+                // schedule while editing one that is already sent, and an
+                // attachment would mean holding an uploaded object with no
+                // message pointing at it.
+                onPointerDown={() => {
+                  if (editing || !text.trim()) return;
+                  const h = sendHold.current;
+                  h.opened = false;
+                  if (h.timer) clearTimeout(h.timer);
+                  h.timer = setTimeout(() => {
+                    h.opened = true;
+                    h.timer = null;
+                    openScheduleSheet();
+                  }, ATTACH_HOLD_MS);
+                }}
+                onPointerUp={cancelSendHold}
+                onPointerLeave={cancelSendHold}
+                onPointerCancel={cancelSendHold}
+                onContextMenu={(e) => {
+                  // Right-click and the Android long-press menu reach the
+                  // same place, rather than offering to save the icon.
+                  if (editing || !text.trim()) return;
+                  e.preventDefault();
+                  sendHold.current.opened = true;
+                  openScheduleSheet();
+                }}
+                onClick={() => {
+                  // The press that opened the sheet must not also send.
+                  if (sendHold.current.opened) { sendHold.current.opened = false; return; }
+                  if (editing || text.trim()) void send();
+                  else void sendAttachment();
+                }}
                 disabled={sending || uploading}
                 aria-label={editing ? "Save changes" : "Send"}
+                aria-description={editing ? undefined : "Hold to send later"}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-accent text-accent-ink transition active:scale-90 disabled:opacity-40"
               >
                 {uploading ? (
@@ -2981,6 +3043,23 @@ export function RealChatView({
               </button>
             )}
           </div>
+        )}
+
+        {scheduleBody !== null && (
+          <ScheduleSendSheet
+            open
+            onClose={() => setScheduleBody(null)}
+            conversationId={conversationId}
+            body={scheduleBody}
+            replyToId={replyTo?.id ?? null}
+            // Only once the row exists: a failed schedule leaves the words
+            // in the composer rather than eating them.
+            onScheduled={() => {
+              setText("");
+              setReplyTo(null);
+              emitStopTyping();
+            }}
+          />
         )}
 
         {/* Hidden file input — `accept` is set per-option by openPicker() */}
