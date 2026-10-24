@@ -4,11 +4,13 @@ import {
   MIN_LEAD_MS,
   canSchedule,
   describeWhen,
-  addMonths,
+  clampTime,
+  dayFromOffset,
+  dayOptions,
   hourOptions,
   minuteOptions,
-  monthGrid,
-  monthInRange,
+  minuteValues,
+  sameDay,
   presets,
   withTime,
 } from "@/lib/schedule-send";
@@ -97,136 +99,117 @@ describe("describeWhen", () => {
   });
 });
 
-describe("the month grid", () => {
+describe("the day drum", () => {
   const now = at("2026-10-24T12:00:00");
 
-  it("is always six weeks, so the grid never changes height", () => {
-    // A calendar that grows and shrinks as it is paged moves the buttons
-    // under the thumb that is reaching for one.
-    for (let n = 0; n < 4; n++) {
-      expect(monthGrid(addMonths(now, n), now)).toHaveLength(42);
+  it("runs from today to the horizon and no further", () => {
+    const days = dayOptions(now);
+    expect(days[0].label).toBe("Today");
+    expect(days[1].label).toBe("Tomorrow");
+    // 90 days ahead, inclusive of today.
+    expect(days).toHaveLength(91);
+  });
+
+  it("names only the two days that need naming", () => {
+    const labels = dayOptions(now).map((d) => d.label);
+    expect(labels.filter((l) => l === "Today" || l === "Tomorrow")).toHaveLength(2);
+    expect(labels[2]).toMatch(/\d/);
+  });
+
+  it("every day it offers can actually be scheduled at some time", () => {
+    // A row under the band that nothing can be picked on would be a dead
+    // end, and a drum has no way to say so.
+    for (const d of dayOptions(now)) {
+      expect(hourOptions(d.date, now).length, d.label).toBeGreaterThan(0);
     }
   });
 
-  it("starts on a Monday", () => {
-    const first = monthGrid(now, now)[0].date;
-    expect(first.getDay()).toBe(1);
+  it("offsets resolve to the day they name", () => {
+    expect(sameDay(dayFromOffset(0, now), now)).toBe(true);
+    expect(dayFromOffset(1, now).getDate()).toBe(25);
+    expect(dayFromOffset(8, now).getMonth()).toBe(10); // into November
   });
 
-  it("covers the whole month it was asked for", () => {
-    const cells = monthGrid(at("2026-10-01T00:00:00"), now);
-    const days = cells.filter((c) => c.inMonth).map((c) => c.date.getDate());
-    expect(days[0]).toBe(1);
-    expect(days[days.length - 1]).toBe(31);
-    expect(days).toHaveLength(31);
-  });
-
-  it("marks the borrowed days from either side as outside the month", () => {
-    const cells = monthGrid(at("2026-10-01T00:00:00"), now);
-    expect(cells[0].inMonth).toBe(false);
-    expect(cells.some((c) => !c.inMonth)).toBe(true);
-  });
-
-  it("disables yesterday and allows today", () => {
-    const cells = monthGrid(now, now);
-    const today = cells.find((c) => c.today);
-    expect(today?.disabled).toBe(false);
-    const yesterday = cells.find((c) => c.date.getDate() === 23 && c.inMonth);
-    expect(yesterday?.disabled).toBe(true);
-  });
-
-  it("disables everything past the 90-day horizon", () => {
-    // The same bound the database enforces, so the calendar cannot offer a
-    // day that schedule_message would then refuse.
-    const far = addMonths(now, 4);
-    const cells = monthGrid(far, now);
-    expect(cells.filter((c) => c.inMonth).every((c) => c.disabled)).toBe(true);
-  });
-
-  it("marks exactly one day as today, and only in the month containing it", () => {
-    expect(monthGrid(now, now).filter((c) => c.today)).toHaveLength(1);
-    expect(monthGrid(addMonths(now, 2), now).some((c) => c.today)).toBe(false);
-  });
-
-  it("handles February, including a leap year", () => {
-    const feb = at("2028-02-01T00:00:00");
-    const days = monthGrid(feb, feb).filter((c) => c.inMonth);
-    expect(days).toHaveLength(29);
+  it("crosses a month and a year end", () => {
+    const dec = at("2026-12-30T12:00:00");
+    expect(dayFromOffset(3, dec).getFullYear()).toBe(2027);
+    expect(dayFromOffset(3, dec).getDate()).toBe(2);
   });
 });
 
-describe("addMonths", () => {
-  it("does not let the 31st spill into the month after next", () => {
-    // setMonth on the 31st of January lands in March. Paging a calendar
-    // that way skips February entirely.
-    const jan31 = at("2026-01-31T12:00:00");
-    expect(addMonths(jan31, 1).getMonth()).toBe(1);
-  });
-
-  it("crosses a year in both directions", () => {
-    expect(addMonths(at("2026-12-15T00:00:00"), 1).getFullYear()).toBe(2027);
-    expect(addMonths(at("2026-01-15T00:00:00"), -1).getFullYear()).toBe(2025);
-  });
-});
-
-describe("monthInRange", () => {
-  const now = at("2026-10-24T12:00:00");
-
-  it("allows this month and refuses the one before", () => {
-    expect(monthInRange(addMonths(now, 0), now)).toBe(true);
-    expect(monthInRange(addMonths(now, -1), now)).toBe(false);
-  });
-
-  it("refuses months entirely past the horizon", () => {
-    expect(monthInRange(addMonths(now, 1), now)).toBe(true);
-    expect(monthInRange(addMonths(now, 6), now)).toBe(false);
-  });
-});
-
-describe("the clock", () => {
+describe("the hour and minute drums", () => {
   const now = at("2026-10-24T12:20:00");
+  const today = dayFromOffset(0, now);
+  const tomorrow = dayFromOffset(1, now);
 
-  it("offers every hour on a future day", () => {
-    const tomorrow = at("2026-10-25T00:00:00");
-    expect(hourOptions(tomorrow, now).every((h) => !h.disabled)).toBe(true);
+  it("a future day offers all twenty-four hours", () => {
+    expect(hourOptions(tomorrow, now)).toHaveLength(24);
   });
 
-  it("keeps the current hour while a later minute step is still ahead", () => {
-    // 12:20 now — 12:30 and 12:45 are still available, so the 12 button
-    // must not disappear.
-    const today = at("2026-10-24T00:00:00");
-    expect(hourOptions(today, now).find((h) => h.hour === 12)?.disabled).toBe(false);
+  it("today offers only the hours still ahead", () => {
+    const hours = hourOptions(today, now).map((h) => h.value);
+    expect(hours).not.toContain(9);
+    expect(hours).toContain(13);
   });
 
-  it("drops hours that have wholly gone", () => {
-    const today = at("2026-10-24T00:00:00");
-    const hours = hourOptions(today, now);
-    expect(hours.find((h) => h.hour === 9)?.disabled).toBe(true);
-    expect(hours.find((h) => h.hour === 13)?.disabled).toBe(false);
+  it("keeps the current hour while a later step within it is still ahead", () => {
+    // 12:20 now, so 12:25 onwards is fine — the 12 row must not disappear.
+    expect(hourOptions(today, now).map((h) => h.value)).toContain(12);
   });
 
-  it("disables only the minutes already past within the current hour", () => {
-    const today = at("2026-10-24T00:00:00");
-    const mins = minuteOptions(today, 12, now);
-    expect(mins.find((m) => m.minute === 0)?.disabled).toBe(true);
-    expect(mins.find((m) => m.minute === 15)?.disabled).toBe(true);
-    expect(mins.find((m) => m.minute === 30)?.disabled).toBe(false);
-    expect(mins.find((m) => m.minute === 45)?.disabled).toBe(false);
+  it("drops the minutes already gone in the current hour", () => {
+    const mins = minuteValues(today, 12, now);
+    expect(mins).not.toContain(0);
+    expect(mins).not.toContain(15);
+    expect(mins).toContain(25);
+    expect(mins[mins.length - 1]).toBe(55);
   });
 
-  it("every enabled hour has at least one enabled minute", () => {
-    // Otherwise an hour is pressable and then offers nothing.
-    const today = at("2026-10-24T00:00:00");
-    for (const h of hourOptions(today, now).filter((h) => !h.disabled)) {
-      expect(minuteOptions(today, h.hour, now).some((m) => !m.disabled), String(h.hour)).toBe(true);
+  it("offers a full set of steps on a future hour", () => {
+    expect(minuteValues(tomorrow, 9, now)).toEqual([0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]);
+  });
+
+  it("every hour it offers has at least one minute behind it", () => {
+    // Otherwise a row is selectable and then offers nothing.
+    for (const h of hourOptions(today, now)) {
+      expect(minuteValues(today, h.value, now).length, String(h.value)).toBeGreaterThan(0);
     }
   });
 
-  it("withTime keeps the day and sets the clock exactly", () => {
-    const d = withTime(at("2026-10-25T23:59:00"), 7, 15);
-    expect(d.getDate()).toBe(25);
-    expect(d.getHours()).toBe(7);
-    expect(d.getMinutes()).toBe(15);
-    expect(d.getSeconds()).toBe(0);
+  it("labels are zero-padded, so the column does not jitter", () => {
+    expect(hourOptions(tomorrow, now)[0].label).toBe("00");
+    expect(minuteOptions(tomorrow, 9, now)[1].label).toBe("05");
+  });
+});
+
+describe("clampTime", () => {
+  const now = at("2026-10-24T12:20:00");
+  const today = dayFromOffset(0, now);
+  const tomorrow = dayFromOffset(1, now);
+
+  it("pulls a stranded time forward when the day moves to today", () => {
+    // 09:00 is fine tomorrow and gone today. Moving the day drum must not
+    // leave the clock showing a time the Send button would refuse.
+    const fixed = clampTime(today, 9, 0, now);
+    expect(canSchedule(withTime(today, fixed.hour, fixed.minute), now)).toBeNull();
+  });
+
+  it("leaves a time that is still fine exactly alone", () => {
+    expect(clampTime(today, 18, 30, now)).toEqual({ hour: 18, minute: 30 });
+    expect(clampTime(tomorrow, 9, 0, now)).toEqual({ hour: 9, minute: 0 });
+  });
+
+  it("keeps the hour and moves only the minute where it can", () => {
+    // 12:00 has gone but 12:25 has not, so the hour should survive.
+    expect(clampTime(today, 12, 0, now).hour).toBe(12);
+  });
+
+  it("always lands on something schedulable", () => {
+    for (let h = 0; h < 24; h++) {
+      for (const m of [0, 25, 55]) {
+        const fixed = clampTime(today, h, m, now);
+        expect(canSchedule(withTime(today, fixed.hour, fixed.minute), now), `${h}:${m}`).toBeNull();
+      }
+    }
   });
 });

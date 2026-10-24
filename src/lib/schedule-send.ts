@@ -64,18 +64,10 @@ export function describeWhen(at: Date, now: Date): string {
   return `${at.toLocaleDateString(undefined, { day: "numeric", month: "short" })} at ${time}`;
 }
 
-/* ── The calendar ──────────────────────────────────────────────────────── */
+/* ── The three drums ───────────────────────────────────────────────────── */
 
-/** One square in the month grid. */
-export type DayCell = {
-  date: Date;
-  /** False for the leading and trailing days borrowed from the neighbouring
-   *  months, which are shown greyed so the weeks line up. */
-  inMonth: boolean;
-  /** Before today, or past the 90-day horizon. Rendered, never pressable. */
-  disabled: boolean;
-  today: boolean;
-};
+/** Minutes offered. Five-minute steps: twelve rows, and precise enough. */
+export const MINUTE_STEP = 5;
 
 /** Midnight on the day `d` falls in, local time. */
 export function startOfDay(d: Date): Date {
@@ -93,71 +85,6 @@ export function sameDay(a: Date, b: Date): boolean {
   );
 }
 
-/**
- * Move by whole months, without the 31st becoming the 1st.
- *
- * `setMonth` on the 31st of a month followed by a 30-day one rolls into the
- * next month — January 31st + 1 would be March 3rd. Landing on the 1st first
- * makes the arithmetic mean what it says, which is all this is used for:
- * paging the grid.
- */
-export function addMonths(d: Date, n: number): Date {
-  const out = new Date(d.getFullYear(), d.getMonth() + n, 1);
-  out.setHours(0, 0, 0, 0);
-  return out;
-}
-
-/** "October 2026", in the reader's own language. */
-export function monthLabel(d: Date): string {
-  return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-}
-
-/** The last day that may be picked: the 90-day horizon the database enforces. */
-export function lastPickableDay(now: Date): Date {
-  return startOfDay(new Date(now.getTime() + MAX_AHEAD_MS));
-}
-
-/**
- * Six weeks of squares for the month `month` falls in, Monday first.
- *
- * Always 42 cells, so the grid does not change height as the months are
- * paged — a calendar that grows and shrinks under the thumb is a calendar
- * whose buttons move while you are reaching for one.
- */
-export function monthGrid(month: Date, now: Date): DayCell[] {
-  const first = new Date(month.getFullYear(), month.getMonth(), 1);
-  // getDay is Sunday-first; this app's weeks start on Monday.
-  const lead = (first.getDay() + 6) % 7;
-  const start = new Date(first);
-  start.setDate(first.getDate() - lead);
-  start.setHours(0, 0, 0, 0);
-
-  const today = startOfDay(now);
-  const last = lastPickableDay(now);
-
-  return Array.from({ length: 42 }, (_, i) => {
-    const date = new Date(start);
-    date.setDate(start.getDate() + i);
-    return {
-      date,
-      inMonth: date.getMonth() === month.getMonth(),
-      disabled: date.getTime() < today.getTime() || date.getTime() > last.getTime(),
-      today: sameDay(date, now),
-    };
-  });
-}
-
-/** Whether paging to this month could show anything pickable at all. */
-export function monthInRange(month: Date, now: Date): boolean {
-  const end = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59, 999);
-  return end.getTime() >= startOfDay(now).getTime() && month.getTime() <= lastPickableDay(now).getTime();
-}
-
-/* ── The clock ─────────────────────────────────────────────────────────── */
-
-/** Minutes offered, so a time is two taps rather than a scroll. */
-export const MINUTE_STEPS = [0, 15, 30, 45];
-
 /** That day at that time, local. */
 export function withTime(day: Date, hour: number, minute: number): Date {
   const out = new Date(day);
@@ -166,23 +93,86 @@ export function withTime(day: Date, hour: number, minute: number): Date {
 }
 
 /**
- * Which hours are still ahead on the chosen day.
+ * Every day that can be picked, from today to the horizon.
  *
- * Every hour of a future day; only the ones not yet gone on today. An hour
- * counts as available while any of its minute steps is still schedulable —
- * otherwise the current hour disappears at :01 even though :15 is fine.
+ * The value is the number of days from today, which is what the drum scrolls
+ * through; the label is what it reads. Today and tomorrow are named, because
+ * the two most common answers should not have to be worked out from a date.
+ *
+ * Invalid days are left out rather than shown greyed. A drum has no good way
+ * to say "this row is dead" — the row under the band is the value, so an
+ * unpickable row under the band is a contradiction.
  */
-export function hourOptions(day: Date, now: Date): { hour: number; disabled: boolean }[] {
-  return Array.from({ length: 24 }, (_, hour) => ({
-    hour,
-    disabled: !MINUTE_STEPS.some((m) => canSchedule(withTime(day, hour, m), now) === null),
-  }));
+export function dayOptions(now: Date): { value: number; label: string; date: Date }[] {
+  const today = startOfDay(now);
+  const days = Math.floor(MAX_AHEAD_MS / (24 * 60 * 60 * 1000));
+  return Array.from({ length: days + 1 }, (_, i) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+    const label =
+      i === 0
+        ? "Today"
+        : i === 1
+          ? "Tomorrow"
+          : date.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    return { value: i, label, date };
+  });
 }
 
-/** And which minutes within a chosen hour. */
-export function minuteOptions(day: Date, hour: number, now: Date): { minute: number; disabled: boolean }[] {
-  return MINUTE_STEPS.map((minute) => ({
-    minute,
-    disabled: canSchedule(withTime(day, hour, minute), now) !== null,
-  }));
+/** The day `n` days from today. */
+export function dayFromOffset(offset: number, now: Date): Date {
+  const d = startOfDay(now);
+  d.setDate(d.getDate() + offset);
+  return d;
+}
+
+/**
+ * The hours still ahead on that day.
+ *
+ * An hour survives while any of its minute steps is still schedulable, so
+ * the current hour does not vanish at one minute past while :30 is fine.
+ */
+export function hourOptions(day: Date, now: Date): { value: number; label: string }[] {
+  const out: { value: number; label: string }[] = [];
+  for (let hour = 0; hour < 24; hour++) {
+    const live = minuteValues(day, hour, now).length > 0;
+    if (live) out.push({ value: hour, label: String(hour).padStart(2, "0") });
+  }
+  return out;
+}
+
+/** The minutes still ahead within that hour, as plain numbers. */
+export function minuteValues(day: Date, hour: number, now: Date): number[] {
+  const out: number[] = [];
+  for (let m = 0; m < 60; m += MINUTE_STEP) {
+    if (canSchedule(withTime(day, hour, m), now) === null) out.push(m);
+  }
+  return out;
+}
+
+/** The same, as drum rows. */
+export function minuteOptions(day: Date, hour: number, now: Date): { value: number; label: string }[] {
+  return minuteValues(day, hour, now).map((m) => ({ value: m, label: String(m).padStart(2, "0") }));
+}
+
+/**
+ * Pull a chosen hour and minute back into what the new day allows.
+ *
+ * Moving the day drum from tomorrow to today can strand the clock in a time
+ * that has already gone. Returning the nearest still-valid pair keeps the
+ * other two drums showing something true instead of something the Send
+ * button would then refuse.
+ */
+export function clampTime(
+  day: Date,
+  hour: number,
+  minute: number,
+  now: Date,
+): { hour: number; minute: number } {
+  const hours = hourOptions(day, now);
+  if (hours.length === 0) return { hour, minute };
+  const h = hours.some((o) => o.value === hour) ? hour : hours[0].value;
+  const mins = minuteValues(day, h, now);
+  const m = mins.includes(minute) ? minute : (mins[0] ?? 0);
+  return { hour: h, minute: m };
 }

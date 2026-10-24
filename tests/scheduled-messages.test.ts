@@ -160,45 +160,41 @@ describe("the composer", () => {
 describe("the picker", () => {
   const sheet = read("src/components/messages/ScheduleSendSheet.tsx");
 
-  it("offers the three offsets, then a calendar", () => {
+  it("offers the three offsets, then the drums", () => {
     expect(sheet).toContain("presets(now).map");
     expect(sheet).toContain("Pick a date and time");
   });
 
-  it("date comes first, then time — the coarser decision narrows the finer", () => {
-    // Which hours are even offered depends on which day was chosen.
-    expect(sheet).toContain('type Step = "presets" | "date" | "time"');
-    expect(sheet).toContain('setStep("time")');
+  it("uses the same wheel as the birthday picker, not a second one", () => {
+    // A second drum implementation is a second set of scroll-feedback bugs.
+    expect(sheet).toContain('from "@/components/ui/Wheel"');
+    expect(read("src/components/ui/DateOfBirthPicker.tsx")).toContain('from "@/components/ui/Wheel"');
+    // And the shared one is the only place the behaviour lives.
+    expect(read("src/components/ui/Wheel.tsx")).toContain("export function WheelColumn");
   });
 
-  it("each step walks back rather than closing and losing the typing", () => {
-    expect(sheet).toContain(
-      `step === "date" ? () => setStep("presets") : step === "time" ? () => setStep("date") : null`,
-    );
-    expect(sheet).toContain("<ChevronLeft size={18} />");
+  it("three drums: day, hour, minute", () => {
+    for (const label of ['ariaLabel="Day"', 'ariaLabel="Hour"', 'ariaLabel="Minute"']) {
+      expect(sheet, label).toContain(label);
+    }
   });
 
-  it("the calendar pages by month, and will not page out of range", () => {
-    expect(sheet).toContain("monthInRange(addMonths(month, -1), now)");
-    expect(sheet).toContain("monthInRange(addMonths(month, 1), now)");
+  it("moving the day pulls a stranded time forward", () => {
+    // Going from tomorrow to today can leave the clock on an hour that has
+    // gone, and the Send button would sit dead with nothing saying why.
+    expect(sheet).toContain("const fixed = clampTime(dayFromOffset(next, now), hour, minute, now);");
   });
 
-  it("a day that cannot be picked is shown but not pressable", () => {
-    // Rendered greyed rather than hidden, so the weeks still line up.
-    expect(sheet).toContain("disabled={cell.disabled}");
+  it("can be walked back to the presets", () => {
+    expect(sheet).toContain('onClick={() => setPicking(false)}');
+    expect(sheet).toContain('aria-label="Back"');
   });
 
-  it("choosing an hour drops a minute that has since gone", () => {
-    // Otherwise :00 stays selected from a previous hour and the Send button
-    // sits disabled with nothing saying why.
-    expect(sheet).toContain("if (!free.some((m) => m.minute === minute)) setMinute(free[0]?.minute ?? 0);");
-  });
-
-  it("the confirm button says what it will do", () => {
-    expect(sheet).toContain("`Send ${describeWhen(chosen, now).toLowerCase()}`");
+  it("the confirm button says what it will do, or why it cannot", () => {
+    expect(sheet).toContain("{problem ?? `Send ${describeWhen(chosen, now).toLowerCase()}`}");
   });
 
   it("and refuses a time the database would refuse", () => {
-    expect(sheet).toContain("canSchedule(chosen, now) !== null");
+    expect(sheet).toContain("disabled={busy || problem !== null}");
   });
 });
