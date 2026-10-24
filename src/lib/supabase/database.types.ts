@@ -2622,6 +2622,18 @@ export type Database = {
         Returns: undefined
       }
       admin_acknowledge_report: { Args: { p_table: string; p_id: string }; Returns: undefined }
+      ops_readiness: {
+        Args: never
+        Returns: {
+          cron_expected: number
+          cron_active: number
+          cron_missing: string[]
+          moderation_secret_set: boolean
+          fingerprints_unverified: number
+          fingerprints_oldest_unverified_hours: number
+          blocked_media_count: number
+        }[]
+      }
       report_sla: {
         Args: never
         Returns: {

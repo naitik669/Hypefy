@@ -22,6 +22,16 @@ export const runtime = "nodejs";
  * a map of what is and is not defended.
  *
  * `ok` is the question "could this ship": every entry marked required is on.
+ *
+ * `operations` is the other half, and it is separate on purpose. Config asks
+ * whether a key exists; operations asks whether the thing the key enables is
+ * actually happening. Everything that went wrong in the week before launch
+ * was the second kind — eight reports open for up to 142 days, six realtime
+ * subscriptions receiving nothing for the life of the app, a verification job
+ * that will sit inert forever if half its secret is never created. A thing
+ * nobody can see does not get done, so it is reported here, with its own
+ * verdict rather than folded into `ok` where a stale queue would read as a
+ * deployment failure.
  */
 
 const has = (v: string | undefined) => typeof v === "string" && v.trim().length > 0;
@@ -83,6 +93,47 @@ export async function GET() {
     service_role: { required: true, on: has(env.SUPABASE_SERVICE_ROLE_KEY), note: "account deletion and admin work" },
   };
 
+  // State the environment cannot see: cron jobs, the Vault half of the
+  // moderation secret, the verification backlog, the report queue against
+  // the timeframes published on /grievance.
+  const [{ data: opsRows }, { data: slaRows }] = await Promise.all([
+    supabase.rpc("ops_readiness"),
+    supabase.rpc("report_sla"),
+  ]);
+  const ops = Array.isArray(opsRows) ? opsRows[0] : opsRows;
+  const sla = Array.isArray(slaRows) ? slaRows[0] : slaRows;
+
+  const operations = {
+    cron: {
+      ok: !!ops && ops.cron_active === ops.cron_expected,
+      active: ops?.cron_active ?? null,
+      expected: ops?.cron_expected ?? null,
+      missing: ops?.cron_missing ?? null,
+      note: "a job that was never created is as missing as one switched off",
+    },
+    media_verification: {
+      // Both halves, and neither can see the other: the env variable is the
+      // route's, the Vault row is what pg_cron reads. Until both exist the
+      // stored hash is whatever the client claimed.
+      ok: has(env.MODERATION_VERIFY_SECRET) && ops?.moderation_secret_set === true,
+      env_secret: has(env.MODERATION_VERIFY_SECRET),
+      vault_secret: ops?.moderation_secret_set ?? null,
+      unverified: ops?.fingerprints_unverified ?? null,
+      oldest_unverified_hours: ops?.fingerprints_oldest_unverified_hours ?? null,
+      blocklist_size: ops?.blocked_media_count ?? null,
+      note: "both halves of the secret, or the job never runs",
+    },
+    report_queue: {
+      // The timeframes on /grievance are a published commitment.
+      ok: !!sla && sla.unacknowledged_over_24h === 0 && sla.open_over_15_days === 0,
+      open: sla?.open_total ?? null,
+      unacknowledged_over_24h: sla?.unacknowledged_over_24h ?? null,
+      open_over_15_days: sla?.open_over_15_days ?? null,
+      oldest_open_hours: sla?.oldest_open_hours ?? null,
+      note: "against the timeframes published on /grievance",
+    },
+  };
+
   const missing = Object.entries(checks)
     .filter(([, c]) => c.required && !c.on)
     .map(([k]) => k);
@@ -92,11 +143,17 @@ export async function GET() {
       ok: missing.length === 0,
       missing,
       checks,
+      operations,
+      operationsOk: Object.values(operations).every((o) => o.ok),
       // Not a check: email cannot be seen from here. Supabase's own sender
       // is configured in its dashboard, not in this environment, and it is
       // the one piece of launch configuration nothing in this process can
       // observe — so it is named here rather than quietly left out.
-      cannotSeeFromHere: ["Supabase custom SMTP", "Supabase leaked-password protection"],
+      cannotSeeFromHere: [
+        "Supabase custom SMTP",
+        "Supabase leaked-password protection",
+        "Supabase plan and point-in-time recovery",
+      ],
     },
     { headers: { "Cache-Control": "no-store" } },
   );
