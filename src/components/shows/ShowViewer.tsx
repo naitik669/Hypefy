@@ -63,7 +63,7 @@ export type ShowItem = {
   caption: string | null;
   created_at: string;
   hype_count?: number;
-  is_showcase?: boolean;
+  is_showcase?: boolean | null;
   linked_post_id?: string | null;
   linked_post?: LinkedPost;
   profiles: ShowProfile;

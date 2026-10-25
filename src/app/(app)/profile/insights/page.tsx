@@ -84,7 +84,7 @@ export default async function InsightsPage() {
           {/* Per-post breakdown */}
           <h2 className="px-1 pb-2 pt-6 text-xs font-bold uppercase tracking-widest text-faint">Per post</h2>
           <div className="flex flex-col gap-1">
-            {rows.map((p: any) => (
+            {rows.map((p) => (
               <Link key={p.id} href={`/p/${p.id}`} className="flex items-center gap-3 rounded-xl px-1 py-2 hover:bg-white/[0.03]">
                 <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface">
                   {cover(p) ? (

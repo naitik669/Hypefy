@@ -335,12 +335,12 @@ export default function NotificationsPage() {
       commentIds.length ? supabase.from("comments").select("id, post_id, shot_id").in("id", commentIds) : Promise.resolve({ data: [] as any[] }),
     ]);
 
-    const postMap = new Map((postsRes.data ?? []).map((p: any) => [p.id, p.image_urls?.[0] ?? p.image_url ?? null]));
-    const shotMap = new Map((shotsRes.data ?? []).map((s: any) => [s.id, mediaThumb(s)]));
-    const showMap = new Map((showsRes.data ?? []).map((s: any) => [s.id, mediaThumb(s)]));
+    const postMap = new Map((postsRes.data ?? []).map((p) => [p.id, p.image_urls?.[0] ?? p.image_url ?? null]));
+    const shotMap = new Map((shotsRes.data ?? []).map((s) => [s.id, mediaThumb(s)]));
+    const showMap = new Map((showsRes.data ?? []).map((s) => [s.id, mediaThumb(s)]));
     const parentMap = new Map<string, { kind: "post" | "shot"; id: string }>(
       (commentsRes.data ?? [])
-        .map((c: any) =>
+        .map((c) =>
           c.post_id
             ? [c.id, { kind: "post" as const, id: c.post_id }]
             : c.shot_id
@@ -405,7 +405,7 @@ export default function NotificationsPage() {
     ]);
     setPrefs((parsePrivateProfile(me)?.notifPrefs ?? {}) as ActivityPrefs);
 
-    const mapped: Notif[] = (data ?? []).map((n: any) => ({
+    const mapped: Notif[] = (data ?? []).map((n) => ({
       ...n,
       actor: Array.isArray(n.actor) ? n.actor[0] ?? null : n.actor,
     }));
@@ -493,7 +493,7 @@ export default function NotificationsPage() {
         .order("created_at", { ascending: false })
         .lt("created_at", oldest)
         .limit(PAGE);
-      const mapped: Notif[] = (data ?? []).map((n: any) => ({ ...n, actor: Array.isArray(n.actor) ? n.actor[0] ?? null : n.actor }));
+      const mapped: Notif[] = (data ?? []).map((n) => ({ ...n, actor: Array.isArray(n.actor) ? n.actor[0] ?? null : n.actor }));
       const withT = await withThumbs(mapped);
       setNotifs((prev) => [...prev, ...withT]);
       setHasMore(mapped.length === PAGE);

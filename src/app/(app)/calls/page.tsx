@@ -19,21 +19,26 @@ export default async function CallsPage() {
 
   const { data } = await supabase
     .from("call_sessions")
+    // One literal, not concatenated: `+` widens it to `string` and the client
+    // can no longer infer the row type from the select.
     .select(
-      "id, caller_id, receiver_id, conversation_id, type, status, answered_at, ended_at, created_at, " +
-        "caller:profiles!call_sessions_caller_id_fkey(id, display_name, username, avatar_hue, avatar_url), " +
-        "receiver:profiles!call_sessions_receiver_id_fkey(id, display_name, username, avatar_hue, avatar_url)",
+      `id, caller_id, receiver_id, conversation_id, type, status, answered_at, ended_at, created_at,
+        caller:profiles!call_sessions_caller_id_fkey(id, display_name, username, avatar_hue, avatar_url),
+        receiver:profiles!call_sessions_receiver_id_fkey(id, display_name, username, avatar_hue, avatar_url)`,
     )
     .or(`caller_id.eq.${user.id},receiver_id.eq.${user.id}`)
     .order("created_at", { ascending: false })
     .limit(60);
 
-  const entries: CallEntry[] = (data ?? []).map((c: any) => {
+  const entries: CallEntry[] = (data ?? []).flatMap((c) => {
+    // Nullable in the schema, though it defaults to now(); a call with no
+    // time has no place in a log ordered by time.
+    if (!c.created_at) return [];
     const outgoing = c.caller_id === user.id;
     const peer = one(outgoing ? c.receiver : c.caller);
     const answered = !!c.answered_at;
     const durationSec =
-      answered && c.ended_at
+      c.answered_at && c.ended_at
         ? Math.max(0, Math.round((new Date(c.ended_at).getTime() - new Date(c.answered_at).getTime()) / 1000))
         : null;
     // Incoming call that was never answered (missed or ended pre-answer).

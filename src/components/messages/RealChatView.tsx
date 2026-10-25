@@ -37,6 +37,7 @@ import { haptics } from "@/lib/haptics";
 import { PresenceDot } from "@/components/presence/PresenceDot";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
 import { one } from "@/lib/supabase/typed";
+import { mapMessageRow } from "@/lib/chat-rows";
 import { ForwardSheet } from "@/components/messages/ForwardSheet";
 import { canPin } from "@/lib/chat-pins";
 import { randomObjectName } from "@/lib/object-name";
@@ -278,18 +279,6 @@ export const SEARCH_REACH_PAGES = 12;
 /** Select used for both the initial server load and client pagination. */
 const MSG_SELECT =
   "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, pinned_at, post:posts(id, user_id, caption, image_url, image_urls, aspect_ratio, profiles!posts_user_id_fkey(username, display_name, avatar_hue, avatar_url)), shot:shots(id, user_id, media_url, poster_url, caption, profiles(username, display_name, avatar_hue, avatar_url))";
-
-/** Flatten Supabase's nested post/shot+profile joins into ChatMsg shape. */
-function mapMessageRow(m: any): ChatMsg {
-  const profOf = (x: any) => { const p = one<any>(x); return p ? one<any>(p.profiles) : null; };
-  return {
-    ...m,
-    post: m.post ? { ...one(m.post), profiles: undefined } : null,
-    postProfile: m.post ? profOf(m.post) : null,
-    shot: m.shot ? { ...one(m.shot), profiles: undefined } : null,
-    shotProfile: m.shot ? profOf(m.shot) : null,
-  };
-}
 
 /**
  * Does this message carry its sender's face?

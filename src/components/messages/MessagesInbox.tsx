@@ -628,7 +628,7 @@ export function MessagesInbox({
         .order("created_at", { ascending: false })
         .limit(100);
       const map = new Map<string, string>();
-      (data ?? []).forEach((m: any) => {
+      (data ?? []).forEach((m) => {
         if (m.body && !map.has(m.conversation_id))
           map.set(m.conversation_id, m.body);
       });

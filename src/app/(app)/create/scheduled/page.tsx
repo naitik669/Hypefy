@@ -14,7 +14,7 @@ export default async function ScheduledPostsPage() {
     .eq("user_id", user.id)
     .order("scheduled_at", { ascending: true });
 
-  const posts: ScheduledPost[] = (data ?? []).map((p: any) => ({
+  const posts: ScheduledPost[] = (data ?? []).map((p) => ({
     id: p.id,
     caption: p.caption,
     body: p.body,

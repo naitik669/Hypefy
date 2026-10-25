@@ -19,16 +19,15 @@ import { noteAdShown } from "@/lib/ads";
 import { useAdFill, useAdSlots } from "@/components/feed/useAdSlots";
 import { useHypeProof } from "@/components/hype/useHypeProof";
 
+import { one } from "@/lib/supabase/typed";
+
 const PAGE_SIZE = 20;
 const POST_SELECT =
   "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration)";
 
 
-function normalize(data: unknown[] | null): FeedPost[] {
-  return (data ?? []).map((p: any) => ({
-    ...p,
-    profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles,
-  })) as FeedPost[];
+function normalize<T extends { profiles: unknown }>(data: T[] | null): FeedPost[] {
+  return (data ?? []).map((p) => ({ ...p, profiles: one(p.profiles) })) as unknown as FeedPost[];
 }
 
 /** Every tab except For You is just "posts from this id list", newest first. */
@@ -155,9 +154,9 @@ export function FeedList({
       supabase.from("hypes").select("target_id").eq("user_id", currentUserId).eq("target_type", "post").in("target_id", ids),
       supabase.from("saved_posts").select("post_id").eq("user_id", currentUserId).in("post_id", ids),
     ]);
-    const hyped = new Set((hypesRes.data ?? []).map((h: any) => h.target_id));
-    const saved = new Set((savedRes.data ?? []).map((s: any) => s.post_id));
-    return fresh.map((p: any) => ({ ...p, initialHyped: hyped.has(p.id), initialSaved: saved.has(p.id) }));
+    const hyped = new Set((hypesRes.data ?? []).map((h) => h.target_id));
+    const saved = new Set((savedRes.data ?? []).map((s) => s.post_id));
+    return fresh.map((p) => ({ ...p, initialHyped: hyped.has(p.id), initialSaved: saved.has(p.id) }));
   }
 
   async function loadMoreForYou() {

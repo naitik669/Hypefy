@@ -96,7 +96,7 @@ export default function SearchPage() {
           .select("tag")
           .eq("user_id", uid)
           .then(({ data: rows }) =>
-            setFollowedTags(new Set((rows ?? []).map((r: any) => r.tag)))
+            setFollowedTags(new Set((rows ?? []).map((r) => r.tag)))
           );
         supabase
           .from("blocked_users")
@@ -104,7 +104,7 @@ export default function SearchPage() {
           .eq("blocker_id", uid)
           .then(({ data: rows }) => {
             blockedRef.current = new Set(
-              (rows ?? []).map((r: any) => r.blocked_id as string)
+              (rows ?? []).map((r) => r.blocked_id as string)
             );
           });
       }
@@ -181,7 +181,7 @@ export default function SearchPage() {
   }
 
   function normPosts(rows: any[]): FeedPost[] {
-    return (rows ?? []).map((p: any) => ({
+    return (rows ?? []).map((p) => ({
       ...p,
       profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles,
     })) as FeedPost[];

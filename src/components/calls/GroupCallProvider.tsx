@@ -29,6 +29,12 @@ import { BLANK_POSTER } from "@/lib/blank-poster";
  */
 
 type CallType = "audio" | "video";
+/** What travels on a group call's broadcast channel. `to` is absent when it is for everyone. */
+type Signal = { from: string; to?: string } & (
+  | { kind: "hello" | "bye" }
+  | { kind: "offer" | "answer"; sdp: RTCSessionDescriptionInit }
+  | { kind: "ice"; candidate: RTCIceCandidateInit }
+);
 type Member = {
   id: string;
   name: string;
@@ -179,7 +185,7 @@ export function GroupCallProvider({
   );
 
   const onSignal = useCallback(
-    async (s: any) => {
+    async (s: Signal | null) => {
       if (!s || s.from === userId) return;
       if (s.to && s.to !== userId) return; // addressed to someone else
       const peerId: string = s.from;
@@ -243,7 +249,7 @@ export function GroupCallProvider({
         config: { broadcast: { self: false } },
       });
       ch.on("broadcast", { event: "gsignal" }, ({ payload }) =>
-        onSignal(payload)
+        onSignal(payload as Signal)
       );
       ch.subscribe((status) => {
         if (status === "SUBSCRIBED") {

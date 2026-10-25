@@ -35,7 +35,9 @@ export function BlockedList({ currentUserId }: { currentUserId: string }) {
         .order("created_at", { ascending: false });
       if (!active) return;
       setRows(
-        (data ?? []).map((r: any) => {
+        (data ?? []).flatMap((r) => {
+          // The column is nullable in the schema; a row blocking no one has nothing to unblock.
+          if (!r.blocked_id) return [];
           const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
           return {
             id: r.id,

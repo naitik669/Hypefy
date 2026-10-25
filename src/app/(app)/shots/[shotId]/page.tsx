@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ReelsFeed } from "@/components/shots/ReelsFeed";
 import { GoneScreen } from "@/components/empty/GoneScreen";
 import { getAdContext } from "@/lib/ads-server";
+import { one } from "@/lib/supabase/typed";
 
 const SELECT =
   "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, duration_secs, trim_start, trim_end, track, profiles(display_name, avatar_hue, username, avatar_url)";
@@ -75,10 +76,7 @@ export default async function ShotPage({
     getAdContext(supabase, user?.id),
   ]);
 
-  const norm = (s: any) => ({
-    ...s,
-    profiles: Array.isArray(s.profiles) ? s.profiles[0] ?? null : s.profiles,
-  });
+  const norm = <T extends { profiles: unknown }>(s: T) => ({ ...s, profiles: one(s.profiles) });
 
   const reels = [norm(target), ...(rest ?? []).map(norm)];
 

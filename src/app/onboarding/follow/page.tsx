@@ -24,7 +24,7 @@ export default async function OnboardingFollowPage() {
       .select("following_id")
       .eq("follower_id", user.id);
     const followingIds = (followRows ?? []).map(
-      (r: any) => r.following_id as string
+      (r) => r.following_id as string
     );
     let query = supabase
       .from("profiles")

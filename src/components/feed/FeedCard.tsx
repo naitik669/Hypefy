@@ -695,10 +695,10 @@ export function FeedCard({
       if (!active) return;
       const rows = data ?? [];
       const iAdded = rows.some(
-        (r: any) => r.user_id === id && r.friend_id === post.user_id
+        (r) => r.user_id === id && r.friend_id === post.user_id
       );
       const theyAdded = rows.some(
-        (r: any) => r.user_id === post.user_id && r.friend_id === id
+        (r) => r.user_id === post.user_id && r.friend_id === id
       );
       setIsHyper(iAdded);
       setIsMutualHyper(iAdded && theyAdded);

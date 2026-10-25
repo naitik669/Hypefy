@@ -69,13 +69,13 @@ export default async function ExplorePage() {
   ]);
 
   const posts = (postsRes.data ?? [])
-    .map((p: any) => ({
+    .map((p) => ({
       ...p,
       profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles,
     }))
     // A tile with no picture is a grey square, and a grid of those says less
     // about Hypefy than fewer tiles would.
-    .filter((p: any) => firstImage(p))
+    .filter((p) => firstImage(p))
     .slice(0, POSTS);
 
   const people = peopleRes.data ?? [];
@@ -114,7 +114,7 @@ export default async function ExplorePage() {
         <section className="pt-2">
           <h2 className="px-4 pb-3 text-sm font-bold">Recent posts</h2>
           <div className="grid grid-cols-2 gap-3 px-4">
-            {posts.map((p: any) => {
+            {posts.map((p) => {
               const img = firstImage(p) as string;
               const text = (p.caption ?? p.body ?? "").trim();
               const name =
@@ -152,14 +152,14 @@ export default async function ExplorePage() {
         <section className="pt-8">
           <h2 className="px-4 pb-3 text-sm font-bold">People on Hypefy</h2>
           <ul className="flex flex-col">
-            {people.map((u: any) => (
+            {people.map((u) => (
               <li key={u.username}>
                 <Link
                   href={`/u/${u.username}`}
                   className="flex items-center gap-3 px-4 py-2.5"
                 >
                   <Avatar
-                    name={u.display_name ?? u.username}
+                    name={u.display_name ?? u.username ?? ""}
                     hue={u.avatar_hue ?? 280}
                     size={40}
                     src={u.avatar_url ?? undefined}

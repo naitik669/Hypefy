@@ -118,21 +118,21 @@ export default async function DiscoverPage() {
   const authorAff = jsonRecord((affRes.data as any)?.authors);
   const tagAff = jsonRecord((affRes.data as any)?.tags);
   const followedTags = new Set<string>(
-    (followedTagRes.data ?? []).map((r: any) => r.tag)
+    (followedTagRes.data ?? []).map((r) => r.tag)
   );
   const blockedIds = await getBlockedIds(supabase);
 
   const posts = (postsRes.data ?? [])
     .map(one)
-    .filter((p: any) => !blockedIds.has(p.user_id))
-    .map((p: any) => ({
+    .filter((p) => !blockedIds.has(p.user_id))
+    .map((p) => ({
       ...p,
       _score: score(p, now, interests, authorAff, tagAff, followedTags),
     }));
   const shots = (shotsRes.data ?? [])
     .map(one)
-    .filter((s: any) => !blockedIds.has(s.user_id))
-    .map((s: any) => ({
+    .filter((s) => !blockedIds.has(s.user_id))
+    .map((s) => ({
       ...s,
       _score: score(s, now, interests, authorAff, tagAff, followedTags),
     }));
@@ -170,7 +170,7 @@ export default async function DiscoverPage() {
   );
 
   // ── Curated buckets, carved from the post pool (no extra queries) ──
-  const tagsOf = (p: any) =>
+  const tagsOf = (p: { hashtags?: string[] | null }) =>
     ((p.hashtags ?? []) as string[]).map((t) =>
       t.replace(/^#/, "").toLowerCase()
     );
@@ -238,8 +238,8 @@ export default async function DiscoverPage() {
   const categoryRails = CATEGORY_DEFS.map(({ label, tags: catTags }) => {
     const set = new Set(catTags);
     const items = posts
-      .filter((p: any) => tagsOf(p).some((t) => set.has(t)))
-      .sort((a: any, b: any) => b._score - a._score)
+      .filter((p) => tagsOf(p).some((t) => set.has(t)))
+      .sort((a, b) => b._score - a._score)
       .slice(0, 40);
     return { label, posts: items };
   }).filter((c) => c.posts.length >= 2);

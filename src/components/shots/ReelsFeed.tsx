@@ -322,7 +322,7 @@ export function ReelsFeed({
             fetchingMore.current = false;
             return;
           }
-          const fresh = (data ?? []).map((s: any) => ({
+          const fresh = (data ?? []).map((s) => ({
             ...s,
             profiles: Array.isArray(s.profiles)
               ? s.profiles[0] ?? null

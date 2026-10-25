@@ -45,13 +45,13 @@ export default async function AdminReportsPage() {
   // Resolve usernames for profile-target reports so "View target" links to a
   // real /u/<username> route instead of /u/<uuid> (which 404s).
   const profileTargetIds = [
-    ...new Set((content ?? []).filter((r: any) => r.target_type === "profile").map((r: any) => r.target_id as string)),
+    ...new Set((content ?? []).filter((r) => r.target_type === "profile").map((r) => r.target_id as string)),
   ];
   const usernameById = new Map<string, string>();
   if (profileTargetIds.length > 0) {
     const { data: targets } = await supabase
       .from("profiles").select("id, username").in("id", profileTargetIds);
-    (targets ?? []).forEach((p: any) => { if (p.username) usernameById.set(p.id, p.username); });
+    (targets ?? []).forEach((p) => { if (p.username) usernameById.set(p.id, p.username); });
   }
 
   /**
@@ -76,7 +76,7 @@ export default async function AdminReportsPage() {
     list.push(r.target_id);
     byType.set(r.target_type, list);
   }
-  const messageIds = (messages ?? []).map((r: any) => r.message_id as string);
+  const messageIds = (messages ?? []).map((r) => r.message_id as string);
   if (messageIds.length > 0) byType.set("message", [...(byType.get("message") ?? []), ...messageIds]);
 
   await Promise.all(
@@ -137,7 +137,7 @@ export default async function AdminReportsPage() {
   };
 
   const rows: ReportRow[] = [
-    ...(content ?? []).map((r: any) => ({
+    ...(content ?? []).map((r) => ({
       id: r.id,
       table: "reports" as const,
       targetType: r.target_type as string,
@@ -157,7 +157,7 @@ export default async function AdminReportsPage() {
       acknowledgedAt: r.acknowledged_at ?? null,
       ...decorate(r.target_id),
     })),
-    ...(messages ?? []).map((r: any) => ({
+    ...(messages ?? []).map((r) => ({
       id: r.id,
       table: "message_reports" as const,
       targetType: "message",

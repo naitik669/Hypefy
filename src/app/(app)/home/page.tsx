@@ -23,14 +23,11 @@ import { isAdult } from "@/lib/ads";
 import { getPrivateProfile } from "@/lib/profile";
 import { getBlockedIds } from "@/lib/blocked";
 import { getFeedExclusions } from "@/lib/feed-quiet";
-import { jsonRecord } from "@/lib/supabase/typed";
+import { jsonRecord, one } from "@/lib/supabase/typed";
 import { placeGhost } from "@/lib/ghost-place";
 
-function normalise(raw: unknown[] | null) {
-  return (raw ?? []).map((p: any) => ({
-    ...p,
-    profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles,
-  }));
+function normalise<T extends { profiles: unknown }>(raw: T[] | null) {
+  return (raw ?? []).map((p) => ({ ...p, profiles: one(p.profiles) }));
 }
 
 const POST_COLS =
@@ -77,7 +74,7 @@ export default async function HomePage() {
   // they join the same set. (Muting does nothing else; see lib/feed-quiet.)
   for (const id of quiet.muted) blockedIds.add(id);
   const followingIds = new Set(
-    (followRows ?? []).map((r: any) => r.following_id as string)
+    (followRows ?? []).map((r) => r.following_id as string)
   );
   const feedUserIds = [...followingIds, user.id];
 
@@ -207,16 +204,16 @@ export default async function HomePage() {
       .eq("friend_id", user.id)
       .limit(1000),
   ]);
-  const hyperIds = (hyperRows ?? []).map((r: any) => r.friend_id as string);
+  const hyperIds = (hyperRows ?? []).map((r) => r.friend_id as string);
   const reverseHyperIds = (reverseHyperRows ?? []).map(
-    (r: any) => r.user_id as string
+    (r) => r.user_id as string
   );
   // Mutual = I added them AND they added me.
   const reverseSet = new Set(reverseHyperIds);
   const mutualHyperIds = hyperIds.filter((id) => reverseSet.has(id));
 
   // Which active shows I've already viewed (server-side truth for the seen ring)
-  const activeShowIds = (activeShows ?? []).map((s: any) => s.id);
+  const activeShowIds = (activeShows ?? []).map((s) => s.id);
   const { data: myViews } =
     activeShowIds.length > 0
       ? await supabase
@@ -226,7 +223,7 @@ export default async function HomePage() {
           .in("show_id", activeShowIds)
       : { data: [] as any[] };
   const viewedShowIds = new Set(
-    (myViews ?? []).map((v: any) => v.show_id as string)
+    (myViews ?? []).map((v) => v.show_id as string)
   );
 
   // Merge followed + global, dedupe (followed posts can appear in both slices).
@@ -275,7 +272,7 @@ export default async function HomePage() {
   const authorAff = jsonRecord((affinityData as any)?.authors);
   const tagAff = jsonRecord((affinityData as any)?.tags);
   const followedTags = new Set<string>(
-    (followedTagRows ?? []).map((r: any) => r.tag)
+    (followedTagRows ?? []).map((r) => r.tag)
   );
 
   // What the viewer has already interacted with, across the whole candidate
@@ -314,11 +311,11 @@ export default async function HomePage() {
       : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
   );
 
-  const viewedIds = new Set((viewedRes.data ?? []).map((v: any) => v.post_id));
-  const hypedIds = new Set((hypesRes.data ?? []).map((h: any) => h.target_id));
-  const savedIds = new Set((savedRes.data ?? []).map((s: any) => s.post_id));
+  const viewedIds = new Set((viewedRes.data ?? []).map((v) => v.post_id));
+  const hypedIds = new Set((hypesRes.data ?? []).map((h) => h.target_id));
+  const savedIds = new Set((savedRes.data ?? []).map((s) => s.post_id));
   const commentedIds = new Set(
-    (commentedRes.data ?? []).map((c: any) => c.post_id).filter(Boolean)
+    (commentedRes.data ?? []).map((c) => c.post_id).filter(Boolean)
   );
 
   // Rank by blended score; recency breaks ties. Then diversify authors.
@@ -328,7 +325,7 @@ export default async function HomePage() {
   // bucket, which made two refreshes inside that window byte-identical.
   const seed = refreshSeed();
   const scored = [...byId.values()]
-    .map((p: any) => ({
+    .map((p) => ({
       ...p,
       _score:
         feedScore(
@@ -344,7 +341,7 @@ export default async function HomePage() {
           viewedIds.has(p.id)
         ) + refreshJitter(p.id, seed),
     }))
-    .sort((a: any, b: any) =>
+    .sort((a, b) =>
       b._score !== a._score
         ? b._score - a._score
         : new Date(rankAt(b)).getTime() - new Date(rankAt(a)).getTime()
@@ -352,7 +349,7 @@ export default async function HomePage() {
   const ranked = scored.slice(0, 30);
   // Found among everything scored, not only the thirty that made the cut:
   // being chosen for you does not depend on having ranked well.
-  const posts = placeGhost(diversify(ranked), ghostId ? scored.find((p: any) => p.id === ghostId) : null);
+  const posts = placeGhost(diversify(ranked), ghostId ? scored.find((p) => p.id === ghostId) : null);
 
   // Shots, mixed in.
   //
@@ -499,7 +496,7 @@ export default async function HomePage() {
             when there's nothing (more) to scroll, so it never opens on a
             dead "no users here" screen. */}
         <FeedList
-          initialPosts={posts.map((post: any) => ({
+          initialPosts={posts.map((post) => ({
             ...post,
             initialHyped: hypedIds.has(post.id),
             initialSaved: savedIds.has(post.id),

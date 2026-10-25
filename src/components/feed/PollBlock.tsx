@@ -49,7 +49,7 @@ export function PollBlock({
       ]);
       if (!active) return;
       const next = poll.options.map(() => 0);
-      (tallyRes.data ?? []).forEach((row: any) => {
+      (tallyRes.data ?? []).forEach((row) => {
         if (row.option_idx >= 0 && row.option_idx < next.length) next[row.option_idx] = Number(row.votes);
       });
       setCounts(next);

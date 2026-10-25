@@ -16,6 +16,12 @@ import { CommentIcon } from "@/components/ui/CommentIcon";
 
 type CallType = "audio" | "video";
 type Role = "caller" | "callee";
+/** What travels on a call's broadcast channel; `send()` stamps `from`. */
+type Signal = { from: string } & (
+  | { kind: "ready" | "end" | "decline" }
+  | { kind: "offer" | "answer"; sdp: RTCSessionDescriptionInit; callType?: CallType }
+  | { kind: "ice"; candidate: RTCIceCandidateInit }
+);
 type Status = "outgoing" | "incoming" | "connected";
 
 type ActiveCall = {
@@ -149,10 +155,10 @@ export function CallProvider({ userId, children }: { userId: string; children: R
 
   // Channel is keyed by the call SESSION id (not conversation) to avoid
   // crossing signals between an old and a new call in the same DM.
-  function openChannel(callSessionId: string, onSignal: (s: any) => void) {
+  function openChannel(callSessionId: string, onSignal: (s: Signal) => void) {
     chanReadyRef.current = false;
     const ch = supabase.channel(`call:${callSessionId}`, { config: { broadcast: { self: false } } });
-    ch.on("broadcast", { event: "signal" }, ({ payload }) => onSignal(payload));
+    ch.on("broadcast", { event: "signal" }, ({ payload }) => onSignal(payload as Signal));
     ch.subscribe((status) => {
       if (status === "SUBSCRIBED") {
         chanReadyRef.current = true;
@@ -204,7 +210,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
       };
       setCall(active);
 
-      openChannel(createdId, async (s: any) => {
+      openChannel(createdId, async (s) => {
         if (s.from === userId) return;
         if (s.kind === "ready") {
           send({ kind: "offer", sdp: offer, callType: a.type });
@@ -264,7 +270,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
   // â”€â”€ incoming: subscribe to channel & wait for offer â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const beginIncoming = useCallback((c: ActiveCall) => {
     setCall(c);
-    openChannel(c.id, async (s: any) => {
+    openChannel(c.id, async (s) => {
       if (s.from === userId) return;
       const pc = pcRef.current;
       if (s.kind === "offer") {

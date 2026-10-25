@@ -186,7 +186,7 @@ export function InAppNotifier({ currentUserId }: { currentUserId: string }) {
         .eq("user_id", currentUserId),
     ]).then(([levelsRes, { data }]) => {
       noteLevels(levelsRes.data);
-      (data ?? []).forEach((row: any) => {
+      (data ?? []).forEach((row) => {
         const conv = Array.isArray(row.conversations) ? row.conversations[0] : row.conversations;
         membership.current.set(row.conversation_id, {
           muted: !!row.muted_at,

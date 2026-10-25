@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { RealChatView } from "@/components/messages/RealChatView";
-import { one } from "@/lib/supabase/typed";
+import { mapMessageRow } from "@/lib/chat-rows";
 import { visibleBubbleStyle } from "@/lib/bubble-styles";
 import { VaultGate } from "@/components/vault/VaultGate";
 
@@ -60,14 +60,14 @@ export default async function ThreadPage({
   }
 
   if (!members || members.length === 0) notFound();
-  const me = members.find((m: any) => m.user_id === user.id);
+  const me = members.find((m) => m.user_id === user.id);
   if (!me) notFound();
 
   const isGroup = conv?.type === "group";
 
   const others = members
-    .filter((m: any) => m.user_id !== user.id)
-    .map((m: any) => (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles))
+    .filter((m) => m.user_id !== user.id)
+    .map((m) => (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles))
     .filter(Boolean);
   const op = others[0] ?? null;
   // The reader's own face, for the places their own messages are shown with
@@ -78,7 +78,7 @@ export default async function ThreadPage({
 
   // Sender lookup + group meta
   const membersMap: Record<string, { name: string; username: string | null; hue: number; avatarUrl: string | null }> = {};
-  others.forEach((p: any) => {
+  others.forEach((p) => {
     membersMap[p.id] = {
       name: p.display_name ?? p.username ?? "User",
       // Where tapping their face in the thread goes.
@@ -89,7 +89,7 @@ export default async function ThreadPage({
     };
   });
   const groupMembers = members
-    .map((m: any) => {
+    .map((m) => {
       const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
       if (!p) return null;
       return {
@@ -107,7 +107,7 @@ export default async function ThreadPage({
     ? {
         title:
           conv?.title ||
-          others.slice(0, 3).map((p: any) => p.display_name ?? p.username ?? "User").join(", ") +
+          others.slice(0, 3).map((p) => p.display_name ?? p.username ?? "User").join(", ") +
             (others.length > 3 ? ` +${others.length - 3}` : ""),
         memberCount: members.length,
         avatarUrl: (conv as any)?.avatar_url ?? null,
@@ -118,19 +118,10 @@ export default async function ThreadPage({
 
   const rawMsgs = (latestMsgs ?? []).slice().reverse();
 
-  const profOf = (x: any) => { const p = one<any>(x); return p ? one<any>(p.profiles) : null; };
-
-  const messages = (rawMsgs ?? []).map((m: any) => ({
-    ...m,
-    reactions: undefined,
-    post: m.post ? { ...one(m.post), profiles: undefined } : null,
-    postProfile: m.post ? profOf(m.post) : null,
-    shot: m.shot ? { ...one(m.shot), profiles: undefined } : null,
-    shotProfile: m.shot ? profOf(m.shot) : null,
-  }));
+  const messages = (rawMsgs ?? []).map((m) => mapMessageRow({ ...m, reactions: undefined }));
 
   // Reactions came embedded with their messages.
-  const reactRows = (rawMsgs ?? []).flatMap((m: any) => m.reactions ?? []);
+  const reactRows = (rawMsgs ?? []).flatMap((m) => m.reactions ?? []);
 
   // Everyone else's read state — drives the "Seen" double-tick.
   //
@@ -139,8 +130,8 @@ export default async function ThreadPage({
   // no "the other person" in a group. The membership query above already has
   // every row, so this costs nothing and covers both shapes.
   const readers = members
-    .filter((m: any) => m.user_id !== user.id)
-    .map((m: any) => {
+    .filter((m) => m.user_id !== user.id)
+    .map((m) => {
       const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
       return {
         userId: m.user_id as string,

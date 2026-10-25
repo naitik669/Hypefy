@@ -31,9 +31,9 @@ export default function NewChatPage() {
         supabase.from("notifications").select("actor_id").eq("user_id", user.id).not("actor_id", "is", null).limit(50),
       ]);
       const ids = new Set<string>();
-      followingRes.data?.forEach((r: any) => ids.add(r.following_id));
-      followerRes.data?.forEach((r: any) => ids.add(r.follower_id));
-      notifRes.data?.forEach((r: any) => r.actor_id && ids.add(r.actor_id));
+      followingRes.data?.forEach((r) => ids.add(r.following_id));
+      followerRes.data?.forEach((r) => ids.add(r.follower_id));
+      notifRes.data?.forEach((r) => r.actor_id && ids.add(r.actor_id));
       ids.delete(user.id);
       if (ids.size === 0) { setPeople([]); setLoading(false); return; }
       const { data } = await supabase

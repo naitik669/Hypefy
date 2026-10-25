@@ -42,7 +42,7 @@ export default async function ShowPage({
     .gt("expires_at", nowIso)
     .order("created_at", { ascending: true });
 
-  const shows = (raw ?? []).map((s: any) => ({
+  const shows = (raw ?? []).map((s) => ({
     ...s,
     profiles: Array.isArray(s.profiles) ? s.profiles[0] ?? null : s.profiles,
     linked_post: s.linked_post

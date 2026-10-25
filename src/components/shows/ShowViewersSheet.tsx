@@ -61,7 +61,7 @@ export function ShowViewersSheet({
       ]);
       if (!active) return;
       setViewers(
-        (viewsRes.data ?? []).map((v: any) => {
+        (viewsRes.data ?? []).map((v) => {
           const p = Array.isArray(v.profiles) ? v.profiles[0] : v.profiles;
           return {
             id: v.viewer_id,
@@ -73,7 +73,7 @@ export function ShowViewersSheet({
           };
         }),
       );
-      setPinned(new Set((pinsRes.data ?? []).map((r: any) => r.pinned_user_id as string)));
+      setPinned(new Set((pinsRes.data ?? []).map((r) => r.pinned_user_id as string)));
     })();
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps

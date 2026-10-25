@@ -57,8 +57,8 @@ export function ForwardSheet({
         supabase.from("follows").select("follower_id").eq("following_id", user.id).limit(100),
       ]);
       const ids = new Set<string>();
-      followingRes.data?.forEach((r: any) => ids.add(r.following_id));
-      followerRes.data?.forEach((r: any) => ids.add(r.follower_id));
+      followingRes.data?.forEach((r) => ids.add(r.following_id));
+      followerRes.data?.forEach((r) => ids.add(r.follower_id));
       ids.delete(user.id);
       if (ids.size === 0) { setFriends([]); setLoading(false); return; }
       const { data: profiles } = await supabase
