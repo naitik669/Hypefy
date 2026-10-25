@@ -11,7 +11,14 @@
 export const MIN_LEAD_MS = 30_000;
 export const MAX_AHEAD_MS = 90 * 24 * 60 * 60 * 1000;
 
-export type Preset = { id: string; label: string; at: Date };
+export type Preset = {
+  id: string;
+  /** Read out in full where there is room, and to a screen reader always. */
+  label: string;
+  /** For the chip row, where three of these sit next to a calendar button. */
+  short: string;
+  at: Date;
+};
 
 /**
  * The shortlist.
@@ -25,9 +32,9 @@ export type Preset = { id: string; label: string; at: Date };
 export function presets(now: Date): Preset[] {
   const after = (ms: number) => new Date(now.getTime() + ms);
   return [
-    { id: "hour", label: "In an hour", at: after(60 * 60 * 1000) },
-    { id: "day", label: "In a day", at: after(24 * 60 * 60 * 1000) },
-    { id: "week", label: "In a week", at: after(7 * 24 * 60 * 60 * 1000) },
+    { id: "hour", label: "In an hour", short: "1 hour", at: after(60 * 60 * 1000) },
+    { id: "day", label: "In a day", short: "1 day", at: after(24 * 60 * 60 * 1000) },
+    { id: "week", label: "In a week", short: "1 week", at: after(7 * 24 * 60 * 60 * 1000) },
   ].filter((p) => canSchedule(p.at, now) === null);
 }
 
@@ -47,21 +54,33 @@ export function canSchedule(at: Date | null, now: Date): string | null {
 }
 
 /**
- * How a scheduled time is read back to the sender.
+ * A scheduled time as the two things it is made of.
  *
- * Today and tomorrow are named rather than dated, because "Today at 18:00"
- * is read in one glance and "24/10/2026, 18:00" is not.
+ * Split because the sheet sets them at different sizes: the day is the
+ * headline and the clock is the line under it. Building the sentence out of
+ * the same two pieces is what stops the headline and the toast ending up
+ * describing the same moment differently.
+ *
+ * Today and tomorrow are named rather than dated, because "Today" is read in
+ * one glance and "24/10/2026" is not.
  */
-export function describeWhen(at: Date, now: Date): string {
+export function describeParts(at: Date, now: Date): { day: string; time: string } {
   const time = at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  const sameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  if (sameDay(at, now)) return `Today at ${time}`;
-  if (sameDay(at, tomorrow)) return `Tomorrow at ${time}`;
-  return `${at.toLocaleDateString(undefined, { day: "numeric", month: "short" })} at ${time}`;
+  const day = sameDay(at, now)
+    ? "Today"
+    : sameDay(at, tomorrow)
+      ? "Tomorrow"
+      : at.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return { day, time };
+}
+
+/** The same, as one line. */
+export function describeWhen(at: Date, now: Date): string {
+  const { day, time } = describeParts(at, now);
+  return `${day} at ${time}`;
 }
 
 /* ── The three drums ───────────────────────────────────────────────────── */
@@ -352,4 +371,39 @@ export function offsetOfDate(year: number, month: number, dayNum: number, now: D
   // zero once a spent today has been dropped — so read the value, never the
   // index.
   return found >= 0 ? dayOptions(now)[found].value : (dayOptions(now)[0]?.value ?? 0);
+}
+
+/**
+ * What the sheet shows the moment it opens.
+ *
+ * The first offset, so the headline is already a time worth sending and the
+ * sheet is one tap from done. It used to open on a hardcoded noon today,
+ * which from one o'clock onwards is in the past — harmless while the first
+ * step was only a list of offsets, and the first thing read now that the
+ * chosen time is the headline.
+ *
+ * The offset is looked up rather than assumed to be zero: an hour from half
+ * past eleven at night is tomorrow.
+ */
+export function openingChoice(now: Date): {
+  offset: number;
+  hour: number;
+  minute: number;
+  presetId: string | null;
+} {
+  const first = presets(now)[0];
+  if (first) {
+    return {
+      offset: offsetOfDate(first.at.getFullYear(), first.at.getMonth(), first.at.getDate(), now),
+      hour: first.at.getHours(),
+      minute: first.at.getMinutes(),
+      presetId: first.id,
+    };
+  }
+  // No offset survived canSchedule, which takes a clock far enough wrong that
+  // nothing here is going to help. Fall back to the first thing the drums
+  // would accept, so the sheet still opens on something true.
+  const offset = dayOptions(now)[0]?.value ?? 0;
+  const { hour, minute } = clampTime(dayFromOffset(offset, now), 12, 0, now);
+  return { offset, hour, minute, presetId: null };
 }

@@ -165,6 +165,57 @@ describe("the picker", () => {
     expect(sheet).toContain("Pick a date and time");
   });
 
+  it("the first thing on it is the time it will send, not a list of options", () => {
+    // The four rows it replaced were near-identical slabs with the times
+    // themselves muted and pushed right. Nothing was louder than anything
+    // else, so there was nothing to read first.
+    expect(sheet).toContain("const when = describeParts(chosen, now);");
+    expect(sheet).toContain("{when.day}");
+    expect(sheet).toContain("{when.time}");
+  });
+
+  it("and a screen reader is handed one sentence, not two sized fragments", () => {
+    // Two lines is a typographic decision. Read aloud it is "Tomorrow",
+    // "11:15 AM" — two orphans with nothing saying what they are.
+    expect(sheet).toContain('aria-live="polite"');
+    expect(sheet).toContain("Sending ${describeWhen(chosen, now).toLowerCase()}");
+    const headline = sheet.slice(sheet.indexOf('aria-live="polite"'), sheet.indexOf("{when.time}"));
+    expect(headline.match(/aria-hidden/g)?.length).toBe(2);
+  });
+
+  it("there is exactly one place this sends from", () => {
+    // The offsets used to send on tap while the drums ended in their own
+    // Send. Two commit points in one sheet is how the same message gets
+    // scheduled twice, and how a tap commits something never displayed.
+    expect(sheet.match(/void schedule\(/g)?.length).toBe(1);
+  });
+
+  it("an offset sets the time rather than sending it", () => {
+    const fn = sheet.slice(sheet.indexOf("function pickPreset"));
+    const body = fn.slice(0, fn.indexOf("\n  }"));
+    expect(body).toContain("setPresetId(id)");
+    expect(body).not.toContain("schedule(");
+  });
+
+  it("so a tap on one is taken back by a tap on another", () => {
+    // Absolute, not cumulative. "+1 day" would read as stacking, and from
+    // inside the sheet stacking has no way back.
+    expect(sheet).toContain("onClick={() => pickPreset(p.id, p.at)}");
+    expect(sheet).toContain("aria-pressed={presetId === p.id}");
+  });
+
+  it("and touching any drum puts the chips out", () => {
+    // Otherwise a chip goes on claiming a time the drums have moved off.
+    for (const fn of ["pickDay", "pickMinute", "pickHour12", "pickMeridiem"]) {
+      const at = sheet.indexOf(`function ${fn}(`);
+      expect(at, fn).toBeGreaterThan(-1);
+      // To the closing brace, not a fixed window — the next function along
+      // sets it too, so a window that overruns passes either way.
+      const body = sheet.slice(at, sheet.indexOf("\n  }", at));
+      expect(body, fn).toContain("setPresetId(null)");
+    }
+  });
+
   it("uses the same wheel as the birthday picker, not a second one", () => {
     // A second drum implementation is a second set of scroll-feedback bugs.
     expect(sheet).toContain('from "@/components/ui/Wheel"');
@@ -221,9 +272,22 @@ describe("the picker", () => {
     expect(fn.slice(0, 300)).toContain("clampTime(day, hour, minute, now)");
   });
 
-  it("opens on the first day that has anything left", () => {
-    // Late at night that is tomorrow, not a "Today" with one time on it.
-    expect(sheet).toContain("dayOptions(new Date())[0]?.value ?? 0");
+  it("opens on a time that is already worth sending", () => {
+    // It opened on a hardcoded noon today, which from one o'clock onwards is
+    // in the past. Invisible while the first step only listed offsets; the
+    // first thing read now that the chosen time is the headline.
+    expect(sheet).toContain("openingChoice(new Date())");
+    expect(sheet).not.toContain("useState(12)");
+  });
+
+  it("and seeds every part of that time from one reading of the clock", () => {
+    // Four separate new Date() calls can land either side of a millisecond
+    // and seed a day that disagrees with its own hour.
+    expect(sheet.match(/openingChoice\(/g)?.length).toBe(1);
+    expect(sheet).toContain("const [seed] = useState(() => openingChoice(new Date()));");
+    for (const part of ["seed.offset", "seed.hour", "seed.minute", "seed.presetId"]) {
+      expect(sheet, part).toContain(part);
+    }
   });
 
   it("the 24-hour value stays the single source of truth", () => {
@@ -250,8 +314,21 @@ describe("the picker", () => {
     expect(sheet).toContain('aria-label={step === "time" ? "Back to the date" : "Back"}');
   });
 
-  it("the confirm button says what it will do, or why it cannot", () => {
-    expect(sheet).toContain("{problem ?? `Send ${describeWhen(chosen, now).toLowerCase()}`}");
+  it("the clock hands its time back to the headline", () => {
+    // Rather than being a second Send. The headline is what the sheet
+    // promises, so the drums have to settle there before anything goes.
+    const timeStep = sheet.slice(sheet.indexOf('{step === "time" && ('));
+    expect(timeStep).toContain('onClick={() => setStep("presets")}');
+    expect(timeStep).toContain('{problem ?? "Done"}');
+  });
+
+  it("the send button says what it will do, or why it cannot", () => {
+    expect(sheet).toContain('{problem ?? "Schedule"}');
+    const presetStep = sheet.slice(
+      sheet.indexOf('{step === "presets" && ('),
+      sheet.indexOf('{step === "date" && ('),
+    );
+    expect(presetStep).toContain("{problem ?? `Sending");
   });
 
   it("and refuses a time the database would refuse", () => {

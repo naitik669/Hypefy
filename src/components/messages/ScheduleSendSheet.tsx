@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, Clock, Loader2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, Loader2 } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { WheelColumn, WheelFrame } from "@/components/ui/Wheel";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -20,7 +20,9 @@ import {
   clampWithinMeridiem,
   dayFromOffset,
   dayOptions,
+  describeParts,
   describeWhen,
+  openingChoice,
   hour12Options,
   meridiemOptions,
   minuteOptions,
@@ -33,14 +35,20 @@ import {
 /**
  * Pick when a typed message should go.
  *
- * Opened by holding Send. Three offsets cover most of it; anything else is
- * three drums — day, hour, minute — which is the same wheel the birthday
- * picker uses, so the gesture is one the reader has already met.
+ * Opened by holding Send. The sheet shows one time — the answer, at the size
+ * of an answer — and three chips plus a calendar button that move it. It is
+ * not a menu of four things to read: whatever you touch, the headline is what
+ * will happen and the button under it does that.
  *
- * It replaced a month grid and two rows of buttons. The grid was accurate
- * and fiddly: a date and a time took a tap on a cell, then a tap on an hour,
- * then a tap on a quarter, with the hours redrawing underneath. The drums
- * take one gesture each and never redraw under the finger.
+ * It replaced a list of four near-identical rows. Those repeated a clock icon
+ * three times, put the times themselves in muted 11px off to the right, and
+ * ended in an outlined button that read as disabled rather than as the fourth
+ * option. Nothing in it was louder than anything else.
+ *
+ * Anything the chips do not cover is three drums for the date and three for
+ * the clock, the same wheel the birthday picker uses, so the gesture is one
+ * the reader has already met. They set that same headline and come back to
+ * it: there is one place this sends from.
  *
  * Days that cannot be picked are left out of the drum rather than greyed.
  * The row under the band IS the value, so an unpickable row under the band
@@ -71,13 +79,14 @@ export function ScheduleSendSheet({
   const [step, setStep] = useState<"presets" | "date" | "time">("presets");
   const [busy, setBusy] = useState(false);
 
-  // Opened on the first hour still ahead, so the drums start somewhere
-  // usable rather than on a time that has gone.
-  // The first day still open, which late at night is tomorrow — dayOptions
-  // drops a day with nothing left on it, so index dayOptions(new Date())[0]?.value ?? 0 is always real.
-  const [offset, setOffset] = useState(() => 0);
-  const [hour, setHour] = useState(12);
-  const [minute, setMinute] = useState(0);
+  // One reading of the clock seeds all four, so they cannot end up
+  // describing different moments across a millisecond boundary at mount.
+  const [seed] = useState(() => openingChoice(new Date()));
+  const [offset, setOffset] = useState(seed.offset);
+  const [hour, setHour] = useState(seed.hour);
+  const [minute, setMinute] = useState(seed.minute);
+  /** Which chip is lit, or null once the drums have been touched. */
+  const [presetId, setPresetId] = useState<string | null>(seed.presetId);
 
   // Read per render rather than held: a sheet left open across midnight
   // would otherwise keep offering yesterday.
@@ -95,6 +104,7 @@ export function ScheduleSendSheet({
 
   /** Moving the day can strand the clock in a time that has already gone. */
   function pickDay(next: number) {
+    setPresetId(null);
     setOffset(next);
     const fixed = clampTime(dayFromOffset(next, now), hour, minute, now);
     setHour(fixed.hour);
@@ -116,9 +126,16 @@ export function ScheduleSendSheet({
     setStep("time");
   }
 
+  /** The chosen time is now this time, so no chip may go on claiming it. */
+  function pickMinute(next: number) {
+    setPresetId(null);
+    setMinute(next);
+  }
+
   function pickHour12(next: number) {
     const fixed = clampWithinMeridiem(day, next, meridiem, minute, now);
     if (!fixed) return;
+    setPresetId(null);
     setHour(fixed.hour);
     setMinute(fixed.minute);
   }
@@ -128,6 +145,7 @@ export function ScheduleSendSheet({
     const to: Meridiem = next === AM ? "AM" : "PM";
     const fixed = clampWithinMeridiem(day, hour12, to, minute, now);
     if (!fixed) return;
+    setPresetId(null);
     setHour(fixed.hour);
     setMinute(fixed.minute);
   }
@@ -158,6 +176,21 @@ export function ScheduleSendSheet({
     onClose();
   }
 
+  /**
+   * Put an offset into the chosen time.
+   *
+   * It does not send. The offsets used to send on tap, which made the chips
+   * and the drums two different kinds of control wearing the same clothes,
+   * and left nothing on screen saying what the tap had just committed to.
+   */
+  function pickPreset(id: string, at: Date) {
+    setPresetId(id);
+    setOffset(offsetOfDate(at.getFullYear(), at.getMonth(), at.getDate(), now));
+    setHour(at.getHours());
+    setMinute(at.getMinutes());
+  }
+
+  const when = describeParts(chosen, now);
   const dayLabel = dayOptions(now).find((d) => d.value === offset)?.label ?? "";
 
   // The three date drums read off the chosen day rather than holding state
@@ -195,28 +228,57 @@ export function ScheduleSendSheet({
       )}
 
       {step === "presets" && (
-        <div className="flex flex-col gap-2 pb-2">
-          {presets(now).map((p) => (
+        <div className="flex flex-col gap-4 pb-2">
+          {/* The answer, at the size of an answer. Two lines because the day
+              and the clock are read at different distances — but one sentence
+              to a screen reader, which has no sizes and would otherwise be
+              handed two unlabelled fragments. */}
+          <div>
+            <span className="sr-only" aria-live="polite">
+              {problem ?? `Sending ${describeWhen(chosen, now).toLowerCase()}`}
+            </span>
+            <p aria-hidden className="text-[27px] font-bold leading-tight tracking-tight text-foreground">
+              {when.day}
+            </p>
+            <p aria-hidden className="text-lg font-bold tabular-nums text-accent">{when.time}</p>
+          </div>
+
+          {/* The offsets are absolute, not cumulative: tapping one is a choice
+              another tap takes back. "+1 day" would read as stacking, and
+              stacking has no way back from inside the sheet. */}
+          <div className="flex gap-1.5">
+            {presets(now).map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => pickPreset(p.id, p.at)}
+                aria-pressed={presetId === p.id}
+                aria-label={p.label}
+                className={`flex-1 rounded-xl py-2.5 text-xs font-semibold transition active:scale-[0.97] ${
+                  presetId === p.id ? "bg-white/15 text-foreground" : "bg-white/5 text-muted"
+                }`}
+              >
+                {p.short}
+              </button>
+            ))}
             <button
-              key={p.id}
               type="button"
-              disabled={busy}
-              onClick={() => void schedule(p.at)}
-              className="flex items-center justify-between gap-3 rounded-2xl bg-surface px-4 py-3 text-left transition active:scale-[0.99] disabled:opacity-50"
+              onClick={() => setStep("date")}
+              aria-label="Pick a date and time"
+              className="flex w-11 items-center justify-center rounded-xl bg-white/5 text-muted transition-colors hover:text-foreground"
             >
-              <span className="flex items-center gap-3">
-                <Clock size={17} className="text-muted" />
-                <span className="text-sm font-semibold text-foreground">{p.label}</span>
-              </span>
-              <span className="text-xs text-muted">{describeWhen(p.at, now)}</span>
+              <CalendarDays size={16} />
             </button>
-          ))}
+          </div>
+
           <button
             type="button"
-            onClick={() => setStep("date")}
-            className="mt-1 rounded-2xl border border-border px-4 py-3 text-sm font-semibold text-muted transition-colors hover:text-foreground"
+            disabled={busy || problem !== null}
+            onClick={() => void schedule(chosen)}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition active:scale-[0.99] disabled:opacity-40"
           >
-            Pick a date and time
+            {busy && <Loader2 size={15} className="animate-spin" />}
+            {problem ?? "Schedule"}
           </button>
         </div>
       )}
@@ -261,7 +323,7 @@ export function ScheduleSendSheet({
         <div className="pb-2">
           <WheelFrame>
             <WheelColumn options={hours12} value={hour12} onChange={pickHour12} ariaLabel="Hour" align="right" />
-            <WheelColumn options={minutes} value={minute} onChange={setMinute} ariaLabel="Minute" />
+            <WheelColumn options={minutes} value={minute} onChange={pickMinute} ariaLabel="Minute" />
             <WheelColumn
               options={meridiems}
               value={meridiem === "AM" ? AM : PM}
@@ -273,12 +335,11 @@ export function ScheduleSendSheet({
 
           <button
             type="button"
-            disabled={busy || problem !== null}
-            onClick={() => void schedule(chosen)}
+            disabled={problem !== null}
+            onClick={() => setStep("presets")}
             className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink transition active:scale-[0.99] disabled:opacity-40"
           >
-            {busy && <Loader2 size={15} className="animate-spin" />}
-            {problem ?? `Send ${describeWhen(chosen, now).toLowerCase()}`}
+            {problem ?? "Done"}
           </button>
         </div>
       )}

@@ -4,6 +4,8 @@ import {
   MIN_LEAD_MS,
   canSchedule,
   describeWhen,
+  describeParts,
+  openingChoice,
   clampDate,
   clampTime,
   dayNumOptions,
@@ -60,6 +62,11 @@ describe("presets", () => {
     expect(w).toBe(7 * 24 * 60 * 60 * 1000);
   });
 
+  it("each one carries a short label, for the chip row", () => {
+    // "In an hour" does not fit three abreast next to the calendar button.
+    expect(presets(now).map((p) => p.short)).toEqual(["1 hour", "1 day", "1 week"]);
+  });
+
   it("every one it offers is schedulable", () => {
     for (const p of presets(now)) expect(canSchedule(p.at, now), p.id).toBeNull();
   });
@@ -107,6 +114,68 @@ describe("describeWhen", () => {
   it("does not call the same clock time on a later date 'today'", () => {
     // A same-day check on hours alone would say Today for next week.
     expect(describeWhen(at("2026-10-31T12:00:00"), now)).not.toMatch(/Today/);
+  });
+});
+
+describe("describeParts", () => {
+  const now = at("2026-10-24T12:00:00");
+
+  it("splits the day from the clock, so the sheet can size them apart", () => {
+    const p = describeParts(at("2026-10-25T09:05:00"), now);
+    expect(p.day).toBe("Tomorrow");
+    expect(p.day).not.toMatch(/\d\d:/);
+    expect(p.time).toMatch(/9|09/);
+    expect(p.time).not.toMatch(/Tomorrow/);
+  });
+
+  it("and describeWhen is built out of it, so the two cannot drift apart", () => {
+    // The headline reads the parts and the toast reads the sentence. If they
+    // were written separately they would eventually disagree about the same
+    // moment, which is the kind of thing nobody notices until a user does.
+    for (const iso of ["2026-10-24T18:00:00", "2026-10-25T09:00:00", "2026-11-02T09:00:00"]) {
+      const p = describeParts(at(iso), now);
+      expect(describeWhen(at(iso), now), iso).toBe(`${p.day} at ${p.time}`);
+    }
+  });
+});
+
+describe("the time the sheet opens on", () => {
+  const now = at("2026-10-24T12:00:00");
+
+  it("is the first offset, so the sheet opens one tap from sent", () => {
+    const o = openingChoice(now);
+    expect(o.presetId).toBe("hour");
+    expect(withTime(dayFromOffset(o.offset, now), o.hour, o.minute).getTime()).toBe(
+      presets(now)[0].at.getTime(),
+    );
+  });
+
+  it("is schedulable at every hour of the day", () => {
+    // The old opening state was a hardcoded 12:00 today, which is in the past
+    // from one o'clock onwards. That was invisible while the first step only
+    // listed offsets; now the headline shows this value the moment the sheet
+    // opens, so a dead one would be the first thing read.
+    for (let h = 0; h < 24; h++) {
+      for (const m of [0, 30, 59]) {
+        const t = at(`2026-10-24T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`);
+        const o = openingChoice(t);
+        const chosen = withTime(dayFromOffset(o.offset, t), o.hour, o.minute);
+        expect(canSchedule(chosen, t), `${h}:${m}`).toBeNull();
+      }
+    }
+  });
+
+  it("opens on a day the date drum actually offers", () => {
+    // Late at night an hour from now is tomorrow. If the offset were not one
+    // the drum lists, the date step would open with nothing under the band.
+    for (let h = 0; h < 24; h++) {
+      const t = at(`2026-10-24T${String(h).padStart(2, "0")}:40:00`);
+      const o = openingChoice(t);
+      expect(
+        dayOptions(t).some((d) => d.value === o.offset),
+        String(h),
+      ).toBe(true);
+    }
   });
 });
 
