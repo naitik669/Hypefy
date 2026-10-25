@@ -169,7 +169,13 @@ describe("finding a message", () => {
   });
 
   it("reaching a result fetches back to it, but only so far", () => {
-    const chat = read("src/components/messages/RealChatView.tsx");
+    // The thread is two files since the view was split: the component, and
+
+    // the pure vocabulary it is built from. Both are the thread.
+
+    const chat =
+
+      read("src/components/messages/RealChatView.tsx") + read("src/lib/chat-thread.ts");
     expect(chat).toContain("export const SEARCH_REACH_PAGES = 12;");
     // Through the ref, not the state: the loop awaits loadOlder, so the
     // `hasMore` it closed over is the value from before the first page.

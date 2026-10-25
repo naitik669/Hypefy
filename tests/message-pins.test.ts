@@ -26,7 +26,13 @@ const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const sql = read("supabase/migrations/0142_message_pins.sql");
 const board = read("src/components/messages/PinBoard.tsx");
 const pane = read("src/components/messages/PinPane.tsx");
-const chat = read("src/components/messages/RealChatView.tsx");
+// The thread is two files since the view was split: the component, and
+
+// the pure vocabulary it is built from. Both are the thread.
+
+const chat =
+
+  read("src/components/messages/RealChatView.tsx") + read("src/lib/chat-thread.ts");
 
 const ME = "me-1";
 const THEM = "them-1";

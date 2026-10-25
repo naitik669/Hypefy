@@ -74,7 +74,13 @@ describe("naming the comment a share is about", () => {
   });
 
   it("the chat keeps the id, never a copy of the words", () => {
-    const chat = read("src/components/messages/RealChatView.tsx");
+    // The thread is two files since the view was split: the component, and
+
+    // the pure vocabulary it is built from. Both are the thread.
+
+    const chat =
+
+      read("src/components/messages/RealChatView.tsx") + read("src/lib/chat-thread.ts");
     expect(chat).toContain("comment_id?: string;");
     expect(chat).toContain('.select("id, body, user_id, profiles(display_name, username, avatar_hue, avatar_url)")');
     expect(chat).toContain('.is("deleted_at", null)');
