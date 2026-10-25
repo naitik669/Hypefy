@@ -131,20 +131,16 @@ describe("the chat details screen", () => {
     expect(info.split("removeChat({").length).toBe(2);
   });
 
-  it("the shared tabs are icons that open in place, and fold away when tapped again", () => {
+  it("Shared is a section of its own: three kinds, one always chosen, filling the screen below", () => {
     expect(info).toContain("SHARED_TAB_ICONS.map(({ id, label, Icon }) => {");
     expect(info).toContain("aria-label={`${label}, ${shared[id].length}`}");
-    expect(info).toContain("onClick={() => openShared(id)}");
+    expect(info).toContain("onClick={() => setSharedTab(id)}");
+    expect(info).toContain('useState<SharedTab>("media")');
     expect(info).toContain("<SharedPanel shared={shared} me={currentUserId} people={people} isGroup={isGroup} tab={sharedTab} />");
     // It does not leave the screen to do it.
     expect(info).not.toContain("/media?tab=");
-  });
-
-  it("it opens beneath the icons: the page is not moved, and nothing below is hidden", () => {
-    expect(info).toContain("const openShared = (tab: SharedTab) => setSharedTab((now) => (now === tab ? null : tab));");
     expect(info).not.toContain("scrollIntoView");
-    expect(info).not.toContain("{!sharedTab && (");
-    // Inside the card, under the tabs.
+    // The kinds come first, then the panel.
     const card = info.slice(info.indexOf("data-shared-card"), info.indexOf("data-privacy"));
     expect(card.indexOf("<SharedPanel")).toBeGreaterThan(card.indexOf('role="tablist"'));
   });

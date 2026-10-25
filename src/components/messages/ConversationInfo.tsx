@@ -8,7 +8,6 @@ import {
   Ban,
   Camera,
   Pencil,
-  Plus,
   Bell,
   Check,
   ChevronRight,
@@ -18,7 +17,6 @@ import {
   Loader2,
   LogOut,
   MoreHorizontal,
-  Play,
   Search,
   ShieldCheck,
   ShieldOff,
@@ -39,17 +37,11 @@ import { ChatThemePicker } from "@/components/messages/ChatThemePicker";
 import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { groupPhotoProblem, toSquareJpeg } from "@/lib/group-photo";
-
-/** How long the member strip takes to become the list, and back. */
-export const MEMBERS_MS = 320;
-/** Each row of the list follows the one above by this much. */
-export const MEMBER_STAGGER_MS = 35;
-import { ChatImg, ChatVideo } from "@/components/messages/ChatMedia";
 import { SHARED_TAB_ICONS, SharedPanel, type SharedPerson } from "@/components/messages/ConversationMedia";
 import type { Shared, SharedTab } from "@/lib/chat-shared";
 
-/** How many of the newest photos the card shows before "+N". */
-export const PREVIEW_TILES = 4;
+/** The sections under the actions, one on screen at a time. */
+export type InfoSection = "members" | "shared" | "privacy";
 
 export type RosterMember = {
   id: string;
@@ -204,8 +196,62 @@ function PrivacyRow({
 }
 
 /**
- * Everything about one conversation, on a real route./**
- * Everything about one conversation, on a real route./**
+ * The switcher under the actions. One section is on screen at a time and each
+ * says how much is in it, so the page stays one screen tall whatever the size
+ * of the group, and what is behind a tab is never a guess. Arrow keys move
+ * along it, as they do in any tab list.
+ */
+function SectionTabs({
+  sections,
+  current,
+  onChange,
+}: {
+  sections: { id: InfoSection; label: string; count: string }[];
+  current: InfoSection;
+  onChange: (id: InfoSection) => void;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Chat details"
+      data-section-tabs
+      className="flex gap-1 rounded-2xl bg-surface p-1"
+      onKeyDown={(e) => {
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        const i = sections.findIndex((t) => t.id === current);
+        const next = sections[(i + (e.key === "ArrowRight" ? 1 : sections.length - 1)) % sections.length];
+        onChange(next.id);
+        document.getElementById(`info-tab-${next.id}`)?.focus();
+      }}
+    >
+      {sections.map(({ id, label, count }) => {
+        const on = id === current;
+        return (
+          <button
+            key={id}
+            id={`info-tab-${id}`}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            aria-controls={`info-panel-${id}`}
+            tabIndex={on ? 0 : -1}
+            onClick={() => onChange(id)}
+            // The count sits under the name rather than beside it, so all
+            // three still fit a 320px phone without cutting a word short.
+            className={`flex h-12 min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-1 leading-tight transition-colors ${
+              on ? "bg-accent text-accent-ink" : "text-muted hover:text-foreground"
+            }`}
+          >
+            <span className="max-w-full truncate text-[13px] font-bold">{label}</span>
+            <span className={`text-[11px] font-semibold tabular-nums ${on ? "opacity-70" : "text-faint"}`}>{count}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * Everything about one conversation, on a real route.
  *
  * Replaces GroupInfoSheet and gives DMs the screen they never had. It is also
@@ -278,23 +324,19 @@ export function ConversationInfo({
   const [confirmRemove, setConfirmRemove] = useState<RosterMember | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  /** The Shared tab that is open in place, or none. */
-  const [sharedTab, setSharedTab] = useState<SharedTab | null>(null);
+  /** Which section is on screen: a group opens on its people, a DM on what was shared. */
+  const [section, setSection] = useState<InfoSection>(isGroup ? "members" : "shared");
+  /** Which kind of shared thing the Shared section shows. */
+  const [sharedTab, setSharedTab] = useState<SharedTab>("media");
   const [timerOpen, setTimerOpen] = useState(false);
-  /** The whole member list, not the strip of faces. */
-  const [allMembers, setAllMembers] = useState(false);
   const [editingName, setEditingName] = useState(false);
   /** The group picture as it is now: what the page gave, or the one just set. */
   const [photo, setPhoto] = useState<string | null>(avatarUrl);
   const [photoBusy, setPhotoBusy] = useState(false);
   /** The member whose menu (make admin, remove) is open. */
   const [memberMenu, setMemberMenu] = useState<string | null>(null);
-  const rest = shared.media.length - PREVIEW_TILES;
-
-  // Opens under the icons, where it was tapped: the page is not moved, so
-  // the name and the actions above stay as they were. The open one, tapped
-  // again, folds away.
-  const openShared = (tab: SharedTab) => setSharedTab((now) => (now === tab ? null : tab));
+  /** How many of the three privacy settings are on, for the Privacy tab. */
+  const privacyOn = [!!autoDelete, vanish, shot].filter(Boolean).length;
 
   // Add-member search, groups only.
   const [adding, setAdding] = useState(false);
@@ -446,9 +488,9 @@ export function ConversationInfo({
     }
   }
 
-  /** Straight to adding someone: the list opens with the search at its head. */
+  /** Straight to adding someone: Members, with the search open at its head. */
   function startAdding() {
-    setAllMembers(true);
+    setSection("members");
     setAdding(true);
   }
 
@@ -644,232 +686,197 @@ export function ConversationInfo({
         )}
       </div>
 
-      {/* Who is in the group. A strip of faces until "See all", when the
-          strip folds away and the same people come down as a list, one after
-          another, each with their name and (for an admin) their menu. */}
-      {isGroup && (
-        <section className="mt-6" data-group-members data-all={allMembers || undefined}>
-          <div className="flex items-center justify-between px-5 pb-2">
-            <p className="text-[11px] font-bold tracking-widest text-faint uppercase">
-              {members.length} {members.length === 1 ? "member" : "members"}
-            </p>
-            <button
-              type="button"
-              aria-expanded={allMembers}
-              onClick={() => {
-                setAllMembers((v) => !v);
-                setAdding(false);
-                setMemberMenu(null);
-              }}
-              className="text-xs font-bold text-accent"
-            >
-              {allMembers ? "Show less" : "See all"}
-            </button>
-          </div>
+      {/* Below the actions, one section at a time: a group's people, what
+          was shared, and privacy. The switcher stays under the header while
+          a long list or a year of photos scrolls beneath it. */}
+      <div className="sticky top-[calc(3.5rem+var(--sat))] z-10 mt-5 bg-background px-4 pb-3 pt-2">
+        <SectionTabs
+          current={section}
+          onChange={(id) => {
+            setSection(id);
+            setMemberMenu(null);
+          }}
+          sections={[
+            ...(isGroup ? [{ id: "members" as const, label: "Members", count: String(members.length) }] : []),
+            {
+              id: "shared" as const,
+              label: "Shared",
+              count: String(shared.media.length + shared.posts.length + shared.more.length),
+            },
+            {
+              id: "privacy" as const,
+              label: "Privacy",
+              count: privacyOn ? `${privacyOn} on` : "Off",
+            },
+          ]}
+        />
+      </div>
 
-          <div
-            inert={allMembers}
-            style={{ transitionDuration: `${MEMBERS_MS}ms` }}
-            className={`grid transition-[grid-template-rows,opacity] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
-              allMembers ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
-            }`}
-          >
-            <div className="overflow-hidden">
-              <div className="no-scrollbar flex gap-3 overflow-x-auto px-4 pb-1">
-                {isAdmin && (
-                  <button type="button" onClick={startAdding} className="flex w-14 shrink-0 flex-col items-center gap-1.5">
-                    <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/15 text-accent">
-                      <Plus size={22} strokeWidth={2.4} />
-                    </span>
-                    <span className="text-[11px] font-semibold text-accent">Add</span>
-                  </button>
+      {/* Who is in the group: everyone, with their handle, and for an admin
+          the way to add people and each member's menu. */}
+      {isGroup && section === "members" && (
+        <section
+          role="tabpanel"
+          id="info-panel-members"
+          aria-labelledby="info-tab-members"
+          className="animate-rise px-4"
+          data-group-members
+        >
+          <div className="divide-y divide-border/50 rounded-2xl bg-surface">
+            {isAdmin && (
+              <div>
+                <button
+                  type="button"
+                  aria-expanded={adding}
+                  onClick={() => setAdding((v) => !v)}
+                  className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-white/[0.04]"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                    <UserPlus size={18} />
+                  </span>
+                  <span className="flex-1 text-sm font-semibold text-accent">Add people</span>
+                  {adding && <X size={16} className="text-faint" />}
+                </button>
+
+                {adding && (
+                  <div className="px-3.5 pb-3">
+                    <div className="flex h-10 items-center gap-2 rounded-xl bg-background/70 px-3">
+                      <Search size={15} className="shrink-0 text-faint" />
+                      <input
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                        placeholder="Search people you know…"
+                        className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
+                      />
+                      {searching && <Loader2 size={14} className="animate-spin text-faint" />}
+                    </div>
+                    {results.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        disabled={busy === r.id}
+                        onClick={() =>
+                          run(
+                            r.id,
+                            () =>
+                              supabase.rpc("add_conversation_member", {
+                                p_conversation_id: conversationId,
+                                p_user_id: r.id,
+                              }) as unknown as Promise<{ error: unknown }>,
+                            `Added ${r.name}`,
+                            "Couldn't add them."
+                          ).then((okd) => {
+                            if (okd) setResults((x) => x.filter((y) => y.id !== r.id));
+                          }) as unknown as void
+                        }
+                        className="mt-2 flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left hover:bg-white/[0.04] disabled:opacity-60"
+                      >
+                        <Avatar name={r.name} hue={r.hue} src={r.avatarUrl ?? undefined} size={36} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold">{r.name}</span>
+                          {r.username && (
+                            <span className="block truncate text-xs text-muted">@{r.username}</span>
+                          )}
+                        </span>
+                        {busy === r.id ? (
+                          <Loader2 size={16} className="animate-spin text-muted" />
+                        ) : (
+                          <UserPlus size={16} className="text-accent" />
+                        )}
+                      </button>
+                    ))}
+                    {!searching && q.trim() && results.length === 0 && (
+                      <p className="mt-3 text-center text-xs text-faint">No one found.</p>
+                    )}
+                  </div>
                 )}
-                {members.map((m) => (
-                  <Link
-                    key={m.id}
-                    href={m.username ? `/u/${m.username}` : "#"}
-                    className="flex w-14 shrink-0 flex-col items-center gap-1.5"
-                  >
-                    <Avatar name={m.name} hue={m.hue} src={m.avatarUrl ?? undefined} size={56} />
-                    <span className="w-full truncate text-center text-[11px] font-semibold text-muted">
-                      {m.id === currentUserId ? "You" : m.name.split(" ")[0]}
-                    </span>
-                  </Link>
-                ))}
               </div>
-            </div>
-          </div>
+            )}
 
-          <div
-            inert={!allMembers}
-            style={{ transitionDuration: `${MEMBERS_MS}ms` }}
-            className={`grid px-4 transition-[grid-template-rows] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
-              allMembers ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-            }`}
-          >
-            <div className="overflow-hidden">
-              <div className="divide-y divide-border/50 rounded-2xl bg-surface">
-                {isAdmin && (
-                  <div>
+            {members.map((m, i) => (
+              <div key={m.id} data-member={m.id} className="relative flex items-center gap-3 px-3.5 py-2.5">
+                <Link href={m.username ? `/u/${m.username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
+                  <Avatar name={m.name} hue={m.hue} src={m.avatarUrl ?? undefined} size={40} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">
+                      {m.name}
+                      {m.id === currentUserId && <span className="ml-1 text-xs font-normal text-faint">(you)</span>}
+                    </span>
+                    {m.username && <span className="block truncate text-xs text-muted">@{m.username}</span>}
+                  </span>
+                </Link>
+                {m.role === "admin" && (
+                  <span className="shrink-0 rounded-pill bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">Admin</span>
+                )}
+                {isAdmin && m.id !== currentUserId && (
+                  <>
                     <button
                       type="button"
-                      aria-expanded={adding}
-                      onClick={() => setAdding((v) => !v)}
-                      className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-white/[0.04]"
+                      disabled={busy === m.id}
+                      aria-label={`Options for ${m.name}`}
+                      aria-haspopup="menu"
+                      aria-expanded={memberMenu === m.id}
+                      onClick={() => setMemberMenu(m.id)}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground disabled:opacity-60"
                     >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
-                        <UserPlus size={18} />
-                      </span>
-                      <span className="flex-1 text-sm font-semibold text-accent">Add people</span>
-                      {adding && <X size={16} className="text-faint" />}
+                      {busy === m.id ? <Loader2 size={16} className="animate-spin" /> : <MoreHorizontal size={18} />}
                     </button>
-
-                    {adding && (
-                      <div className="px-3.5 pb-3">
-                        <div className="flex h-10 items-center gap-2 rounded-xl bg-background/70 px-3">
-                          <Search size={15} className="shrink-0 text-faint" />
-                          <input
-                            value={q}
-                            onChange={(e) => setQ(e.target.value)}
-                            placeholder="Search people you know…"
-                            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
-                          />
-                          {searching && <Loader2 size={14} className="animate-spin text-faint" />}
-                        </div>
-                        {results.map((r) => (
-                          <button
-                            key={r.id}
-                            type="button"
-                            disabled={busy === r.id}
-                            onClick={() =>
-                              run(
-                                r.id,
-                                () =>
-                                  supabase.rpc("add_conversation_member", {
-                                    p_conversation_id: conversationId,
-                                    p_user_id: r.id,
-                                  }) as unknown as Promise<{ error: unknown }>,
-                                `Added ${r.name}`,
-                                "Couldn't add them."
-                              ).then((okd) => {
-                                if (okd) setResults((x) => x.filter((y) => y.id !== r.id));
-                              }) as unknown as void
-                            }
-                            className="mt-2 flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left hover:bg-white/[0.04] disabled:opacity-60"
-                          >
-                            <Avatar name={r.name} hue={r.hue} src={r.avatarUrl ?? undefined} size={36} />
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-semibold">{r.name}</span>
-                              {r.username && (
-                                <span className="block truncate text-xs text-muted">@{r.username}</span>
-                              )}
-                            </span>
-                            {busy === r.id ? (
-                              <Loader2 size={16} className="animate-spin text-muted" />
-                            ) : (
-                              <UserPlus size={16} className="text-accent" />
-                            )}
-                          </button>
-                        ))}
-                        {!searching && q.trim() && results.length === 0 && (
-                          <p className="mt-3 text-center text-xs text-faint">No one found.</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                    <FloatingMenu
+                      open={memberMenu === m.id}
+                      onClose={() => setMemberMenu(null)}
+                      // The last rows open upward, so the menu is not cut
+                      // off by the foot of the page.
+                      origin={i >= members.length - 2 ? "bottom-right" : "top-right"}
+                      className={`absolute right-3 min-w-[200px] ${i >= members.length - 2 ? "bottom-11" : "top-11"}`}
+                    >
+                      <MenuItem
+                        icon={m.role === "admin" ? ShieldOff : ShieldCheck}
+                        label={m.role === "admin" ? "Make a member" : "Make admin"}
+                        onClick={() => {
+                          setMemberMenu(null);
+                          void run(
+                            m.id,
+                            () =>
+                              supabase.rpc("set_member_role", {
+                                p_conversation_id: conversationId,
+                                p_user_id: m.id,
+                                p_role: m.role === "admin" ? "member" : "admin",
+                              }) as unknown as Promise<{ error: unknown }>,
+                            m.role === "admin" ? `${m.name} is now a member` : `${m.name} is now an admin`,
+                            "Couldn't change their role."
+                          );
+                        }}
+                      />
+                      <MenuItem
+                        icon={UserMinus}
+                        label="Remove from group"
+                        danger
+                        onClick={() => {
+                          setMemberMenu(null);
+                          setConfirmRemove(m);
+                        }}
+                      />
+                    </FloatingMenu>
+                  </>
                 )}
-
-                {members.map((m, i) => (
-                  <div
-                    key={m.id}
-                    data-member={m.id}
-                    // Each comes down a beat after the one above; all leave together.
-                    style={{
-                      transitionDuration: `${MEMBERS_MS}ms`,
-                      transitionDelay: allMembers ? `${Math.min(i, 12) * MEMBER_STAGGER_MS}ms` : "0ms",
-                    }}
-                    className={`relative flex items-center gap-3 px-3.5 py-2.5 transition-[opacity,transform] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
-                      allMembers ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"
-                    }`}
-                  >
-                    <Link href={m.username ? `/u/${m.username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
-                      <Avatar name={m.name} hue={m.hue} src={m.avatarUrl ?? undefined} size={40} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">
-                          {m.name}
-                          {m.id === currentUserId && <span className="ml-1 text-xs font-normal text-faint">(you)</span>}
-                        </span>
-                        {m.username && <span className="block truncate text-xs text-muted">@{m.username}</span>}
-                      </span>
-                    </Link>
-                    {m.role === "admin" && (
-                      <span className="shrink-0 rounded-pill bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">Admin</span>
-                    )}
-                    {isAdmin && m.id !== currentUserId && (
-                      <>
-                        <button
-                          type="button"
-                          disabled={busy === m.id}
-                          aria-label={`Options for ${m.name}`}
-                          aria-haspopup="menu"
-                          aria-expanded={memberMenu === m.id}
-                          onClick={() => setMemberMenu(m.id)}
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground disabled:opacity-60"
-                        >
-                          {busy === m.id ? <Loader2 size={16} className="animate-spin" /> : <MoreHorizontal size={18} />}
-                        </button>
-                        <FloatingMenu
-                          open={memberMenu === m.id}
-                          onClose={() => setMemberMenu(null)}
-                          // The list is clipped to its card while it folds, so
-                          // the last rows open their menu upward, inside it.
-                          origin={i >= members.length - 2 ? "bottom-right" : "top-right"}
-                          className={`absolute right-3 min-w-[200px] ${i >= members.length - 2 ? "bottom-11" : "top-11"}`}
-                        >
-                          <MenuItem
-                            icon={m.role === "admin" ? ShieldOff : ShieldCheck}
-                            label={m.role === "admin" ? "Make a member" : "Make admin"}
-                            onClick={() => {
-                              setMemberMenu(null);
-                              void run(
-                                m.id,
-                                () =>
-                                  supabase.rpc("set_member_role", {
-                                    p_conversation_id: conversationId,
-                                    p_user_id: m.id,
-                                    p_role: m.role === "admin" ? "member" : "admin",
-                                  }) as unknown as Promise<{ error: unknown }>,
-                                m.role === "admin" ? `${m.name} is now a member` : `${m.name} is now an admin`,
-                                "Couldn't change their role."
-                              );
-                            }}
-                          />
-                          <MenuItem
-                            icon={UserMinus}
-                            label="Remove from group"
-                            danger
-                            onClick={() => {
-                              setMemberMenu(null);
-                              setConfirmRemove(m);
-                            }}
-                          />
-                        </FloatingMenu>
-                      </>
-                    )}
-                  </div>
-                ))}
               </div>
-            </div>
+            ))}
           </div>
         </section>
       )}
 
-      {/* Shared in this chat: the three kinds and how many of each. Tapping
-          one opens it right here, the card growing downward under the icons;
-          nothing above it moves and Privacy carries on below. */}
-      <section className="mt-5 px-4" data-shared-card data-open={sharedTab ?? undefined}>
-        <div className="rounded-2xl bg-surface p-1.5">
-          <div role="tablist" aria-label="Shared in this chat" className="flex gap-1.5">
+      {/* Shared in this chat: the three kinds, one always chosen, and that
+          kind filling the rest of the screen. */}
+      {section === "shared" && (
+        <section
+          role="tabpanel"
+          id="info-panel-shared"
+          aria-labelledby="info-tab-shared"
+          className="animate-rise"
+          data-shared-card
+          data-open={sharedTab}
+        >
+          <div role="tablist" aria-label="Shared in this chat" className="mx-4 flex gap-1.5 rounded-2xl bg-surface p-1.5">
             {SHARED_TAB_ICONS.map(({ id, label, Icon }) => {
               const on = sharedTab === id;
               return (
@@ -878,10 +885,9 @@ export function ConversationInfo({
                   type="button"
                   role="tab"
                   aria-selected={on}
-                  aria-expanded={on}
                   aria-label={`${label}, ${shared[id].length}`}
                   data-shared-tab={id}
-                  onClick={() => openShared(id)}
+                  onClick={() => setSharedTab(id)}
                   className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold tabular-nums transition-colors ${
                     on ? "bg-accent text-accent-ink" : "bg-background/60 text-muted hover:text-foreground"
                   }`}
@@ -892,54 +898,23 @@ export function ConversationInfo({
               );
             })}
           </div>
-
-          {sharedTab ? (
-            <div className="animate-rise -mx-1.5 pb-3">
-              <SharedPanel shared={shared} me={currentUserId} people={people} isGroup={isGroup} tab={sharedTab} />
-            </div>
-          ) : shared.media.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => openShared("media")}
-              aria-label="Open photos and videos"
-              className="mt-1.5 grid w-full grid-cols-4 gap-1"
-            >
-              {shared.media.slice(0, PREVIEW_TILES).map((m, i) => {
-                const last = i === PREVIEW_TILES - 1 && rest > 0;
-                return (
-                  <span key={m.id} className="relative block aspect-square overflow-hidden rounded-xl bg-background">
-                    {m.kind === "video" ? (
-                      <>
-                        <ChatVideo url={m.url} fragment="#t=0.1" preload="metadata" muted playsInline className="h-full w-full object-cover" />
-                        {!last && (
-                          <Play size={16} className="absolute inset-0 m-auto text-white drop-shadow" fill="currentColor" aria-hidden />
-                        )}
-                      </>
-                    ) : (
-                      <ChatImg url={m.url} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                    )}
-                    {last && (
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-sm font-bold tabular-nums text-white">
-                        +{rest}
-                      </span>
-                    )}
-                  </span>
-                );
-              })}
-            </button>
-          ) : (
-            <p className="px-2 pb-1.5 pt-2.5 text-xs text-muted">
-              Photos, posts, Shots, voice notes and links sent here collect in these three.
-            </p>
-          )}
-        </div>
-      </section>
+          <div className="pt-1">
+            <SharedPanel shared={shared} me={currentUserId} people={people} isGroup={isGroup} tab={sharedTab} />
+          </div>
+        </section>
+      )}
 
       {/* Privacy (migration 0032): one list. Two switches, and the timer,
           which shows what it is set to and opens its four choices. */}
-      <section className="mt-6 px-4" data-privacy>
-        <p className="px-1 pb-2 text-[11px] font-bold tracking-widest text-faint uppercase">Privacy</p>
-        <div className="divide-y divide-border/50 overflow-hidden rounded-2xl bg-surface">
+      {section === "privacy" && (
+        <section
+          role="tabpanel"
+          id="info-panel-privacy"
+          aria-labelledby="info-tab-privacy"
+          className="animate-rise px-4"
+          data-privacy
+        >
+          <div className="divide-y divide-border/50 overflow-hidden rounded-2xl bg-surface">
           <PrivacyRow
             icon={<Timer size={18} />}
             label="Disappearing messages"
@@ -991,8 +966,10 @@ export function ConversationInfo({
               if (!okd) setShot(!next);
             }}
           />
-        </div>
-      </section>
+          </div>
+          <p className="px-1 pt-2 text-xs text-faint">These apply to everyone in this chat.</p>
+        </section>
+      )}
 
       <div className="h-8" />
 
