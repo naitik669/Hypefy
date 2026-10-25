@@ -273,3 +273,83 @@ export function clampWithinMeridiem(
   const mins = minuteValues(day, hour, now);
   return { hour, minute: mins.includes(minute) ? minute : (mins[0] ?? 0) };
 }
+
+/* ── The date, as three drums ──────────────────────────────────────────── */
+
+const MONTHS_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/**
+ * Every day that can be picked, as dates.
+ *
+ * All three date drums are derived from this one list rather than from the
+ * bounds directly. Three columns computed independently can be each
+ * individually in range and still combine into a date that is not — the
+ * 31st of a 30-day month, or a day past the horizon in the last month. If
+ * every option comes from the same set of real days, that cannot happen.
+ */
+export function pickableDays(now: Date): Date[] {
+  return dayOptions(now).map((d) => d.date);
+}
+
+/** The years the range touches: one, or two across a new year. */
+export function yearOptions(now: Date): { value: number; label: string }[] {
+  const years = [...new Set(pickableDays(now).map((d) => d.getFullYear()))];
+  return years.map((y) => ({ value: y, label: String(y) }));
+}
+
+/** The months of that year the range touches. */
+export function monthOptions(year: number, now: Date): { value: number; label: string }[] {
+  const months = [
+    ...new Set(
+      pickableDays(now)
+        .filter((d) => d.getFullYear() === year)
+        .map((d) => d.getMonth()),
+    ),
+  ];
+  return months.map((m) => ({ value: m, label: MONTHS_SHORT[m] }));
+}
+
+/** The days of that month that are actually pickable. */
+export function dayNumOptions(year: number, month: number, now: Date): { value: number; label: string }[] {
+  return pickableDays(now)
+    .filter((d) => d.getFullYear() === year && d.getMonth() === month)
+    .map((d) => ({ value: d.getDate(), label: String(d.getDate()) }));
+}
+
+/**
+ * The nearest pickable date to the one the drums are showing.
+ *
+ * Moving one drum can leave the other two describing a date that does not
+ * exist — February the 31st, or December in a range that stops in November.
+ * Narrowing year, then month, then day keeps as much of the reader's choice
+ * as possible instead of jumping to the start of the range.
+ */
+export function clampDate(
+  year: number,
+  month: number,
+  dayNum: number,
+  now: Date,
+): { year: number; month: number; dayNum: number } {
+  const days = pickableDays(now);
+  const y = days.some((d) => d.getFullYear() === year) ? year : days[0].getFullYear();
+  const inYear = days.filter((d) => d.getFullYear() === y);
+  const m = inYear.some((d) => d.getMonth() === month) ? month : inYear[0].getMonth();
+  const inMonth = inYear.filter((d) => d.getMonth() === m);
+  const dn = inMonth.some((d) => d.getDate() === dayNum) ? dayNum : inMonth[0].getDate();
+  return { year: y, month: m, dayNum: dn };
+}
+
+/** That calendar date as the day-offset the rest of this module speaks in. */
+export function offsetOfDate(year: number, month: number, dayNum: number, now: Date): number {
+  const target = new Date(year, month, dayNum);
+  target.setHours(0, 0, 0, 0);
+  const days = pickableDays(now);
+  const found = days.findIndex((d) => d.getTime() === target.getTime());
+  // dayOptions values are offsets from today, and the list may not start at
+  // zero once a spent today has been dropped — so read the value, never the
+  // index.
+  return found >= 0 ? dayOptions(now)[found].value : (dayOptions(now)[0]?.value ?? 0);
+}

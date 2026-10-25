@@ -173,15 +173,31 @@ describe("the picker", () => {
     expect(read("src/components/ui/Wheel.tsx")).toContain("export function WheelColumn");
   });
 
-  it("the date is its own step, on its own drum", () => {
-    // Four columns at once made the day — the thing most people are
-    // actually choosing — a narrow strip.
+  it("the date is its own step: date, month, year", () => {
     const dateStep = sheet.slice(
       sheet.indexOf('{step === "date" && ('),
       sheet.indexOf('{step === "time" && ('),
     );
-    expect(dateStep).toContain('ariaLabel="Day"');
+    for (const label of ['ariaLabel="Date"', 'ariaLabel="Month"', 'ariaLabel="Year"']) {
+      expect(dateStep, label).toContain(label);
+    }
+    // The clock is the step after, not alongside.
     expect(dateStep).not.toContain('ariaLabel="Hour"');
+  });
+
+  it("the date drums read off the chosen day rather than holding their own state", () => {
+    // Three independent pieces of state are three things that can drift
+    // apart from each other and from what gets sent.
+    expect(sheet).toContain("const picked = dayFromOffset(offset, now);");
+    expect(sheet).toContain("[picked.getFullYear(), picked.getMonth(), picked.getDate()]");
+  });
+
+  it("moving one date drum settles the other two", () => {
+    // February the 31st, or December in a range that stops in November.
+    expect(sheet).toContain('function setDatePart(part: "year" | "month" | "day", value: number)');
+    const fn = sheet.slice(sheet.indexOf("function setDatePart"));
+    expect(fn.slice(0, 500)).toContain("clampDate(");
+    expect(fn.slice(0, 500)).toContain("offsetOfDate(");
   });
 
   it("then the clock, as three drums", () => {

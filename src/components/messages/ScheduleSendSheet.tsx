@@ -11,6 +11,11 @@ import {
   AM,
   PM,
   canSchedule,
+  clampDate,
+  dayNumOptions,
+  monthOptions,
+  offsetOfDate,
+  yearOptions,
   clampTime,
   clampWithinMeridiem,
   dayFromOffset,
@@ -155,6 +160,22 @@ export function ScheduleSendSheet({
 
   const dayLabel = dayOptions(now).find((d) => d.value === offset)?.label ?? "";
 
+  // The three date drums read off the chosen day rather than holding state
+  // of their own, so they cannot drift apart from it or from each other.
+  const picked = dayFromOffset(offset, now);
+  const [pYear, pMonth, pDay] = [picked.getFullYear(), picked.getMonth(), picked.getDate()];
+
+  /** Move one part of the date, and let the other two settle around it. */
+  function setDatePart(part: "year" | "month" | "day", value: number) {
+    const next = clampDate(
+      part === "year" ? value : pYear,
+      part === "month" ? value : pMonth,
+      part === "day" ? value : pDay,
+      now,
+    );
+    pickDay(offsetOfDate(next.year, next.month, next.dayNum, now));
+  }
+
   return (
     <BottomSheet open={open} onClose={onClose} title={step === "presets" ? "Send later" : undefined}>
       {step !== "presets" && (
@@ -205,7 +226,26 @@ export function ScheduleSendSheet({
       {step === "date" && (
         <div className="pb-2">
           <WheelFrame>
-            <WheelColumn options={dayOptions(now)} value={offset} onChange={pickDay} ariaLabel="Day" />
+            <WheelColumn
+              options={dayNumOptions(pYear, pMonth, now)}
+              value={pDay}
+              onChange={(v) => setDatePart("day", v)}
+              ariaLabel="Date"
+              align="right"
+            />
+            <WheelColumn
+              options={monthOptions(pYear, now)}
+              value={pMonth}
+              onChange={(v) => setDatePart("month", v)}
+              ariaLabel="Month"
+            />
+            <WheelColumn
+              options={yearOptions(now)}
+              value={pYear}
+              onChange={(v) => setDatePart("year", v)}
+              ariaLabel="Year"
+              align="left"
+            />
           </WheelFrame>
           <button
             type="button"

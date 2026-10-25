@@ -4,7 +4,13 @@ import {
   MIN_LEAD_MS,
   canSchedule,
   describeWhen,
+  clampDate,
   clampTime,
+  dayNumOptions,
+  monthOptions,
+  offsetOfDate,
+  pickableDays,
+  yearOptions,
   clampWithinMeridiem,
   from12h,
   hour12Options,
@@ -363,5 +369,89 @@ describe("clampWithinMeridiem", () => {
   it("answers null for a half of the day with nothing left", () => {
     const late = at("2026-10-24T23:50:00");
     expect(clampWithinMeridiem(dayFromOffset(0, late), 3, "AM", 0, late)).toBeNull();
+  });
+});
+
+describe("the date as three drums", () => {
+  const now = at("2026-10-25T12:00:00");
+
+  it("every combination the drums can reach is a real pickable day", () => {
+    // The whole reason all three are derived from one list: three columns
+    // each individually in range can still combine into a date that is not.
+    const real = new Set(pickableDays(now).map((d) => d.getTime()));
+    for (const y of yearOptions(now)) {
+      for (const m of monthOptions(y.value, now)) {
+        for (const d of dayNumOptions(y.value, m.value, now)) {
+          const made = new Date(y.value, m.value, d.value);
+          made.setHours(0, 0, 0, 0);
+          expect(real.has(made.getTime()), `${d.value} ${m.label} ${y.label}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("spans the turn of the year when the range crosses it", () => {
+    // 25 Oct + 90 days lands in January, so both years must be offered.
+    expect(yearOptions(now).map((y) => y.value)).toEqual([2026, 2027]);
+    expect(monthOptions(2026, now).map((m) => m.label)).toEqual(["Oct", "Nov", "Dec"]);
+    expect(monthOptions(2027, now).map((m) => m.label)).toEqual(["Jan"]);
+  });
+
+  it("the first month starts today, not on the 1st", () => {
+    expect(dayNumOptions(2026, 9, now)[0].value).toBe(25);
+  });
+
+  it("offers a short month only the days it has", () => {
+    // November has 30. A 31 here would be a row that resolves to December.
+    const nov = dayNumOptions(2026, 10, now).map((d) => d.value);
+    expect(nov[0]).toBe(1);
+    expect(nov[nov.length - 1]).toBe(30);
+    expect(nov).toHaveLength(30);
+  });
+
+  it("stops the last month at the horizon", () => {
+    const jan = dayNumOptions(2027, 0, now).map((d) => d.value);
+    expect(jan[0]).toBe(1);
+    // 90 days from 25 Oct 2026 is 23 Jan 2027.
+    expect(jan[jan.length - 1]).toBeLessThanOrEqual(23);
+  });
+
+  it("clampDate keeps as much of the choice as it can", () => {
+    // Moving the month drum to November while the 31st is showing.
+    expect(clampDate(2026, 10, 31, now)).toEqual({ year: 2026, month: 10, dayNum: 1 });
+    // A month the year does not reach falls back inside that year.
+    expect(clampDate(2027, 5, 10, now).year).toBe(2027);
+    expect(clampDate(2027, 5, 10, now).month).toBe(0);
+  });
+
+  it("clampDate always lands somewhere real", () => {
+    const real = new Set(pickableDays(now).map((d) => d.getTime()));
+    for (const [y, m, d] of [
+      [2026, 9, 1],    // earlier this month, already gone
+      [2026, 1, 30],   // February the 30th, and in the past
+      [2027, 11, 31],  // past the horizon entirely
+      [2026, 10, 31],  // the 31st of a 30-day month
+    ] as const) {
+      const fixed = clampDate(y, m, d, now);
+      const made = new Date(fixed.year, fixed.month, fixed.dayNum);
+      made.setHours(0, 0, 0, 0);
+      expect(real.has(made.getTime()), `${d}/${m}/${y}`).toBe(true);
+    }
+  });
+
+  it("offsetOfDate round-trips through the offset the rest of the code uses", () => {
+    for (const offset of [0, 1, 7, 40, 89]) {
+      const date = dayFromOffset(offset, now);
+      const back = offsetOfDate(date.getFullYear(), date.getMonth(), date.getDate(), now);
+      expect(back, String(offset)).toBe(offset);
+    }
+  });
+
+  it("reads the offset off the list rather than its index", () => {
+    // Late at night a spent today is dropped, so the first row is offset 1.
+    // Taking the index would silently shift every date by a day.
+    const late = at("2026-10-25T23:58:00");
+    const first = pickableDays(late)[0];
+    expect(offsetOfDate(first.getFullYear(), first.getMonth(), first.getDate(), late)).toBe(1);
   });
 });
