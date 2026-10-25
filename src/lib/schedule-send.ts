@@ -126,6 +126,64 @@ export function dayFromOffset(offset: number, now: Date): Date {
   return d;
 }
 
+/* ── Twelve-hour time ──────────────────────────────────────────────────── */
+
+export type Meridiem = "AM" | "PM";
+
+/** AM and PM as drum values, since a wheel row carries a number. */
+export const AM = 0;
+export const PM = 1;
+
+/**
+ * 24-hour to what a clock face shows.
+ *
+ * Midnight is 12 AM and noon is 12 PM, not 0 of either. That pair is where
+ * every twelve-hour bug lives: `hour % 12` gives 0 for both, and an hour
+ * labelled "0 AM" is not a time anybody recognises.
+ */
+export function to12h(hour24: number): { hour12: number; meridiem: Meridiem } {
+  const meridiem: Meridiem = hour24 < 12 ? "AM" : "PM";
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return { hour12, meridiem };
+}
+
+/** And back. The same midnight and noon care, in reverse. */
+export function from12h(hour12: number, meridiem: Meridiem): number {
+  const base = hour12 % 12;
+  return meridiem === "AM" ? base : base + 12;
+}
+
+/** A clock face reads 12, 1, 2 … 11, not 1 … 12. */
+const CLOCK_ORDER = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+/**
+ * The twelve-hour rows still ahead within one half of the day.
+ *
+ * Left out rather than greyed, like every other drum here.
+ */
+export function hour12Options(
+  day: Date,
+  meridiem: Meridiem,
+  now: Date,
+): { value: number; label: string }[] {
+  return CLOCK_ORDER.filter(
+    (h12) => minuteValues(day, from12h(h12, meridiem), now).length > 0,
+  ).map((h12) => ({ value: h12, label: String(h12) }));
+}
+
+/**
+ * Which halves of the day still have anything in them.
+ *
+ * On today after noon there is no AM left, and offering it would put a row
+ * under the band that resolves to nothing.
+ */
+export function meridiemOptions(day: Date, now: Date): { value: number; label: string }[] {
+  const out: { value: number; label: string }[] = [];
+  if (hour12Options(day, "AM", now).length > 0) out.push({ value: AM, label: "AM" });
+  if (hour12Options(day, "PM", now).length > 0) out.push({ value: PM, label: "PM" });
+  return out;
+}
+
 /**
  * The hours still ahead on that day.
  *
@@ -175,4 +233,31 @@ export function clampTime(
   const mins = minuteValues(day, h, now);
   const m = mins.includes(minute) ? minute : (mins[0] ?? 0);
   return { hour: h, minute: m };
+}
+
+/**
+ * Keep a time inside the half of the day it was just put in.
+ *
+ * clampTime on its own is not enough once there is an AM/PM drum: when the
+ * chosen hour is no longer valid it falls back to the first valid hour of
+ * the whole day, which can be in the other half — so setting the meridiem
+ * to AM would silently flip it back to PM. This stays where it was put and
+ * moves only within that half.
+ *
+ * Returns null when that half has nothing left at all, which only happens
+ * if a caller offers a meridiem meridiemOptions left out.
+ */
+export function clampWithinMeridiem(
+  day: Date,
+  hour12: number,
+  meridiem: Meridiem,
+  minute: number,
+  now: Date,
+): { hour: number; minute: number } | null {
+  const hours = hour12Options(day, meridiem, now);
+  if (hours.length === 0) return null;
+  const h12 = hours.some((o) => o.value === hour12) ? hour12 : hours[0].value;
+  const hour = from12h(h12, meridiem);
+  const mins = minuteValues(day, hour, now);
+  return { hour, minute: mins.includes(minute) ? minute : (mins[0] ?? 0) };
 }

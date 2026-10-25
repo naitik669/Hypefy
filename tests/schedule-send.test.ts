@@ -5,6 +5,11 @@ import {
   canSchedule,
   describeWhen,
   clampTime,
+  clampWithinMeridiem,
+  from12h,
+  hour12Options,
+  meridiemOptions,
+  to12h,
   dayFromOffset,
   dayOptions,
   hourOptions,
@@ -211,5 +216,120 @@ describe("clampTime", () => {
         expect(canSchedule(withTime(today, fixed.hour, fixed.minute), now), `${h}:${m}`).toBeNull();
       }
     }
+  });
+});
+
+describe("twelve-hour time", () => {
+  it("midnight is 12 AM and noon is 12 PM, not zero of either", () => {
+    // `hour % 12` gives 0 for both, and "0 AM" is not a time anybody reads.
+    // This pair is where every twelve-hour bug lives.
+    expect(to12h(0)).toEqual({ hour12: 12, meridiem: "AM" });
+    expect(to12h(12)).toEqual({ hour12: 12, meridiem: "PM" });
+  });
+
+  it("reads the rest of the clock the way a clock does", () => {
+    expect(to12h(1)).toEqual({ hour12: 1, meridiem: "AM" });
+    expect(to12h(11)).toEqual({ hour12: 11, meridiem: "AM" });
+    expect(to12h(13)).toEqual({ hour12: 1, meridiem: "PM" });
+    expect(to12h(23)).toEqual({ hour12: 11, meridiem: "PM" });
+  });
+
+  it("round-trips every hour of the day", () => {
+    // The real guarantee: no hour may be lost or aliased onto another.
+    for (let h = 0; h < 24; h++) {
+      const { hour12, meridiem } = to12h(h);
+      expect(from12h(hour12, meridiem), String(h)).toBe(h);
+    }
+  });
+
+  it("from12h handles the two that are not a simple offset", () => {
+    expect(from12h(12, "AM")).toBe(0);
+    expect(from12h(12, "PM")).toBe(12);
+  });
+});
+
+describe("the AM/PM drum", () => {
+  const today = (iso: string) => dayFromOffset(0, at(iso));
+
+  it("a future day offers both halves", () => {
+    const now = at("2026-10-24T12:20:00");
+    expect(meridiemOptions(dayFromOffset(1, now), now).map((m) => m.label)).toEqual(["AM", "PM"]);
+  });
+
+  it("drops AM once the morning has gone", () => {
+    // Offering it would put a row under the band that resolves to nothing.
+    const now = at("2026-10-24T14:00:00");
+    expect(meridiemOptions(today("2026-10-24T14:00:00"), now).map((m) => m.label)).toEqual(["PM"]);
+  });
+
+  it("still offers AM in the morning, including the current hour", () => {
+    const now = at("2026-10-24T11:50:00");
+    const opts = meridiemOptions(today("2026-10-24T11:50:00"), now);
+    expect(opts.map((m) => m.label)).toEqual(["AM", "PM"]);
+    // 11:55 is still ahead, so 11 AM survives.
+    expect(hour12Options(today("2026-10-24T11:50:00"), "AM", now).map((o) => o.value)).toEqual([11]);
+  });
+
+  it("orders the hour drum like a clock face: 12 first, then 1", () => {
+    const now = at("2026-10-24T12:20:00");
+    const pm = hour12Options(dayFromOffset(1, now), "PM", now).map((o) => o.value);
+    expect(pm).toEqual([12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  });
+
+  it("late at night only the last hour survives, as PM", () => {
+    const now = at("2026-10-24T23:50:00");
+    const day = today("2026-10-24T23:50:00");
+    expect(meridiemOptions(day, now).map((m) => m.label)).toEqual(["PM"]);
+    expect(hour12Options(day, "PM", now).map((o) => o.value)).toEqual([11]);
+  });
+
+  it("every hour either drum offers has a minute behind it", () => {
+    const now = at("2026-10-24T12:20:00");
+    const day = today("2026-10-24T12:20:00");
+    for (const m of meridiemOptions(day, now)) {
+      const meridiem = m.label as "AM" | "PM";
+      for (const h of hour12Options(day, meridiem, now)) {
+        expect(minuteValues(day, from12h(h.value, meridiem), now).length, `${h.value}${meridiem}`)
+          .toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+describe("clampWithinMeridiem", () => {
+  const now = at("2026-10-24T12:20:00");
+  const today = dayFromOffset(0, now);
+  const tomorrow = dayFromOffset(1, now);
+
+  it("stays in the half of the day it was put in", () => {
+    // clampTime alone falls back to the first valid hour of the whole day,
+    // which would flip the meridiem the reader just set.
+    const fixed = clampWithinMeridiem(tomorrow, 3, "AM", 0, now);
+    expect(to12h(fixed!.hour).meridiem).toBe("AM");
+    expect(fixed!.hour).toBe(3);
+  });
+
+  it("moves within that half when the exact hour has gone", () => {
+    // 12 PM has passed at 12:20 only for :00 and :15; :25 is still fine, so
+    // the hour survives and only the minute moves.
+    const fixed = clampWithinMeridiem(today, 12, "PM", 0, now);
+    expect(fixed!.hour).toBe(12);
+    expect(fixed!.minute).toBe(25);
+  });
+
+  it("always lands on something schedulable", () => {
+    for (const meridiem of ["AM", "PM"] as const) {
+      for (const h12 of [12, 1, 6, 11]) {
+        const fixed = clampWithinMeridiem(today, h12, meridiem, 0, now);
+        if (!fixed) continue;
+        expect(canSchedule(withTime(today, fixed.hour, fixed.minute), now), `${h12}${meridiem}`)
+          .toBeNull();
+      }
+    }
+  });
+
+  it("answers null for a half of the day with nothing left", () => {
+    const late = at("2026-10-24T23:50:00");
+    expect(clampWithinMeridiem(dayFromOffset(0, late), 3, "AM", 0, late)).toBeNull();
   });
 });

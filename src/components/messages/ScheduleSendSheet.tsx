@@ -8,15 +8,22 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { haptics } from "@/lib/haptics";
 import {
+  AM,
+  PM,
   canSchedule,
   clampTime,
+  clampWithinMeridiem,
   dayFromOffset,
   dayOptions,
   describeWhen,
+  hour12Options,
   hourOptions,
+  meridiemOptions,
   minuteOptions,
   presets,
+  to12h,
   withTime,
+  type Meridiem,
 } from "@/lib/schedule-send";
 
 /**
@@ -77,7 +84,12 @@ export function ScheduleSendSheet({
   // would otherwise keep offering yesterday.
   const now = new Date();
   const day = dayFromOffset(offset, now);
-  const hours = hourOptions(day, now);
+  // The 24-hour value stays the single source of truth; the drums are a
+  // reading of it. Deriving rather than storing hour12 and the meridiem
+  // separately is what stops the three of them disagreeing.
+  const { hour12, meridiem } = to12h(hour);
+  const meridiems = meridiemOptions(day, now);
+  const hours12 = hour12Options(day, meridiem, now);
   const minutes = minuteOptions(day, hour, now);
   const chosen = withTime(day, hour, minute);
   const problem = canSchedule(chosen, now);
@@ -86,6 +98,22 @@ export function ScheduleSendSheet({
   function pickDay(next: number) {
     setOffset(next);
     const fixed = clampTime(dayFromOffset(next, now), hour, minute, now);
+    setHour(fixed.hour);
+    setMinute(fixed.minute);
+  }
+
+  function pickHour12(next: number) {
+    const fixed = clampWithinMeridiem(day, next, meridiem, minute, now);
+    if (!fixed) return;
+    setHour(fixed.hour);
+    setMinute(fixed.minute);
+  }
+
+  /** Staying in the half just chosen, rather than falling back across it. */
+  function pickMeridiem(next: number) {
+    const to: Meridiem = next === AM ? "AM" : "PM";
+    const fixed = clampWithinMeridiem(day, hour12, to, minute, now);
+    if (!fixed) return;
     setHour(fixed.hour);
     setMinute(fixed.minute);
   }
@@ -167,8 +195,15 @@ export function ScheduleSendSheet({
               ariaLabel="Day"
               align="right"
             />
-            <WheelColumn options={hours} value={hour} onChange={setHour} ariaLabel="Hour" />
-            <WheelColumn options={minutes} value={minute} onChange={setMinute} ariaLabel="Minute" align="left" />
+            <WheelColumn options={hours12} value={hour12} onChange={pickHour12} ariaLabel="Hour" />
+            <WheelColumn options={minutes} value={minute} onChange={setMinute} ariaLabel="Minute" />
+            <WheelColumn
+              options={meridiems}
+              value={meridiem === "AM" ? AM : PM}
+              onChange={pickMeridiem}
+              ariaLabel="AM or PM"
+              align="left"
+            />
           </WheelFrame>
 
           <button

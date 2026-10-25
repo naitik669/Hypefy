@@ -173,10 +173,23 @@ describe("the picker", () => {
     expect(read("src/components/ui/Wheel.tsx")).toContain("export function WheelColumn");
   });
 
-  it("three drums: day, hour, minute", () => {
-    for (const label of ['ariaLabel="Day"', 'ariaLabel="Hour"', 'ariaLabel="Minute"']) {
+  it("four drums: day, hour, minute, AM/PM", () => {
+    for (const label of ['ariaLabel="Day"', 'ariaLabel="Hour"', 'ariaLabel="Minute"', 'ariaLabel="AM or PM"']) {
       expect(sheet, label).toContain(label);
     }
+  });
+
+  it("the 24-hour value stays the single source of truth", () => {
+    // Storing hour12 and the meridiem separately is how the two drums end
+    // up disagreeing with each other and with what gets sent.
+    expect(sheet).toContain("const { hour12, meridiem } = to12h(hour);");
+    expect(sheet).toContain("withTime(day, hour, minute)");
+  });
+
+  it("changing AM/PM stays in the half just chosen", () => {
+    // clampTime alone falls back to the first valid hour of the whole day,
+    // which would flip the drum straight back.
+    expect(sheet).toContain("clampWithinMeridiem(day, hour12, to, minute, now)");
   });
 
   it("moving the day pulls a stranded time forward", () => {
