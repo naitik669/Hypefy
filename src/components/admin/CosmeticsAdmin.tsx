@@ -242,10 +242,11 @@ export function CosmeticsAdmin({
     setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, ...patch } : r)));
     const { error } = await supabase.rpc("admin_update_product", {
       p_id: row.id,
-      p_name: patch.name ?? null,
-      p_tier: patch.tier ?? null,
-      p_sort: patch.sort ?? null,
-      p_active: patch.active ?? null,
+      // Omitted arguments default to NULL, which the function reads as "unchanged".
+      p_name: patch.name ?? undefined,
+      p_tier: patch.tier ?? undefined,
+      p_sort: patch.sort ?? undefined,
+      p_active: patch.active ?? undefined,
     });
     if (error) {
       setNote(`Could not save: ${error.message}`);

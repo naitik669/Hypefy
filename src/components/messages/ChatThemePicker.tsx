@@ -6,6 +6,7 @@ import { Check, Lock } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { useToast } from "@/components/ui/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
+import { sqlNull } from "@/lib/supabase/typed";
 import { CHAT_THEMES, bubbleCss, type ChatTheme } from "@/lib/chat-themes";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { blockedReason, unlocked as isUnlocked } from "@/lib/marketplace";
@@ -83,7 +84,7 @@ export function ChatThemePicker({
     setBusy(id ?? "none");
     const { error } = await createClient().rpc("set_chat_theme", {
       p_conversation_id: conversationId,
-      p_theme: id,
+      p_theme: sqlNull(id),
     });
     setBusy(null);
     if (error) {
