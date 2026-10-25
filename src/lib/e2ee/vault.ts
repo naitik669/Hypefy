@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import { sqlNull } from "@/lib/supabase/typed";
 import { fromB64, identityFromSeed, toB64, type Identity } from "@/lib/e2ee/crypto";
 import {
   createVault,
@@ -235,8 +236,8 @@ export async function setupIdentity(
     p_identity_pub: vault.identity_pub,
     p_signing_pub: vault.signing_pub,
     p_seed_wrapped: vault.seed_wrapped,
-    p_mk_wrapped_pw: vault.mk_wrapped_pw,
-    p_salt_pw: vault.salt_pw,
+    p_mk_wrapped_pw: sqlNull(vault.mk_wrapped_pw),
+    p_salt_pw: sqlNull(vault.salt_pw),
     p_mk_wrapped_rc: vault.mk_wrapped_rc,
     p_salt_rc: vault.salt_rc,
   });

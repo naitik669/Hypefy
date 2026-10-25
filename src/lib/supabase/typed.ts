@@ -25,6 +25,16 @@ export function many<T>(value: T | T[] | null | undefined): T[] {
 }
 
 /**
+ * Postgres function arguments always accept NULL, but the generator types them
+ * as non-null. Wrap an argument in this where passing NULL is the intent
+ * (clearing a chat theme, a vault set up without a password), so the generated
+ * file never has to be hand-edited to allow it.
+ */
+export function sqlNull<T>(value: T | null): T {
+  return value as T;
+}
+
+/**
  * `toggle_hype` returns `jsonb` — typed as `Json`, which isn't indexable — so
  * narrow it to the shape the callers actually read.
  */
