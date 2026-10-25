@@ -8,7 +8,9 @@ import {
   queueOutbox,
   readOutbox,
   recordAttempt,
+  toRestore,
   type OutboxEntry,
+  type SentLike,
 } from "@/lib/chat-outbox";
 
 /**
@@ -192,5 +194,71 @@ describe("a disk that will not cooperate", () => {
     queueOutbox(ME, entry({ tempId: "good" }));
     localStorage.setItem("hypefy_chat_outbox:user-1:partial", JSON.stringify({ tempId: "partial" }));
     expect(readOutbox(ME).map((e) => e.tempId)).toEqual(["good"]);
+  });
+});
+
+describe("deciding what to put back in the thread", () => {
+  const sent = (over: Partial<SentLike> = {}): SentLike => ({
+    sender_id: ME,
+    body: "yeah give me twenty mins",
+    created_at: "2026-10-25T10:00:30.000Z",
+    ...over,
+  });
+
+  it("puts back only the ones that have given up", () => {
+    // One still being retried is already drawn as pending by the thread it
+    // belongs to. Restoring it as "Not sent" would be a lie about a message
+    // that is still on its way.
+    const entries = [
+      entry({ tempId: "trying", attempts: 1 }),
+      entry({ tempId: "dead", attempts: MAX_ATTEMPTS }),
+    ];
+    expect(toRestore(entries, [], ME).map((e) => e.tempId)).toEqual(["dead"]);
+  });
+
+  it("drops one that evidently arrived, rather than drawing it twice", () => {
+    // The app can be killed in the gap between the server accepting a
+    // message and the outbox row being dropped. The row survives, the
+    // message is really in the thread, and without this the sender sees
+    // their own message twice — once real, once marked Not sent.
+    const e = entry({ tempId: "dead", attempts: MAX_ATTEMPTS, wire: "yeah give me twenty mins" });
+    expect(toRestore([e], [sent()], ME)).toEqual([]);
+  });
+
+  it("but not one that merely resembles something else in the thread", () => {
+    // Same words from the other person, or from a different time, is not
+    // evidence that this one got through.
+    const e = entry({ tempId: "dead", attempts: MAX_ATTEMPTS, wire: "ok" });
+    expect(toRestore([e], [sent({ body: "ok", sender_id: "someone-else" })], ME).length).toBe(1);
+    expect(toRestore([e], [sent({ body: "ok", created_at: "2026-10-25T18:00:00.000Z" })], ME).length).toBe(1);
+    expect(toRestore([e], [sent({ body: "something else" })], ME).length).toBe(1);
+  });
+
+  it("and a sealed one is matched on its envelope, not on words it never stored", () => {
+    // The plaintext is deliberately not kept, so the only thing there is to
+    // compare is the envelope the server would have received.
+    const e = entry({
+      tempId: "dead",
+      attempts: MAX_ATTEMPTS,
+      wire: "e2ee:v1:ENVELOPE",
+      sealed: true,
+    });
+    expect(toRestore([e], [sent({ body: "e2ee:v1:ENVELOPE" })], ME)).toEqual([]);
+    expect(toRestore([e], [sent({ body: "e2ee:v1:DIFFERENT" })], ME).length).toBe(1);
+  });
+
+  it("a message with no body is never matched away by another of its kind", () => {
+    // A OneShot carries no body by design: two of them would otherwise look
+    // identical and the second would be silently dropped.
+    const e = entry({ tempId: "dead", attempts: MAX_ATTEMPTS, kind: "oneshot", wire: null });
+    expect(toRestore([e], [sent({ body: null })], ME).length).toBe(1);
+  });
+
+  it("oldest first, so they go back in the order they were written", () => {
+    const entries = [
+      entry({ tempId: "late", attempts: MAX_ATTEMPTS, createdAt: "2026-10-25T12:00:00.000Z" }),
+      entry({ tempId: "early", attempts: MAX_ATTEMPTS, createdAt: "2026-10-25T09:00:00.000Z" }),
+    ];
+    expect(toRestore(entries, [], ME).map((e) => e.tempId)).toEqual(["early", "late"]);
   });
 });

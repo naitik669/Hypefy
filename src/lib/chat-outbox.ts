@@ -177,6 +177,58 @@ export function isTerminal(entry: OutboxEntry): boolean {
   return entry.attempts >= MAX_ATTEMPTS;
 }
 
+/** Enough of a delivered message to tell whether it is one of ours. */
+export type SentLike = { sender_id: string; body: string | null; created_at: string };
+
+/**
+ * How close in time a delivered message has to be to count as the same one.
+ *
+ * Generous, because the whole point is that the send succeeded some time
+ * after it was written — but not unbounded, or saying the same short thing
+ * twice in a day would silently swallow the second one.
+ */
+const SAME_MESSAGE_MS = 60 * 60 * 1000;
+
+/**
+ * Which unsent messages should go back into the thread.
+ *
+ * Two jobs. Only the ones that have given up are drawn: one still inside its
+ * attempt budget is already shown as pending by the thread that owns it, and
+ * calling it "Not sent" would be a lie about a message still on its way.
+ *
+ * And one that evidently arrived is dropped instead of drawn. The app can be
+ * killed in the gap between the server accepting a message and the outbox
+ * row being deleted; the row survives, the message is genuinely in the
+ * thread, and without this the sender sees their own message twice — once
+ * real, once marked as never sent. The ids cannot be compared, because the
+ * real row has a server uuid and this has only the temporary one, so the
+ * comparison is what the server would have received, from us, at about the
+ * right time.
+ *
+ * A message with no body is never matched this way. A OneShot carries none
+ * by design, so two of them would look identical and the second would
+ * vanish.
+ */
+export function toRestore(
+  entries: OutboxEntry[],
+  sent: SentLike[],
+  myId: string,
+): OutboxEntry[] {
+  const arrived = (e: OutboxEntry) =>
+    e.wire !== null &&
+    sent.some(
+      (s) =>
+        s.sender_id === myId &&
+        s.body === e.wire &&
+        Math.abs(new Date(s.created_at).getTime() - new Date(e.createdAt).getTime()) <=
+          SAME_MESSAGE_MS,
+    );
+
+  return entries
+    .filter((e) => isTerminal(e) && !arrived(e))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
 function subscribe(onChange: () => void) {
   window.addEventListener(CHANGED, onChange);
   window.addEventListener("storage", onChange);
