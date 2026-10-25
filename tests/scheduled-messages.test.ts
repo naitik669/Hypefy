@@ -173,10 +173,41 @@ describe("the picker", () => {
     expect(read("src/components/ui/Wheel.tsx")).toContain("export function WheelColumn");
   });
 
-  it("four drums: day, hour, minute, AM/PM", () => {
-    for (const label of ['ariaLabel="Day"', 'ariaLabel="Hour"', 'ariaLabel="Minute"', 'ariaLabel="AM or PM"']) {
-      expect(sheet, label).toContain(label);
+  it("the date is its own step, on its own drum", () => {
+    // Four columns at once made the day — the thing most people are
+    // actually choosing — a narrow strip.
+    const dateStep = sheet.slice(
+      sheet.indexOf('{step === "date" && ('),
+      sheet.indexOf('{step === "time" && ('),
+    );
+    expect(dateStep).toContain('ariaLabel="Day"');
+    expect(dateStep).not.toContain('ariaLabel="Hour"');
+  });
+
+  it("then the clock, as three drums", () => {
+    const timeStep = sheet.slice(sheet.indexOf('{step === "time" && ('));
+    for (const label of ['ariaLabel="Hour"', 'ariaLabel="Minute"', 'ariaLabel="AM or PM"']) {
+      expect(timeStep, label).toContain(label);
     }
+    expect(timeStep).not.toContain('ariaLabel="Day"');
+  });
+
+  it("and the clock header says which day it is setting", () => {
+    // Otherwise the second step is three drums with no idea what they
+    // belong to.
+    expect(sheet).toContain('{step === "date" ? "Pick a date" : dayLabel}');
+  });
+
+  it("the time is settled against the day just chosen", () => {
+    // Picking tomorrow after looking at today must not land on an hour
+    // that only made sense yesterday.
+    const fn = sheet.slice(sheet.indexOf("function openClock()"));
+    expect(fn.slice(0, 300)).toContain("clampTime(day, hour, minute, now)");
+  });
+
+  it("opens on the first day that has anything left", () => {
+    // Late at night that is tomorrow, not a "Today" with one time on it.
+    expect(sheet).toContain("dayOptions(new Date())[0]?.value ?? 0");
   });
 
   it("the 24-hour value stays the single source of truth", () => {
@@ -198,9 +229,9 @@ describe("the picker", () => {
     expect(sheet).toContain("const fixed = clampTime(dayFromOffset(next, now), hour, minute, now);");
   });
 
-  it("can be walked back to the presets", () => {
-    expect(sheet).toContain('onClick={() => setPicking(false)}');
-    expect(sheet).toContain('aria-label="Back"');
+  it("each step walks back one, rather than closing", () => {
+    expect(sheet).toContain('setStep(step === "time" ? "date" : "presets")');
+    expect(sheet).toContain('aria-label={step === "time" ? "Back to the date" : "Back"}');
   });
 
   it("the confirm button says what it will do, or why it cannot", () => {

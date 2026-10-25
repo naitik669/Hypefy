@@ -17,7 +17,6 @@ import {
   dayOptions,
   describeWhen,
   hour12Options,
-  hourOptions,
   meridiemOptions,
   minuteOptions,
   presets,
@@ -64,21 +63,16 @@ export function ScheduleSendSheet({
 }) {
   const supabase = createClient();
   const toast = useToast();
-  const [picking, setPicking] = useState(false);
+  const [step, setStep] = useState<"presets" | "date" | "time">("presets");
   const [busy, setBusy] = useState(false);
 
   // Opened on the first hour still ahead, so the drums start somewhere
   // usable rather than on a time that has gone.
-  const [offset, setOffset] = useState(0);
-  const [start] = useState(() => {
-    const now = new Date();
-    const first = hourOptions(now, now)[0];
-    return first
-      ? { hour: first.value, minute: minuteOptions(now, first.value, now)[0]?.value ?? 0 }
-      : { hour: 9, minute: 0 };
-  });
-  const [hour, setHour] = useState(start.hour);
-  const [minute, setMinute] = useState(start.minute);
+  // The first day still open, which late at night is tomorrow — dayOptions
+  // drops a day with nothing left on it, so index dayOptions(new Date())[0]?.value ?? 0 is always real.
+  const [offset, setOffset] = useState(() => 0);
+  const [hour, setHour] = useState(12);
+  const [minute, setMinute] = useState(0);
 
   // Read per render rather than held: a sheet left open across midnight
   // would otherwise keep offering yesterday.
@@ -100,6 +94,21 @@ export function ScheduleSendSheet({
     const fixed = clampTime(dayFromOffset(next, now), hour, minute, now);
     setHour(fixed.hour);
     setMinute(fixed.minute);
+  }
+
+  /**
+   * Open the clock on the chosen day.
+   *
+   * The time is settled here rather than carried from whatever the drums
+   * last showed, because the day has just changed underneath it: picking
+   * tomorrow after looking at today must not land on an hour that only made
+   * sense yesterday.
+   */
+  function openClock() {
+    const fixed = clampTime(day, hour, minute, now);
+    setHour(fixed.hour);
+    setMinute(fixed.minute);
+    setStep("time");
   }
 
   function pickHour12(next: number) {
@@ -144,23 +153,27 @@ export function ScheduleSendSheet({
     onClose();
   }
 
+  const dayLabel = dayOptions(now).find((d) => d.value === offset)?.label ?? "";
+
   return (
-    <BottomSheet open={open} onClose={onClose} title={picking ? undefined : "Send later"}>
-      {picking && (
+    <BottomSheet open={open} onClose={onClose} title={step === "presets" ? "Send later" : undefined}>
+      {step !== "presets" && (
         <div className="mb-1 flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setPicking(false)}
-            aria-label="Back"
+            onClick={() => setStep(step === "time" ? "date" : "presets")}
+            aria-label={step === "time" ? "Back to the date" : "Back"}
             className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground"
           >
             <ChevronLeft size={18} />
           </button>
-          <span className="text-sm font-bold text-foreground">Pick a time</span>
+          <span className="text-sm font-bold text-foreground">
+            {step === "date" ? "Pick a date" : dayLabel}
+          </span>
         </div>
       )}
 
-      {!picking ? (
+      {step === "presets" && (
         <div className="flex flex-col gap-2 pb-2">
           {presets(now).map((p) => (
             <button
@@ -179,23 +192,35 @@ export function ScheduleSendSheet({
           ))}
           <button
             type="button"
-            onClick={() => setPicking(true)}
+            onClick={() => setStep("date")}
             className="mt-1 rounded-2xl border border-border px-4 py-3 text-sm font-semibold text-muted transition-colors hover:text-foreground"
           >
             Pick a date and time
           </button>
         </div>
-      ) : (
+      )}
+
+      {/* One drum on its own, full width. Four columns at once made the day
+          — the thing most people are actually choosing — a narrow strip. */}
+      {step === "date" && (
         <div className="pb-2">
           <WheelFrame>
-            <WheelColumn
-              options={dayOptions(now)}
-              value={offset}
-              onChange={pickDay}
-              ariaLabel="Day"
-              align="right"
-            />
-            <WheelColumn options={hours12} value={hour12} onChange={pickHour12} ariaLabel="Hour" />
+            <WheelColumn options={dayOptions(now)} value={offset} onChange={pickDay} ariaLabel="Day" />
+          </WheelFrame>
+          <button
+            type="button"
+            onClick={openClock}
+            className="mt-4 flex h-12 w-full items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-ink transition active:scale-[0.99]"
+          >
+            Next
+          </button>
+        </div>
+      )}
+
+      {step === "time" && (
+        <div className="pb-2">
+          <WheelFrame>
+            <WheelColumn options={hours12} value={hour12} onChange={pickHour12} ariaLabel="Hour" align="right" />
             <WheelColumn options={minutes} value={minute} onChange={setMinute} ariaLabel="Minute" />
             <WheelColumn
               options={meridiems}

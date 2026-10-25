@@ -102,6 +102,18 @@ export function withTime(day: Date, hour: number, minute: number): Date {
  * Invalid days are left out rather than shown greyed. A drum has no good way
  * to say "this row is dead" — the row under the band is the value, so an
  * unpickable row under the band is a contradiction.
+ *
+ * Which is why the ends are filtered, not just generated. Both of them can
+ * be dead:
+ *
+ *   Late at night, today has nothing left. Opening on a "Today" that offers
+ *   one time, or none, is what made the picker look broken.
+ *
+ *   The last day is only partly inside the horizon, because that is counted
+ *   in hours from now and the drum is counted in whole days. At nine in the
+ *   morning the ninetieth day runs out at nine in the morning, so its
+ *   afternoon does not exist — and if the arithmetic lands badly, neither
+ *   does any of it.
  */
 export function dayOptions(now: Date): { value: number; label: string; date: Date }[] {
   const today = startOfDay(now);
@@ -116,7 +128,7 @@ export function dayOptions(now: Date): { value: number; label: string; date: Dat
           ? "Tomorrow"
           : date.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
     return { value: i, label, date };
-  });
+  }).filter((d) => hourOptions(d.date, now).length > 0);
 }
 
 /** The day `n` days from today. */

@@ -111,8 +111,40 @@ describe("the day drum", () => {
     const days = dayOptions(now);
     expect(days[0].label).toBe("Today");
     expect(days[1].label).toBe("Tomorrow");
-    // 90 days ahead, inclusive of today.
-    expect(days).toHaveLength(91);
+    // 90 days ahead, inclusive of today; the ninetieth may fall outside the
+    // horizon depending on the time of day, so it is 90 or 91, never more.
+    expect(days.length).toBeGreaterThanOrEqual(90);
+    expect(days.length).toBeLessThanOrEqual(91);
+  });
+
+  it("keeps today while any of it is left, even one slot", () => {
+    // At 23:50 the only time still ahead is 11:55 pm, and it is a real
+    // choice — hiding it would remove a time somebody might want. This is
+    // what looked broken in the picker, and the answer was the two-step
+    // flow, not dropping the option.
+    const late = at("2026-10-25T23:50:00");
+    expect(dayOptions(late)[0].label).toBe("Today");
+    expect(minuteValues(dayFromOffset(0, late), 23, late)).toEqual([55]);
+  });
+
+  it("drops today once nothing is left of it", () => {
+    const tooLate = at("2026-10-25T23:58:00");
+    expect(dayOptions(tooLate)[0].label).toBe("Tomorrow");
+  });
+
+  it("never offers a day with nothing on it, at any hour", () => {
+    // The earlier version of this test only ran at midday, which is exactly
+    // when both ends of the range happen to be healthy.
+    for (const hour of [0, 6, 9, 12, 17, 22, 23]) {
+      for (const minute of [0, 30, 50, 58]) {
+        const t = at(`2026-10-25T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`);
+        const days = dayOptions(t);
+        expect(days.length, `${hour}:${minute}`).toBeGreaterThan(0);
+        for (const d of days) {
+          expect(hourOptions(d.date, t).length, `${hour}:${minute} ${d.label}`).toBeGreaterThan(0);
+        }
+      }
+    }
   });
 
   it("names only the two days that need naming", () => {
@@ -121,12 +153,12 @@ describe("the day drum", () => {
     expect(labels[2]).toMatch(/\d/);
   });
 
-  it("every day it offers can actually be scheduled at some time", () => {
-    // A row under the band that nothing can be picked on would be a dead
-    // end, and a drum has no way to say so.
-    for (const d of dayOptions(now)) {
-      expect(hourOptions(d.date, now).length, d.label).toBeGreaterThan(0);
-    }
+  it("and the last day it offers is inside the horizon", () => {
+    // The horizon is counted in hours from now, the drum in whole days, so
+    // the far end is the other place a dead row can appear.
+    const days = dayOptions(now);
+    const last = days[days.length - 1];
+    expect(hourOptions(last.date, now).length).toBeGreaterThan(0);
   });
 
   it("offsets resolve to the day they name", () => {
