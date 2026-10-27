@@ -22,6 +22,7 @@ import { HypeParticles } from "@/components/feed/HypeParticles";
 import { HypeBreak } from "@/components/feed/HypeBreak";
 import { GhostRise, useGhostRise } from "@/components/ghost/GhostRise";
 import { HypeProofLine } from "@/components/hype/HypeProofLine";
+import { hypersToDeck } from "@/lib/hype-proof";
 import { playbackWindow } from "@/lib/shot-trim";
 import { overlayCount } from "@/lib/overlay-stack";
 import { HypedBySheet } from "@/components/hype/HypedBySheet";
@@ -711,6 +712,11 @@ function ReelCard({
   // is no page to batch — it is fetched per reel, once, when it becomes the
   // one you are watching.
   const [proof, setProof] = useState<HypeProof | null>(null);
+  /** The hypers you follow, as faces. Same deck as the rehypes, star mark. */
+  const hypeDeck = useMemo(
+    () => hypersToDeck(proof?.previewers ?? [], currentUserId ?? ""),
+    [proof, currentUserId],
+  );
   const [hypedBySheet, setHypedBySheet] = useState(false);
   const [hypePending, setHypePending] = useState(false);
   const ghostRise = useGhostRise("shot", reel.id);
@@ -1627,7 +1633,18 @@ function ReelCard({
       >
         {/* Who passed this on. The faces carry the rehype mark themselves,
             so the line that used to name them here is gone. */}
-        <RehypeDeck seated={deck} size={30} bounds={reelRef} onPick={setReplyTo} />
+        <div className="flex items-end gap-3">
+          <RehypeDeck seated={deck} size={30} bounds={reelRef} onPick={setReplyTo} />
+          {hypeDeck.length > 0 && (
+            <RehypeDeck
+              seated={hypeDeck}
+              mark="hype"
+              size={30}
+              bounds={reelRef}
+              onPick={() => setHypedBySheet(true)}
+            />
+          )}
+        </div>
         <Link
           href={handle ? `/u/${handle}` : "#"}
           className="flex items-center gap-2.5"
@@ -1643,14 +1660,6 @@ function ReelCard({
             {handle ? `@${handle}` : name}
           </span>
         </Link>
-        {proof && (
-          <HypeProofLine
-            glass
-            previewers={proof.previewers}
-            total={hypeCount}
-            onOpen={() => setHypedBySheet(true)}
-          />
-        )}
         {caption && !commentsOpen && (
           <ExpandableText
             clampClass="line-clamp-2"
@@ -1659,6 +1668,17 @@ function ReelCard({
           >
             {reel.caption}
           </ExpandableText>
+        )}
+        {/* Under the caption, and quieter than it: the caption is what the
+            author said, this is a footnote about it. The faces are on the
+            deck above, so this carries only the names. */}
+        {proof && (
+          <HypeProofLine
+            glass
+            previewers={proof.previewers}
+            total={hypeCount}
+            onOpen={() => setHypedBySheet(true)}
+          />
         )}
       </div>
 

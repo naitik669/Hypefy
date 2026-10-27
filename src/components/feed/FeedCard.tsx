@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { overlayCount } from "@/lib/overlay-stack";
 import Link from "next/link";
 import { Star, Bookmark, MoreHorizontal, Maximize2 } from "lucide-react";
@@ -22,6 +22,7 @@ import { HypeParticles } from "@/components/feed/HypeParticles";
 import { HypeBreak } from "@/components/feed/HypeBreak";
 import { GhostRise, useGhostRise } from "@/components/ghost/GhostRise";
 import { HypeProofLine } from "@/components/hype/HypeProofLine";
+import { hypersToDeck } from "@/lib/hype-proof";
 import { HypedBySheet } from "@/components/hype/HypedBySheet";
 import type { HypeProof } from "@/lib/hype-proof";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
@@ -181,6 +182,8 @@ export function FeedCard({
   // Resolve the current user ourselves when the parent didn't pass one,
   // so hype/save work on every surface (profile modal, search, discover...).
   const [uid, setUid] = useState(currentUserId);
+  /** The hypers you follow, as faces. Same deck as the rehypes, star mark. */
+  const hypeDeck = useMemo(() => hypersToDeck(proof?.previewers ?? [], uid), [proof, uid]);
 
   const [hypedBySheet, setHypedBySheet] = useState(false);
   const [hyped, setHyped] = useState(post.initialHyped ?? false);
@@ -1108,8 +1111,20 @@ export function FeedCard({
           {/* Who passed this on. A sibling of the photo rather than a child:
               the photo clips what is inside it, and these faces are meant to
               be dragged off it. */}
-          <div className="pointer-events-none absolute bottom-3.5 left-7 z-20">
+          {/* Two crowds, kept apart: who passed this on, and who you
+              follow that hyped it. Both on the left, because the speaker
+              owns the other corner — and in one row rather than stacked, so
+              a tall post does not end up with two shelves of faces. */}
+          <div className="pointer-events-none absolute bottom-3.5 left-7 z-20 flex items-end gap-3">
             <RehypeDeck seated={seated} bounds={galleryRef} onPick={setReplyTo} />
+            {hypeDeck.length > 0 && (
+              <RehypeDeck
+                seated={hypeDeck}
+                mark="hype"
+                bounds={galleryRef}
+                onPick={() => setHypedBySheet(true)}
+              />
+            )}
           </div>
         </div>
       )}

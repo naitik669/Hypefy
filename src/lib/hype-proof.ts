@@ -12,6 +12,8 @@ import { createClient } from "@/lib/supabase/client";
  * component on purpose, so that promise is structural rather than remembered.
  */
 
+import { DECK_SEATS, type DeckPerson } from "@/lib/rehype";
+
 export type Previewer = {
   id: string;
   name: string | null;
@@ -145,4 +147,26 @@ export function sharedFollowsNames(s: SharedFollows): string | null {
   const more = s.count - s.names.length;
   const listed = s.names.join(", ");
   return more > 0 ? `${listed} and ${more} more` : listed;
+}
+
+/**
+ * The hypers you follow, as faces for the deck.
+ *
+ * The same floating, tilting, throwable row the rehypes use — see
+ * RehypeDeck — because a second copy of that gesture code would be a second
+ * copy of the bugs it took to get right. Only the mark differs: a star
+ * where a rehype wears the loop.
+ *
+ * Names and hues fall back exactly as the sentence's do, so a face and the
+ * line beneath it never disagree about who someone is.
+ */
+export function hypersToDeck(previewers: Previewer[], myId: string): DeckPerson[] {
+  return previewers.slice(0, DECK_SEATS).map((p) => ({
+    userId: p.id,
+    name: label(p),
+    username: p.username,
+    avatarUrl: p.avatar_url,
+    hue: p.hue ?? 200,
+    isMe: p.id === myId,
+  }));
 }

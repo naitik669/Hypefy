@@ -13,11 +13,12 @@ import { proofSentence, type Previewer } from "@/lib/hype-proof";
  *     inversion is the whole "Personality > Numbers" idea, in two font
  *     weights.
  *
- *   glass — a frosted white squircle for a Shot, sitting with the caption
- *     rather than on the rail, so the rail keeps its spacing. The same values
- *     as the Spotlight song line, on purpose: a white glass squircle is how
- *     Hypefy overlays anything on media, rather than each surface inventing
- *     its own.
+ *   glass — over media, under the caption: one dim line of bold names and
+ *     nothing else. It was a frosted squircle carrying its own faces, which
+ *     on a Shot is a second panel to read and a second crowd to look at —
+ *     the floating deck already shows the faces, so this keeps the names and
+ *     gives up everything else. Dimmer than the caption on purpose: the
+ *     caption is what the author said, this is a footnote about it.
  */
 export function HypeProofLine({
   previewers,
@@ -34,9 +35,10 @@ export function HypeProofLine({
   const said = proofSentence(previewers, total);
   if (!said) return null;
 
-  // Three faces read as a group; two names is the most anyone reads without
-  // effort. Over a photo, two of each — the pill is beside a caption.
-  const faces = previewers.slice(0, glass ? 2 : 3);
+  // Three faces read as a group; two names is the most anyone reads
+  // without effort. Over media there are no faces at all — the deck has
+  // them, and the same people twice is worse than either.
+  const faces = glass ? [] : previewers.slice(0, 3);
 
   return (
     <button
@@ -48,7 +50,7 @@ export function HypeProofLine({
       aria-label={`Hyped by ${said.names.join(said.joiner)}${said.tail}`}
       className={
         glass
-          ? "flex w-fit max-w-full items-center gap-2 rounded-[13px] border border-white/[0.18] bg-white/[0.14] py-1.5 pl-1.5 pr-3 text-left backdrop-blur-md transition-colors hover:bg-white/20"
+          ? "flex w-full min-w-0 items-center text-left transition-opacity active:opacity-70"
           : "flex w-full items-center gap-2 text-left transition-opacity active:opacity-70"
       }
     >
@@ -74,14 +76,16 @@ export function HypeProofLine({
         ))}
       </span>
       <span
-        className={`min-w-0 truncate text-[12px] leading-tight ${
-          glass ? "font-medium text-white/90" : "font-medium text-muted"
+        className={`min-w-0 truncate whitespace-nowrap leading-tight ${
+          glass
+            ? "text-[11px] font-semibold text-white/55 drop-shadow"
+            : "text-[12px] font-medium text-muted"
         }`}
       >
         {said.names.map((n, i) => (
           <span key={n + i}>
             {i > 0 && said.joiner}
-            <b className={glass ? "font-extrabold text-white" : "font-extrabold text-foreground"}>{n}</b>
+            <b className={glass ? "font-bold text-white/70" : "font-extrabold text-foreground"}>{n}</b>
           </span>
         ))}
         {said.tail}

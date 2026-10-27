@@ -159,9 +159,15 @@ export function RehypeDeck({
   size = 36,
   bounds,
   onPick,
+  mark = "rehype",
 }: {
   seated: DeckPerson[];
   size?: number;
+  /**
+   * What each face is here for. The same row serves both: who passed this
+   * on, and who you follow that hyped it. Only the glyph changes.
+   */
+  mark?: "rehype" | "hype";
   /** The picture the deck sits on. Faces dragged past its edge fade out. */
   bounds?: RefObject<HTMLElement | null>;
   /** A tap on a face — a drag is not a tap, and never calls this. */
@@ -384,7 +390,7 @@ export function RehypeDeck({
                 }}
               >
                 <Avatar name={p.name} hue={p.hue} src={p.avatarUrl ?? undefined} size={size} />
-                {!leaving && <RehypeMark size={size} />}
+                {!leaving && <DeckMark size={size} mark={mark} />}
               </span>
             </span>
           </button>
@@ -395,7 +401,7 @@ export function RehypeDeck({
 }
 
 /** What says this row is rehypes, now that nothing is written above it: the Rehype arrows, on glass. */
-function RehypeMark({ size }: { size: number }) {
+function DeckMark({ size, mark }: { size: number; mark: "rehype" | "hype" }) {
   const box = Math.round(size * 0.47);
   return (
     <span
@@ -403,12 +409,21 @@ function RehypeMark({ size }: { size: number }) {
       style={{ width: box, height: box }}
       aria-hidden
     >
-      <svg viewBox="0 0 24 24" width={box * 0.65} height={box * 0.65} fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M13 18H7a2 2 0 0 1-2-2V6" />
-        <path d="m2 9 3-3 3 3" />
-        <path d="M11 6h6a2 2 0 0 1 2 2v10" />
-        <path d="m22 15-3 3-3-3" />
-      </svg>
+      {mark === "hype" ? (
+        // Filled, like the hype button itself. An outline star is what the
+        // button wears when you have NOT hyped something, so an outline here
+        // would say the opposite of what the face is for.
+        <svg viewBox="0 0 24 24" width={box * 0.7} height={box * 0.7} fill="currentColor" stroke="none">
+          <path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9z" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" width={box * 0.65} height={box * 0.65} fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M13 18H7a2 2 0 0 1-2-2V6" />
+          <path d="m2 9 3-3 3 3" />
+          <path d="M11 6h6a2 2 0 0 1 2 2v10" />
+          <path d="m22 15-3 3-3-3" />
+        </svg>
+      )}
     </span>
   );
 }
