@@ -115,7 +115,34 @@ export type DeckPerson = {
   avatarUrl: string | null;
   hue: number;
   isMe: boolean;
+  /**
+   * Why this face is here. One row seats both kinds now, so the mark
+   * belongs to the person rather than to the deck.
+   */
+  mark?: "rehype" | "hype";
 };
+
+/**
+ * The three faces a post shows, out of everyone who passed it on or hyped it.
+ *
+ * Two rows side by side meant six faces on one photograph, which reads as
+ * clutter rather than as people. There is one row, and rehypes fill it
+ * first: passing something on costs more than tapping a star, so it earns
+ * the seat. Three rehypes and three hypes shows three rehypes; two and
+ * three shows both rehypes and one hype.
+ *
+ * Anyone who did both sits once, in the seat that cost them more — and the
+ * de-duplication happens before the seats are counted, or the row would
+ * come up a face short while someone was still waiting for a seat.
+ */
+export function mergeDecks(rehypers: DeckPerson[], hypers: DeckPerson[]): DeckPerson[] {
+  const rehyped = new Set(rehypers.map((p) => p.userId));
+  const seats: DeckPerson[] = [
+    ...rehypers.map((p) => ({ ...p, mark: "rehype" as const })),
+    ...hypers.filter((p) => !rehyped.has(p.userId)).map((p) => ({ ...p, mark: "hype" as const })),
+  ];
+  return seats.slice(0, DECK_SEATS);
+}
 
 /** Faces the deck ever shows at once. */
 export const DECK_SEATS = 3;

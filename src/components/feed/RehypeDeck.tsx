@@ -166,8 +166,9 @@ export function RehypeDeck({
   seated: DeckPerson[];
   size?: number;
   /**
-   * What each face is here for. The same row serves both: who passed this
-   * on, and who you follow that hyped it. Only the glyph changes.
+   * What a face is here for when it does not say itself. One row seats
+   * both kinds — see mergeDecks — so the mark normally rides on the
+   * person; this is the fallback for a row that is all one thing.
    */
   mark?: "rehype" | "hype";
   /** The picture the deck sits on. Faces dragged past its edge fade out. */
@@ -392,7 +393,7 @@ export function RehypeDeck({
                 }}
               >
                 <Avatar name={p.name} hue={p.hue} src={p.avatarUrl ?? undefined} size={size} />
-                {!leaving && <DeckMark size={size} mark={mark} />}
+                {!leaving && <DeckMark size={size} mark={f.person.mark ?? mark} />}
               </span>
             </span>
           </button>

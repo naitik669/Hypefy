@@ -23,6 +23,7 @@ import { HypeBreak } from "@/components/feed/HypeBreak";
 import { GhostRise, useGhostRise } from "@/components/ghost/GhostRise";
 import { HypeProofLine } from "@/components/hype/HypeProofLine";
 import { hypersToDeck } from "@/lib/hype-proof";
+import { mergeDecks } from "@/lib/rehype";
 import { playbackWindow } from "@/lib/shot-trim";
 import { overlayCount } from "@/lib/overlay-stack";
 import { HypedBySheet } from "@/components/hype/HypedBySheet";
@@ -712,11 +713,6 @@ function ReelCard({
   // is no page to batch — it is fetched per reel, once, when it becomes the
   // one you are watching.
   const [proof, setProof] = useState<HypeProof | null>(null);
-  /** The hypers you follow, as faces. Same deck as the rehypes, star mark. */
-  const hypeDeck = useMemo(
-    () => hypersToDeck(proof?.previewers ?? [], currentUserId ?? ""),
-    [proof, currentUserId],
-  );
   const [hypedBySheet, setHypedBySheet] = useState(false);
   const [hypePending, setHypePending] = useState(false);
   const ghostRise = useGhostRise("shot", reel.id);
@@ -818,6 +814,14 @@ function ReelCard({
   const [rehypePulse, setRehypePulse] = useState(0);
   // Who rehyped this Shot, loaded for the reel on screen and its neighbours.
   const deck = useRehypeDeck("shot", reel.id, currentUserId, rehyped, preload === "auto");
+  /**
+   * The three faces this Shot shows: who passed it on, then who you follow
+   * that hyped it. One row rather than two — see mergeDecks.
+   */
+  const faces = useMemo(
+    () => mergeDecks(deck, hypersToDeck(proof?.previewers ?? [], currentUserId ?? "")),
+    [deck, proof, currentUserId],
+  );
   /** Whose rehype you tapped, and are about to reply to. */
   const [replyTo, setReplyTo] = useState<DeckPerson | null>(null);
   // Save: a tap saves and drops down the folders, a hold fans them out, and
@@ -1633,18 +1637,12 @@ function ReelCard({
       >
         {/* Who passed this on. The faces carry the rehype mark themselves,
             so the line that used to name them here is gone. */}
-        <div className="flex items-end gap-3">
-          <RehypeDeck seated={deck} size={36} bounds={reelRef} onPick={setReplyTo} />
-          {hypeDeck.length > 0 && (
-            <RehypeDeck
-              seated={hypeDeck}
-              mark="hype"
-              size={36}
-              bounds={reelRef}
-              onPick={() => setHypedBySheet(true)}
-            />
-          )}
-        </div>
+        <RehypeDeck
+          seated={faces}
+          size={36}
+          bounds={reelRef}
+          onPick={(person) => (person.mark === "hype" ? setHypedBySheet(true) : setReplyTo(person))}
+        />
         <Link
           href={handle ? `/u/${handle}` : "#"}
           className="flex items-center gap-2.5"

@@ -150,31 +150,30 @@ describe("where the two crowds sit", () => {
   const card = read("src/components/feed/FeedCard.tsx");
   const reel = read("src/components/shots/ReelsFeed.tsx");
 
-  it("side by side in one row, not stacked", () => {
-    // Stacked, a tall post ends up with two shelves of faces.
+  it("is one row, not two", () => {
+    // Two decks side by side put six faces on a photograph, which reads as
+    // clutter rather than as people.
     for (const [name, src] of [["post", card], ["shot", reel]] as const) {
-      expect(src, name).toContain("seated={hypeDeck}");
-      expect(src, name).toContain('mark="hype"');
-      expect(src, name).toContain("flex items-end gap-3");
+      expect(src.match(/<RehypeDeck/g)?.length, name).toBe(1);
+      expect(src, name).toContain("seated={faces}");
+      expect(src, name).toContain("mergeDecks(");
     }
   });
 
-  it("on a post they keep clear of the speaker, which owns the other corner", () => {
-    const deck = card.indexOf("flex items-end gap-3");
+  it("on a post it keeps clear of the speaker, which owns the other corner", () => {
+    const deck = card.indexOf("<RehypeDeck");
     expect(deck).toBeGreaterThan(-1);
-    expect(card.slice(deck - 90, deck)).toContain("left-7");
+    expect(card.slice(deck - 120, deck)).toContain("left-7");
   });
 
-  it("a face leads to the same place every other face leads", () => {
-    // Eight faces that each go somewhere different is eight doors. The
-    // sheet is the one door, and it lists everyone.
-    for (const src of [card, reel]) {
-      expect(src).toContain("onPick={() => setHypedBySheet(true)}");
+  it("a tap goes wherever that face's own mark points", () => {
+    // A rehype is something to reply to; a hype is a name on a list. One
+    // row carries both, so one handler has to tell them apart.
+    for (const [name, src] of [["post", card], ["shot", reel]] as const) {
+      expect(src, name).toContain('person.mark === "hype"');
+      expect(src, name).toContain("setHypedBySheet(true)");
+      expect(src, name).toContain("setReplyTo(person)");
     }
-  });
-
-  it("no hypers you follow, no deck at all", () => {
-    for (const src of [card, reel]) expect(src).toContain("{hypeDeck.length > 0 && (");
   });
 });
 

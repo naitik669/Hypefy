@@ -23,6 +23,7 @@ import { HypeBreak } from "@/components/feed/HypeBreak";
 import { GhostRise, useGhostRise } from "@/components/ghost/GhostRise";
 import { HypeProofLine } from "@/components/hype/HypeProofLine";
 import { hypersToDeck } from "@/lib/hype-proof";
+import { mergeDecks } from "@/lib/rehype";
 import { HypedBySheet } from "@/components/hype/HypedBySheet";
 import type { HypeProof } from "@/lib/hype-proof";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
@@ -182,8 +183,6 @@ export function FeedCard({
   // Resolve the current user ourselves when the parent didn't pass one,
   // so hype/save work on every surface (profile modal, search, discover...).
   const [uid, setUid] = useState(currentUserId);
-  /** The hypers you follow, as faces. Same deck as the rehypes, star mark. */
-  const hypeDeck = useMemo(() => hypersToDeck(proof?.previewers ?? [], uid), [proof, uid]);
 
   const [hypedBySheet, setHypedBySheet] = useState(false);
   const [hyped, setHyped] = useState(post.initialHyped ?? false);
@@ -203,6 +202,15 @@ export function FeedCard({
   const [rehypePulse, setRehypePulse] = useState(0);
   /** The deck on the photo: who rehyped this, ranked for you, and you once you have. */
   const seated = useRehypeDeck("post", post.id, uid, rehyped);
+  /**
+   * The three faces this post shows: who passed it on, then who you follow
+   * that hyped it. One row rather than two — six faces on a photograph read
+   * as clutter rather than as people.
+   */
+  const faces = useMemo(
+    () => mergeDecks(seated, hypersToDeck(proof?.previewers ?? [], uid)),
+    [seated, proof, uid],
+  );
   /** Whose rehype you tapped, and are about to reply to. */
   const [replyTo, setReplyTo] = useState<DeckPerson | null>(null);
   const [savePending, setSavePending] = useState(false);
@@ -1111,20 +1119,17 @@ export function FeedCard({
           {/* Who passed this on. A sibling of the photo rather than a child:
               the photo clips what is inside it, and these faces are meant to
               be dragged off it. */}
-          {/* Two crowds, kept apart: who passed this on, and who you
-              follow that hyped it. Both on the left, because the speaker
-              owns the other corner — and in one row rather than stacked, so
-              a tall post does not end up with two shelves of faces. */}
-          <div className="pointer-events-none absolute bottom-3.5 left-7 z-20 flex items-end gap-3">
-            <RehypeDeck seated={seated} bounds={galleryRef} onPick={setReplyTo} />
-            {hypeDeck.length > 0 && (
-              <RehypeDeck
-                seated={hypeDeck}
-                mark="hype"
-                bounds={galleryRef}
-                onPick={() => setHypedBySheet(true)}
-              />
-            )}
+          {/* One crowd, three seats, rehypes first. A tap goes wherever
+              that face's own mark points: a rehype is something to reply
+              to, a hype is a name on a list. */}
+          <div className="pointer-events-none absolute bottom-3.5 left-7 z-20">
+            <RehypeDeck
+              seated={faces}
+              bounds={galleryRef}
+              onPick={(person) =>
+                person.mark === "hype" ? setHypedBySheet(true) : setReplyTo(person)
+              }
+            />
           </div>
         </div>
       )}
