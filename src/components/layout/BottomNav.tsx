@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { activeTab, isTabRoot, tabOf, type Tab } from "@/lib/active-tab";
 import {
   House,
   Chat,
@@ -111,8 +112,31 @@ export function BottomNav({
   const pathname = usePathname();
   const router = useRouter();
   const [unreadMsgs, setUnreadMsgs] = useState(initialUnreadMsgs);
-  const profileActive = pathname.startsWith("/profile");
-  const messagesActive = pathname.startsWith("/messages");
+  /**
+   * The last tab actually stood on, so a page opened from one keeps it lit.
+   *
+   * Adjusted during render rather than in an effect: the bar has to be
+   * right on the first paint after a navigation, and an effect would light
+   * the wrong tab for a frame. This is React's own pattern for state that
+   * follows a prop — the extra render is immediate and nothing between
+   * sees the stale value.
+   *
+   * A hard load starts from the path, which is right: a shared link has
+   * nowhere to have come from.
+   */
+  const [seen, setSeen] = useState<{ path: string; tab: Tab | null }>(() => ({
+    path: pathname,
+    tab: tabOf(pathname),
+  }));
+  let from = seen.tab;
+  if (seen.path !== pathname) {
+    from = isTabRoot(pathname) ? tabOf(pathname) : seen.tab;
+    setSeen({ path: pathname, tab: from });
+  }
+  const here = activeTab(pathname, from);
+
+  const profileActive = here === "profile";
+  const messagesActive = here === "messages";
 
   // Read inside the realtime handlers below, which are built once. The effect
   // deliberately does not depend on the pathname — rebuilding the channel on
@@ -184,7 +208,7 @@ export function BottomNav({
             href="/home"
             label="Home"
             Icon={House}
-            active={pathname.startsWith("/home")}
+            active={here === "home"}
           />
         </NavHoldMenu>
 
@@ -270,7 +294,7 @@ export function BottomNav({
           href="/shots"
           label="Shots"
           Icon={Lightning}
-          active={pathname.startsWith("/shots")}
+          active={here === "shots"}
         />
 
         {/* Tap goes to the profile as always; holding raises the account
