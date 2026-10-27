@@ -67,6 +67,7 @@ import { ChatImg, ChatLink, ChatVideo } from "@/components/messages/ChatMedia";
 import { readDraft, writeDraft } from "@/lib/chat-drafts";
 import {
   dropOutbox,
+  isTerminal,
   outboxFor,
   queueOutbox,
   recordAttempt,
@@ -1285,6 +1286,41 @@ export function RealChatView({
       );
     }
   }
+
+  /**
+   * Send again what the connection took away, when it comes back.
+   *
+   * Two triggers, and the second is the one that matters more than it
+   * looks. The browser fires `online` when a live tab regains the network
+   * — but an app killed on the underground and opened at the surface is
+   * already online when it loads, so that event never comes. Flushing on
+   * open as well is the difference between a message that goes by itself
+   * and one that waits for a tap nobody knows to give.
+   *
+   * Only what still has attempts left. A message that has spent them is
+   * drawn as failed and waits for the sender, which is the point of
+   * having a budget at all.
+   */
+  useEffect(() => {
+    let stopped = false;
+    const flush = async () => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      for (const e of outboxFor(currentUserId, conversationId)) {
+        if (stopped) return;
+        if (isTerminal(e)) continue;
+        await retrySend(restoredMessage(e, currentUserId));
+      }
+    };
+    void flush();
+    window.addEventListener("online", flush);
+    return () => {
+      stopped = true;
+      window.removeEventListener("online", flush);
+    };
+    // retrySend is rebuilt every render and depends on nothing that
+    // changes what a retry does; listing it would resubscribe per render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, currentUserId]);
 
   /** Upload voice blob to Supabase Storage and send as a voice message. */
   async function sendVoice(blob: Blob, durationSecs: number, peaks: number[]) {

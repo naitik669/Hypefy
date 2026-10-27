@@ -390,3 +390,38 @@ describe("an unsent message survives the app closing", () => {
     expect(fn.slice(0, 900)).toContain("!here.has(e.tempId)");
   });
 });
+
+describe("and goes by itself when the connection comes back", () => {
+  const chat = read("src/components/messages/RealChatView.tsx");
+  const fn = chat.slice(chat.indexOf("Send again what the connection took away"));
+
+  it("on the browser saying it is back", () => {
+    expect(fn.slice(0, 1400)).toContain('window.addEventListener("online", flush)');
+    expect(fn.slice(0, 1400)).toContain('window.removeEventListener("online", flush)');
+  });
+
+  it("and on opening the thread, which is the case that actually happens", () => {
+    // An app killed on the underground and opened at the surface is
+    // already online when it loads. That `online` event never comes, so
+    // without this nothing ever retries by itself.
+    expect(fn.slice(0, 1400)).toContain("void flush();");
+  });
+
+  it("not while the device says it is offline", () => {
+    expect(fn.slice(0, 1400)).toContain("navigator.onLine === false) return");
+  });
+
+  it("only what still has attempts left", () => {
+    // One that has spent them is drawn as failed and waits for the
+    // sender. That is what having a budget is for.
+    expect(fn.slice(0, 1400)).toContain("if (isTerminal(e)) continue;");
+  });
+
+  it("one at a time, and it stops if the thread goes away mid-flush", () => {
+    // Firing them all at once is a burst at exactly the moment the
+    // connection is least able to take one.
+    expect(fn.slice(0, 1400)).toContain("await retrySend(");
+    expect(fn.slice(0, 1400)).toContain("if (stopped) return;");
+    expect(fn.slice(0, 1400)).toContain("stopped = true;");
+  });
+});
