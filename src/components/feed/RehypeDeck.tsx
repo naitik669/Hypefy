@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import type { DeckPerson } from "@/lib/rehype";
 
@@ -400,9 +401,6 @@ export function RehypeDeck({
   );
 }
 
-/** The star every hype in the app wears: gold, per the palette note. */
-const HYPE_GOLD = "#FFD000";
-
 /**
  * What says why a face is here, now that nothing is written above the row.
  *
@@ -416,25 +414,22 @@ const HYPE_GOLD = "#FFD000";
  */
 function DeckMark({ size, mark }: { size: number; mark: "rehype" | "hype" }) {
   if (mark === "hype") {
-    const star = Math.round(size * 0.52);
     return (
       <span
-        className="absolute -bottom-1.5 -right-1.5"
-        style={{ width: star, height: star, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.55))" }}
+        className="absolute -bottom-1.5 -right-1.5 text-hype"
+        // A dark halo rather than a dark outline. A stroke of another colour
+        // would not just darken the edge, it would reshape the star: the
+        // round join on a stroke the same colour as the fill is the whole
+        // reason the points are curved rather than spiked.
+        style={{ filter: "drop-shadow(0 0 1px rgba(0,0,0,0.6)) drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }}
         aria-hidden
       >
-        {/* Filled, like the hype button itself. An outline star is what the
-            button wears when you have NOT hyped something, so an outline
-            here would say the opposite of what the face is for. */}
-        <svg viewBox="0 0 24 24" width={star} height={star}>
-          <path
-            d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9z"
-            fill={HYPE_GOLD}
-            stroke="rgba(0,0,0,0.5)"
-            strokeWidth={1.4}
-            strokeLinejoin="round"
-          />
-        </svg>
+        {/* The hype button's own star, at its own stroke weight, so the two
+            are the same shape rather than two drawings of a star. Filled,
+            because the button wears an outline when you have NOT hyped
+            something — an outline here would say the opposite of what the
+            face is for. */}
+        <Star size={Math.round(size * 0.52)} strokeWidth={2.2} fill="currentColor" />
       </span>
     );
   }

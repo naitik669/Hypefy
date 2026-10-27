@@ -74,22 +74,33 @@ describe("the mark on the face", () => {
     expect(deck).toContain('mark: "rehype" | "hype"');
   });
 
-  it("a hype wears the gold star the rest of the app hypes with", () => {
-    expect(deck).toContain('mark === "hype"');
-    // The palette note reserves gold for Hype and the Verified Star, and
-    // HyperStar already uses this value. A lime star would be the brand
-    // pop spent on the wrong thing.
-    expect(deck).toContain('const HYPE_GOLD = "#FFD000"');
-    expect(deck).toContain("fill={HYPE_GOLD}");
+  it("is the hype button's own star, not a second drawing of one", () => {
+    // Hand-drawn, the points came out spiked. The button's curve is not in
+    // its path — it comes from a round join on a stroke the same colour as
+    // the fill, at that weight. Reusing the component is the only way the
+    // two stay the same shape.
+    const hype = deck.slice(deck.indexOf('if (mark === "hype")'), deck.indexOf("const box ="));
+    expect(hype).toContain("<Star size={Math.round(size * 0.52)} strokeWidth={2.2} fill=\"currentColor\" />");
+    const card = readFileSync("src/components/feed/FeedCard.tsx", "utf8");
+    expect(card, "the button's own weight").toContain("strokeWidth={2.2}");
+  });
+
+  it("in the hype colour the app already has a token for", () => {
+    // --color-hype, not a hex copied into a component. A lime star would
+    // be the single brand pop spent on the wrong thing.
+    const hype = deck.slice(deck.indexOf('if (mark === "hype")'), deck.indexOf("const box ="));
+    expect(hype).toContain("text-hype");
+    expect(hype).not.toMatch(/#[0-9a-fA-F]{6}/);
   });
 
   it("and sits on the face rather than on a plate beside it", () => {
-    // On a dark plate it read as a grey chip stuck to a corner. A star is
-    // legible as itself; it needs a rim and a shadow, not a background.
+    // On a dark plate it read as a grey chip stuck to a corner. It holds
+    // against a pale avatar with a halo, not an outline — an outline of
+    // another colour would reshape the star, not just darken its edge.
     const hype = deck.slice(deck.indexOf('if (mark === "hype")'), deck.indexOf("const box ="));
     expect(hype).not.toContain("bg-black/55");
     expect(hype).toContain("drop-shadow");
-    expect(hype).toContain('stroke="rgba(0,0,0,0.5)"');
+    expect(hype).not.toContain("stroke=");
   });
 
   it("the rehype keeps its plate, because a thin white line needs one", () => {
