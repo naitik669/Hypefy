@@ -184,3 +184,29 @@ describe("loading and saving them", () => {
     expect(hook).toContain("name.trim().slice(0, 40)");
   });
 });
+
+describe("and in the thread itself", () => {
+  const chat = read("src/components/messages/RealChatView.tsx");
+
+  it("one helper answers it for every place a name is written", () => {
+    // The sender line, the quoted reply and the photo viewer's title all
+    // go through senderName. Three copies is how a nickname shows in one
+    // and not another.
+    expect(chat).toContain("displayNameFor(id, members?.[id]?.name ?? other.name, nicknames)");
+    expect(chat.match(/senderName\(/g)?.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("you are still You, not whatever you called yourself", () => {
+    expect(chat).toContain('id === currentUserId\n      ? "You"');
+  });
+
+  it("the face beside a message agrees with the name above it", () => {
+    expect(chat).toContain("const whoName = displayNameFor(m.sender_id, who.name, nicknames);");
+    expect(chat).toContain("<Avatar name={whoName}");
+    expect(chat).not.toContain("<Avatar name={who.name}");
+  });
+
+  it("and the link to their profile is labelled with it too", () => {
+    expect(chat).toContain("aria-label={`${whoName}'s profile`}");
+  });
+});

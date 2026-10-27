@@ -65,6 +65,8 @@ import { openEncryptionSetup } from "@/lib/e2ee/open-setup";
 import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 import { ChatImg, ChatLink, ChatVideo } from "@/components/messages/ChatMedia";
 import { readDraft, writeDraft } from "@/lib/chat-drafts";
+import { displayNameFor } from "@/lib/nicknames";
+import { useNicknames } from "@/components/messages/useNicknames";
 import {
   dropOutbox,
   isTerminal,
@@ -175,7 +177,19 @@ export function RealChatView({
   bubbleStyles?: Record<string, string | null>;
 }) {
   const isGroup = !!group;
-  const senderName = (id: string) => (id === currentUserId ? "You" : members?.[id]?.name ?? other.name);
+  // What you call the people here. Personal: nobody else sees it, and
+  // nobody else's rows ever come back. See 0169.
+  const { nicknames } = useNicknames(conversationId);
+  /**
+   * The name to write above somebody's words.
+   *
+   * One helper for the sender line, the quoted reply and the photo
+   * viewer's title, so a nickname cannot show in one and not another.
+   */
+  const senderName = (id: string) =>
+    id === currentUserId
+      ? "You"
+      : displayNameFor(id, members?.[id]?.name ?? other.name, nicknames);
   const supabase = createClient();
   const [themeId, setThemeId] = useState<string | null>(initialTheme);
   const theme = findChatTheme(themeId);
@@ -2040,6 +2054,9 @@ export function RealChatView({
               // all leave the same room for it, so a run stays in one line.
               const face = showsFace(m, next, currentUserId);
               const who = members?.[m.sender_id] ?? { name: other.name, hue: other.hue, avatarUrl: other.avatarUrl };
+              // The face takes its initial from the same string as the
+              // name above it, or the letter and the label disagree.
+              const whoName = displayNameFor(m.sender_id, who.name, nicknames);
               // Their profile, behind their face. Only when the face is known
               // to be theirs: someone who has left a group falls back to
               // another member's details above, and must not link to them.
@@ -2124,13 +2141,13 @@ export function RealChatView({
                             {whoUsername ? (
                               <Link
                                 href={`/u/${whoUsername}`}
-                                aria-label={`${who.name}'s profile`}
+                                aria-label={`${whoName}'s profile`}
                                 className="block rounded-full transition-transform active:scale-90"
                               >
-                                <Avatar name={who.name} hue={who.hue} size={28} src={who.avatarUrl ?? undefined} />
+                                <Avatar name={whoName} hue={who.hue} size={28} src={who.avatarUrl ?? undefined} />
                               </Link>
                             ) : (
-                              <Avatar name={who.name} hue={who.hue} size={28} src={who.avatarUrl ?? undefined} />
+                              <Avatar name={whoName} hue={who.hue} size={28} src={who.avatarUrl ?? undefined} />
                             )}
                           </span>
                         )}
