@@ -156,7 +156,7 @@ export function fadeOutside(face: Box, bounds: Box | null, over: number): number
 
 export function RehypeDeck({
   seated,
-  size = 36,
+  size = 42,
   bounds,
   onPick,
   mark = "rehype",
@@ -340,7 +340,7 @@ export function RehypeDeck({
                   // the deck stops the drifting, so only your drag moves them.
                   drag
                   ? undefined
-                  : `deck-float ${5.2 + f.seat * 0.9}s ${f.seat * 0.7}s ease-in-out infinite`;
+                  : `deck-float ${8.6 + f.seat * 1.4}s ${f.seat * 1.1}s ease-in-out infinite`;
         return (
           <button
             type="button"
@@ -400,8 +400,45 @@ export function RehypeDeck({
   );
 }
 
-/** What says this row is rehypes, now that nothing is written above it: the Rehype arrows, on glass. */
+/** The star every hype in the app wears: gold, per the palette note. */
+const HYPE_GOLD = "#FFD000";
+
+/**
+ * What says why a face is here, now that nothing is written above the row.
+ *
+ * The two marks are not built the same, on purpose. A rehype is a thin
+ * white line drawing and needs a dark plate under it to survive whatever
+ * photo it lands on. A hype is the gold star the rest of the app already
+ * uses for hyping, and a star is legible as itself — on a plate it read as
+ * a grey chip stuck to the corner of a face rather than as a star on it.
+ * So the star sits straight on the face, bigger, with a dark rim and a
+ * shadow to hold it against a pale avatar.
+ */
 function DeckMark({ size, mark }: { size: number; mark: "rehype" | "hype" }) {
+  if (mark === "hype") {
+    const star = Math.round(size * 0.52);
+    return (
+      <span
+        className="absolute -bottom-1.5 -right-1.5"
+        style={{ width: star, height: star, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.55))" }}
+        aria-hidden
+      >
+        {/* Filled, like the hype button itself. An outline star is what the
+            button wears when you have NOT hyped something, so an outline
+            here would say the opposite of what the face is for. */}
+        <svg viewBox="0 0 24 24" width={star} height={star}>
+          <path
+            d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9z"
+            fill={HYPE_GOLD}
+            stroke="rgba(0,0,0,0.5)"
+            strokeWidth={1.4}
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+    );
+  }
+
   const box = Math.round(size * 0.47);
   return (
     <span
@@ -409,21 +446,12 @@ function DeckMark({ size, mark }: { size: number; mark: "rehype" | "hype" }) {
       style={{ width: box, height: box }}
       aria-hidden
     >
-      {mark === "hype" ? (
-        // Filled, like the hype button itself. An outline star is what the
-        // button wears when you have NOT hyped something, so an outline here
-        // would say the opposite of what the face is for.
-        <svg viewBox="0 0 24 24" width={box * 0.7} height={box * 0.7} fill="currentColor" stroke="none">
-          <path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9z" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" width={box * 0.65} height={box * 0.65} fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M13 18H7a2 2 0 0 1-2-2V6" />
-          <path d="m2 9 3-3 3 3" />
-          <path d="M11 6h6a2 2 0 0 1 2 2v10" />
-          <path d="m22 15-3 3-3-3" />
-        </svg>
-      )}
+      <svg viewBox="0 0 24 24" width={box * 0.65} height={box * 0.65} fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M13 18H7a2 2 0 0 1-2-2V6" />
+        <path d="m2 9 3-3 3 3" />
+        <path d="M11 6h6a2 2 0 0 1 2 2v10" />
+        <path d="m22 15-3 3-3-3" />
+      </svg>
     </span>
   );
 }

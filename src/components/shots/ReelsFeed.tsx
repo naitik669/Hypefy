@@ -1634,12 +1634,12 @@ function ReelCard({
         {/* Who passed this on. The faces carry the rehype mark themselves,
             so the line that used to name them here is gone. */}
         <div className="flex items-end gap-3">
-          <RehypeDeck seated={deck} size={30} bounds={reelRef} onPick={setReplyTo} />
+          <RehypeDeck seated={deck} size={36} bounds={reelRef} onPick={setReplyTo} />
           {hypeDeck.length > 0 && (
             <RehypeDeck
               seated={hypeDeck}
               mark="hype"
-              size={30}
+              size={36}
               bounds={reelRef}
               onPick={() => setHypedBySheet(true)}
             />

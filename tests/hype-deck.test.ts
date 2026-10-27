@@ -74,10 +74,27 @@ describe("the mark on the face", () => {
     expect(deck).toContain('mark: "rehype" | "hype"');
   });
 
-  it("a hype wears the star the hype button wears", () => {
+  it("a hype wears the gold star the rest of the app hypes with", () => {
     expect(deck).toContain('mark === "hype"');
-    // Filled, like the button: an outline star reads as "not hyped".
-    expect(deck).toContain('fill="currentColor"');
+    // The palette note reserves gold for Hype and the Verified Star, and
+    // HyperStar already uses this value. A lime star would be the brand
+    // pop spent on the wrong thing.
+    expect(deck).toContain('const HYPE_GOLD = "#FFD000"');
+    expect(deck).toContain("fill={HYPE_GOLD}");
+  });
+
+  it("and sits on the face rather than on a plate beside it", () => {
+    // On a dark plate it read as a grey chip stuck to a corner. A star is
+    // legible as itself; it needs a rim and a shadow, not a background.
+    const hype = deck.slice(deck.indexOf('if (mark === "hype")'), deck.indexOf("const box ="));
+    expect(hype).not.toContain("bg-black/55");
+    expect(hype).toContain("drop-shadow");
+    expect(hype).toContain('stroke="rgba(0,0,0,0.5)"');
+  });
+
+  it("the rehype keeps its plate, because a thin white line needs one", () => {
+    const rehype = deck.slice(deck.indexOf("const box ="));
+    expect(rehype).toContain("bg-black/55");
   });
 
   it("and the loop is still what a rehype wears", () => {
@@ -148,5 +165,46 @@ describe("the line under a Shot's caption", () => {
     const proof = reel.indexOf("<HypeProofLine");
     expect(caption).toBeGreaterThan(-1);
     expect(proof).toBeGreaterThan(caption);
+  });
+});
+
+describe("how the faces float", () => {
+  const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
+  const deck = read("src/components/feed/RehypeDeck.tsx");
+  const css = read("src/app/globals.css");
+
+  it("slowly — a cycle you notice only if you look for it", () => {
+    // The first cycles were short enough that three faces bobbing in the
+    // corner pulled the eye off the photograph they sit on.
+    const cycle = deck.match(/deck-float \$\{([\d.]+) \+ f\.seat \* ([\d.]+)\}s/);
+    expect(cycle, "float cycle not found").not.toBeNull();
+    expect(Number(cycle![1])).toBeGreaterThanOrEqual(8);
+    expect(Number(cycle![2])).toBeGreaterThanOrEqual(1);
+  });
+
+  it("and barely — slower must not also mean further", () => {
+    // A long slow cycle over a big distance is a drift, not a float.
+    const rise = css.match(/@keyframes deck-float \{[\s\S]*?translate: 0 (-?\d+)px;/);
+    expect(rise, "deck-float keyframe not found").not.toBeNull();
+    expect(Math.abs(Number(rise![1]))).toBeLessThanOrEqual(4);
+  });
+
+  it("each on its own cycle, or they bob as one block", () => {
+    expect(deck).toContain("f.seat * 1.1}s ease-in-out infinite");
+  });
+
+  it("big enough to be a face rather than a dot", () => {
+    expect(deck).toContain("  size = 42,");
+  });
+
+  it("including in a Shot, which asks for its own size", () => {
+    // The default does not reach the reel: it passes one explicitly, so
+    // the default growing would have left the Shot's faces behind.
+    const reel = read("src/components/shots/ReelsFeed.tsx");
+    for (const n of reel.match(/<RehypeDeck[\s\S]{0,200}?size=\{(\d+)\}/g) ?? []) {
+      const size = Number(n.match(/size=\{(\d+)\}/)![1]);
+      expect(size, n.slice(0, 40)).toBeGreaterThanOrEqual(36);
+    }
+    expect(reel.match(/size=\{\d+\}/g)?.length, "both decks sized").toBeGreaterThanOrEqual(2);
   });
 });
