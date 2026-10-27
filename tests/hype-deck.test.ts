@@ -116,23 +116,16 @@ describe("the mark on the face", () => {
     expect(hype).not.toContain("boxShadow");
   });
 
-  it("nothing in the row drops a shadow behind it any more", () => {
-    // No halo on the star, no shadow under either plate. The one filter
-    // left is a 1.2px edge on the white loop, which is not a drop shadow
-    // doing decoration — it is the only thing keeping that loop visible
-    // where the lime gradient is still brand lime at 1.5:1.
-    // Scoped to the marks. The faces themselves keep the soft shadow that
-    // makes them read as floating over the photo rather than stuck to it —
-    // that one is older than any of this and is the float, not decoration.
-    const marks = deck
-      .slice(deck.indexOf("function DeckMark"))
+  it("nothing in the row drops a shadow at all", () => {
+    // Not under the faces, not behind the star, not on the white loop.
+    // The faces lost theirs too, so the row sits on the photo rather than
+    // hovering over it.
+    const code = deck
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
       .replace(/^\s*\/\/.*$/gm, "");
-    expect(marks).not.toContain("boxShadow");
-    const shadows = marks.match(/drop-shadow\([^)]*\)/g) ?? [];
-    expect(shadows.length, shadows.join(" ")).toBe(1);
-    expect(shadows[0]).toContain("1.2px");
+    expect(code).not.toContain("drop-shadow");
+    expect(code).not.toContain("boxShadow");
   });
 
   it("the rehype keeps a plate, now in the lime that is already its colour", () => {
@@ -149,12 +142,16 @@ describe("the mark on the face", () => {
     expect(css).toContain("--color-accent-deep:");
   });
 
-  it("the white loop carries a shadow, because the light end is real lime", () => {
-    // White on #a3e635 is 1.5:1 and the gradient's light corner sits right
-    // under the upper arrow. Without something behind it, that arrow
-    // dissolves into the plate.
+  it("the white loop stands on its own, with nothing behind it", () => {
+    // It had a 1.2px edge, because white on #a3e635 is 1.5:1 and the
+    // gradient's light corner sits right under the upper arrow. The edge
+    // is gone by choice — no shadows anywhere in the row — so the loop's
+    // legibility now rests entirely on where the gradient's light end
+    // falls. If that arrow ever washes out, this is the line that explains
+    // why, and darkening the light stop is the fix that keeps the rule.
     const rehype = deck.slice(deck.indexOf("const box ="));
-    expect(rehype).toContain("drop-shadow");
+    expect(rehype).not.toContain("drop-shadow");
+    expect(rehype).toContain("text-white");
   });
 
   it("and the loop is the rehype button's own, not a copy of its path", () => {

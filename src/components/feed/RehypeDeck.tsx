@@ -397,7 +397,6 @@ export function RehypeDeck({
                 className="relative block h-full w-full transition-transform duration-200"
                 style={{
                   transform: `rotate(${TILT[f.seat] ?? 0}deg) scale(${layout?.gathered && !held ? 0.88 : 1})`,
-                  filter: "drop-shadow(0 3px 8px rgb(0 0 0 / 0.35))",
                 }}
               >
                 <Avatar name={p.name} hue={p.hue} src={p.avatarUrl ?? undefined} size={size} />
@@ -499,7 +498,7 @@ function DeckMark({ size, scale, mark }: { size: number; scale: number; mark: "r
       <RehypeIcon
         size={Math.round(box * 0.68)}
         strokeWidth={2.8}
-        className="text-white [filter:drop-shadow(0_0_1.2px_rgba(0,0,0,0.75))]"
+        className="text-white"
       />
     </span>
   );
