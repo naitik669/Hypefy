@@ -270,11 +270,34 @@ describe("what they are called here", () => {
 });
 
 describe("the row under the tabs", () => {
-  it("is simply there — no arrow, nothing to fold away", () => {
-    expect(inbox).toContain("<PagesStrip pages={pages} me={me} />");
-    expect(inbox).not.toContain("PagesTrigger");
-    expect(inbox).not.toContain("pagesOpen");
-    expect(src).not.toContain("export function PagesTrigger");
+  it("can be folded away, from the arrow where the filter used to be", () => {
+    // Always-on is a row of faces you cannot put away. The arrow is back
+    // in the slot the filter vacated when it moved to the search bar.
+    expect(src).toContain("export function PagesTrigger");
+    expect(inbox).toContain("<PagesTrigger open={pagesOpen} count={pages.length} onToggle={togglePages} />");
+    expect(inbox).toContain("{pagesOpen && <PagesStrip pages={pages} me={me} />}");
+  });
+
+  it("opens open, and stays shut once you shut it", () => {
+    // A collapse that starts collapsed hides something nobody asked to
+    // hide; one that forgets is one you use again every visit.
+    expect(inbox).toContain("useState(true)");
+    expect(inbox).toContain("setPagesOpen(readPagesOpen())");
+    expect(inbox).toContain("writePagesOpen(!v)");
+    expect(src).toContain("export function readPagesOpen");
+    expect(src).toContain("export function writePagesOpen");
+  });
+
+  it("and a disk that refuses leaves it open rather than breaking the inbox", () => {
+    const fn = src.slice(src.indexOf("export function readPagesOpen"));
+    expect(fn.slice(0, 260)).toContain("catch");
+    expect(fn.slice(0, 260)).toContain("return true");
+  });
+
+  it("the arrow counts pages, not unread ones", () => {
+    // Unread is read from this device's storage inside the strip. A second
+    // read out here is a second answer waiting to disagree with the first.
+    expect(inbox).toContain("count={pages.length}");
   });
 
   it("starts where the search field above it starts", () => {
@@ -309,9 +332,20 @@ describe("the filters beside the tabs", () => {
     expect(deps.slice(0, 120)).toContain("filters");
   });
 
-  it("the pill says how many are on, and lights when any is", () => {
-    expect(inbox).toContain('filters.size > 0 ? "bg-accent/15 text-accent" : "bg-surface text-muted"');
-    expect(inbox).toContain("{filters.size}");
+  it("sits beside the search field, as an icon, the way Discover's does", () => {
+    // It was a labelled pill on the tab row. Every other list in the app
+    // keeps its filter next to the search field; this one now does too,
+    // and the tab row got its slot back for the UpDates arrow.
+    const search = inbox.indexOf('placeholder="Search messages"');
+    const filter = inbox.indexOf("<SlidersHorizontal");
+    expect(search).toBeGreaterThan(-1);
+    expect(filter).toBeGreaterThan(search);
+    expect(inbox).toContain("flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-surface");
+  });
+
+  it("and shows a dot rather than a number, since the icon has no room for one", () => {
+    expect(inbox).toContain('className="absolute right-[7px] top-[7px] h-2 w-2 rounded-full bg-accent ring-2 ring-surface"');
+    expect(inbox).toContain('aria-label={filters.size > 0 ? `Filters, ${filters.size} on` : "Filters"}');
   });
 
   it("each is a checkbox a screen reader can read the state of", () => {

@@ -7,7 +7,6 @@ import {
   Search,
   Users,
   Check,
-  ChevronDown,
   SlidersHorizontal,
   Ban,
   Loader2,
@@ -35,7 +34,7 @@ import { createClient } from "@/lib/supabase/client";
 import { isEncrypted, openEnvelope, useEnvelopeReader } from "@/lib/e2ee/chat";
 import { STATUS_ENABLED } from "@/lib/status-feature";
 import { FloatingPages } from "@/components/diary/FloatingPages";
-import { PagesStrip } from "@/components/diary/PagesStrip";
+import { PagesStrip, PagesTrigger, readPagesOpen, writePagesOpen } from "@/components/diary/PagesStrip";
 import type { DiaryEntry } from "@/lib/diary";
 import { isEmojiReply } from "@/components/diary/PageReplyEmbed";
 import { Avatar } from "@/components/ui/Avatar";
@@ -287,6 +286,27 @@ export function MessagesInbox({
    */
   const [filters, setFilters] = useState<Set<RowFilter>>(() => new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /**
+   * Whether today's UpDates are showing.
+   *
+   * Open to begin with, because it was always open before this and a
+   * collapse that starts collapsed hides something nobody asked to hide.
+   * Shut it and it stays shut — a toggle that forgets is a toggle you have
+   * to use every time you come back.
+   */
+  const [pagesOpen, setPagesOpen] = useState(true);
+  useEffect(() => {
+    // Read after mount: the server has no idea what this device decided,
+    // and a strip that started shut on the server would flicker open.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-time read of browser-only storage
+    setPagesOpen(readPagesOpen());
+  }, []);
+  const togglePages = useCallback(() => {
+    setPagesOpen((v) => {
+      writePagesOpen(!v);
+      return !v;
+    });
+  }, []);
   const toggleFilter = (f: RowFilter) =>
     setFilters((prev) => {
       const next = new Set(prev);
@@ -882,7 +902,8 @@ export function MessagesInbox({
 
       {/* Search */}
       <div className="px-4 pt-3">
-        <div className="flex h-11 items-center gap-2 rounded-2xl border border-border bg-surface px-3.5 focus-within:border-white/25">
+        <div className="flex items-center gap-2">
+        <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-2xl border border-border bg-surface px-3.5 focus-within:border-white/25">
           <Search size={17} className="shrink-0 text-faint" />
           <input
             value={q}
@@ -894,70 +915,37 @@ export function MessagesInbox({
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
           />
         </div>
-      </div>
-
-      {/* Filter tabs, with the Pages arrow riding the end of the row.
-          Not overflow-x-auto any more: the arrow is pushed to the right by
-          ml-auto, which needs a row that is exactly as wide as the screen.
-          Three pills and an arrow fit, so nothing was being scrolled to. */}
-      <div className="flex gap-2 px-4 pb-1 pt-3">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={`flex shrink-0 items-center gap-1.5 rounded-[14px] px-4 py-1.5 text-sm font-semibold transition-colors ${
-              tab === t.key
-                ? "bg-accent text-accent-ink"
-                : "bg-surface text-muted"
-            }`}
-          >
-            {t.label}
-            {t.count > 0 && (
-              <span
-                className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
-                  tab === t.key
-                    ? "bg-accent-ink/15 text-accent-ink"
-                    : "bg-accent text-accent-ink"
-                }`}
-              >
-                {t.count}
-              </span>
-            )}
-          </button>
-        ))}
-
-        <div className="relative ml-auto self-center">
+          <div className="relative shrink-0">
           <button
             type="button"
             onClick={() => setFiltersOpen((v) => !v)}
             aria-haspopup="menu"
             aria-expanded={filtersOpen}
             data-filters
-            className={`flex items-center gap-1.5 rounded-[14px] px-3 py-1.5 text-xs font-bold transition-colors ${
-              filters.size > 0 ? "bg-accent/15 text-accent" : "bg-surface text-muted"
+            aria-label={filters.size > 0 ? `Filters, ${filters.size} on` : "Filters"}
+            className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-surface transition-colors ${
+              filtersOpen || filters.size > 0
+                ? "border-white/25 text-foreground"
+                : "border-border text-muted"
             }`}
           >
-            <SlidersHorizontal size={13} strokeWidth={2.4} />
-            Filters
+            <SlidersHorizontal size={19} strokeWidth={2} />
             {filters.size > 0 && (
-              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-black text-accent-ink">
-                {filters.size}
-              </span>
+              // Ringed in the bar's own colour so it sits on the corner
+              // rather than floating over the border — the same dot
+              // Discover's filter wears.
+              <span
+                aria-hidden
+                className="absolute right-[7px] top-[7px] h-2 w-2 rounded-full bg-accent ring-2 ring-surface"
+              />
             )}
-            <ChevronDown
-              size={13}
-              strokeWidth={2.8}
-              aria-hidden
-              className={`transition-transform duration-200 ${filtersOpen ? "rotate-180" : ""}`}
-            />
           </button>
 
           <FloatingMenu
             open={filtersOpen}
             onClose={() => setFiltersOpen(false)}
             origin="top-right"
-            className="absolute right-0 top-10 min-w-[190px]"
+            className="absolute right-0 top-12 min-w-[190px]"
           >
             {(Object.keys(ROW_FILTERS) as RowFilter[]).map((f) => {
               const on = filters.has(f);
@@ -996,6 +984,46 @@ export function MessagesInbox({
             )}
           </FloatingMenu>
         </div>
+        </div>
+      </div>
+
+      {/* Filter tabs, with the Pages arrow riding the end of the row.
+          Not overflow-x-auto any more: the arrow is pushed to the right by
+          ml-auto, which needs a row that is exactly as wide as the screen.
+          Three pills and an arrow fit, so nothing was being scrolled to. */}
+      <div className="flex gap-2 px-4 pb-1 pt-3">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={`flex shrink-0 items-center gap-1.5 rounded-[14px] px-4 py-1.5 text-sm font-semibold transition-colors ${
+              tab === t.key
+                ? "bg-accent text-accent-ink"
+                : "bg-surface text-muted"
+            }`}
+          >
+            {t.label}
+            {t.count > 0 && (
+              <span
+                className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
+                  tab === t.key
+                    ? "bg-accent-ink/15 text-accent-ink"
+                    : "bg-accent text-accent-ink"
+                }`}
+              >
+                {t.count}
+              </span>
+            )}
+          </button>
+        ))}
+
+        {/* The arrow that opens today's UpDates, back where it used to
+            be. The filter moved to the search bar, which is where every
+            other list in the app keeps its filter. */}
+        {pages.length > 0 && (
+          <PagesTrigger open={pagesOpen} count={pages.length} onToggle={togglePages} />
+        )}
       </div>
 
       {/* Locked chats: there when Messages opens, gone at the first scroll
@@ -1005,7 +1033,7 @@ export function MessagesInbox({
         <LockedChatsRow count={vault.locked} unread={vault.unread} />
       )}
 
-      <PagesStrip pages={pages} me={me} />
+      {pagesOpen && <PagesStrip pages={pages} me={me} />}
 
       {/* Spotlight: a small deck of today's pages floating at the bottom
           right, shuffling itself; tap to open Spotlight on the one showing. */}

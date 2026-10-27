@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Music, Plus } from "lucide-react";
+import { ChevronDown, Music, Plus } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { loadSeen, pageText, storyOrder, unseen, type DiaryEntry } from "@/lib/diary";
 import { NoteEditorSheet, type MyNote } from "@/components/notes/NoteEditorSheet";
@@ -264,3 +264,70 @@ function Bubble({
   );
 }
 
+/**
+ * The arrow that opens and shuts today's UpDates.
+ *
+ * It lived on the filter row once, was dropped when the strip became
+ * always-on, and is back because always-on is a row of faces you cannot
+ * put away. It sits where the filter used to be; the filter moved to the
+ * search bar, where every other list in the app keeps one.
+ *
+ * The count is how many pages there are, not how many are unread. Unread
+ * is read from this device's own storage inside the strip, and a second
+ * read here is a second answer waiting to disagree with the first.
+ */
+export function PagesTrigger({
+  open,
+  count,
+  onToggle,
+}: {
+  open: boolean;
+  count: number;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-label={`${count} ${count === 1 ? "update" : "updates"} today. ${open ? "Hide" : "Show"}`}
+      data-pages-trigger
+      className="ml-auto flex shrink-0 items-center gap-1 self-center pl-2 pr-1 text-xs font-bold text-muted transition-colors active:text-accent"
+    >
+      <span className={open ? "text-accent" : ""}>UpDates</span>
+      {count > 0 && (
+        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-black text-accent-ink">
+          {count}
+        </span>
+      )}
+      <ChevronDown
+        size={15}
+        strokeWidth={3}
+        aria-hidden
+        className={`transition-transform duration-200 ${open ? "rotate-180 text-accent" : ""}`}
+      />
+    </button>
+  );
+}
+
+/** Whether UpDates were left open, on this device. A collapse that forgets
+ *  is one you have to use again every visit. */
+const OPEN_KEY = "hypefy_updates_open";
+
+export function readPagesOpen(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return localStorage.getItem(OPEN_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function writePagesOpen(open: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(OPEN_KEY, open ? "1" : "0");
+  } catch {
+    /* private mode: it stays open next time, which is the kinder default */
+  }
+}
