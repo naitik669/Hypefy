@@ -162,9 +162,15 @@ export function RehypeDeck({
   bounds,
   onPick,
   mark = "rehype",
+  markScale = 0.58,
 }: {
   seated: DeckPerson[];
   size?: number;
+  /**
+   * The mark's size as a share of the face. A Shot is held closer and
+   * drawn over moving video, so it asks for a bigger one than a post does.
+   */
+  markScale?: number;
   /**
    * What a face is here for when it does not say itself. One row seats
    * both kinds — see mergeDecks — so the mark normally rides on the
@@ -326,6 +332,8 @@ export function RehypeDeck({
       onTouchCancel={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
+      {/* One gradient definition for every star drawn in this deck. */}
+      <HypeGradientDefs />
       {faces.map((f, i) => {
         const p = f.person;
         const leaving = f.motion === "leave";
@@ -393,7 +401,9 @@ export function RehypeDeck({
                 }}
               >
                 <Avatar name={p.name} hue={p.hue} src={p.avatarUrl ?? undefined} size={size} />
-                {!leaving && <DeckMark size={size} mark={f.person.mark ?? mark} />}
+                {!leaving && (
+                  <DeckMark size={size} scale={markScale} mark={f.person.mark ?? mark} />
+                )}
               </span>
             </span>
           </button>
@@ -414,29 +424,57 @@ export function RehypeDeck({
  * So the star sits straight on the face, bigger, with a dark rim and a
  * shadow to hold it against a pale avatar.
  */
-function DeckMark({ size, mark }: { size: number; mark: "rehype" | "hype" }) {
+/**
+ * The gradient the hype star is filled with.
+ *
+ * One definition for every star on the page, with a fixed id, the way
+ * VerifiedStar already does it: a per-instance id would mean one copy of
+ * an identical gradient per face, and they all resolve to the same thing
+ * anyway.
+ *
+ * It lives in its own zero-sized svg because lucide's Star draws its own,
+ * and url(#…) resolves across the document rather than within one element.
+ */
+const HYPE_GRAD = "hypeStarGrad";
+
+function HypeGradientDefs() {
+  return (
+    <svg width="0" height="0" aria-hidden className="absolute">
+      <defs>
+        <linearGradient id={HYPE_GRAD} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="var(--color-hype-lit)" />
+          <stop offset="1" stopColor="var(--color-hype-deep)" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
+function DeckMark({ size, scale, mark }: { size: number; scale: number; mark: "rehype" | "hype" }) {
   if (mark === "hype") {
     return (
-      <span
-        className="absolute -bottom-1.5 -right-1.5 text-hype"
-        // A dark halo rather than a dark outline. A stroke of another colour
-        // would not just darken the edge, it would reshape the star: the
-        // round join on a stroke the same colour as the fill is the whole
-        // reason the points are curved rather than spiked.
-        style={{ filter: "drop-shadow(0 0 1px rgba(0,0,0,0.6)) drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }}
-        aria-hidden
-      >
-        {/* The hype button's own star, at its own stroke weight, so the two
-            are the same shape rather than two drawings of a star. Filled,
-            because the button wears an outline when you have NOT hyped
-            something — an outline here would say the opposite of what the
-            face is for. */}
-        <Star size={Math.round(size * 0.52)} strokeWidth={2.2} fill="currentColor" />
+      <span className="absolute -bottom-1.5 -right-1.5" aria-hidden>
+        {/* No plate and no shadow, which is the shape of the thing: a star
+            is legible as itself. What stands in for the shadow is the
+            gradient's deep end — dark enough that the star keeps some mass
+            against a pale face.
+
+            The hype button's own star, at its own stroke weight, so the two
+            are one drawing rather than two. Filled, because the button
+            wears an outline when you have NOT hyped something, and the
+            stroke matches the fill: the round join on a same-coloured
+            stroke is what makes the points curved rather than spiked. */}
+        <Star
+          size={Math.round(size * scale)}
+          strokeWidth={2.2}
+          fill={`url(#${HYPE_GRAD})`}
+          stroke={`url(#${HYPE_GRAD})`}
+        />
       </span>
     );
   }
 
-  const box = Math.round(size * 0.47);
+  const box = Math.round(size * scale);
   return (
     <span
       className="absolute -bottom-1 -right-1 flex items-center justify-center rounded-[30%] text-white"
@@ -447,7 +485,6 @@ function DeckMark({ size, mark }: { size: number; mark: "rehype" | "hype" }) {
         // lime, which is the point of it.
         background:
           "linear-gradient(135deg, var(--color-accent), var(--color-accent-deep))",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.45)",
       }}
       aria-hidden
     >

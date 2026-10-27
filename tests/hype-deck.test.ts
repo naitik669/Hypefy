@@ -80,27 +80,59 @@ describe("the mark on the face", () => {
     // the fill, at that weight. Reusing the component is the only way the
     // two stay the same shape.
     const hype = deck.slice(deck.indexOf('if (mark === "hype")'), deck.indexOf("const box ="));
-    expect(hype).toContain("<Star size={Math.round(size * 0.52)} strokeWidth={2.2} fill=\"currentColor\" />");
+    expect(hype).toContain("<Star");
+    expect(hype).toContain("strokeWidth={2.2}");
     const card = readFileSync("src/components/feed/FeedCard.tsx", "utf8");
     expect(card, "the button's own weight").toContain("strokeWidth={2.2}");
   });
 
-  it("in the hype colour the app already has a token for", () => {
-    // --color-hype, not a hex copied into a component. A lime star would
-    // be the single brand pop spent on the wrong thing.
-    const hype = deck.slice(deck.indexOf('if (mark === "hype")'), deck.indexOf("const box ="));
-    expect(hype).toContain("text-hype");
-    expect(hype).not.toMatch(/#[0-9a-fA-F]{6}/);
+  it("its gradient is two tokens, not two hexes in a component", () => {
+    expect(deck).toContain("var(--color-hype-lit)");
+    expect(deck).toContain("var(--color-hype-deep)");
+    const css = readFileSync("src/app/globals.css", "utf8");
+    expect(css).toContain("--color-hype-lit:");
+    expect(css).toContain("--color-hype-deep:");
   });
 
-  it("and sits on the face rather than on a plate beside it", () => {
-    // On a dark plate it read as a grey chip stuck to a corner. It holds
-    // against a pale avatar with a halo, not an outline — an outline of
-    // another colour would reshape the star, not just darken its edge.
+  it("and one definition serves every star on the page", () => {
+    // A per-instance id would mean one copy of an identical gradient per
+    // face. VerifiedStar already settled this; same fixed id here.
+    expect(deck).toContain('const HYPE_GRAD = "hypeStarGrad"');
+    expect(deck.match(/<HypeGradientDefs \/>/g)?.length).toBe(1);
+  });
+
+  it("the stroke matches the fill, or the points go spiky", () => {
+    // The curve is a round join on a same-coloured stroke. A stroke of any
+    // other colour reshapes the star rather than just recolouring its edge.
+    const hype = deck.slice(deck.indexOf('if (mark === "hype")'), deck.indexOf("const box ="));
+    expect(hype).toContain("fill={`url(#${HYPE_GRAD})`}");
+    expect(hype).toContain("stroke={`url(#${HYPE_GRAD})`}");
+  });
+
+  it("sits bare on the face — no plate, and no shadow under it", () => {
     const hype = deck.slice(deck.indexOf('if (mark === "hype")'), deck.indexOf("const box ="));
     expect(hype).not.toContain("bg-black/55");
-    expect(hype).toContain("drop-shadow");
-    expect(hype).not.toContain("stroke=");
+    expect(hype).not.toContain("drop-shadow");
+    expect(hype).not.toContain("boxShadow");
+  });
+
+  it("nothing in the row drops a shadow behind it any more", () => {
+    // No halo on the star, no shadow under either plate. The one filter
+    // left is a 1.2px edge on the white loop, which is not a drop shadow
+    // doing decoration — it is the only thing keeping that loop visible
+    // where the lime gradient is still brand lime at 1.5:1.
+    // Scoped to the marks. The faces themselves keep the soft shadow that
+    // makes them read as floating over the photo rather than stuck to it —
+    // that one is older than any of this and is the float, not decoration.
+    const marks = deck
+      .slice(deck.indexOf("function DeckMark"))
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    expect(marks).not.toContain("boxShadow");
+    const shadows = marks.match(/drop-shadow\([^)]*\)/g) ?? [];
+    expect(shadows.length, shadows.join(" ")).toBe(1);
+    expect(shadows[0]).toContain("1.2px");
   });
 
   it("the rehype keeps a plate, now in the lime that is already its colour", () => {
@@ -239,14 +271,24 @@ describe("how the faces float", () => {
     expect(deck).toContain("  size = 42,");
   });
 
-  it("including in a Shot, which asks for its own size", () => {
-    // The default does not reach the reel: it passes one explicitly, so
-    // the default growing would have left the Shot's faces behind.
+  it("and bigger again in a Shot, which is held closer", () => {
+    // The default does not reach the reel: it passes its own, so the
+    // default growing would leave the Shot's faces behind.
     const reel = read("src/components/shots/ReelsFeed.tsx");
-    for (const n of reel.match(/<RehypeDeck[\s\S]{0,200}?size=\{(\d+)\}/g) ?? []) {
-      const size = Number(n.match(/size=\{(\d+)\}/)![1]);
-      expect(size, n.slice(0, 40)).toBeGreaterThanOrEqual(36);
-    }
-    expect(reel.match(/size=\{\d+\}/g)?.length, "both decks sized").toBeGreaterThanOrEqual(2);
+    const size = Number(reel.match(/<RehypeDeck[\s\S]{0,200}?size=\{(\d+)\}/)?.[1]);
+    expect(size, "shot face size").toBeGreaterThanOrEqual(44);
+  });
+
+  it("the mark grows with the face rather than sitting at one size", () => {
+    expect(deck).toContain("size={Math.round(size * scale)}");
+    expect(deck).toContain("const box = Math.round(size * scale);");
+    expect(deck).toContain("markScale = 0.58");
+  });
+
+  it("and is proportionally bigger in a Shot, not just bigger with it", () => {
+    const reel = read("src/components/shots/ReelsFeed.tsx");
+    const shot = Number(reel.match(/markScale=\{([\d.]+)\}/)?.[1]);
+    const post = Number(deck.match(/markScale = ([\d.]+)/)?.[1]);
+    expect(shot, "shot markScale").toBeGreaterThan(post);
   });
 });

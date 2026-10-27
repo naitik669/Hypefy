@@ -1637,9 +1637,12 @@ function ReelCard({
       >
         {/* Who passed this on. The faces carry the rehype mark themselves,
             so the line that used to name them here is gone. */}
+        {/* Bigger than on a post: a Shot is held closer and the faces
+            sit over moving video rather than a still photograph. */}
         <RehypeDeck
           seated={faces}
-          size={36}
+          size={44}
+          markScale={0.66}
           bounds={reelRef}
           onPick={(person) => (person.mark === "hype" ? setHypedBySheet(true) : setReplyTo(person))}
         />

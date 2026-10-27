@@ -33,6 +33,11 @@
   /* The far end of the lime, for a fill that has to carry white on it.
      The brand lime is too bright to: white on #a3e635 is 1.5:1. */
   --color-accent-deep: #3f6212;
+  /* The two ends of the hype gold, for the star's gradient. The deep end
+     is dark enough that the star still has mass against a pale face,
+     which is what it has instead of a shadow. */
+  --color-hype-lit: #ffe066;
+  --color-hype-deep: #b07800;
   --color-accent-ink: #0a0a0a; /* text on accent fills */
   --color-hype: #ffd000; /* active Hype star */
   --color-verified: #4d8dff; /* Verified (blue) — the badge's own family, not Instagram's #3897f0 */
