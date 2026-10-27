@@ -8,6 +8,7 @@ import {
   queueOutbox,
   readOutbox,
   recordAttempt,
+  restoredMessage,
   toRestore,
   type OutboxEntry,
   type SentLike,
@@ -205,15 +206,15 @@ describe("deciding what to put back in the thread", () => {
     ...over,
   });
 
-  it("puts back only the ones that have given up", () => {
-    // One still being retried is already drawn as pending by the thread it
-    // belongs to. Restoring it as "Not sent" would be a lie about a message
-    // that is still on its way.
+  it("puts back everything that did not arrive, spent or not", () => {
+    // Nothing retries across a restart, so an entry with attempts left is
+    // not a message on its way — leaving it out would be a message in
+    // storage that can be neither seen nor sent.
     const entries = [
       entry({ tempId: "trying", attempts: 1 }),
       entry({ tempId: "dead", attempts: MAX_ATTEMPTS }),
     ];
-    expect(toRestore(entries, [], ME).map((e) => e.tempId)).toEqual(["dead"]);
+    expect(toRestore(entries, [], ME).map((e) => e.tempId)).toEqual(["trying", "dead"]);
   });
 
   it("drops one that evidently arrived, rather than drawing it twice", () => {
@@ -260,5 +261,55 @@ describe("deciding what to put back in the thread", () => {
       entry({ tempId: "early", attempts: MAX_ATTEMPTS, createdAt: "2026-10-25T09:00:00.000Z" }),
     ];
     expect(toRestore(entries, [], ME).map((e) => e.tempId)).toEqual(["early", "late"]);
+  });
+});
+
+describe("drawing one back into the thread", () => {
+  /** Always ours: the outbox only ever holds what we tried to send. */
+  const drawn = (e: OutboxEntry) => restoredMessage(e, ME);
+
+  it("as ours, on our side of the thread", () => {
+    // Without a sender it is drawn as the other person’s: wrong side,
+    // their face on it, and no way to retry it.
+    expect(drawn(entry()).sender_id).toBe(ME);
+  });
+
+  it("comes back under the id it was drawn under the first time", () => {
+    // The thread already has that id in its own records — the album's
+    // files, a retry's storage path. A new id orphans all of it.
+    const m = drawn(entry({ tempId: "temp-7" }));
+    expect(m.id).toBe("temp-7");
+  });
+
+  it("dead if it spent its attempts, still owed a try if it did not", () => {
+    expect(drawn(entry({ attempts: MAX_ATTEMPTS }))._status).toBe("failed");
+    expect(drawn(entry({ attempts: 1 }))._status).toBe("pending");
+  });
+
+  it("at the time it was written, not the time it came back", () => {
+    // Otherwise a message from last night reappears at the foot of the
+    // thread this morning, below replies it never saw.
+    const m = drawn(entry({ createdAt: "2026-10-25T09:00:00.000Z" }));
+    expect(m.created_at).toBe("2026-10-25T09:00:00.000Z");
+  });
+
+  it("carrying the envelope, which the thread opens the same way it opens any", () => {
+    // Nothing special on the way in: body holds exactly what the server
+    // would have held, so the existing decrypt covers it.
+    const m = drawn(entry({ wire: "e2ee:v1:ENVELOPE", sealed: true }));
+    expect(m.body).toBe("e2ee:v1:ENVELOPE");
+  });
+
+  it("and what a retry needs to go again without re-uploading", () => {
+    const m = drawn(
+      entry({ kind: "oneshot", wire: null, storagePath: "u/1/x.jpg", caption: "hi" }),
+    );
+    expect(m.kind).toBe("oneshot");
+    expect(m._storagePath).toBe("u/1/x.jpg");
+    expect(m._caption).toBe("hi");
+  });
+
+  it("keeps the reply it was a reply to", () => {
+    expect(drawn(entry({ replyToId: "m-9" })).reply_to_id).toBe("m-9");
   });
 });

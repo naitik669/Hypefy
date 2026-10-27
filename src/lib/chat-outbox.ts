@@ -2,6 +2,8 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 
+import type { ChatMsg } from "@/lib/chat-thread";
+
 /**
  * Messages written but not yet sent, kept on the device until they are.
  *
@@ -192,11 +194,13 @@ const SAME_MESSAGE_MS = 60 * 60 * 1000;
 /**
  * Which unsent messages should go back into the thread.
  *
- * Two jobs. Only the ones that have given up are drawn: one still inside its
- * attempt budget is already shown as pending by the thread that owns it, and
- * calling it "Not sent" would be a lie about a message still on its way.
+ * All of them, minus any that evidently arrived. An entry that has not
+ * spent its attempts is not a message on its way — nothing is retrying it
+ * across a restart — so leaving it out would mean a message sitting in
+ * storage that cannot be seen and cannot be sent. It comes back too; how
+ * it is drawn is isTerminal's business, not this one's.
  *
- * And one that evidently arrived is dropped instead of drawn. The app can be
+ * One that evidently arrived is dropped instead of drawn. The app can be
  * killed in the gap between the server accepting a message and the outbox
  * row being deleted; the row survives, the message is genuinely in the
  * thread, and without this the sender sees their own message twice — once
@@ -225,8 +229,43 @@ export function toRestore(
     );
 
   return entries
-    .filter((e) => isTerminal(e) && !arrived(e))
+    .filter((e) => !arrived(e))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/**
+ * One unsent message, as the thread draws its own.
+ *
+ * `body` holds exactly what the server would have held — the envelope for
+ * a sealed chat — so the decrypt the thread already runs over everything
+ * arriving covers this too, and nothing about a restored message is a
+ * special case downstream.
+ *
+ * It keeps its original id, because the thread has records under that id
+ * already: an album's files on this device, a OneShot's storage path. A
+ * fresh id would orphan all of them. And it keeps its original time, or a
+ * message written last night reappears this morning at the foot of the
+ * thread, under replies it never saw.
+ */
+export function restoredMessage(entry: OutboxEntry, myId: string): ChatMsg {
+  return {
+    id: entry.tempId,
+    body: entry.wire,
+    // Yours, always: the outbox is per account and only ever holds what
+    // you tried to send. Without this the thread draws it as the other
+    // person's, on the wrong side, with their face on it.
+    sender_id: myId,
+    kind: entry.kind,
+    post_id: null,
+    reply_to_id: entry.replyToId,
+    is_unsent: false,
+    created_at: entry.createdAt,
+    // Spent its attempts: dead, and drawn as such. Otherwise it is still
+    // owed a try, and reads as pending until something gives it one.
+    _status: isTerminal(entry) ? "failed" : "pending",
+    ...(entry.storagePath ? { _storagePath: entry.storagePath } : {}),
+    ...(entry.caption ? { _caption: entry.caption } : {}),
+  };
 }
 
 function subscribe(onChange: () => void) {

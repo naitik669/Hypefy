@@ -65,6 +65,14 @@ import { openEncryptionSetup } from "@/lib/e2ee/open-setup";
 import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 import { ChatImg, ChatLink, ChatVideo } from "@/components/messages/ChatMedia";
 import { readDraft, writeDraft } from "@/lib/chat-drafts";
+import {
+  dropOutbox,
+  outboxFor,
+  queueOutbox,
+  recordAttempt,
+  restoredMessage,
+  toRestore,
+} from "@/lib/chat-outbox";
 import { mediaUrlsOf, prefetchChatMedia } from "@/lib/chat-media-url";
 import { SharedShotCard } from "@/components/messages/SharedShotCard";
 import { SharedPostCard } from "@/components/messages/SharedPostCard";
@@ -1126,6 +1134,60 @@ export function RealChatView({
     setScheduleBody(sealed ?? body);
   }
 
+  /**
+   * Unsent messages from a previous visit, back where they were written.
+   *
+   * They keep their original time rather than arriving at the foot of the
+   * thread, so one written last night sits above this morning's replies
+   * where it belongs — and keeps its original id, because the thread has
+   * records under that id already.
+   *
+   * Anything that evidently reached the server is dropped instead of
+   * drawn: the app can be killed between the server accepting a message
+   * and the row being deleted, and the same message twice is worse than
+   * the failure this feature exists to fix. See toRestore.
+   */
+  useEffect(() => {
+    const waiting = outboxFor(currentUserId, conversationId);
+    if (waiting.length === 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-time read of browser-only storage
+    setMessages((prev) => {
+      const here = new Set(prev.map((m) => m.id));
+      const back = toRestore(waiting, prev, currentUserId)
+        .filter((e) => !here.has(e.tempId))
+        .map((e) => restoredMessage(e, currentUserId));
+      if (back.length === 0) return prev;
+      return [...prev, ...back].sort((a, b) => a.created_at.localeCompare(b.created_at));
+    });
+  }, [conversationId, currentUserId]);
+
+  /**
+   * Mark a message failed, and keep it on the device.
+   *
+   * Everything that fails goes through here. Until it did, an unsent
+   * message lived in React state alone: it was on screen with a red tick
+   * and gone the moment you switched apps, which is the failure people
+   * blame an app for permanently.
+   *
+   * What is stored is what would have gone to the server — the envelope
+   * for a sealed chat, never its plaintext. See chat-outbox.
+   */
+  function keepFailed(m: ChatMsg) {
+    setMessages((p) => p.map((x) => (x.id === m.id ? { ...x, _status: "failed" as const } : x)));
+    queueOutbox(currentUserId, {
+      tempId: m.id,
+      conversationId,
+      kind: m.kind,
+      wire: m._cipher ?? m.body,
+      sealed: !!m._cipher,
+      replyToId: m.reply_to_id,
+      createdAt: m.created_at,
+      attempts: 1,
+      ...(m._storagePath ? { storagePath: m._storagePath } : {}),
+      ...(m._caption ? { caption: m._caption } : {}),
+    });
+  }
+
   async function send(override?: string, replyOverride?: ChatMsg): Promise<boolean> {
     if (editing && !replyOverride) { await saveEdit(); return true; }
     const body = (override ?? text).trim();
@@ -1157,12 +1219,13 @@ export function RealChatView({
     });
     if (error || !data) {
       // Keep message visible but mark it failed
-      setMessages((p) => p.map((m) => (m.id === tempId ? { ...m, _status: "failed" as const } : m)));
+      keepFailed(optimistic);
       showToast("Couldn't send. Try again.");
       setSending(false);
       return false;
     }
     const real = data as ChatMsg;
+    dropOutbox(currentUserId, tempId);
     // If the realtime echo already added the real row, just drop the temp.
     setMessages((p) =>
       p.some((m) => m.id === real.id)
@@ -1207,10 +1270,14 @@ export function RealChatView({
       p_storage_path: failed._storagePath ?? undefined,
     });
     if (error || !data) {
-      setMessages((p) => p.map((m) => (m.id === failed.id ? { ...m, _status: "failed" as const } : m)));
+      // Counted on the device, so an app killed between tries does not
+      // get a fresh budget every launch and retry for ever.
+      recordAttempt(currentUserId, failed.id);
+      keepFailed(failed);
       showToast("Still couldn't send. Check your connection.");
     } else {
       const real = data as ChatMsg;
+      dropOutbox(currentUserId, failed.id);
       setMessages((p) =>
         p.some((m) => m.id === real.id)
           ? p.filter((m) => m.id !== failed.id)
@@ -1276,7 +1343,7 @@ export function RealChatView({
     });
 
     if (error || !data) {
-      setMessages((p) => p.map((m) => (m.id === tempId ? { ...m, _status: "failed" as const } : m)));
+      keepFailed(optimistic);
       showToast("Couldn't send voice note. Tap it to retry.");
       return;
     }
@@ -1309,7 +1376,7 @@ export function RealChatView({
       p_post_id: undefined, p_reply_to_id: replyId ?? undefined,
     });
     if (error || !data) {
-      setMessages((p) => p.map((m) => m.id === tempId ? { ...m, _status: "failed" as const } : m));
+      keepFailed(optimistic);
       showToast("Couldn't send GIF.");
     } else {
       const real = data as ChatMsg;
@@ -1341,7 +1408,7 @@ export function RealChatView({
       p_post_id: undefined, p_reply_to_id: replyId ?? undefined,
     });
     if (error || !data) {
-      setMessages((p) => p.map((m) => m.id === tempId ? { ...m, _status: "failed" as const } : m));
+      keepFailed(optimistic);
       showToast("Couldn't send that song.");
     } else {
       const real = data as ChatMsg;
@@ -1581,7 +1648,7 @@ export function RealChatView({
       p_storage_path: isOneShot ? path : undefined,
     });
     if (error || !data) {
-      setMessages((p) => p.map((m) => m.id === tempId ? { ...m, _status: "failed" as const } : m));
+      keepFailed(optimistic);
       showToast("Couldn't send. Try again.");
     } else {
       const real = data as ChatMsg;

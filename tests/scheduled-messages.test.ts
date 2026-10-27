@@ -335,3 +335,58 @@ describe("the picker", () => {
     expect(sheet).toContain("disabled={busy || problem !== null}");
   });
 });
+
+describe("an unsent message survives the app closing", () => {
+  const chat = read("src/components/messages/RealChatView.tsx");
+
+  it("every failure goes through one place that keeps it", () => {
+    // Six send paths failed in six slightly different ways. One of them
+    // forgetting to persist is one kind of message that still vanishes.
+    expect(chat).toContain("function keepFailed(m: ChatMsg)");
+    expect(chat.match(/keepFailed\(/g)?.length).toBeGreaterThanOrEqual(6);
+    expect(chat).not.toContain('_status: "failed" as const } : m)));');
+  });
+
+  it("and what it writes down is the wire, never a sealed body's words", () => {
+    const fn = chat.slice(chat.indexOf("function keepFailed"));
+    expect(fn.slice(0, 700)).toContain("wire: m._cipher ?? m.body");
+    expect(fn.slice(0, 700)).toContain("sealed: !!m._cipher");
+  });
+
+  it("and it writes unconditionally — marking the screen is not keeping it", () => {
+    // Asserting the call exists is not the same as asserting it runs: an
+    // `if (false)` in front of it passed the first version of this.
+    const fn = chat.slice(chat.indexOf("function keepFailed"));
+    expect(fn.slice(0, 700)).toMatch(
+      /_status: "failed" as const \} : x\)\)\);\s*\n\s*queueOutbox\(currentUserId, \{/,
+    );
+  });
+
+  it("a message that went is one the device forgets", () => {
+    // Left behind, it comes back as a duplicate the next time the thread
+    // opens — the one failure worse than the one being fixed.
+    expect(chat.match(/dropOutbox\(currentUserId,/g)?.length).toBe(2);
+  });
+
+  it("a retry spends an attempt rather than trying for ever", () => {
+    const fn = chat.slice(chat.indexOf("async function retrySend"));
+    expect(fn.slice(0, 1600)).toContain("recordAttempt(currentUserId, failed.id)");
+  });
+
+  it("and the thread puts back what it finds when it opens", () => {
+    expect(chat).toContain("outboxFor(currentUserId, conversationId)");
+    expect(chat).toContain("toRestore(waiting, prev, currentUserId)");
+    expect(chat).toContain("restoredMessage(e, currentUserId)");
+  });
+
+  it("in the order they were written, not at the foot of the thread", () => {
+    // A message from last night belongs above this morning's replies.
+    const fn = chat.slice(chat.indexOf("const waiting = outboxFor"));
+    expect(fn.slice(0, 900)).toContain("a.created_at.localeCompare(b.created_at)");
+  });
+
+  it("and never twice, when one is already on screen", () => {
+    const fn = chat.slice(chat.indexOf("const waiting = outboxFor"));
+    expect(fn.slice(0, 900)).toContain("!here.has(e.tempId)");
+  });
+});
