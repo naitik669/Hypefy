@@ -123,3 +123,96 @@ describe("a song under a feed post", () => {
     expect(played.at(-1)).toContain("b.mp3");
   });
 });
+
+/**
+ * The overlay variant: the disc in its case, inside the top-left of a post.
+ *
+ * The case used to be the play/pause button. It is not any more — muting is
+ * the only way to stop a song now, and tapping the case is how you find out
+ * what is playing. Getting that wrong means a tap meant to read the title
+ * silences the post instead, which is the thing this change exists to fix.
+ */
+async function renderOverlay() {
+  const { TrackChip } = await import("@/components/music/TrackChip");
+  await act(async () =>
+    root.render(createElement(TrackChip, { track: track("a"), autoPlayInView: true, overlay: true })),
+  );
+}
+
+const caseButton = () => host.querySelector("button") as HTMLButtonElement;
+const titleLink = () => host.querySelector("a") as HTMLAnchorElement;
+const stage = () => host.querySelector("[data-sound-stage]") as HTMLElement;
+const isOpen = () => stage().getAttribute("data-open") === "true";
+
+describe("the disc in its case", () => {
+  it("does not stop the music when it is tapped", async () => {
+    // The whole point of the change. A tap used to pause; now the mute
+    // button is the only off switch and this one only shows the title.
+    await renderOverlay();
+    await scrollTo(0, 0.9);
+    expect(played).toHaveLength(1);
+    await act(async () => caseButton().click());
+    expect(paused).toBe(0);
+    expect(played).toHaveLength(1);
+  });
+
+  it("shows the title instead", async () => {
+    await renderOverlay();
+    expect(isOpen()).toBe(false);
+    await act(async () => caseButton().click());
+    expect(isOpen()).toBe(true);
+  });
+
+  it("and tapping it again goes to the song's page rather than doing nothing", async () => {
+    // Otherwise the second tap is a dead control sitting on top of a photo.
+    await renderOverlay();
+    let went = 0;
+    await act(async () => caseButton().click());
+    titleLink().addEventListener("click", (e) => {
+      e.preventDefault();
+      went++;
+    });
+    await act(async () => caseButton().click());
+    expect(went).toBe(1);
+  });
+
+  it("the song's page is reachable without seeing the title at all", async () => {
+    // The reveal is a hover-and-tap affordance. A keyboard or screen reader
+    // user never triggers it, so the link has to be in the page regardless.
+    await renderOverlay();
+    expect(isOpen()).toBe(false);
+    expect(titleLink().getAttribute("href")).toContain("/sound/");
+    expect(titleLink().textContent).toContain("a");
+  });
+
+  it("focus holds the title out, rather than snatching it back on a timer", async () => {
+    // Someone reading it with the keyboard cannot hover and read quickly.
+    vi.useFakeTimers();
+    try {
+      await renderOverlay();
+      await act(async () => caseButton().focus());
+      expect(isOpen()).toBe(true);
+      await act(async () => {
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(isOpen()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("but a tap lets it tuck back on its own", async () => {
+    vi.useFakeTimers();
+    try {
+      await renderOverlay();
+      await act(async () => caseButton().click());
+      expect(isOpen()).toBe(true);
+      await act(async () => {
+        vi.advanceTimersByTime(3_000);
+      });
+      expect(isOpen()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
