@@ -103,13 +103,45 @@ describe("the mark on the face", () => {
     expect(hype).not.toContain("stroke=");
   });
 
-  it("the rehype keeps its plate, because a thin white line needs one", () => {
+  it("the rehype keeps a plate, now in the lime that is already its colour", () => {
+    // RehypeIcon paints itself text-accent when active, so lime is the
+    // rehype colour exactly as gold is the hype colour.
     const rehype = deck.slice(deck.indexOf("const box ="));
-    expect(rehype).toContain("bg-black/55");
+    expect(rehype).toContain("var(--color-accent)");
+    expect(rehype).toContain("var(--color-accent-deep)");
+    expect(rehype).not.toMatch(/#[0-9a-fA-F]{6}/);
   });
 
-  it("and the loop is still what a rehype wears", () => {
-    expect(deck).toContain("M13 18H7a2 2 0 0 1-2-2V6");
+  it("and the deep end of that lime is a token, not a hex in a component", () => {
+    const css = readFileSync("src/app/globals.css", "utf8");
+    expect(css).toContain("--color-accent-deep:");
+  });
+
+  it("the white loop carries a shadow, because the light end is real lime", () => {
+    // White on #a3e635 is 1.5:1 and the gradient's light corner sits right
+    // under the upper arrow. Without something behind it, that arrow
+    // dissolves into the plate.
+    const rehype = deck.slice(deck.indexOf("const box ="));
+    expect(rehype).toContain("drop-shadow");
+  });
+
+  it("and the loop is the rehype button's own, not a copy of its path", () => {
+    // Same lesson as the star: a hand-copied path drifts from the button
+    // the first time either is touched.
+    expect(deck).toContain("<RehypeIcon");
+    expect(deck).not.toContain("M13 18H7a2 2 0 0 1-2-2V6");
+  });
+
+  it("drawn inactive, because active paints it lime on a lime plate", () => {
+    // Comments stripped: the one above this code explains the trap and
+    // would satisfy the assertion on its own.
+    const code = deck
+      .slice(deck.indexOf("const box ="))
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    expect(code).not.toContain("active");
+    expect(code).toContain("text-white");
   });
 });
 

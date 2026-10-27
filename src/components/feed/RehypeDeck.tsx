@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Star } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
+import { RehypeIcon } from "@/components/ui/RehypeIcon";
 import type { DeckPerson } from "@/lib/rehype";
 
 /**
@@ -437,16 +438,31 @@ function DeckMark({ size, mark }: { size: number; mark: "rehype" | "hype" }) {
   const box = Math.round(size * 0.47);
   return (
     <span
-      className="absolute -bottom-1 -right-1 flex items-center justify-center rounded-[30%] bg-black/55 text-white backdrop-blur-md"
-      style={{ width: box, height: box }}
+      className="absolute -bottom-1 -right-1 flex items-center justify-center rounded-[30%] text-white"
+      style={{
+        width: box,
+        height: box,
+        // Brand lime falling to the deep end. The light corner is real
+        // lime, which is the point of it.
+        background:
+          "linear-gradient(135deg, var(--color-accent), var(--color-accent-deep))",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.45)",
+      }}
       aria-hidden
     >
-      <svg viewBox="0 0 24 24" width={box * 0.65} height={box * 0.65} fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M13 18H7a2 2 0 0 1-2-2V6" />
-        <path d="m2 9 3-3 3 3" />
-        <path d="M11 6h6a2 2 0 0 1 2 2v10" />
-        <path d="m22 15-3 3-3-3" />
-      </svg>
+      {/* The rehype button's own loop, so the mark and the button are one
+          drawing rather than two. Inactive: active would paint it lime,
+          and on a lime plate that is a loop you cannot see.
+
+          The shadow is doing real work, not decoration. White on brand
+          lime is 1.5:1, and the gradient's light end sits exactly under
+          the upper arrow — without something behind it that arrow
+          dissolves into the plate. */}
+      <RehypeIcon
+        size={Math.round(box * 0.68)}
+        strokeWidth={2.8}
+        className="text-white [filter:drop-shadow(0_0_1.2px_rgba(0,0,0,0.75))]"
+      />
     </span>
   );
 }
