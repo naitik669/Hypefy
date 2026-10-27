@@ -477,6 +477,55 @@ export type Database = {
           },
         ]
       }
+      conversation_nicknames: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          nickname: string
+          owner_id: string
+          subject_id: string
+          updated_at: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          nickname: string
+          owner_id: string
+          subject_id: string
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          nickname?: string
+          owner_id?: string
+          subject_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_nicknames_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_nicknames_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_nicknames_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           auto_delete_after: string | null
@@ -3191,6 +3240,14 @@ export type Database = {
       send_page_reply: {
         Args: { p_body: string; p_owner: string }
         Returns: string
+      }
+      set_nickname: {
+        Args: {
+          p_conversation_id: string
+          p_nickname: string
+          p_subject_id: string
+        }
+        Returns: undefined
       }
       set_activity_mute: {
         Args: { p_on: boolean; p_user: string }

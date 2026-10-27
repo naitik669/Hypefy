@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { displayNameFor } from "@/lib/nicknames";
+import { useNicknames } from "@/components/messages/useNicknames";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -213,6 +215,60 @@ function PrivacyRow({
  * messages and screenshot alerts all had complete RPCs and no way to reach
  * them, while the cron that acts on auto_delete_after ran hourly regardless.
  */
+/**
+ * Naming someone, for yourself.
+ *
+ * A sheet rather than an inline field: it is a rare thing to do, and a
+ * row of twenty members with twenty live inputs in it is twenty things
+ * that can be focused by accident.
+ */
+function NicknameSheet({
+  open,
+  onClose,
+  name,
+  current,
+  onSave,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** Their own name, which is what clearing goes back to. */
+  name: string;
+  current: string;
+  onSave: (next: string) => void;
+}) {
+  // Seeded once per person. The caller keys this on who is being named,
+  // so opening it on somebody else remounts it rather than syncing state
+  // across in an effect — which would leave the last person's name in the
+  // field for a frame.
+  const [draft, setDraft] = useState(current);
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title={`What you call ${name}`}>
+      <div className="flex flex-col gap-3 pb-2">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          maxLength={40}
+          placeholder={name}
+          aria-label={`Nickname for ${name}`}
+          className="h-12 rounded-xl bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-1 focus:ring-white/20"
+        />
+        <p className="text-xs text-muted">Only you see this.</p>
+        <button
+          type="button"
+          onClick={() => {
+            onSave(draft);
+            onClose();
+          }}
+          className="flex h-12 items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-ink transition active:scale-[0.99]"
+        >
+          {draft.trim() ? "Save" : "Use their own name"}
+        </button>
+      </div>
+    </BottomSheet>
+  );
+}
+
 export function ConversationInfo({
   conversationId,
   currentUserId,
@@ -301,6 +357,9 @@ export function ConversationInfo({
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Found[]>([]);
   const [searching, setSearching] = useState(false);
+  const { nicknames, rename } = useNicknames(conversationId);
+  /** Who the nickname sheet is open on, if anyone. */
+  const [naming, setNaming] = useState<string | null>(null);
   const memberIds = new Set(members.map((m) => m.id));
 
   useEffect(() => {
@@ -793,10 +852,15 @@ export function ConversationInfo({
                     }`}
                   >
                     <Link href={m.username ? `/u/${m.username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
-                      <Avatar name={m.name} hue={m.hue} src={m.avatarUrl ?? undefined} size={40} />
+                      <Avatar
+                        name={displayNameFor(m.id, m.name, nicknames)}
+                        hue={m.hue}
+                        src={m.avatarUrl ?? undefined}
+                        size={40}
+                      />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold">
-                          {m.name}
+                          {displayNameFor(m.id, m.name, nicknames)}
                           {m.id === currentUserId && <span className="ml-1 text-xs font-normal text-faint">(you)</span>}
                         </span>
                         {m.username && <span className="block truncate text-xs text-muted">@{m.username}</span>}
@@ -804,6 +868,18 @@ export function ConversationInfo({
                     </Link>
                     {m.role === "admin" && (
                       <span className="shrink-0 rounded-pill bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">Admin</span>
+                    )}
+                    {m.id !== currentUserId && (
+                      // Everyone, not only admins: what you call someone is
+                      // yours and affects nobody else's screen.
+                      <button
+                        type="button"
+                        onClick={() => setNaming(m.id)}
+                        aria-label={`Rename ${m.name} for yourself`}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground"
+                      >
+                        <Pencil size={15} />
+                      </button>
                     )}
                     {isAdmin && m.id !== currentUserId && (
                       <>
@@ -995,6 +1071,18 @@ export function ConversationInfo({
       </section>
 
       <div className="h-8" />
+
+      {/* Naming someone, for yourself alone. */}
+      <NicknameSheet
+        key={naming ?? "none"}
+        open={naming !== null}
+        onClose={() => setNaming(null)}
+        name={members.find((m) => m.id === naming)?.name ?? "them"}
+        current={naming ? (nicknames[naming] ?? "") : ""}
+        onSave={(next) => {
+          if (naming) void rename(naming, next);
+        }}
+      />
 
       <BottomSheet open={timerOpen} onClose={() => setTimerOpen(false)} title="Disappearing messages">
         <p className="pb-2 text-xs text-muted">
