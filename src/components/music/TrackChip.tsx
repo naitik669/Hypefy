@@ -123,20 +123,42 @@ function OverlayChip({
         tuck(TITLE_LEAVE_MS);
       }}
     >
-      {/* The insert. Clipped with `round`, or its corners square off while
-          it slides and snap back at the end. */}
+      {/* The insert, unrolling out of the case.
+          This animated clip-path at first, which Android's WebView does not
+          composite: it repainted the whole pill every frame and stuttered on
+          the one device it had to look right on. Transform and opacity only
+          now — the ground scales out of the case and the words follow a beat
+          behind it, which is what makes it read as unrolling rather than as
+          a box appearing. */}
       <Link
         href={soundHref(track.id)}
         prefetch={false}
         onClick={(e) => e.stopPropagation()}
-        className={`absolute left-1 top-0 flex h-9 max-w-[220px] items-center truncate rounded-[13px] pl-[38px] pr-3 text-[11px] text-white transition-[clip-path,opacity] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none ${glass}`}
-        style={{
-          clipPath: open ? "inset(0 0 0 0 round 13px)" : "inset(0 100% 0 0 round 13px)",
-          opacity: open ? 1 : 0,
-        }}
+        style={{ pointerEvents: open ? "auto" : "none" }}
+        className="absolute left-1 top-0 flex h-9 max-w-[220px] items-center whitespace-nowrap pl-[38px] pr-3 text-[11px] text-white"
       >
-        <span className="truncate font-semibold">{track.title}</span>
-        {track.artist && <span className="truncate text-white/70">&nbsp;· {track.artist}</span>}
+        <span
+          aria-hidden
+          className={`absolute inset-0 rounded-[13px] will-change-transform motion-reduce:transition-none ${glass}`}
+          style={{
+            transform: open ? "scaleX(1)" : "scaleX(0)",
+            transformOrigin: "0% 50%",
+            transition: `transform 320ms ${UNROLL_EASE}`,
+          }}
+        />
+        <span
+          className="relative truncate will-change-transform motion-reduce:transition-none"
+          style={{
+            opacity: open ? 1 : 0,
+            transform: open ? "none" : "translateX(-10px)",
+            transition: `opacity 160ms ease ${open ? "70ms" : "0ms"}, transform 300ms ${UNROLL_EASE} ${
+              open ? "70ms" : "0ms"
+            }`,
+          }}
+        >
+          <span className="font-semibold">{track.title}</span>
+          {track.artist && <span className="text-white/70"> · {track.artist}</span>}
+        </span>
       </Link>
 
       <button
@@ -176,6 +198,9 @@ function OverlayChip({
     </div>
   );
 }
+
+/** The curve the insert unrolls on: quick out of the case, soft to a stop. */
+const UNROLL_EASE = "cubic-bezier(.22,1,.36,1)";
 
 /** How long the title stays out after a tap before tucking back. */
 const TITLE_HOLD_MS = 2600;

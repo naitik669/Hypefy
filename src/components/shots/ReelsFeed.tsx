@@ -100,10 +100,9 @@ import { useLongPress } from "@/lib/useLongPress";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { CommentIcon } from "@/components/ui/CommentIcon";
 import { claimPreview, originalTrackFor, parseTrack } from "@/lib/music";
-import { SoundBox } from "@/components/music/SoundBox";
+import { ShotSound } from "@/components/music/ShotSound";
 import { ShotsEndCard, type NewCheck } from "@/components/shots/ShotsEndCard";
 import { forgetSeenAtOpen, markShotSeen, orderReel, seenAtOpen, SEEN_AFTER_MS, THIN_REEL } from "@/lib/shots-seen";
-import { SoundPill } from "@/components/music/SoundPill";
 import { hideContent, muteUser, QUIET_COPY } from "@/lib/feed-quiet";
 
 type ReelProfile = {
@@ -1612,8 +1611,10 @@ function ReelCard({
           <MoreHorizontal size={30} className="text-white" />
         </RailButton>
 
-        {/* The sound's cover, where a thumb looks for it: under the dots. */}
-        <SoundBox track={sound} />
+        {/* The sound, where a thumb looks for it: under the dots. The
+            record turns with the Shot and its name unrolls out of the case
+            when you arrive, then rolls back. */}
+        <ShotSound track={sound} playing={isActive && playing} active={isActive} />
       </div>
 
       {/* Author and caption, which also stand down. Both describe the
@@ -1659,7 +1660,6 @@ function ReelCard({
             {reel.caption}
           </ExpandableText>
         )}
-        <SoundPill track={sound} glass />
       </div>
 
       {proof && (

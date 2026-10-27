@@ -267,13 +267,16 @@ describe("the sound's box on the reel", () => {
   it("sits under the three dots, and every Shot has one", () => {
     const src = readFileSync("src/components/shots/ReelsFeed.tsx", "utf8");
     const dots = src.indexOf('<MoreHorizontal size={30} className="text-white" />');
-    const box = src.indexOf("<SoundBox track={sound} />");
+    const box = src.indexOf("<ShotSound track={sound}");
     expect(dots).toBeGreaterThan(0);
     expect(box).toBeGreaterThan(dots);
     expect(src.slice(dots, box)).not.toContain("<RailButton");
     // A Shot without a song still has a sound: its own.
     expect(src).toContain("() => track ?? originalTrackFor(reel)");
-    expect(src).toContain("<SoundPill track={sound} glass />");
+    // Its name is not a second pill under the caption any more: it unrolls
+    // out of the case, so the sound has one home on the screen.
+    expect(src).toContain("<ShotSound track={sound}");
+    expect(src).not.toContain("<SoundPill track={sound} glass />");
   });
 
   it("only a song is played beside the video; original audio is the video's own sound", () => {
