@@ -1021,7 +1021,13 @@ export function MessagesInbox({
         {/* The arrow that opens today's UpDates, back where it used to
             be. The filter moved to the search bar, which is where every
             other list in the app keeps its filter. */}
-        {pages.length > 0 && (
+        {/* Shown whether or not anybody has posted today. Gated on there
+            being updates, it vanished exactly when it was needed: shut the
+            strip, wait for every update to expire, and the arrow that would
+            open it again had gone too — so the collapse could not be undone
+            and the "add yours…" slot, the only way to write one from
+            Messages, was unreachable until somebody else posted. */}
+        {level === "normal" && (
           <PagesTrigger open={pagesOpen} count={pages.length} onToggle={togglePages} />
         )}
       </div>
@@ -1033,7 +1039,10 @@ export function MessagesInbox({
         <LockedChatsRow count={vault.locked} unread={vault.unread} />
       )}
 
-      {pagesOpen && <PagesStrip pages={pages} me={me} />}
+      {/* The inbox only. The Vault and the locked list are not the chat
+          list, and with no pages passed to either of them the strip was
+          drawing a bare "add yours…" row on both. */}
+      {level === "normal" && pagesOpen && <PagesStrip pages={pages} me={me} />}
 
       {/* Spotlight: a small deck of today's pages floating at the bottom
           right, shuffling itself; tap to open Spotlight on the one showing. */}

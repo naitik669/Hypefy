@@ -275,7 +275,9 @@ describe("the row under the tabs", () => {
     // in the slot the filter vacated when it moved to the search bar.
     expect(src).toContain("export function PagesTrigger");
     expect(inbox).toContain("<PagesTrigger open={pagesOpen} count={pages.length} onToggle={togglePages} />");
-    expect(inbox).toContain("{pagesOpen && <PagesStrip pages={pages} me={me} />}");
+    // On the inbox, not the Vault or the locked list — neither is passed any
+    // pages, so the strip was drawing a bare "add yours…" row on both.
+    expect(inbox).toContain('{level === "normal" && pagesOpen && <PagesStrip pages={pages} me={me} />}');
   });
 
   it("opens open, and stays shut once you shut it", () => {
