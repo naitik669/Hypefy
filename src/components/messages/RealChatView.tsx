@@ -37,6 +37,8 @@ import { haptics } from "@/lib/haptics";
 import { PresenceDot } from "@/components/presence/PresenceDot";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
 import { one } from "@/lib/supabase/typed";
+import { LinkCard } from "./LinkCard";
+import { firstPreviewable } from "@/lib/link-preview";
 import { ForwardSheet } from "@/components/messages/ForwardSheet";
 import { canPin } from "@/lib/chat-pins";
 import { randomObjectName } from "@/lib/object-name";
@@ -2567,6 +2569,13 @@ export function RealChatView({
                             </span>
                           )}
                         </div>
+                      )}
+
+                      {/* A link in the message gets a card under it. Never
+                          on an unsent one: the body is gone, and a card for
+                          a message somebody took back would outlive it. */}
+                      {m.kind === "text" && !m.is_unsent && firstPreviewable(m.body) && (
+                        <LinkCard url={firstPreviewable(m.body)!} mine={mine} />
                       )}
 
                       {/* Reaction chips */}
