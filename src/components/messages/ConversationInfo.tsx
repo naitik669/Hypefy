@@ -42,6 +42,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { ChatThemePicker } from "@/components/messages/ChatThemePicker";
 import { FloatingMenu, MenuItem } from "@/components/ui/FloatingMenu";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { CenterModal } from "@/components/ui/CenterModal";
 import { groupPhotoProblem, toSquareJpeg } from "@/lib/group-photo";
 
 /** How long the member strip takes to become the list, and back. */
@@ -225,9 +226,17 @@ const COUNTER_FROM = 28;
 /**
  * Naming someone, for the whole chat.
  *
- * A sheet rather than an inline field: it is a rare thing to do, and a
+ * A dialog rather than an inline field: it is a rare thing to do, and a
  * row of twenty members with twenty live inputs in it is twenty things
  * that can be focused by accident.
+ *
+ * Centred rather than a bottom sheet. A sheet is the right shape for a
+ * list you are picking from, where more of it can always be dragged up;
+ * this is one short question with one answer, and a sheet lying along the
+ * bottom edge made it look like the start of something longer. CenterModal
+ * is the app's own card for exactly this — the same shell ConfirmDialog
+ * uses — so it arrives with the blurred backdrop, the pop-in, escape, the
+ * Android back button and the focus trap already right.
  *
  * The first version was a title, a field and a button, and it had two
  * faults worth naming. The title said "What you call Spidey" while the
@@ -242,7 +251,7 @@ const COUNTER_FROM = 28;
  * runs of space collapse, 41 characters become 40 — and a save that
  * quietly differs from what was typed is a save you cannot trust.
  */
-function NicknameSheet({
+function NicknameDialog({
   open,
   onClose,
   member,
@@ -272,8 +281,8 @@ function NicknameSheet({
   const shown = clean || ownName;
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={isSelf ? "Your nickname" : "Nickname"}>
-      <div className="flex flex-col gap-4 pb-1">
+    <CenterModal open={open} onClose={onClose} title={isSelf ? "Your nickname" : "Nickname"}>
+      <div className="flex flex-col gap-4 pt-1">
         {/* Who, not what. The old sheet put the person's name in the title
             and their nickname in the field, which read as the same thing
             twice. */}
@@ -371,7 +380,7 @@ function NicknameSheet({
           </button>
         </div>
       </div>
-    </BottomSheet>
+    </CenterModal>
   );
 }
 
@@ -1312,7 +1321,7 @@ export function ConversationInfo({
       )}
 
       {/* Naming someone, for everybody in the chat. */}
-      <NicknameSheet
+      <NicknameDialog
         key={naming ?? "none"}
         open={naming !== null}
         onClose={() => setNaming(null)}

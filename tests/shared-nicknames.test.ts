@@ -334,7 +334,7 @@ describe("the sheet answers who it is naming", () => {
     // The old sheet put their name in the title and their nickname in the
     // field, so "Spidey" above "Spidey" gave no way to tell whether a
     // nickname was set — the one question the sheet exists to answer.
-    const sheet = info.slice(info.indexOf("function NicknameSheet"), info.indexOf("export function ConversationInfo"));
+    const sheet = info.slice(info.indexOf("function NicknameDialog"), info.indexOf("export function ConversationInfo"));
     expect(sheet).toContain("member: RosterMember | null;");
     // Scoped to the 44px avatar at the top. The preview row below uses
     // the same prop, so matching the string anywhere in the file passed
@@ -346,7 +346,7 @@ describe("the sheet answers who it is naming", () => {
   });
 
   it("and the field holds the nickname alone", () => {
-    const sheet = info.slice(info.indexOf("function NicknameSheet"), info.indexOf("export function ConversationInfo"));
+    const sheet = info.slice(info.indexOf("function NicknameDialog"), info.indexOf("export function ConversationInfo"));
     expect(sheet).toContain("value={draft}");
     expect(sheet).toContain("placeholder={ownName}");
   });
@@ -357,7 +357,7 @@ describe("the sheet answers who it is naming", () => {
 });
 
 describe("the sheet shows what will actually be saved", () => {
-  const sheet = info.slice(info.indexOf("function NicknameSheet"), info.indexOf("export function ConversationInfo"));
+  const sheet = info.slice(info.indexOf("function NicknameDialog"), info.indexOf("export function ConversationInfo"));
 
   it("tidied the way the server tidies it", () => {
     // Runs of space collapse and 41 characters become 40. A save that
@@ -387,7 +387,7 @@ describe("the sheet shows what will actually be saved", () => {
 });
 
 describe("the sheet's two actions", () => {
-  const sheet = info.slice(info.indexOf("function NicknameSheet"), info.indexOf("export function ConversationInfo"));
+  const sheet = info.slice(info.indexOf("function NicknameDialog"), info.indexOf("export function ConversationInfo"));
 
   it("saving is refused when there is nothing to save", () => {
     expect(sheet).toContain("const unchanged = clean === current.trim();");
@@ -396,5 +396,23 @@ describe("the sheet's two actions", () => {
 
   it("and clearing is only offered when there is something to clear", () => {
     expect(sheet).toContain("{current.trim() && (");
+  });
+});
+
+describe("the dialog floats rather than lying along the bottom", () => {
+  it("it is the app's centred card, not a sheet", () => {
+    // A sheet is the right shape for a list you can always drag more of
+    // into view. This is one short question with one answer, and lying
+    // along the bottom edge made it read as the start of something
+    // longer.
+    const dialog = info.slice(info.indexOf("function NicknameDialog"), info.indexOf("export function ConversationInfo"));
+    expect(dialog).toContain("<CenterModal");
+    expect(dialog).not.toContain("<BottomSheet");
+  });
+
+  it("and reuses the shell the other dialogs use rather than a second one", () => {
+    // CenterModal brings the blurred backdrop, the pop-in, escape, the
+    // Android back button and the focus trap with it.
+    expect(info).toContain('import { CenterModal } from "@/components/ui/CenterModal";');
   });
 });
