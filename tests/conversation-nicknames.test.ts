@@ -147,7 +147,9 @@ describe("where it shows, and how you set one", () => {
   });
 
   it("and clearing is offered as going back to their own name", () => {
-    expect(info).toContain('{draft.trim() ? "Save" : "Use their own name"}');
+    // Reads the tidied draft rather than the raw one, so a field holding
+    // only spaces offers to clear rather than to save them.
+    expect(info).toContain('{clean ? "Save" : "Use their own name"}');
   });
 });
 

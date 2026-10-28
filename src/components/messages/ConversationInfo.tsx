@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { displayNameFor } from "@/lib/nicknames";
+import { displayNameFor, tidyNickname } from "@/lib/nicknames";
 import { useNicknames } from "@/components/messages/useNicknames";
 import { inviteUrl, useGroupInvite } from "@/components/messages/useGroupInvite";
 import Link from "next/link";
@@ -29,6 +29,7 @@ import {
   Trash2,
   UserMinus,
   UserPlus,
+  Users,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -216,6 +217,11 @@ function PrivacyRow({
  * messages and screenshot alerts all had complete RPCs and no way to reach
  * them, while the cron that acts on auto_delete_after ran hourly regardless.
  */
+/** The longest a nickname can be, matching the column and set_shared_nickname. */
+const NICKNAME_MAX = 40;
+/** Where the counter starts being useful rather than being clutter. */
+const COUNTER_FROM = 28;
+
 /**
  * Naming someone, for the whole chat.
  *
@@ -223,22 +229,31 @@ function PrivacyRow({
  * row of twenty members with twenty live inputs in it is twenty things
  * that can be focused by accident.
  *
- * It says plainly that everybody sees this. Nicknames were private until
- * 0176, and somebody who learned them then would otherwise write
- * something meant for their own eyes into a thread that announces it.
+ * The first version was a title, a field and a button, and it had two
+ * faults worth naming. The title said "What you call Spidey" while the
+ * field also held "Spidey", so there was no way to tell whether that was
+ * a nickname somebody had set or just their own name showing through —
+ * the one question this sheet exists to answer. And it still said "Only
+ * you see this", which stopped being true at 0176.
+ *
+ * So the person is drawn at the top, with their own name and handle, and
+ * the field below holds only the nickname. What the thread will show is
+ * previewed underneath, because the server tidies what it is given —
+ * runs of space collapse, 41 characters become 40 — and a save that
+ * quietly differs from what was typed is a save you cannot trust.
  */
 function NicknameSheet({
   open,
   onClose,
-  name,
+  member,
   isSelf,
   current,
   onSave,
 }: {
   open: boolean;
   onClose: () => void;
-  /** Their own name, which is what clearing goes back to. */
-  name: string;
+  /** Who is being named. Their own name is what clearing goes back to. */
+  member: RosterMember | null;
   /** Whether this is you, which changes what the sheet calls them. */
   isSelf?: boolean;
   current: string;
@@ -249,33 +264,112 @@ function NicknameSheet({
   // across in an effect — which would leave the last person's name in the
   // field for a frame.
   const [draft, setDraft] = useState(current);
+  const ownName = member?.name ?? "them";
+  // Exactly what set_shared_nickname would store, so the preview and the
+  // count are not a guess at it.
+  const clean = tidyNickname(draft);
+  const unchanged = clean === current.trim();
+  const shown = clean || ownName;
 
   return (
-    <BottomSheet
-      open={open}
-      onClose={onClose}
-      title={isSelf ? "What this chat calls you" : `What this chat calls ${name}`}
-    >
-      <div className="flex flex-col gap-3 pb-2">
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          maxLength={40}
-          placeholder={name}
-          aria-label={`Nickname for ${name}`}
-          className="h-12 rounded-xl bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-1 focus:ring-white/20"
-        />
-        <p className="text-xs text-muted">Everyone here sees this, and is told when it changes.</p>
-        <button
-          type="button"
-          onClick={() => {
-            onSave(draft);
-            onClose();
-          }}
-          className="flex h-12 items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-ink transition active:scale-[0.99]"
-        >
-          {draft.trim() ? "Save" : "Use their own name"}
-        </button>
+    <BottomSheet open={open} onClose={onClose} title={isSelf ? "Your nickname" : "Nickname"}>
+      <div className="flex flex-col gap-4 pb-1">
+        {/* Who, not what. The old sheet put the person's name in the title
+            and their nickname in the field, which read as the same thing
+            twice. */}
+        <div className="flex items-center gap-3">
+          <Avatar
+            name={ownName}
+            hue={member?.hue ?? 280}
+            src={member?.avatarUrl ?? undefined}
+            size={44}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[15px] font-bold">
+              {ownName}
+              {isSelf && <span className="ml-1 text-xs font-normal text-muted">(you)</span>}
+            </span>
+            <span className="block truncate text-xs text-muted">
+              {member?.username ? `@${member.username}` : "Their own name"}
+            </span>
+          </span>
+        </div>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="px-0.5 text-[11px] font-bold uppercase tracking-widest text-muted">
+            Nickname
+          </span>
+          <span className="flex items-center gap-2 rounded-xl bg-surface pr-3 focus-within:ring-1 focus-within:ring-accent/50">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              maxLength={NICKNAME_MAX}
+              placeholder={ownName}
+              autoComplete="off"
+              aria-label={isSelf ? "Your nickname in this chat" : `Nickname for ${ownName}`}
+              className="h-12 min-w-0 flex-1 bg-transparent px-4 text-sm outline-none placeholder:text-muted"
+            />
+            {/* Only near the limit. A counter sitting at 2/40 is noise, and
+                running into a cap with no warning is the thing it is for. */}
+            {draft.length >= COUNTER_FROM && (
+              <span
+                className={`shrink-0 text-[11px] font-bold tabular-nums ${
+                  draft.length >= NICKNAME_MAX ? "text-accent" : "text-muted"
+                }`}
+              >
+                {draft.length}/{NICKNAME_MAX}
+              </span>
+            )}
+          </span>
+        </label>
+
+        {/* What the thread will actually show, after the server has tidied
+            it. Doubles as the answer to "what happens if I clear this". */}
+        <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.06] bg-surface/60 px-3 py-2.5">
+          <Avatar name={shown} hue={member?.hue ?? 280} src={member?.avatarUrl ?? undefined} size={26} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-semibold">{shown}</span>
+            <span className="block text-[11px] text-muted">
+              {clean ? "How this chat will read" : "No nickname — their own name shows"}
+            </span>
+          </span>
+        </div>
+
+        <p className="flex items-start gap-2 px-0.5 text-xs text-muted">
+          <Users size={14} className="mt-px shrink-0" />
+          <span>
+            Everyone in this chat sees this, and is told when it changes.
+            {isSelf ? "" : " They can change it back."}
+          </span>
+        </p>
+
+        <div className="flex items-center gap-2">
+          {/* Offered only when there is something to undo, so the row is
+              one clear action in the common case. */}
+          {current.trim() && (
+            <button
+              type="button"
+              onClick={() => {
+                onSave("");
+                onClose();
+              }}
+              className="flex h-12 shrink-0 items-center justify-center rounded-xl bg-elevated px-4 text-sm font-bold text-muted transition active:scale-[0.98]"
+            >
+              Clear
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={unchanged}
+            onClick={() => {
+              onSave(clean);
+              onClose();
+            }}
+            className="flex h-12 flex-1 items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-ink transition active:scale-[0.99] disabled:opacity-40 disabled:active:scale-100"
+          >
+            {clean ? "Save" : "Use their own name"}
+          </button>
+        </div>
       </div>
     </BottomSheet>
   );
@@ -1222,7 +1316,7 @@ export function ConversationInfo({
         key={naming ?? "none"}
         open={naming !== null}
         onClose={() => setNaming(null)}
-        name={members.find((m) => m.id === naming)?.name ?? "them"}
+        member={members.find((m) => m.id === naming) ?? null}
         isSelf={naming === currentUserId}
         // The shared name, not the effective one: the field has to edit
         // what it writes, or clearing it would look like it did nothing

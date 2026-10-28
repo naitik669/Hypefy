@@ -284,7 +284,7 @@ describe("the thread keeps up", () => {
 
 describe("the sheet tells the truth about who sees it", () => {
   it("plainly, because it used to be private", () => {
-    expect(info).toContain("Everyone here sees this, and is told when it changes.");
+    expect(info).toContain("Everyone in this chat sees this, and is told when it changes.");
     expect(info).not.toContain("Only you see this.");
   });
 
@@ -297,7 +297,7 @@ describe("the sheet tells the truth about who sees it", () => {
   it("you can name yourself", () => {
     expect(info).toContain('isSelf={naming === currentUserId}');
     expect(info).toContain('? "Rename yourself in this chat"');
-    expect(info).toContain('title={isSelf ? "What this chat calls you" : `What this chat calls ${name}`}');
+    expect(info).toContain('title={isSelf ? "Your nickname" : "Nickname"}');
   });
 
   it("and the rename control is drawn for every member, yourself included", () => {
@@ -326,5 +326,75 @@ describe("the inbox agrees with the thread", () => {
     const groupTitle = rows.indexOf("members.slice(0, 3).map((m) => m.name)");
     expect(apply).toBeGreaterThan(-1);
     expect(groupTitle).toBeGreaterThan(apply);
+  });
+});
+
+describe("the sheet answers who it is naming", () => {
+  it("the person is drawn, not just referred to", () => {
+    // The old sheet put their name in the title and their nickname in the
+    // field, so "Spidey" above "Spidey" gave no way to tell whether a
+    // nickname was set — the one question the sheet exists to answer.
+    const sheet = info.slice(info.indexOf("function NicknameSheet"), info.indexOf("export function ConversationInfo"));
+    expect(sheet).toContain("member: RosterMember | null;");
+    // Scoped to the 44px avatar at the top. The preview row below uses
+    // the same prop, so matching the string anywhere in the file passed
+    // with the identity block deleted.
+    const face = sheet.slice(sheet.indexOf("<Avatar"), sheet.indexOf("size={44}") + 12);
+    expect(face).toContain("name={ownName}");
+    expect(face).toContain("src={member?.avatarUrl ?? undefined}");
+    expect(sheet).toContain('{member?.username ? `@${member.username}` : "Their own name"}');
+  });
+
+  it("and the field holds the nickname alone", () => {
+    const sheet = info.slice(info.indexOf("function NicknameSheet"), info.indexOf("export function ConversationInfo"));
+    expect(sheet).toContain("value={draft}");
+    expect(sheet).toContain("placeholder={ownName}");
+  });
+
+  it("the member is handed over whole", () => {
+    expect(info).toContain('member={members.find((m) => m.id === naming) ?? null}');
+  });
+});
+
+describe("the sheet shows what will actually be saved", () => {
+  const sheet = info.slice(info.indexOf("function NicknameSheet"), info.indexOf("export function ConversationInfo"));
+
+  it("tidied the way the server tidies it", () => {
+    // Runs of space collapse and 41 characters become 40. A save that
+    // quietly differs from what was typed is a save you cannot trust.
+    expect(sheet).toContain("const clean = tidyNickname(draft);");
+    expect(sheet).toContain("const shown = clean || ownName;");
+  });
+
+  it("and what an empty field means is said, not guessed at", () => {
+    expect(sheet).toContain('"No nickname — their own name shows"');
+  });
+
+  it("saving sends the tidied name, not the raw one", () => {
+    expect(sheet).toContain("onSave(clean);");
+  });
+
+  it("the cap is one number, shared with the column", () => {
+    expect(sheet).toContain("maxLength={NICKNAME_MAX}");
+    expect(info).toContain("const NICKNAME_MAX = 40;");
+  });
+
+  it("and the counter appears near the limit rather than always", () => {
+    // At 2/40 it is noise; running into a cap unwarned is what it is for.
+    expect(sheet).toContain("{draft.length >= COUNTER_FROM && (");
+    expect(info).toContain("const COUNTER_FROM = 28;");
+  });
+});
+
+describe("the sheet's two actions", () => {
+  const sheet = info.slice(info.indexOf("function NicknameSheet"), info.indexOf("export function ConversationInfo"));
+
+  it("saving is refused when there is nothing to save", () => {
+    expect(sheet).toContain("const unchanged = clean === current.trim();");
+    expect(sheet).toContain("disabled={unchanged}");
+  });
+
+  it("and clearing is only offered when there is something to clear", () => {
+    expect(sheet).toContain("{current.trim() && (");
   });
 });
