@@ -73,7 +73,7 @@ export default async function ThreadPage({
   // The reader's own face, for the places their own messages are shown with
   // one: the full-screen photo viewer named them "You" over a blank avatar.
   const mineProfile = (Array.isArray((me as any).profiles) ? (me as any).profiles[0] : (me as any).profiles) as
-    | { avatar_hue?: number | null; avatar_url?: string | null }
+    | { avatar_hue?: number | null; avatar_url?: string | null; is_premium?: boolean | null }
     | null;
 
   // Sender lookup + group meta
@@ -190,7 +190,12 @@ export default async function ThreadPage({
       }}
       group={group}
       members={membersMap}
-      self={{ hue: mineProfile?.avatar_hue ?? 280, avatarUrl: mineProfile?.avatar_url ?? null }}
+      self={{
+        hue: mineProfile?.avatar_hue ?? 280,
+        avatarUrl: mineProfile?.avatar_url ?? null,
+        // Which frames this reader may react with.
+        isPremium: !!mineProfile?.is_premium,
+      }}
       initialMessages={messages}
       initialReactions={(reactRows ?? []) as any}
       initialReaders={readers}

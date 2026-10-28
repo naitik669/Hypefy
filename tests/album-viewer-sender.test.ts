@@ -21,7 +21,14 @@ describe("the sender shown in the photo viewer", () => {
   });
 
   it("the page hands the reader's own picture to the chat", () => {
+    // The fields, not the formatting. `self` has since grown a third
+    // one, and a one-line match broke on the line wrapping rather than
+    // on anything that matters.
     const page = read("src/app/(app)/messages/[threadId]/page.tsx");
-    expect(page).toContain("self={{ hue: mineProfile?.avatar_hue ?? 280, avatarUrl: mineProfile?.avatar_url ?? null }}");
+    const at = page.indexOf("self={{");
+    expect(at).toBeGreaterThan(-1);
+    const prop = page.slice(at, at + 320);
+    expect(prop).toContain("hue: mineProfile?.avatar_hue ?? 280");
+    expect(prop).toContain("avatarUrl: mineProfile?.avatar_url ?? null");
   });
 });

@@ -47,6 +47,10 @@ import { ChatAmbient } from "@/components/messages/ChatAmbient";
 import { resolveBubble } from "@/lib/bubble-styles";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { Nameplate } from "@/components/ui/Nameplate";
+import { useFrameCatalog } from "@/components/ui/FrameCatalogProvider";
+import { canShow } from "@/lib/cosmetics";
+import type { FrameAsset } from "@/lib/frames";
+import { frameIdOf, frameReaction, reactionLabel } from "@/lib/chat-reactions";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { DisplayName } from "@/components/ui/DisplayName";
 import { MediaFolder, AlbumViewer } from "@/components/messages/MediaFolder";
@@ -178,7 +182,7 @@ export function RealChatView({
     }
   >;
   /** The reader's own avatar, for where their own messages are shown with a face. */
-  self?: { hue: number; avatarUrl: string | null };
+  self?: { hue: number; avatarUrl: string | null; isPremium?: boolean };
   initialMessages: ChatMsg[];
   initialReactions?: ReactionRow[];
   initialReaders?: Reader[];
@@ -197,6 +201,17 @@ export function RealChatView({
    * One helper for the sender line, the quoted reply and the photo
    * viewer's title, so a nickname cannot show in one and not another.
    */
+  // Tier-gated, the way frames are everywhere else. Offering one that
+  // cannot be worn is offering somebody a thing to be refused.
+  const frameCatalog = useFrameCatalog();
+  const wearableReactionFrames: FrameAsset[] = useMemo(
+    () =>
+      Object.values(frameCatalog)
+        .filter((f) => f.url && canShow(f.tier, !!self?.isPremium))
+        .slice(0, 8),
+    [frameCatalog, self?.isPremium],
+  );
+
   const senderName = (id: string) =>
     id === currentUserId
       ? "You"
@@ -2544,7 +2559,9 @@ export function RealChatView({
                                 r.mine ? "ring-1 ring-inset ring-white/25" : ""
                               }`}
                             >
-                              <span>{r.emoji}</span>
+                              <span aria-label={reactionLabel(r.emoji, frameCatalog[frameIdOf(r.emoji) ?? ""]?.label)}>
+                                <ReactionGlyph reaction={r.emoji} />
+                              </span>
                               {r.count > 1 && <span className="ml-0.5 text-[11px] font-bold">{r.count}</span>}
                             </button>
                           ))}
@@ -3102,6 +3119,25 @@ export function RealChatView({
                     </button>
                   ))}
                 </div>
+                {/* What you own, under what everybody has. A second row
+                    rather than mixed in: six emoji is a thing you read at
+                    a glance, and burying them among frames would cost
+                    that for everyone who owns none. */}
+                {wearableReactionFrames.length > 0 && (
+                  <div className={`mb-2 flex w-fit gap-0.5 rounded-pill bg-elevated p-1 shadow-xl ring-1 ring-border ${mine ? "ml-auto" : ""}`}>
+                    {wearableReactionFrames.map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        aria-label={`React with ${f.label}`}
+                        onClick={() => { toggleReaction(menu.msg.id, frameReaction(f.id)); setMenu(null); }}
+                        className="flex h-9 w-9 items-center justify-center rounded-full transition-transform hover:scale-125 active:scale-110"
+                      >
+                        <ReactionGlyph reaction={frameReaction(f.id)} size={22} />
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {/* Actions */}
                 <div className={`w-44 overflow-hidden rounded-2xl bg-elevated p-1 shadow-xl ring-1 ring-border ${mine ? "ml-auto" : ""}`}>
                   <CtxItem icon={<Reply size={17} />} label="Reply" onClick={() => { setReplyTo(menu.msg); setMenu(null); }} />
@@ -3228,6 +3264,36 @@ export function RealChatView({
   );
 }
 
+
+/**
+ * One reaction, drawn.
+ *
+ * An emoji is a character and draws itself. A frame is a token naming a
+ * thing in the catalogue, and draws the artwork.
+ *
+ * Anything else draws as text. The column is free text — a client can
+ * write what it likes into it — so the fallback is not politeness, it is
+ * the only honest thing to do with a token nobody recognises, and text
+ * is what the column held before frames existed.
+ */
+function ReactionGlyph({ reaction, size = 17 }: { reaction: string; size?: number }) {
+  const catalog = useFrameCatalog();
+  const id = frameIdOf(reaction);
+  if (!id) return <>{reaction}</>;
+  const asset = catalog[id];
+  if (!asset?.url) return <>{reaction}</>;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={asset.url}
+      alt=""
+      width={size}
+      height={size}
+      className="inline-block align-middle"
+      style={{ width: size, height: size, objectFit: "contain" }}
+    />
+  );
+}
 
 function CtxItem({ icon, label, onClick, danger }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
   return (
