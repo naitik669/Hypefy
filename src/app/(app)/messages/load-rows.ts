@@ -78,7 +78,7 @@ export async function loadInboxRows(
 
   let rows: InboxRow[] = [];
   if (convIds.length > 0) {
-    const [membersRes, msgsRes, myMemberRes, reactionsRes] = await Promise.all([
+    const [membersRes, msgsRes, myMemberRes, reactionsRes, nicknamesRes] = await Promise.all([
       // The other participant in each conversation
       supabase
         .from("conversation_members")
@@ -102,6 +102,14 @@ export async function loadInboxRows(
         .in("messages.conversation_id", convIds)
         .order("created_at", { ascending: false })
         .limit(80),
+      // What each chat calls its people (0176). A name everybody sees has
+      // to be the name in the list as well as the name in the thread —
+      // otherwise the inbox and the chat disagree about who you are
+      // talking to, which reads as a bug rather than as a boundary.
+      supabase
+        .from("conversation_display_names")
+        .select("conversation_id, subject_id, nickname")
+        .in("conversation_id", convIds),
     ]);
 
     // Latest reaction per conversation
@@ -130,6 +138,18 @@ export async function loadInboxRows(
         Date.now() - new Date(p.last_seen_at).getTime() < 90_000;
       arr.push({ id: p.id, name: p.display_name ?? p.username ?? "User", username: p.username ?? null, hue: p.avatar_hue ?? 280, avatarUrl: p.avatar_url ?? null, online, lastSeenAt: showActivity ? (p.last_seen_at ?? null) : null, showActivity, verified: !!p.is_verified, cosmetics: { is_premium: p.is_premium ?? false, name_font: p.name_font ?? null, name_glow: p.name_glow ?? null, avatar_decoration: p.avatar_decoration ?? null, nameplate: p.nameplate ?? null } });
       membersByConv.set(m.conversation_id, arr);
+    });
+
+    // Applied to the members themselves rather than at each place a name
+    // is written: the DM's title, a group's automatic title and the "who
+    // sent the last one" line all read member.name, so one pass here is
+    // three surfaces that cannot drift apart. Only shared names appear —
+    // the private ones (0169) are loaded in the thread, where the viewer
+    // is known; this runs once for the whole list.
+    (nicknamesRes.data ?? []).forEach((n: any) => {
+      const arr = membersByConv.get(n.conversation_id);
+      const who = arr?.find((m) => m.id === n.subject_id);
+      if (who) who.name = n.nickname;
     });
 
     // 24h status of each 1:1 peer — shown as a thought bubble on the inbox row

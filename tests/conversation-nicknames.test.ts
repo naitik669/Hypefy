@@ -109,6 +109,7 @@ describe("which name the thread shows", () => {
 
 describe("where it shows, and how you set one", () => {
   const info = read("src/components/messages/ConversationInfo.tsx");
+  const hookSource = read("src/components/messages/useNicknames.ts");
 
   it("the member list draws what you call them", () => {
     expect(info).toContain("displayNameFor(m.id, m.name, nicknames)");
@@ -124,15 +125,19 @@ describe("where it shows, and how you set one", () => {
   });
 
   it("anyone can name anyone, because it is not an admin power", () => {
-    // What you call someone is yours and reaches nobody else's screen,
-    // so gating it behind admin would be gating the wrong thing.
-    expect(info).toContain("{m.id !== currentUserId && (");
-    const btn = info.slice(info.indexOf("Rename ${m.name} for yourself") - 400);
-    expect(btn.slice(0, 500)).not.toContain("isAdmin");
+    // Renaming reaches everybody's screen now (0176), which is a reason
+    // to say who did it, not a reason to make it an admin power: anyone
+    // in the chat can undo it just as easily.
+    const btn = info.slice(info.indexOf("Rename ${m.name} in this chat") - 500);
+    expect(btn.slice(0, 600)).not.toContain("isAdmin");
   });
 
-  it("except yourself", () => {
-    expect(info).toContain("aria-label={`Rename ${m.name} for yourself`}");
+  it("and the private label is still drawn where no shared one exists", () => {
+    // 0169's rows did not go away. displayNameFor is handed the merged
+    // map, and mergeNicknames is where the two meet — see
+    // tests/shared-nicknames.test.ts for the precedence itself.
+    expect(info).toContain("displayNameFor(m.id, m.name, nicknames)");
+    expect(hookSource).toContain("mergeNicknames(shared, personal)");
   });
 
   it("the sheet is keyed on who it is naming", () => {
@@ -143,7 +148,6 @@ describe("where it shows, and how you set one", () => {
 
   it("and clearing is offered as going back to their own name", () => {
     expect(info).toContain('{draft.trim() ? "Save" : "Use their own name"}');
-    expect(info).toContain("Only you see this.");
   });
 });
 
@@ -155,6 +159,11 @@ describe("loading and saving them", () => {
     expect(hook).toContain('.eq("conversation_id", conversationId)');
   });
 
+  it("and the private rows are still read, not abandoned", () => {
+    // A label somebody set before 0176 keeps working.
+    expect(hook).toContain("setPersonal(byId(mine as Row[]))");
+  });
+
   it("the client is made once, not per render", () => {
     // A fresh client each render changes every callback's identity, which
     // is what put ScheduledStrip in a render loop.
@@ -162,8 +171,11 @@ describe("loading and saving them", () => {
   });
 
   it("a rename shows before the server answers", () => {
-    expect(hook).toContain("setNicknames((prev) => {");
-    expect(hook).toContain('await supabase.rpc("set_nickname"');
+    // It writes the shared table now (0176). The optimism is the same:
+    // the write cannot be refused for anything the client could have
+    // known in advance.
+    expect(hook).toContain("setShared((prev) => {");
+    expect(hook).toContain('await supabase.rpc("set_shared_nickname"');
   });
 
   it("and is taken back if it did not stick", () => {
@@ -172,16 +184,18 @@ describe("loading and saving them", () => {
     // of them, which is how the first version of this proved nothing.
     const fn = hook.slice(hook.indexOf("const rename"));
     expect(fn).toMatch(
-      /if \(!error\) return true;\s*\n\s*setNicknames\(\(prev\) => \{[\s\S]*?previous === undefined/,
+      /if \(!error\) return true;\s*\n\s*setShared\(\(prev\) => \{[\s\S]*?previous === undefined/,
     );
   });
 
   it("a late answer for a chat you have left is dropped", () => {
-    expect(hook).toContain("if (dropped || !data) return;");
+    expect(hook).toContain("if (dropped) return;");
   });
 
   it("and it never sends more than the column holds", () => {
-    expect(hook).toContain("name.trim().slice(0, 40)");
+    // Through the same helper the function's own cleaning mirrors, so the
+    // field shows what the chat is about to see.
+    expect(hook).toContain("tidyNickname(name)");
   });
 });
 

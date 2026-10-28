@@ -542,6 +542,55 @@ export type Database = {
           },
         ]
       }
+      conversation_display_names: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          nickname: string
+          set_by: string | null
+          subject_id: string
+          updated_at: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          nickname: string
+          set_by?: string | null
+          subject_id: string
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          nickname?: string
+          set_by?: string | null
+          subject_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_display_names_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_display_names_set_by_fkey"
+            columns: ["set_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_display_names_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_nicknames: {
         Row: {
           conversation_id: string
@@ -3382,6 +3431,14 @@ export type Database = {
           p_reply_to_id?: string
         }
         Returns: Json
+      }
+      set_shared_nickname: {
+        Args: {
+          p_conversation_id: string
+          p_nickname: string
+          p_subject_id: string
+        }
+        Returns: undefined
       }
       set_nickname: {
         Args: {

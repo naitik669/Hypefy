@@ -204,7 +204,7 @@ export function RealChatView({
   const isGroup = !!group;
   // What you call the people here. Personal: nobody else sees it, and
   // nobody else's rows ever come back. See 0169.
-  const { nicknames } = useNicknames(conversationId);
+  const { nicknames, refresh: refreshNicknames } = useNicknames(conversationId);
   /**
    * The name to write above somebody's words.
    *
@@ -226,6 +226,15 @@ export function RealChatView({
     id === currentUserId
       ? "You"
       : displayNameFor(id, members?.[id]?.name ?? other.name, nicknames);
+  /**
+   * What to call the other person in a DM.
+   *
+   * The header had their profile name written straight in, which was fine
+   * while a nickname was private to whoever set it — now that the chat
+   * agrees on one, the name at the top of the chat is the first place it
+   * has to show.
+   */
+  const peerName = displayNameFor(other.id, other.name, nicknames);
   const supabase = createClient();
   const [themeId, setThemeId] = useState<string | null>(initialTheme);
   const theme = findChatTheme(themeId);
@@ -987,6 +996,11 @@ export function RealChatView({
           if (m.kind === "system") {
             supabase.from("conversations").select("theme").eq("id", conversationId).maybeSingle()
               .then(({ data }) => { if (data) setThemeId(data.theme ?? null); });
+            // A shared nickname is the other thing a system message can be
+            // announcing, and the only way a name on this screen changes
+            // without this screen doing it. Cheap enough to just re-read:
+            // system messages are rare and it is one small query.
+            void refreshNicknames();
           }
         })
       .on("postgres_changes",
@@ -2052,13 +2066,13 @@ export function RealChatView({
           <Link href={`/messages/${conversationId}/info`} className="flex min-w-0 flex-1 items-center gap-3">
             <div className="relative shrink-0">
               <AvatarFrame wearer={other.cosmetics} size={36}>
-                <Avatar name={other.name} hue={other.hue} size={36} src={other.avatarUrl ?? undefined} />
+                <Avatar name={peerName} hue={other.hue} size={36} src={other.avatarUrl ?? undefined} />
               </AvatarFrame>
               <PresenceDot lastSeenAt={otherLastSeen} size="sm" />
             </div>
             <div className="min-w-0">
               <p className="flex min-w-0 items-center gap-1 text-sm font-semibold">
-                <DisplayName name={other.name} profile={other.cosmetics} className="truncate" />
+                <DisplayName name={peerName} profile={other.cosmetics} className="truncate" />
                 {other.verified && <VerifiedBadge className="h-3.5 w-3.5 shrink-0" />}
               </p>
               {(() => {

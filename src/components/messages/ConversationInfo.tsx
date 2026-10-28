@@ -217,16 +217,21 @@ function PrivacyRow({
  * them, while the cron that acts on auto_delete_after ran hourly regardless.
  */
 /**
- * Naming someone, for yourself.
+ * Naming someone, for the whole chat.
  *
  * A sheet rather than an inline field: it is a rare thing to do, and a
  * row of twenty members with twenty live inputs in it is twenty things
  * that can be focused by accident.
+ *
+ * It says plainly that everybody sees this. Nicknames were private until
+ * 0176, and somebody who learned them then would otherwise write
+ * something meant for their own eyes into a thread that announces it.
  */
 function NicknameSheet({
   open,
   onClose,
   name,
+  isSelf,
   current,
   onSave,
 }: {
@@ -234,6 +239,8 @@ function NicknameSheet({
   onClose: () => void;
   /** Their own name, which is what clearing goes back to. */
   name: string;
+  /** Whether this is you, which changes what the sheet calls them. */
+  isSelf?: boolean;
   current: string;
   onSave: (next: string) => void;
 }) {
@@ -244,7 +251,11 @@ function NicknameSheet({
   const [draft, setDraft] = useState(current);
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={`What you call ${name}`}>
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      title={isSelf ? "What this chat calls you" : `What this chat calls ${name}`}
+    >
       <div className="flex flex-col gap-3 pb-2">
         <input
           value={draft}
@@ -254,7 +265,7 @@ function NicknameSheet({
           aria-label={`Nickname for ${name}`}
           className="h-12 rounded-xl bg-surface px-4 text-sm outline-none placeholder:text-faint focus:ring-1 focus:ring-white/20"
         />
-        <p className="text-xs text-muted">Only you see this.</p>
+        <p className="text-xs text-muted">Everyone here sees this, and is told when it changes.</p>
         <button
           type="button"
           onClick={() => {
@@ -358,7 +369,7 @@ export function ConversationInfo({
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Found[]>([]);
   const [searching, setSearching] = useState(false);
-  const { nicknames, rename } = useNicknames(conversationId);
+  const { nicknames, shared: sharedNames, rename } = useNicknames(conversationId);
   const groupInvite = useGroupInvite(conversationId, isGroup);
   const [copied, setCopied] = useState(false);
   /** Who the nickname sheet is open on, if anyone. */
@@ -872,18 +883,22 @@ export function ConversationInfo({
                     {m.role === "admin" && (
                       <span className="shrink-0 rounded-pill bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">Admin</span>
                     )}
-                    {m.id !== currentUserId && (
-                      // Everyone, not only admins: what you call someone is
-                      // yours and affects nobody else's screen.
-                      <button
-                        type="button"
-                        onClick={() => setNaming(m.id)}
-                        aria-label={`Rename ${m.name} for yourself`}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground"
-                      >
-                        <Pencil size={15} />
-                      </button>
-                    )}
+                    {/* Everyone, not only admins, and anyone in the chat
+                        including yourself — in a DM that reads as "mine and
+                        theirs", which is what was asked for, and in a group
+                        it is what every other group chat does. */}
+                    <button
+                      type="button"
+                      onClick={() => setNaming(m.id)}
+                      aria-label={
+                        m.id === currentUserId
+                          ? "Rename yourself in this chat"
+                          : `Rename ${m.name} in this chat`
+                      }
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground"
+                    >
+                      <Pencil size={15} />
+                    </button>
                     {isAdmin && m.id !== currentUserId && (
                       <>
                         <button
@@ -1202,13 +1217,17 @@ export function ConversationInfo({
         </div>
       )}
 
-      {/* Naming someone, for yourself alone. */}
+      {/* Naming someone, for everybody in the chat. */}
       <NicknameSheet
         key={naming ?? "none"}
         open={naming !== null}
         onClose={() => setNaming(null)}
         name={members.find((m) => m.id === naming)?.name ?? "them"}
-        current={naming ? (nicknames[naming] ?? "") : ""}
+        isSelf={naming === currentUserId}
+        // The shared name, not the effective one: the field has to edit
+        // what it writes, or clearing it would look like it did nothing
+        // while an older private name showed through.
+        current={naming ? (sharedNames[naming] ?? "") : ""}
         onSave={(next) => {
           if (naming) void rename(naming, next);
         }}
