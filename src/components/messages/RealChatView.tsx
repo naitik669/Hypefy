@@ -78,6 +78,7 @@ import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 import { ChatImg, ChatLink, ChatVideo } from "@/components/messages/ChatMedia";
 import { readDraft, writeDraft } from "@/lib/chat-drafts";
 import { displayNameFor } from "@/lib/nicknames";
+import { forwardedBody, isForwarded } from "@/lib/chat-forward";
 import { useNicknames } from "@/components/messages/useNicknames";
 import {
   dropOutbox,
@@ -2315,9 +2316,25 @@ export function RealChatView({
                       {/* On the board, and said so here: otherwise the only
                           way to know a message is pinned is to go and look. */}
                       {m.pinned_at && (
-                        <span className="mb-0.5 flex items-center gap-1 px-1 text-[10px] font-bold uppercase tracking-widest text-faint">
+                        <span className="mb-0.5 flex items-center gap-1 px-1 text-[10px] font-bold uppercase tracking-widest text-muted">
                           <PinIcon size={9} className="shrink-0" />
                           Pinned
+                        </span>
+                      )}
+                      {/* Where it came from, said once above the bubble and
+                          in the same voice as "Pinned" — rather than inside
+                          the words, which is where it used to be written.
+                          Every kind, not only text: a forwarded photo is as
+                          much a forward as a forwarded sentence.
+
+                          Both labels are muted rather than faint: faint is
+                          measured at 2.2–2.7:1 on this ground and fails
+                          contrast, and two lines of label at different
+                          brightness in one stack reads as a mistake. */}
+                      {isForwarded(m) && !m.is_unsent && (
+                        <span className="mb-0.5 flex items-center gap-1 px-1 text-[10px] font-bold uppercase tracking-widest text-muted">
+                          <ShareIcon size={9} weight="bold" className="shrink-0" />
+                          Forwarded
                         </span>
                       )}
                       {showSender && (
@@ -2656,7 +2673,7 @@ export function RealChatView({
                           style={mine && m._status === "failed" ? undefined : lookCss?.style}
                         >
                           {look?.decor && showTime && <ChatThemeDecor decor={look.decor} mine={mine} />}
-                          {m.body}
+                          {forwardedBody(m.body)}
                           {/* Time + status always at bottom-right inside the bubble */}
                           <span className="absolute bottom-1.5 right-2.5 flex items-center gap-[3px]">
                             {m.edited_at && (

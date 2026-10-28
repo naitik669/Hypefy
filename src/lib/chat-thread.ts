@@ -13,6 +13,7 @@
  */
 
 import { albumSnippet, parseAlbum, type Album } from "@/lib/chat-album";
+import { forwardedBody } from "@/lib/chat-forward";
 import { isEncrypted } from "@/lib/e2ee/chat";
 import { musicSnippet } from "@/lib/music-message";
 import { one } from "@/lib/supabase/typed";
@@ -61,6 +62,10 @@ export type ChatMsg = {
     page?: unknown;
     /** A shared post: which of its photos was shared (send_message, 0110). */
     slide?: number;
+    /** Forwarded from another chat (send_message, 0177). A fact about the
+     *  message: it used to be written into the body, where it could not be
+     *  styled and followed the words everywhere they went. */
+    forwarded?: boolean;
     /** A forwarded comment on that post or Shot (send_message, 0134). Only
      *  the id: the words are read live, so an edit follows it and a deleted
      *  one says so, rather than the chat keeping a copy for ever. */
@@ -157,7 +162,10 @@ export function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string 
     case "document": {
       try { return JSON.parse(m.body ?? "")?.name ?? "Document"; } catch { return "Document"; }
     }
-    default: return m.body ?? "Message";
+    // Messages forwarded before 0177 carry "Forwarded: " in the body
+    // itself. The label belongs above the bubble, not in the preview of
+    // what was said.
+    default: return forwardedBody(m.body) ?? "Message";
   }
 }
 

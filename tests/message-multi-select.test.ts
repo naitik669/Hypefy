@@ -62,9 +62,14 @@ describe("what you can do with them", () => {
   });
 
   it("and a failure half way names what stopped rather than counting", () => {
+    // Scoped to the error branch rather than to a count of characters
+    // from the top of the loop: a comment added above the call used to
+    // push the toast out of the window and fail this without anything
+    // changing about what happens when a forward fails.
     const loop = fwd.slice(fwd.indexOf("for (const one of sending) {"));
-    expect(loop.slice(0, 900)).toContain("toast(error.message");
-    expect(loop.slice(0, 900)).toContain("return;");
+    const failed = loop.slice(loop.indexOf("if (error) {"));
+    expect(failed.slice(0, 300)).toContain("toast(error.message");
+    expect(failed.slice(0, 300)).toContain("return;");
   });
 
   it("unsending touches only your own", () => {

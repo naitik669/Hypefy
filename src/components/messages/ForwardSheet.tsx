@@ -102,15 +102,19 @@ export function ForwardSheet({
     // at once: they arrive as a run of messages, and firing them together
     // would let the server decide what order a conversation happened in.
     for (const one of sending) {
-      const body =
-        one.kind === "text" && one.body ? `↪️ Forwarded: ${one.body}` : one.body;
       const { error } = await supabase.rpc("send_message", {
         p_conversation_id: convId,
-        p_body: body ?? undefined,
+        p_body: one.body ?? undefined,
         p_kind: one.kind,
         p_post_id: one.post_id ?? undefined,
         p_reply_to_id: undefined,
         p_shot_id: one.shot_id ?? undefined,
+        // Said about the message rather than inside it (0177). This used
+        // to prefix the body with "Forwarded: ", which the thread could
+        // not style, the inbox preview repeated, a second forward wrote
+        // again — and which only text ever got, so a forwarded photo or
+        // voice note said nothing at all.
+        p_metadata: { forwarded: true },
       });
       if (error) {
         setBusy(null);
