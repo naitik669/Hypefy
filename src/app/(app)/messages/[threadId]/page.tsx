@@ -29,7 +29,7 @@ export default async function ThreadPage({
     supabase.auth.getUser(),
     supabase
       .from("conversation_members")
-      .select("user_id, role, last_read_at, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, hide_read_receipts, is_verified, is_premium, name_font, name_glow, avatar_decoration, bubble_style)")
+      .select("user_id, role, last_read_at, profiles(id, display_name, username, avatar_hue, avatar_url, last_seen_at, show_activity, hide_read_receipts, is_verified, is_premium, name_font, name_glow, avatar_decoration, bubble_style, nameplate)")
       .eq("conversation_id", threadId),
     supabase.from("conversations").select("type, title, avatar_url, theme").eq("id", threadId).maybeSingle(),
     // Latest 30 messages with post + shot previews and their reactions
@@ -77,7 +77,10 @@ export default async function ThreadPage({
     | null;
 
   // Sender lookup + group meta
-  const membersMap: Record<string, { name: string; username: string | null; hue: number; avatarUrl: string | null }> = {};
+  const membersMap: Record<
+    string,
+    { name: string; username: string | null; hue: number; avatarUrl: string | null; nameplate: string | null }
+  > = {};
   others.forEach((p: any) => {
     membersMap[p.id] = {
       name: p.display_name ?? p.username ?? "User",
@@ -86,6 +89,8 @@ export default async function ThreadPage({
       hue: p.avatar_hue ?? 280,
       // The face beside each of their messages in the thread.
       avatarUrl: p.avatar_url ?? null,
+      // What they are wearing, for the name above their messages.
+      nameplate: p.nameplate ?? null,
     };
   });
   const groupMembers = members

@@ -46,6 +46,7 @@ import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
 import { ChatAmbient } from "@/components/messages/ChatAmbient";
 import { resolveBubble } from "@/lib/bubble-styles";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
+import { Nameplate } from "@/components/ui/Nameplate";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { DisplayName } from "@/components/ui/DisplayName";
 import { MediaFolder, AlbumViewer } from "@/components/messages/MediaFolder";
@@ -165,7 +166,17 @@ export function RealChatView({
   currentUserId: string;
   other: Other;
   group?: GroupMeta | null;
-  members?: Record<string, { name: string; username?: string | null; hue: number; avatarUrl?: string | null }>;
+  members?: Record<
+    string,
+    {
+      name: string;
+      username?: string | null;
+      hue: number;
+      avatarUrl?: string | null;
+      /** The plate they wear, drawn behind their name in a group. */
+      nameplate?: string | null;
+    }
+  >;
   /** The reader's own avatar, for where their own messages are shown with a face. */
   self?: { hue: number; avatarUrl: string | null };
   initialMessages: ChatMsg[];
@@ -2163,7 +2174,30 @@ export function RealChatView({
                         </span>
                       )}
                       {showSender && (
-                        <span className="mb-0.5 px-1 text-[11px] font-semibold text-muted">{senderName(m.sender_id)}</span>
+                        // Who is talking, wearing what they bought. In a
+                        // group of eight this is the fastest way to tell
+                        // people apart — a colour read before a word is.
+                        //
+                        // The plate is a wash of about a third opacity, so
+                        // it tints rather than covers. Over the dark base
+                        // underneath, white sits around 13:1 on the
+                        // strongest of them; the base is here so that holds
+                        // whatever chat theme is behind it, rather than
+                        // only on the default one.
+                        //
+                        // Behind the name and nothing else. A wash behind
+                        // the words themselves is how a thread stops being
+                        // readable, and the words are the point.
+                        <span
+                          className={`relative mb-0.5 self-start overflow-hidden rounded-md px-1.5 py-px text-[11px] font-semibold ${
+                            members?.[m.sender_id]?.nameplate
+                              ? "bg-black/75 text-foreground"
+                              : "text-muted"
+                          }`}
+                        >
+                          <Nameplate id={members?.[m.sender_id]?.nameplate} className="inset-0" />
+                          <span className="relative">{senderName(m.sender_id)}</span>
+                        </span>
                       )}
                       {replied && (
                         <div className="mb-0.5 max-w-full truncate rounded-lg border-l-2 border-accent/60 bg-surface px-2 py-1 text-[11px] text-muted">
