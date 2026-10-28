@@ -282,6 +282,17 @@ export function RealChatView({
   const [dmCursor, setDmCursor] = useState(0);
   const { suggestions: pickerSuggestions, reset: resetPicker } = useMentionHashtag(text, dmCursor);
   const [sending, setSending] = useState(false);
+  /**
+   * Which messages are picked, or null when nothing is being picked.
+   *
+   * Null rather than an empty set, so "not selecting" and "selecting
+   * nothing yet" are different states. Leaving the last one unticked
+   * should not drop you out of the mode you are standing in.
+   */
+  const [picked, setPicked] = useState<ReadonlySet<string> | null>(null);
+  /** The run being forwarded, held while the sheet is open. */
+  const [forwardMany, setForwardMany] = useState<ChatMsg[]>([]);
+  const selecting = picked !== null;
 
   // Prefill the composer when arriving from a Note reply ("?prefill=…"), so the
   // indirect-confession payoff lands as a quoted draft. Clears the param after.
@@ -1857,12 +1868,40 @@ export function RealChatView({
    * take focus is unreachable by every one of them, and Report being
    * unreachable is a safety problem before it is an accessibility one.
    */
+  /** Start picking, with the message that was held already picked. */
+  function startSelecting(m: ChatMsg) {
+    setPicked(new Set([m.id]));
+    setMenu(null);
+  }
+
+  function togglePicked(id: string) {
+    setPicked((prev) => {
+      if (!prev) return prev;
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  /** The picked messages, in the order the thread shows them. */
+  function pickedMessages(): ChatMsg[] {
+    return picked ? messages.filter((m) => picked.has(m.id)) : [];
+  }
+
   function openMenu(m: ChatMsg, el: HTMLElement) {
     if (m.is_unsent) return;
     setMenu({ msg: m, rect: el.getBoundingClientRect() });
   }
 
   function onPressStart(m: ChatMsg, e: React.PointerEvent) {
+    // While picking, a press is a tick. Opening the hold menu on top of
+    // a selection would offer actions for one message in the middle of
+    // choosing several.
+    if (selecting) {
+      togglePicked(m.id);
+      return;
+    }
     if (m.is_unsent) return;
 
     // ── Double-tap → ⭐ star reaction ────────────────────────────────────────
@@ -2100,7 +2139,7 @@ export function RealChatView({
                   data-msg-id={m.id}
                   className={`relative ${isNew ? "animate-msg-in" : ""} ${
                     foundId === m.id ? "animate-found rounded-2xl" : ""
-                  }`}
+                  } ${picked?.has(m.id) ? "rounded-2xl bg-accent/10 ring-1 ring-accent/40" : ""}`}
                 >
                   {/* The single-pointer way into a message's actions.
                       Invisible until it takes focus, so the bubbles look
@@ -2807,6 +2846,47 @@ export function RealChatView({
         )}
 
         {/* What is queued to go in this thread. Sender-only, by RLS. */}
+        {selecting && (
+          // Over the composer rather than above it: while picking, there
+          // is nothing to type, and leaving a live box under a selection
+          // invites typing into a thread that is not listening.
+          <div className="flex items-center gap-2 border-t border-border bg-elevated px-3 py-2">
+            <button
+              type="button"
+              onClick={() => setPicked(null)}
+              aria-label="Stop selecting"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/5 hover:text-foreground"
+            >
+              <X size={18} />
+            </button>
+            <span className="min-w-0 flex-1 truncate text-sm font-bold tabular-nums">
+              {picked.size} selected
+            </span>
+            <button
+              type="button"
+              disabled={picked.size === 0}
+              onClick={() => setForwardMany(pickedMessages())}
+              className="shrink-0 rounded-xl bg-surface px-3 py-2 text-xs font-bold transition active:scale-95 disabled:opacity-40"
+            >
+              Forward
+            </button>
+            <button
+              type="button"
+              // Only your own. The server refuses anybody else's, and a
+              // button that is going to be refused should not be offered.
+              disabled={pickedMessages().every((m) => m.sender_id !== currentUserId)}
+              onClick={() => {
+                for (const m of pickedMessages()) {
+                  if (m.sender_id === currentUserId && !m.is_unsent) unsend(m);
+                }
+                setPicked(null);
+              }}
+              className="shrink-0 rounded-xl bg-surface px-3 py-2 text-xs font-bold text-danger transition active:scale-95 disabled:opacity-40"
+            >
+              Unsend
+            </button>
+          </div>
+        )}
         <ScheduledStrip conversationId={conversationId} />
 
         {voiceMode ? (
@@ -3141,6 +3221,7 @@ export function RealChatView({
                 {/* Actions */}
                 <div className={`w-44 overflow-hidden rounded-2xl bg-elevated p-1 shadow-xl ring-1 ring-border ${mine ? "ml-auto" : ""}`}>
                   <CtxItem icon={<Reply size={17} />} label="Reply" onClick={() => { setReplyTo(menu.msg); setMenu(null); }} />
+                  <CtxItem icon={<Check size={17} />} label="Select" onClick={() => startSelecting(menu.msg)} />
                   {!menu.msg.is_unsent && (
                     <CtxItem icon={<ShareIcon size={17} weight="bold" />} label="Forward" onClick={() => { setForwardMsg(menu.msg); setMenu(null); }} />
                   )}
@@ -3219,6 +3300,14 @@ export function RealChatView({
       />
 
       <ForwardSheet open={!!forwardMsg} onClose={() => setForwardMsg(null)} msg={forwardMsg} />
+      <ForwardSheet
+        open={forwardMany.length > 0}
+        onClose={() => {
+          setForwardMany([]);
+          setPicked(null);
+        }}
+        msgs={forwardMany}
+      />
 
       {/* Report reason sheet */}
       {reportMsg && (

@@ -33,10 +33,16 @@ export function ForwardSheet({
   open,
   onClose,
   msg,
+  msgs,
 }: {
   open: boolean;
   onClose: () => void;
-  msg: ForwardableMsg | null;
+  msg?: ForwardableMsg | null;
+  /**
+   * Several at once, from the thread's selection mode. One or the other:
+   * a single `msg` is the common case and stays the simple call.
+   */
+  msgs?: ForwardableMsg[];
 }) {
   const supabase = createClient();
   const toast = useToast();
@@ -77,7 +83,10 @@ export function ForwardSheet({
   }, [open]);
 
   async function forwardTo(friend: Friend) {
-    if (!msg || busy || sentTo.has(friend.id)) return;
+    // Whichever way it was called. Empty means nothing to send, which
+    // is not an error — the thread simply has nothing selected.
+    const sending = msgs ?? (msg ? [msg] : []);
+    if (sending.length === 0 || busy || sentTo.has(friend.id)) return;
     setBusy(friend.id);
     const { data: convId, error: convErr } = await supabase.rpc("get_or_create_dm", { p_other: friend.id });
     if (convErr || !convId) {
@@ -89,21 +98,29 @@ export function ForwardSheet({
       toast(convErr?.message ?? "Couldn't open a chat with them.", "error");
       return;
     }
-    const body =
-      msg.kind === "text" && msg.body ? `↪️ Forwarded: ${msg.body}` : msg.body;
-    const { error } = await supabase.rpc("send_message", {
-      p_conversation_id: convId,
-      p_body: body ?? undefined,
-      p_kind: msg.kind,
-      p_post_id: msg.post_id ?? undefined,
-      p_reply_to_id: undefined,
-      p_shot_id: msg.shot_id ?? undefined,
-    });
-    setBusy(null);
-    if (error) {
-      toast(error.message, "error");
-      return;
+    // In the order they were written, one after another rather than all
+    // at once: they arrive as a run of messages, and firing them together
+    // would let the server decide what order a conversation happened in.
+    for (const one of sending) {
+      const body =
+        one.kind === "text" && one.body ? `↪️ Forwarded: ${one.body}` : one.body;
+      const { error } = await supabase.rpc("send_message", {
+        p_conversation_id: convId,
+        p_body: body ?? undefined,
+        p_kind: one.kind,
+        p_post_id: one.post_id ?? undefined,
+        p_reply_to_id: undefined,
+        p_shot_id: one.shot_id ?? undefined,
+      });
+      if (error) {
+        setBusy(null);
+        // Named rather than counted: "3 of 5 sent" is worse than knowing
+        // which one stopped, because the rest are already there.
+        toast(error.message, "error");
+        return;
+      }
     }
+    setBusy(null);
     setSentTo((s) => new Set(s).add(friend.id));
   }
 
