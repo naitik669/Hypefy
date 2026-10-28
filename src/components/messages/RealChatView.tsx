@@ -39,6 +39,8 @@ import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/compon
 import { one } from "@/lib/supabase/typed";
 import { LinkCard } from "./LinkCard";
 import { PollBubble } from "./PollBubble";
+import { SwipeRow } from "./SwipeRow";
+import { canEdit, swipeAction, type SwipeAction } from "@/lib/chat-gestures";
 import { PollComposer } from "./PollComposer";
 import { readPoll } from "@/lib/chat-poll";
 import { firstPreviewable } from "@/lib/link-preview";
@@ -352,7 +354,19 @@ export function RealChatView({
     if (!draftReady.current || editing) return;
     writeDraft(currentUserId, conversationId, text);
   }, [text, editing, currentUserId, conversationId]);
-  const [menu, setMenu] = useState<{ msg: ChatMsg; rect: DOMRect } | null>(null);
+  const [menu, setMenuState] = useState<{ msg: ChatMsg; rect: DOMRect; at: number } | null>(null);
+  /**
+   * Opening the menu stamps the time.
+   *
+   * The Edit item depends on how old the message is, and reading the clock
+   * while rendering is not something a render may do - it would also mean
+   * the item could vanish mid-press. Stamped once, when the menu opens;
+   * startEdit checks the live clock, so a menu left open past the window
+   * refuses with a sentence rather than saving nothing.
+   */
+  function setMenu(next: { msg: ChatMsg; rect: DOMRect } | null) {
+    setMenuState(next ? { ...next, at: Date.now() } : null);
+  }
   const [reportMsg, setReportMsg] = useState<ChatMsg | null>(null);
   const [forwardMsg, setForwardMsg] = useState<ChatMsg | null>(null);
   // Message id whose reaction list ("who reacted with what") is open
@@ -1813,6 +1827,13 @@ export function RealChatView({
   }
 
   function startEdit(m: ChatMsg) {
+    // Checked here rather than only where it is offered: the menu can be
+    // open when the window closes, and the server refuses it either way —
+    // this is so the refusal is a sentence instead of a failed save.
+    if (!canEdit(m, currentUserId, Date.now())) {
+      showToast("That message can no longer be edited");
+      return;
+    }
     setEditing(m);
     setReplyTo(null);
     setText(m.kind === "album" ? albumOf(m)?.caption ?? "" : m.body ?? "");
@@ -1925,6 +1946,19 @@ export function RealChatView({
   /** The picked messages, in the order the thread shows them. */
   function pickedMessages(): ChatMsg[] {
     return picked ? messages.filter((m) => picked.has(m.id)) : [];
+  }
+
+  /**
+   * Carry out a swipe.
+   *
+   * The same three handlers the hold menu calls, so there is exactly one
+   * implementation of reply, edit and forward and the gesture cannot drift
+   * away from the menu.
+   */
+  function doSwipe(m: ChatMsg, action: SwipeAction) {
+    if (action === "reply") { setReplyTo(m); return; }
+    if (action === "forward") { setForwardMsg(m); return; }
+    startEdit(m);
   }
 
   function openMenu(m: ChatMsg, el: HTMLElement) {
@@ -2234,6 +2268,13 @@ export function RealChatView({
                       </p>
                     </div>
                   ) : (
+                  <SwipeRow
+                    actionFor={(direction) => swipeAction(m, currentUserId, direction, Date.now())}
+                    onAction={(action) => doSwipe(m, action)}
+                    // A claimed swipe is not also a long-press: the menu
+                    // would open under the moving bubble.
+                    onClaim={onPressEnd}
+                  >
                   <div className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}>
                     {!mine && (
                       <span className="w-7 shrink-0" data-msg-face={face || undefined}>
@@ -2695,6 +2736,7 @@ export function RealChatView({
                       )}
                     </div>
                   </div>
+                  </SwipeRow>
                   )}
                   {/* Group: the members who have read down to here. */}
                   {(markers.get(m.id)?.length ?? 0) > 0 && (
@@ -3295,10 +3337,10 @@ export function RealChatView({
                       onClick={() => { togglePin(menu.msg); setMenu(null); }}
                     />
                   )}
-                  {menu.msg.sender_id === currentUserId && menu.msg.kind === "text" && !menu.msg.is_unsent && (
+                  {canEdit(menu.msg, currentUserId, menu.at) && menu.msg.kind === "text" && (
                     <CtxItem icon={<Pencil size={17} />} label="Edit" onClick={() => { startEdit(menu.msg); setMenu(null); }} />
                   )}
-                  {menu.msg.sender_id === currentUserId && menu.msg.kind === "album" && !menu.msg.is_unsent && !menu.msg.id.startsWith("temp-") && (
+                  {canEdit(menu.msg, currentUserId, menu.at) && menu.msg.kind === "album" && (
                     <CtxItem icon={<Pencil size={17} />} label="Edit caption" onClick={() => { startEdit(menu.msg); setMenu(null); }} />
                   )}
                   {mine ? (
