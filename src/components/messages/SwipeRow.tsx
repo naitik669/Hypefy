@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { Reply, Pencil } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import {
-  SWIPE_MAX_PX,
   SWIPE_SLOP_PX,
   SWIPE_TRIGGER_PX,
   type SwipeAction,
   swipeLabel,
+  swipeTravel,
 } from "@/lib/chat-gestures";
 
 /**
@@ -29,12 +29,33 @@ import {
  *
  * So the action lives in a ref, the position is written straight to the
  * node inside one requestAnimationFrame, and the layer is promoted for the
- * length of the gesture. React renders once, when the icon appears.
+ * length of the gesture. React renders once, when the mark appears.
  *
- * Only `transform` and `opacity` are animated. `clip-path` is not
- * composited in Android's WebView, so a reveal drawn by clipping repaints
- * the whole row every frame — the reason the music title had to be rebuilt.
+ * **Only `transform` and `opacity` are written per frame.** Everything else
+ * is a paint. The version before this one lerped the mark's background and
+ * its arrow colour on every frame, which repainted it sixty times a second
+ * for a change nobody could name — and that was the chop. `clip-path` is
+ * not composited in Android's WebView either, which is why the music title
+ * had to be rebuilt. The rule holds for colour just as much.
+ *
+ * So the mark is two layers and tells the gesture in two beats:
+ *
+ *   1. **The arrow arrives by moving.** It slides in from the edge as the
+ *      bubble leaves it, tracking the finger. Position and opacity only.
+ *   2. **The plate grows behind it at the trigger**, which is the moment
+ *      letting go starts to mean something. That is a state, not a ramp,
+ *      so it is written once when the gesture arms and once when it
+ *      disarms, and CSS carries it the rest of the way.
  */
+
+/** How far out the arrow starts before it slides into place. */
+const ARROW_TRAVEL_PX = 22;
+/** The plate catching rather than merely stopping. */
+const PLATE_EASE =
+  "transform 240ms cubic-bezier(.34,1.56,.64,1), opacity 140ms ease";
+/** The arrow's colour is the only paint, and it happens twice a gesture. */
+const GLYPH_EASE = "color 140ms ease";
+
 export function SwipeRow({
   actionFor,
   onAction,
@@ -50,6 +71,7 @@ export function SwipeRow({
 }) {
   const slider = useRef<HTMLDivElement | null>(null);
   const glyph = useRef<HTMLSpanElement | null>(null);
+  const plate = useRef<HTMLSpanElement | null>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
   const claimed = useRef(false);
   const offset = useRef(0);
@@ -65,6 +87,8 @@ export function SwipeRow({
   const armed = useRef(false);
   const frame = useRef(0);
   const want = useRef(0);
+  /** Which side the mark is on, read inside the frame without a render. */
+  const side = useRef<"left" | "right">("left");
   /**
    * Which gesture this is.
    *
@@ -82,6 +106,24 @@ export function SwipeRow({
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
+  /**
+   * Past the trigger, or back below it.
+   *
+   * Written when it changes and not before: this is the one place the
+   * mark paints, and a gesture crosses the line once or twice, not sixty
+   * times a second.
+   */
+  function setArmed(on: boolean) {
+    const p = plate.current;
+    if (p) {
+      p.style.transform = on ? "scale(1)" : "scale(0.2)";
+      p.style.opacity = on ? "1" : "0";
+    }
+    const g = glyph.current;
+    // Deep lime on the lime plate, white on the thread behind it.
+    if (g) g.style.color = on ? "var(--color-accent-deep)" : "#ffffff";
+  }
+
   /** One write per frame, however many pointer events arrive. */
   function schedule() {
     if (frame.current) return;
@@ -92,22 +134,15 @@ export function SwipeRow({
       el.style.transform = `translate3d(${want.current}px, 0, 0)`;
       const g = glyph.current;
       if (!g) return;
-      // The mark grows out of nothing and turns over as the trigger is
-      // reached: a dark squircle with a white arrow becomes a lime
-      // squircle with a deep-lime arrow, so the moment letting go starts
-      // to mean something is a colour you cannot miss rather than a few
-      // pixels of travel you have to judge.
       const reach = Math.min(1, Math.abs(want.current) / SWIPE_TRIGGER_PX);
-      // The colour is weighted late while the size is linear, so the turn
-      // lands with the trigger instead of halfway to it.
-      const turn = reach * reach;
-      const t = palette();
-      g.style.opacity = String(Math.min(1, 0.25 + reach * 1.3));
-      // A few per cent over full size once it is armed — the squircle
-      // catching, rather than simply stopping.
-      g.style.transform = `scale(${0.4 + reach * 0.6 + (reach >= 1 ? 0.06 : 0)})`;
-      g.style.backgroundColor = mix(t.rest, t.lit, turn);
-      g.style.color = mix(WHITE, t.ink, turn);
+      // The arrow comes in from the edge the bubble is moving away from,
+      // and is in place by the time the swipe is far enough. Nothing here
+      // is a paint: the browser can run both of these on the compositor.
+      const out = (1 - reach) * (side.current === "left" ? -ARROW_TRAVEL_PX : ARROW_TRAVEL_PX);
+      g.style.transform = `translate3d(${out}px, 0, 0)`;
+      // Slightly ahead of the travel, so it is readable before it lands
+      // rather than arriving at full strength in the last few pixels.
+      g.style.opacity = String(Math.min(1, reach * 1.6));
     });
   }
 
@@ -118,16 +153,19 @@ export function SwipeRow({
     // under the bubble that is still travelling home.
     const g = glyph.current;
     if (g) {
-      g.style.transition = "opacity 180ms ease, transform 240ms cubic-bezier(.22,1,.36,1)";
+      g.style.transition = `opacity 180ms ease, transform 240ms cubic-bezier(.22,1,.36,1), ${GLYPH_EASE}`;
       g.style.opacity = "0";
-      g.style.transform = "scale(0.4)";
+      g.style.transform = `translate3d(${
+        side.current === "left" ? -ARROW_TRAVEL_PX : ARROW_TRAVEL_PX
+      }px, 0, 0)`;
     }
+    setArmed(false);
     const mine = ++gen.current;
     window.setTimeout(() => {
       // Only if nothing has started since: a second swipe must not have
       // the first one's tidying land on top of it.
       if (gen.current === mine) setShowing(null);
-    }, 220);
+    }, 240);
     const el = slider.current;
     if (el) {
       el.style.transition = reducedMotion()
@@ -174,11 +212,13 @@ export function SwipeRow({
       }
       claimed.current = true;
       action.current = next;
+      side.current = dx > 0 ? "left" : "right";
       gen.current++;
       const g = glyph.current;
-      // Whatever is left of the last gesture's fade is dropped: the mark
-      // has to follow the finger, not finish the previous animation.
-      if (g) g.style.transition = "none";
+      // Whatever is left of the last gesture's fade is dropped: the arrow
+      // has to follow the finger, not finish the previous animation. Its
+      // colour keeps its own transition, which is not per-frame.
+      if (g) g.style.transition = GLYPH_EASE;
       const el = slider.current;
       if (el) {
         // Set once, here. Writing the transition string on every move was a
@@ -186,15 +226,15 @@ export function SwipeRow({
         el.style.transition = "none";
         el.style.willChange = "transform";
       }
-      setShowing({ action: next, side: dx > 0 ? "left" : "right" });
+      setShowing({ action: next, side: side.current });
       onClaim();
       e.currentTarget.setPointerCapture?.(e.pointerId);
     }
 
-    // Past the trigger it keeps moving, but at a third of the speed, so the
-    // limit is felt as resistance rather than as a wall.
-    const over = Math.max(0, Math.abs(dx) - SWIPE_TRIGGER_PX);
-    const travel = Math.min(SWIPE_TRIGGER_PX + over / 3, SWIPE_MAX_PX);
+    // Under the finger to the trigger, then resisting. See swipeTravel:
+    // the old line here could not return less than the trigger, so the
+    // bubble jumped the whole way the moment the gesture was claimed.
+    const travel = swipeTravel(Math.abs(dx));
     offset.current = dx > 0 ? travel : -travel;
     want.current = offset.current;
 
@@ -202,11 +242,10 @@ export function SwipeRow({
     // the eye does. Only on the way in — buzzing on every wobble over the
     // line is worse than not buzzing at all.
     const far = travel >= SWIPE_TRIGGER_PX;
-    if (far && !armed.current) {
-      armed.current = true;
-      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
-    } else if (!far) {
-      armed.current = false;
+    if (far !== armed.current) {
+      armed.current = far;
+      setArmed(far);
+      if (far && typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
     }
 
     schedule();
@@ -227,25 +266,39 @@ export function SwipeRow({
     <div className="relative">
       {showing && (
         <span
-          ref={glyph}
           aria-hidden
-          style={{
-            opacity: 0,
-            transform: "scale(0.4)",
-            // Promoted for the gesture: it is repainted on the same frames
-            // the bubble is.
-            willChange: "opacity, transform, background-color",
-            backgroundColor: "var(--color-border)",
-            color: "#ffffff",
-          }}
-          // A squircle, not a circle — the same corner the avatars and the
-          // music case use, so the mark belongs to Hypefy rather than to
-          // the gesture.
-          className={`pointer-events-none absolute inset-y-0 my-auto flex h-9 w-9 items-center justify-center rounded-[32%] ${
+          className={`pointer-events-none absolute inset-y-0 my-auto flex h-9 w-9 items-center justify-center ${
             showing.side === "left" ? "left-3" : "right-3"
           }`}
         >
-          <SwipeGlyph action={showing.action} />
+          {/* The plate. A squircle, not a circle — the same corner the
+              avatars and the music case use, so the mark belongs to Hypefy
+              rather than to the gesture. It is not drawn until the swipe
+              is far enough, which is the whole of what it says. */}
+          <span
+            ref={plate}
+            style={{
+              opacity: 0,
+              transform: "scale(0.2)",
+              transition: PLATE_EASE,
+              backgroundColor: "var(--color-accent)",
+              willChange: "transform, opacity",
+            }}
+            className="absolute inset-0 rounded-[32%]"
+          />
+          <span
+            ref={glyph}
+            style={{
+              opacity: 0,
+              transform: "translate3d(0, 0, 0)",
+              color: "#ffffff",
+              transition: GLYPH_EASE,
+              willChange: "transform, opacity",
+            }}
+            className="relative flex items-center justify-center"
+          >
+            <SwipeGlyph action={showing.action} />
+          </span>
         </span>
       )}
       <div
@@ -265,72 +318,14 @@ export function SwipeRow({
 }
 
 /**
- * Inside the squircle, and taking its colour from it — so the one write
- * that turns the plate lime turns the arrow deep-lime with it.
+ * The arrow itself, taking its colour from the layer around it — so the
+ * one write that turns it deep-lime needs to touch nothing else.
  */
 function SwipeGlyph({ action }: { action: SwipeAction }) {
   const label = swipeLabel(action);
   if (action === "reply") return <Reply size={19} strokeWidth={2.4} aria-label={label} />;
   if (action === "edit") return <Pencil size={17} strokeWidth={2.4} aria-label={label} />;
   return <ShareIcon size={18} weight="bold" aria-label={label} />;
-}
-
-type RGB = readonly [number, number, number];
-
-const WHITE: RGB = [255, 255, 255];
-
-/** "#a3e635" or "#abc" to channels, or null if it is neither. */
-function parseHex(raw: string): RGB | null {
-  const hex = raw.trim().replace(/^#/, "");
-  if (hex.length === 3) {
-    const n = Number.parseInt(hex, 16);
-    if (Number.isNaN(n)) return null;
-    const r = (n >> 8) & 0xf, g = (n >> 4) & 0xf, b = n & 0xf;
-    return [r * 17, g * 17, b * 17];
-  }
-  if (hex.length !== 6) return null;
-  const n = Number.parseInt(hex, 16);
-  if (Number.isNaN(n)) return null;
-  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
-}
-
-let cached: { rest: RGB; lit: RGB; ink: RGB } | null = null;
-
-/**
- * The three colours the mark moves between, read from the page's own
- * tokens rather than written out here, so a change to the brand reaches
- * the gesture without anybody remembering this file.
- *
- * Read once and kept: it is the same answer on every frame of every swipe,
- * and getComputedStyle is not something to call sixty times a second.
- */
-function palette(): { rest: RGB; lit: RGB; ink: RGB } {
-  if (cached) return cached;
-  const fallback = {
-    rest: [42, 42, 42] as RGB,
-    lit: [163, 230, 53] as RGB,
-    ink: [63, 98, 18] as RGB,
-  };
-  if (typeof window === "undefined") return fallback;
-  try {
-    const css = getComputedStyle(document.documentElement);
-    const pick = (name: string, dflt: RGB) => parseHex(css.getPropertyValue(name)) ?? dflt;
-    cached = {
-      rest: pick("--color-border", fallback.rest),
-      lit: pick("--color-accent", fallback.lit),
-      ink: pick("--color-accent-deep", fallback.ink),
-    };
-    return cached;
-  } catch {
-    return fallback;
-  }
-}
-
-/** Part of the way from one colour to another. */
-function mix(from: RGB, to: RGB, t: number): string {
-  const at = Math.min(1, Math.max(0, t));
-  const c = (i: number) => Math.round(from[i] + (to[i] - from[i]) * at);
-  return `rgb(${c(0)}, ${c(1)}, ${c(2)})`;
 }
 
 function reducedMotion(): boolean {

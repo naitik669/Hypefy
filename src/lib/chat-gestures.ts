@@ -114,3 +114,25 @@ export function swipeAction(
 export function swipeLabel(action: SwipeAction): string {
   return action === "reply" ? "Reply" : action === "edit" ? "Edit" : "Forward";
 }
+
+/**
+ * How far the bubble has moved, for a finger that has moved `dx`.
+ *
+ * Up to the trigger the bubble is simply under the finger. Past it, it
+ * keeps going at a third of the speed and stops at SWIPE_MAX_PX, so the
+ * limit is felt as resistance rather than as a wall.
+ *
+ * This was `min(TRIGGER + over / 3, MAX)`, which cannot return less than
+ * TRIGGER — so from the moment the gesture was claimed, at twelve pixels
+ * of movement, the bubble jumped the full fifty-six and the swipe counted
+ * as complete. Every drag was a snap, then a dead stretch where the finger
+ * moved and nothing did, and letting go anywhere fired the action. That
+ * was the chop.
+ *
+ * Takes the distance already made absolute; the caller owns the direction.
+ */
+export function swipeTravel(distance: number): number {
+  const dist = Math.max(0, distance);
+  const over = Math.max(0, dist - SWIPE_TRIGGER_PX);
+  return Math.min(dist - (over * 2) / 3, SWIPE_MAX_PX);
+}
