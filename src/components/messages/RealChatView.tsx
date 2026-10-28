@@ -1972,7 +1972,6 @@ export function RealChatView({
    */
   function doSwipe(m: ChatMsg, action: SwipeAction) {
     if (action === "reply") { setReplyTo(m); return; }
-    if (action === "forward") { setForwardMsg(m); return; }
     startEdit(m);
   }
 

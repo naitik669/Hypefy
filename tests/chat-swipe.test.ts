@@ -86,8 +86,12 @@ describe("a message you received", () => {
     expect(swipeAction(theirs(), "me", "left", NOW)).toBe("reply");
   });
 
-  it("swipe right forwards", () => {
-    expect(swipeAction(theirs(), "me", "right", NOW)).toBe("forward");
+  it("and so does swipe right — either way, on anybody else's message", () => {
+    // Forwarding used to sit on this side, which made the gesture
+    // something you had to aim: the thing you nearly always want was on
+    // one half only, and missing it sent the message to somebody instead
+    // of quoting them.
+    expect(swipeAction(theirs(), "me", "right", NOW)).toBe("reply");
   });
 
   it("and nothing about it is editable, however new it is", () => {
@@ -95,11 +99,22 @@ describe("a message you received", () => {
     expect(canEdit(theirs({ created_at: ago(1) }), "me", NOW)).toBe(false);
   });
 
-  it("a view-once photo is not forwardable", () => {
-    // send_message refuses a oneshot with no storage path, so the gesture
-    // would only ever fail.
-    expect(swipeAction(theirs({ kind: "oneshot" }), "me", "right", NOW)).toBe(null);
+  it("a view-once photo answers both ways too", () => {
+    // It used to refuse a right swipe, because that meant forward and
+    // send_message rejects a oneshot with no storage path. Replying to
+    // one was always allowed on the other side, so now both agree.
+    expect(swipeAction(theirs({ kind: "oneshot" }), "me", "right", NOW)).toBe("reply");
     expect(swipeAction(theirs({ kind: "oneshot" }), "me", "left", NOW)).toBe("reply");
+  });
+
+  it("there is no half of a received message that does anything else", () => {
+    // The property, rather than two examples of it: whatever the kind,
+    // neither direction can produce anything but a reply.
+    for (const kind of ["text", "image", "video", "album", "voice", "document", "gif", "poll", "post", "shot", "oneshot"]) {
+      for (const d of ["left", "right"] as const) {
+        expect(swipeAction(theirs({ kind }), "me", d, NOW)).toBe("reply");
+      }
+    }
   });
 });
 
@@ -133,7 +148,7 @@ describe("attachments swipe like anything else", () => {
     // Nothing about the gesture is gated on the body being words.
     for (const kind of ["image", "video", "album", "voice", "document", "gif", "poll", "post", "shot"]) {
       expect(swipeAction(msg({ kind, sender_id: "them" }), "me", "left", NOW)).toBe("reply");
-      expect(swipeAction(msg({ kind, sender_id: "them" }), "me", "right", NOW)).toBe("forward");
+      expect(swipeAction(msg({ kind, sender_id: "them" }), "me", "right", NOW)).toBe("reply");
       expect(swipeAction(msg({ kind }), "me", "right", NOW)).toBe("reply");
     }
   });
@@ -179,7 +194,14 @@ describe("the distances", () => {
   it("every action has words for the screen reader", () => {
     expect(swipeLabel("reply")).toBe("Reply");
     expect(swipeLabel("edit")).toBe("Edit");
-    expect(swipeLabel("forward")).toBe("Forward");
+  });
+
+  it("and forwarding is not one of them, but is still reachable", () => {
+    // It left the gesture, not the app: the hold menu still offers it,
+    // where it cannot be reached by a thumb going the wrong way.
+    const gestures = read("src/lib/chat-gestures.ts");
+    expect(gestures).not.toContain('"forward"');
+    expect(read("src/components/messages/RealChatView.tsx")).toContain('label="Forward"');
   });
 });
 

@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Reply, Pencil } from "lucide-react";
-import { ShareIcon } from "@/components/ui/ShareIcon";
 import {
   SWIPE_SLOP_PX,
   SWIPE_TRIGGER_PX,
@@ -324,8 +323,7 @@ export function SwipeRow({
 function SwipeGlyph({ action }: { action: SwipeAction }) {
   const label = swipeLabel(action);
   if (action === "reply") return <Reply size={19} strokeWidth={2.4} aria-label={label} />;
-  if (action === "edit") return <Pencil size={17} strokeWidth={2.4} aria-label={label} />;
-  return <ShareIcon size={18} weight="bold" aria-label={label} />;
+  return <Pencil size={17} strokeWidth={2.4} aria-label={label} />;
 }
 
 function reducedMotion(): boolean {

@@ -36,7 +36,7 @@ export const SWIPE_MAX_PX = 76;
  */
 export const SWIPE_SLOP_PX = 12;
 
-export type SwipeAction = "reply" | "edit" | "forward";
+export type SwipeAction = "reply" | "edit";
 
 /** The kinds whose content can actually be changed after sending. */
 export function editableKind(kind: string): boolean {
@@ -103,16 +103,19 @@ export function swipeAction(
     return canEdit(m, myId, now) ? "edit" : null;
   }
 
-  if (direction === "left") return "reply";
-  // A view-once photo is deliberately not forwardable: send_message refuses
-  // a oneshot with no storage path, so the gesture would only ever fail.
-  if (m.kind === "oneshot") return null;
-  return "forward";
+  // Either way on somebody else's message is reply. Forwarding used to
+  // sit on the other direction, which made the gesture something you had
+  // to aim: the thing you nearly always want was on one side only, and
+  // getting it wrong sent a chat to somebody rather than quoting them.
+  // Reply is the answer to a message; it does not need a correct half.
+  // Forwarding is still a tap away in the hold menu, where it cannot be
+  // reached by accident.
+  return "reply";
 }
 
 /** What the revealed icon is announced as. */
 export function swipeLabel(action: SwipeAction): string {
-  return action === "reply" ? "Reply" : action === "edit" ? "Edit" : "Forward";
+  return action === "reply" ? "Reply" : "Edit";
 }
 
 /**
