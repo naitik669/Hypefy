@@ -416,3 +416,20 @@ describe("the dialog floats rather than lying along the bottom", () => {
     expect(info).toContain('import { CenterModal } from "@/components/ui/CenterModal";');
   });
 });
+
+describe("a rename that does not stick", () => {
+  it("says so rather than just putting the old name back", () => {
+    // The name shows before the server answers and is put back if the
+    // write is refused. Putting it back silently is the worst of both:
+    // you watch the name you typed appear and then vanish, with nothing
+    // to say whether it saved.
+    const save = info.slice(info.indexOf("onSave={(next) => {"), info.indexOf("onSave={(next) => {") + 600);
+    expect(save).toContain("void rename(naming, next).then((stuck) => {");
+    expect(save).toContain('if (!stuck) showToast("Couldn\'t change that nickname.");');
+  });
+
+  it("and the hook reports it rather than swallowing it", () => {
+    expect(hook).toContain("): Promise<boolean> => {");
+    expect(hook).toContain("return false;");
+  });
+});

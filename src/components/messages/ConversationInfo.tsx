@@ -1332,7 +1332,14 @@ export function ConversationInfo({
         // while an older private name showed through.
         current={naming ? (sharedNames[naming] ?? "") : ""}
         onSave={(next) => {
-          if (naming) void rename(naming, next);
+          if (!naming) return;
+          // The name is shown before the server answers, and put back if
+          // the write is refused. Putting it back without saying anything
+          // is the worst of both: you watch the name you typed appear and
+          // then vanish, with nothing to tell you whether it saved.
+          void rename(naming, next).then((stuck) => {
+            if (!stuck) showToast("Couldn't change that nickname.");
+          });
         }}
       />
 
