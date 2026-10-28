@@ -65,6 +65,15 @@ export type ChatMsg = {
      *  the id: the words are read live, so an edit follows it and a deleted
      *  one says so, rather than the chat keeping a copy for ever. */
     comment_id?: string;
+    /** A poll (0174): the options as written, whether more than one may be
+     *  chosen, and the tally, which cast_poll_vote recomputes on every vote
+     *  so the thread learns the new counts through the message UPDATE it is
+     *  already subscribed to. Loose types on purpose — readPoll checks the
+     *  shape, because a jsonb column can hold an older or newer one. */
+    options?: unknown;
+    multi?: boolean;
+    tally?: unknown;
+    voters?: number;
   } | null;
   /** Client-only: set on optimistic messages before server confirms */
   _status?: "pending" | "failed";
@@ -144,6 +153,7 @@ export function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string 
     case "oneshot": return "Photo";
     case "album": return albumSnippet(m.body);
     case "page_reply": return m.body ? `Page reply: ${m.body}` : "Page reply";
+    case "poll": return m.body ? `Poll: ${m.body}` : "Poll";
     case "document": {
       try { return JSON.parse(m.body ?? "")?.name ?? "Document"; } catch { return "Document"; }
     }

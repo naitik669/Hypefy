@@ -997,6 +997,35 @@ export type Database = {
           },
         ]
       }
+      message_poll_votes: {
+        Row: {
+          choice: number
+          created_at: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          choice: number
+          created_at?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          choice?: number
+          created_at?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_poll_votes_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_reports: {
         Row: {
           conversation_id: string
@@ -3339,6 +3368,20 @@ export type Database = {
           p_requires_approval: boolean
         }
         Returns: undefined
+      }
+      cast_poll_vote: {
+        Args: { p_choice: number; p_message_id: string }
+        Returns: Json
+      }
+      send_poll: {
+        Args: {
+          p_conversation_id: string
+          p_multi?: boolean
+          p_options: string[]
+          p_question: string
+          p_reply_to_id?: string
+        }
+        Returns: Json
       }
       set_nickname: {
         Args: {

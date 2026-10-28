@@ -122,7 +122,9 @@ describe("sending a song", () => {
     expect(labels).toContain("Music");
     // GIF draws its own label as the icon too, so its text reads twice.
     expect(labels.some((l) => l.includes("GIF"))).toBe(true);
-    expect(labels.indexOf("Music")).toBe(labels.length - 1);
+    // Right after GIF, which is what "beside" means here. Not last:
+    // the menu grows, and a poll went on the end of it.
+    expect(labels.indexOf("Music")).toBe(labels.findIndex((l) => l.includes("GIF")) + 1);
   });
 
   it("sends the track as the message body, with no upload and no migration", async () => {

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock, AlertCircle, Search, Pin as PinIcon } from "lucide-react";
+import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock, AlertCircle, Search, Pin as PinIcon, BarChart2 } from "lucide-react";
 import { SendIcon, ShareIcon } from "@/components/ui/ShareIcon";
 import { FACES_SHOWN, lastMine, readMarkers, receiptFor } from "@/lib/chat-receipts";
 import { ChatSearch, type FoundMessage } from "@/components/messages/ChatSearch";
@@ -38,6 +38,9 @@ import { PresenceDot } from "@/components/presence/PresenceDot";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
 import { one } from "@/lib/supabase/typed";
 import { LinkCard } from "./LinkCard";
+import { PollBubble } from "./PollBubble";
+import { PollComposer } from "./PollComposer";
+import { readPoll } from "@/lib/chat-poll";
 import { firstPreviewable } from "@/lib/link-preview";
 import { ForwardSheet } from "@/components/messages/ForwardSheet";
 import { canPin } from "@/lib/chat-pins";
@@ -139,7 +142,7 @@ export {
  *  and the one row that genuinely needs a caveat (View once) gets it at
  *  the point of sending, in the composer preview. */
 const ATTACH_OPTIONS: {
-  mode: "camera" | "media" | "oneshot" | "document" | "gif" | "music";
+  mode: "camera" | "media" | "oneshot" | "document" | "gif" | "music" | "poll";
   icon: React.ReactNode;
   label: string;
 }[] = [
@@ -150,6 +153,9 @@ const ATTACH_OPTIONS: {
   { mode: "gif", icon: <span className="text-[9px] font-black tracking-wider">GIF</span>, label: "GIF" },
   // A song is an attachment, like a photo or a GIF — not a thing of its own.
   { mode: "music", icon: <Music size={16} />, label: "Music" },
+  // "where are we eating" in a group of six is twenty messages and no
+  // answer, so a poll sits with the other things you attach to a chat.
+  { mode: "poll", icon: <BarChart2 size={16} />, label: "Poll" },
 ];
 
 /** How long the paperclip is held before its menu opens instead. */
@@ -388,6 +394,7 @@ export function RealChatView({
   // The paperclip's sheet: camera, this chat's photos, your gallery.
   const [pickerOpen, setPickerOpen] = useState(false);
   const [attachMenu, setAttachMenu] = useState(false);
+  const [pollOpen, setPollOpen] = useState(false);
   const pickerApi = useRef<MediaPickerApi>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const attachHold = useRef<{ timer: ReturnType<typeof setTimeout> | null; opened: boolean }>({ timer: null, opened: false });
@@ -1303,6 +1310,35 @@ export function RealChatView({
    * JSON wrapper for documents and voice notes), and a OneShot's private
    * storage path is carried on the optimistic message for exactly this.
    */
+  /**
+   * Put a poll in the thread.
+   *
+   * No optimistic copy, unlike every other send. A poll is a card whose
+   * whole content is a tally, and a local one would have to invent the
+   * shape the server is about to build — options it may have cleaned
+   * differently, a tally of zeros that is only right until somebody votes.
+   * It is one round trip and the sheet is already closing, so the card
+   * arrives a moment later rather than arriving wrong.
+   */
+  async function sendPoll(question: string, options: string[], multi: boolean) {
+    const { data, error } = await supabase.rpc("send_poll", {
+      p_conversation_id: conversationId,
+      p_question: question,
+      p_options: options,
+      p_multi: multi,
+      p_reply_to_id: replyTo?.id ?? undefined,
+    });
+    setReplyTo(null);
+    if (error || !data) {
+      // The server's words, not ours: it is the one that knows whether this
+      // was a blocked conversation, too many options or a lost connection.
+      showToast(error?.message ?? "Couldn't send that poll.");
+      return;
+    }
+    const real = data as ChatMsg;
+    setMessages((p) => (p.some((m) => m.id === real.id) ? p : [...p, real]));
+  }
+
   async function retrySend(failed: ChatMsg) {
     const files = albumFiles.current.get(failed.id);
     if (files) {
@@ -2525,7 +2561,23 @@ export function RealChatView({
                             )}
                           </div>
                         );
-                      })() : (
+                      })() : readPoll(m) ? (
+                        <div
+                          onPointerDown={(e) => onPressStart(m, e)}
+                          onPointerUp={onPressEnd}
+                          onPointerMove={onPressEnd}
+                          onPointerLeave={onPressEnd}
+                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          className="relative"
+                        >
+                          <PollBubble
+                            poll={readPoll(m)!}
+                            messageId={m.id}
+                            mine={mine}
+                            onError={(msg) => showToast(msg)}
+                          />
+                        </div>
+                      ) : (
                         /* Plain text — time + status tick live inside bubble, bottom-right */
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
@@ -2618,7 +2670,7 @@ export function RealChatView({
 
                       {/* External time+status — for voice, document, post, and shot cards.
                           Plain text, gif, image, and video bubbles embed the time+tick inside themselves. */}
-                      {(m.kind === "voice" || m.kind === "document" || m.kind === "album" || m.kind === "page_reply" || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
+                      {(m.kind === "voice" || m.kind === "document" || m.kind === "album" || m.kind === "page_reply" || (m.kind === "poll" && !m.is_unsent) || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
                         (showTime || (mine && (m._status === "failed" || (m.kind === "album" && m._status === "pending")))) && (
                         <div className={`flex items-center gap-1 px-1 pt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
                           {showTime && (
@@ -2965,7 +3017,8 @@ export function RealChatView({
                     role="menuitem"
                     onClick={() => {
                       setAttachMenu(false);
-                      if (o.mode === "gif") setGifPickerOpen(true);
+                      if (o.mode === "poll") setPollOpen(true);
+                      else if (o.mode === "gif") setGifPickerOpen(true);
                       else if (o.mode === "music") setSongPickerOpen(true);
                       else if (o.mode === "camera") pickerApi.current?.openCamera();
                       else if (o.mode === "media") mediaInputRef.current?.click();
@@ -3308,6 +3361,11 @@ export function RealChatView({
         onSelect={(t) => void sendSong(t)}
       />
 
+      <PollComposer
+        open={pollOpen}
+        onClose={() => setPollOpen(false)}
+        onSend={sendPoll}
+      />
       <ForwardSheet open={!!forwardMsg} onClose={() => setForwardMsg(null)} msg={forwardMsg} />
       <ForwardSheet
         open={forwardMany.length > 0}
