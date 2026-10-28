@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 import { barCount, resamplePeaks, voiceWidth } from "@/lib/voice-peaks";
 import { useChatMediaUrl } from "@/lib/chat-media-url";
+import { nextSpeed, readSpeed, speedLabel, writeSpeed, type Speed } from "@/lib/voice-speed";
 
 interface Props {
   /** Storage URL from the voice-notes bucket */
@@ -64,6 +65,25 @@ export function VoiceMessage({ url, storedDuration, peaks, mine }: Props) {
   const [duration, setDuration] = useState(storedDuration ?? 0);
   const [currentTime, setCurrentTime] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  /**
+   * How fast this device plays voice notes.
+   *
+   * Read after mount rather than at first render: the server has no
+   * localStorage, and a bubble that rendered "2x" on the server and "1x"
+   * in the browser is a hydration mismatch.
+   */
+  const [speed, setSpeed] = useState<Speed>(1);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-time read of browser-only storage
+    setSpeed(readSpeed());
+  }, []);
+
+  // Applied to whatever is loaded, so changing it lands in the sentence
+  // being listened to rather than the next note.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) audio.playbackRate = speed;
+  }, [speed, loaded]);
 
   // Voice notes sit in a private bucket; the stored URL is signed on the way in.
   const { src, retry } = useChatMediaUrl(url);
@@ -192,6 +212,27 @@ export function VoiceMessage({ url, storedDuration, peaks, mine }: Props) {
         >
           {fmt(displayTime)}
         </span>
+
+        {/* Three steps round a loop rather than a slider: the difference
+            between 1.5 and 1.6 is not worth a gesture, and a slider on a
+            bubble this size is a target nobody could hit. */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            const next = nextSpeed(speed);
+            setSpeed(next);
+            writeSpeed(next);
+          }}
+          aria-label={`Playback speed ${speedLabel(speed)}. Tap to change.`}
+          className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black tabular-nums transition active:scale-90 ${
+            mine
+              ? "bg-accent-ink/15 text-accent-ink/80 hover:bg-accent-ink/25"
+              : "bg-foreground/10 text-muted hover:text-foreground"
+          }`}
+        >
+          {speedLabel(speed)}
+        </button>
       </div>
     </div>
   );
