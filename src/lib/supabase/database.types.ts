@@ -477,6 +477,71 @@ export type Database = {
           },
         ]
       }
+      conversation_invites: {
+        Row: {
+          code: string
+          conversation_id: string
+          created_at: string
+          created_by: string | null
+          requires_approval: boolean
+        }
+        Insert: {
+          code: string
+          conversation_id: string
+          created_at?: string
+          created_by?: string | null
+          requires_approval?: boolean
+        }
+        Update: {
+          code?: string
+          conversation_id?: string
+          created_at?: string
+          created_by?: string | null
+          requires_approval?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_invites_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_join_requests: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_join_requests_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_join_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_nicknames: {
         Row: {
           conversation_id: string
@@ -3240,6 +3305,40 @@ export type Database = {
       send_page_reply: {
         Args: { p_body: string; p_owner: string }
         Returns: string
+      }
+      clear_group_invite: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
+      decide_join_request: {
+        Args: {
+          p_accept: boolean
+          p_conversation_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      is_conv_admin: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
+      join_by_invite: {
+        Args: { p_code: string }
+        Returns: Json
+      }
+      set_group_invite: {
+        Args: {
+          p_conversation_id: string
+          p_requires_approval?: boolean
+        }
+        Returns: string
+      }
+      set_group_invite_approval: {
+        Args: {
+          p_conversation_id: string
+          p_requires_approval: boolean
+        }
+        Returns: undefined
       }
       set_nickname: {
         Args: {

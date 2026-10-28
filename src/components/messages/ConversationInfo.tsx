@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { displayNameFor } from "@/lib/nicknames";
 import { useNicknames } from "@/components/messages/useNicknames";
+import { inviteUrl, useGroupInvite } from "@/components/messages/useGroupInvite";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -358,6 +359,8 @@ export function ConversationInfo({
   const [results, setResults] = useState<Found[]>([]);
   const [searching, setSearching] = useState(false);
   const { nicknames, rename } = useNicknames(conversationId);
+  const groupInvite = useGroupInvite(conversationId, isGroup);
+  const [copied, setCopied] = useState(false);
   /** Who the nickname sheet is open on, if anyone. */
   const [naming, setNaming] = useState<string | null>(null);
   const memberIds = new Set(members.map((m) => m.id));
@@ -1071,6 +1074,133 @@ export function ConversationInfo({
       </section>
 
       <div className="h-8" />
+
+      {/* The link into this group, and whoever is waiting on it. Admins
+          only: it is the one control here that decides who can read what
+          everybody else has written. */}
+      {isGroup && isAdmin && (
+        <div className="mx-4 mb-3 rounded-2xl bg-surface p-3.5">
+          <p className="text-sm font-bold">Invite link</p>
+          <p className="mt-0.5 text-xs text-muted">
+            {groupInvite.invite
+              ? groupInvite.invite.requiresApproval
+                ? "Anyone with the link can ask to join."
+                : "Anyone with the link can join."
+              : "There is no link yet."}
+          </p>
+
+          {groupInvite.invite && (
+            <div className="mt-3 flex items-center gap-2">
+              <code className="min-w-0 flex-1 truncate rounded-xl bg-elevated px-3 py-2 text-[11px] text-muted">
+                {inviteUrl(groupInvite.invite.code)}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = inviteUrl(groupInvite.invite!.code);
+                  navigator.clipboard
+                    .writeText(url)
+                    .then(() => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1600);
+                    })
+                    .catch(() => showToast("Couldn't copy that"));
+                }}
+                className="shrink-0 rounded-xl bg-accent px-3 py-2 text-xs font-bold text-accent-ink transition active:scale-95"
+              >
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+          )}
+
+          <label className="mt-3 flex items-center justify-between gap-3">
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold">Approve people first</span>
+              <span className="block text-xs text-muted">
+                They ask, and you let them in.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={groupInvite.invite?.requiresApproval ?? false}
+              disabled={!groupInvite.invite}
+              onChange={(e) => {
+                void groupInvite.setApproval(e.target.checked).then((ok) => {
+                  if (!ok) showToast("Couldn't change that");
+                });
+              }}
+              className="h-5 w-5 shrink-0 accent-[var(--color-accent)]"
+            />
+          </label>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                void groupInvite
+                  .regenerate(groupInvite.invite?.requiresApproval ?? false)
+                  .then((ok) => showToast(ok ? "New link made" : "Couldn't make a link"));
+              }}
+              className="flex-1 rounded-xl bg-elevated px-3 py-2 text-xs font-bold transition active:scale-[0.98]"
+            >
+              {groupInvite.invite ? "New link" : "Create link"}
+            </button>
+            {groupInvite.invite && (
+              <button
+                type="button"
+                onClick={() => {
+                  void groupInvite.revoke().then((ok) => {
+                    if (!ok) showToast("Couldn't turn it off");
+                  });
+                }}
+                className="flex-1 rounded-xl bg-elevated px-3 py-2 text-xs font-bold text-danger transition active:scale-[0.98]"
+              >
+                Turn off
+              </button>
+            )}
+          </div>
+          {groupInvite.invite && (
+            <p className="mt-2 text-[11px] text-faint">
+              A new link stops the old one working.
+            </p>
+          )}
+
+          {groupInvite.waiting.length > 0 && (
+            <div className="mt-4 border-t border-border pt-3">
+              <p className="text-xs font-bold text-muted">
+                Waiting ({groupInvite.waiting.length})
+              </p>
+              {groupInvite.waiting.map((w) => (
+                <div key={w.userId} className="mt-2 flex items-center gap-2.5">
+                  <Avatar name={w.name} hue={w.hue} src={w.avatarUrl ?? undefined} size={32} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">{w.name}</span>
+                    {w.username && (
+                      <span className="block truncate text-xs text-muted">@{w.username}</span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void groupInvite.decide(w.userId, true)}
+                    aria-label={`Let ${w.name} in`}
+                    className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-accent-ink transition active:scale-95"
+                  >
+                    Let in
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void groupInvite.decide(w.userId, false)}
+                    aria-label={`Turn ${w.name} away`}
+                    className="shrink-0 rounded-lg bg-elevated px-3 py-1.5 text-xs font-bold text-muted transition active:scale-95"
+                  >
+                    No
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Naming someone, for yourself alone. */}
       <NicknameSheet

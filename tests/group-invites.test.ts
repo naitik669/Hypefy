@@ -144,3 +144,90 @@ describe("two mistakes that only a running database finds", () => {
     expect(code_(join)).not.toContain("returns table (conversation_id");
   });
 });
+
+describe("the link in the app", () => {
+  const read2 = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
+  const info = read2("src/components/messages/ConversationInfo.tsx");
+  const hook = read2("src/components/messages/useGroupInvite.ts");
+
+  it("only an admin of a group sees the controls", () => {
+    // Scoped to this section. The file has three admin-gated blocks, so
+    // asserting the string exists somewhere passes with this one ungated
+    // — which is how the first version of this missed it.
+    const at = info.indexOf("Invite link");
+    expect(at).toBeGreaterThan(-1);
+    expect(info.slice(Math.max(0, at - 420), at)).toContain("{isGroup && isAdmin && (");
+  });
+
+  it("the switch says which of the two things the link does", () => {
+    expect(info).toContain('"Anyone with the link can ask to join."');
+    expect(info).toContain('"Anyone with the link can join."');
+  });
+
+  it("and making a new one is named as what it does to the old", () => {
+    expect(info).toContain("A new link stops the old one working.");
+  });
+
+  it("the waiting list is only drawn when somebody is waiting", () => {
+    expect(info).toContain("{groupInvite.waiting.length > 0 && (");
+  });
+
+  it("every write is a function call, never a table write", () => {
+    // Admin is checked on the server. The client asking nicely is not a
+    // check, and this file is where it would be tempting to pretend.
+    for (const fn of [
+      "set_group_invite",
+      "set_group_invite_approval",
+      "clear_group_invite",
+      "decide_join_request",
+    ]) {
+      expect(hook, fn).toContain(`supabase.rpc("${fn}"`);
+    }
+    expect(hook).not.toContain(".insert(");
+    expect(hook).not.toContain(".update(");
+  });
+
+  it("a refusal comes back as false, not as a thrown error", () => {
+    // The caller is a button and has to say something.
+    expect(hook).toContain("if (error || typeof data !== \"string\") return false;");
+    // Both of them: the switch and the revoke each hold a previous value
+    // and each has to put it back. One rollback covers one button.
+    expect(hook.split("setInvite(before);").length - 1).toBe(2);
+    expect(hook.split("setWaiting(before);").length - 1).toBe(1);
+  });
+});
+
+describe("where a link lands", () => {
+  const read2 = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
+  const land = read2("src/components/messages/JoinByInvite.tsx");
+  const page = read2("src/app/(app)/join/[code]/page.tsx");
+
+  it("shows nothing about the group before anyone has let you in", () => {
+    // The name, the picture and the size belong to people who have not
+    // agreed to show a stranger anything. A link is a door, not a window.
+    expect(land).not.toContain("conversations");
+    expect(page).not.toContain("from(");
+    expect(page).toContain("robots: { index: false, follow: false }");
+  });
+
+  it("asks exactly once, however many times React mounts it", () => {
+    // Strict Mode mounts twice. The second call is harmless; the race
+    // between two navigations is not.
+    expect(land).toContain("if (tried.current) return;");
+    expect(land).toContain("tried.current = true;");
+  });
+
+  it("joining goes into the chat, and replaces rather than stacks", () => {
+    // Back should go where they came from, not through a join already made.
+    expect(land).toContain("router.replace(`/messages/${result.conversation_id}`)");
+  });
+
+  it("waiting says so and stays put, because there is nowhere to send them", () => {
+    expect(land).toContain('result?.outcome === "pending"');
+    expect(land).toContain("An admin has to let you in.");
+  });
+
+  it("and a dead link says so in the words the server used", () => {
+    expect(land).toContain('setState({ kind: "failed", why: error.message })');
+  });
+});
