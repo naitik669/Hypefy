@@ -125,6 +125,48 @@ describe("messages that take no gesture at all", () => {
   });
 });
 
+describe("attachments swipe like anything else", () => {
+  const chat = read("src/components/messages/RealChatView.tsx");
+
+  it("a photo, a folder, a voice note, a document, a poll and a shared post all answer", () => {
+    // Nothing about the gesture is gated on the body being words.
+    for (const kind of ["image", "video", "album", "voice", "document", "gif", "poll", "post", "shot"]) {
+      expect(swipeAction(msg({ kind, sender_id: "them" }), "me", "left", NOW)).toBe("reply");
+      expect(swipeAction(msg({ kind, sender_id: "them" }), "me", "right", NOW)).toBe("forward");
+      expect(swipeAction(msg({ kind }), "me", "right", NOW)).toBe("reply");
+    }
+  });
+
+  it("because the swipe wraps the row, not the text bubble", () => {
+    // Every kind is rendered inside this one container. If the wrapper
+    // ever moved inside a branch, only that kind would swipe.
+    const open = chat.indexOf("<SwipeRow");
+    const close = chat.indexOf("</SwipeRow>");
+    expect(open).toBeGreaterThan(-1);
+    expect(close).toBeGreaterThan(open);
+    const inside = chat.slice(open, close);
+    for (const branch of [
+      'm.kind === "album" && albumOf(m) ?',
+      'm.kind === "voice" && m.body ?',
+      "readPoll(m) ?",
+    ]) {
+      expect(inside).toContain(branch);
+    }
+  });
+
+  it("and nothing in the thread takes the horizontal gesture away from it", () => {
+    // A scrubber or a pager that claimed the drag would make the swipe
+    // work everywhere except on the bubbles people share most.
+    const voice = read("src/components/messages/VoiceMessage.tsx");
+    expect(voice).not.toContain("onPointerMove");
+    // The folder's touch-action: none belongs to the full-screen viewer,
+    // which is a portal and not in the thread at all.
+    const folder = read("src/components/messages/MediaFolder.tsx");
+    const guard = folder.slice(0, folder.indexOf('style={{ touchAction: "none" }}'));
+    expect(guard).toContain("createPortal(");
+  });
+});
+
 describe("the distances", () => {
   it("the trigger is reachable but not accidental, and travel is capped", () => {
     expect(SWIPE_SLOP_PX).toBeGreaterThan(0);
@@ -204,8 +246,51 @@ describe("the gesture itself", () => {
   it("and the transition is set once, not on every frame", () => {
     const move = row.slice(row.indexOf("function onPointerMove"));
     const body = move.slice(0, move.indexOf("function onPointerUp"));
+    // Both nodes are set at the claim — the bubble and its mark — and
+    // neither is touched again while the finger moves. What matters is the
+    // per-frame work, so that is what is counted: the frame callback must
+    // not write a transition at all.
     expect(body).toContain('el.style.transition = "none";');
-    expect(body.match(/style\.transition/g)).toHaveLength(1);
+    expect(body).toContain('if (g) g.style.transition = "none";');
+    const paint = row.slice(row.indexOf("function schedule()"), row.indexOf("function settle()"));
+    expect(paint).not.toContain("style.transition");
+  });
+
+  it("the mark is a squircle that grows out of nothing", () => {
+    // The same corner the avatars and the music case use, so it belongs to
+    // Hypefy rather than to the gesture.
+    expect(row).toContain("rounded-[32%]");
+    expect(row).toContain('transform: "scale(0.4)"');
+    expect(row).toContain("0.4 + reach * 0.6");
+  });
+
+  it("and turns over as the trigger is reached: white on dark, to deep-lime on lime", () => {
+    expect(row).toContain("g.style.backgroundColor = mix(t.rest, t.lit, turn);");
+    expect(row).toContain("g.style.color = mix(WHITE, t.ink, turn);");
+    // Weighted late, so the colour lands with the trigger rather than
+    // halfway to it.
+    expect(row).toContain("const turn = reach * reach;");
+  });
+
+  it("its colours come from the brand's own tokens, not from this file", () => {
+    expect(row).toContain('pick("--color-border"');
+    expect(row).toContain('pick("--color-accent"');
+    expect(row).toContain('pick("--color-accent-deep"');
+    // Read once: it is the same answer on every frame of every swipe.
+    expect(row).toContain("if (cached) return cached;");
+  });
+
+  it("and a page that cannot be read still draws a mark", () => {
+    // Server render, or a locked-down document: a throw here would take
+    // the thread down with it.
+    const fn = row.slice(row.indexOf("function palette()"));
+    expect(fn.slice(0, 900)).toContain("return fallback;");
+    expect(fn.slice(0, 900)).toContain("} catch {");
+  });
+
+  it("the mark leaves the way it came, and a second swipe is not tidied away by the first", () => {
+    expect(row).toContain("const mine = ++gen.current;");
+    expect(row).toContain("if (gen.current === mine) setShowing(null);");
   });
 
   it("one tick when it becomes a real swipe, not one per wobble", () => {

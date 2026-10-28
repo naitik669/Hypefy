@@ -65,6 +65,14 @@ export function SwipeRow({
   const armed = useRef(false);
   const frame = useRef(0);
   const want = useRef(0);
+  /**
+   * Which gesture this is.
+   *
+   * The mark is held for the length of its fade rather than torn off the
+   * moment the finger lifts, and a new swipe must not have the previous
+   * one's cleanup land on top of it.
+   */
+  const gen = useRef(0);
 
   // Which glyph is showing, and on which side. The one piece of this that
   // has to be rendered, so it is set once per gesture and never during it.
@@ -84,18 +92,42 @@ export function SwipeRow({
       el.style.transform = `translate3d(${want.current}px, 0, 0)`;
       const g = glyph.current;
       if (!g) return;
-      // The icon fades in with the travel and settles at full size as the
-      // trigger is passed, so the point where letting go does something can
-      // be seen as well as felt.
+      // The mark grows out of nothing and turns over as the trigger is
+      // reached: a dark squircle with a white arrow becomes a lime
+      // squircle with a deep-lime arrow, so the moment letting go starts
+      // to mean something is a colour you cannot miss rather than a few
+      // pixels of travel you have to judge.
       const reach = Math.min(1, Math.abs(want.current) / SWIPE_TRIGGER_PX);
-      g.style.opacity = String(reach);
-      g.style.transform = `scale(${0.7 + reach * 0.3})`;
+      // The colour is weighted late while the size is linear, so the turn
+      // lands with the trigger instead of halfway to it.
+      const turn = reach * reach;
+      const t = palette();
+      g.style.opacity = String(Math.min(1, 0.25 + reach * 1.3));
+      // A few per cent over full size once it is armed — the squircle
+      // catching, rather than simply stopping.
+      g.style.transform = `scale(${0.4 + reach * 0.6 + (reach >= 1 ? 0.06 : 0)})`;
+      g.style.backgroundColor = mix(t.rest, t.lit, turn);
+      g.style.color = mix(WHITE, t.ink, turn);
     });
   }
 
   function settle() {
     cancelAnimationFrame(frame.current);
     frame.current = 0;
+    // The mark leaves the way it arrived rather than blinking out from
+    // under the bubble that is still travelling home.
+    const g = glyph.current;
+    if (g) {
+      g.style.transition = "opacity 180ms ease, transform 240ms cubic-bezier(.22,1,.36,1)";
+      g.style.opacity = "0";
+      g.style.transform = "scale(0.4)";
+    }
+    const mine = ++gen.current;
+    window.setTimeout(() => {
+      // Only if nothing has started since: a second swipe must not have
+      // the first one's tidying land on top of it.
+      if (gen.current === mine) setShowing(null);
+    }, 220);
     const el = slider.current;
     if (el) {
       el.style.transition = reducedMotion()
@@ -114,7 +146,6 @@ export function SwipeRow({
     offset.current = 0;
     want.current = 0;
     action.current = null;
-    setShowing(null);
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -143,6 +174,11 @@ export function SwipeRow({
       }
       claimed.current = true;
       action.current = next;
+      gen.current++;
+      const g = glyph.current;
+      // Whatever is left of the last gesture's fade is dropped: the mark
+      // has to follow the finger, not finish the previous animation.
+      if (g) g.style.transition = "none";
       const el = slider.current;
       if (el) {
         // Set once, here. Writing the transition string on every move was a
@@ -193,8 +229,19 @@ export function SwipeRow({
         <span
           ref={glyph}
           aria-hidden
-          style={{ opacity: 0, transform: "scale(0.7)", willChange: "opacity, transform" }}
-          className={`pointer-events-none absolute inset-y-0 flex items-center text-accent ${
+          style={{
+            opacity: 0,
+            transform: "scale(0.4)",
+            // Promoted for the gesture: it is repainted on the same frames
+            // the bubble is.
+            willChange: "opacity, transform, background-color",
+            backgroundColor: "var(--color-border)",
+            color: "#ffffff",
+          }}
+          // A squircle, not a circle — the same corner the avatars and the
+          // music case use, so the mark belongs to Hypefy rather than to
+          // the gesture.
+          className={`pointer-events-none absolute inset-y-0 my-auto flex h-9 w-9 items-center justify-center rounded-[32%] ${
             showing.side === "left" ? "left-3" : "right-3"
           }`}
         >
@@ -217,11 +264,73 @@ export function SwipeRow({
   );
 }
 
+/**
+ * Inside the squircle, and taking its colour from it — so the one write
+ * that turns the plate lime turns the arrow deep-lime with it.
+ */
 function SwipeGlyph({ action }: { action: SwipeAction }) {
   const label = swipeLabel(action);
-  if (action === "reply") return <Reply size={18} aria-label={label} />;
-  if (action === "edit") return <Pencil size={17} aria-label={label} />;
+  if (action === "reply") return <Reply size={19} strokeWidth={2.4} aria-label={label} />;
+  if (action === "edit") return <Pencil size={17} strokeWidth={2.4} aria-label={label} />;
   return <ShareIcon size={18} weight="bold" aria-label={label} />;
+}
+
+type RGB = readonly [number, number, number];
+
+const WHITE: RGB = [255, 255, 255];
+
+/** "#a3e635" or "#abc" to channels, or null if it is neither. */
+function parseHex(raw: string): RGB | null {
+  const hex = raw.trim().replace(/^#/, "");
+  if (hex.length === 3) {
+    const n = Number.parseInt(hex, 16);
+    if (Number.isNaN(n)) return null;
+    const r = (n >> 8) & 0xf, g = (n >> 4) & 0xf, b = n & 0xf;
+    return [r * 17, g * 17, b * 17];
+  }
+  if (hex.length !== 6) return null;
+  const n = Number.parseInt(hex, 16);
+  if (Number.isNaN(n)) return null;
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
+}
+
+let cached: { rest: RGB; lit: RGB; ink: RGB } | null = null;
+
+/**
+ * The three colours the mark moves between, read from the page's own
+ * tokens rather than written out here, so a change to the brand reaches
+ * the gesture without anybody remembering this file.
+ *
+ * Read once and kept: it is the same answer on every frame of every swipe,
+ * and getComputedStyle is not something to call sixty times a second.
+ */
+function palette(): { rest: RGB; lit: RGB; ink: RGB } {
+  if (cached) return cached;
+  const fallback = {
+    rest: [42, 42, 42] as RGB,
+    lit: [163, 230, 53] as RGB,
+    ink: [63, 98, 18] as RGB,
+  };
+  if (typeof window === "undefined") return fallback;
+  try {
+    const css = getComputedStyle(document.documentElement);
+    const pick = (name: string, dflt: RGB) => parseHex(css.getPropertyValue(name)) ?? dflt;
+    cached = {
+      rest: pick("--color-border", fallback.rest),
+      lit: pick("--color-accent", fallback.lit),
+      ink: pick("--color-accent-deep", fallback.ink),
+    };
+    return cached;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Part of the way from one colour to another. */
+function mix(from: RGB, to: RGB, t: number): string {
+  const at = Math.min(1, Math.max(0, t));
+  const c = (i: number) => Math.round(from[i] + (to[i] - from[i]) * at);
+  return `rgb(${c(0)}, ${c(1)}, ${c(2)})`;
 }
 
 function reducedMotion(): boolean {
