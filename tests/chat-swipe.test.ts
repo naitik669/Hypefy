@@ -152,7 +152,7 @@ describe("the gesture itself", () => {
 
   it("a row with nothing to do does not move", () => {
     const claim = row.slice(row.indexOf("if (!claimed.current) {"));
-    expect(claim.slice(0, 700)).toContain("if (!action) {");
+    expect(claim.slice(0, 700)).toContain("if (!next) {");
     expect(claim.slice(0, 700)).toContain("start.current = null;");
   });
 
@@ -166,7 +166,52 @@ describe("the gesture itself", () => {
 
   it("letting go short of the trigger does nothing", () => {
     expect(row).toContain("const far = Math.abs(offset.current) >= SWIPE_TRIGGER_PX;");
-    expect(row).toContain("if (far && action) {");
+    expect(row).toContain("if (far && chosen) onAction(chosen);");
+  });
+
+  it("the action is read from a ref, so a fast flick still fires", () => {
+    // It was read out of React state set during the move. A swipe quick
+    // enough to claim and release inside one tick found it still empty and
+    // did nothing — the faster you swiped, the more often reply dropped.
+    expect(row).toContain("const action = useRef<SwipeAction | null>(null);");
+    expect(row).toContain("const chosen = action.current;");
+    const up = row.slice(row.indexOf("function onPointerUp()"));
+    expect(up.slice(0, up.indexOf("return ("))).not.toContain("showing");
+  });
+
+  it("the drag writes to the node, not through a render", () => {
+    // A re-render on the frame the swipe is claimed is a hitch exactly
+    // where the movement starts, which is the part a finger notices.
+    expect(row).toContain("requestAnimationFrame(");
+    // One write per frame however many pointer events arrive: without the
+    // guard a finger that outpaces the display queues a frame per event.
+    const sched = row.slice(row.indexOf("function schedule()"));
+    expect(sched.slice(0, 120)).toContain("if (frame.current) return;");
+    const move = row.slice(row.indexOf("function onPointerMove"));
+    const body = move.slice(0, move.indexOf("function onPointerUp"));
+    // One setState in the whole drag: the glyph, once, at the claim.
+    expect(body.match(/setShowing\(/g)).toHaveLength(1);
+    expect(body).not.toContain("setShowing(null)");
+  });
+
+  it("the row is promoted for the gesture and let go afterwards", () => {
+    // A layer kept on every row of a long thread is memory nobody asked
+    // for; promoted only while something is actually moving.
+    expect(row).toContain('el.style.willChange = "transform";');
+    expect(row).toContain('if (slider.current === el) el.style.willChange = "";');
+  });
+
+  it("and the transition is set once, not on every frame", () => {
+    const move = row.slice(row.indexOf("function onPointerMove"));
+    const body = move.slice(0, move.indexOf("function onPointerUp"));
+    expect(body).toContain('el.style.transition = "none";');
+    expect(body.match(/style\.transition/g)).toHaveLength(1);
+  });
+
+  it("one tick when it becomes a real swipe, not one per wobble", () => {
+    expect(row).toContain("if (far && !armed.current) {");
+    expect(row).toContain("armed.current = true;");
+    expect(row).toContain("} else if (!far) {");
   });
 
   it("a claimed swipe cancels the long-press", () => {
@@ -176,7 +221,7 @@ describe("the gesture itself", () => {
   });
 
   it("and the restore respects reduced motion", () => {
-    expect(row).toContain("paint(0, !reducedMotion());");
+    expect(row).toContain("el.style.transition = reducedMotion()");
   });
 });
 
