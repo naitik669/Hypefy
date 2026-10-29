@@ -254,12 +254,12 @@ describe("the reap route checks the caller's word", () => {
 });
 
 describe("a Show carries its mentions", () => {
-  const composer = read("src/components/create/ShotPreview.tsx");
+  const publishLib = read("src/lib/show-publish.ts");
 
   it("the insert sends what the typeahead collected", () => {
     // The dropdown has always offered names and the caption has always
     // kept them; only the insert dropped them.
-    const insert = composer.slice(composer.indexOf('.from("shows").insert({'));
+    const insert = publishLib.slice(publishLib.indexOf('.from("shows")\n    .insert({'));
     expect(insert.slice(0, 760)).toContain("extractMentions(text)");
   });
 });

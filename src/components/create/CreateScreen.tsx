@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Video,
   Camera,
+  Plus,
 } from "lucide-react";
 import { useCamera } from "@/lib/useCamera";
 import { useVideoRecorder } from "@/lib/useVideoRecorder";
@@ -47,6 +48,8 @@ import {
   type DraftEdit,
 } from "@/lib/creation-drafts";
 import { ConstructionNote, DraftStrip, LeaveSheet } from "@/components/create/CreateExtras";
+import { TextShowComposer } from "@/components/shows/TextShowComposer";
+import { AlbumSheet } from "@/components/shows/AlbumSheet";
 
 export type CreateMode = "shot" | "show";
 
@@ -136,8 +139,16 @@ export function CreateScreen({
    * mount regardless, it did that in every mode, Post and Live included.
    * Most Shots are a clip somebody already has, so choosing one is the
    * landing state and the camera is a thing you ask for.
+   *
+   * A Show is the opposite: it is the moment, so its camera is already up
+   * when you arrive, with the gallery, text and an album beside it.
    */
-  const [source, setSource] = useState<"pick" | "camera">("pick");
+  const [source, setSource] = useState<"pick" | "camera">(initialMode === "show" ? "camera" : "pick");
+  /** Writing a text Show, instead of taking one. */
+  const [writing, setWriting] = useState(false);
+  /** Files chosen for an album, while it is being put together. */
+  const [albumFiles, setAlbumFiles] = useState<File[] | null>(null);
+  const albumRef = useRef<HTMLInputElement>(null);
   /**
    * What the edit stage settled on, once it has been through. Null means the
    * clip has not been edited yet, which is what puts the editor on screen.
@@ -192,7 +203,10 @@ export function CreateScreen({
       if (arranged && mode === "show" && !isVideoFile(captured)) return setArranged(null);
       return setLeaving(true);
     }
-    if (source === "camera") return setSource("pick");
+    if (albumFiles) return setAlbumFiles(null);
+    if (writing) return setWriting(false);
+    // A Show has no screen behind its camera: back leaves.
+    if (source === "camera" && mode !== "show") return setSource("pick");
     close();
   }
   useOverlayBackButton(true, back);
@@ -316,7 +330,9 @@ export function CreateScreen({
 
   // Only Shot and Show want a viewfinder. Live has nothing to show yet, so
   // running the camera for it would light the indicator for no reason.
-  const wantsCamera = (mode === "shot" || mode === "show") && source === "camera";
+  // Not while writing a text Show: the camera has nothing to do there, and
+  // its light would stay on over a page of words.
+  const wantsCamera = (mode === "shot" || mode === "show") && source === "camera" && !writing;
   const wantsAudio = mode === "shot";
 
   // enabled, so the stream is only ever opened once someone asks to record.
@@ -391,6 +407,19 @@ export function CreateScreen({
       onStay={() => setLeaving(false)}
     />
   ) : null;
+
+  if (writing && !captured) {
+    return (
+      <TextShowComposer
+        onCancel={() => setWriting(false)}
+        onDone={(file) => {
+          setWriting(false);
+          // Into the same arrange step a photo goes through.
+          startWith(file);
+        }}
+      />
+    );
+  }
 
   if (captured && mode !== "show" && !captioning) {
     return (
@@ -526,13 +555,24 @@ export function CreateScreen({
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/90 px-8 text-center">
           <AlertCircle size={40} className="text-danger" />
           <p className="text-sm text-white/80">{cam.error}</p>
-          <button
-            type="button"
-            onClick={cam.retry}
-            className="rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-ink"
-          >
-            Retry
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={cam.retry}
+              className="rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-ink"
+            >
+              Retry
+            </button>
+            {/* Without the camera a Show can still be words or a photo you
+                already have: the rail beside this stays usable too. */}
+            <button
+              type="button"
+              onClick={() => galleryRef.current?.click()}
+              className="rounded-xl bg-white/10 px-5 py-2.5 text-sm font-bold text-white"
+            >
+              Use your gallery
+            </button>
+          </div>
         </div>
       )}
 
@@ -562,6 +602,45 @@ export function CreateScreen({
 
         <div className="h-10 w-10" aria-hidden />
       </div>
+
+      {/* ── Left rail: a Show that isn't taken with the camera ────
+          Above the camera's error screen (z-30), so a refused camera still
+          leaves two ways to make one. */}
+      {mode === "show" && !filtering && (
+        <div className="absolute left-3 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-3.5" data-show-rail>
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              setWriting(true);
+            }}
+            className="flex flex-col items-center gap-1 text-white active:scale-95"
+          >
+            <span className="flex h-[46px] w-[46px] items-center justify-center rounded-2xl border border-white/20 bg-black/50 text-lg font-extrabold tracking-tight backdrop-blur-sm">
+              Aa
+            </span>
+            <span className="text-[11px] font-semibold">Text</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              albumRef.current?.click();
+            }}
+            className="flex flex-col items-center gap-1 text-white active:scale-95"
+          >
+            {/* A little stack of pictures, the album tile from design C. */}
+            <span aria-hidden className="relative block h-[46px] w-[46px]">
+              <span className="absolute left-[13px] top-[3px] block h-[30px] w-[30px] rotate-[9deg] rounded-lg bg-white/35" />
+              <span className="absolute left-[8px] top-[6px] block h-[30px] w-[30px] -rotate-[4deg] rounded-lg bg-white/60" />
+              <span className="absolute left-[3px] top-[11px] flex h-[30px] w-[30px] items-center justify-center rounded-lg border-2 border-black/60 bg-accent text-accent-ink">
+                <Plus size={16} strokeWidth={3} />
+              </span>
+            </span>
+            <span className="text-[11px] font-semibold">Album</span>
+          </button>
+        </div>
+      )}
 
       {/* ── Right rail ──────────────────────────────────────────── */}
       {wantsCamera && (
@@ -594,6 +673,17 @@ export function CreateScreen({
 
       {/* ── Bottom: capture row, then the mode switcher ─────────── */}
       <div className="relative z-10 mt-auto flex flex-col gap-5 pb-[max(0.75rem,var(--sab))]">
+        {/* A Show lands on its camera, so its drafts are kept here, above
+            the shutter, rather than on a choosing screen it no longer has. */}
+        {mode === "show" && source === "camera" && !filtering && (
+          <div className="flex justify-center px-6">
+            <DraftStrip
+              drafts={drafts.filter((d) => d.mode === "show")}
+              onResume={resume}
+              onDelete={(d) => void removeDraft(d.id)}
+            />
+          </div>
+        )}
         {filtering ? (
           <FilterCarousel
             selected={filters.selected}
@@ -666,7 +756,7 @@ export function CreateScreen({
 
             {/* Back out of the camera, which otherwise had no exit but the
                 mode switcher. Keeps the shutter centred either way. */}
-            {wantsCamera ? (
+            {wantsCamera && mode !== "show" ? (
               <button
                 type="button"
                 onClick={() => {
@@ -715,7 +805,7 @@ export function CreateScreen({
                   router.push("/create/post");
                   return;
                 }
-                setSource("pick");
+                setSource(m.id === "show" ? "camera" : "pick");
                 setPickError(null);
                 setMode(m.id);
                 if (m.id !== "show") filters.close();
@@ -742,6 +832,33 @@ export function CreateScreen({
         className="hidden"
         onChange={onGallery}
       />
+
+      <input
+        ref={albumRef}
+        type="file"
+        accept="image/*,video/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])];
+          e.target.value = "";
+          if (files.length) setAlbumFiles(files);
+        }}
+      />
+
+      {albumFiles && (
+        <AlbumSheet
+          userId={userId}
+          initialFiles={albumFiles}
+          track={track}
+          collabId={collabId}
+          onCancel={() => setAlbumFiles(null)}
+          onDone={() => {
+            setAlbumFiles(null);
+            finish();
+          }}
+        />
+      )}
 
       {songPicker}
     </div>

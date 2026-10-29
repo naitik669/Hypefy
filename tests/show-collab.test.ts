@@ -175,7 +175,8 @@ describe("posting into one", () => {
   });
 
   it("and the composer sends it", () => {
-    expect(preview).toContain("collab_id: collabId ?? null,");
+    expect(preview).toContain("      collabId,\n    });");
+    expect(read("src/lib/show-publish.ts")).toContain("collab_id: d.collabId ?? null,");
   });
 });
 

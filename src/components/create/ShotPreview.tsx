@@ -16,12 +16,12 @@ import type { Track } from "@/lib/music";
 import type { Trim } from "@/lib/shot-trim";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { useObjectUrl } from "@/lib/object-url";
-import { isAllowedVideo, isVideoFile, uploadContentType } from "@/lib/video-mime";
+import { isAllowedVideo, isVideoFile } from "@/lib/video-mime";
 import { useUpload } from "@/components/upload/UploadProvider";
-import { layerMentions, type ShowLayer } from "@/lib/show-layers";
+import type { ShowLayer } from "@/lib/show-layers";
+import { publishFailureMessage, publishShow } from "@/lib/show-publish";
 import { ShowAudienceBar } from "@/components/shows/ShowAudienceBar";
 import type { ShowAudience } from "@/lib/show-audience";
-import type { Json } from "@/lib/supabase/database.types";
 
 /**
  * Preview and publish step for the camera-first creator.
@@ -139,71 +139,20 @@ export function ShotPreview({
     }
 
     setBusy(true);
-    const bucket = mode === "show" ? "show-media" : "shot-media";
-    const ext = file.name.split(".").pop() || (isVideo ? "webm" : "jpg");
-    const path = `${userId}/${Date.now()}.${ext}`;
-
-    const { error: upErr } = await supabase.storage
-      .from(bucket)
-      // The base type, so the object is served as video/webm rather than
-      // video/webm;codecs=vp9,opus.
-      .upload(path, file, { contentType: uploadContentType(file), upsert: false });
-
-    if (upErr) {
-      setBusy(false);
-      toast("Upload failed. Check your connection and try again.");
-      return;
-    }
-
-    const mediaUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
-
-    const text = caption.trim();
-    const { data: row, error: insErr } = await supabase.from("shows").insert({
-      user_id: userId,
-      media_url: mediaUrl,
-      caption: text || null,
-      track: track ?? null,
-      // The typeahead above has always offered names and the caption has
-      // always kept them; only the insert dropped them, so @-ing somebody
-      // in a Show reached nobody. The Shot path a few lines up has sent
-      // these since 0102.
-      // A name placed on the picture reaches its owner the same way one
-      // typed into the caption does; layerMentions says why.
-      mentions: [...new Set([...extractMentions(text), ...layerMentions(layers)])],
-      layers: layers as unknown as Json,
+    const result = await publishShow(supabase, {
+      userId,
+      file,
+      caption,
+      track,
+      layers,
       audience,
-      collab_id: collabId ?? null,
-    })
-      .select("id")
-      .single();
-
-    if (insErr || !row) {
-      // The file went up first; with no Show pointing at it, it is litter.
-      await supabase.storage.from(bucket).remove([path]);
-      // Said out loud: this toast is all anyone saw while 0183's policy
-      // refused every Show, and it named nothing.
-      console.error("show insert failed", insErr);
+      hiddenFrom,
+      collabId,
+    });
+    if (!result.ok) {
       setBusy(false);
-      toast("Couldn't publish that. Try again.");
+      toast(publishFailureMessage(result.reason));
       return;
-    }
-
-    // The exclusions, once there is a Show for them to point at. A row
-    // here is a promise, so a failure to write them is a failure to
-    // publish: the Show is taken back down rather than left standing in
-    // front of somebody it was meant to be kept from.
-    if (hiddenFrom.length > 0) {
-      const { error: hideErr } = await supabase
-        .from("show_hidden_from")
-        .insert(hiddenFrom.map((id) => ({ show_id: row.id, user_id: id })));
-
-      if (hideErr) {
-        await supabase.from("shows").delete().eq("id", row.id);
-        await supabase.storage.from(bucket).remove([path]);
-        setBusy(false);
-        toast("Couldn't set who it's hidden from. Nothing was posted.");
-        return;
-      }
     }
 
     setBusy(false);

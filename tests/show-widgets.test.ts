@@ -23,7 +23,7 @@ const editor = read("src/components/shows/ShowEditor.tsx");
 const pickers = read("src/components/shows/ShowWidgetPickers.tsx");
 const view = read("src/components/shows/LayerView.tsx");
 const viewer = read("src/components/shows/ShowViewer.tsx");
-const preview = read("src/components/create/ShotPreview.tsx");
+const publishLib = read("src/lib/show-publish.ts");
 const create = read("src/components/create/CreateScreen.tsx");
 
 describe("every kind of layer can actually be added", () => {
@@ -176,9 +176,9 @@ describe("a mention placed on the picture reaches its owner", () => {
     // shows.mentions is what the 0180 trigger reads. A mention layer
     // that did not join it would be a mention that reaches nobody —
     // which is exactly what caption mentions did before 0180.
-    const insert = preview.slice(preview.indexOf('.from("shows").insert({'));
+    const insert = publishLib.slice(publishLib.indexOf('.from("shows")\n    .insert({'));
     expect(insert.slice(0, 900)).toContain(
-      "mentions: [...new Set([...extractMentions(text), ...layerMentions(layers)])],",
+      "mentions: [...new Set([...extractMentions(text), ...layerMentions(d.layers)])],",
     );
   });
 
@@ -189,8 +189,8 @@ describe("a mention placed on the picture reaches its owner", () => {
 
 describe("the arrangement reaches the column", () => {
   it("the insert sends it", () => {
-    const insert = preview.slice(preview.indexOf('.from("shows").insert({'));
-    expect(insert.slice(0, 900)).toContain("layers: layers as unknown as Json,");
+    const insert = publishLib.slice(publishLib.indexOf('.from("shows")\n    .insert({'));
+    expect(insert.slice(0, 900)).toContain("layers: d.layers as unknown as Json,");
   });
 
   it("and the editor is on the way there for a photo Show", () => {
