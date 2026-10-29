@@ -321,3 +321,17 @@ export function nextLook(type: LayerType, look: number): number {
   const at = Number.isFinite(look) ? Math.trunc(look) : 0;
   return ((at + 1) % looks + looks) % looks;
 }
+
+/**
+ * The width every layer's own sizes are written against.
+ *
+ * A card's width, a sticker's size, the point size of text: all authored
+ * once at this width, and the whole stack scaled to whatever frame it is
+ * drawn in. Without it each component does its own arithmetic against
+ * the screen, and the first version of the text layer — a plate authored
+ * at 300px — hung out of both sides of a 260px preview.
+ *
+ * 390 is the phone the app is designed on, so the numbers in a layer
+ * component read as the pixels a designer would name.
+ */
+export const DESIGN_WIDTH = 390;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   X,
@@ -69,11 +69,15 @@ export type ShowItem = {
   profiles: ShowProfile;
   /** Attached song ({id,title,artist,artwork,preview} jsonb) — see src/lib/music. */
   track?: unknown;
+  /** What is arranged on top of the picture — see src/lib/show-layers. */
+  layers?: unknown;
 };
 
 import { showDurationMs, showMediaKind } from "@/lib/show-media";
 import { isVideoUrl } from "@/lib/video-mime";
 import { BLANK_POSTER } from "@/lib/blank-poster";
+import { readLayers } from "@/lib/show-layers";
+import { LayerStack } from "@/components/shows/LayerView";
 import { storyGesture, storyKey, type StoryMove } from "@/lib/story-gesture";
 
 function timeAgo(iso: string) {
@@ -432,6 +436,29 @@ function ShowScreen({
     setMediaSecs(null);
   }, [show.id]);
 
+  /**
+   * The frame the layers are placed in.
+   *
+   * Positions are fractions, so they need a real width and height to
+   * become pixels. Measured rather than assumed: this screen is a phone
+   * most of the time and a centred column on a desktop.
+   */
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [frameSize, setFrameSize] = useState({ width: 390, height: 844 });
+
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const seen = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) setFrameSize({ width, height });
+    });
+    seen.observe(el);
+    return () => seen.disconnect();
+  }, []);
+
+  const layers = useMemo(() => readLayers(show.layers), [show.layers]);
+
   const kind = showMediaKind(show.media_url);
   const duration = showDurationMs(show.media_url, mediaSecs);
 
@@ -590,6 +617,15 @@ function ShowScreen({
         <div className="absolute inset-0 bg-gradient-to-br from-accent/40 to-[hsl(280deg_80%_20%)]" />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
+
+      {/* What was arranged on top of the picture. Above the scrim so the
+          words stay readable, below the chrome and the gesture surface so
+          a tap still moves between Shows — only a layer that is really
+          something to press takes the press, and LayerView decides that
+          per layer rather than the stack claiming the whole frame. */}
+      <div ref={frameRef} className="pointer-events-none absolute inset-0 z-[5]">
+        <LayerStack layers={layers} frame={frameSize} />
+      </div>
 
       {/* ── The gesture surface ──
           Two tap zones became one. Diary's player has had tap, swipe

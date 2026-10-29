@@ -26,7 +26,7 @@ export default async function ShowPage({
   const nowIso = new Date().toISOString();
   // profiles must be disambiguated: show_views adds a second shows<->profiles
   // relationship path, which makes a bare profiles(...) embed error (PGRST201).
-  const baseSelect = `id, user_id, media_url, caption, created_at, hype_count, track, profiles!shows_user_id_fkey(display_name, avatar_hue, username)`;
+  const baseSelect = `id, user_id, media_url, caption, created_at, hype_count, track, layers, profiles!shows_user_id_fkey(display_name, avatar_hue, username)`;
 
   // is_showcase and linked_post_id have long existed; probing for them cost
   // two extra round trips on every Show opened.
