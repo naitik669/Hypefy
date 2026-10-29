@@ -213,7 +213,10 @@ describe("being in one", () => {
   });
 
   it("the cap is one number, in the database, mirrored in the client", () => {
-    expect(sql).toContain("returns int language sql immutable as $$ select 20 $$");
+    // search_path pinned like every other function here: the
+    // advisor flags any that is not, and a constant-returning one is
+    // no reason to be the exception.
+    expect(sql).toContain("returns int language sql immutable set search_path = public as $ select 20 $");
     expect(COLLAB_CAP).toBe(20);
   });
 });

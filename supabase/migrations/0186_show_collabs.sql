@@ -174,7 +174,7 @@ grant execute on function public.can_see_show(uuid) to anon, authenticated;
 
 /** How many people one collab holds, the owner included. */
 create or replace function public.show_collab_cap()
-returns int language sql immutable as $$ select 20 $$;
+returns int language sql immutable set search_path = public as $ select 20 $;
 
 grant execute on function public.show_collab_cap() to authenticated;
 
