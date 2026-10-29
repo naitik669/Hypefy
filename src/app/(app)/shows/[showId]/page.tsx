@@ -28,10 +28,13 @@ export default async function ShowPage({
   // relationship path, which makes a bare profiles(...) embed error (PGRST201).
   const baseSelect = `id, user_id, media_url, caption, created_at, hype_count, track, layers, profiles!shows_user_id_fkey(display_name, avatar_hue, username)`;
 
-  // is_showcase and linked_post_id have long existed; probing for them cost
-  // two extra round trips on every Show opened.
+  // Whether each one is kept comes from the boards rather than the old
+  // is_showcase flag, which 0185 stopped reading: a flagged Show
+  // survived its day but sat on no board, so "kept" meant two things.
+  // Embedded rather than fetched separately, which is what the flag was
+  // bought here for — two extra round trips on every Show opened.
   const extraCols =
-    "is_showcase, linked_post_id, linked_post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(display_name, username, avatar_hue, avatar_url))";
+    "linked_post_id, showcase_items(id, removed_at), linked_post:posts(id, caption, image_url, image_urls, profiles!posts_user_id_fkey(display_name, username, avatar_hue, avatar_url))";
 
   const selectStr = `${baseSelect}, ${extraCols}`;
 
@@ -44,6 +47,9 @@ export default async function ShowPage({
 
   const shows = (raw ?? []).map((s: any) => ({
     ...s,
+    kept: ((s.showcase_items ?? []) as { removed_at: string | null }[]).some(
+      (i) => i.removed_at == null,
+    ),
     profiles: Array.isArray(s.profiles) ? s.profiles[0] ?? null : s.profiles,
     linked_post: s.linked_post
       ? {

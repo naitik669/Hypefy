@@ -225,12 +225,19 @@ describe("the reap route checks the caller's word", () => {
     expect(route).toContain('secretMatches(req.headers.get("x-show-reap-secret")');
   });
 
-  it("and the window, the flag and the board are all re-read here", () => {
+  it("and the window and the board are both re-read here", () => {
     // A leaked secret should not delete a Show posted this morning.
+    //
+    // The is_showcase flag used to be a third check. 0185 moved every
+    // flagged Show onto a board and stopped anything reading the flag,
+    // so the board check is the whole answer — and it is the same
+    // condition can_see_show uses, which means what survives and what
+    // is readable finally agree.
     expect(route).toContain("SHOW_ARCHIVE_DAYS * 86_400_000");
     expect(route).toContain('return NextResponse.json({ error: "not past the archive window" }, { status: 409 });');
-    expect(route).toContain('if (show.is_showcase)');
+    expect(route).not.toContain('if (show.is_showcase)');
     expect(route).toContain('.eq("show_id", showId)');
+    expect(route).toContain('return NextResponse.json({ error: "on a board" }, { status: 409 });');
   });
 
   it("the object goes before the row, so bytes are never orphaned", () => {

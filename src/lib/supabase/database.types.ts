@@ -2609,8 +2609,27 @@ export type Database = {
           },
         ]
       }
+      show_hidden_from: {
+        Row: {
+          created_at: string
+          show_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          show_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          show_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       shows: {
         Row: {
+          audience: string
           caption: string | null
           created_at: string
           expires_at: string
@@ -2628,6 +2647,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          audience?: string
           caption?: string | null
           created_at?: string
           expires_at?: string
@@ -2645,6 +2665,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          audience?: string
           caption?: string | null
           created_at?: string
           expires_at?: string

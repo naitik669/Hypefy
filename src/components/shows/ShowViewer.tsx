@@ -63,7 +63,8 @@ export type ShowItem = {
   caption: string | null;
   created_at: string;
   hype_count?: number;
-  is_showcase?: boolean;
+  /** On a Showcase board, so it outlives its day. */
+  kept?: boolean;
   linked_post_id?: string | null;
   linked_post?: LinkedPost;
   profiles: ShowProfile;
@@ -77,6 +78,8 @@ import { showDurationMs, showMediaKind } from "@/lib/show-media";
 import { isVideoUrl } from "@/lib/video-mime";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { readLayers } from "@/lib/show-layers";
+import { keepShow, unkeepShow } from "@/lib/show-keep";
+import { HypeParticles } from "@/components/feed/HypeParticles";
 import { LayerStack } from "@/components/shows/LayerView";
 import type { PollState } from "@/components/shows/ShowPoll";
 import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
@@ -113,8 +116,12 @@ export function ShowViewer({
 }) {
   const router = useRouter();
   const [idx, setIdx] = useState(startIdx);
+  // Which of these are kept — that is, on a Showcase board. It was
+  // the is_showcase flag, which 0068 superseded and 0185 stopped
+  // reading: a flagged Show survived its day but appeared on no board,
+  // so "kept" meant two different things depending on who was asking.
   const [showcasedIds, setShowcasedIds] = useState<Set<string>>(
-    () => new Set(shows.filter((s) => s.is_showcase).map((s) => s.id))
+    () => new Set(shows.filter((s) => s.kept).map((s) => s.id))
   );
 
   const show = shows[idx];
@@ -220,6 +227,15 @@ function ShowScreen({
   const hue = show.profiles?.avatar_hue ?? 280;
 
   const [hyped, setHyped] = useState(false);
+  /**
+   * The burst, which a Show never had.
+   *
+   * Hype is the app's own verb and this is the one screen where it
+   * happened silently — the star changed colour and a number went up.
+   * The keyframes have been in globals.css since the feed got them;
+   * nothing here was firing them.
+   */
+  const [hypeBurst, setHypeBurst] = useState(false);
   const [hypeCount, setHypeCount] = useState(show.hype_count ?? 0);
   const [hypePending, setHypePending] = useState(false);
   const [viewCount, setViewCount] = useState<number | null>(null);
@@ -312,6 +328,12 @@ function ShowScreen({
     setHypePending(true);
     setHyped(!prev);
     setHypeCount((c) => c + (prev ? -1 : 1));
+    // Only on the way in. Taking a hype back is a correction, and
+    // celebrating it reads as the opposite of what happened.
+    if (!prev) {
+      setHypeBurst(true);
+      window.setTimeout(() => setHypeBurst(false), 600);
+    }
     try {
       const { data, error } = await supabase.rpc("toggle_hype", {
         p_target_type: "show",
@@ -419,12 +441,11 @@ function ShowScreen({
   async function toggleShowcase() {
     setActionPending("showcase");
     const next = !isShowcase;
-    const { error } = await supabase
-      .from("shows")
-      .update({ is_showcase: next })
-      .eq("id", show.id);
+    const ok = next
+      ? await keepShow(supabase, show.user_id, show.id)
+      : await unkeepShow(supabase, show.id);
     setActionPending(null);
-    if (error) {
+    if (!ok) {
       showToast("Couldn't update your showcase. Try again.");
       return;
     }
@@ -1058,11 +1079,12 @@ function ShowScreen({
                 e.stopPropagation();
                 toggleShowHype();
               }}
-              className="flex flex-col items-center gap-0.5 transition-transform active:scale-90 disabled:opacity-60"
+              className="relative flex flex-col items-center gap-0.5 transition-transform active:scale-90 disabled:opacity-60"
             >
+              {hypeBurst && <HypeParticles size={11} />}
               <Star
                 size={28}
-                className={`transition-colors ${
+                className={`transition-colors ${hypeBurst ? "animate-hype-burst" : ""} ${
                   hyped ? "text-hype" : "text-white"
                 }`}
                 fill={hyped ? "currentColor" : "none"}

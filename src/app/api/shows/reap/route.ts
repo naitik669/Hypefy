@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
    */
   const { data: show, error: readErr } = await admin
     .from("shows")
-    .select("id, user_id, media_url, expires_at, is_showcase")
+    .select("id, user_id, media_url, expires_at")
     .eq("id", showId)
     .maybeSingle();
 
@@ -70,10 +70,10 @@ export async function POST(req: NextRequest) {
   if (!show.expires_at || new Date(show.expires_at).getTime() > cutoff) {
     return NextResponse.json({ error: "not past the archive window" }, { status: 409 });
   }
-  if (show.is_showcase) {
-    return NextResponse.json({ error: "kept" }, { status: 409 });
-  }
-
+  // The is_showcase flag used to be asked here as well. 0185 moved
+  // every flagged Show onto a board, so the board check below is now
+  // the whole answer — and it is the same condition can_see_show uses,
+  // which means what survives and what is readable finally agree.
   const { count: onBoard, error: boardErr } = await admin
     .from("showcase_items")
     .select("id", { count: "exact", head: true })

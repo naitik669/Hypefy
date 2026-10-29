@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/TopBar";
+import { isRestricted } from "@/lib/show-audience";
 import { ShowsRow } from "@/components/home/ShowsRow";
 import { FeedList } from "@/components/feed/FeedList";
 import { HintPointer } from "@/components/ui/CoachMarks";
@@ -146,7 +147,7 @@ export default async function HomePage() {
       ? supabase
           .from("shows")
           .select(
-            "id, user_id, profiles!shows_user_id_fkey(display_name, avatar_hue, avatar_url, username)"
+            "id, user_id, audience, profiles!shows_user_id_fkey(display_name, avatar_hue, avatar_url, username)"
           )
           .gt("expires_at", nowIso)
           .in("user_id", [...followingIds])
@@ -422,6 +423,8 @@ export default async function HomePage() {
       avatar_url: string | null;
       latestId: string;
       allIds: string[];
+      /** Any of their live Shows went somewhere narrower than everybody. */
+      restricted: boolean;
     }
   >();
   for (const s of (activeShows ?? []) as any[]) {
@@ -436,10 +439,15 @@ export default async function HomePage() {
         avatar_url: p?.avatar_url ?? null,
         latestId: s.id, // newest first, so the first one seen is the latest
         allIds: [s.id],
+        restricted: isRestricted(s.audience),
       });
     } else {
       existing.id = s.id; // iterating newest->oldest, so this ends as the oldest
       existing.allIds.push(s.id);
+      // Any one of them being narrow colours the ring: it is one ring
+      // for the whole person, and the gold says "something here was
+      // only for some people", not "all of it was".
+      existing.restricted ||= isRestricted(s.audience);
     }
   }
   // Seen only when EVERY active show from that user has a server-side view

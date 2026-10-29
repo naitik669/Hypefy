@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyScene, ctaClass } from "@/components/empty/EmptyScene";
 import { TvArt } from "@/components/empty/scenes";
+import { isRestricted } from "@/lib/show-audience";
+import { SHOW_ARCHIVE_DAYS } from "@/lib/show-media";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { isVideoUrl } from "@/lib/video-mime";
 
@@ -12,9 +14,14 @@ import { isVideoUrl } from "@/lib/video-mime";
  * Your Shows.
  *
  * There was no route listing Shows at all — only /shows/[showId] and
- * /shows/add. Your own expire after 24 hours unless flagged is_showcase, so
- * the thing you most need to see is the one thing the app never showed you:
- * what is still up, and how long it has left.
+ * /shows/add. The thing you most need to see is the one thing the app
+ * never showed you: what is still up, and how long it has left.
+ *
+ * Two shelves. "Up now" is what people can see; "Archive" is everything
+ * that has been and gone, which is yours alone and which the reaper
+ * clears at SHOW_ARCHIVE_DAYS. The archive replaced a "Kept" shelf that
+ * listed only the Shows carrying is_showcase — so every other Show you
+ * had ever posted became unreachable the moment it expired.
  */
 export const dynamic = "force-dynamic";
 
@@ -23,8 +30,8 @@ type Row = {
   media_url: string;
   caption: string | null;
   expires_at: string;
-  is_showcase: boolean | null;
   hype_count: number;
+  audience: string;
 };
 
 /** "4h left" / "18m left" — the number that decides whether you act. */
@@ -69,6 +76,15 @@ function Tile({ s, badge }: { s: Row; badge: string }) {
           {s.hype_count}
         </span>
       )}
+      {/* Which room it went to. Only ever drawn on a narrower one:
+          "Everyone" on nearly every tile is a label that stops being
+          read, and then the one that matters is not read either. */}
+      {isRestricted(s.audience) && (
+        <span className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-pill bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-hype">
+          <Star size={9} className="fill-hype" />
+          Hypers
+        </span>
+      )}
     </Link>
   );
 }
@@ -83,16 +99,24 @@ export default async function ShowsPage() {
   const nowIso = new Date().toISOString();
   const { data } = await supabase
     .from("shows")
-    .select("id, media_url, caption, expires_at, is_showcase, hype_count")
+    .select("id, media_url, caption, expires_at, hype_count, audience")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(200);
 
   const all = (data ?? []) as Row[];
   const live = all.filter((s) => s.expires_at > nowIso);
-  // Expired but kept: the only Shows that survive the 24h window, and until
-  // now there was nowhere to look at them.
-  const kept = all.filter((s) => s.expires_at <= nowIso && s.is_showcase);
+  /**
+   * Everything that has been and gone, yours alone.
+   *
+   * This was a "Kept" shelf holding only the Shows flagged is_showcase,
+   * which meant every other Show you had ever posted was unreachable
+   * the moment it expired — readable by id, listed nowhere. The policy
+   * has always let you see your own past ones; there was simply no
+   * screen. Now there is, and it holds all of them until the reaper
+   * takes them at SHOW_ARCHIVE_DAYS.
+   */
+  const archive = all.filter((s) => s.expires_at <= nowIso);
 
   return (
     <>
@@ -110,7 +134,7 @@ export default async function ShowsPage() {
         }
       />
 
-      {live.length === 0 && kept.length === 0 ? (
+      {live.length === 0 && archive.length === 0 ? (
         <EmptyScene
           art={<TvArt />}
           title="Nothing on tonight"
@@ -136,14 +160,17 @@ export default async function ShowsPage() {
             </>
           )}
 
-          {kept.length > 0 && (
+          {archive.length > 0 && (
             <>
               <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-faint">
-                Kept
+                Archive
               </h2>
+              <p className="mb-2 text-xs text-muted">
+                Only you can see these. They go for good after {SHOW_ARCHIVE_DAYS} days.
+              </p>
               <div className="grid grid-cols-3 gap-2">
-                {kept.map((s) => (
-                  <Tile key={s.id} s={s} badge="Kept" />
+                {archive.map((s) => (
+                  <Tile key={s.id} s={s} badge="Off air" />
                 ))}
               </div>
             </>

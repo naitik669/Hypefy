@@ -13,6 +13,8 @@ export type Show = {
   /** Their newest active Show: watched-on-this-device is remembered against it, so a new Show brings the ring back. */
   latestId: string;
   avatar_url?: string | null;
+  /** True when any of their live Shows went to a narrower room than everybody. */
+  restricted?: boolean;
 };
 
 type CurrentUser = {
@@ -150,21 +152,21 @@ export function ShowsRow({
             onClick={() => handleShowTap(s.id, s.latestId)}
             className="flex w-16 shrink-0 flex-col items-center gap-1.5 active:opacity-70"
           >
-            {isSeen ? (
-              /* ── Seen: grey ring, avatar stays full opacity ── */
-              <div className="rounded-[22px] p-[2.5px]" style={{ background: "#3a3a3a" }}>
-                <div className="rounded-[20px] bg-background p-[2px]">
-                  <Avatar name={s.name} hue={s.hue} size={56} src={s.avatar_url ?? undefined} className="rounded-[18px]" />
-                </div>
+            {/* Seen is grey, unseen is the accent — and a Show that went
+                to a narrower room than everybody rings gold instead, so
+                being let into one reads as what it is before it is
+                opened. Seen still wins: the ring's first job is telling
+                you whether there is anything new behind it. */}
+            <div
+              className={`rounded-[22px] p-[2.5px] ${
+                isSeen ? "" : s.restricted ? "bg-hype" : "bg-accent"
+              }`}
+              style={isSeen ? { background: "#3a3a3a" } : undefined}
+            >
+              <div className="rounded-[20px] bg-background p-[2px]">
+                <Avatar name={s.name} hue={s.hue} size={56} src={s.avatar_url ?? undefined} className="rounded-[18px]" />
               </div>
-            ) : (
-              /* ── Unseen: green ring ── */
-              <div className="rounded-[22px] p-[2.5px] bg-accent">
-                <div className="rounded-[20px] bg-background p-[2px]">
-                  <Avatar name={s.name} hue={s.hue} size={56} src={s.avatar_url ?? undefined} className="rounded-[18px]" />
-                </div>
-              </div>
-            )}
+            </div>
             <span
               className={`max-w-full truncate text-xs transition-colors ${
                 isSeen ? "text-faint" : "text-muted"
