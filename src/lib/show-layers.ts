@@ -323,6 +323,26 @@ export function nextLook(type: LayerType, look: number): number {
 }
 
 /**
+ * Everybody @-mentioned by a layer, lowercased and each once.
+ *
+ * A mention layer has to reach the person the same way one typed into
+ * the caption does. shows.mentions is what the notification trigger
+ * reads, and it is a plain array the client supplies — so a mention
+ * placed on the picture is added to it rather than being a second kind
+ * of mention that quietly reaches nobody, which is what the caption's
+ * own mentions did before 0180.
+ */
+export function layerMentions(layers: readonly ShowLayer[]): string[] {
+  const out: string[] = [];
+  for (const layer of layers) {
+    if (layer.type !== "mention") continue;
+    const { username } = layer.payload as MentionPayload;
+    if (!out.includes(username)) out.push(username);
+  }
+  return out;
+}
+
+/**
  * The width every layer's own sizes are written against.
  *
  * A card's width, a sticker's size, the point size of text: all authored

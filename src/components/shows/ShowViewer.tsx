@@ -79,6 +79,7 @@ import { BLANK_POSTER } from "@/lib/blank-poster";
 import { readLayers } from "@/lib/show-layers";
 import { LayerStack } from "@/components/shows/LayerView";
 import type { PollState } from "@/components/shows/ShowPoll";
+import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
 import { storyGesture, storyKey, type StoryMove } from "@/lib/story-gesture";
 
 function timeAgo(iso: string) {
@@ -483,6 +484,82 @@ function ShowScreen({
     };
   }, [show.id, hasPoll, supabase]);
 
+  /**
+   * What the embedded posts and Shots look like now.
+   *
+   * Read by id rather than copied onto the layer when it was placed, so
+   * a post that has since been deleted or taken down stops appearing
+   * inside every Show that embedded it. Both queries go through RLS, so
+   * one that is hidden from this reader comes back as nothing — which is
+   * what `gone` means here, and the layer stops being a door to it.
+   */
+  const [embeds, setEmbeds] = useState<Record<string, EmbedState>>({});
+  const embedded = useMemo(
+    () => layers.filter((l) => l.type === "post" || l.type === "shot"),
+    [layers],
+  );
+  useEffect(() => {
+    if (embedded.length === 0) return;
+    let dropped = false;
+
+    const postIds = embedded
+      .filter((l) => l.type === "post")
+      .map((l) => (l.payload as { postId: string }).postId);
+    const shotIds = embedded
+      .filter((l) => l.type === "shot")
+      .map((l) => (l.payload as { shotId: string }).shotId);
+
+    void (async () => {
+      const [posts, shots] = await Promise.all([
+        postIds.length
+          ? supabase
+              .from("posts")
+              .select("id, image_url, image_urls, caption, body")
+              .in("id", postIds)
+              .is("removed_at", null)
+          : Promise.resolve({ data: [] as never[] }),
+        shotIds.length
+          ? supabase
+              .from("shots")
+              .select("id, poster_url, caption")
+              .in("id", shotIds)
+              .is("removed_at", null)
+          : Promise.resolve({ data: [] as never[] }),
+      ]);
+      if (dropped) return;
+
+      const byPost = new Map(
+        (posts.data ?? []).map((p) => [
+          p.id,
+          {
+            thumb: p.image_url ?? p.image_urls?.[0] ?? null,
+            caption: p.caption ?? p.body ?? null,
+          } satisfies EmbedState,
+        ]),
+      );
+      const byShot = new Map(
+        (shots.data ?? []).map((s) => [
+          s.id,
+          { thumb: s.poster_url ?? null, caption: s.caption ?? null } satisfies EmbedState,
+        ]),
+      );
+
+      const next: Record<string, EmbedState> = {};
+      for (const layer of embedded) {
+        const found =
+          layer.type === "post"
+            ? byPost.get((layer.payload as { postId: string }).postId)
+            : byShot.get((layer.payload as { shotId: string }).shotId);
+        next[layer.id] = found ?? { thumb: null, caption: null, gone: true };
+      }
+      setEmbeds(next);
+    })();
+
+    return () => {
+      dropped = true;
+    };
+  }, [embedded, supabase]);
+
   const kind = showMediaKind(show.media_url);
   const duration = showDurationMs(show.media_url, mediaSecs);
 
@@ -648,7 +725,13 @@ function ShowScreen({
           something to press takes the press, and LayerView decides that
           per layer rather than the stack claiming the whole frame. */}
       <div ref={frameRef} className="pointer-events-none absolute inset-0 z-[5]">
-        <LayerStack layers={layers} frame={frameSize} showId={show.id} polls={polls} />
+        <LayerStack
+          layers={layers}
+          frame={frameSize}
+          showId={show.id}
+          polls={polls}
+          embeds={embeds}
+        />
       </div>
 
       {/* ── The gesture surface ──

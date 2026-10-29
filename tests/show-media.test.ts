@@ -253,7 +253,7 @@ describe("a Show carries its mentions", () => {
     // The dropdown has always offered names and the caption has always
     // kept them; only the insert dropped them.
     const insert = composer.slice(composer.indexOf('.from("shows").insert({'));
-    expect(insert.slice(0, 520)).toContain("mentions: extractMentions(text),");
+    expect(insert.slice(0, 760)).toContain("extractMentions(text)");
   });
 });
 

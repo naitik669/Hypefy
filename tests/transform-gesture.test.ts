@@ -225,7 +225,7 @@ describe("the editor", () => {
   it("and the selected layer is drawn by the body alone, not twice", () => {
     // The box owns where it sits; a positioned LayerView inside it would
     // place the layer a second time and fight itself.
-    expect(editor).toContain("<LayerBody layer={chosen} editing />");
+    expect(editor).toContain("<LayerBody layer={chosen} editing embeds={embeds} />");
     expect(editor).toContain("layer.id === selected ? null : (");
   });
 });

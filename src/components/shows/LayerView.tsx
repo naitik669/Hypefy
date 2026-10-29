@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { lookFor } from "@/lib/show-looks";
 import { ShowPoll, ShowQuestion, type PollState } from "@/components/shows/ShowPoll";
+import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
 import {
   DESIGN_WIDTH,
   layerBox,
@@ -38,6 +39,7 @@ export function LayerView({
   editing = false,
   showId,
   polls,
+  embeds,
 }: {
   layer: ShowLayer;
   frame: { width: number; height: number };
@@ -47,6 +49,8 @@ export function LayerView({
   showId?: string;
   /** What the server knows about this Show's polls, by layer id. */
   polls?: Record<string, PollState>;
+  /** What each embedded post or Shot looks like now, by layer id. */
+  embeds?: Record<string, EmbedState>;
 }) {
   const box = layerBox(layer, frame);
   return (
@@ -55,7 +59,7 @@ export function LayerView({
       style={{ left: box.left, top: box.top, transform: box.transform, transformOrigin: "center" }}
     >
       <div className={editing ? "pointer-events-none" : "pointer-events-auto"}>
-        <LayerBody layer={layer} editing={editing} showId={showId} polls={polls} />
+        <LayerBody layer={layer} editing={editing} showId={showId} polls={polls} embeds={embeds} />
       </div>
     </div>
   );
@@ -73,11 +77,13 @@ export function LayerBody({
   editing = false,
   showId,
   polls,
+  embeds,
 }: {
   layer: ShowLayer;
   editing?: boolean;
   showId?: string;
   polls?: Record<string, PollState>;
+  embeds?: Record<string, EmbedState>;
 }) {
   const look = lookFor(layer.type, layer.look);
 
@@ -263,22 +269,61 @@ export function LayerBody({
           ? (layer.payload as PostPayload).postId
           : (layer.payload as ShotPayload).shotId;
       const href = layer.type === "post" ? `/p/${id}` : `/shots/${id}`;
+      // The picture is fetched by id and never stored on the layer: a
+      // post that is deleted or taken down has to stop appearing inside
+      // every Show that embedded it, and a thumbnail copied into the
+      // layer would outlive the takedown.
+      const embed = embeds?.[layer.id];
+      const label = embed?.gone
+        ? `This ${layer.type === "post" ? "post" : "Shot"} is gone`
+        : embed?.caption?.trim() ||
+          (layer.type === "post" ? "Post · tap to open" : "Shot · tap to open");
       const body = (
-        <span style={{ ...look.box, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <span
+          style={{
+            ...look.box,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            width: 170,
+          }}
+        >
+          {embed?.thumb && !embed.gone ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={embed.thumb}
+              alt=""
+              style={{ display: "block", width: "100%", height: 112, objectFit: "cover" }}
+            />
+          ) : (
+            <span
+              aria-hidden
+              style={{
+                display: "block",
+                height: 112,
+                background: "linear-gradient(160deg, #1b2320 0%, #101010 100%)",
+              }}
+            />
+          )}
           <span
-            aria-hidden
             style={{
+              ...look.sub,
               display: "block",
-              height: 88,
-              background: "linear-gradient(160deg, #1b2320 0%, #101010 100%)",
+              padding: "8px 10px",
+              fontSize: 10.5,
+              fontWeight: 700,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}
-          />
-          <span style={{ ...look.sub, display: "flex", alignItems: "center", gap: 5, padding: "8px 10px", fontSize: 10.5, fontWeight: 700 }}>
-            {layer.type === "post" ? "Post" : "Shot"} · tap to open
+          >
+            {label}
           </span>
         </span>
       );
-      return editing ? body : <Link href={href}>{body}</Link>;
+      // A layer whose thing is gone stops being a door to it.
+      if (editing || embed?.gone) return body;
+      return <Link href={href}>{body}</Link>;
     }
   }
 }
@@ -295,12 +340,14 @@ export function LayerStack({
   editing = false,
   showId,
   polls,
+  embeds,
 }: {
   layers: ShowLayer[];
   frame: { width: number; height: number };
   editing?: boolean;
   showId?: string;
   polls?: Record<string, PollState>;
+  embeds?: Record<string, EmbedState>;
 }) {
   // Everything inside a layer — a card's width, a sticker's size, the
   // point size of text — is written once at DESIGN_WIDTH, and the whole
@@ -330,6 +377,7 @@ export function LayerStack({
           editing={editing}
           showId={showId}
           polls={polls}
+          embeds={embeds}
         />
       ))}
     </div>

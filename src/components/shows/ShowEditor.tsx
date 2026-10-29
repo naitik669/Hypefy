@@ -1,9 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Type, Smile, Undo2, Trash2, X } from "lucide-react";
+import {
+  Type,
+  Smile,
+  Undo2,
+  Trash2,
+  X,
+  Music,
+  AtSign,
+  Link2,
+  BarChart3,
+  MessageCircleQuestion,
+  LayoutGrid,
+} from "lucide-react";
 import { LayerBody, LayerView } from "@/components/shows/LayerView";
 import { TransformBox } from "@/components/shows/TransformBox";
+import { TrackPicker } from "@/components/music/TrackPicker";
+import { PollComposer } from "@/components/messages/PollComposer";
+import {
+  EmbedSheet,
+  LinkSheet,
+  MentionSheet,
+  QuestionSheet,
+  type EmbedState,
+} from "@/components/shows/ShowWidgetPickers";
 import { lookName } from "@/lib/show-looks";
 import {
   DESIGN_WIDTH,
@@ -25,16 +46,56 @@ import { topmostAt, type Placed } from "@/lib/transform-gesture";
  * you see here is the card your circle gets" — and it holds harder here,
  * because every layer is drawn by the same component the viewer uses.
  *
- * Phase 2 adds the two layers you make rather than pick: words and a
- * sticker. A song, a poll, a mention, a link and a post embed all need a
- * picker of their own and arrive in Phase 3; the model, the renderer and
- * this screen already carry them.
+ * Everything a layer can be is reachable from one tray. Three of the
+ * pickers behind it are the app's own, reused rather than rebuilt — a
+ * song comes from TrackPicker, a poll from PollComposer, and a mention
+ * from the same people search the chat composer's typeahead uses — and
+ * three are in ShowWidgetPickers because they had nowhere to come from.
+ *
+ * An embed is picked here but not *stored* here: the layer keeps only
+ * the post's id, and its picture is handed to the renderer separately,
+ * the same way the viewer fetches it. A thumbnail copied into the layer
+ * would outlive a takedown of the thing it came from.
  */
 
 /** A new layer lands here, and slightly off square so it reads as placed. */
 const DROP = { x: 0.5, y: 0.45, scale: 1, rotation: -3 };
 
+/**
+ * Where the nth layer lands.
+ *
+ * Every one used to arrive on the same spot, which was survivable while
+ * the only things to add were words and a sticker and plainly wrong once
+ * a Show can carry eight: the second widget covered the first exactly,
+ * so it read as nothing having happened. Each lands a little below and
+ * to the right of the last, the way a duplicated object does in every
+ * drawing program, and wraps before it walks off the bottom.
+ */
+function dropAt(count: number) {
+  const step = count % 6;
+  return { ...DROP, x: DROP.x + step * 0.035, y: DROP.y + step * 0.055 };
+}
+
 const STICKERS = ["🔥", "✨", "💀", "🫠", "❤️", "🎧", "🌙", "⚡"];
+
+/** Which sheet is open. */
+type Picker = "music" | "mention" | "link" | "poll" | "question" | "embed" | null;
+
+/**
+ * The tray, in the order people reach for them.
+ *
+ * A song first because it is the one every story product has trained
+ * people to look for; the embed last because it needs something of
+ * yours to already exist.
+ */
+const WIDGETS = [
+  { key: "music", label: "Music", icon: Music },
+  { key: "mention", label: "Mention", icon: AtSign },
+  { key: "link", label: "Link", icon: Link2 },
+  { key: "poll", label: "Poll", icon: BarChart3 },
+  { key: "question", label: "Question", icon: MessageCircleQuestion },
+  { key: "embed", label: "Embed", icon: LayoutGrid },
+] as const satisfies readonly { key: Exclude<Picker, null>; label: string; icon: unknown }[];
 
 function freshId(): string {
   // Collides with nothing and needs no library; the id only has to be
@@ -57,7 +118,11 @@ export function ShowEditor({
   const [layers, setLayers] = useState<ShowLayer[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [writing, setWriting] = useState<string | null>(null);
-  const [stickers, setStickers] = useState(false);
+  const [tray, setTray] = useState(false);
+  /** Which picker is open, if any. */
+  const [picking, setPicking] = useState<Picker>(null);
+  /** The pictures for embedded layers, as the viewer would supply them. */
+  const [embeds, setEmbeds] = useState<Record<string, EmbedState>>({});
   /** One step back, which is the one people actually reach for. */
   const [previous, setPrevious] = useState<ShowLayer[] | null>(null);
 
@@ -83,7 +148,7 @@ export function ShowEditor({
     (type: LayerType, payload: ShowLayer["payload"]) => {
       if (layers.length >= MAX_LAYERS) return;
       remember();
-      const layer = { id: freshId(), type, ...DROP, look: 0, payload } as ShowLayer;
+      const layer = { id: freshId(), type, ...dropAt(layers.length), look: 0, payload } as ShowLayer;
       // Appended, so a new layer lands on top — the list is back to front.
       setLayers((l) => [...l, layer]);
       setSelected(layer.id);
@@ -168,7 +233,7 @@ export function ShowEditor({
             arranged here is what people get. */}
         {layers.map((layer) =>
           layer.id === selected ? null : (
-            <LayerView key={layer.id} layer={layer} frame={frame} editing />
+            <LayerView key={layer.id} layer={layer} frame={frame} editing embeds={embeds} />
           ),
         )}
 
@@ -181,7 +246,7 @@ export function ShowEditor({
           >
             {/* The body alone: the box above already owns where it
                 sits, how big it is and which way it faces. */}
-            <LayerBody layer={chosen} editing />
+            <LayerBody layer={chosen} editing embeds={embeds} />
           </TransformBox>
         )}
 
@@ -197,7 +262,7 @@ export function ShowEditor({
           >
             <Type size={18} />
           </RailButton>
-          <RailButton label="Add a sticker" disabled={full} onClick={() => setStickers((s) => !s)}>
+          <RailButton label="Add something" disabled={full} onClick={() => setTray((t) => !t)}>
             <Smile size={18} />
           </RailButton>
           <RailButton label="Undo" disabled={!previous} onClick={() => {
@@ -227,22 +292,40 @@ export function ShowEditor({
           </div>
         )}
 
-        {stickers && (
-          <div className="absolute inset-x-3 bottom-28 z-30 flex flex-wrap justify-center gap-2 rounded-2xl border border-border bg-elevated/95 p-3 backdrop-blur-xl">
-            {STICKERS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                aria-label={`Add ${emoji}`}
-                className="flex h-12 w-12 items-center justify-center rounded-[30%] text-2xl transition active:scale-90"
-                onClick={() => {
-                  add("sticker", { emoji });
-                  setStickers(false);
-                }}
-              >
-                {emoji}
-              </button>
-            ))}
+        {tray && (
+          <div className="absolute inset-x-3 bottom-28 z-30 space-y-3 rounded-2xl border border-border bg-elevated/95 p-3 backdrop-blur-xl">
+            <div className="flex flex-wrap justify-center gap-2">
+              {STICKERS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  aria-label={`Add ${emoji}`}
+                  className="flex h-11 w-11 items-center justify-center rounded-[30%] text-2xl transition active:scale-90"
+                  onClick={() => {
+                    add("sticker", { emoji });
+                    setTray(false);
+                  }}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-2 border-t border-border pt-3">
+              {WIDGETS.map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setTray(false);
+                    setPicking(key);
+                  }}
+                  className="flex flex-col items-center gap-1.5 rounded-xl bg-surface py-3 text-[11px] font-bold text-foreground transition active:scale-95"
+                >
+                  <Icon size={18} className="text-accent" />
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -270,6 +353,65 @@ export function ShowEditor({
           />
         </div>
       )}
+
+      <TrackPicker
+        open={picking === "music"}
+        onClose={() => setPicking(null)}
+        onSelect={(track) => {
+          add("music", {
+            id: track.id,
+            title: track.title,
+            artist: track.artist,
+            artwork: track.artwork || null,
+            preview: track.preview || null,
+          });
+          setPicking(null);
+        }}
+      />
+      <MentionSheet
+        open={picking === "mention"}
+        onClose={() => setPicking(null)}
+        onPick={(username) => add("mention", { username })}
+      />
+      <LinkSheet
+        open={picking === "link"}
+        onClose={() => setPicking(null)}
+        onPick={(url) => add("link", { url })}
+      />
+      <PollComposer
+        open={picking === "poll"}
+        onClose={() => setPicking(null)}
+        onSend={(question, options) => {
+          // A Show poll takes one answer each, so the composer's
+          // multiple-choice switch has nothing to set here.
+          add("poll", { question, options });
+          setPicking(null);
+        }}
+      />
+      <QuestionSheet
+        open={picking === "question"}
+        onClose={() => setPicking(null)}
+        onPick={(prompt) => add("question", { prompt })}
+      />
+      <EmbedSheet
+        open={picking === "embed"}
+        onClose={() => setPicking(null)}
+        onPick={(choice) => {
+          const id =
+            choice.kind === "post"
+              ? add("post", { postId: choice.id })
+              : add("shot", { shotId: choice.id });
+          // What was just picked is already in hand, so the editor draws
+          // it without a second round trip — the layer still stores only
+          // the id.
+          if (id) {
+            setEmbeds((e) => ({
+              ...e,
+              [id]: { thumb: choice.thumb, caption: choice.caption },
+            }));
+          }
+        }}
+      />
 
       {writing === null && (
         <div className="flex items-center gap-2 border-t border-border bg-black p-3 pb-[max(var(--sab),12px)]">

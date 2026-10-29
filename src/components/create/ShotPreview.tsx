@@ -18,6 +18,8 @@ import { BLANK_POSTER } from "@/lib/blank-poster";
 import { useObjectUrl } from "@/lib/object-url";
 import { isAllowedVideo, isVideoFile, uploadContentType } from "@/lib/video-mime";
 import { useUpload } from "@/components/upload/UploadProvider";
+import { layerMentions, type ShowLayer } from "@/lib/show-layers";
+import type { Json } from "@/lib/supabase/database.types";
 
 /**
  * Preview and publish step for the camera-first creator.
@@ -36,6 +38,7 @@ export function ShotPreview({
   onCaptionChange,
   onBack,
   onDone,
+  layers = [],
 }: {
   file: File;
   mode: "shot" | "show";
@@ -53,6 +56,8 @@ export function ShotPreview({
   onCaptionChange?: (caption: string) => void;
   onBack: () => void;
   onDone: () => void;
+  /** What was arranged on a Show, if anything was. */
+  layers?: ShowLayer[];
 }) {
   const supabase = useMemo(() => createClient(), []);
   const toast = useToast();
@@ -154,7 +159,10 @@ export function ShotPreview({
       // always kept them; only the insert dropped them, so @-ing somebody
       // in a Show reached nobody. The Shot path a few lines up has sent
       // these since 0102.
-      mentions: extractMentions(text),
+      // A name placed on the picture reaches its owner the same way one
+      // typed into the caption does; layerMentions says why.
+      mentions: [...new Set([...extractMentions(text), ...layerMentions(layers)])],
+      layers: layers as unknown as Json,
     });
 
     setBusy(false);

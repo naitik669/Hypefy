@@ -25,7 +25,11 @@ const shelf = vi.hoisted(() => ({
   result: "saved" as "saved" | "full" | "failed",
   deleted: [] as string[],
 }));
-const stage = vi.hoisted(() => ({ editorInitial: undefined as unknown, previewCaption: undefined as unknown }));
+const stage = vi.hoisted(() => ({
+  editorInitial: undefined as unknown,
+  previewCaption: undefined as unknown,
+  previewLayers: undefined as unknown,
+}));
 
 vi.mock("next/navigation", () => ({
   redirect: nav.redirect,
@@ -59,6 +63,8 @@ vi.mock("@/lib/creation-drafts", () => ({
 }));
 
 const EDIT = { duration: 20, trim: { start: 2, end: 14 }, coverTime: 5 };
+/** What the arrange step hands back, standing in for a real layer. */
+const STICKER = { id: "l1", type: "sticker", x: 0.5, y: 0.45, scale: 1, rotation: -3, look: 0, payload: { emoji: "🔥" } };
 
 vi.mock("@/components/create/ShotEditor", () => ({
   ShotEditor: (p: { initial?: unknown; onEdit?: (e: typeof EDIT) => void; onBack: () => void; onNext: (e: typeof EDIT) => void }) => {
@@ -72,9 +78,19 @@ vi.mock("@/components/create/ShotEditor", () => ({
     );
   },
 }));
+vi.mock("@/components/shows/ShowEditor", () => ({
+  ShowEditor: (p: { onCancel: () => void; onPublish: (layers: unknown[]) => void }) =>
+    createElement(
+      "div",
+      { "data-stage": "arrange" },
+      createElement("button", { onClick: p.onCancel }, "arrange back"),
+      createElement("button", { onClick: () => p.onPublish([STICKER]) }, "arrange done"),
+    ),
+}));
 vi.mock("@/components/create/ShotPreview", () => ({
-  ShotPreview: (p: { initialCaption?: string; onCaptionChange?: (c: string) => void; onBack: () => void; onDone: () => void }) => {
+  ShotPreview: (p: { initialCaption?: string; layers?: unknown[]; onCaptionChange?: (c: string) => void; onBack: () => void; onDone: () => void }) => {
     stage.previewCaption = p.initialCaption;
+    stage.previewLayers = p.layers;
     return createElement(
       "div",
       { "data-stage": "caption" },
@@ -173,9 +189,38 @@ describe("Back, with a clip in hand", () => {
   it("asks about a Show too, by its own name", async () => {
     await open({ initialMode: "show" });
     await pickClip("sky.jpg", "image/jpeg");
-    expect(at()).toBe("caption");
-    await tap("caption back");
+    // A photo Show is arranged before it is captioned.
+    expect(at()).toBe("arrange");
+    await tap("arrange back");
     expect(asking()?.getAttribute("aria-label")).toBe("Leave this Show?");
+  });
+
+  it("a photo Show is arranged first, and what was arranged reaches the publish step", async () => {
+    await open({ initialMode: "show" });
+    await pickClip("sky.jpg", "image/jpeg");
+    expect(at()).toBe("arrange");
+    await tap("arrange done");
+    expect(at()).toBe("caption");
+    expect(stage.previewLayers).toEqual([STICKER]);
+  });
+
+  it("stepping back from the caption goes to the arrangement, not out", async () => {
+    await open({ initialMode: "show" });
+    await pickClip("sky.jpg", "image/jpeg");
+    await tap("arrange done");
+    await tap("caption back");
+    // Nothing lost and nothing asked: this is one step, like the Shot's
+    // caption → editor.
+    expect(at()).toBe("arrange");
+    expect(asking()).toBeNull();
+    expect(nav.left).toBe(0);
+  });
+
+  it("but a video Show goes straight to the caption — there is nothing to place on it", async () => {
+    await open({ initialMode: "show" });
+    await pickClip("sky.mp4", "video/mp4");
+    expect(at()).toBe("caption");
+    expect(stage.previewLayers).toEqual([]);
   });
 });
 

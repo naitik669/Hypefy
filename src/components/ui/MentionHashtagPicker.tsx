@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 
-type Suggestion =
+export type Suggestion =
   | { kind: "hashtag"; tag: string; count: number }
   | { kind: "mention"; id: string; username: string; display_name: string | null; avatar_hue: number | null; avatar_url: string | null };
 

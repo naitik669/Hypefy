@@ -2617,6 +2617,7 @@ export type Database = {
           hype_count: number
           id: string
           is_showcase: boolean | null
+          layers: Json
           linked_post_id: string | null
           media_url: string
           mentions: string[]
@@ -2633,6 +2634,7 @@ export type Database = {
           hype_count?: number
           id?: string
           is_showcase?: boolean | null
+          layers?: Json
           linked_post_id?: string | null
           media_url: string
           mentions?: string[]
@@ -2649,6 +2651,7 @@ export type Database = {
           hype_count?: number
           id?: string
           is_showcase?: boolean | null
+          layers?: Json
           linked_post_id?: string | null
           media_url?: string
           mentions?: string[]

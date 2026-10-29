@@ -20,6 +20,9 @@ import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { haptics } from "@/lib/haptics";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { ShotPreview } from "@/components/create/ShotPreview";
+import { ShowEditor } from "@/components/shows/ShowEditor";
+import { useObjectUrl } from "@/lib/object-url";
+import type { ShowLayer } from "@/lib/show-layers";
 import { ShotEditor } from "@/components/create/ShotEditor";
 import {
   FilterCarousel,
@@ -46,6 +49,26 @@ import {
 import { ConstructionNote, DraftStrip, LeaveSheet } from "@/components/create/CreateExtras";
 
 export type CreateMode = "shot" | "show";
+
+/**
+ * The arrange step, wrapped so the blob URL is minted only when it is on
+ * screen.
+ *
+ * useObjectUrl takes a File and cannot be called for a `captured` that
+ * may be null, and a video Show never reaches the editor at all — so a
+ * component of its own is both the simpler and the cheaper shape.
+ */
+function ShowArrange({
+  file,
+  onCancel,
+  onDone,
+}: {
+  file: File;
+  onCancel: () => void;
+  onDone: (layers: ShowLayer[]) => void;
+}) {
+  return <ShowEditor photoUrl={useObjectUrl(file)} onCancel={onCancel} onPublish={onDone} />;
+}
 
 /** How long the note on an unbuilt control stays up. */
 const NOTE_MS = 2600;
@@ -124,6 +147,13 @@ export function CreateScreen({
   /** Past the editor, on the caption. Kept apart from `edited` so stepping
    *  back to the editor does not throw the edit away. */
   const [captioning, setCaptioning] = useState(false);
+  /**
+   * What has been arranged on a photo Show, once the editor has been
+   * through. Null means it has not, which is what puts the editor on
+   * screen — the same shape `edited` uses for a Shot, and for the same
+   * reason: stepping back to arrange again must not lose the layers.
+   */
+  const [arranged, setArranged] = useState<ShowLayer[] | null>(null);
   const [caption, setCaption] = useState("");
   /** The edit as it stands in the editor right now, for a draft saved from there. */
   const liveEdit = useRef<DraftEdit | null>(null);
@@ -155,6 +185,8 @@ export function CreateScreen({
       // Caption → editor keeps everything. Anything further back would drop
       // the clip, so that is asked about first.
       if (captioning && mode === "shot") return setCaptioning(false);
+      // A photo Show goes caption → arrange, which keeps everything.
+      if (arranged && mode === "show" && !isVideoFile(captured)) return setArranged(null);
       return setLeaving(true);
     }
     if (source === "camera") return setSource("pick");
@@ -379,6 +411,18 @@ export function CreateScreen({
     );
   }
 
+  // Arrange step — a photo Show is laid out before it is captioned.
+  // Video Shows skip it: there is nothing to place on something that
+  // moves, and the layer renderer is written against a still frame.
+  if (captured && mode === "show" && !isVideoFile(captured) && arranged === null) {
+    return (
+      <>
+        <ShowArrange file={captured} onCancel={back} onDone={setArranged} />
+        {leaveSheet}
+      </>
+    );
+  }
+
   // Preview step — the captured media, caption, hashtags and publish.
   if (captured) {
     return (
@@ -393,6 +437,7 @@ export function CreateScreen({
           onCaptionChange={setCaption}
           onBack={back}
           onDone={finish}
+          layers={arranged ?? []}
         />
         {leaveSheet}
       </>
