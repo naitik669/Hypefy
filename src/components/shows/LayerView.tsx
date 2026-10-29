@@ -54,7 +54,14 @@ export function LayerView({
   );
 }
 
-function LayerBody({ layer, editing }: { layer: ShowLayer; editing: boolean }) {
+/**
+ * A layer's own appearance, with no positioning of its own.
+ *
+ * Exported because the editor's selection box already owns where the
+ * thing sits; handing it a positioned LayerView would place the layer
+ * twice and fight itself.
+ */
+export function LayerBody({ layer, editing = false }: { layer: ShowLayer; editing?: boolean }) {
   const look = lookFor(layer.type, layer.look);
 
   switch (layer.type) {
