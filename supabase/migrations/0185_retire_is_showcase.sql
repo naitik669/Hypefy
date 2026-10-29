@@ -14,10 +14,11 @@
 --   * stops the reaper reading the flag, and has it ask the boards
 --     instead — the same question can_see_show already asks.
 --
--- Dropping the column is 0186, deliberately separate and deliberately
--- after this has been live. A DROP COLUMN cannot be undone, and there
--- is no reason to run it in the same breath as the change that makes it
--- safe.
+-- Dropping the column is a migration of its own, deliberately separate
+-- and deliberately after this has been live. A DROP COLUMN cannot be
+-- undone, and there is no reason to run it in the same breath as the
+-- change that makes it safe. It is not numbered here on purpose: the
+-- next number belongs to whatever ships next, not to a reservation.
 
 -- Every flagged Show onto a board, creating one per author if needed.
 --
@@ -74,4 +75,4 @@ select distinct on (s.id)
 -- readable and the thing that decides what is deleted now agree, which
 -- they did not before.
 comment on column public.shows.is_showcase is
-  'SUPERSEDED by showcase_items (0068). Nothing reads this as of 0185; dropped in 0186.';
+  'SUPERSEDED by showcase_items (0068). Nothing reads this as of 0185; safe to drop.';

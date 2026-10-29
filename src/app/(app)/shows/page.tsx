@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, Star } from "lucide-react";
+import { Plus, Star, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyScene, ctaClass } from "@/components/empty/EmptyScene";
 import { TvArt } from "@/components/empty/scenes";
 import { isRestricted } from "@/lib/show-audience";
 import { SHOW_ARCHIVE_DAYS } from "@/lib/show-media";
+import { NewCollabButton } from "@/components/shows/NewCollabButton";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { isVideoUrl } from "@/lib/video-mime";
 
@@ -97,6 +98,28 @@ export default async function ShowsPage() {
   if (!user) redirect("/signin");
 
   const nowIso = new Date().toISOString();
+
+  /**
+   * The shared Shows you are in, and the ones you have been asked into.
+   *
+   * Through RLS: the collab policy returns only the ones you own, are
+   * in, or were invited to, so there is nothing to filter here. The
+   * membership rows come back for the same reason — which is what
+   * separates an invitation from a membership on this screen.
+   */
+  const { data: collabRows } = await supabase
+    .from("show_collab_members")
+    .select("joined_at, collab:show_collabs!inner(id, title, owner_id)")
+    .eq("user_id", user.id)
+    .limit(40);
+
+  const collabs = (collabRows ?? []).flatMap((r) => {
+    const raw = (r as { collab: unknown }).collab;
+    const c = (Array.isArray(raw) ? raw[0] : raw) as Record<string, unknown> | null;
+    if (!c?.id) return [];
+    return [{ id: c.id as string, title: c.title as string, joined: r.joined_at != null }];
+  });
+
   const { data } = await supabase
     .from("shows")
     .select("id, media_url, caption, expires_at, hype_count, audience")
@@ -124,17 +147,20 @@ export default async function ShowsPage() {
         title="Your Shows"
         showBack
         right={
-          <Link
-            href="/create?mode=show"
-            aria-label="Add a Show"
-            className="flex h-9 items-center gap-1 rounded-pill bg-accent px-3 text-xs font-bold text-accent-ink active:scale-[0.98]"
-          >
-            <Plus size={15} /> New
-          </Link>
+          <span className="flex items-center gap-2">
+            <NewCollabButton />
+            <Link
+              href="/create?mode=show"
+              aria-label="Add a Show"
+              className="flex h-9 items-center gap-1 rounded-pill bg-accent px-3 text-xs font-bold text-accent-ink active:scale-[0.98]"
+            >
+              <Plus size={15} /> New
+            </Link>
+          </span>
         }
       />
 
-      {live.length === 0 && archive.length === 0 ? (
+      {live.length === 0 && archive.length === 0 && collabs.length === 0 ? (
         <EmptyScene
           art={<TvArt />}
           title="Nothing on tonight"
@@ -147,6 +173,41 @@ export default async function ShowsPage() {
         />
       ) : (
         <div className="px-4 pb-10 pt-3">
+          {collabs.length > 0 && (
+            <>
+              <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-faint">
+                Shared
+              </h2>
+              <div className="mb-6 space-y-2">
+                {collabs.map((c) => (
+                  <Link
+                    key={c.id}
+                    href={`/shows/collab/${c.id}`}
+                    className="flex items-center gap-3 rounded-2xl bg-surface px-3 py-3 active:scale-[0.99]"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-elevated text-accent">
+                      <Users size={17} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold">{c.title}</span>
+                      <span className="block text-xs text-muted">
+                        {c.joined ? "You're in it" : "You were asked to join"}
+                      </span>
+                    </span>
+                    {/* An invitation is the one row on this screen that
+                        wants something from you, so it is the one row
+                        that says so in the accent. */}
+                    {!c.joined && (
+                      <span className="shrink-0 rounded-pill bg-accent px-2.5 py-1 text-[11px] font-extrabold text-accent-ink">
+                        Join
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
+
           {live.length > 0 && (
             <>
               <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-faint">

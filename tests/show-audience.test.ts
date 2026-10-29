@@ -197,7 +197,15 @@ describe("a narrower room looks like one before it is opened", () => {
     const home = read("src/app/(app)/home/page.tsx");
     expect(home).toContain("restricted: isRestricted(s.audience),");
     expect(home).toContain("existing.restricted ||= isRestricted(s.audience);");
-    expect(home).toContain('"id, user_id, audience, profiles!shows_user_id_fkey');
+    // The select grew a collab embed in 0186, and there are now two
+    // of them — the follows query and the collab query. Both must
+    // carry the audience, because the ring's colour is read from it.
+    // Asserted as a count: a toContain was satisfied by the second
+    // select while the first had lost the column, and a mutation
+    // proved it.
+    const needle =
+      '"id, user_id, audience, collab_id, collab:show_collabs(id, title), profiles!shows_user_id_fkey';
+    expect(home.split(needle)).toHaveLength(3);
   });
 
   it("and the grid labels only the narrow ones", () => {
@@ -230,7 +238,10 @@ describe("the archive, and is_showcase stepping down", () => {
     // A DROP COLUMN cannot be undone and has no business running in the
     // same breath as the change that makes it safe.
     expect(retire).not.toContain("drop column");
-    expect(retire).toContain("dropped in 0186");
+    expect(retire).toContain("safe to drop");
+    // Not numbered on purpose: the next number belongs to whatever
+    // ships next, not to a reservation.
+    expect(retire).toContain("It is not numbered here on purpose");
   });
 
   it("keeping a Show means putting it on a board", () => {

@@ -41,6 +41,7 @@ export function ShotPreview({
   onBack,
   onDone,
   layers = [],
+  collabId,
 }: {
   file: File;
   mode: "shot" | "show";
@@ -60,6 +61,8 @@ export function ShotPreview({
   onDone: () => void;
   /** What was arranged on a Show, if anything was. */
   layers?: ShowLayer[];
+  /** The shared Show this one is being added to, if any. */
+  collabId?: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const toast = useToast();
@@ -169,6 +172,7 @@ export function ShotPreview({
       mentions: [...new Set([...extractMentions(text), ...layerMentions(layers)])],
       layers: layers as unknown as Json,
       audience,
+      collab_id: collabId ?? null,
     })
       .select("id")
       .single();

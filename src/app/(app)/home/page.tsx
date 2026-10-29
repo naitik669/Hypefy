@@ -147,7 +147,7 @@ export default async function HomePage() {
       ? supabase
           .from("shows")
           .select(
-            "id, user_id, audience, profiles!shows_user_id_fkey(display_name, avatar_hue, avatar_url, username)"
+            "id, user_id, audience, collab_id, collab:show_collabs(id, title), profiles!shows_user_id_fkey(display_name, avatar_hue, avatar_url, username)"
           )
           .gt("expires_at", nowIso)
           .in("user_id", [...followingIds])
@@ -217,7 +217,65 @@ export default async function HomePage() {
   const mutualHyperIds = hyperIds.filter((id) => reverseSet.has(id));
 
   // Which active shows I've already viewed (server-side truth for the seen ring)
-  const activeShowIds = (activeShows ?? []).map((s: any) => s.id);
+  /**
+   * Shows posted into a shared Show you are in.
+   *
+   * The query above is follows-only, deliberately: the ring is the one
+   * surface where "why am I seeing this?" has to be one sentence. But
+   * joining a collab is a stronger answer than following somebody, and
+   * a member who does not follow a contributor would otherwise never
+   * see what was posted into the thing they joined — which is the
+   * whole feature.
+   *
+   * Read through RLS, so can_see_show's membership clause is what
+   * actually decides; this only avoids asking for rows it would refuse.
+   */
+  const { data: myCollabs } = await supabase
+    .from("show_collab_members")
+    .select("collab_id")
+    .eq("user_id", user.id)
+    .not("joined_at", "is", null)
+    .limit(40);
+
+  const collabIds = (myCollabs ?? []).map((m) => m.collab_id);
+
+  /** One bubble's worth of Show, from either of the two queries. */
+  type RingShow = {
+    id: string;
+    user_id: string;
+    audience?: string | null;
+    collab?: { id: string; title: string } | { id: string; title: string }[] | null;
+    profiles?: unknown;
+  };
+
+  const collabShows: RingShow[] = collabIds.length
+    ? (((
+        await supabase
+          .from("shows")
+          .select(
+            "id, user_id, audience, collab_id, collab:show_collabs(id, title), profiles!shows_user_id_fkey(display_name, avatar_hue, avatar_url, username)",
+          )
+          .gt("expires_at", nowIso)
+          .in("collab_id", collabIds)
+          .order("created_at", { ascending: false })
+          .limit(50)
+      ).data ?? []) as RingShow[])
+    : [];
+
+  // Merged by id: a Show from somebody you follow that was also posted
+  // into a collab you are in arrives from both queries, and must be
+  // one entry.
+  const seenShowIds = new Set<string>();
+  const allActiveShows = [
+    ...((activeShows ?? []) as RingShow[]),
+    ...collabShows,
+  ].filter((s) => {
+    if (seenShowIds.has(s.id)) return false;
+    seenShowIds.add(s.id);
+    return true;
+  });
+
+  const activeShowIds = allActiveShows.map((s) => s.id);
   const { data: myViews } =
     activeShowIds.length > 0
       ? await supabase
@@ -425,21 +483,30 @@ export default async function HomePage() {
       allIds: string[];
       /** Any of their live Shows went somewhere narrower than everybody. */
       restricted: boolean;
+      /** This bubble is a shared Show rather than one person's. */
+      shared: boolean;
     }
   >();
-  for (const s of (activeShows ?? []) as any[]) {
+  for (const s of allActiveShows) {
     if (blockedIds.has(s.user_id)) continue;
     const p = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
-    const existing = byUser.get(s.user_id);
+    const c = Array.isArray(s.collab) ? s.collab[0] : s.collab;
+    // A shared Show is one bubble for the collab, not one per person
+    // in it — that is what "under one cover" means. Keyed apart from
+    // the author so somebody's own Shows and the collab they posted
+    // into stay two separate things to open.
+    const key = c?.id ? `collab:${c.id}` : s.user_id;
+    const existing = byUser.get(key);
     if (!existing) {
-      byUser.set(s.user_id, {
+      byUser.set(key, {
         id: s.id,
-        name: p?.display_name ?? p?.username ?? "User",
+        name: c?.title ?? p?.display_name ?? p?.username ?? "User",
         hue: p?.avatar_hue ?? 280,
         avatar_url: p?.avatar_url ?? null,
         latestId: s.id, // newest first, so the first one seen is the latest
         allIds: [s.id],
         restricted: isRestricted(s.audience),
+        shared: Boolean(c?.id),
       });
     } else {
       existing.id = s.id; // iterating newest->oldest, so this ends as the oldest

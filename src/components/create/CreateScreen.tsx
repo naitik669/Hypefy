@@ -102,6 +102,7 @@ const DURATIONS = [15, 30, 60];
 export function CreateScreen({
   userId,
   initialMode = "shot",
+  collabId,
   askedForLive = false,
   initialTrack = null,
 }: {
@@ -117,6 +118,8 @@ export function CreateScreen({
    * shortcut.
    */
   initialMode?: CreateMode;
+  /** The shared Show this is being added to, from ?collab=. */
+  collabId?: string;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -438,6 +441,7 @@ export function CreateScreen({
           onBack={back}
           onDone={finish}
           layers={arranged ?? []}
+          collabId={collabId}
         />
         {leaveSheet}
       </>

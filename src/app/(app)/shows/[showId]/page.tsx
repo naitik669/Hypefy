@@ -13,10 +13,10 @@ export default async function ShowPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // 1. Get the target Show to know whose Shows to fetch
+  // 1. Get the target Show to know which reel to fetch
   const { data: target } = await supabase
     .from("shows")
-    .select("id, user_id")
+    .select("id, user_id, collab_id")
     .eq("id", showId)
     .maybeSingle();
 
@@ -38,12 +38,23 @@ export default async function ShowPage({
 
   const selectStr = `${baseSelect}, ${extraCols}`;
 
-  const { data: raw } = await supabase
+  /**
+   * The reel this Show belongs to.
+   *
+   * A Show posted into a shared Show plays with the rest of that
+   * collab, not with the rest of its author's own Shows. The ring
+   * draws it as one cover standing for several people; opening it and
+   * getting one person's reel instead would make the cover a lie.
+   */
+  const reel = supabase
     .from("shows")
     .select(selectStr)
-    .eq("user_id", target.user_id)
     .gt("expires_at", nowIso)
     .order("created_at", { ascending: true });
+
+  const { data: raw } = await (target.collab_id
+    ? reel.eq("collab_id", target.collab_id)
+    : reel.eq("user_id", target.user_id).is("collab_id", null));
 
   const shows = (raw ?? []).map((s: any) => ({
     ...s,

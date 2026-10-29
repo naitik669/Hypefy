@@ -212,6 +212,10 @@ export function notifHref(n: Notif): string {
   if (n.target_type === "post" && n.target_id) return `/p/${n.target_id}`;
   if (n.target_type === "shot" && n.target_id) return `/shots/${n.target_id}`;
   if (n.target_type === "show" && n.target_id) return `/shows/${n.target_id}`;
+  // An invitation to a shared Show. Without this it falls through to
+  // "#" below — a notification that goes nowhere, which is how every
+  // new target_type arrives if nobody adds it here.
+  if (n.target_type === "show_collab" && n.target_id) return `/shows/collab/${n.target_id}`;
   if (n.target_type === "conversation" && n.target_id) return `/messages/${n.target_id}`;
   if (n.target_type === "comment" && n.parent)
     return n.parent.kind === "post"

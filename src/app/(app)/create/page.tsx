@@ -24,7 +24,11 @@ function parseMode(v: string | string[] | undefined): CreateMode {
 export default async function CreatePage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string | string[]; sound?: string | string[] }>;
+  searchParams: Promise<{
+    mode?: string | string[];
+    sound?: string | string[];
+    collab?: string | string[];
+  }>;
 }) {
   const supabase = await createClient();
   const {
@@ -33,7 +37,7 @@ export default async function CreatePage({
 
   if (!user) redirect("/signin");
 
-  const { mode, sound } = await searchParams;
+  const { mode, sound, collab } = await searchParams;
 
   // A post is written, not filmed. This screen is a camera, so Post never
   // belonged on it — it had a video picker and a button whose only job was to
@@ -56,6 +60,11 @@ export default async function CreatePage({
     <CreateScreen
       userId={user.id}
       initialMode={found ? "shot" : parseMode(mode)}
+      // Which shared Show this is being added to, if it arrived from
+      // one. Not checked here: the trigger refuses a collab its author
+      // has not joined, so a hand-typed id is a failed insert rather
+      // than a thing to validate twice.
+      collabId={Array.isArray(collab) ? collab[0] : collab}
       askedForLive={asked === "live"}
       initialTrack={found?.track ?? null}
     />

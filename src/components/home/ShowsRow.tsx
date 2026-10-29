@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 export type Show = {
   id: string;
@@ -15,6 +15,8 @@ export type Show = {
   avatar_url?: string | null;
   /** True when any of their live Shows went to a narrower room than everybody. */
   restricted?: boolean;
+  /** This bubble is a shared Show — one cover, several people behind it. */
+  shared?: boolean;
 };
 
 type CurrentUser = {
@@ -157,15 +159,28 @@ export function ShowsRow({
                 being let into one reads as what it is before it is
                 opened. Seen still wins: the ring's first job is telling
                 you whether there is anything new behind it. */}
-            <div
-              className={`rounded-[22px] p-[2.5px] ${
-                isSeen ? "" : s.restricted ? "bg-hype" : "bg-accent"
-              }`}
-              style={isSeen ? { background: "#3a3a3a" } : undefined}
-            >
-              <div className="rounded-[20px] bg-background p-[2px]">
-                <Avatar name={s.name} hue={s.hue} size={56} src={s.avatar_url ?? undefined} className="rounded-[18px]" />
+            <div className="relative">
+              <div
+                className={`rounded-[22px] p-[2.5px] ${
+                  isSeen ? "" : s.restricted ? "bg-hype" : "bg-accent"
+                }`}
+                style={isSeen ? { background: "#3a3a3a" } : undefined}
+              >
+                <div className="rounded-[20px] bg-background p-[2px]">
+                  <Avatar name={s.name} hue={s.hue} size={56} src={s.avatar_url ?? undefined} className="rounded-[18px]" />
+                </div>
               </div>
+              {/* A shared Show is one bubble standing for several
+                  people, which the avatar inside it cannot say on its
+                  own — it is whoever posted last. */}
+              {s.shared && (
+                <span
+                  aria-hidden
+                  className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-elevated ring-2 ring-background"
+                >
+                  <Users size={11} className="text-accent" />
+                </span>
+              )}
             </div>
             <span
               className={`max-w-full truncate text-xs transition-colors ${

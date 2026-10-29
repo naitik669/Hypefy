@@ -2609,6 +2609,75 @@ export type Database = {
           },
         ]
       }
+      show_collabs: {
+        Row: {
+          created_at: string
+          id: string
+          owner_id: string
+          removal_reason: string | null
+          removed_at: string | null
+          removed_by: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_id: string
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_id?: string
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      show_collab_members: {
+        Row: {
+          collab_id: string
+          invited_at: string
+          invited_by: string | null
+          joined_at: string | null
+          user_id: string
+        }
+        Insert: {
+          collab_id: string
+          invited_at?: string
+          invited_by?: string | null
+          joined_at?: string | null
+          user_id: string
+        }
+        Update: {
+          collab_id?: string
+          invited_at?: string
+          invited_by?: string | null
+          joined_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_collab_members_collab_id_fkey"
+            columns: ["collab_id"]
+            isOneToOne: false
+            referencedRelation: "show_collabs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "show_collab_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       show_hidden_from: {
         Row: {
           created_at: string
@@ -2631,6 +2700,7 @@ export type Database = {
         Row: {
           audience: string
           caption: string | null
+          collab_id: string | null
           created_at: string
           expires_at: string
           hype_count: number
@@ -2649,6 +2719,7 @@ export type Database = {
         Insert: {
           audience?: string
           caption?: string | null
+          collab_id?: string | null
           created_at?: string
           expires_at?: string
           hype_count?: number
@@ -2667,6 +2738,7 @@ export type Database = {
         Update: {
           audience?: string
           caption?: string | null
+          collab_id?: string | null
           created_at?: string
           expires_at?: string
           hype_count?: number
@@ -2683,6 +2755,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "shows_collab_id_fkey"
+            columns: ["collab_id"]
+            isOneToOne: false
+            referencedRelation: "show_collabs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "shows_linked_post_id_fkey"
             columns: ["linked_post_id"]
@@ -3474,6 +3553,26 @@ export type Database = {
           p_subject_id: string
         }
         Returns: undefined
+      }
+      create_show_collab: {
+        Args: { p_title: string }
+        Returns: string
+      }
+      invite_to_show_collab: {
+        Args: { p_collab: string; p_user: string }
+        Returns: undefined
+      }
+      join_show_collab: {
+        Args: { p_collab: string }
+        Returns: undefined
+      }
+      leave_show_collab: {
+        Args: { p_collab: string }
+        Returns: undefined
+      }
+      in_show_collab: {
+        Args: { p_collab: string; p_user: string }
+        Returns: boolean
       }
       cast_show_vote: {
         Args: {
