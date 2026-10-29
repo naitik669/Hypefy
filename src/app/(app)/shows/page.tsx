@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyScene, ctaClass } from "@/components/empty/EmptyScene";
 import { TvArt } from "@/components/empty/scenes";
 import { BLANK_POSTER } from "@/lib/blank-poster";
+import { isVideoUrl } from "@/lib/video-mime";
 
 /**
  * Your Shows.
@@ -41,13 +42,25 @@ function Tile({ s, badge }: { s: Row; badge: string }) {
       href={`/shows/${s.id}`}
       className="relative aspect-[3/4] overflow-hidden rounded-xl bg-black"
     >
-      <video poster={BLANK_POSTER}
-        src={s.media_url}
-        muted
-        playsInline
-        preload="metadata"
-        className="h-full w-full object-cover"
-      />
+      {/* Every tile was a <video>, so an ordinary photo Show — which is
+          nearly all of them — drew as a blank black square in its own
+          author's list. The viewer had the mirror of this bug. */}
+      {isVideoUrl(s.media_url) ? (
+        <video poster={BLANK_POSTER}
+          src={s.media_url}
+          muted
+          playsInline
+          preload="metadata"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={s.media_url}
+          alt={s.caption ?? "Show"}
+          className="h-full w-full object-cover"
+        />
+      )}
       <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2 pb-1.5 pt-6 text-[10px] font-bold text-white">
         {badge}
       </span>

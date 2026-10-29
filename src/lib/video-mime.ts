@@ -77,3 +77,23 @@ export function isAllowedVideo(file: { type?: string; name?: string }): boolean 
 export function uploadContentType(file: { type?: string; name?: string }, fallback = "video/webm"): string {
   return videoMimeOf(file) || baseMime(file.type) || fallback;
 }
+
+/**
+ * Whether a stored URL points at a video, judged by its extension.
+ *
+ * The Show viewer drew every `media_url` with an `<img>`, so a video Show
+ * — which the picker accepts, the bucket allows and "share a Shot to your
+ * Show" produces every time — rendered as a broken image. Its own delete
+ * path already tested the extension with a third copy of this regex; one
+ * function, reading the same table as `videoMimeOf`, so the two cannot
+ * drift apart.
+ *
+ * The query and the fragment are cut first: a signed URL carries a token,
+ * and neither says anything about the format.
+ */
+export function isVideoUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const path = url.split(/[?#]/)[0];
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  return Object.prototype.hasOwnProperty.call(BY_EXTENSION, ext);
+}

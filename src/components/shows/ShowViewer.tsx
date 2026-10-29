@@ -71,7 +71,10 @@ export type ShowItem = {
   track?: unknown;
 };
 
-const DURATION = 5000;
+import { showDurationMs, showMediaKind } from "@/lib/show-media";
+import { isVideoUrl } from "@/lib/video-mime";
+import { BLANK_POSTER } from "@/lib/blank-poster";
+import { storyGesture, storyKey, type StoryMove } from "@/lib/story-gesture";
 
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -172,9 +175,12 @@ function ShowScreen({
   const showToast = useToast();
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
+  /** The video's own length, once it knows it. Null for a photo, and
+   *  until metadata arrives. */
+  const [mediaSecs, setMediaSecs] = useState<number | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [reply, setReply] = useState("");
   const rafRef = useRef<number>(0);
-  const startRef = useRef<number>(0);
   const progressRef = useRef(0);
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -392,7 +398,7 @@ function ShowScreen({
       router.refresh();
     });
 
-    const isVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(show.media_url ?? "");
+    const isVideo = isVideoUrl(show.media_url);
     showToast("Show deleted", "plain", {
       label: "Undo",
       detail: show.caption?.trim() || "Your Show",
@@ -422,16 +428,46 @@ function ShowScreen({
 
   useEffect(() => {
     progressRef.current = 0;
-    startRef.current = 0;
     setProgress(0);
+    setMediaSecs(null);
   }, [show.id]);
+
+  const kind = showMediaKind(show.media_url);
+  const duration = showDurationMs(show.media_url, mediaSecs);
+
+  /**
+   * The video follows the story clock rather than running on its own.
+   *
+   * A tap-and-hold pauses the bar; it has to pause the picture too, or the
+   * clip plays on silently behind a frozen progress bar and the two are
+   * describing different moments.
+   */
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (paused || menuOpen || viewersOpen) {
+      v.pause();
+      return;
+    }
+    const tryPlay = v.play();
+    if (!tryPlay) return;
+    tryPlay.catch((err: unknown) => {
+      // Only autoplay refusal is worth answering. Anything else — a
+      // missing file, a codec the device will not take — is a broken
+      // Show, and muting it would not help.
+      if ((err as { name?: string })?.name !== "NotAllowedError") return;
+      v.muted = true;
+      void v.play().catch(() => {});
+    });
+  }, [show.id, paused, menuOpen, viewersOpen]);
 
   useEffect(() => {
     if (paused || menuOpen || viewersOpen) return;
     const lastP = progressRef.current;
+    let base = 0;
     function tick(now: number) {
-      if (startRef.current === 0) startRef.current = now - lastP * DURATION;
-      const p = Math.min((now - startRef.current) / DURATION, 1);
+      if (base === 0) base = now - lastP * duration;
+      const p = Math.min((now - base) / duration, 1);
       progressRef.current = p;
       setProgress(p);
       if (p < 1) rafRef.current = requestAnimationFrame(tick);
@@ -439,7 +475,69 @@ function ShowScreen({
     }
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [show.id, paused, menuOpen, viewersOpen, onNext]);
+  }, [show.id, paused, menuOpen, viewersOpen, duration, onNext]);
+
+  /**
+   * One place where a press turns into a move.
+   *
+   * Holding pauses the clock the moment the finger lands, so a long look
+   * at somebody's photo does not run out underneath them; letting go
+   * un-pauses whatever the press turned out to mean.
+   */
+  const press = useRef<{ x: number; y: number; t: number } | null>(null);
+
+  function act(move: StoryMove) {
+    if (move === "next") onNext();
+    else if (move === "prev") onPrev();
+    else if (move === "close") onClose();
+  }
+
+  function onPressDown(e: React.PointerEvent) {
+    press.current = { x: e.clientX, y: e.clientY, t: performance.now() };
+    setPaused(true);
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  }
+
+  function onPressUp(e: React.PointerEvent) {
+    const from = press.current;
+    press.current = null;
+    setPaused(false);
+    if (!from) return;
+    const box = e.currentTarget.getBoundingClientRect();
+    act(
+      storyGesture({
+        dx: e.clientX - from.x,
+        dy: e.clientY - from.y,
+        ms: performance.now() - from.t,
+        x: e.clientX - box.left,
+        width: box.width,
+      }),
+    );
+  }
+
+  function onPressCancel() {
+    press.current = null;
+    setPaused(false);
+  }
+
+  // Arrow keys and Escape, which this screen never had.
+  useEffect(() => {
+    if (menuOpen || viewersOpen) return;
+    function onKey(e: KeyboardEvent) {
+      const el = document.activeElement;
+      // Not while somebody is writing a reply: Escape should leave the
+      // field, and an arrow key should move the caret.
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
+      const move = storyKey(e.key);
+      if (!move) return;
+      e.preventDefault();
+      if (move === "next") onNext();
+      else if (move === "prev") onPrev();
+      else onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen, viewersOpen, onNext, onPrev, onClose]);
 
   function openLinkedPost() {
     if (!linkedPost) return;
@@ -467,6 +565,19 @@ function ShowScreen({
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-[#0d0d1e] via-[#111128] to-[#08080f]" />
         )
+      ) : kind === "video" ? (
+        // A video Show. The picker has always accepted one and the bucket
+        // has always stored it; only the viewer insisted on an <img>.
+        <video
+          ref={videoRef}
+          poster={BLANK_POSTER}
+          src={show.media_url ?? undefined}
+          className="absolute inset-0 h-full w-full object-cover"
+          playsInline
+          autoPlay
+          onLoadedMetadata={(e) => setMediaSecs(e.currentTarget.duration)}
+          aria-label={show.caption ?? "Show"}
+        />
       ) : show.media_url ? (
         // Normal shot: full-bleed image
         // eslint-disable-next-line @next/next/no-img-element
@@ -480,34 +591,19 @@ function ShowScreen({
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
 
-      {/* ── Tap zones (prev / next) ── */}
+      {/* ── The gesture surface ──
+          Two tap zones became one. Diary's player has had tap, swipe
+          between people, swipe down to leave and hold-to-pause since it
+          shipped; this had the two zones and no way out but the X. The
+          inset keeps the chrome above and below clickable. */}
       {!menuOpen && (
-        <>
-          <div
-            className="absolute left-0 z-10 w-1/3"
-            style={{ top: 88, bottom: 88 }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!paused) onPrev();
-            }}
-            onMouseDown={() => setPaused(true)}
-            onMouseUp={() => setPaused(false)}
-            onTouchStart={() => setPaused(true)}
-            onTouchEnd={() => setPaused(false)}
-          />
-          <div
-            className="absolute right-0 z-10 w-2/3"
-            style={{ top: 88, bottom: 88 }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!paused) onNext();
-            }}
-            onMouseDown={() => setPaused(true)}
-            onMouseUp={() => setPaused(false)}
-            onTouchStart={() => setPaused(true)}
-            onTouchEnd={() => setPaused(false)}
-          />
-        </>
+        <div
+          className="absolute inset-x-0 z-10"
+          style={{ top: 88, bottom: 88, touchAction: "none" }}
+          onPointerDown={onPressDown}
+          onPointerUp={onPressUp}
+          onPointerCancel={onPressCancel}
+        />
       )}
 
       {/* ── Progress bars ── */}
