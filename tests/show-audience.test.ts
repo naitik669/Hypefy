@@ -273,3 +273,55 @@ describe("hype, where it is the app's own verb", () => {
     expect(toggle).toContain("setHypeBurst(true);");
   });
 });
+
+describe("what else was still reading the retired flag", () => {
+  /**
+   * Found by asking the database rather than the repo.
+   *
+   * The first draft of 0185 changed the API route and said "nothing
+   * reads the flag". Two database functions still did —
+   * reap_expired_shows and notify_show_posted — so dropping the column
+   * on that claim would have taken the nightly reaper down with it.
+   */
+  it("the reaper's own query no longer filters on it", () => {
+    // Bounded to the function body: the slice to end-of-file picked
+    // up a later comment that names the flag, and the test failed on
+    // prose rather than on SQL.
+    const fn = retire.slice(
+      retire.indexOf("create or replace function public.reap_expired_shows"),
+      retire.indexOf("revoke execute on function public.reap_expired_shows"),
+    );
+    expect(fn).not.toContain("is_showcase");
+    // The board check already covers every Show the flag protected,
+    // because this migration put them all on one.
+    expect(fn).toContain("from public.showcase_items si");
+  });
+
+  it("and neither does the posted-a-Show notification", () => {
+    const fn = retire.slice(retire.indexOf("create or replace function public.notify_show_posted"));
+    expect(fn).not.toContain("is_showcase");
+  });
+
+  it("which while being restated stops telling people about Shows they cannot open", () => {
+    // A hole carried since 0184: that migration fixed exactly this for
+    // mentions and nobody checked the other notification path, so a
+    // Hypers-only Show told every follower and a Show hidden from
+    // somebody told that exact person.
+    const fn = retire.slice(retire.indexOf("create or replace function public.notify_show_posted"));
+    expect(fn).toContain("new.audience = 'everyone'");
+    expect(fn).toContain("from public.close_friends c");
+    expect(fn).toContain("from public.show_hidden_from h");
+  });
+
+  it("without losing the throttle or the block check it already had", () => {
+    const fn = retire.slice(retire.indexOf("create or replace function public.notify_show_posted"));
+    expect(fn).toContain("now() - interval '6 hours'");
+    expect(fn).toContain("from public.blocked_users b");
+    expect(fn).toContain("p.notif_prefs -> 'shows_posted' = 'true'::jsonb");
+  });
+
+  it("and both stay off the client's reach", () => {
+    expect(retire).toContain("revoke execute on function public.reap_expired_shows() from public, anon, authenticated;");
+    expect(retire).toContain("revoke execute on function public.notify_show_posted() from public, anon, authenticated;");
+  });
+});
