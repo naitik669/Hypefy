@@ -178,6 +178,11 @@ export function ShotPreview({
       .single();
 
     if (insErr || !row) {
+      // The file went up first; with no Show pointing at it, it is litter.
+      await supabase.storage.from(bucket).remove([path]);
+      // Said out loud: this toast is all anyone saw while 0183's policy
+      // refused every Show, and it named nothing.
+      console.error("show insert failed", insErr);
       setBusy(false);
       toast("Couldn't publish that. Try again.");
       return;
@@ -194,6 +199,7 @@ export function ShotPreview({
 
       if (hideErr) {
         await supabase.from("shows").delete().eq("id", row.id);
+        await supabase.storage.from(bucket).remove([path]);
         setBusy(false);
         toast("Couldn't set who it's hidden from. Nothing was posted.");
         return;
