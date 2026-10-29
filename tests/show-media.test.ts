@@ -6,6 +6,7 @@ import {
   SHOW_VIDEO_FALLBACK_MS,
   SHOW_VIDEO_MAX_MS,
   SHOW_VIDEO_MIN_MS,
+  reapableObjectPath,
   showDurationMs,
   showMediaKind,
 } from "@/lib/show-media";
@@ -158,5 +159,108 @@ describe("the grid draws what it was given too", () => {
   it("and a video tile keeps its poster", () => {
     // BLANK_POSTER exists to stop a black first frame flashing in.
     expect(grid).toContain("<video poster={BLANK_POSTER}");
+  });
+});
+
+describe("what the reaper is allowed to delete", () => {
+  const OWNER = "f7de5612-3fd9-41cb-9e0a-089c0a704576";
+  const OTHER = "997b0da0-dc2e-485e-8cf4-4a300934efd4";
+  const url = (bucket: string, path: string) =>
+    `https://fyaioseridqabockidyp.supabase.co/storage/v1/object/public/${bucket}/${path}`;
+
+  it("the Show's own upload, and that is all", () => {
+    expect(reapableObjectPath(url("show-media", `${OWNER}/1730.jpg`), OWNER)).toBe(`${OWNER}/1730.jpg`);
+  });
+
+  it("never a shared post's image or a Shot's video", () => {
+    // ShareSheet's share-to-your-Show writes those URLs into media_url.
+    // They belong to content that is still there; deleting one because a
+    // Show expired would destroy the original post.
+    expect(reapableObjectPath(url("post-images", `${OWNER}/a.jpg`), OWNER)).toBe(null);
+    expect(reapableObjectPath(url("shot-media", `${OWNER}/a.mp4`), OWNER)).toBe(null);
+    expect(reapableObjectPath(url("chat-media", `${OWNER}/a.jpg`), OWNER)).toBe(null);
+  });
+
+  it("never somebody else's folder", () => {
+    expect(reapableObjectPath(url("show-media", `${OTHER}/a.jpg`), OWNER)).toBe(null);
+  });
+
+  it("never a path that climbs out of it", () => {
+    expect(reapableObjectPath(url("show-media", `${OWNER}/../${OTHER}/a.jpg`), OWNER)).toBe(null);
+    expect(reapableObjectPath(url("show-media", `..%2F${OTHER}/a.jpg`), OWNER)).toBe(null);
+  });
+
+  it("never a bare file with no folder", () => {
+    // Every Show upload is `<uid>/<ts>.<ext>`; anything else is not one.
+    expect(reapableObjectPath(url("show-media", "loose.jpg"), OWNER)).toBe(null);
+  });
+
+  it("nor the folder itself", () => {
+    // The owner check alone would pass this: the first segment is the
+    // owner and there is nothing after it, so without the length guard
+    // the reaper would hand Storage a folder to delete.
+    expect(reapableObjectPath(url("show-media", OWNER), OWNER)).toBe(null);
+    expect(reapableObjectPath(url("show-media", `${OWNER}/`), OWNER)).toBe(null);
+  });
+
+  it("never an empty segment", () => {
+    expect(reapableObjectPath(url("show-media", `${OWNER}//a.jpg`), OWNER)).toBe(null);
+  });
+
+  it("and nothing at all when either side is missing", () => {
+    expect(reapableObjectPath(null, OWNER)).toBe(null);
+    expect(reapableObjectPath(url("show-media", `${OWNER}/a.jpg`), null)).toBe(null);
+    expect(reapableObjectPath("", "")).toBe(null);
+  });
+
+  it("a token on the end is not part of the path", () => {
+    expect(reapableObjectPath(url("show-media", `${OWNER}/a.jpg?t=1`), OWNER)).toBe(`${OWNER}/a.jpg`);
+  });
+});
+
+describe("the reap route checks the caller's word", () => {
+  const route = read("src/app/api/shows/reap/route.ts");
+
+  it("the secret is compared in constant time", () => {
+    expect(route).toContain('secretMatches(req.headers.get("x-show-reap-secret")');
+  });
+
+  it("and the window, the flag and the board are all re-read here", () => {
+    // A leaked secret should not delete a Show posted this morning.
+    expect(route).toContain("SHOW_ARCHIVE_DAYS * 86_400_000");
+    expect(route).toContain('return NextResponse.json({ error: "not past the archive window" }, { status: 409 });');
+    expect(route).toContain('if (show.is_showcase)');
+    expect(route).toContain('.eq("show_id", showId)');
+  });
+
+  it("the object goes before the row, so bytes are never orphaned", () => {
+    const rm = route.indexOf('.remove([path])');
+    const del = route.indexOf('.from("shows").delete()');
+    expect(rm).toBeGreaterThan(-1);
+    expect(del).toBeGreaterThan(rm);
+  });
+
+  it("and a failed object delete keeps the row for the next run", () => {
+    const branch = route.slice(route.indexOf("if (rmErr)"));
+    expect(branch.slice(0, 320)).toContain('status: 500');
+  });
+});
+
+describe("a Show carries its mentions", () => {
+  const composer = read("src/components/create/ShotPreview.tsx");
+
+  it("the insert sends what the typeahead collected", () => {
+    // The dropdown has always offered names and the caption has always
+    // kept them; only the insert dropped them.
+    const insert = composer.slice(composer.indexOf('.from("shows").insert({'));
+    expect(insert.slice(0, 520)).toContain("mentions: extractMentions(text),");
+  });
+});
+
+describe("one extension test, not four", () => {
+  it("the notifications screen uses the shared one", () => {
+    const notifications = read("src/app/(app)/notifications/page.tsx");
+    expect(notifications).toContain('import { isVideoUrl } from "@/lib/video-mime";');
+    expect(notifications).not.toContain('const VIDEO_EXT = [".mp4", ".webm", ".mov", ".m4v"];');
   });
 });

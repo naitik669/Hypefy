@@ -150,6 +150,11 @@ export function ShotPreview({
       media_url: mediaUrl,
       caption: text || null,
       track: track ?? null,
+      // The typeahead above has always offered names and the caption has
+      // always kept them; only the insert dropped them, so @-ing somebody
+      // in a Show reached nobody. The Shot path a few lines up has sent
+      // these since 0102.
+      mentions: extractMentions(text),
     });
 
     setBusy(false);

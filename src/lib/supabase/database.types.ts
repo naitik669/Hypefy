@@ -2619,6 +2619,7 @@ export type Database = {
           is_showcase: boolean | null
           linked_post_id: string | null
           media_url: string
+          mentions: string[]
           removal_reason: string | null
           removed_at: string | null
           removed_by: string | null
@@ -2634,6 +2635,7 @@ export type Database = {
           is_showcase?: boolean | null
           linked_post_id?: string | null
           media_url: string
+          mentions?: string[]
           removal_reason?: string | null
           removed_at?: string | null
           removed_by?: string | null
@@ -2649,6 +2651,7 @@ export type Database = {
           is_showcase?: boolean | null
           linked_post_id?: string | null
           media_url?: string
+          mentions?: string[]
           removal_reason?: string | null
           removed_at?: string | null
           removed_by?: string | null

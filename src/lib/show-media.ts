@@ -63,3 +63,48 @@ export function showDurationMs(
   const ms = Math.round(seconds * 1000);
   return Math.min(Math.max(ms, SHOW_VIDEO_MIN_MS), SHOW_VIDEO_MAX_MS);
 }
+
+/**
+ * How long an expired Show stays in its author's archive before the row
+ * and its picture go for good.
+ */
+export const SHOW_ARCHIVE_DAYS = 30;
+
+/** Where show-media objects sit inside a Supabase public URL. */
+const SHOW_BUCKET_MARK = "/storage/v1/object/public/show-media/";
+
+/**
+ * The object the reaper may delete for this Show, or null for "leave it".
+ *
+ * `media_url` is not always the Show's own upload. ShareSheet's
+ * share-to-your-Show writes a **post image** or a **Shot's video** into
+ * the column — those live in other buckets and belong to content that is
+ * still there. Deleting one because a Show expired would destroy the
+ * original post.
+ *
+ * So two things must both hold before anything is removed: the object is
+ * in show-media, and its first path segment is this Show's own author,
+ * which is the shape every Show upload has (`<uid>/<ts>.<ext>`) and the
+ * shape the bucket's own insert policy enforces. Anything else returns
+ * null and the file is left alone.
+ */
+export function reapableObjectPath(
+  mediaUrl: string | null | undefined,
+  ownerId: string | null | undefined,
+): string | null {
+  if (!mediaUrl || !ownerId) return null;
+  const at = mediaUrl.indexOf(SHOW_BUCKET_MARK);
+  if (at === -1) return null;
+
+  const path = mediaUrl.slice(at + SHOW_BUCKET_MARK.length).split(/[?#]/)[0];
+  if (!path) return null;
+  // No climbing out of the folder, however the url was written.
+  if (path.includes("..") || path.startsWith("/")) return null;
+
+  const segments = path.split("/");
+  if (segments.length < 2) return null;
+  if (segments[0] !== ownerId) return null;
+  if (segments.some((part) => part === "")) return null;
+
+  return path;
+}

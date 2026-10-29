@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isVideoUrl } from "@/lib/video-mime";
 import { CheckCheck, Loader2, Trash2, UserPlus, ShieldAlert, Sparkles, SlidersHorizontal, Trophy, BellOff } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -148,14 +149,10 @@ function timeAgo(iso: string) {
  *  - "reacted to your status" went to the REACTOR's profile rather than to
  *    your own, where the status they reacted to actually is.
  */
-/** Extensions the app stores video under. Anything else is a picture. */
-const VIDEO_EXT = [".mp4", ".webm", ".mov", ".m4v"];
-
-/** Is this stored media a video? The extension is all there is to go on. */
-function isVideoUrl(url: string): boolean {
-  const path = url.split("?")[0].split("#")[0].toLowerCase();
-  return VIDEO_EXT.some((ext) => path.endsWith(ext));
-}
+// The extension test lives in video-mime.ts, beside the table that maps
+// those extensions to the types the buckets accept. This was the fourth
+// copy of it — the Show viewer's delete path and the Show grid had two
+// more — and a fourth list to keep in step with the bucket.
 
 /**
  * The picture to draw in the little square beside a row, if there is one.

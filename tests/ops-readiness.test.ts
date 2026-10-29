@@ -43,11 +43,18 @@ describe("it reports state the environment cannot see", () => {
     // did not grow with it — the same mistake, one migration apart.
     // Taken from every cron.schedule() in the migrations, which is where a
     // job actually comes into being — not from a doc that can fall behind.
-    const latest = read("supabase/migrations/0167_ops_readiness_scheduled_messages.sql");
-    const all = readdirSync("supabase/migrations")
-      .filter((f) => f.endsWith(".sql"))
-      .map((f) => read(`supabase/migrations/${f}`))
-      .join("\n");
+    //
+    // Which migration holds the list is found rather than named. It used
+    // to be spelled out here, so adding a job meant remembering to move a
+    // pointer in a test — the same shape of mistake the test is for, and
+    // it duly caught the twelfth job by failing on a stale filename.
+    const files = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort();
+    const defining = files.filter((f) =>
+      read(`supabase/migrations/${f}`).includes("function public.ops_readiness"),
+    );
+    expect(defining.length, "no migration defines ops_readiness").toBeGreaterThan(0);
+    const latest = read(`supabase/migrations/${defining[defining.length - 1]}`);
+    const all = files.map((f) => read(`supabase/migrations/${f}`)).join("\n");
     const jobs = [...new Set([...all.matchAll(/cron\.schedule\(\s*'([a-z-]+)'/g)].map((m) => m[1]))];
     expect(jobs.length).toBeGreaterThan(8);
     for (const job of jobs) expect(latest, job).toContain(`'${job}'`);
