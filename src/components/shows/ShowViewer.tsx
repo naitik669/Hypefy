@@ -78,6 +78,7 @@ import { isVideoUrl } from "@/lib/video-mime";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { readLayers } from "@/lib/show-layers";
 import { LayerStack } from "@/components/shows/LayerView";
+import type { PollState } from "@/components/shows/ShowPoll";
 import { storyGesture, storyKey, type StoryMove } from "@/lib/story-gesture";
 
 function timeAgo(iso: string) {
@@ -459,6 +460,29 @@ function ShowScreen({
 
   const layers = useMemo(() => readLayers(show.layers), [show.layers]);
 
+  /**
+   * What the server knows about this Show's polls.
+   *
+   * One call for the whole Show rather than one per poll, and nothing
+   * at all when it carries none — most Shows do not.
+   */
+  const [polls, setPolls] = useState<Record<string, PollState>>({});
+  const hasPoll = useMemo(() => layers.some((l) => l.type === "poll"), [layers]);
+
+  useEffect(() => {
+    if (!hasPoll) return;
+    let dropped = false;
+    void supabase
+      .rpc("show_poll_tallies", { p_show_id: show.id })
+      .then(({ data }) => {
+        if (dropped || !data) return;
+        setPolls(data as Record<string, PollState>);
+      });
+    return () => {
+      dropped = true;
+    };
+  }, [show.id, hasPoll, supabase]);
+
   const kind = showMediaKind(show.media_url);
   const duration = showDurationMs(show.media_url, mediaSecs);
 
@@ -624,7 +648,7 @@ function ShowScreen({
           something to press takes the press, and LayerView decides that
           per layer rather than the stack claiming the whole frame. */}
       <div ref={frameRef} className="pointer-events-none absolute inset-0 z-[5]">
-        <LayerStack layers={layers} frame={frameSize} />
+        <LayerStack layers={layers} frame={frameSize} showId={show.id} polls={polls} />
       </div>
 
       {/* ── The gesture surface ──

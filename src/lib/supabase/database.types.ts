@@ -3451,6 +3451,30 @@ export type Database = {
         }
         Returns: undefined
       }
+      cast_show_vote: {
+        Args: {
+          p_choice: number
+          p_layer_id: string
+          p_show_id: string
+        }
+        Returns: Json
+      }
+      answer_show_question: {
+        Args: {
+          p_body: string
+          p_layer_id: string
+          p_show_id: string
+        }
+        Returns: undefined
+      }
+      show_poll_tallies: {
+        Args: { p_show_id: string }
+        Returns: Json
+      }
+      can_see_show: {
+        Args: { p_show: string }
+        Returns: boolean
+      }
       set_activity_mute: {
         Args: { p_on: boolean; p_user: string }
         Returns: Json

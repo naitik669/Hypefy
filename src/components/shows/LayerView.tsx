@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { lookFor } from "@/lib/show-looks";
+import { ShowPoll, ShowQuestion, type PollState } from "@/components/shows/ShowPoll";
 import {
   DESIGN_WIDTH,
   layerBox,
@@ -35,11 +36,17 @@ export function LayerView({
   layer,
   frame,
   editing = false,
+  showId,
+  polls,
 }: {
   layer: ShowLayer;
   frame: { width: number; height: number };
   /** In the editor: draw it, but do not let it act. */
   editing?: boolean;
+  /** Which Show this is, for the layers that write something back. */
+  showId?: string;
+  /** What the server knows about this Show's polls, by layer id. */
+  polls?: Record<string, PollState>;
 }) {
   const box = layerBox(layer, frame);
   return (
@@ -48,7 +55,7 @@ export function LayerView({
       style={{ left: box.left, top: box.top, transform: box.transform, transformOrigin: "center" }}
     >
       <div className={editing ? "pointer-events-none" : "pointer-events-auto"}>
-        <LayerBody layer={layer} editing={editing} />
+        <LayerBody layer={layer} editing={editing} showId={showId} polls={polls} />
       </div>
     </div>
   );
@@ -61,7 +68,17 @@ export function LayerView({
  * thing sits; handing it a positioned LayerView would place the layer
  * twice and fight itself.
  */
-export function LayerBody({ layer, editing = false }: { layer: ShowLayer; editing?: boolean }) {
+export function LayerBody({
+  layer,
+  editing = false,
+  showId,
+  polls,
+}: {
+  layer: ShowLayer;
+  editing?: boolean;
+  showId?: string;
+  polls?: Record<string, PollState>;
+}) {
   const look = lookFor(layer.type, layer.look);
 
   switch (layer.type) {
@@ -171,57 +188,72 @@ export function LayerBody({ layer, editing = false }: { layer: ShowLayer; editin
 
     case "poll": {
       const poll = layer.payload as PollPayload;
-      return (
-        <span style={{ ...look.box, display: "flex", flexDirection: "column", gap: 7, width: 230 }}>
-          <span style={{ ...look.title, fontSize: 12.5 }}>{poll.question}</span>
-          {poll.options.map((option, i) => (
-            <span
-              key={i}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                height: 34,
-                padding: "0 12px",
-                borderRadius: 11,
-                border: `1px solid ${look.ink}40`,
-                ...look.title,
-                fontSize: 12,
-                fontWeight: 700,
-              }}
-            >
-              {option}
+      // Live only where there is a Show to vote on. In the editor it is
+      // a shape being arranged, and a poll that took the author's own
+      // vote while they placed it would be answering itself.
+      if (editing || !showId) {
+        return (
+          <span style={{ ...look.box, display: "flex", flexDirection: "column", gap: 7, width: 230 }}>
+            <span style={{ ...look.title, fontSize: 12.5 }}>{poll.question}</span>
+            {poll.options.map((option, i) => (
+              <span
+                key={i}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  height: 34,
+                  padding: "0 12px",
+                  borderRadius: 11,
+                  border: `1px solid ${look.ink}40`,
+                  ...look.title,
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                {option}
+              </span>
+            ))}
+            <span style={{ ...look.sub, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              Poll
             </span>
-          ))}
-          {/* Counts arrive with voting in Phase 3; until then the card
-              says what it is rather than showing a tally of nothing. */}
-          <span style={{ ...look.sub, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-            Poll
           </span>
-        </span>
+        );
+      }
+      return (
+        <ShowPoll
+          showId={showId}
+          layerId={layer.id}
+          poll={poll}
+          look={look}
+          state={polls?.[layer.id]}
+        />
       );
     }
 
     case "question": {
-      const { prompt } = layer.payload as QuestionPayload;
-      return (
-        <span style={{ ...look.box, display: "flex", flexDirection: "column", gap: 10, width: 230 }}>
-          <span style={{ ...look.title, fontSize: 12.5 }}>{prompt}</span>
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              height: 36,
-              padding: "0 13px",
-              borderRadius: 100,
-              background: "rgba(255,255,255,0.08)",
-              ...look.sub,
-              fontSize: 12,
-            }}
-          >
-            Type something…
+      const question = layer.payload as QuestionPayload;
+      if (editing || !showId) {
+        return (
+          <span style={{ ...look.box, display: "flex", flexDirection: "column", gap: 10, width: 230 }}>
+            <span style={{ ...look.title, fontSize: 12.5 }}>{question.prompt}</span>
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                height: 36,
+                padding: "0 13px",
+                borderRadius: 100,
+                background: "rgba(255,255,255,0.08)",
+                ...look.sub,
+                fontSize: 12,
+              }}
+            >
+              Type something…
+            </span>
           </span>
-        </span>
-      );
+        );
+      }
+      return <ShowQuestion showId={showId} layerId={layer.id} question={question} look={look} />;
     }
 
     case "post":
@@ -261,10 +293,14 @@ export function LayerStack({
   layers,
   frame,
   editing = false,
+  showId,
+  polls,
 }: {
   layers: ShowLayer[];
   frame: { width: number; height: number };
   editing?: boolean;
+  showId?: string;
+  polls?: Record<string, PollState>;
 }) {
   // Everything inside a layer — a card's width, a sticker's size, the
   // point size of text — is written once at DESIGN_WIDTH, and the whole
@@ -287,7 +323,14 @@ export function LayerStack({
       }}
     >
       {layers.map((layer) => (
-        <LayerView key={layer.id} layer={layer} frame={design} editing={editing} />
+        <LayerView
+          key={layer.id}
+          layer={layer}
+          frame={design}
+          editing={editing}
+          showId={showId}
+          polls={polls}
+        />
       ))}
     </div>
   );

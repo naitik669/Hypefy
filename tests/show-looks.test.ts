@@ -148,7 +148,7 @@ describe("one renderer, used by both", () => {
   it("the viewer draws the stack it was given", () => {
     const viewer = read("src/components/shows/ShowViewer.tsx");
     expect(viewer).toContain("const layers = useMemo(() => readLayers(show.layers), [show.layers]);");
-    expect(viewer).toContain("<LayerStack layers={layers} frame={frameSize} />");
+    expect(viewer).toContain("<LayerStack layers={layers} frame={frameSize} showId={show.id} polls={polls} />");
   });
 
   it("and the route actually fetches the column", () => {
