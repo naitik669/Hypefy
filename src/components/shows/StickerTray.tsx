@@ -60,15 +60,23 @@ export const YOURS: Tile[] = [
 
 /** The squircle chips. */
 export const TAGS: Tile[] = [
+  { key: "time", label: "Time", layer: sample("time", { at: new Date().toISOString() }, 0), zoom: 0.8, tilt: -4 },
   { key: "music", label: "Music", layer: sample("music", { id: "tray", title: "Your song", artist: "Any artist", artwork: null, preview: null }, 0), zoom: 0.8, tilt: 4 },
   { key: "mention", label: "Mention", layer: sample("mention", { username: "someone" }, 3), zoom: 0.8, tilt: -5 },
   { key: "link", label: "Link", layer: sample("link", { url: "https://hypefy.chat" }, 6), zoom: 0.8, tilt: 3 },
   { key: "location", label: "Location", layer: sample("location", { place: "Mumbai" }, 3), zoom: 0.8, tilt: -3 },
   { key: "hashtag", label: "Hashtag", layer: sample("hashtag", { tag: "weekend" }, 5), zoom: 0.8, tilt: 4 },
-  { key: "time", label: "Time", layer: sample("time", { at: new Date().toISOString() }, 0), zoom: 0.8, tilt: -4 },
 ];
 
 export const ALL_TILES: Tile[] = [...ASK_AND_PLAY, ...HYPE_AND_PLAN, ...YOURS, ...TAGS];
+
+/**
+ * The big ones, two to a row in this order, as they were arranged on the
+ * design canvas: no shelves to swipe and no headings over them — every
+ * sticker is on the board at once.
+ */
+const BOARD_ORDER: WidgetKey[] = ["quiz", "poll", "countdown", "question", "addyours", "slider", "embed"];
+export const BOARD: Tile[] = BOARD_ORDER.map((key) => ALL_TILES.find((t) => t.key === key)!);
 
 const SAMPLE_EMBEDS: Record<string, EmbedState> = {
   [SAMPLE_EMBED_ID]: { thumb: null, caption: "Something you posted" },
@@ -142,32 +150,6 @@ function Pinned({ tile, index, onPick }: { tile: Tile; index: number; onPick: (k
   );
 }
 
-function Shelf({
-  title,
-  tiles,
-  onPick,
-  hint = false,
-}: {
-  title: string;
-  tiles: Tile[];
-  onPick: (key: WidgetKey) => void;
-  hint?: boolean;
-}) {
-  return (
-    <section className="mt-5">
-      <div className="flex items-baseline justify-between px-5">
-        <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/70">{title}</h2>
-        {hint && <span className="text-[11px] font-semibold text-white/60">Swipe</span>}
-      </div>
-      <div className="no-scrollbar flex items-end gap-5 overflow-x-auto px-5 pb-1 pt-5">
-        {tiles.map((t, i) => (
-          <Pinned key={t.key} tile={t} index={i} onPick={onPick} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
 /**
  * Everything that can go on a Show, as a pinboard on glass.
  *
@@ -226,7 +208,7 @@ export function StickerTray({
         {/* Tags first: the quick ones people reach for most. */}
         <section className="mt-5">
           <h2 className="px-5 text-[11px] font-bold uppercase tracking-[0.14em] text-white/70">Tags</h2>
-          <div className="flex flex-wrap justify-center gap-x-4 gap-y-4 px-4 pt-4">
+          <div className="grid grid-cols-3 justify-items-center gap-x-2 gap-y-4 px-3 pt-4">
             {TAGS.map((t) => (
               <button
                 key={t.key}
@@ -245,9 +227,14 @@ export function StickerTray({
           </div>
         </section>
 
-        <Shelf title="Ask & play" tiles={ASK_AND_PLAY} onPick={pick} hint />
-        <Shelf title="Hype & plan" tiles={HYPE_AND_PLAN} onPick={pick} hint />
-        <Shelf title="Yours" tiles={YOURS} onPick={pick} />
+        {/* Then every big sticker, pinned two to a row. */}
+        <div className="mt-6 grid grid-cols-2 justify-items-center gap-x-3 gap-y-7 px-3 pb-2 pt-3" data-board>
+          {BOARD.map((t, i) => (
+            <div key={t.key} className={BOARD.length % 2 === 1 && i === BOARD.length - 1 ? "col-span-2" : undefined}>
+              <Pinned tile={t} index={i} onPick={pick} />
+            </div>
+          ))}
+        </div>
 
       </div>
     </div>
