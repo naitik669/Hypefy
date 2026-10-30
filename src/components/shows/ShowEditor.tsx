@@ -17,6 +17,7 @@ import { EmbedSheet, type EmbedState } from "@/components/shows/ShowWidgetPicker
 import { TagWriter, isTagType, type TagType } from "@/components/shows/TagWriter";
 import { MusicEditor } from "@/components/shows/MusicEditor";
 import { DrawCanvas, DrawTools } from "@/components/shows/DrawPad";
+import { EmbedEditor } from "@/components/shows/EmbedEditor";
 import type { Stroke } from "@/lib/draw";
 import { COLOUR_SWATCHES, lookFor, lookName, usesColours } from "@/lib/show-looks";
 import { haptics } from "@/lib/haptics";
@@ -33,6 +34,7 @@ import {
   typedPayload,
   typedValue,
   readLayers,
+  isEmbedType,
   linkFrom,
   type LayerPayload,
   type LayerType,
@@ -133,6 +135,8 @@ export function ShowEditor({
   const [writing, setWriting] = useState<string | null>(null);
   /** The place, tag, person or link being typed on its own sticker. */
   const [tagging, setTagging] = useState<string | null>(null);
+  /** The post or Shot whose style is being chosen, and how it was before. */
+  const [styling, setStyling] = useState<{ id: string; before: ShowLayer } | null>(null);
   /** Everything drawn so far, and whether the pens are out. */
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [drawing, setDrawing] = useState(false);
@@ -397,6 +401,7 @@ export function ShowEditor({
           return;
         }
         if (chosenLayer?.type === "music") setTuning({ id: g.id, before: chosenLayer });
+        else if (chosenLayer?.type === "post" || chosenLayer?.type === "shot") setStyling({ id: g.id, before: chosenLayer });
         else if (chosenLayer && isTagType(chosenLayer.type)) setTagging(g.id);
         else if (chosenLayer?.type === "text") setWriting(g.id);
         return;
@@ -514,7 +519,7 @@ export function ShowEditor({
             style={
               // A song being tuned or a card being written on is drawn by
               // its own editor; the one on the picture would show through.
-              tuning?.id === layer.id || editingCard === layer.id ? { opacity: 0 } : drag?.id === layer.id && drag.hot ? { opacity: 0.55 } : undefined
+              tuning?.id === layer.id || styling?.id === layer.id || editingCard === layer.id ? { opacity: 0 } : drag?.id === layer.id && drag.hot ? { opacity: 0.55 } : undefined
             }
           >
             <LayerView layer={layer} frame={frame} editing embeds={embeds} />
@@ -525,7 +530,7 @@ export function ShowEditor({
         {/* No plates: bold white with a soft shadow reads on any photo
             and leaves the picture alone. */}
         {/* Put away while a card is being written on: its own Done sits there. */}
-        <div className={`absolute right-2 top-2 z-20 flex flex-col gap-1.5 ${editingCard || selected || drag || tagging || tuning || drawing ? "hidden" : ""}`}>
+        <div className={`absolute right-2 top-2 z-20 flex flex-col gap-1.5 ${editingCard || selected || drag || tagging || tuning || styling || drawing ? "hidden" : ""}`}>
           <RailButton
             label="Add text"
             disabled={full}
@@ -558,7 +563,7 @@ export function ShowEditor({
         <button
           type="button"
           aria-label="Close"
-          data-hidden={!!editingCard || !!drag || !!tagging || !!tuning || drawing}
+          data-hidden={!!editingCard || !!drag || !!tagging || !!tuning || !!styling || drawing}
           onClick={onCancel}
           onPointerDown={(e) => e.stopPropagation()}
           className="absolute left-2 top-2 z-20 flex h-12 w-12 items-center justify-center text-white data-[hidden=true]:hidden [filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))_drop-shadow(0_0_8px_rgba(0,0,0,0.3))] transition active:scale-90"
@@ -568,7 +573,7 @@ export function ShowEditor({
 
         {/* While something is selected: its colour wheel up top, and Done
             where the rail was. One tap on the wheel is the next colour. */}
-        {chosen && !drag && !editingCard && !tagging && !tuning && writing === null && (
+        {chosen && !drag && !editingCard && !tagging && !tuning && !styling && writing === null && (
           <>
             <button
               type="button"
@@ -645,7 +650,7 @@ export function ShowEditor({
         })()}
 
         {/* The one way on: small, in the corner, out of the picture's way. */}
-        {!selected && !drag && !tray && !editingCard && !tagging && !tuning && !drawing && writing === null && (
+        {!selected && !drag && !tray && !editingCard && !tagging && !tuning && !styling && !drawing && writing === null && (
           <button
             type="button"
             disabled={busy}
@@ -708,6 +713,24 @@ export function ShowEditor({
                 setTuning(null);
               }}
               onDone={() => setTuning(null)}
+            />
+          );
+        })()}
+
+        {(() => {
+          const embed = layers.find((l) => l.id === styling?.id) ?? null;
+          if (!embed || !styling) return null;
+          return (
+            <EmbedEditor
+              layer={embed}
+              embeds={embeds}
+              onChange={(payload) => setLayers((l) => l.map((x) => (x.id === embed.id ? { ...x, payload } : x)))}
+              onSwap={() => setPicking("embed")}
+              onCancel={() => {
+                setLayers((l) => l.map((x) => (x.id === embed.id ? styling.before : x)));
+                setStyling(null);
+              }}
+              onDone={() => setStyling(null)}
             />
           );
         })()}
@@ -785,17 +808,27 @@ export function ShowEditor({
         open={picking === "embed"}
         onClose={() => setPicking(null)}
         onPick={(choice) => {
+          // One per Show: a second replaces the first, in its place.
+          const old = layers.find((l) => isEmbedType(l.type)) ?? null;
+          if (old) {
+            remember();
+            setLayers((l) => l.filter((x) => x.id !== old.id));
+          }
           const id =
-            choice.kind === "post"
-              ? add("post", { postId: choice.id })
-              : add("shot", { shotId: choice.id });
+            choice.kind === "spotlight"
+              ? add("spotlight", { ownerId: choice.id })
+              : choice.kind === "post"
+                ? add("post", { postId: choice.id })
+                : add("shot", { shotId: choice.id });
+          if (id && old) update(id, { x: old.x, y: old.y, scale: old.scale, rotation: old.rotation });
+          setStyling(null);
           // What was just picked is already in hand, so the editor draws
           // it without a second round trip — the layer still stores only
           // the id.
           if (id) {
             setEmbeds((e) => ({
               ...e,
-              [id]: { thumb: choice.thumb, caption: choice.caption },
+              [id]: { thumb: choice.thumb, caption: choice.caption, video: choice.video ?? null, color: choice.color ?? null },
             }));
           }
         }}

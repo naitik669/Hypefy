@@ -91,6 +91,7 @@ import {
 } from "@/lib/chat-outbox";
 import { mediaUrlsOf, prefetchChatMedia } from "@/lib/chat-media-url";
 import { SharedShotCard } from "@/components/messages/SharedShotCard";
+import { ShowReplyCard } from "@/components/messages/ShowReplyCard";
 import { SharedPostCard } from "@/components/messages/SharedPostCard";
 import {
   ForwardedCommentOverlay,
@@ -2330,6 +2331,10 @@ export function RealChatView({
                           measured at 2.2–2.7:1 on this ground and fails
                           contrast, and two lines of label at different
                           brightness in one stack reads as a mistake. */}
+                      {/* What a Show reply answers, above it. */}
+                      {m.metadata?.show_id && !m.is_unsent && (
+                        <ShowReplyCard showId={m.metadata.show_id} mine={mine} />
+                      )}
                       {isForwarded(m) && !m.is_unsent && (
                         <span className="mb-0.5 flex items-center gap-1 px-1 text-[10px] font-bold uppercase tracking-widest text-muted">
                           <ShareIcon size={9} weight="bold" className="shrink-0" />

@@ -238,6 +238,7 @@ const BY_TYPE: Record<LayerType, Look[]> = {
   addyours: CARD_LOOKS,
   post: embedLooks(),
   shot: embedLooks(),
+  spotlight: embedLooks().slice(0, 1),
 };
 
 /**

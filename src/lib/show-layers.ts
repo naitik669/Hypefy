@@ -49,6 +49,7 @@ export const LAYER_TYPES = [
   "slider",
   "countdown",
   "addyours",
+  "spotlight",
 ] as const;
 
 export type LayerType = (typeof LAYER_TYPES)[number];
@@ -107,6 +108,8 @@ export const LOOKS: Record<LayerType, number> = {
   slider: COLOUR_LOOKS,
   countdown: COLOUR_LOOKS,
   addyours: COLOUR_LOOKS,
+  // A Spotlight page wears its own colour.
+  spotlight: 1,
 };
 
 /** The look index that takes its colour from the photo (`tint`). */
@@ -143,8 +146,26 @@ export type MentionPayload = { username: string };
 export type LinkPayload = { url: string };
 export type PollPayload = { question: string; options: string[] };
 export type QuestionPayload = { prompt: string };
-export type PostPayload = { postId: string };
-export type ShotPayload = { shotId: string };
+/**
+ * How a post or Shot sits on a Show: a polaroid card, a tall card that
+ * plays (a Shot's default), a compact ticket, or a round bubble.
+ */
+export const EMBED_STYLES = ["card", "tall", "compact", "bubble"] as const;
+export type EmbedStyle = (typeof EMBED_STYLES)[number];
+export type PostPayload = { postId: string; style?: EmbedStyle };
+export type ShotPayload = { shotId: string; style?: EmbedStyle };
+/** Your Spotlight page, as it is on the day the Show goes up. */
+export type SpotlightPayload = { ownerId: string };
+
+/** The embeds, of which a Show carries one: a second replaces the first. */
+export const EMBED_TYPES = ["post", "shot", "spotlight"] as const;
+export function isEmbedType(type: LayerType): type is (typeof EMBED_TYPES)[number] {
+  return (EMBED_TYPES as readonly string[]).includes(type);
+}
+
+function embedStyle(raw: unknown): { style?: EmbedStyle } {
+  return typeof raw === "string" && (EMBED_STYLES as readonly string[]).includes(raw) ? { style: raw as EmbedStyle } : {};
+}
 /** A place, as typed. Not looked up: a name is all a story needs. */
 export type LocationPayload = {
   place: string;
@@ -193,7 +214,8 @@ export type LayerPayload =
   | QuizPayload
   | SliderPayload
   | CountdownPayload
-  | AddYoursPayload;
+  | AddYoursPayload
+  | SpotlightPayload;
 
 export type ShowLayer = {
   /** Stable for the life of the layer: votes and answers point at it. */
@@ -333,11 +355,11 @@ function readPayload(type: LayerType, raw: unknown): LayerPayload | null {
     }
     case "post": {
       const pid = id(p.postId);
-      return pid ? { postId: pid } : null;
+      return pid ? { postId: pid, ...embedStyle(p.style) } : null;
     }
     case "shot": {
       const sid = id(p.shotId);
-      return sid ? { shotId: sid } : null;
+      return sid ? { shotId: sid, ...embedStyle(p.style) } : null;
     }
     case "location": {
       const place = text(p.place, MAX_PLACE);
@@ -379,6 +401,10 @@ function readPayload(type: LayerType, raw: unknown): LayerPayload | null {
       if (!prompt) return null;
       const collab = typeof p.collabId === "string" && /^[0-9a-f-]{36}$/i.test(p.collabId) ? p.collabId : null;
       return collab ? { prompt, collabId: collab } : { prompt };
+    }
+    case "spotlight": {
+      const owner = id(p.ownerId);
+      return owner ? { ownerId: owner } : null;
     }
   }
 }

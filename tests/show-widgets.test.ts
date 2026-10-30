@@ -116,7 +116,7 @@ describe("an embed points at the thing, and does not copy it", () => {
     // that the viewer fetches into, never into the layer's payload.
     const sheet = editor.slice(editor.indexOf("<EmbedSheet"), editor.indexOf("{writing === null &&"));
     expect(sheet).toContain("setEmbeds((e) => ({");
-    expect(sheet).toContain("[id]: { thumb: choice.thumb, caption: choice.caption },");
+    expect(sheet).toContain("[id]: { thumb: choice.thumb, caption: choice.caption, video: choice.video ?? null, color: choice.color ?? null },");
   });
 
   it("the picture is fetched by id, and a removed one is not fetched", () => {
@@ -134,9 +134,9 @@ describe("an embed points at the thing, and does not copy it", () => {
   it("and a gone one stops being a door to it", () => {
     // Scoped to the embed branch: `editing` appears in every branch, so
     // a file-wide check would pass with this condition reverted.
-    const branch = view.slice(view.indexOf('    case "post":'));
-    expect(branch).toContain("if (editing || embed?.gone) return body;");
-    expect(branch).toContain('? `This ${layer.type === "post" ? "post" : "Shot"} is gone`');
+    const branch = view.slice(view.indexOf("function EmbedSticker("));
+    expect(branch).toContain("if (editing || gone) return body;");
+    expect(branch).toContain('? `This ${isShot ? "Shot" : "post"} is gone`');
   });
 
   it("nothing is asked for when the Show embeds nothing", () => {
