@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { CARD_TYPES } from "@/components/shows/CardEditor";
 import { readFileSync } from "node:fs";
 import { LAYER_TYPES, layerMentions, readLayers, type ShowLayer } from "@/lib/show-layers";
 
@@ -50,6 +51,11 @@ describe("every kind of layer can actually be added", () => {
     for (const type of LAYER_TYPES) {
       if (editor.includes(`add("${type}"`)) reachable.add(type);
     }
+    // The cards written on the sticker are placed by one generic line,
+    // for every type CardEditor lists.
+    if (editor.includes("const id = add(key, blankCard(key));")) {
+      for (const t of CARD_TYPES) reachable.add(t);
+    }
     expect([...LAYER_TYPES].filter((t) => !reachable.has(t))).toEqual([]);
   });
 
@@ -70,7 +76,8 @@ describe("the pickers that already existed are the ones used", () => {
     // alike; readPayload asks the same questions on the way into the column.
     const card = read("src/components/shows/CardEditor.tsx");
     expect(card).toContain("options: tidyOptions(poll.options)");
-    expect(editor).toContain('add("poll", { question: "", options: ["", ""] });');
+    expect(editor).toContain("const id = add(key, blankCard(key));");
+    expect(card).toContain('return { question: "", options: ["", ""] };');
   });
 
   it("and a mention is the same people search the chat typeahead runs", () => {
@@ -180,7 +187,7 @@ describe("a mention placed on the picture reaches its owner", () => {
     // which is exactly what caption mentions did before 0180.
     const insert = publishLib.slice(publishLib.indexOf('.from("shows")\n    .insert({'));
     expect(insert.slice(0, 900)).toContain(
-      "mentions: [...new Set([...extractMentions(text), ...layerMentions(d.layers)])],",
+      "mentions: [...new Set([...extractMentions(text), ...layerMentions(layers)])],",
     );
   });
 
@@ -192,7 +199,7 @@ describe("a mention placed on the picture reaches its owner", () => {
 describe("the arrangement reaches the column", () => {
   it("the insert sends it", () => {
     const insert = publishLib.slice(publishLib.indexOf('.from("shows")\n    .insert({'));
-    expect(insert.slice(0, 900)).toContain("layers: d.layers as unknown as Json,");
+    expect(insert.slice(0, 900)).toContain("layers: layers as unknown as Json,");
   });
 
   it("and the editor is on the way there for a photo Show", () => {

@@ -44,6 +44,10 @@ export const LAYER_TYPES = [
   "location",
   "hashtag",
   "time",
+  "quiz",
+  "slider",
+  "countdown",
+  "addyours",
 ] as const;
 
 export type LayerType = (typeof LAYER_TYPES)[number];
@@ -98,6 +102,10 @@ export const LOOKS: Record<LayerType, number> = {
   location: COLOUR_LOOKS,
   hashtag: COLOUR_LOOKS,
   time: COLOUR_LOOKS,
+  quiz: COLOUR_LOOKS,
+  slider: COLOUR_LOOKS,
+  countdown: COLOUR_LOOKS,
+  addyours: COLOUR_LOOKS,
 };
 
 /** The look index that takes its colour from the photo (`tint`). */
@@ -125,7 +133,21 @@ export type HashtagPayload = { tag: string };
 /** When it was added, fixed then: a Show is a moment, and this says which. */
 export type TimePayload = { at: string };
 
+/** A poll with one right answer, by index. */
+export type QuizPayload = { question: string; options: string[]; answer: number };
+/** "How hyped are you?" — viewers drag a ★ along it. */
+export type SliderPayload = { prompt: string };
+/** Something coming up: what, and when. */
+export type CountdownPayload = { title: string; at: string };
+/**
+ * A prompt others answer with a Show of their own. `collabId` is the shared
+ * Show their answers go into, made when the Show is published.
+ */
+export type AddYoursPayload = { prompt: string; collabId?: string };
+
 export const MAX_PLACE = 60;
+/** A countdown or an Add yours prompt is a line, not a paragraph. */
+export const MAX_STICKER_LINE = 60;
 export const MAX_TAG = 40;
 
 export type LayerPayload =
@@ -140,7 +162,11 @@ export type LayerPayload =
   | ShotPayload
   | LocationPayload
   | HashtagPayload
-  | TimePayload;
+  | TimePayload
+  | QuizPayload
+  | SliderPayload
+  | CountdownPayload
+  | AddYoursPayload;
 
 export type ShowLayer = {
   /** Stable for the life of the layer: votes and answers point at it. */
@@ -287,6 +313,34 @@ function readPayload(type: LayerType, raw: unknown): LayerPayload | null {
     case "time": {
       const at = typeof p.at === "string" ? p.at : "";
       return at && !Number.isNaN(Date.parse(at)) ? { at: new Date(at).toISOString() } : null;
+    }
+    case "quiz": {
+      const question = text(p.question, MAX_POLL_QUESTION);
+      const raw = Array.isArray(p.options) ? p.options.filter((o): o is string => typeof o === "string") : [];
+      const options = tidyOptions(raw);
+      // tidied options must be the written ones in the same order, or the
+      // stored answer index would point at a different option.
+      if (!question || options.length !== raw.length) return null;
+      if (options.length < MIN_POLL_OPTIONS || options.length > MAX_POLL_OPTIONS) return null;
+      const answer = typeof p.answer === "number" && Number.isInteger(p.answer) ? p.answer : -1;
+      if (answer < 0 || answer >= options.length) return null;
+      return { question, options, answer };
+    }
+    case "slider": {
+      const prompt = text(p.prompt, MAX_POLL_QUESTION);
+      return prompt ? { prompt } : null;
+    }
+    case "countdown": {
+      const title = text(p.title, MAX_STICKER_LINE);
+      const at = typeof p.at === "string" ? p.at : "";
+      if (!title || !at || Number.isNaN(Date.parse(at))) return null;
+      return { title, at: new Date(at).toISOString() };
+    }
+    case "addyours": {
+      const prompt = text(p.prompt, MAX_STICKER_LINE);
+      if (!prompt) return null;
+      const collab = typeof p.collabId === "string" && /^[0-9a-f-]{36}$/i.test(p.collabId) ? p.collabId : null;
+      return collab ? { prompt, collabId: collab } : { prompt };
     }
   }
 }

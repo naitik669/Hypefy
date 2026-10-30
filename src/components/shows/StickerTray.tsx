@@ -12,7 +12,16 @@ export type SheetKey = "music" | "mention" | "link" | "embed";
  * Those placed straight onto the picture: written on the sticker itself
  * (poll, question), typed at the foot (location, hashtag), or stamped (time).
  */
-export type DirectKey = "poll" | "question" | "location" | "hashtag" | "time";
+export type DirectKey =
+  | "poll"
+  | "question"
+  | "quiz"
+  | "slider"
+  | "countdown"
+  | "addyours"
+  | "location"
+  | "hashtag"
+  | "time";
 export type WidgetKey = SheetKey | DirectKey;
 
 /**

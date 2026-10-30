@@ -40,7 +40,8 @@ describe("writing a poll on the sticker", () => {
 describe("the editor", () => {
   const editor = readFileSync("src/components/shows/ShowEditor.tsx", "utf8");
   it("places a poll or question blank and opens it to be written on", () => {
-    expect(editor).toContain('const id = add("question", { prompt: "" });\n      if (id) setEditingCard(id);');
+    expect(editor).toContain("} else if (isCardType(key)) {");
+    expect(editor).toContain("const id = add(key, blankCard(key));\n      if (id) setEditingCard(id);");
     expect(editor).not.toContain("PollComposer");
     expect(editor).not.toContain("QuestionSheet");
   });

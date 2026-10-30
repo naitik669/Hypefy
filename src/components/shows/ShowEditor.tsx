@@ -6,7 +6,14 @@ import { LayerBody, LayerView } from "@/components/shows/LayerView";
 import { TransformBox } from "@/components/shows/TransformBox";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { StickerTray, type SheetKey, type WidgetKey } from "@/components/shows/StickerTray";
-import { CardEditor, cardIsBlank, isCard, tidyCard } from "@/components/shows/CardEditor";
+import {
+  CardEditor,
+  blankCard,
+  cardIsBlank,
+  isCard,
+  isCardType,
+  tidyCard,
+} from "@/components/shows/CardEditor";
 import {
   EmbedSheet,
   LinkSheet,
@@ -172,12 +179,9 @@ export function ShowEditor({
       if (id) setWriting(id);
     } else if (key === "time") {
       add("time", { at: new Date().toISOString() });
-    } else if (key === "poll") {
+    } else if (isCardType(key)) {
       // Placed blank and written on the sticker itself.
-      const id = add("poll", { question: "", options: ["", ""] });
-      if (id) setEditingCard(id);
-    } else if (key === "question") {
-      const id = add("question", { prompt: "" });
+      const id = add(key, blankCard(key));
       if (id) setEditingCard(id);
     } else {
       setPicking(key);
