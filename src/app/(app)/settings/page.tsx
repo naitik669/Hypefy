@@ -95,7 +95,7 @@ const LISTS = [
     sub: "Posts, Shots and sounds you kept, and your playlists",
     icon: LibraryBig,
   },
-  { href: "/hypers", label: "Hypers", sub: "Your closest people", icon: Star },
+  { href: "/hypers", label: "Hype buddies", sub: "Your closest people", icon: Star },
   {
     href: "/activity",
     label: "Your interactions",

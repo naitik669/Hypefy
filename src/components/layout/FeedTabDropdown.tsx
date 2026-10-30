@@ -20,7 +20,7 @@ export type FeedTab = "foryou" | "following" | "hypers";
 const OPTIONS: { value: FeedTab; label: string }[] = [
   { value: "foryou", label: "For You" },
   { value: "following", label: "Following" },
-  { value: "hypers", label: "Hypers" },
+  { value: "hypers", label: "Hype buddies" },
 ];
 
 /** Reads the active feed tab from the URL (?feed=), defaulting to "foryou". */

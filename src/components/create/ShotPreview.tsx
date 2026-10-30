@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Music } from "lucide-react";
+import { ArrowLeft, ChevronLeft, Globe, Music, Star } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -120,7 +120,7 @@ export function ShotPreview({
   // allowed list — so every recorded Shot was refused here.
   const badType = isVideo && !isAllowedVideo(file);
 
-  async function publish() {
+  async function publish(room: ShowAudience = audience) {
     if (busy) return;
 
     if (tooBig) {
@@ -162,7 +162,7 @@ export function ShotPreview({
       caption,
       track,
       layers,
-      audience,
+      audience: room,
       hiddenFrom,
       collabId,
     });
@@ -174,6 +174,125 @@ export function ShotPreview({
 
     setBusy(false);
     onDone();
+  }
+
+  const captionField = (
+    <div className="relative">
+      {/* Suggestions open downward here: the field sits at the bottom of
+          a fullscreen overlay, so the usual upward dropdown would run
+          off the top of the caption area. */}
+      {suggestions.length > 0 && (
+        <div className="absolute bottom-full left-0 right-0 mb-2">
+          <SuggestionDropdown
+            suggestions={suggestions}
+            onSelect={(s) => {
+              const { newValue, newCursor } = applySuggestion(caption, cursor, s);
+              setCaption(newValue);
+              setCursor(newCursor);
+              reset();
+              requestAnimationFrame(() =>
+                inputRef.current?.setSelectionRange(newCursor, newCursor),
+              );
+            }}
+          />
+        </div>
+      )}
+
+      <textarea
+        ref={inputRef}
+        value={caption}
+        onChange={(e) => {
+          setCaption(e.target.value);
+          setCursor(e.target.selectionStart ?? 0);
+        }}
+        onKeyUp={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
+        onClick={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
+        rows={2}
+        maxLength={280}
+        placeholder="Say something… use #hashtags"
+        aria-label="Caption"
+        className="w-full resize-none rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-sm text-white outline-none backdrop-blur-sm transition placeholder:text-white/45 focus:border-white/35"
+      />
+    </div>
+  );
+
+  /**
+   * A Show is shared from its own preview: the picture as people will see
+   * it, stickers and all, and under it one row — who it is kept from, then
+   * the two places it can go. Choosing the room is the button you press,
+   * so there is no picker to set first.
+   */
+  if (mode === "show") {
+    return (
+      <div className="fixed inset-0 z-[200] flex flex-col bg-black px-2 pb-[max(0.75rem,var(--sab))] pt-[max(0.5rem,var(--sat))]">
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-[26px] bg-neutral-900" data-show-preview>
+          {isVideo ? (
+            <video poster={BLANK_POSTER} src={url} className="absolute inset-0 h-full w-full object-cover" autoPlay loop muted playsInline />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          )}
+          <div ref={frameRef} className="pointer-events-none absolute inset-0">
+            <LayerStack layers={layers} frame={frame} editing />
+          </div>
+          <div aria-hidden className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/70 to-transparent" />
+
+          <div className="absolute inset-x-0 top-0 flex items-center justify-between p-2">
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label="Back to editing"
+              className="flex h-11 w-11 items-center justify-center text-white [filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))_drop-shadow(0_0_8px_rgba(0,0,0,0.3))] active:scale-90"
+            >
+              <ChevronLeft size={28} strokeWidth={2.6} />
+            </button>
+            {track && (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white [filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))]">
+                <Music size={13} />
+                <span className="max-w-[160px] truncate">{track.title}</span>
+              </span>
+            )}
+          </div>
+
+          <div className="absolute inset-x-3 bottom-3">
+            {(tooBig || badType) && (
+              <p className="mb-2 rounded-lg bg-danger/15 px-3 py-2 text-xs text-danger">
+                {tooBig
+                  ? `That photo is ${(file.size / 1024 / 1024).toFixed(0)}MB — the limit is ${maxMb}MB.`
+                  : "That video format isn't supported."}
+              </p>
+            )}
+            {captionField}
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-center gap-2 px-1" data-share-row>
+          <ShowAudienceBar
+            userId={userId}
+            audience="everyone"
+            onAudience={setAudience}
+            hidden={hiddenFrom}
+            onHidden={setHiddenFrom}
+            compact
+          />
+          <span className="flex-1" />
+          {collabId ? (
+            <ShareButton label={busy ? "Posting…" : "Add to the shared Show"} tone="lime" disabled={busy || tooBig || badType} onClick={() => publish("everyone")}>
+              <Globe size={15} />
+            </ShareButton>
+          ) : (
+            <>
+              <ShareButton label={busy && audience === "everyone" ? "Posting…" : "Your Show"} tone="white" disabled={busy || tooBig || badType} onClick={() => { setAudience("everyone"); void publish("everyone"); }}>
+                <Globe size={15} />
+              </ShareButton>
+              <ShareButton label={busy && audience === "hypers" ? "Posting…" : "Hype buddies"} tone="lime" disabled={busy || tooBig || badType} onClick={() => { setAudience("hypers"); void publish("hypers"); }}>
+                <Star size={15} className="fill-current" />
+              </ShareButton>
+            </>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -189,18 +308,7 @@ export function ShotPreview({
         />
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={url}
-          alt=""
-          // Covering, as the editor and the viewer both draw it, so the
-          // stickers land on the same part of the picture.
-          className={`absolute inset-0 h-full w-full ${layers.length > 0 ? "object-cover" : "object-contain"}`}
-        />
-      )}
-      {layers.length > 0 && (
-        <div ref={frameRef} className="pointer-events-none absolute inset-0">
-          <LayerStack layers={layers} frame={frame} editing />
-        </div>
+        <img src={url} alt="" className="absolute inset-0 h-full w-full object-contain" />
       )}
 
       {/* Scrims so the controls stay readable over any footage. */}
@@ -239,53 +347,7 @@ export function ShotPreview({
           </p>
         )}
 
-        <div className="relative">
-          {/* Suggestions open downward here: the field sits at the bottom of
-              a fullscreen overlay, so the usual upward dropdown would run
-              off the top of the caption area. */}
-          {suggestions.length > 0 && (
-            <div className="absolute bottom-full left-0 right-0 mb-2">
-              <SuggestionDropdown
-                suggestions={suggestions}
-                onSelect={(s) => {
-                  const { newValue, newCursor } = applySuggestion(caption, cursor, s);
-                  setCaption(newValue);
-                  setCursor(newCursor);
-                  reset();
-                  requestAnimationFrame(() =>
-                    inputRef.current?.setSelectionRange(newCursor, newCursor),
-                  );
-                }}
-              />
-            </div>
-          )}
-
-          <textarea
-            ref={inputRef}
-            value={caption}
-            onChange={(e) => {
-              setCaption(e.target.value);
-              setCursor(e.target.selectionStart ?? 0);
-            }}
-            onKeyUp={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
-            onClick={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
-            rows={2}
-            maxLength={280}
-            placeholder="Say something… use #hashtags"
-            aria-label="Caption"
-            className="w-full resize-none rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-sm text-white outline-none backdrop-blur-sm transition placeholder:text-white/45 focus:border-white/35"
-          />
-        </div>
-
-        {mode === "show" && (
-          <ShowAudienceBar
-            userId={userId}
-            audience={audience}
-            onAudience={setAudience}
-            hidden={hiddenFrom}
-            onHidden={setHiddenFrom}
-          />
-        )}
+        {captionField}
 
         <div className="flex items-center justify-between gap-3">
           <span className="text-[11px] text-white/50">
@@ -293,15 +355,46 @@ export function ShotPreview({
           </span>
           <button
             type="button"
-            onClick={publish}
+            onClick={() => publish()}
             disabled={busy || tooBig || badType}
             className="flex items-center gap-2 rounded-pill bg-accent px-6 py-3 text-sm font-bold text-accent-ink transition active:scale-95 disabled:opacity-50"
           >
-            {busy ? "Posting…" : mode === "show" ? "Add to Show" : "Post Shot"}
+            {busy ? "Posting…" : "Post Shot"}
             {!busy && <SendIcon size={15} weight="fill" />}
           </button>
         </div>
       </div>
     </div>
+  );
+}
+
+/** One of the two places a Show can go: small, a dark icon tile then the words. */
+function ShareButton({
+  label,
+  tone,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  tone: "white" | "lime";
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex h-11 items-center gap-2 rounded-[15px] pl-1.5 pr-3.5 text-[13px] font-extrabold text-black transition active:scale-95 disabled:opacity-50 ${
+        tone === "lime" ? "bg-accent" : "bg-white"
+      }`}
+    >
+      <span aria-hidden className={`flex h-8 w-8 items-center justify-center rounded-[11px] bg-black ${tone === "lime" ? "text-accent" : "text-white"}`}>
+        {children}
+      </span>
+      {label}
+    </button>
   );
 }

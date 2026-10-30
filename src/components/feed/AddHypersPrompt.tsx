@@ -103,15 +103,15 @@ export function AddHypersPrompt({ currentUserId }: { currentUserId: string }) {
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface text-muted">
           <Star size={28} />
         </div>
-        <h2 className="text-lg font-bold">No Hypers yet</h2>
+        <h2 className="text-lg font-bold">No Hype buddies yet</h2>
         <p className="max-w-xs text-sm text-muted">
-          Hypers are your closest friends, pick a few below to see their posts here first.
+          Hype buddies are your closest friends, pick a few below to see their posts here first.
         </p>
       </div>
 
       {people.length === 0 ? (
         <p className="px-6 py-6 text-center text-xs text-muted">
-          Follow some people first, then come back to pick your Hypers.
+          Follow some people first, then come back to pick your Hype buddies.
         </p>
       ) : (
         <div className="flex flex-col gap-2">

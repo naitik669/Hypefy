@@ -26,7 +26,7 @@ import { SHOW_AUDIENCES, type ShowAudience } from "@/lib/show-audience";
 
 const OPTIONS: readonly AudienceOption<ShowAudience>[] = [
   { value: "everyone", label: "Everyone", hint: "Anybody who can already see you", Icon: Globe },
-  { value: "hypers", label: "Hypers", hint: "Only your closest people", Icon: Star, narrow: true },
+  { value: "hypers", label: "Hype buddies", hint: "Only your closest people", Icon: Star, narrow: true },
 ];
 
 /** Somebody who would otherwise see it. */
@@ -38,6 +38,7 @@ export function ShowAudienceBar({
   onAudience,
   hidden,
   onHidden,
+  compact = false,
 }: {
   userId: string;
   audience: ShowAudience;
@@ -45,6 +46,11 @@ export function ShowAudienceBar({
   /** Ids kept from seeing it. */
   hidden: string[];
   onHidden: (next: string[]) => void;
+  /**
+   * Only the "Hide from" control, as a small square: the Show preview
+   * chooses the room with its two share buttons instead of a picker.
+   */
+  compact?: boolean;
 }) {
   const [supabase] = useState(createClient);
   const [sheet, setSheet] = useState(false);
@@ -114,6 +120,21 @@ export function ShowAudienceBar({
 
   return (
     <>
+      {compact ? (
+        <button
+          type="button"
+          onClick={() => setSheet(true)}
+          aria-label={count ? `Hidden from ${count} ${count === 1 ? "person" : "people"}` : "Hide from somebody"}
+          className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white/[0.09] text-white transition active:scale-95"
+        >
+          <EyeOff size={18} className={count ? "text-accent" : ""} />
+          {count > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-extrabold text-accent-ink">
+              {count}
+            </span>
+          )}
+        </button>
+      ) : (
       <div className="flex items-center gap-2">
         <AudiencePicker<ShowAudience> value={audience} onChange={onAudience} options={OPTIONS} />
         <button
@@ -126,18 +147,19 @@ export function ShowAudienceBar({
           {count ? `Hidden from ${count}` : "Hide from"}
         </button>
       </div>
+      )}
 
       <BottomSheet open={sheet} onClose={() => setSheet(false)} title="Hide this Show from" size="tall">
         <div className="space-y-1 px-4 pb-4">
           <p className="pb-2 text-xs text-muted">
             {audience === "hypers"
-              ? "Your Hypers are the only people this Show goes to. Leave any of them out."
+              ? "Your Hype buddies are the only people this Show goes to. Leave any of them out."
               : "Anybody here could see this Show. Leave any of them out."}
           </p>
           {people === null && <p className="py-8 text-center text-sm text-muted">Finding them…</p>}
           {people !== null && people.length === 0 && (
             <p className="py-8 text-center text-sm text-muted">
-              {audience === "hypers" ? "You have no Hypers yet." : "Nobody follows you yet."}
+              {audience === "hypers" ? "You have no Hype buddies yet." : "Nobody follows you yet."}
             </p>
           )}
           {(people ?? []).map((person) => {

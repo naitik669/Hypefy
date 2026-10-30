@@ -132,8 +132,16 @@ describe("a mention has to lead somewhere", () => {
 
 describe("choosing the room, on the screen where it is posted", () => {
   it("the Show composer has the control and the Shot one does not", () => {
-    expect(preview).toContain('{mode === "show" && (');
-    expect(preview).toContain("<ShowAudienceBar");
+    // A Show is shared from its own preview, which returns before the
+    // Shot's screen is drawn; the room is the button pressed.
+    const show = preview.slice(preview.indexOf('if (mode === "show") {'), preview.indexOf("function ShareButton"));
+    expect(show).toContain("<ShowAudienceBar");
+    expect(show).toContain('onClick={() => { setAudience("hypers"); void publish("hypers"); }}');
+    expect(show).toContain('label={busy && audience === "hypers" ? "Posting…" : "Hype buddies"}');
+    const shotStart = preview.indexOf('  return (\n    <div className="fixed inset-0 z-[200] flex flex-col bg-black">');
+    expect(shotStart).toBeGreaterThan(0);
+    const shot = preview.slice(shotStart, preview.indexOf("function ShareButton"));
+    expect(shot).not.toContain("<ShowAudienceBar");
   });
 
   it("the picker is Diary's, taught a second set of words", () => {

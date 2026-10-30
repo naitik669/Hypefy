@@ -22,7 +22,7 @@ export default async function HypersPage() {
 
   return (
     <>
-      <PageHeader title="Hypers" showBack />
+      <PageHeader title="Hype buddies" showBack />
       <CircleList kind="hypers" currentUserId={user.id} initial={people} />
     </>
   );

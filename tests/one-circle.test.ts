@@ -44,7 +44,7 @@ afterEach(async () => {
 });
 
 describe("one private list", () => {
-  it("offers Hypers on a profile, and no second list", async () => {
+  it("offers Hype buddies on a profile, and no second list", async () => {
     const { HyperFavoriteButton } = await import("@/components/profile/HyperFavoriteButton");
     await act(async () =>
       root.render(
@@ -52,7 +52,7 @@ describe("one private list", () => {
       ),
     );
     await act(async () => (host.querySelector('[aria-label="More options"]') as HTMLButtonElement).click());
-    expect(document.body.textContent).toContain("Hypers");
+    expect(document.body.textContent).toContain("Hype buddies");
     expect(document.body.textContent).not.toMatch(/favourite/i);
   });
 

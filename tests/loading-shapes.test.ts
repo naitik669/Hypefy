@@ -44,11 +44,11 @@ describe("loading shapes", () => {
   });
 
   it("names the page it is loading, where the page is known", async () => {
-    expect(await html("@/app/(app)/hypers/loading")).toContain(">Hypers</h1>");
+    expect(await html("@/app/(app)/hypers/loading")).toContain(">Hype buddies</h1>");
     expect(await html("@/app/(app)/requests/loading")).toContain(">Follow requests</h1>");
     expect(await html("@/app/(app)/shows/loading")).toContain(">Your Shows</h1>");
     // The titles are the pages' own.
-    expect(readFileSync("src/app/(app)/hypers/page.tsx", "utf8")).toContain('title="Hypers"');
+    expect(readFileSync("src/app/(app)/hypers/page.tsx", "utf8")).toContain('title="Hype buddies"');
     expect(readFileSync("src/app/(app)/requests/page.tsx", "utf8")).toContain('title="Follow requests"');
     expect(readFileSync("src/app/(app)/shows/page.tsx", "utf8")).toContain('title="Your Shows"');
   });
