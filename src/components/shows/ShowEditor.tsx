@@ -1,32 +1,37 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Type,
-  Smile,
-  Undo2,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Undo2, Trash2, X } from "lucide-react";
 import { LayerBody, LayerView } from "@/components/shows/LayerView";
 import { TransformBox } from "@/components/shows/TransformBox";
 import { TrackPicker } from "@/components/music/TrackPicker";
-import { StickerTray, type WidgetKey } from "@/components/shows/StickerTray";
-import { PollComposer } from "@/components/messages/PollComposer";
+import { StickerTray, type SheetKey, type WidgetKey } from "@/components/shows/StickerTray";
+import {
+  CardEditor,
+  blankCard,
+  cardIsBlank,
+  isCard,
+  isCardType,
+  tidyCard,
+} from "@/components/shows/CardEditor";
 import {
   EmbedSheet,
   LinkSheet,
   MentionSheet,
-  QuestionSheet,
   type EmbedState,
 } from "@/components/shows/ShowWidgetPickers";
-import { lookName } from "@/lib/show-looks";
+import { COLOUR_SWATCHES, lookName, usesColours } from "@/lib/show-looks";
+import { ambientTint, photoAverage } from "@/lib/ambient";
 import {
   DESIGN_WIDTH,
   MAX_LAYERS,
   MAX_LAYER_TEXT,
   layerBox,
   nextLook,
+  AMBIENT_LOOK,
+  isTyped,
+  typedPayload,
+  typedValue,
   readLayers,
   type LayerType,
   type ShowLayer,
@@ -41,11 +46,12 @@ import { topmostAt, type Placed } from "@/lib/transform-gesture";
  * you see here is the card your circle gets" — and it holds harder here,
  * because every layer is drawn by the same component the viewer uses.
  *
- * Everything a layer can be is reachable from one tray. Three of the
- * pickers behind it are the app's own, reused rather than rebuilt — a
- * song comes from TrackPicker, a poll from PollComposer, and a mention
- * from the same people search the chat composer's typeahead uses — and
- * three are in ShowWidgetPickers because they had nowhere to come from.
+ * Everything a layer can be is reachable from one tray. A poll or a
+ * question is written on the sticker itself (CardEditor); words, a place
+ * and a tag are typed at the foot; the time is stamped. The rest come from
+ * pickers: a song from the app's own TrackPicker, a mention from the same
+ * people search the chat composer's typeahead uses, and a link or an
+ * embed from ShowWidgetPickers.
  *
  * An embed is picked here but not *stored* here: the layer keeps only
  * the post's id, and its picture is handed to the renderer separately,
@@ -72,7 +78,7 @@ function dropAt(count: number) {
 }
 
 /** Which sheet is open: one per widget the tray offers, so the two cannot drift apart. */
-type Picker = WidgetKey | null;
+type Picker = SheetKey | null;
 
 function freshId(): string {
   // Collides with nothing and needs no library; the id only has to be
@@ -95,6 +101,8 @@ export function ShowEditor({
   const [layers, setLayers] = useState<ShowLayer[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [writing, setWriting] = useState<string | null>(null);
+  /** The poll or question being written on, if any. */
+  const [editingCard, setEditingCard] = useState<string | null>(null);
   const [tray, setTray] = useState(false);
   /** Which picker is open, if any. */
   const [picking, setPicking] = useState<Picker>(null);
@@ -118,6 +126,18 @@ export function ShowEditor({
   }, []);
 
   const chosen = useMemo(() => layers.find((l) => l.id === selected) ?? null, [layers, selected]);
+
+  /** The photo's own colour, deepened, for the Ambient look. Read once. */
+  const [ambient, setAmbient] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void photoAverage(photoUrl).then((avg) => {
+      if (live && avg) setAmbient(ambientTint(avg));
+    });
+    return () => {
+      live = false;
+    };
+  }, [photoUrl]);
 
   const remember = useCallback(() => setPrevious(layers), [layers]);
 
@@ -146,6 +166,43 @@ export function ShowEditor({
   }, [selected, remember]);
 
   /**
+   * What a tray tile does: a picker for the ones that need choosing, and
+   * straight onto the picture for the rest — a place or a tag typed at the
+   * foot like words are, the time stamped as it is now.
+   */
+  function place(key: WidgetKey) {
+    if (key === "location") {
+      const id = add("location", { place: "" });
+      if (id) setWriting(id);
+    } else if (key === "hashtag") {
+      const id = add("hashtag", { tag: "" });
+      if (id) setWriting(id);
+    } else if (key === "time") {
+      add("time", { at: new Date().toISOString() });
+    } else if (isCardType(key)) {
+      // Placed blank and written on the sticker itself.
+      const id = add(key, blankCard(key));
+      if (id) setEditingCard(id);
+    } else {
+      setPicking(key);
+    }
+  }
+
+  /** Dress the chosen layer in one of the eight colours. */
+  function paint(look: number) {
+    if (!chosen) return;
+    remember();
+    setLayers((l) =>
+      l.map((layer) => {
+        if (layer.id !== chosen.id) return layer;
+        const { tint: _drop, ...rest } = layer;
+        void _drop;
+        return look === AMBIENT_LOOK && ambient ? { ...rest, look, tint: ambient } : { ...rest, look };
+      }),
+    );
+  }
+
+  /**
    * A tap on the picture selects what is under it, and a tap on what is
    * already selected runs it through its looks — the gesture people know
    * from every sticker they have used.
@@ -170,6 +227,14 @@ export function ShowEditor({
       return;
     }
     if (hit === selected) {
+      // A poll or a question opens to be written on again; other chips
+      // and cards pick a colour from the row below instead.
+      const layer = layers.find((x) => x.id === hit) ?? null;
+      if (isCard(layer)) {
+        setEditingCard(hit);
+        return;
+      }
+      if (layer && usesColours(layer.type)) return;
       remember();
       setLayers((l) =>
         l.map((layer) =>
@@ -181,8 +246,15 @@ export function ShowEditor({
     setSelected(hit);
   }
 
-  function writeText(id: string | null, value: string) {
-    const text = value.slice(0, MAX_LAYER_TEXT);
+  /** `done` is the field being left: only then does an empty layer go. */
+  function writeText(id: string | null, value: string, done = false) {
+    const layer = layers.find((l) => l.id === id);
+    const type = layer && isTyped(layer.type) ? layer.type : "text";
+    const payload = typedPayload(type, value);
+    const text = typedValue({ ...(layer ?? { type: "text" }), payload } as ShowLayer);
+    // Mid-typing an empty value is just a start: "#" on its way to a tag
+    // cleans to nothing, and removing the layer there lost it.
+    if (!text.trim() && !done) return;
     if (!text.trim()) {
       // An empty text layer is nothing to look at; cancelling out of the
       // field removes it rather than leaving an invisible thing to find.
@@ -193,7 +265,7 @@ export function ShowEditor({
     }
     if (id) {
       setLayers((l) =>
-        l.map((layer) => (layer.id === id ? { ...layer, payload: { text } } : layer)),
+        l.map((layer) => (layer.id === id ? { ...layer, payload } : layer)),
       );
     }
   }
@@ -214,7 +286,7 @@ export function ShowEditor({
           ),
         )}
 
-        {chosen && (
+        {chosen && chosen.id !== editingCard && (
           <TransformBox
             placed={chosen}
             frame={frame}
@@ -228,7 +300,10 @@ export function ShowEditor({
         )}
 
         {/* The rail. */}
-        <div className="absolute right-3 top-3 z-20 flex flex-col gap-2">
+        {/* No plates: bold white with a soft shadow reads on any photo
+            and leaves the picture alone. */}
+        {/* Put away while a card is being written on: its own Done sits there. */}
+        <div className={`absolute right-2 top-2 z-20 flex flex-col gap-1.5 ${editingCard ? "hidden" : ""}`}>
           <RailButton
             label="Add text"
             disabled={full}
@@ -237,10 +312,10 @@ export function ShowEditor({
               if (id) setWriting(id);
             }}
           >
-            <Type size={18} />
+            <span className="text-[22px] font-extrabold tracking-[-0.06em]">Aa</span>
           </RailButton>
           <RailButton label="Add something" disabled={full} onClick={() => setTray((t) => !t)}>
-            <Smile size={18} />
+            <PeelIcon />
           </RailButton>
           <RailButton label="Undo" disabled={!previous} onClick={() => {
             if (!previous) return;
@@ -248,37 +323,88 @@ export function ShowEditor({
             setPrevious(null);
             setSelected(null);
           }}>
-            <Undo2 size={18} />
+            <Undo2 size={26} strokeWidth={2.5} />
           </RailButton>
         </div>
 
         <button
           type="button"
           aria-label="Close"
+          data-hidden={!!editingCard}
           onClick={onCancel}
-          className="absolute left-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-[30%] bg-black/50 text-white backdrop-blur-sm"
+          onPointerDown={(e) => e.stopPropagation()}
+          className="absolute left-2 top-2 z-20 flex h-12 w-12 items-center justify-center text-white data-[hidden=true]:hidden [filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))_drop-shadow(0_0_8px_rgba(0,0,0,0.3))] transition active:scale-90"
         >
-          <X size={19} />
+          <X size={26} strokeWidth={2.6} />
         </button>
 
-        {chosen && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-28 z-20 flex justify-center">
+        {chosen && usesColours(chosen.type) ? (
+          // The eight colours, as a row under the picture.
+          <div
+            role="radiogroup"
+            aria-label="Sticker colour"
+            onPointerDown={(e) => e.stopPropagation()}
+            // Above the card being written on, so its colour can change
+            // while you type.
+            className={`absolute inset-x-0 bottom-4 flex justify-center gap-2.5 ${editingCard ? "z-40" : "z-20"}`}
+            data-colour-row
+          >
+            {COLOUR_SWATCHES.map((sw, i) => {
+              const on = chosen.look === i;
+              return (
+                <button
+                  key={sw.name}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  aria-label={sw.name}
+                  title={sw.name}
+                  onClick={() => paint(i)}
+                  style={{ background: i === AMBIENT_LOOK && ambient ? ambient : sw.background }}
+                  className={`rounded-[11px] shadow-[0_2px_8px_rgba(0,0,0,0.35)] transition active:scale-90 ${
+                    on ? "h-9 w-9 border-[3px] border-accent" : "h-8 w-8 border-2 border-white/80"
+                  } ${sw.name === "Glass" ? "backdrop-blur-md" : ""}`}
+                />
+              );
+            })}
+          </div>
+        ) : chosen ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center">
             <span className="rounded-pill bg-black/65 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-white backdrop-blur-sm">
               {lookName(chosen.type, chosen.look)} · tap again to change
             </span>
           </div>
-        )}
+        ) : null}
+
+        {(() => {
+          const card = layers.find((l) => l.id === editingCard) ?? null;
+          if (!isCard(card)) return null;
+          return (
+            <CardEditor
+              layer={card}
+              onChange={(payload) =>
+                setLayers((l) => l.map((x) => (x.id === card.id ? { ...x, payload } : x)))
+              }
+              onDone={() => {
+                if (cardIsBlank(card)) {
+                  // Opened and left empty: as if it had never been added.
+                  setLayers((l) => l.filter((x) => x.id !== card.id));
+                  setSelected(null);
+                } else {
+                  setLayers((l) => l.map((x) => (x.id === card.id ? tidyCard(card) : x)));
+                }
+                setEditingCard(null);
+              }}
+            />
+          );
+        })()}
 
         {tray && (
           <StickerTray
             onClose={() => setTray(false)}
-            onSticker={(emoji) => {
-              add("sticker", { emoji });
-              setTray(false);
-            }}
             onWidget={(key) => {
               setTray(false);
-              setPicking(key);
+              place(key);
             }}
           />
         )}
@@ -296,13 +422,15 @@ export function ShowEditor({
             id="layer-text"
             autoFocus
             maxLength={MAX_LAYER_TEXT}
-            defaultValue={(chosen?.payload as { text?: string } | undefined)?.text ?? ""}
+            defaultValue={chosen ? typedValue(chosen) : ""}
             onChange={(e) => writeText(writing, e.target.value)}
             onBlur={(e) => {
-              writeText(writing, e.target.value);
+              writeText(writing, e.target.value, true);
               setWriting(null);
             }}
-            placeholder="Say something"
+            placeholder={
+              chosen?.type === "location" ? "Where are you?" : chosen?.type === "hashtag" ? "#hashtag" : "Say something"
+            }
             className="h-12 w-full rounded-xl bg-surface px-4 text-sm text-foreground outline-none placeholder:text-muted"
           />
         </div>
@@ -331,21 +459,6 @@ export function ShowEditor({
         open={picking === "link"}
         onClose={() => setPicking(null)}
         onPick={(url) => add("link", { url })}
-      />
-      <PollComposer
-        open={picking === "poll"}
-        onClose={() => setPicking(null)}
-        onSend={(question, options) => {
-          // A Show poll takes one answer each, so the composer's
-          // multiple-choice switch has nothing to set here.
-          add("poll", { question, options });
-          setPicking(null);
-        }}
-      />
-      <QuestionSheet
-        open={picking === "question"}
-        onClose={() => setPicking(null)}
-        onPick={(prompt) => add("question", { prompt })}
       />
       <EmbedSheet
         open={picking === "embed"}
@@ -410,9 +523,21 @@ function RailButton({
       disabled={disabled}
       onClick={onClick}
       onPointerDown={(e) => e.stopPropagation()}
-      className="flex h-10 w-10 items-center justify-center rounded-[30%] bg-black/50 text-white backdrop-blur-sm transition active:scale-90 disabled:opacity-35"
+      className="flex h-12 w-12 items-center justify-center text-white [filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))_drop-shadow(0_0_8px_rgba(0,0,0,0.3))] transition active:scale-90 disabled:opacity-45"
     >
       {children}
     </button>
+  );
+}
+
+/** A square sticker with its corner lifting: the tray's button. */
+function PeelIcon() {
+  return (
+    <svg aria-hidden width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 13.5V8a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v8a4 4 0 0 0 4 4h5.5z" />
+      <path d="M13.5 20v-3a3.5 3.5 0 0 1 3.5-3.5h3" />
+      <path d="M9.5 10h.01M14.5 10h.01" />
+      <path d="M9 14c.9.8 2 1.1 3 .9" />
+    </svg>
   );
 }

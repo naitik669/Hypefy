@@ -41,6 +41,13 @@ export const LAYER_TYPES = [
   "question",
   "post",
   "shot",
+  "location",
+  "hashtag",
+  "time",
+  "quiz",
+  "slider",
+  "countdown",
+  "addyours",
 ] as const;
 
 export type LayerType = (typeof LAYER_TYPES)[number];
@@ -74,17 +81,35 @@ export const MAX_LAYER_TEXT = 200;
  * The index is stored, never the styling, so restyling a look later
  * reaches every Show already posted rather than only new ones.
  */
+/**
+ * The eight colours a chip or a card can wear — Night, Lime, Glass, White,
+ * Ambient, Sunset, Aurora, Grape — picked from a row under the selected
+ * layer. The first is the old first look, so a Show posted before keeps
+ * its default; the old looks 2 and 3 now read as Glass and White.
+ */
+export const COLOUR_LOOKS = 8;
+
 export const LOOKS: Record<LayerType, number> = {
   text: 4,
   sticker: 4,
-  music: 4,
-  mention: 4,
-  link: 4,
-  poll: 4,
-  question: 4,
+  music: COLOUR_LOOKS,
+  mention: COLOUR_LOOKS,
+  link: COLOUR_LOOKS,
+  poll: COLOUR_LOOKS,
+  question: COLOUR_LOOKS,
   post: 4,
   shot: 4,
+  location: COLOUR_LOOKS,
+  hashtag: COLOUR_LOOKS,
+  time: COLOUR_LOOKS,
+  quiz: COLOUR_LOOKS,
+  slider: COLOUR_LOOKS,
+  countdown: COLOUR_LOOKS,
+  addyours: COLOUR_LOOKS,
 };
+
+/** The look index that takes its colour from the photo (`tint`). */
+export const AMBIENT_LOOK = 4;
 
 export type TextPayload = { text: string };
 export type StickerPayload = { emoji: string };
@@ -101,6 +126,29 @@ export type PollPayload = { question: string; options: string[] };
 export type QuestionPayload = { prompt: string };
 export type PostPayload = { postId: string };
 export type ShotPayload = { shotId: string };
+/** A place, as typed. Not looked up: a name is all a story needs. */
+export type LocationPayload = { place: string };
+/** A tag without its #, in the shape the app's hashtags take. */
+export type HashtagPayload = { tag: string };
+/** When it was added, fixed then: a Show is a moment, and this says which. */
+export type TimePayload = { at: string };
+
+/** A poll with one right answer, by index. */
+export type QuizPayload = { question: string; options: string[]; answer: number };
+/** "How hyped are you?" — viewers drag a ★ along it. */
+export type SliderPayload = { prompt: string };
+/** Something coming up: what, and when. */
+export type CountdownPayload = { title: string; at: string };
+/**
+ * A prompt others answer with a Show of their own. `collabId` is the shared
+ * Show their answers go into, made when the Show is published.
+ */
+export type AddYoursPayload = { prompt: string; collabId?: string };
+
+export const MAX_PLACE = 60;
+/** A countdown or an Add yours prompt is a line, not a paragraph. */
+export const MAX_STICKER_LINE = 60;
+export const MAX_TAG = 40;
 
 export type LayerPayload =
   | TextPayload
@@ -111,7 +159,14 @@ export type LayerPayload =
   | PollPayload
   | QuestionPayload
   | PostPayload
-  | ShotPayload;
+  | ShotPayload
+  | LocationPayload
+  | HashtagPayload
+  | TimePayload
+  | QuizPayload
+  | SliderPayload
+  | CountdownPayload
+  | AddYoursPayload;
 
 export type ShowLayer = {
   /** Stable for the life of the layer: votes and answers point at it. */
@@ -125,6 +180,12 @@ export type ShowLayer = {
   rotation: number;
   /** Which of this type's looks is showing. */
   look: number;
+  /**
+   * The colour the Ambient look wears: a deep shade of the photo under it,
+   * worked out once in the editor and stored, so the viewer draws the same
+   * thing without sampling the picture again. Absent on every other look.
+   */
+  tint?: string;
   payload: LayerPayload;
 };
 
@@ -241,7 +302,81 @@ function readPayload(type: LayerType, raw: unknown): LayerPayload | null {
       const sid = id(p.shotId);
       return sid ? { shotId: sid } : null;
     }
+    case "location": {
+      const place = text(p.place, MAX_PLACE);
+      return place ? { place } : null;
+    }
+    case "hashtag": {
+      const tag = typeof p.tag === "string" ? cleanTag(p.tag) : "";
+      return tag ? { tag } : null;
+    }
+    case "time": {
+      const at = typeof p.at === "string" ? p.at : "";
+      return at && !Number.isNaN(Date.parse(at)) ? { at: new Date(at).toISOString() } : null;
+    }
+    case "quiz": {
+      const question = text(p.question, MAX_POLL_QUESTION);
+      const raw = Array.isArray(p.options) ? p.options.filter((o): o is string => typeof o === "string") : [];
+      const options = tidyOptions(raw);
+      // tidied options must be the written ones in the same order, or the
+      // stored answer index would point at a different option.
+      if (!question || options.length !== raw.length) return null;
+      if (options.length < MIN_POLL_OPTIONS || options.length > MAX_POLL_OPTIONS) return null;
+      const answer = typeof p.answer === "number" && Number.isInteger(p.answer) ? p.answer : -1;
+      if (answer < 0 || answer >= options.length) return null;
+      return { question, options, answer };
+    }
+    case "slider": {
+      const prompt = text(p.prompt, MAX_POLL_QUESTION);
+      return prompt ? { prompt } : null;
+    }
+    case "countdown": {
+      const title = text(p.title, MAX_STICKER_LINE);
+      const at = typeof p.at === "string" ? p.at : "";
+      if (!title || !at || Number.isNaN(Date.parse(at))) return null;
+      return { title, at: new Date(at).toISOString() };
+    }
+    case "addyours": {
+      const prompt = text(p.prompt, MAX_STICKER_LINE);
+      if (!prompt) return null;
+      const collab = typeof p.collabId === "string" && /^[0-9a-f-]{36}$/i.test(p.collabId) ? p.collabId : null;
+      return collab ? { prompt, collabId: collab } : { prompt };
+    }
   }
+}
+
+/** A hashtag as typed, made into one: no #, no spaces, letters, digits and _. */
+export function cleanTag(raw: string): string {
+  return raw
+    .replace(/^#+/, "")
+    .replace(/[^\p{L}\p{M}\p{N}_]/gu, "")
+    .toLowerCase()
+    .slice(0, MAX_TAG);
+}
+
+/**
+ * The layers that are typed at the foot of the editor, and which field of
+ * their payload the typing goes into.
+ */
+export const TYPED_FIELD = { text: "text", location: "place", hashtag: "tag" } as const;
+export type TypedType = keyof typeof TYPED_FIELD;
+
+export function isTyped(type: LayerType): type is TypedType {
+  return type in TYPED_FIELD;
+}
+
+/** What a typed layer currently says. */
+export function typedValue(layer: ShowLayer): string {
+  if (!isTyped(layer.type)) return "";
+  const v = (layer.payload as Record<string, unknown>)[TYPED_FIELD[layer.type]];
+  return typeof v === "string" ? v : "";
+}
+
+/** The payload a typed layer gets for what was typed, cleaned for its type. */
+export function typedPayload(type: TypedType, value: string): LayerPayload {
+  if (type === "hashtag") return { tag: cleanTag(value) };
+  if (type === "location") return { place: value.slice(0, MAX_PLACE) };
+  return { text: value.slice(0, MAX_LAYER_TEXT) };
 }
 
 /** One layer, or null. */
@@ -273,6 +408,8 @@ function readLayer(raw: unknown, seen: Set<string>): ShowLayer | null {
     // Out of range reads as the first look rather than as no layer: a
     // look added and later removed should not delete somebody's Show.
     look: look >= 0 && look < looks ? look : 0,
+    // Only a plain #rrggbb: it goes straight into a style.
+    ...(typeof l.tint === "string" && /^#[0-9a-f]{6}$/i.test(l.tint) ? { tint: l.tint.toLowerCase() } : {}),
     payload,
   };
 }

@@ -82,6 +82,7 @@ import { keepShow, unkeepShow } from "@/lib/show-keep";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { LayerStack } from "@/components/shows/LayerView";
 import type { PollState } from "@/components/shows/ShowPoll";
+import { EMPTY_STICKER_STATE, readStickerState, type StickerState } from "@/lib/show-stickers";
 import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
 import { storyGesture, storyKey, type StoryMove } from "@/lib/story-gesture";
 
@@ -489,7 +490,7 @@ function ShowScreen({
    * at all when it carries none — most Shows do not.
    */
   const [polls, setPolls] = useState<Record<string, PollState>>({});
-  const hasPoll = useMemo(() => layers.some((l) => l.type === "poll"), [layers]);
+  const hasPoll = useMemo(() => layers.some((l) => l.type === "poll" || l.type === "quiz"), [layers]);
 
   useEffect(() => {
     if (!hasPoll) return;
@@ -504,6 +505,26 @@ function ShowScreen({
       dropped = true;
     };
   }, [show.id, hasPoll, supabase]);
+
+  /**
+   * Hype sliders, countdown reminders and Add yours counts, in one call,
+   * and only for a Show that carries one of them.
+   */
+  const [stickers, setStickers] = useState<StickerState>(EMPTY_STICKER_STATE);
+  const hasLive = useMemo(
+    () => layers.some((l) => l.type === "slider" || l.type === "countdown" || l.type === "addyours"),
+    [layers],
+  );
+  useEffect(() => {
+    if (!hasLive) return;
+    let dropped = false;
+    void supabase.rpc("show_sticker_state", { p_show_id: show.id }).then(({ data }) => {
+      if (!dropped) setStickers(readStickerState(data));
+    });
+    return () => {
+      dropped = true;
+    };
+  }, [show.id, hasLive, supabase]);
 
   /**
    * What the embedded posts and Shots look like now.
@@ -752,6 +773,9 @@ function ShowScreen({
           showId={show.id}
           polls={polls}
           embeds={embeds}
+          stickers={stickers}
+          isAuthor={isOwner}
+          version={`${Object.keys(polls).length}:${stickers === EMPTY_STICKER_STATE ? 0 : 1}`}
         />
       </div>
 

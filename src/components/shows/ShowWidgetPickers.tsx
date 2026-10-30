@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Avatar } from "@/components/ui/Avatar";
-import { MAX_POLL_QUESTION } from "@/lib/chat-poll";
 import { type Suggestion, useMentionHashtag } from "@/components/ui/MentionHashtagPicker";
 
 /**
@@ -84,53 +83,6 @@ export function LinkSheet({
         </button>
         <p className="text-xs text-muted">
           Only https links. People see where it goes before they tap.
-        </p>
-      </div>
-    </BottomSheet>
-  );
-}
-
-export function QuestionSheet({
-  open,
-  onClose,
-  onPick,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onPick: (prompt: string) => void;
-}) {
-  const [prompt, setPrompt] = useState("");
-  const ready = prompt.trim().length > 0;
-
-  return (
-    <BottomSheet open={open} onClose={onClose} title="Ask something">
-      <div className="space-y-3 px-4 pb-4">
-        <label htmlFor="show-question" className="sr-only">
-          What you are asking
-        </label>
-        <input
-          id="show-question"
-          autoFocus
-          value={prompt}
-          maxLength={MAX_POLL_QUESTION}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Ask me anything"
-          className="h-12 w-full rounded-xl bg-surface px-4 text-sm text-foreground outline-none placeholder:text-muted"
-        />
-        <button
-          type="button"
-          disabled={!ready}
-          onClick={() => {
-            onPick(prompt.trim());
-            setPrompt("");
-            onClose();
-          }}
-          className="h-12 w-full rounded-xl bg-accent text-sm font-extrabold text-accent-ink disabled:opacity-40"
-        >
-          Add it
-        </button>
-        <p className="text-xs text-muted">
-          Answers come only to you — nobody else on the Show sees them.
         </p>
       </div>
     </BottomSheet>

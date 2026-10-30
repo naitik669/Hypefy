@@ -501,6 +501,127 @@ export type Database = {
           },
         ]
       }
+      conversation_display_names: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          nickname: string
+          set_by: string | null
+          subject_id: string
+          updated_at: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          nickname: string
+          set_by?: string | null
+          subject_id: string
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          nickname?: string
+          set_by?: string | null
+          subject_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_display_names_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_display_names_set_by_fkey"
+            columns: ["set_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_display_names_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_invites: {
+        Row: {
+          code: string
+          conversation_id: string
+          created_at: string
+          created_by: string | null
+          requires_approval: boolean
+        }
+        Insert: {
+          code: string
+          conversation_id: string
+          created_at?: string
+          created_by?: string | null
+          requires_approval?: boolean
+        }
+        Update: {
+          code?: string
+          conversation_id?: string
+          created_at?: string
+          created_by?: string | null
+          requires_approval?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_invites_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_invites_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_join_requests: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_join_requests_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_join_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_members: {
         Row: {
           archived_at: string | null
@@ -558,120 +679,6 @@ export type Database = {
           {
             foreignKeyName: "conversation_members_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      conversation_invites: {
-        Row: {
-          code: string
-          conversation_id: string
-          created_at: string
-          created_by: string | null
-          requires_approval: boolean
-        }
-        Insert: {
-          code: string
-          conversation_id: string
-          created_at?: string
-          created_by?: string | null
-          requires_approval?: boolean
-        }
-        Update: {
-          code?: string
-          conversation_id?: string
-          created_at?: string
-          created_by?: string | null
-          requires_approval?: boolean
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversation_invites_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: true
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      conversation_join_requests: {
-        Row: {
-          conversation_id: string
-          created_at: string
-          user_id: string
-        }
-        Insert: {
-          conversation_id: string
-          created_at?: string
-          user_id: string
-        }
-        Update: {
-          conversation_id?: string
-          created_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversation_join_requests_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_join_requests_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      conversation_display_names: {
-        Row: {
-          conversation_id: string
-          created_at: string
-          nickname: string
-          set_by: string | null
-          subject_id: string
-          updated_at: string
-        }
-        Insert: {
-          conversation_id: string
-          created_at?: string
-          nickname: string
-          set_by?: string | null
-          subject_id: string
-          updated_at?: string
-        }
-        Update: {
-          conversation_id?: string
-          created_at?: string
-          nickname?: string
-          set_by?: string | null
-          subject_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversation_display_names_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_display_names_set_by_fkey"
-            columns: ["set_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_display_names_subject_id_fkey"
-            columns: ["subject_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1248,6 +1255,35 @@ export type Database = {
           },
         ]
       }
+      message_poll_votes: {
+        Row: {
+          choice: number
+          created_at: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          choice: number
+          created_at?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          choice?: number
+          created_at?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_poll_votes_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_reactions: {
         Row: {
           created_at: string
@@ -1280,35 +1316,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      message_poll_votes: {
-        Row: {
-          choice: number
-          created_at: string
-          message_id: string
-          user_id: string
-        }
-        Insert: {
-          choice: number
-          created_at?: string
-          message_id: string
-          user_id: string
-        }
-        Update: {
-          choice?: number
-          created_at?: string
-          message_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "message_poll_votes_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
-            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
         ]
@@ -2877,6 +2884,292 @@ export type Database = {
           },
         ]
       }
+      show_answers: {
+        Row: {
+          asker_id: string
+          body: string
+          created_at: string
+          id: string
+          layer_id: string
+          show_id: string
+        }
+        Insert: {
+          asker_id: string
+          body: string
+          created_at?: string
+          id?: string
+          layer_id: string
+          show_id: string
+        }
+        Update: {
+          asker_id?: string
+          body?: string
+          created_at?: string
+          id?: string
+          layer_id?: string
+          show_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_answers_asker_id_fkey"
+            columns: ["asker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "show_answers_show_id_fkey"
+            columns: ["show_id"]
+            isOneToOne: false
+            referencedRelation: "shows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      show_collab_members: {
+        Row: {
+          collab_id: string
+          invited_at: string
+          invited_by: string | null
+          joined_at: string | null
+          user_id: string
+        }
+        Insert: {
+          collab_id: string
+          invited_at?: string
+          invited_by?: string | null
+          joined_at?: string | null
+          user_id: string
+        }
+        Update: {
+          collab_id?: string
+          invited_at?: string
+          invited_by?: string | null
+          joined_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_collab_members_collab_id_fkey"
+            columns: ["collab_id"]
+            isOneToOne: false
+            referencedRelation: "show_collabs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "show_collab_members_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "show_collab_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      show_collabs: {
+        Row: {
+          created_at: string
+          id: string
+          owner_id: string
+          removal_reason: string | null
+          removed_at: string | null
+          removed_by: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_id: string
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_id?: string
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_collabs_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "show_collabs_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      show_countdown_reminders: {
+        Row: {
+          created_at: string
+          layer_id: string
+          remind_at: string
+          sent_at: string | null
+          show_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          layer_id: string
+          remind_at: string
+          sent_at?: string | null
+          show_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          layer_id?: string
+          remind_at?: string
+          sent_at?: string | null
+          show_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_countdown_reminders_show_id_fkey"
+            columns: ["show_id"]
+            isOneToOne: false
+            referencedRelation: "shows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "show_countdown_reminders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      show_hidden_from: {
+        Row: {
+          created_at: string
+          show_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          show_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          show_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_hidden_from_show_id_fkey"
+            columns: ["show_id"]
+            isOneToOne: false
+            referencedRelation: "shows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "show_hidden_from_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      show_poll_votes: {
+        Row: {
+          choice: number
+          created_at: string
+          layer_id: string
+          show_id: string
+          voter_id: string
+        }
+        Insert: {
+          choice: number
+          created_at?: string
+          layer_id: string
+          show_id: string
+          voter_id: string
+        }
+        Update: {
+          choice?: number
+          created_at?: string
+          layer_id?: string
+          show_id?: string
+          voter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_poll_votes_show_id_fkey"
+            columns: ["show_id"]
+            isOneToOne: false
+            referencedRelation: "shows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "show_poll_votes_voter_id_fkey"
+            columns: ["voter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      show_slider_votes: {
+        Row: {
+          created_at: string
+          layer_id: string
+          show_id: string
+          value: number
+          voter_id: string
+        }
+        Insert: {
+          created_at?: string
+          layer_id: string
+          show_id: string
+          value: number
+          voter_id: string
+        }
+        Update: {
+          created_at?: string
+          layer_id?: string
+          show_id?: string
+          value?: number
+          voter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_slider_votes_show_id_fkey"
+            columns: ["show_id"]
+            isOneToOne: false
+            referencedRelation: "shows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "show_slider_votes_voter_id_fkey"
+            columns: ["voter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       show_views: {
         Row: {
           created_at: string
@@ -3026,93 +3319,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      show_collabs: {
-        Row: {
-          created_at: string
-          id: string
-          owner_id: string
-          removal_reason: string | null
-          removed_at: string | null
-          removed_by: string | null
-          title: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          owner_id: string
-          removal_reason?: string | null
-          removed_at?: string | null
-          removed_by?: string | null
-          title: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          owner_id?: string
-          removal_reason?: string | null
-          removed_at?: string | null
-          removed_by?: string | null
-          title?: string
-        }
-        Relationships: []
-      }
-      show_collab_members: {
-        Row: {
-          collab_id: string
-          invited_at: string
-          invited_by: string | null
-          joined_at: string | null
-          user_id: string
-        }
-        Insert: {
-          collab_id: string
-          invited_at?: string
-          invited_by?: string | null
-          joined_at?: string | null
-          user_id: string
-        }
-        Update: {
-          collab_id?: string
-          invited_at?: string
-          invited_by?: string | null
-          joined_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "show_collab_members_collab_id_fkey"
-            columns: ["collab_id"]
-            isOneToOne: false
-            referencedRelation: "show_collabs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "show_collab_members_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      show_hidden_from: {
-        Row: {
-          created_at: string
-          show_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          show_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          show_id?: string
-          user_id?: string
-        }
-        Relationships: []
       }
       shows: {
         Row: {
@@ -3469,6 +3675,10 @@ export type Database = {
         Returns: undefined
       }
       age_ok: { Args: never; Returns: boolean }
+      answer_show_question: {
+        Args: { p_body: string; p_layer_id: string; p_show_id: string }
+        Returns: undefined
+      }
       api_rate_limit: { Args: { p_action: string }; Returns: undefined }
       approve_follow_request: {
         Args: { p_requester: string }
@@ -3487,7 +3697,16 @@ export type Database = {
       can_read_chat_media: { Args: { p_path: string }; Returns: boolean }
       can_see_activity_of: { Args: { p_user: string }; Returns: boolean }
       can_see_profile: { Args: { p_user: string }; Returns: boolean }
+      can_see_show: { Args: { p_show: string }; Returns: boolean }
       capture_creator_daily_stats: { Args: never; Returns: undefined }
+      cast_poll_vote: {
+        Args: { p_choice: number; p_message_id: string }
+        Returns: Json
+      }
+      cast_show_vote: {
+        Args: { p_choice: number; p_layer_id: string; p_show_id: string }
+        Returns: Json
+      }
       chat_pin_places: { Args: never; Returns: number }
       check_media: { Args: { p_hash: string }; Returns: boolean }
       claim_ghost_share: { Args: { p_kind: string }; Returns: string }
@@ -3502,6 +3721,10 @@ export type Database = {
       }
       claim_oneshot: { Args: { p_message_id: string }; Returns: string }
       claim_referral: { Args: { p_ref_username: string }; Returns: boolean }
+      clear_group_invite: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
       clear_lock_pin: {
         Args: { p_current_pin: string; p_scope: string }
         Returns: undefined
@@ -3535,8 +3758,18 @@ export type Database = {
         }
         Returns: string
       }
+      create_show_collab: { Args: { p_title: string }; Returns: string }
+      decide_join_request: {
+        Args: {
+          p_accept: boolean
+          p_conversation_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       decline_call: { Args: { p_call_id: string }; Returns: undefined }
       delete_comment: { Args: { p_id: string }; Returns: boolean }
+      deliver_countdown_reminders: { Args: never; Returns: number }
       deliver_due_messages: { Args: never; Returns: number }
       deny_follow_request: { Args: { p_requester: string }; Returns: undefined }
       disconnect_spotify: { Args: never; Returns: undefined }
@@ -3798,6 +4031,10 @@ export type Database = {
           username: string
         }[]
       }
+      in_show_collab: {
+        Args: { p_collab: string; p_user: string }
+        Returns: boolean
+      }
       increment_post_view: { Args: { p_post_id: string }; Returns: undefined }
       init_user_keys: {
         Args: {
@@ -3815,21 +4052,33 @@ export type Database = {
         Args: { p_collection: string; p_user: string }
         Returns: undefined
       }
+      invite_to_show_collab: {
+        Args: { p_collab: string; p_user: string }
+        Returns: undefined
+      }
       ip_rate_limit: {
         Args: { p_key: string; p_limit: number; p_window_seconds: number }
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
       is_comment_image: { Args: { p_url: string }; Returns: boolean }
+      is_conv_admin: { Args: { p_conversation_id: string }; Returns: boolean }
       is_conv_member: { Args: { conv: string }; Returns: boolean }
       is_media_blocked: { Args: { p_hash: unknown }; Returns: boolean }
       is_suspended: { Args: { p_user?: string }; Returns: boolean }
+      join_add_yours: {
+        Args: { p_layer_id: string; p_show_id: string }
+        Returns: string
+      }
+      join_by_invite: { Args: { p_code: string }; Returns: Json }
       join_group_call: { Args: { p_call_id: string }; Returns: undefined }
+      join_show_collab: { Args: { p_collab: string }; Returns: undefined }
       leave_conversation: {
         Args: { p_conversation_id: string }
         Returns: undefined
       }
       leave_group_call: { Args: { p_call_id: string }; Returns: undefined }
+      leave_show_collab: { Args: { p_collab: string }; Returns: undefined }
       lock_vault: { Args: never; Returns: undefined }
       log_security_alert: { Args: { p_body: string }; Returns: undefined }
       mark_call_busy: { Args: { p_call_id: string }; Returns: undefined }
@@ -3964,6 +4213,7 @@ export type Database = {
         Args: { p_emoji: string; p_owner: string }
         Returns: undefined
       }
+      reap_expired_shows: { Args: never; Returns: undefined }
       reap_oneshots: { Args: never; Returns: undefined }
       recently_authenticated: { Args: { p_seconds?: number }; Returns: boolean }
       record_login_session: {
@@ -4190,44 +4440,6 @@ export type Database = {
         Args: { p_body: string; p_owner: string }
         Returns: string
       }
-      clear_group_invite: {
-        Args: { p_conversation_id: string }
-        Returns: undefined
-      }
-      decide_join_request: {
-        Args: {
-          p_accept: boolean
-          p_conversation_id: string
-          p_user_id: string
-        }
-        Returns: undefined
-      }
-      is_conv_admin: {
-        Args: { p_conversation_id: string }
-        Returns: boolean
-      }
-      join_by_invite: {
-        Args: { p_code: string }
-        Returns: Json
-      }
-      set_group_invite: {
-        Args: {
-          p_conversation_id: string
-          p_requires_approval?: boolean
-        }
-        Returns: string
-      }
-      set_group_invite_approval: {
-        Args: {
-          p_conversation_id: string
-          p_requires_approval: boolean
-        }
-        Returns: undefined
-      }
-      cast_poll_vote: {
-        Args: { p_choice: number; p_message_id: string }
-        Returns: Json
-      }
       send_poll: {
         Args: {
           p_conversation_id: string
@@ -4237,66 +4449,6 @@ export type Database = {
           p_reply_to_id?: string
         }
         Returns: Json
-      }
-      set_shared_nickname: {
-        Args: {
-          p_conversation_id: string
-          p_nickname: string
-          p_subject_id: string
-        }
-        Returns: undefined
-      }
-      set_nickname: {
-        Args: {
-          p_conversation_id: string
-          p_nickname: string
-          p_subject_id: string
-        }
-        Returns: undefined
-      }
-      create_show_collab: {
-        Args: { p_title: string }
-        Returns: string
-      }
-      invite_to_show_collab: {
-        Args: { p_collab: string; p_user: string }
-        Returns: undefined
-      }
-      join_show_collab: {
-        Args: { p_collab: string }
-        Returns: undefined
-      }
-      leave_show_collab: {
-        Args: { p_collab: string }
-        Returns: undefined
-      }
-      in_show_collab: {
-        Args: { p_collab: string; p_user: string }
-        Returns: boolean
-      }
-      cast_show_vote: {
-        Args: {
-          p_choice: number
-          p_layer_id: string
-          p_show_id: string
-        }
-        Returns: Json
-      }
-      answer_show_question: {
-        Args: {
-          p_body: string
-          p_layer_id: string
-          p_show_id: string
-        }
-        Returns: undefined
-      }
-      show_poll_tallies: {
-        Args: { p_show_id: string }
-        Returns: Json
-      }
-      can_see_show: {
-        Args: { p_show: string }
-        Returns: boolean
       }
       set_activity_mute: {
         Args: { p_on: boolean; p_user: string }
@@ -4331,6 +4483,14 @@ export type Database = {
         Returns: undefined
       }
       set_date_of_birth: { Args: { p_dob: string }; Returns: undefined }
+      set_group_invite: {
+        Args: { p_conversation_id: string; p_requires_approval?: boolean }
+        Returns: string
+      }
+      set_group_invite_approval: {
+        Args: { p_conversation_id: string; p_requires_approval: boolean }
+        Returns: undefined
+      }
       set_item_folders: {
         Args: { p_folders?: string[]; p_post?: string; p_shot?: string }
         Returns: undefined
@@ -4345,6 +4505,14 @@ export type Database = {
       }
       set_message_pinned: {
         Args: { p_id: string; p_pinned: boolean }
+        Returns: undefined
+      }
+      set_nickname: {
+        Args: {
+          p_conversation_id: string
+          p_nickname: string
+          p_subject_id: string
+        }
         Returns: undefined
       }
       set_note: {
@@ -4378,6 +4546,18 @@ export type Database = {
         Args: { p_id: string; p_pinned: boolean }
         Returns: undefined
       }
+      set_shared_nickname: {
+        Args: {
+          p_conversation_id: string
+          p_nickname: string
+          p_subject_id: string
+        }
+        Returns: undefined
+      }
+      set_show_slider: {
+        Args: { p_layer_id: string; p_show_id: string; p_value: number }
+        Returns: Json
+      }
       set_sound_playlists: {
         Args: { p_folders?: string[]; p_track: Json }
         Returns: undefined
@@ -4404,6 +4584,20 @@ export type Database = {
         }[]
       }
       shared_follows: { Args: { p_other: string }; Returns: Json }
+      show_collab_cap: { Args: never; Returns: number }
+      show_poll_tallies: { Args: { p_show_id: string }; Returns: Json }
+      show_slider_voters: {
+        Args: { p_layer_id: string; p_show_id: string }
+        Returns: {
+          avatar_hue: number
+          avatar_url: string
+          display_name: string
+          user_id: string
+          username: string
+          value: number
+        }[]
+      }
+      show_sticker_state: { Args: { p_show_id: string }; Returns: Json }
       spotify_connection_status: {
         Args: never
         Returns: {
@@ -4429,6 +4623,10 @@ export type Database = {
         }[]
       }
       sync_entitlements: { Args: { p_uid: string }; Returns: undefined }
+      toggle_countdown_reminder: {
+        Args: { p_layer_id: string; p_show_id: string }
+        Returns: boolean
+      }
       toggle_hashtag_follow: { Args: { p_tag: string }; Returns: boolean }
       toggle_hype: {
         Args: {

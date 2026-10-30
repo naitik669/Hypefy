@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { barWidth, voteLabel } from "@/lib/chat-poll";
 import type { Look } from "@/lib/show-looks";
 import type { PollPayload, QuestionPayload } from "@/lib/show-layers";
+import { onInk } from "@/lib/show-stickers";
 
 /** What the server knows about one poll on this Show. */
 export type PollState = { tally: number[]; voters: number; mine: number | null };
@@ -231,7 +232,7 @@ export function ShowQuestion({
               opacity: body.trim() ? 1 : 0.45,
             }}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={String(look.box.background ?? "#0a0a0a")} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={onInk(look.ink)} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M22 2 11 13" />
               <path d="m22 2-7 20-4-9-9-4z" />
             </svg>

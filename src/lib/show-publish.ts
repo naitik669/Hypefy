@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import type { Track } from "@/lib/music";
 import { extractMentions } from "@/lib/content-utils";
-import { layerMentions, type ShowLayer } from "@/lib/show-layers";
+import { layerMentions, type AddYoursPayload, type ShowLayer } from "@/lib/show-layers";
 import type { ShowAudience } from "@/lib/show-audience";
 import { isVideoFile, uploadContentType } from "@/lib/video-mime";
 
@@ -28,7 +28,7 @@ export type ShowDraft = {
 
 export type ShowPublishResult =
   | { ok: true; id: string }
-  | { ok: false; reason: "upload" | "insert" | "hidden" };
+  | { ok: false; reason: "upload" | "insert" | "hidden" | "prompt" };
 
 export async function publishShow(
   supabase: SupabaseClient<Database>,
@@ -50,6 +50,28 @@ export async function publishShow(
   const mediaUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
   const text = d.caption.trim();
 
+  // An Add yours prompt needs somewhere for the answers to go: a shared
+  // Show of the author's, named after the prompt, made now rather than
+  // when the sticker was placed so a Show that is never posted leaves none
+  // behind. join_add_yours lets viewers in only if it is the author's.
+  const made: string[] = [];
+  const layers: ShowLayer[] = [];
+  for (const layer of d.layers) {
+    if (layer.type !== "addyours" || (layer.payload as AddYoursPayload).collabId) {
+      layers.push(layer);
+      continue;
+    }
+    const prompt = (layer.payload as AddYoursPayload).prompt;
+    const { data: collabId, error } = await supabase.rpc("create_show_collab", { p_title: prompt });
+    if (error || !collabId) {
+      await undoCollabs(supabase, made);
+      await supabase.storage.from(bucket).remove([path]);
+      return { ok: false, reason: "prompt" };
+    }
+    made.push(collabId);
+    layers.push({ ...layer, payload: { prompt, collabId } });
+  }
+
   const { data: row, error: insErr } = await supabase
     .from("shows")
     .insert({
@@ -59,8 +81,8 @@ export async function publishShow(
       track: (d.track ?? null) as unknown as Json,
       // A name typed into the caption and one placed on the picture both
       // reach their owner; layerMentions says why.
-      mentions: [...new Set([...extractMentions(text), ...layerMentions(d.layers)])],
-      layers: d.layers as unknown as Json,
+      mentions: [...new Set([...extractMentions(text), ...layerMentions(layers)])],
+      layers: layers as unknown as Json,
       audience: d.audience,
       collab_id: d.collabId ?? null,
     })
@@ -70,6 +92,7 @@ export async function publishShow(
   if (insErr || !row) {
     // The file went up first; with no Show pointing at it, it is litter.
     await supabase.storage.from(bucket).remove([path]);
+    await undoCollabs(supabase, made);
     // Said out loud: a toast was all anyone saw while 0183's policy refused
     // every Show, and it named nothing.
     console.error("show insert failed", insErr);
@@ -85,6 +108,7 @@ export async function publishShow(
     if (hideErr) {
       await supabase.from("shows").delete().eq("id", row.id);
       await supabase.storage.from(bucket).remove([path]);
+      await undoCollabs(supabase, made);
       return { ok: false, reason: "hidden" };
     }
   }
@@ -92,9 +116,15 @@ export async function publishShow(
   return { ok: true, id: row.id };
 }
 
+/** Shared Shows made for prompts on a Show that then did not go up: closed again. */
+async function undoCollabs(supabase: SupabaseClient<Database>, ids: string[]) {
+  for (const id of ids) await supabase.rpc("leave_show_collab", { p_collab: id });
+}
+
 /** What to tell someone when a Show did not go up. */
-export function publishFailureMessage(reason: "upload" | "insert" | "hidden"): string {
+export function publishFailureMessage(reason: "upload" | "insert" | "hidden" | "prompt"): string {
   if (reason === "upload") return "Upload failed. Check your connection and try again.";
+  if (reason === "prompt") return "Couldn't set up the Add yours prompt. Nothing was posted.";
   if (reason === "hidden") return "Couldn't set who it's hidden from. Nothing was posted.";
   return "Couldn't publish that. Try again.";
 }

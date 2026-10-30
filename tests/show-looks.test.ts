@@ -103,9 +103,10 @@ describe("the readable ones are readable", () => {
   it("a look with no ground of its own carries a shadow instead", () => {
     // Over a photograph there is nothing to measure against, so the
     // words need their own edge.
-    const bare = lookFor("music", 3);
-    expect(bare.name).toBe("Bare");
-    expect(String(bare.title.textShadow)).toContain("rgba(0,0,0");
+    // Glass is the see-through one now that chips pick from eight colours.
+    const glass = lookFor("music", 2);
+    expect(glass.name).toBe("Glass");
+    expect(String(glass.title.textShadow)).toContain("rgba(0,0,0");
   });
 });
 

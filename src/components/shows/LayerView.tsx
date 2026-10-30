@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { lookFor } from "@/lib/show-looks";
 import { ShowPoll, ShowQuestion, type PollState } from "@/components/shows/ShowPoll";
+import { ShowAddYours, ShowCountdown, ShowQuiz, ShowSlider } from "@/components/shows/ShowStickers";
+import type { StickerState } from "@/lib/show-stickers";
 import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
 import {
   DESIGN_WIDTH,
@@ -17,6 +19,13 @@ import {
   type ShowLayer,
   type StickerPayload,
   type TextPayload,
+  type LocationPayload,
+  type HashtagPayload,
+  type TimePayload,
+  type QuizPayload,
+  type SliderPayload,
+  type CountdownPayload,
+  type AddYoursPayload,
 } from "@/lib/show-layers";
 
 /**
@@ -40,6 +49,8 @@ export function LayerView({
   showId,
   polls,
   embeds,
+  stickers,
+  isAuthor = false,
 }: {
   layer: ShowLayer;
   frame: { width: number; height: number };
@@ -51,6 +62,10 @@ export function LayerView({
   polls?: Record<string, PollState>;
   /** What each embedded post or Shot looks like now, by layer id. */
   embeds?: Record<string, EmbedState>;
+  /** What viewers have done with the interactive stickers (show_sticker_state). */
+  stickers?: StickerState;
+  /** The person looking is the one who posted it. */
+  isAuthor?: boolean;
 }) {
   const box = layerBox(layer, frame);
   return (
@@ -59,7 +74,15 @@ export function LayerView({
       style={{ left: box.left, top: box.top, transform: box.transform, transformOrigin: "center" }}
     >
       <div className={editing ? "pointer-events-none" : "pointer-events-auto"}>
-        <LayerBody layer={layer} editing={editing} showId={showId} polls={polls} embeds={embeds} />
+        <LayerBody
+          layer={layer}
+          editing={editing}
+          showId={showId}
+          polls={polls}
+          embeds={embeds}
+          stickers={stickers}
+          isAuthor={isAuthor}
+        />
       </div>
     </div>
   );
@@ -78,14 +101,20 @@ export function LayerBody({
   showId,
   polls,
   embeds,
+  stickers,
+  isAuthor = false,
 }: {
   layer: ShowLayer;
   editing?: boolean;
   showId?: string;
   polls?: Record<string, PollState>;
   embeds?: Record<string, EmbedState>;
+  /** What viewers have done with the interactive stickers (show_sticker_state). */
+  stickers?: StickerState;
+  /** The person looking is the one who posted it. */
+  isAuthor?: boolean;
 }) {
-  const look = lookFor(layer.type, layer.look);
+  const look = lookFor(layer.type, layer.look, layer.tint);
 
   switch (layer.type) {
     case "text": {
@@ -325,6 +354,94 @@ export function LayerBody({
       if (editing || embed?.gone) return body;
       return <Link href={href}>{body}</Link>;
     }
+
+    case "location": {
+      const { place } = layer.payload as LocationPayload;
+      return (
+        <span style={{ ...look.box, display: "inline-flex", alignItems: "center", gap: 7, maxWidth: 260 }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={look.ink} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none" }} aria-hidden>
+            <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" />
+            <circle cx="12" cy="9.5" r="2.5" />
+          </svg>
+          <span style={{ ...look.title, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {place}
+          </span>
+        </span>
+      );
+    }
+
+    case "hashtag": {
+      const { tag } = layer.payload as HashtagPayload;
+      const body = (
+        <span style={{ ...look.box, ...look.title, display: "inline-block", fontSize: 15 }}>#{tag}</span>
+      );
+      return editing ? body : <Link href={`/tag/${encodeURIComponent(tag)}`}>{body}</Link>;
+    }
+
+    case "quiz": {
+      const preview = editing || !showId;
+      return (
+        <ShowQuiz
+          showId={showId}
+          layerId={layer.id}
+          quiz={layer.payload as QuizPayload}
+          look={look}
+          state={polls?.[layer.id]}
+          preview={preview}
+        />
+      );
+    }
+
+    case "slider":
+      return (
+        <ShowSlider
+          showId={showId}
+          layerId={layer.id}
+          slider={layer.payload as SliderPayload}
+          look={look}
+          state={stickers?.sliders[layer.id]}
+          isAuthor={isAuthor}
+          preview={editing || !showId}
+        />
+      );
+
+    case "countdown":
+      return (
+        <ShowCountdown
+          showId={showId}
+          layerId={layer.id}
+          countdown={layer.payload as CountdownPayload}
+          look={look}
+          reminded={stickers?.reminders.includes(layer.id) ?? false}
+          isAuthor={isAuthor}
+          preview={editing || !showId}
+        />
+      );
+
+    case "addyours":
+      return (
+        <ShowAddYours
+          showId={showId}
+          layerId={layer.id}
+          addYours={layer.payload as AddYoursPayload}
+          look={look}
+          added={stickers?.added[layer.id] ?? 0}
+          isAuthor={isAuthor}
+          preview={editing || !showId}
+        />
+      );
+
+    case "time": {
+      const { at } = layer.payload as TimePayload;
+      // Shown in the viewer's own clock: the moment is fixed, the reading
+      // of it is theirs.
+      const label = new Date(at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+      return (
+        <span style={{ ...look.box, ...look.title, display: "inline-block", fontSize: 17, fontVariantNumeric: "tabular-nums" }}>
+          {label}
+        </span>
+      );
+    }
   }
 }
 
@@ -341,6 +458,9 @@ export function LayerStack({
   showId,
   polls,
   embeds,
+  stickers,
+  isAuthor = false,
+  version = "",
 }: {
   layers: ShowLayer[];
   frame: { width: number; height: number };
@@ -348,6 +468,16 @@ export function LayerStack({
   showId?: string;
   polls?: Record<string, PollState>;
   embeds?: Record<string, EmbedState>;
+  /** What viewers have done with the interactive stickers (show_sticker_state). */
+  stickers?: StickerState;
+  /** The person looking is the one who posted it. */
+  isAuthor?: boolean;
+  /**
+   * Changes when what the server knows has arrived. The live stickers take
+   * their starting state once, when they mount, and that state lands a
+   * moment after the Show does — so they are drawn again when it lands.
+   */
+  version?: string;
 }) {
   // Everything inside a layer — a card's width, a sticker's size, the
   // point size of text — is written once at DESIGN_WIDTH, and the whole
@@ -371,13 +501,15 @@ export function LayerStack({
     >
       {layers.map((layer) => (
         <LayerView
-          key={layer.id}
+          key={`${layer.id}:${version}`}
           layer={layer}
           frame={design}
           editing={editing}
           showId={showId}
           polls={polls}
           embeds={embeds}
+          stickers={stickers}
+          isAuthor={isAuthor}
         />
       ))}
     </div>

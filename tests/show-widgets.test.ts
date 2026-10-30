@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { CARD_TYPES } from "@/components/shows/CardEditor";
 import { readFileSync } from "node:fs";
 import { LAYER_TYPES, layerMentions, readLayers, type ShowLayer } from "@/lib/show-layers";
 
@@ -31,15 +32,16 @@ describe("every kind of layer can actually be added", () => {
     // The whole point of the phase. Read off the tray's tile table rather
     // than from the rendered JSX, because that table is what it maps over.
     const tray = read("src/components/shows/StickerTray.tsx");
-    const table = tray.slice(tray.indexOf("const WIDGET_TILES"), tray.indexOf("const SAMPLE_EMBEDS"));
-    for (const key of ["music", "mention", "link", "poll", "question", "embed"]) {
+    const table = tray.slice(tray.indexOf("export const ASK_AND_PLAY"), tray.indexOf("export const ALL_TILES"));
+    for (const key of ["music", "mention", "link", "poll", "question", "embed", "quiz", "slider", "countdown", "addyours", "location", "hashtag", "time"]) {
       expect(table, key).toContain(`key: "${key}"`);
     }
   });
 
-  it("and the other two are made rather than picked", () => {
+  it("and words are made rather than picked", () => {
     expect(editor).toContain('add("text", { text: "" })');
-    expect(editor).toContain('add("sticker", { emoji })');
+    // The emoji sticker is no longer added from the tray.
+    expect(editor).not.toContain('add("sticker"');
   });
 
   it("so between them the editor reaches every type the model has", () => {
@@ -50,12 +52,19 @@ describe("every kind of layer can actually be added", () => {
     for (const type of LAYER_TYPES) {
       if (editor.includes(`add("${type}"`)) reachable.add(type);
     }
-    expect([...LAYER_TYPES].filter((t) => !reachable.has(t))).toEqual([]);
+    // The cards written on the sticker are placed by one generic line,
+    // for every type CardEditor lists.
+    if (editor.includes("const id = add(key, blankCard(key));")) {
+      for (const t of CARD_TYPES) reachable.add(t);
+    }
+    // The emoji sticker left the tray (the keyboard has emoji, and a text
+    // layer takes them); it is still read, so Shows that carry one keep it.
+    expect([...LAYER_TYPES].filter((t) => !reachable.has(t))).toEqual(["sticker"]);
   });
 
   it("the table is typed against the sheets, not kept in step by hand", () => {
-    expect(editor).toContain("type Picker = WidgetKey | null;");
-    expect(read("src/components/shows/StickerTray.tsx")).toContain("{ key: WidgetKey; label: string; layer: ShowLayer; zoom: number }[]");
+    expect(editor).toContain("type Picker = SheetKey | null;");
+    expect(read("src/components/shows/StickerTray.tsx")).toContain("type Tile = { key: WidgetKey; label: string; layer: ShowLayer; zoom: number; tilt: number };");
   });
 });
 
@@ -65,11 +74,13 @@ describe("the pickers that already existed are the ones used", () => {
     expect(editor).toContain('open={picking === "music"}');
   });
 
-  it("a poll comes from the chat composer, so one validator decides what is a poll", () => {
-    expect(editor).toContain('import { PollComposer } from "@/components/messages/PollComposer";');
-    // tidyOptions / pollReady live behind it; readPayload asks the same
-    // questions again on the way into the column.
-    expect(editor).toContain("add(\"poll\", { question, options });");
+  it("a poll is written on the sticker, and kept by the chat's own validator", () => {
+    // tidyOptions decides what is an option, for chat polls and Show polls
+    // alike; readPayload asks the same questions on the way into the column.
+    const card = read("src/components/shows/CardEditor.tsx");
+    expect(card).toContain("options: tidyOptions(poll.options)");
+    expect(editor).toContain("const id = add(key, blankCard(key));");
+    expect(card).toContain('return { question: "", options: ["", ""] };');
   });
 
   it("and a mention is the same people search the chat typeahead runs", () => {
@@ -83,13 +94,13 @@ describe("the pickers that already existed are the ones used", () => {
   it("a link sheet cannot offer one the parser would refuse", () => {
     // readPayload takes https only. The sheet checks the same shape, so
     // a link is never silently dropped after it was added.
-    const check = pickers.slice(pickers.indexOf("const LINK_OK"), pickers.indexOf("export function QuestionSheet"));
+    const check = pickers.slice(pickers.indexOf("const LINK_OK"), pickers.indexOf("export function MentionSheet"));
     expect(check).toContain("/^https:\\/\\/[^\\s]+$/i");
     expect(check).toContain("disabled={!url}");
   });
 
   it("and typing a bare host is read as the link it plainly is", () => {
-    const check = pickers.slice(pickers.indexOf("const url = (() => {"), pickers.indexOf("export function QuestionSheet"));
+    const check = pickers.slice(pickers.indexOf("const url = (() => {"), pickers.indexOf("export function MentionSheet"));
     expect(check).toContain('`https://${t}`');
     expect(check).toContain('replace(/^http:\\/\\//i, "https://")');
   });
@@ -179,7 +190,7 @@ describe("a mention placed on the picture reaches its owner", () => {
     // which is exactly what caption mentions did before 0180.
     const insert = publishLib.slice(publishLib.indexOf('.from("shows")\n    .insert({'));
     expect(insert.slice(0, 900)).toContain(
-      "mentions: [...new Set([...extractMentions(text), ...layerMentions(d.layers)])],",
+      "mentions: [...new Set([...extractMentions(text), ...layerMentions(layers)])],",
     );
   });
 
@@ -191,7 +202,7 @@ describe("a mention placed on the picture reaches its owner", () => {
 describe("the arrangement reaches the column", () => {
   it("the insert sends it", () => {
     const insert = publishLib.slice(publishLib.indexOf('.from("shows")\n    .insert({'));
-    expect(insert.slice(0, 900)).toContain("layers: d.layers as unknown as Json,");
+    expect(insert.slice(0, 900)).toContain("layers: layers as unknown as Json,");
   });
 
   it("and the editor is on the way there for a photo Show", () => {

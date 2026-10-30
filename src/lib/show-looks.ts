@@ -16,7 +16,7 @@
  */
 
 import type { CSSProperties } from "react";
-import { LOOKS, type LayerType } from "@/lib/show-layers";
+import { AMBIENT_LOOK, LOOKS, type LayerType } from "@/lib/show-layers";
 
 const LIME = "#a3e635";
 const GOLD = "#ffd000";
@@ -46,79 +46,68 @@ const GLASS: CSSProperties = {
   backdropFilter: "blur(10px)",
 };
 
+/** Where the Ambient look has no stored colour yet: a neutral deep grey. */
+export const AMBIENT_FALLBACK = "#3a3a3a";
+
 /**
- * A pill or plate carrying a line or two — a song, a link, a name.
+ * The eight colours a chip or a card wears, in the order the editor's row
+ * shows them. One list for both shapes; only the corner differs, and it is
+ * a squircle either way — the brand's corner, not a pill.
  *
- * Night, lime, outline, bare: dark glass, then the brand fill, then an
- * outline for a busy photo, then nothing at all for when the picture
- * should win.
+ * Night stays first so a Show posted before this keeps its default.
  */
-function chipLooks(radius: number): Look[] {
+function colourLooks(radius: number, padding: CSSProperties["padding"]): Look[] {
+  const on = (background: string, light: boolean): Pick<Look, "title" | "sub" | "ink"> =>
+    light
+      ? { title: { color: INK, fontWeight: 800 }, sub: { color: "rgba(10,10,10,0.62)" }, ink: INK }
+      : { title: { color: WHITE, fontWeight: 800 }, sub: { color: "rgba(255,255,255,0.78)" }, ink: WHITE };
   return [
     {
       name: "Night",
-      box: { ...GLASS, borderRadius: radius, padding: "7px 15px" },
+      box: { ...GLASS, borderRadius: radius, padding },
       title: { color: WHITE, fontWeight: 800 },
       sub: { color: "#cfcfcf" },
       ink: LIME,
     },
+    { name: "Lime", box: { background: "linear-gradient(135deg, #a3e635, #22c55e)", borderRadius: radius, padding }, ...on("", true) },
     {
-      name: "Lime",
-      box: { background: LIME, borderRadius: radius, padding: "7px 15px" },
-      title: { color: INK, fontWeight: 800 },
-      sub: { color: "rgba(10,10,10,0.68)" },
-      ink: INK,
-    },
-    {
-      name: "Outline",
-      box: { border: `2px solid ${WHITE}`, borderRadius: radius, padding: "6px 15px" },
-      title: { color: WHITE, fontWeight: 800 },
-      sub: { color: "#d4d4d4" },
+      name: "Glass",
+      box: {
+        background: "rgba(255,255,255,0.2)",
+        border: "1px solid rgba(255,255,255,0.45)",
+        backdropFilter: "blur(12px)",
+        borderRadius: radius,
+        padding,
+      },
+      title: { color: WHITE, fontWeight: 800, textShadow: "0 1px 3px rgba(0,0,0,0.35)" },
+      sub: { color: "rgba(255,255,255,0.88)", textShadow: "0 1px 3px rgba(0,0,0,0.35)" },
       ink: WHITE,
     },
-    {
-      name: "Bare",
-      box: { padding: 0 },
-      title: { color: WHITE, fontWeight: 800, textShadow: OVER_PHOTO },
-      sub: { color: "#d6d6d6", textShadow: OVER_PHOTO },
-      ink: LIME,
-    },
+    { name: "White", box: { background: WHITE, borderRadius: radius, padding }, title: { color: INK, fontWeight: 800 }, sub: { color: "#525252" }, ink: INK },
+    // The ground is the layer's own tint, filled in by lookFor.
+    { name: "Ambient", box: { background: AMBIENT_FALLBACK, borderRadius: radius, padding }, ...on("", false) },
+    { name: "Sunset", box: { background: "linear-gradient(135deg, #f97316, #db2777)", borderRadius: radius, padding }, ...on("", false) },
+    { name: "Aurora", box: { background: "linear-gradient(135deg, #6366f1, #0ea5e9)", borderRadius: radius, padding }, ...on("", false) },
+    { name: "Grape", box: { background: "linear-gradient(135deg, #f472b6, #a855f7)", borderRadius: radius, padding }, ...on("", false) },
   ];
 }
 
-/** A box you answer — a poll, a question. */
-function cardLooks(): Look[] {
-  return [
-    {
-      name: "Night",
-      box: { ...GLASS, borderRadius: 18, padding: 14 },
-      title: { color: WHITE, fontWeight: 800 },
-      sub: { color: "#a8a8a8" },
-      ink: LIME,
-    },
-    {
-      name: "Lime",
-      box: { background: LIME, borderRadius: 18, padding: 14 },
-      title: { color: INK, fontWeight: 800 },
-      sub: { color: "rgba(10,10,10,0.6)" },
-      ink: INK,
-    },
-    {
-      name: "Outline",
-      box: { border: `2px solid ${WHITE}`, borderRadius: 18, padding: 14 },
-      title: { color: WHITE, fontWeight: 800 },
-      sub: { color: "#d4d4d4" },
-      ink: WHITE,
-    },
-    {
-      name: "Gold",
-      box: { background: "rgba(10,10,10,0.72)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: 14 },
-      title: { color: GOLD, fontWeight: 800 },
-      sub: { color: "#c9c9c9" },
-      ink: GOLD,
-    },
-  ];
-}
+/** The swatch each colour shows in the editor's row. */
+export const COLOUR_SWATCHES: { name: string; background: string }[] = [
+  { name: "Night", background: "#111111" },
+  { name: "Lime", background: "linear-gradient(135deg, #a3e635, #22c55e)" },
+  { name: "Glass", background: "rgba(255,255,255,0.28)" },
+  { name: "White", background: WHITE },
+  { name: "Ambient", background: AMBIENT_FALLBACK },
+  { name: "Sunset", background: "linear-gradient(135deg, #f97316, #db2777)" },
+  { name: "Aurora", background: "linear-gradient(135deg, #6366f1, #0ea5e9)" },
+  { name: "Grape", background: "linear-gradient(135deg, #f472b6, #a855f7)" },
+];
+
+/** Card layers — a box you answer. */
+const CARD_LOOKS = colourLooks(22, 14);
+/** Chip layers — a line or two. Squircle, 14 at chip height. */
+const CHIP_LOOKS = colourLooks(14, "7px 14px");
 
 /** Somebody else's post or Shot, carried into a Show. */
 function embedLooks(): Look[] {
@@ -235,12 +224,18 @@ const STICKER_LOOKS: Look[] = [
 const BY_TYPE: Record<LayerType, Look[]> = {
   text: TEXT_LOOKS,
   sticker: STICKER_LOOKS,
-  // A pill for a song or a name, a softer rectangle for a link's two lines.
-  music: chipLooks(100),
-  mention: chipLooks(100),
-  link: chipLooks(14),
-  poll: cardLooks(),
-  question: cardLooks(),
+  music: CHIP_LOOKS,
+  mention: CHIP_LOOKS,
+  link: CHIP_LOOKS,
+  poll: CARD_LOOKS,
+  question: CARD_LOOKS,
+  location: CHIP_LOOKS,
+  hashtag: CHIP_LOOKS,
+  time: CHIP_LOOKS,
+  quiz: CARD_LOOKS,
+  slider: CARD_LOOKS,
+  countdown: CARD_LOOKS,
+  addyours: CARD_LOOKS,
   post: embedLooks(),
   shot: embedLooks(),
 };
@@ -252,10 +247,20 @@ const BY_TYPE: Record<LayerType, Look[]> = {
  * readLayers already clamps it, but this is also called straight from the
  * editor while somebody is cycling.
  */
-export function lookFor(type: LayerType, look: number): Look {
+export function lookFor(type: LayerType, look: number, tint?: string): Look {
   const list = BY_TYPE[type];
   const at = Number.isFinite(look) ? Math.trunc(look) : 0;
-  return list[at >= 0 && at < list.length ? at : 0];
+  const chosen = list[at >= 0 && at < list.length ? at : 0];
+  // Ambient wears the layer's own colour, when it has one.
+  if (tint && list.length > AMBIENT_LOOK && chosen === list[AMBIENT_LOOK]) {
+    return { ...chosen, box: { ...chosen.box, background: tint } };
+  }
+  return chosen;
+}
+
+/** Whether a type picks from the eight colours rather than cycling looks. */
+export function usesColours(type: LayerType): boolean {
+  return BY_TYPE[type] === CARD_LOOKS || BY_TYPE[type] === CHIP_LOOKS;
 }
 
 /** What the editor writes under the layer while it is selected. */
