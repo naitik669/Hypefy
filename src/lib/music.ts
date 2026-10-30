@@ -29,7 +29,7 @@ let playingId: string | null = null;
  * snippet start, not 0:00, so a Diary loops the part its writer picked.
  * Cleared by any play that does not ask to loop.
  */
-let loopFrom: { id: string; start: number } | null = null;
+let loopFrom: { id: string; start: number; end: number | null } | null = null;
 /**
  * Which play() is the latest. A play interrupted by the next one (or by a
  * pause) rejects later; only the latest may say "it did not start", or a
@@ -100,6 +100,13 @@ function ensureAudio(): HTMLAudioElement {
       playingId = null;
       emit();
     };
+    // The end of a picked part is not the end of the file, so it is
+    // watched for rather than waited for.
+    audio.addEventListener("timeupdate", () => {
+      if (audio && loopFrom && loopFrom.end !== null && loopFrom.id === playingId && audio.currentTime >= loopFrom.end) {
+        audio.currentTime = loopFrom.start;
+      }
+    });
     audio.addEventListener("ended", clear);
     audio.addEventListener("pause", clear);
     audio.addEventListener("error", clear);
@@ -135,7 +142,10 @@ export type PlayOpts = {
 };
 
 function setLoop(track: Track, opts?: PlayOpts) {
-  loopFrom = opts?.loop ? { id: track.id, start: track.start ?? 0 } : null;
+  const start = track.start ?? 0;
+  // A Show's song plays only the part its author picked: `length` seconds
+  // from `start`, then round again.
+  loopFrom = opts?.loop ? { id: track.id, start, end: track.length ? start + track.length : null } : null;
 }
 
 function applyMute(a: HTMLAudioElement, opts?: PlayOpts) {

@@ -275,7 +275,8 @@ function ShowScreen({
     if (paused || menuOpen || viewersOpen) {
       pausePreview();
     } else {
-      ensurePreviewPlaying(showTrack);
+      // Only the part its author picked, round and round.
+      ensurePreviewPlaying(showTrack, showTrack.length ? { loop: true } : undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showTrack?.id, paused, menuOpen, viewersOpen]);

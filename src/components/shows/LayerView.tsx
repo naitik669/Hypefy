@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { lookFor } from "@/lib/show-looks";
+import { lookFor, type Look } from "@/lib/show-looks";
 import { ShowPoll, ShowQuestion, type PollState } from "@/components/shows/ShowPoll";
 import { ShowAddYours, ShowCountdown, ShowQuiz, ShowSlider } from "@/components/shows/ShowStickers";
 import type { StickerState } from "@/lib/show-stickers";
@@ -151,34 +151,8 @@ export function LayerBody({
       );
     }
 
-    case "music": {
-      const track = layer.payload as MusicPayload;
-      return (
-        <span
-          style={{ ...look.box, display: "inline-flex", alignItems: "center", gap: 10 }}
-        >
-          <span
-            aria-hidden
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: "50%",
-              flex: "none",
-              background: `conic-gradient(from 210deg, ${look.ink}, #3f6212, ${look.ink})`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#0a0a0a" }} />
-          </span>
-          <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.18, minWidth: 0 }}>
-            <span style={{ ...look.title, fontSize: 12.5 }}>{track.title}</span>
-            <span style={{ ...look.sub, fontSize: 11 }}>{track.artist}</span>
-          </span>
-        </span>
-      );
-    }
+    case "music":
+      return <MusicSticker track={layer.payload as MusicPayload} look={look} editing={editing} />;
 
     case "mention": {
       const { username } = layer.payload as MentionPayload;
@@ -520,5 +494,108 @@ export function LayerStack({
         />
       ))}
     </div>
+  );
+}
+
+/**
+ * A song on a Show, in the style its author swiped to.
+ *
+ * Banner is the default and the old sticker: the disc on the left of a
+ * bar with the title. "Music only" is the song with nothing on the
+ * picture — while arranging it is a faint pill so it can still be found,
+ * and for everyone else it is not drawn at all.
+ */
+function MusicSticker({ track, look, editing }: { track: MusicPayload; look: Look; editing: boolean }) {
+  const style = track.style ?? "banner";
+  const disc = (size: number) => (
+    <span
+      aria-hidden
+      className="animate-spin"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        flex: "none",
+        animationDuration: "4s",
+        background: `radial-gradient(circle, #0a0a0a 0 ${size * 0.09}px, #e5e5e5 ${size * 0.1}px ${size * 0.16}px, transparent ${size * 0.17}px), conic-gradient(from 30deg, #f9a8d4, #a5b4fc, #67e8f9, #fde68a, #f9a8d4)`,
+        boxShadow: "inset 0 0 0 2px rgba(0,0,0,0.25)",
+        display: "block",
+        ...(track.artwork
+          ? {
+              backgroundImage: `radial-gradient(circle, #0a0a0a 0 ${size * 0.09}px, #e5e5e5 ${size * 0.1}px ${size * 0.16}px, transparent ${size * 0.17}px), url("${track.artwork.replace(/"/g, "")}")`,
+              backgroundSize: "cover",
+            }
+          : {}),
+      }}
+    />
+  );
+  const lines = (title: number, sub: number) => (
+    <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.18, minWidth: 0 }}>
+      <span style={{ ...look.title, fontSize: title, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{track.title}</span>
+      <span style={{ ...look.sub, fontSize: sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{track.artist}</span>
+    </span>
+  );
+
+  if (style === "only") {
+    if (!editing) return null;
+    return (
+      <span style={{ ...look.box, ...look.title, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, opacity: 0.8 }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill={look.ink} aria-hidden>
+          <path d="M8.5 6.2V16a3.5 3.5 0 1 1-2-3.2V4.8L21 2.5v4z" />
+        </svg>
+        Music only
+      </span>
+    );
+  }
+  if (style === "cd") {
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+        {disc(92)}
+        <span style={{ ...look.box, padding: "4px 10px", maxWidth: 170 }}>{lines(12, 10)}</span>
+      </span>
+    );
+  }
+  if (style === "waves") {
+    return (
+      <span style={{ ...look.box, display: "inline-flex", alignItems: "center", gap: 10, maxWidth: 240 }}>
+        <span aria-hidden style={{ display: "flex", alignItems: "center", gap: 2.5, height: 30, flex: "none" }}>
+          {[0.45, 0.8, 1, 0.6, 0.9, 0.5, 0.75].map((h, i) => (
+            <span
+              key={i}
+              className={editing ? undefined : "animate-eq"}
+              style={{ width: 3.5, height: 30 * h, borderRadius: 2, background: look.ink, animationDelay: `${i * 90}ms`, display: "block" }}
+            />
+          ))}
+        </span>
+        {lines(12.5, 11)}
+      </span>
+    );
+  }
+  if (style === "type") {
+    return (
+      <span style={{ ...look.box, display: "inline-flex", flexDirection: "column", maxWidth: 240, lineHeight: 0.95 }}>
+        <span style={{ ...look.title, fontSize: 26, letterSpacing: "-0.03em", textTransform: "uppercase", overflowWrap: "anywhere" }}>{track.title}</span>
+        <span style={{ ...look.sub, fontSize: 11.5, marginTop: 4, fontWeight: 700 }}>{track.artist}</span>
+      </span>
+    );
+  }
+  if (style === "cover") {
+    return (
+      <span style={{ ...look.box, display: "inline-flex", flexDirection: "column", gap: 7, width: 132, padding: 7 }}>
+        {track.artwork ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={track.artwork} alt="" draggable={false} style={{ width: 118, height: 118, borderRadius: 12, objectFit: "cover", display: "block" }} />
+        ) : (
+          <span aria-hidden style={{ width: 118, height: 118, borderRadius: 12, background: "linear-gradient(135deg, #fbbf24, #db2777)", display: "block" }} />
+        )}
+        <span style={{ padding: "0 3px 2px" }}>{lines(12, 10.5)}</span>
+      </span>
+    );
+  }
+  return (
+    <span style={{ ...look.box, display: "inline-flex", alignItems: "center", gap: 10, maxWidth: 250 }}>
+      {disc(34)}
+      {lines(12.5, 11)}
+    </span>
   );
 }
