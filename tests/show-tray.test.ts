@@ -36,3 +36,18 @@ describe("the sticker tray", () => {
     expect(nextRecent(["poll", "quiz", "time", "link"], "music")).toEqual(["music", "poll", "quiz", "time"]);
   });
 });
+
+describe("the tray's order", () => {
+  it("puts the tags first, above the pinned shelves", () => {
+    const tray = readFileSync("src/components/shows/StickerTray.tsx", "utf8");
+    const tags = tray.indexOf(">Tags</h2>");
+    expect(tags).toBeGreaterThan(0);
+    expect(tags).toBeLessThan(tray.indexOf('<Shelf title="Ask & play"'));
+  });
+
+  it("and the editor's way on is one small Next, not a bar under the picture", () => {
+    const editor = readFileSync("src/components/shows/ShowEditor.tsx", "utf8");
+    expect(editor).toContain('{busy ? "Posting…" : "Next"}');
+    expect(editor).not.toContain('"Add to your Show"');
+  });
+});

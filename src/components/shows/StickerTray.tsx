@@ -223,10 +223,7 @@ export function StickerTray({
           </div>
         )}
 
-        <Shelf title="Ask & play" tiles={ASK_AND_PLAY} onPick={pick} hint />
-        <Shelf title="Hype & plan" tiles={HYPE_AND_PLAN} onPick={pick} hint />
-        <Shelf title="Yours" tiles={YOURS} onPick={pick} />
-
+        {/* Tags first: the quick ones people reach for most. */}
         <section className="mt-5">
           <h2 className="px-5 text-[11px] font-bold uppercase tracking-[0.14em] text-white/70">Tags</h2>
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-4 px-4 pt-4">
@@ -247,6 +244,11 @@ export function StickerTray({
             ))}
           </div>
         </section>
+
+        <Shelf title="Ask & play" tiles={ASK_AND_PLAY} onPick={pick} hint />
+        <Shelf title="Hype & plan" tiles={HYPE_AND_PLAN} onPick={pick} hint />
+        <Shelf title="Yours" tiles={YOURS} onPick={pick} />
+
       </div>
     </div>
   );

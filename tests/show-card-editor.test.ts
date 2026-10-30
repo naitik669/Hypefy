@@ -46,6 +46,6 @@ describe("the editor", () => {
     expect(editor).not.toContain("QuestionSheet");
   });
   it("tapping one already placed opens it again", () => {
-    expect(editor).toContain("if (isCard(layer)) {\n        setEditingCard(hit);");
+    expect(editor).toContain("if (isCard(chosenLayer)) {\n          setEditingCard(g.id);");
   });
 });
