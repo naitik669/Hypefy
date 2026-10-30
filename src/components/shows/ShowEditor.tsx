@@ -15,6 +15,7 @@ import {
 } from "@/components/shows/CardEditor";
 import { EmbedSheet, type EmbedState } from "@/components/shows/ShowWidgetPickers";
 import { TagWriter, isTagType, type TagType } from "@/components/shows/TagWriter";
+import { MusicEditor } from "@/components/shows/MusicEditor";
 import { COLOUR_SWATCHES, lookFor, lookName, usesColours } from "@/lib/show-looks";
 import { haptics } from "@/lib/haptics";
 import { ambientTint, photoAverage } from "@/lib/ambient";
@@ -127,6 +128,8 @@ export function ShowEditor({
   const [writing, setWriting] = useState<string | null>(null);
   /** The place, tag, person or link being typed on its own sticker. */
   const [tagging, setTagging] = useState<string | null>(null);
+  /** The song whose style and part are being chosen, and how it was before. */
+  const [tuning, setTuning] = useState<{ id: string; before: ShowLayer } | null>(null);
   /** The poll or question being written on, if any. */
   const [editingCard, setEditingCard] = useState<string | null>(null);
   const [tray, setTray] = useState(false);
@@ -385,7 +388,8 @@ export function ShowEditor({
           setEditingCard(g.id);
           return;
         }
-        if (chosenLayer && isTagType(chosenLayer.type)) setTagging(g.id);
+        if (chosenLayer?.type === "music") setTuning({ id: g.id, before: chosenLayer });
+        else if (chosenLayer && isTagType(chosenLayer.type)) setTagging(g.id);
         else if (chosenLayer?.type === "text") setWriting(g.id);
         return;
       }
@@ -497,7 +501,11 @@ export function ShowEditor({
           <div
             key={layer.id}
             className="absolute inset-0 transition-opacity"
-            style={drag?.id === layer.id && drag.hot ? { opacity: 0.55 } : undefined}
+            style={
+              // The song being tuned is drawn large by its editor; the one
+              // on the picture would show through behind it.
+              tuning?.id === layer.id ? { opacity: 0 } : drag?.id === layer.id && drag.hot ? { opacity: 0.55 } : undefined
+            }
           >
             <LayerView layer={layer} frame={frame} editing embeds={embeds} />
           </div>
@@ -507,7 +515,7 @@ export function ShowEditor({
         {/* No plates: bold white with a soft shadow reads on any photo
             and leaves the picture alone. */}
         {/* Put away while a card is being written on: its own Done sits there. */}
-        <div className={`absolute right-2 top-2 z-20 flex flex-col gap-1.5 ${editingCard || selected || drag || tagging ? "hidden" : ""}`}>
+        <div className={`absolute right-2 top-2 z-20 flex flex-col gap-1.5 ${editingCard || selected || drag || tagging || tuning ? "hidden" : ""}`}>
           <RailButton
             label="Add text"
             disabled={full}
@@ -537,7 +545,7 @@ export function ShowEditor({
         <button
           type="button"
           aria-label="Close"
-          data-hidden={!!editingCard || !!drag || !!tagging}
+          data-hidden={!!editingCard || !!drag || !!tagging || !!tuning}
           onClick={onCancel}
           onPointerDown={(e) => e.stopPropagation()}
           className="absolute left-2 top-2 z-20 flex h-12 w-12 items-center justify-center text-white data-[hidden=true]:hidden [filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))_drop-shadow(0_0_8px_rgba(0,0,0,0.3))] transition active:scale-90"
@@ -547,7 +555,7 @@ export function ShowEditor({
 
         {/* While something is selected: its colour wheel up top, and Done
             where the rail was. One tap on the wheel is the next colour. */}
-        {chosen && !drag && !editingCard && !tagging && writing === null && (
+        {chosen && !drag && !editingCard && !tagging && !tuning && writing === null && (
           <>
             <button
               type="button"
@@ -624,7 +632,7 @@ export function ShowEditor({
         })()}
 
         {/* The one way on: small, in the corner, out of the picture's way. */}
-        {!selected && !drag && !tray && !editingCard && !tagging && writing === null && (
+        {!selected && !drag && !tray && !editingCard && !tagging && !tuning && writing === null && (
           <button
             type="button"
             disabled={busy}
@@ -674,6 +682,23 @@ export function ShowEditor({
           );
         })()}
 
+        {(() => {
+          const song = layers.find((l) => l.id === tuning?.id) ?? null;
+          if (!song || !tuning) return null;
+          return (
+            <MusicEditor
+              layer={song}
+              onChange={(payload) => setLayers((l) => l.map((x) => (x.id === song.id ? { ...x, payload } : x)))}
+              onColour={nextColour}
+              onCancel={() => {
+                setLayers((l) => l.map((x) => (x.id === song.id ? tuning.before : x)));
+                setTuning(null);
+              }}
+              onDone={() => setTuning(null)}
+            />
+          );
+        })()}
+
         {tray && (
           <StickerTray
             onClose={() => setTray(false)}
@@ -713,9 +738,10 @@ export function ShowEditor({
 
       <TrackPicker
         open={picking === "music"}
+        pickPart={false}
         onClose={() => setPicking(null)}
         onSelect={(track) => {
-          add("music", {
+          const payload = {
             id: track.id,
             title: track.title,
             artist: track.artist,
@@ -723,8 +749,12 @@ export function ShowEditor({
             preview: track.preview || null,
             ...(track.uri ? { uri: track.uri } : {}),
             ...(track.start ? { start: track.start } : {}),
-          });
+            length: 15,
+          };
+          const id = add("music", payload);
           setPicking(null);
+          // Straight into choosing how it looks and which part plays.
+          if (id) setTuning({ id, before: { id, type: "music", ...dropAt(layers.length), look: 0, payload } as ShowLayer });
         }}
       />
       <EmbedSheet

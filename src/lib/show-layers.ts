@@ -128,7 +128,17 @@ export type MusicPayload = {
   uri?: string;
   /** Seconds into the song where the part that plays begins. */
   start?: number;
+  /** How many seconds of it play, from `start`: 5 to 30. */
+  length?: number;
+  /** How the sticker looks; "only" is the song with nothing on the picture. */
+  style?: MusicStyle;
 };
+
+export const MUSIC_STYLES = ["banner", "cd", "waves", "type", "cover", "only"] as const;
+export type MusicStyle = (typeof MUSIC_STYLES)[number];
+/** The lengths a Show's song can play for. Every song is a 30-second preview for now. */
+export const MUSIC_LENGTHS = [5, 10, 15, 20, 25, 30] as const;
+export const SONG_SPAN = 30;
 export type MentionPayload = { username: string };
 export type LinkPayload = { url: string };
 export type PollPayload = { question: string; options: string[] };
@@ -285,6 +295,12 @@ function readPayload(type: LayerType, raw: unknown): LayerPayload | null {
         ...(typeof p.uri === "string" && SPOTIFY_URI.test(p.uri) ? { uri: p.uri } : {}),
         ...(typeof p.start === "number" && Number.isFinite(p.start) && p.start > 0 && p.start <= MAX_SONG_START
           ? { start: Math.round(p.start * 10) / 10 }
+          : {}),
+        ...(typeof p.length === "number" && (MUSIC_LENGTHS as readonly number[]).includes(p.length)
+          ? { length: p.length }
+          : {}),
+        ...(typeof p.style === "string" && (MUSIC_STYLES as readonly string[]).includes(p.style) && p.style !== "banner"
+          ? { style: p.style as MusicStyle }
           : {}),
       };
     }

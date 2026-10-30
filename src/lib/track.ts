@@ -22,6 +22,8 @@ export type Track = {
   durationMs?: number;
   /** Seconds into the track to start from (snippet selection). */
   start?: number;
+  /** How many seconds from `start` play before going round again. A Show's song. */
+  length?: number;
   /** "Listen on" link — Apple Music or Spotify, depending on the source. */
   appleUrl?: string;
 };
@@ -39,6 +41,7 @@ export function parseTrack(raw: unknown): Track | null {
   if (!t.id || !t.title || !(t.preview || t.uri)) return null;
   const start = Number(t.start);
   const durationMs = Number(t.durationMs);
+  const length = Number(t.length);
   return {
     id: String(t.id),
     title: String(t.title),
@@ -48,6 +51,7 @@ export function parseTrack(raw: unknown): Track | null {
     ...(t.uri ? { uri: String(t.uri) } : {}),
     ...(Number.isFinite(durationMs) && durationMs > 0 ? { durationMs } : {}),
     ...(Number.isFinite(start) && start > 0 ? { start } : {}),
+    ...(Number.isFinite(length) && length >= 5 && length <= 60 ? { length: Math.round(length) } : {}),
     ...(t.appleUrl ? { appleUrl: String(t.appleUrl) } : {}),
   };
 }

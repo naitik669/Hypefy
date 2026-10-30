@@ -122,10 +122,16 @@ export function TrackPicker({
   open,
   onClose,
   onSelect,
+  pickPart = true,
 }: {
   open: boolean;
   onClose: () => void;
   onSelect: (track: Track) => void;
+  /**
+   * Whether picking a song goes on to choosing the moment it starts. A
+   * Show chooses its part on the sticker, so it takes the song as it is.
+   */
+  pickPart?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -265,6 +271,12 @@ export function TrackPicker({
   }, [open]);
 
   function openSnippet(track: Track) {
+    if (!pickPart) {
+      stopPreview();
+      onSelect(track);
+      onClose();
+      return;
+    }
     stopPreview();
     setSnippet(track);
     setMarked(track.id);
