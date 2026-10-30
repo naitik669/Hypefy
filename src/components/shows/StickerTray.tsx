@@ -7,9 +7,12 @@ import type { LayerType, ShowLayer } from "@/lib/show-layers";
 
 /** The widgets, each opening its own picker. Kept in the order people reach for them. */
 /** The widgets that open a picker of their own. */
-export type SheetKey = "music" | "mention" | "link" | "poll" | "question" | "embed";
-/** Those placed straight onto the picture: typed at the foot, or stamped. */
-export type DirectKey = "location" | "hashtag" | "time";
+export type SheetKey = "music" | "mention" | "link" | "embed";
+/**
+ * Those placed straight onto the picture: written on the sticker itself
+ * (poll, question), typed at the foot (location, hashtag), or stamped (time).
+ */
+export type DirectKey = "poll" | "question" | "location" | "hashtag" | "time";
 export type WidgetKey = SheetKey | DirectKey;
 
 /**

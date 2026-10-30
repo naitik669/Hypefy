@@ -6,12 +6,11 @@ import { LayerBody, LayerView } from "@/components/shows/LayerView";
 import { TransformBox } from "@/components/shows/TransformBox";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { StickerTray, type SheetKey, type WidgetKey } from "@/components/shows/StickerTray";
-import { PollComposer } from "@/components/messages/PollComposer";
+import { CardEditor, cardIsBlank, isCard, tidyCard } from "@/components/shows/CardEditor";
 import {
   EmbedSheet,
   LinkSheet,
   MentionSheet,
-  QuestionSheet,
   type EmbedState,
 } from "@/components/shows/ShowWidgetPickers";
 import { COLOUR_SWATCHES, lookName, usesColours } from "@/lib/show-looks";
@@ -40,11 +39,12 @@ import { topmostAt, type Placed } from "@/lib/transform-gesture";
  * you see here is the card your circle gets" — and it holds harder here,
  * because every layer is drawn by the same component the viewer uses.
  *
- * Everything a layer can be is reachable from one tray. Three of the
- * pickers behind it are the app's own, reused rather than rebuilt — a
- * song comes from TrackPicker, a poll from PollComposer, and a mention
- * from the same people search the chat composer's typeahead uses — and
- * three are in ShowWidgetPickers because they had nowhere to come from.
+ * Everything a layer can be is reachable from one tray. A poll or a
+ * question is written on the sticker itself (CardEditor); words, a place
+ * and a tag are typed at the foot; the time is stamped. The rest come from
+ * pickers: a song from the app's own TrackPicker, a mention from the same
+ * people search the chat composer's typeahead uses, and a link or an
+ * embed from ShowWidgetPickers.
  *
  * An embed is picked here but not *stored* here: the layer keeps only
  * the post's id, and its picture is handed to the renderer separately,
@@ -94,6 +94,8 @@ export function ShowEditor({
   const [layers, setLayers] = useState<ShowLayer[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [writing, setWriting] = useState<string | null>(null);
+  /** The poll or question being written on, if any. */
+  const [editingCard, setEditingCard] = useState<string | null>(null);
   const [tray, setTray] = useState(false);
   /** Which picker is open, if any. */
   const [picking, setPicking] = useState<Picker>(null);
@@ -170,6 +172,13 @@ export function ShowEditor({
       if (id) setWriting(id);
     } else if (key === "time") {
       add("time", { at: new Date().toISOString() });
+    } else if (key === "poll") {
+      // Placed blank and written on the sticker itself.
+      const id = add("poll", { question: "", options: ["", ""] });
+      if (id) setEditingCard(id);
+    } else if (key === "question") {
+      const id = add("question", { prompt: "" });
+      if (id) setEditingCard(id);
     } else {
       setPicking(key);
     }
@@ -214,8 +223,13 @@ export function ShowEditor({
       return;
     }
     if (hit === selected) {
-      // Chips and cards pick a colour from the row below instead.
-      const layer = layers.find((x) => x.id === hit);
+      // A poll or a question opens to be written on again; other chips
+      // and cards pick a colour from the row below instead.
+      const layer = layers.find((x) => x.id === hit) ?? null;
+      if (isCard(layer)) {
+        setEditingCard(hit);
+        return;
+      }
       if (layer && usesColours(layer.type)) return;
       remember();
       setLayers((l) =>
@@ -268,7 +282,7 @@ export function ShowEditor({
           ),
         )}
 
-        {chosen && (
+        {chosen && chosen.id !== editingCard && (
           <TransformBox
             placed={chosen}
             frame={frame}
@@ -324,7 +338,9 @@ export function ShowEditor({
             role="radiogroup"
             aria-label="Sticker colour"
             onPointerDown={(e) => e.stopPropagation()}
-            className="absolute inset-x-0 bottom-4 z-20 flex justify-center gap-2.5"
+            // Above the card being written on, so its colour can change
+            // while you type.
+            className={`absolute inset-x-0 bottom-4 flex justify-center gap-2.5 ${editingCard ? "z-40" : "z-20"}`}
             data-colour-row
           >
             {COLOUR_SWATCHES.map((sw, i) => {
@@ -353,6 +369,29 @@ export function ShowEditor({
             </span>
           </div>
         ) : null}
+
+        {(() => {
+          const card = layers.find((l) => l.id === editingCard) ?? null;
+          if (!isCard(card)) return null;
+          return (
+            <CardEditor
+              layer={card}
+              onChange={(payload) =>
+                setLayers((l) => l.map((x) => (x.id === card.id ? { ...x, payload } : x)))
+              }
+              onDone={() => {
+                if (cardIsBlank(card)) {
+                  // Opened and left empty: as if it had never been added.
+                  setLayers((l) => l.filter((x) => x.id !== card.id));
+                  setSelected(null);
+                } else {
+                  setLayers((l) => l.map((x) => (x.id === card.id ? tidyCard(card) : x)));
+                }
+                setEditingCard(null);
+              }}
+            />
+          );
+        })()}
 
         {tray && (
           <StickerTray
@@ -418,21 +457,6 @@ export function ShowEditor({
         open={picking === "link"}
         onClose={() => setPicking(null)}
         onPick={(url) => add("link", { url })}
-      />
-      <PollComposer
-        open={picking === "poll"}
-        onClose={() => setPicking(null)}
-        onSend={(question, options) => {
-          // A Show poll takes one answer each, so the composer's
-          // multiple-choice switch has nothing to set here.
-          add("poll", { question, options });
-          setPicking(null);
-        }}
-      />
-      <QuestionSheet
-        open={picking === "question"}
-        onClose={() => setPicking(null)}
-        onPick={(prompt) => add("question", { prompt })}
       />
       <EmbedSheet
         open={picking === "embed"}

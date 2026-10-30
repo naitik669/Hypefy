@@ -65,11 +65,12 @@ describe("the pickers that already existed are the ones used", () => {
     expect(editor).toContain('open={picking === "music"}');
   });
 
-  it("a poll comes from the chat composer, so one validator decides what is a poll", () => {
-    expect(editor).toContain('import { PollComposer } from "@/components/messages/PollComposer";');
-    // tidyOptions / pollReady live behind it; readPayload asks the same
-    // questions again on the way into the column.
-    expect(editor).toContain("add(\"poll\", { question, options });");
+  it("a poll is written on the sticker, and kept by the chat's own validator", () => {
+    // tidyOptions decides what is an option, for chat polls and Show polls
+    // alike; readPayload asks the same questions on the way into the column.
+    const card = read("src/components/shows/CardEditor.tsx");
+    expect(card).toContain("options: tidyOptions(poll.options)");
+    expect(editor).toContain('add("poll", { question: "", options: ["", ""] });');
   });
 
   it("and a mention is the same people search the chat typeahead runs", () => {
@@ -83,13 +84,13 @@ describe("the pickers that already existed are the ones used", () => {
   it("a link sheet cannot offer one the parser would refuse", () => {
     // readPayload takes https only. The sheet checks the same shape, so
     // a link is never silently dropped after it was added.
-    const check = pickers.slice(pickers.indexOf("const LINK_OK"), pickers.indexOf("export function QuestionSheet"));
+    const check = pickers.slice(pickers.indexOf("const LINK_OK"), pickers.indexOf("export function MentionSheet"));
     expect(check).toContain("/^https:\\/\\/[^\\s]+$/i");
     expect(check).toContain("disabled={!url}");
   });
 
   it("and typing a bare host is read as the link it plainly is", () => {
-    const check = pickers.slice(pickers.indexOf("const url = (() => {"), pickers.indexOf("export function QuestionSheet"));
+    const check = pickers.slice(pickers.indexOf("const url = (() => {"), pickers.indexOf("export function MentionSheet"));
     expect(check).toContain('`https://${t}`');
     expect(check).toContain('replace(/^http:\\/\\//i, "https://")');
   });
