@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { lookFor, type Look } from "@/lib/show-looks";
 import { ShowPoll, ShowQuestion, type PollState } from "@/components/shows/ShowPoll";
@@ -26,6 +27,7 @@ import {
   type SliderPayload,
   type CountdownPayload,
   type AddYoursPayload,
+  type SpotlightPayload,
 } from "@/lib/show-layers";
 
 /**
@@ -266,68 +268,9 @@ export function LayerBody({
     }
 
     case "post":
-    case "shot": {
-      const id =
-        layer.type === "post"
-          ? (layer.payload as PostPayload).postId
-          : (layer.payload as ShotPayload).shotId;
-      const href = layer.type === "post" ? `/p/${id}` : `/shots/${id}`;
-      // The picture is fetched by id and never stored on the layer: a
-      // post that is deleted or taken down has to stop appearing inside
-      // every Show that embedded it, and a thumbnail copied into the
-      // layer would outlive the takedown.
-      const embed = embeds?.[layer.id];
-      const label = embed?.gone
-        ? `This ${layer.type === "post" ? "post" : "Shot"} is gone`
-        : embed?.caption?.trim() ||
-          (layer.type === "post" ? "Post · tap to open" : "Shot · tap to open");
-      const body = (
-        <span
-          style={{
-            ...look.box,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-            width: 170,
-          }}
-        >
-          {embed?.thumb && !embed.gone ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={embed.thumb}
-              alt=""
-              style={{ display: "block", width: "100%", height: 112, objectFit: "cover" }}
-            />
-          ) : (
-            <span
-              aria-hidden
-              style={{
-                display: "block",
-                height: 112,
-                background: "linear-gradient(160deg, #1b2320 0%, #101010 100%)",
-              }}
-            />
-          )}
-          <span
-            style={{
-              ...look.sub,
-              display: "block",
-              padding: "8px 10px",
-              fontSize: 10.5,
-              fontWeight: 700,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {label}
-          </span>
-        </span>
-      );
-      // A layer whose thing is gone stops being a door to it.
-      if (editing || embed?.gone) return body;
-      return <Link href={href}>{body}</Link>;
-    }
+    case "shot":
+    case "spotlight":
+      return <EmbedSticker layer={layer} look={look} embed={embeds?.[layer.id]} editing={editing} />;
 
     case "location": {
       const { place, area } = layer.payload as LocationPayload;
@@ -596,6 +539,154 @@ function MusicSticker({ track, look, editing }: { track: MusicPayload; look: Loo
     <span style={{ ...look.box, display: "inline-flex", alignItems: "center", gap: 10, maxWidth: 250 }}>
       {disc(34)}
       {lines(12.5, 11)}
+    </span>
+  );
+}
+
+/**
+ * A post, a Shot or a Spotlight page on a Show.
+ *
+ * The picture is fetched by id and never stored on the layer: a post that
+ * is deleted or taken down has to stop appearing inside every Show that
+ * embedded it, and a thumbnail copied into the layer would outlive the
+ * takedown. A Shot in its tall style plays where it sits, muted, the way
+ * a reel does in a story; tapping it opens it.
+ */
+function EmbedSticker({
+  layer,
+  look,
+  embed,
+  editing,
+}: {
+  layer: ShowLayer;
+  look: Look;
+  embed: EmbedState | undefined;
+  editing: boolean;
+}) {
+  if (layer.type === "spotlight") {
+    const { ownerId } = layer.payload as SpotlightPayload;
+    const body = (
+      <span
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          width: 180,
+          minHeight: 150,
+          padding: 14,
+          borderRadius: 22,
+          background: embed?.color || "linear-gradient(165deg, #2a3a12, #0e0e0e)",
+          color: "#ffffff",
+          boxShadow: "0 12px 28px rgba(0,0,0,0.35)",
+        }}
+      >
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.7 }}>
+          Spotlight{embed?.author ? ` · @${embed.author}` : ""}
+        </span>
+        <span style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.12, display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {embed?.gone ? "This page has ended" : embed?.caption || "Your Spotlight page"}
+        </span>
+      </span>
+    );
+    if (editing || embed?.gone) return body;
+    return <Link href={`/messages/spotlight?page=${encodeURIComponent(ownerId)}`}>{body}</Link>;
+  }
+
+  const isShot = layer.type === "shot";
+  const id = isShot ? (layer.payload as ShotPayload).shotId : (layer.payload as PostPayload).postId;
+  const style = (layer.payload as PostPayload | ShotPayload).style ?? (isShot ? "tall" : "card");
+  const href = isShot ? `/shots/${id}` : `/p/${id}`;
+  const gone = !!embed?.gone;
+  const label = gone
+    ? `This ${isShot ? "Shot" : "post"} is gone`
+    : embed?.caption?.trim() || (isShot ? "Shot · tap to open" : "Post · tap to open");
+  // It plays while being arranged too, so what is placed is what plays.
+  const plays = isShot && !gone && !!embed?.video;
+  const picture = (w: number, h: number, radius: number) =>
+    plays ? (
+      <ShotLoop src={embed!.video!} poster={embed?.thumb ?? null} width={w} height={h} radius={radius} />
+    ) : embed?.thumb && !gone ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={embed.thumb} alt="" draggable={false} style={{ display: "block", width: w, height: h, objectFit: "cover", borderRadius: radius }} />
+    ) : (
+      <span aria-hidden style={{ display: "block", width: w, height: h, borderRadius: radius, background: "linear-gradient(160deg, #1b2320 0%, #101010 100%)" }} />
+    );
+  const byline = embed?.author ? (
+    <span style={{ fontSize: 11.5, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>@{embed.author}</span>
+  ) : null;
+
+  let body: React.ReactNode;
+  if (style === "tall") {
+    body = (
+      <span style={{ position: "relative", display: "block", width: 150, height: 266, borderRadius: 22, border: "3px solid #ffffff", overflow: "hidden", boxShadow: "0 14px 30px rgba(0,0,0,0.4)", background: "#111" }}>
+        {picture(144, 260, 0)}
+        {isShot && !plays && (
+          <span aria-hidden style={{ position: "absolute", left: "50%", top: "50%", width: 46, height: 46, margin: "-23px 0 0 -23px", borderRadius: 16, background: "rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M7 4.5v15l13-7.5z" /></svg>
+          </span>
+        )}
+        <span style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "28px 10px 9px", background: "linear-gradient(transparent, rgba(0,0,0,0.75))", color: "#fff", display: "flex", flexDirection: "column", gap: 2 }}>
+          {byline}
+          <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+        </span>
+      </span>
+    );
+  } else if (style === "compact") {
+    body = (
+      <span style={{ ...look.box, display: "flex", alignItems: "center", gap: 10, width: 240, padding: "7px 14px 7px 7px" }}>
+        <span style={{ flex: "none" }}>{picture(54, 54, 13)}</span>
+        <span style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: 2 }}>
+          <span style={{ ...look.title, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+          <span style={{ ...look.sub, fontSize: 11, fontWeight: 700 }}>
+            {embed?.author ? `@${embed.author} · ` : ""}
+            {isShot ? "Shot" : "Post"}
+          </span>
+        </span>
+      </span>
+    );
+  } else if (style === "bubble") {
+    body = (
+      <span style={{ display: "block", width: 104, height: 104, borderRadius: "50%", border: "4px solid #a3e635", overflow: "hidden", boxShadow: "0 10px 24px rgba(0,0,0,0.4)" }}>
+        {picture(96, 96, 48)}
+      </span>
+    );
+  } else {
+    body = (
+      <span style={{ ...look.box, display: "flex", flexDirection: "column", gap: 7, width: 178, padding: 8, overflow: "hidden" }}>
+        {byline && <span style={{ ...look.title, padding: "0 3px" }}>{byline}</span>}
+        {picture(162, 170, 13)}
+        <span style={{ ...look.sub, fontSize: 11.5, fontWeight: 700, padding: "0 3px 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      </span>
+    );
+  }
+  // A layer whose thing is gone stops being a door to it.
+  if (editing || gone) return body;
+  return <Link href={href}>{body}</Link>;
+}
+
+/** A Shot playing in place: muted, round and round, with how far along it is. */
+function ShotLoop({ src, poster, width, height, radius }: { src: string; poster: string | null; width: number; height: number; radius: number }) {
+  const [progress, setProgress] = useState(0);
+  return (
+    <span style={{ position: "relative", display: "block", width, height }}>
+      <video
+        src={src}
+        poster={poster ?? undefined}
+        autoPlay
+        muted
+        loop
+        playsInline
+        onTimeUpdate={(e) => {
+          const v = e.currentTarget;
+          if (v.duration) setProgress(v.currentTime / v.duration);
+        }}
+        style={{ display: "block", width, height, objectFit: "cover", borderRadius: radius }}
+      />
+      {height > 120 && (
+        <span aria-hidden style={{ position: "absolute", left: 8, right: 8, top: 8, height: 3, borderRadius: 2, background: "rgba(255,255,255,0.35)" }}>
+          <span style={{ display: "block", height: 3, borderRadius: 2, width: `${progress * 100}%`, background: "#fff" }} />
+        </span>
+      )}
     </span>
   );
 }

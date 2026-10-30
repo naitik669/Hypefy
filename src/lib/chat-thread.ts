@@ -70,6 +70,9 @@ export type ChatMsg = {
      *  the id: the words are read live, so an edit follows it and a deleted
      *  one says so, rather than the chat keeping a copy for ever. */
     comment_id?: string;
+    /** A reply to a Show: which Show it answers (send_message, 0191). Only
+     *  the id, and only kept when the sender could see it. */
+    show_id?: string;
     /** A poll (0174): the options as written, whether more than one may be
      *  chosen, and the tally, which cast_poll_vote recomputes on every vote
      *  so the thread learns the new counts through the message UPDATE it is

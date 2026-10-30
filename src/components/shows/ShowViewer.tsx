@@ -77,6 +77,7 @@ import { showDurationMs, showMediaKind } from "@/lib/show-media";
 import { isVideoUrl } from "@/lib/video-mime";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { readLayers, showSong } from "@/lib/show-layers";
+import { diaryTheme } from "@/components/diary/DiaryPage";
 import { keepShow, unkeepShow } from "@/lib/show-keep";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { LayerStack } from "@/components/shows/LayerView";
@@ -355,10 +356,7 @@ function ShowScreen({
     }
   }
 
-  /**
-   * Send a Show reply as a DM to the owner. Without a show_id column on
-   * messages, we prefix a context line so the chat reads like a story reply.
-   */
+  /** Send a Show reply as a DM to the owner, carrying which Show it answers. */
   async function sendReply() {
     const text = reply.trim();
     if (!text || sendingReply || !currentUserId || isOwner) return;
@@ -386,14 +384,18 @@ function ShowScreen({
       return;
     }
 
-    const body = `↩️ Replied to your Show: ${text}`;
+    // The Show it answers travels with it (0191), and the chat draws it
+    // above the words — so the words are only the words. They used to
+    // open with a fixed prefix, which said which kind of thing they
+    // answered and never which one.
     const { error: sendErr } = await supabase.rpc("send_message", {
       p_conversation_id: convId,
-      p_body: body,
+      p_body: text,
       p_kind: "text",
       p_post_id: undefined,
       p_reply_to_id: undefined,
       p_shot_id: undefined,
+      p_metadata: { show_id: show.id },
     });
 
     setSendingReply(false);
@@ -537,7 +539,7 @@ function ShowScreen({
    */
   const [embeds, setEmbeds] = useState<Record<string, EmbedState>>({});
   const embedded = useMemo(
-    () => layers.filter((l) => l.type === "post" || l.type === "shot"),
+    () => layers.filter((l) => l.type === "post" || l.type === "shot" || l.type === "spotlight"),
     [layers],
   );
   useEffect(() => {
@@ -550,23 +552,27 @@ function ShowScreen({
     const shotIds = embedded
       .filter((l) => l.type === "shot")
       .map((l) => (l.payload as { shotId: string }).shotId);
+    const wantsSpotlight = embedded.some((l) => l.type === "spotlight");
 
     void (async () => {
-      const [posts, shots] = await Promise.all([
+      const [posts, shots, notes] = await Promise.all([
         postIds.length
           ? supabase
               .from("posts")
-              .select("id, image_url, image_urls, caption, body")
+              .select("id, image_url, image_urls, caption, body, author:profiles!posts_user_id_fkey(username)")
               .in("id", postIds)
               .is("removed_at", null)
           : Promise.resolve({ data: [] as never[] }),
         shotIds.length
           ? supabase
               .from("shots")
-              .select("id, poster_url, caption")
+              .select("id, poster_url, caption, media_url, author:profiles!shots_user_id_fkey(username)")
               .in("id", shotIds)
               .is("removed_at", null)
           : Promise.resolve({ data: [] as never[] }),
+        // A Spotlight page is read through get_notes, which already decides
+        // who may see whose: one you may not see reads as ended.
+        wantsSpotlight ? supabase.rpc("get_notes") : Promise.resolve({ data: [] as never[] }),
       ]);
       if (dropped) return;
 
@@ -576,22 +582,30 @@ function ShowScreen({
           {
             thumb: p.image_url ?? p.image_urls?.[0] ?? null,
             caption: p.caption ?? p.body ?? null,
+            author: authorOf(p.author),
           } satisfies EmbedState,
         ]),
       );
       const byShot = new Map(
         (shots.data ?? []).map((s) => [
           s.id,
-          { thumb: s.poster_url ?? null, caption: s.caption ?? null } satisfies EmbedState,
+          {
+            thumb: s.poster_url ?? null,
+            caption: s.caption ?? null,
+            video: s.media_url ?? null,
+            author: authorOf(s.author),
+          } satisfies EmbedState,
         ]),
       );
 
       const next: Record<string, EmbedState> = {};
       for (const layer of embedded) {
         const found =
-          layer.type === "post"
-            ? byPost.get((layer.payload as { postId: string }).postId)
-            : byShot.get((layer.payload as { shotId: string }).shotId);
+          layer.type === "spotlight"
+            ? spotlightOf(notes.data, (layer.payload as { ownerId: string }).ownerId)
+            : layer.type === "post"
+              ? byPost.get((layer.payload as { postId: string }).postId)
+              : byShot.get((layer.payload as { shotId: string }).shotId);
         next[layer.id] = found ?? { thumb: null, caption: null, gone: true };
       }
       setEmbeds(next);
@@ -1301,4 +1315,28 @@ function ShowScreen({
       )}
     </div>
   );
+}
+
+/** A joined profile's username, whichever shape the join came back in. */
+function authorOf(raw: unknown): string | null {
+  const p = Array.isArray(raw) ? raw[0] : raw;
+  return p && typeof p === "object" && typeof (p as { username?: unknown }).username === "string"
+    ? (p as { username: string }).username
+    : null;
+}
+
+/** Somebody's Spotlight page from get_notes, as an embed shows it, or undefined when it has ended. */
+function spotlightOf(rows: unknown, ownerId: string): EmbedState | undefined {
+  if (!Array.isArray(rows)) return undefined;
+  const note = rows.find((r) => r && typeof r === "object" && (r as { user_id?: unknown }).user_id === ownerId) as
+    | { text?: string; color?: string | null; username?: string | null; image_url?: string | null; avatar_hue?: number | null }
+    | undefined;
+  if (!note) return undefined;
+  return {
+    thumb: note.image_url ?? null,
+    caption: note.text ?? null,
+    // The page's own background, as Spotlight draws it.
+    color: diaryTheme(note.color, note.avatar_hue ?? 280).background,
+    author: note.username ?? null,
+  };
 }

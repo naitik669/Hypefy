@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LayerBody } from "@/components/shows/LayerView";
+import { StyleCarousel } from "@/components/shows/StyleCarousel";
 import { ensurePreviewPlaying, parseTrack, stopPreview } from "@/lib/music";
 import {
   MUSIC_LENGTHS,
@@ -65,8 +66,6 @@ const STYLE_NAME: Record<MusicStyle, string> = {
 
 /** The carousel's order: Music only first, Banner where the eye lands. */
 const ORDER: MusicStyle[] = ["only", "type", "banner", "cd", "waves", "cover"];
-const ITEM = 56;
-const GAP = 14;
 
 /** A sound graph for a song that has none to read: fixed per song, so it does not shuffle. */
 export function soundGraph(seed: string, bars: number): number[] {
@@ -113,7 +112,6 @@ export function MusicEditor({
   const length = music.length ?? 15;
   const start = clampStart(music.start ?? 0, length);
   const [lengths, setLengths] = useState(false);
-  const rowRef = useRef<HTMLDivElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const bars = useMemo(() => soundGraph(music.id, 52), [music.id]);
 
@@ -128,27 +126,6 @@ export function MusicEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trackKey]);
   useEffect(() => () => stopPreview(), []);
-
-  // The chosen style sits in the middle of the row when this opens.
-  useEffect(() => {
-    const row = rowRef.current;
-    if (row) row.scrollLeft = ORDER.indexOf(style) * (ITEM + GAP);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /** Swiping settles on whichever icon is in the middle. */
-  function onRowScroll() {
-    const row = rowRef.current;
-    if (!row) return;
-    const at = Math.round(row.scrollLeft / (ITEM + GAP));
-    const next = ORDER[Math.min(Math.max(at, 0), ORDER.length - 1)];
-    if (next !== style) set({ style: next });
-  }
-
-  function pick(next: MusicStyle) {
-    rowRef.current?.scrollTo({ left: ORDER.indexOf(next) * (ITEM + GAP), behavior: "smooth" });
-    set({ style: next });
-  }
 
   /** Dragging the window along the sound graph moves the part that plays. */
   function onStripDown(e: React.PointerEvent) {
@@ -172,8 +149,6 @@ export function MusicEditor({
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
   }
-
-  const pad = `calc(50% - ${ITEM / 2}px)`;
 
   return (
     <div
@@ -219,43 +194,12 @@ export function MusicEditor({
 
       {/* The styles: a carousel of icons, the middle one chosen. */}
       <div className="absolute inset-x-0 bottom-[148px]">
-        <div className="relative">
-          <span
-            aria-hidden
-            className="pointer-events-none absolute left-1/2 top-1/2 z-10 block h-[68px] w-[68px] -translate-x-1/2 -translate-y-1/2 rounded-[23px] border-[3px] border-accent"
-          />
-          <div
-            ref={rowRef}
-            role="radiogroup"
-            aria-label="Music sticker style"
-            onScroll={onRowScroll}
-            className="no-scrollbar flex snap-x snap-mandatory items-center overflow-x-auto py-2"
-            style={{ gap: GAP, paddingLeft: pad, paddingRight: pad, touchAction: "pan-x" }}
-          >
-            {ORDER.map((s) => {
-              const on = s === style;
-              return (
-                <button
-                  key={s}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  aria-label={STYLE_NAME[s]}
-                  onClick={() => pick(s)}
-                  className={`flex shrink-0 snap-center items-center justify-center rounded-[19px] text-white transition ${
-                    on ? "bg-white/25" : "bg-white/[0.14] opacity-70"
-                  }`}
-                  style={{ width: ITEM, height: ITEM }}
-                >
-                  {STYLE_ICON[s]}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <p className="mt-1.5 text-center text-xs font-extrabold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.6)]">
-          {STYLE_NAME[style]}
-        </p>
+        <StyleCarousel
+          label="Music sticker style"
+          options={ORDER.map((s) => ({ key: s, name: STYLE_NAME[s], icon: STYLE_ICON[s] }))}
+          value={style}
+          onChange={(next) => set({ style: next })}
+        />
       </div>
 
       {/* One line: how long, and which part. */}

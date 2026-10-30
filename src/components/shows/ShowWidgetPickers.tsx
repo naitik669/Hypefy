@@ -5,6 +5,7 @@ import { Link2, MessageCircleQuestion, Image as ImageIcon, Film } from "lucide-r
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { diaryTheme } from "@/components/diary/DiaryPage";
 
 /**
  * The sheet behind the Show editor's embed sticker: picking one of your
@@ -18,10 +19,24 @@ export type EmbedState = {
   caption: string | null;
   /** Deleted, or taken down, since the Show was made. */
   gone?: boolean;
+  /** A Shot's clip, so it can play where it sits. */
+  video?: string | null;
+  /** Whose it is. */
+  author?: string | null;
+  /** A Spotlight page's own colour. */
+  color?: string | null;
 };
 
 /** One of your own posts or Shots, as the picker lists it. */
-type Mine = { kind: "post" | "shot"; id: string; thumb: string | null; caption: string | null };
+type Mine = {
+  kind: "post" | "shot" | "spotlight";
+  id: string;
+  thumb: string | null;
+  caption: string | null;
+  /** A Shot's clip, so it plays in the editor as it will on the Show. */
+  video?: string | null;
+  color?: string | null;
+};
 
 /**
  * Your own posts and Shots, to embed one.
@@ -30,6 +45,8 @@ type Mine = { kind: "post" | "shot"; id: string; thumb: string | null; caption: 
  * and a picker over everybody's would be a way of attaching a stranger's
  * picture to your Show.
  */
+export type EmbedChoice = Mine;
+
 export function EmbedSheet({
   open,
   onClose,
@@ -54,7 +71,7 @@ export function EmbedSheet({
         return;
       }
 
-      const [posts, shots] = await Promise.all([
+      const [posts, shots, notes] = await Promise.all([
         supabase
           .from("posts")
           .select("id, image_url, image_urls, caption, body, created_at")
@@ -64,15 +81,31 @@ export function EmbedSheet({
           .limit(24),
         supabase
           .from("shots")
-          .select("id, poster_url, caption, created_at")
+          .select("id, poster_url, caption, media_url, created_at")
           .eq("user_id", me)
           .is("removed_at", null)
           .order("created_at", { ascending: false })
           .limit(24),
+        // Your Spotlight page, if one is up: get_notes lists yours first.
+        supabase.rpc("get_notes"),
       ]);
+      const page = (Array.isArray(notes.data) ? notes.data : []).find(
+        (n) => (n as { is_self?: boolean }).is_self,
+      ) as { text?: string; color?: string | null; avatar_hue?: number | null } | undefined;
 
       if (dropped) return;
       setMine([
+        ...(page
+          ? [
+              {
+                kind: "spotlight" as const,
+                id: me,
+                thumb: null,
+                caption: page.text ?? null,
+                color: diaryTheme(page.color, page.avatar_hue ?? 280).background,
+              },
+            ]
+          : []),
         ...(posts.data ?? []).map((p) => ({
           kind: "post" as const,
           id: p.id,
@@ -84,6 +117,7 @@ export function EmbedSheet({
           id: s.id,
           thumb: s.poster_url ?? null,
           caption: s.caption ?? null,
+          video: s.media_url ?? null,
         })),
       ]);
     })();
@@ -95,6 +129,7 @@ export function EmbedSheet({
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Embed something of yours" size="tall">
+      <p className="px-4 pb-3 text-xs text-muted">One per Show — picking another swaps it.</p>
       <div className="px-4 pb-4">
         {mine === null && <p className="py-10 text-center text-sm text-muted">Finding them…</p>}
         {mine !== null && mine.length === 0 && (
@@ -116,7 +151,15 @@ export function EmbedSheet({
                 }}
                 className="relative aspect-square overflow-hidden rounded-xl bg-surface transition active:scale-95"
               >
-                {item.thumb ? (
+                {item.kind === "spotlight" ? (
+                  <span
+                    className="flex h-full w-full flex-col justify-between p-2 text-left text-white"
+                    style={{ background: item.color ?? undefined }}
+                  >
+                    <span className="text-[9px] font-extrabold uppercase tracking-wider opacity-75">Your Spotlight</span>
+                    <span className="line-clamp-3 text-[12px] font-extrabold leading-tight">{item.caption}</span>
+                  </span>
+                ) : item.thumb ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={item.thumb} alt="" className="h-full w-full object-cover" />
                 ) : (
