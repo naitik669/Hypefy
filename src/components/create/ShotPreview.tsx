@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Music } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
@@ -18,7 +18,8 @@ import { BLANK_POSTER } from "@/lib/blank-poster";
 import { useObjectUrl } from "@/lib/object-url";
 import { isAllowedVideo, isVideoFile } from "@/lib/video-mime";
 import { useUpload } from "@/components/upload/UploadProvider";
-import type { ShowLayer } from "@/lib/show-layers";
+import { DESIGN_WIDTH, type ShowLayer } from "@/lib/show-layers";
+import { LayerStack } from "@/components/shows/LayerView";
 import { publishFailureMessage, publishShow } from "@/lib/show-publish";
 import { ShowAudienceBar } from "@/components/shows/ShowAudienceBar";
 import type { ShowAudience } from "@/lib/show-audience";
@@ -81,6 +82,22 @@ export function ShotPreview({
    *  for again on this screen, a second time for the same Shot. */
   const coverTime = edit?.coverTime ?? null;
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  /**
+   * The Show's stickers, drawn where they were placed. This screen showed
+   * the bare photo, so everything arranged on it looked lost the moment
+   * "Add to your Show" was pressed — it was posted, just never shown here.
+   */
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [frame, setFrame] = useState({ width: DESIGN_WIDTH, height: 844 });
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const seen = new ResizeObserver(([entry]) => {
+      setFrame({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    seen.observe(el);
+    return () => seen.disconnect();
+  }, []);
 
   const { suggestions, reset } = useMentionHashtag(caption, cursor);
   // Not file.type.startsWith: a gallery pick can arrive with no type at all,
@@ -172,7 +189,18 @@ export function ShotPreview({
         />
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" className="absolute inset-0 h-full w-full object-contain" />
+        <img
+          src={url}
+          alt=""
+          // Covering, as the editor and the viewer both draw it, so the
+          // stickers land on the same part of the picture.
+          className={`absolute inset-0 h-full w-full ${layers.length > 0 ? "object-cover" : "object-contain"}`}
+        />
+      )}
+      {layers.length > 0 && (
+        <div ref={frameRef} className="pointer-events-none absolute inset-0">
+          <LayerStack layers={layers} frame={frame} editing />
+        </div>
       )}
 
       {/* Scrims so the controls stay readable over any footage. */}

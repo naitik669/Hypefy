@@ -25,7 +25,6 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ShowViewersSheet } from "@/components/shows/ShowViewersSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
-  parseTrack,
   ensurePreviewPlaying,
   pausePreview,
   stopPreview,
@@ -77,7 +76,7 @@ export type ShowItem = {
 import { showDurationMs, showMediaKind } from "@/lib/show-media";
 import { isVideoUrl } from "@/lib/video-mime";
 import { BLANK_POSTER } from "@/lib/blank-poster";
-import { readLayers } from "@/lib/show-layers";
+import { readLayers, showSong } from "@/lib/show-layers";
 import { keepShow, unkeepShow } from "@/lib/show-keep";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { LayerStack } from "@/components/shows/LayerView";
@@ -267,7 +266,7 @@ function ShowScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show.id, currentUserId, isOwner]);
 
-  const showTrack = parseTrack(show.track);
+  const showTrack = useMemo(() => showSong(show.track, readLayers(show.layers)), [show.track, show.layers]);
 
   // Song on the Show: plays while this screen is up, pauses with the story
   // timer (hold / menus / sheets), and stops when the screen unmounts.
