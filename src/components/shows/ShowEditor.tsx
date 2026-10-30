@@ -446,6 +446,8 @@ export function ShowEditor({
             artist: track.artist,
             artwork: track.artwork || null,
             preview: track.preview || null,
+            ...(track.uri ? { uri: track.uri } : {}),
+            ...(track.start ? { start: track.start } : {}),
           });
           setPicking(null);
         }}

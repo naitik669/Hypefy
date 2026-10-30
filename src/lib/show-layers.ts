@@ -23,6 +23,7 @@
  * stance readPoll already takes for the same reason.
  */
 
+import { parseTrack, type Track } from "@/lib/track";
 import {
   MAX_POLL_OPTION,
   MAX_POLL_OPTIONS,
@@ -119,6 +120,14 @@ export type MusicPayload = {
   artist: string;
   artwork: string | null;
   preview: string | null;
+  /**
+   * `spotify:track:…`. Spotify tracks come with no preview mp3, and the
+   * sticker used to keep only the mp3 — so a Spotify song on a Show had
+   * nothing to play, and most songs are Spotify songs now.
+   */
+  uri?: string;
+  /** Seconds into the song where the part that plays begins. */
+  start?: number;
 };
 export type MentionPayload = { username: string };
 export type LinkPayload = { url: string };
@@ -265,6 +274,10 @@ function readPayload(type: LayerType, raw: unknown): LayerPayload | null {
         artist,
         artwork: typeof p.artwork === "string" ? p.artwork : null,
         preview: typeof p.preview === "string" ? p.preview : null,
+        ...(typeof p.uri === "string" && SPOTIFY_URI.test(p.uri) ? { uri: p.uri } : {}),
+        ...(typeof p.start === "number" && Number.isFinite(p.start) && p.start > 0 && p.start <= MAX_SONG_START
+          ? { start: Math.round(p.start * 10) / 10 }
+          : {}),
       };
     }
     case "mention": {
@@ -492,3 +505,21 @@ export function layerMentions(layers: readonly ShowLayer[]): string[] {
  * component read as the pixels a designer would name.
  */
 export const DESIGN_WIDTH = 390;
+
+const SPOTIFY_URI = /^spotify:track:[A-Za-z0-9]{22}$/;
+/** Ten minutes: further in than any song worth a sticker. */
+const MAX_SONG_START = 600;
+
+/**
+ * The song a Show plays: the one picked with "Add sound" on the camera, or
+ * failing that the first music sticker on it. A sticker used to be only a
+ * label — it named a song and nothing played.
+ */
+export function showSong(track: unknown, layers: readonly ShowLayer[]): Track | null {
+  const picked = parseTrack(track);
+  if (picked) return picked;
+  const layer = layers.find((l) => l.type === "music");
+  if (!layer) return null;
+  const m = layer.payload as MusicPayload;
+  return parseTrack({ ...m, artwork: m.artwork ?? "", preview: m.preview ?? "" });
+}
