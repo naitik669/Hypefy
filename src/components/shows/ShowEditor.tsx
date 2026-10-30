@@ -13,12 +13,8 @@ import {
   isCardType,
   tidyCard,
 } from "@/components/shows/CardEditor";
-import {
-  EmbedSheet,
-  LinkSheet,
-  MentionSheet,
-  type EmbedState,
-} from "@/components/shows/ShowWidgetPickers";
+import { EmbedSheet, type EmbedState } from "@/components/shows/ShowWidgetPickers";
+import { TagWriter, isTagType, type TagType } from "@/components/shows/TagWriter";
 import { COLOUR_SWATCHES, lookFor, lookName, usesColours } from "@/lib/show-looks";
 import { haptics } from "@/lib/haptics";
 import { ambientTint, photoAverage } from "@/lib/ambient";
@@ -34,6 +30,8 @@ import {
   typedPayload,
   typedValue,
   readLayers,
+  linkFrom,
+  type LayerPayload,
   type LayerType,
   type ShowLayer,
 } from "@/lib/show-layers";
@@ -127,6 +125,8 @@ export function ShowEditor({
   const [layers, setLayers] = useState<ShowLayer[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [writing, setWriting] = useState<string | null>(null);
+  /** The place, tag, person or link being typed on its own sticker. */
+  const [tagging, setTagging] = useState<string | null>(null);
   /** The poll or question being written on, if any. */
   const [editingCard, setEditingCard] = useState<string | null>(null);
   const [tray, setTray] = useState(false);
@@ -199,12 +199,12 @@ export function ShowEditor({
    * foot like words are, the time stamped as it is now.
    */
   function place(key: WidgetKey) {
-    if (key === "location") {
-      const id = add("location", { place: "" });
-      if (id) setWriting(id);
-    } else if (key === "hashtag") {
-      const id = add("hashtag", { tag: "" });
-      if (id) setWriting(id);
+    if (key === "location" || key === "hashtag" || key === "mention" || key === "link") {
+      // Placed empty and typed on the sticker itself.
+      const blank =
+        key === "location" ? { place: "" } : key === "hashtag" ? { tag: "" } : key === "mention" ? { username: "" } : { url: "" };
+      const id = add(key, blank);
+      if (id) setTagging(id);
     } else if (key === "time") {
       add("time", { at: new Date().toISOString() });
     } else if (isCardType(key)) {
@@ -385,7 +385,8 @@ export function ShowEditor({
           setEditingCard(g.id);
           return;
         }
-        if (chosenLayer && (chosenLayer.type === "text" || isTyped(chosenLayer.type))) setWriting(g.id);
+        if (chosenLayer && isTagType(chosenLayer.type)) setTagging(g.id);
+        else if (chosenLayer?.type === "text") setWriting(g.id);
         return;
       }
       setSelected(g.id);
@@ -401,6 +402,34 @@ export function ShowEditor({
     if (!chosen) return;
     paint(nextLook(chosen.type, chosen.look));
     haptics.tap();
+  }
+
+  /** A keystroke on a tag being typed on its sticker. */
+  function typeTag(id: string, value: string) {
+    setLayers((l) =>
+      l.map((layer) =>
+        layer.id === id && isTyped(layer.type) ? { ...layer, payload: typedPayload(layer.type, value) } : layer,
+      ),
+    );
+  }
+
+  /**
+   * Leaving a tag: a link gets its scheme, and one that says nothing — or
+   * a link that is not one — goes, rather than sitting there empty.
+   */
+  function finishTag(id: string, payload?: LayerPayload) {
+    setLayers((l) =>
+      l.flatMap((layer) => {
+        if (layer.id !== id) return [layer];
+        const next = { ...layer, payload: payload ?? layer.payload } as ShowLayer;
+        if (next.type === "link") {
+          const url = linkFrom((next.payload as { url: string }).url);
+          return url ? [{ ...next, payload: { url } }] : [];
+        }
+        return typedValue(next).trim() ? [next] : [];
+      }),
+    );
+    setTagging(null);
   }
 
   /** `done` is the field being left: only then does an empty layer go. */
@@ -478,7 +507,7 @@ export function ShowEditor({
         {/* No plates: bold white with a soft shadow reads on any photo
             and leaves the picture alone. */}
         {/* Put away while a card is being written on: its own Done sits there. */}
-        <div className={`absolute right-2 top-2 z-20 flex flex-col gap-1.5 ${editingCard || selected || drag ? "hidden" : ""}`}>
+        <div className={`absolute right-2 top-2 z-20 flex flex-col gap-1.5 ${editingCard || selected || drag || tagging ? "hidden" : ""}`}>
           <RailButton
             label="Add text"
             disabled={full}
@@ -508,7 +537,7 @@ export function ShowEditor({
         <button
           type="button"
           aria-label="Close"
-          data-hidden={!!editingCard || !!drag}
+          data-hidden={!!editingCard || !!drag || !!tagging}
           onClick={onCancel}
           onPointerDown={(e) => e.stopPropagation()}
           className="absolute left-2 top-2 z-20 flex h-12 w-12 items-center justify-center text-white data-[hidden=true]:hidden [filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))_drop-shadow(0_0_8px_rgba(0,0,0,0.3))] transition active:scale-90"
@@ -518,7 +547,7 @@ export function ShowEditor({
 
         {/* While something is selected: its colour wheel up top, and Done
             where the rail was. One tap on the wheel is the next colour. */}
-        {chosen && !drag && !editingCard && writing === null && (
+        {chosen && !drag && !editingCard && !tagging && writing === null && (
           <>
             <button
               type="button"
@@ -595,7 +624,7 @@ export function ShowEditor({
         })()}
 
         {/* The one way on: small, in the corner, out of the picture's way. */}
-        {!selected && !drag && !tray && !editingCard && writing === null && (
+        {!selected && !drag && !tray && !editingCard && !tagging && writing === null && (
           <button
             type="button"
             disabled={busy}
@@ -627,6 +656,20 @@ export function ShowEditor({
                 }
                 setEditingCard(null);
               }}
+            />
+          );
+        })()}
+
+        {(() => {
+          const tag = layers.find((l) => l.id === tagging) ?? null;
+          if (!tag || !isTagType(tag.type)) return null;
+          return (
+            <TagWriter
+              key={tag.id}
+              layer={tag as ShowLayer & { type: TagType }}
+              onType={(value) => typeTag(tag.id, value)}
+              onPick={(payload) => finishTag(tag.id, payload)}
+              onDone={() => finishTag(tag.id)}
             />
           );
         })()}
@@ -683,16 +726,6 @@ export function ShowEditor({
           });
           setPicking(null);
         }}
-      />
-      <MentionSheet
-        open={picking === "mention"}
-        onClose={() => setPicking(null)}
-        onPick={(username) => add("mention", { username })}
-      />
-      <LinkSheet
-        open={picking === "link"}
-        onClose={() => setPicking(null)}
-        onPick={(url) => add("link", { url })}
       />
       <EmbedSheet
         open={picking === "embed"}
