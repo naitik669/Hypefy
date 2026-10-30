@@ -49,3 +49,15 @@ describe("the editor", () => {
     expect(editor).toContain("if (isCard(chosenLayer)) {\n          setEditingCard(g.id);");
   });
 });
+
+describe("a countdown's end is picked like a scheduled message", () => {
+  const card = readFileSync("src/components/shows/CardEditor.tsx", "utf8");
+  const when = readFileSync("src/components/shows/CountdownWhen.tsx", "utf8");
+  it("with the scheduler's offsets and drums, not the browser's date field", () => {
+    expect(card).not.toContain('type="datetime-local"');
+    expect(card).toContain("<CountdownWhen open at={at} onClose={() => setOpen(false)} onPick={onPick} />");
+    expect(when).toContain("presets(now).map");
+    expect(when).toContain('from "@/components/ui/Wheel"');
+    expect(when).toContain('{problem ?? "Set countdown"}');
+  });
+});

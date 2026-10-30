@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Plus, X } from "lucide-react";
+import { describeParts } from "@/lib/schedule-send";
+import { CountdownWhen } from "@/components/shows/CountdownWhen";
 import { lookFor } from "@/lib/show-looks";
 import {
   MAX_POLL_OPTION,
@@ -144,14 +147,6 @@ export function tidyCard(layer: CardLayer): CardLayer {
   }
 }
 
-/** A Date as the value a datetime-local field takes, in local time. */
-function localInput(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
 /**
  * A poll or a question, written on the sticker itself.
  *
@@ -259,20 +254,11 @@ export function CardEditor({
                   className={`${field} text-center`}
                 />
               </label>
-              <label className="flex flex-col gap-1">
-                <span style={{ ...look.sub, fontSize: 11, fontWeight: 700 }}>When</span>
-                <input
-                  type="datetime-local"
-                  value={localInput((layer.payload as CountdownPayload).at)}
-                  min={localInput(new Date().toISOString())}
-                  onChange={(e) => {
-                    const at = new Date(e.target.value);
-                    if (!Number.isNaN(at.getTime())) onChange({ ...(layer.payload as CountdownPayload), at: at.toISOString() });
-                  }}
-                  style={{ ...look.title, fontSize: 14, border: `1px solid ${look.ink}40`, colorScheme: "dark" }}
-                  className="h-10 rounded-[12px] bg-transparent px-3 outline-none"
-                />
-              </label>
+              <CountdownField
+                at={(layer.payload as CountdownPayload).at}
+                look={look}
+                onPick={(at) => onChange({ ...(layer.payload as CountdownPayload), at: at.toISOString() })}
+              />
             </>
           ) : (
             <PollFields layer={layer} onChange={onChange} field={field} />
@@ -376,6 +362,30 @@ function PollFields({
           Add option
         </button>
       )}
+    </>
+  );
+}
+
+/**
+ * When the countdown ends, as one line on the card: tapping it opens the
+ * picker the message scheduler uses. It was the browser's own date field,
+ * which looks different on every phone and like none of this app.
+ */
+function CountdownField({ at, look, onPick }: { at: string; look: ReturnType<typeof lookFor>; onPick: (at: Date) => void }) {
+  const [open, setOpen] = useState(false);
+  const when = Number.isNaN(Date.parse(at)) ? null : describeParts(new Date(at), new Date());
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        style={{ ...look.title, fontSize: 14, border: `1px solid ${look.ink}40` }}
+        className="flex h-10 items-center justify-between gap-2 rounded-[12px] px-3"
+      >
+        <span style={{ ...look.sub, fontSize: 11, fontWeight: 700 }}>Ends</span>
+        <span className="truncate">{when ? `${when.day}, ${when.time}` : "Pick a time"}</span>
+      </button>
+      {open && <CountdownWhen open at={at} onClose={() => setOpen(false)} onPick={onPick} />}
     </>
   );
 }
