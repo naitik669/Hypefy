@@ -32,15 +32,16 @@ describe("every kind of layer can actually be added", () => {
     // The whole point of the phase. Read off the tray's tile table rather
     // than from the rendered JSX, because that table is what it maps over.
     const tray = read("src/components/shows/StickerTray.tsx");
-    const table = tray.slice(tray.indexOf("const WIDGET_TILES"), tray.indexOf("const SAMPLE_EMBEDS"));
-    for (const key of ["music", "mention", "link", "poll", "question", "embed"]) {
+    const table = tray.slice(tray.indexOf("export const ASK_AND_PLAY"), tray.indexOf("export const ALL_TILES"));
+    for (const key of ["music", "mention", "link", "poll", "question", "embed", "quiz", "slider", "countdown", "addyours", "location", "hashtag", "time"]) {
       expect(table, key).toContain(`key: "${key}"`);
     }
   });
 
-  it("and the other two are made rather than picked", () => {
+  it("and words are made rather than picked", () => {
     expect(editor).toContain('add("text", { text: "" })');
-    expect(editor).toContain('add("sticker", { emoji })');
+    // The emoji sticker is no longer added from the tray.
+    expect(editor).not.toContain('add("sticker"');
   });
 
   it("so between them the editor reaches every type the model has", () => {
@@ -56,12 +57,14 @@ describe("every kind of layer can actually be added", () => {
     if (editor.includes("const id = add(key, blankCard(key));")) {
       for (const t of CARD_TYPES) reachable.add(t);
     }
-    expect([...LAYER_TYPES].filter((t) => !reachable.has(t))).toEqual([]);
+    // The emoji sticker left the tray (the keyboard has emoji, and a text
+    // layer takes them); it is still read, so Shows that carry one keep it.
+    expect([...LAYER_TYPES].filter((t) => !reachable.has(t))).toEqual(["sticker"]);
   });
 
   it("the table is typed against the sheets, not kept in step by hand", () => {
     expect(editor).toContain("type Picker = SheetKey | null;");
-    expect(read("src/components/shows/StickerTray.tsx")).toContain("{ key: WidgetKey; label: string; layer: ShowLayer; zoom: number }[]");
+    expect(read("src/components/shows/StickerTray.tsx")).toContain("type Tile = { key: WidgetKey; label: string; layer: ShowLayer; zoom: number; tilt: number };");
   });
 });
 

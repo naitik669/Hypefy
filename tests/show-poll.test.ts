@@ -96,7 +96,7 @@ describe("the tally is not somewhere its author can type", () => {
 
   it("which the viewer only makes when there is a poll to count", () => {
     const viewer = read("src/components/shows/ShowViewer.tsx");
-    expect(viewer).toContain('const hasPoll = useMemo(() => layers.some((l) => l.type === "poll"), [layers]);');
+    expect(viewer).toContain('const hasPoll = useMemo(() => layers.some((l) => l.type === "poll" || l.type === "quiz"), [layers]);');
     expect(viewer).toContain("if (!hasPoll) return;");
   });
 });

@@ -18,6 +18,26 @@ import type { PollState } from "@/components/shows/ShowPoll";
 
 const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
+/**
+ * A button, or in preview just its shape. A preview sits inside the tray's
+ * own tile button, and a button inside a button is not a page a browser
+ * will build the way it was written.
+ */
+function Press({
+  preview,
+  ...props
+}: { preview: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  if (preview) {
+    const { style, className, children } = props;
+    return (
+      <span style={{ display: "flex", alignItems: "center", justifyContent: "center", ...style }} className={className}>
+        {children}
+      </span>
+    );
+  }
+  return <button type="button" {...props} />;
+}
+
 const label = (look: Look): React.CSSProperties => ({
   ...look.sub,
   fontSize: 10.5,
@@ -67,9 +87,9 @@ export function ShowQuiz({
       {quiz.options.map((option, i) => {
         const mark = quizMark(i, quiz.answer, mine);
         return (
-          <button
+          <Press
+          preview={preview}
             key={i}
-            type="button"
             disabled={preview || busy || mine !== null}
             onPointerDown={stop}
             onClick={(e) => {
@@ -95,7 +115,7 @@ export function ShowQuiz({
           >
             <span>{option}</span>
             {mark && <span aria-label={mark === "right" ? "Right answer" : "Your answer, wrong"}>{mark === "right" ? "✓" : "✕"}</span>}
-          </button>
+          </Press>
         );
       })}
       <span style={label(look)}>{mine === null ? "Quiz · tap to answer" : voteLabel(voters)}</span>
@@ -218,8 +238,8 @@ export function ShowSlider({
         </span>
       </span>
       {isAuthor ? (
-        <button
-          type="button"
+        <Press
+          preview={preview}
           disabled={preview || !sent?.count}
           onPointerDown={stop}
           onClick={(e) => {
@@ -229,7 +249,7 @@ export function ShowSlider({
           style={{ ...label(look), background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer", fontFamily: "inherit" }}
         >
           {sent?.count ? `${sent.count} hyped · avg ${sent.avg}% · see who` : "Hype slider · nobody yet"}
-        </button>
+        </Press>
       ) : (
         <span style={label(look)}>{sent ? `${sent.count} hyped · avg ${sent.avg}%` : "Drag the ★"}</span>
       )}
@@ -322,8 +342,8 @@ export function ShowCountdown({
         </span>
       )}
       {!isAuthor && !left.ended && (
-        <button
-          type="button"
+        <Press
+          preview={preview}
           disabled={preview || busy}
           onPointerDown={stop}
           onClick={(e) => {
@@ -343,7 +363,7 @@ export function ShowCountdown({
           }}
         >
           {on ? "Reminder set ✓" : "Remind me"}
-        </button>
+        </Press>
       )}
     </span>
   );
@@ -392,8 +412,8 @@ export function ShowAddYours({
     <span style={{ ...look.box, display: "flex", flexDirection: "column", gap: 8, width: 210, alignItems: "stretch" }}>
       <span style={{ ...label(look), textAlign: "center", ...look.title, fontSize: 10.5 }}>ADD YOURS</span>
       <span style={{ ...look.title, fontSize: 14, textAlign: "center" }}>{addYours.prompt}</span>
-      <button
-        type="button"
+      <Press
+          preview={preview}
         disabled={preview || busy}
         onPointerDown={stop}
         onClick={(e) => {
@@ -413,7 +433,7 @@ export function ShowAddYours({
         }}
       >
         {problem ?? (isAuthor ? "See what people added" : "+ Add yours")}
-      </button>
+      </Press>
       {added > 0 && <span style={{ ...label(look), textAlign: "center" }}>{added} added</span>}
     </span>
   );

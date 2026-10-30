@@ -302,7 +302,8 @@ export function ShowEditor({
         {/* The rail. */}
         {/* No plates: bold white with a soft shadow reads on any photo
             and leaves the picture alone. */}
-        <div className="absolute right-2 top-2 z-20 flex flex-col gap-1.5">
+        {/* Put away while a card is being written on: its own Done sits there. */}
+        <div className={`absolute right-2 top-2 z-20 flex flex-col gap-1.5 ${editingCard ? "hidden" : ""}`}>
           <RailButton
             label="Add text"
             disabled={full}
@@ -329,9 +330,10 @@ export function ShowEditor({
         <button
           type="button"
           aria-label="Close"
+          data-hidden={!!editingCard}
           onClick={onCancel}
           onPointerDown={(e) => e.stopPropagation()}
-          className="absolute left-2 top-2 z-20 flex h-12 w-12 items-center justify-center text-white [filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))_drop-shadow(0_0_8px_rgba(0,0,0,0.3))] transition active:scale-90"
+          className="absolute left-2 top-2 z-20 flex h-12 w-12 items-center justify-center text-white data-[hidden=true]:hidden [filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))_drop-shadow(0_0_8px_rgba(0,0,0,0.3))] transition active:scale-90"
         >
           <X size={26} strokeWidth={2.6} />
         </button>
@@ -400,10 +402,6 @@ export function ShowEditor({
         {tray && (
           <StickerTray
             onClose={() => setTray(false)}
-            onSticker={(emoji) => {
-              add("sticker", { emoji });
-              setTray(false);
-            }}
             onWidget={(key) => {
               setTray(false);
               place(key);
