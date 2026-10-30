@@ -57,6 +57,10 @@ describe("every kind of layer can actually be added", () => {
     if (editor.includes("const id = add(key, blankCard(key));")) {
       for (const t of CARD_TYPES) reachable.add(t);
     }
+    // The tags typed on the sticker are placed blank by one line too.
+    if (editor.includes("const id = add(key, blank);")) {
+      for (const t of ["location", "hashtag", "mention", "link"]) reachable.add(t);
+    }
     // The emoji sticker left the tray (the keyboard has emoji, and a text
     // layer takes them); it is still read, so Shows that carry one keep it.
     expect([...LAYER_TYPES].filter((t) => !reachable.has(t))).toEqual(["sticker"]);
@@ -84,23 +88,19 @@ describe("the pickers that already existed are the ones used", () => {
   });
 
   it("and a mention is the same people search the chat typeahead runs", () => {
-    expect(pickers).toContain('import { type Suggestion, useMentionHashtag } from "@/components/ui/MentionHashtagPicker";');
+    const writer = read("src/components/shows/TagWriter.tsx");
+    expect(writer).toContain('import { useMentionHashtag, type Suggestion } from "@/components/ui/MentionHashtagPicker";');
     // Driven with a value that is one mention and a caret at its end,
     // which is the question that hook already answers.
-    expect(pickers).toContain("const typed = `@${query}`;");
-    expect(pickers).toContain("useMentionHashtag(typed, typed.length)");
+    expect(writer).toContain('const typed = `@${query.replace(/^@+/, "")}`;');
+    expect(writer).toContain("useMentionHashtag(typed, typed.length)");
   });
 
-  it("a link sheet cannot offer one the parser would refuse", () => {
-    // readPayload takes https only. The sheet checks the same shape, so
-    // a link is never silently dropped after it was added.
-    const check = pickers.slice(pickers.indexOf("const LINK_OK"), pickers.indexOf("export function MentionSheet"));
-    expect(check).toContain("/^https:\\/\\/[^\\s]+$/i");
-    expect(check).toContain("disabled={!url}");
-  });
-
-  it("and typing a bare host is read as the link it plainly is", () => {
-    const check = pickers.slice(pickers.indexOf("const url = (() => {"), pickers.indexOf("export function MentionSheet"));
+  it("a link cannot be kept that the parser would refuse", () => {
+    // readPayload takes https only. Leaving a link sticker checks the same
+    // shape, so a link is never silently dropped at publish.
+    const layers = read("src/lib/show-layers.ts");
+    const check = layers.slice(layers.indexOf("export function linkFrom"), layers.indexOf("export function cleanTag"));
     expect(check).toContain('`https://${t}`');
     expect(check).toContain('replace(/^http:\\/\\//i, "https://")');
   });

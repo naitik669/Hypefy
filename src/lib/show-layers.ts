@@ -136,7 +136,11 @@ export type QuestionPayload = { prompt: string };
 export type PostPayload = { postId: string };
 export type ShotPayload = { shotId: string };
 /** A place, as typed. Not looked up: a name is all a story needs. */
-export type LocationPayload = { place: string };
+export type LocationPayload = {
+  place: string;
+  /** The rest of the address, under the name: "Uttar Pradesh, India". */
+  area?: string;
+};
 /** A tag without its #, in the shape the app's hashtags take. */
 export type HashtagPayload = { tag: string };
 /** When it was added, fixed then: a Show is a moment, and this says which. */
@@ -155,6 +159,10 @@ export type CountdownPayload = { title: string; at: string };
 export type AddYoursPayload = { prompt: string; collabId?: string };
 
 export const MAX_PLACE = 60;
+/** The rest of a place's address, under its name. */
+export const MAX_AREA = 80;
+/** The longest link a sticker holds. */
+export const MAX_URL = 2048;
 /** A countdown or an Add yours prompt is a line, not a paragraph. */
 export const MAX_STICKER_LINE = 60;
 export const MAX_TAG = 40;
@@ -290,7 +298,7 @@ function readPayload(type: LayerType, raw: unknown): LayerPayload | null {
       const url = typeof p.url === "string" ? p.url.trim() : "";
       // Whether the host is one we will unfurl is link-preview's job, and
       // it is asked again at render. This only refuses what is not a URL.
-      if (!/^https:\/\/[^\s]+$/i.test(url) || url.length > 2048) return null;
+      if (!/^https:\/\/[^\s]+$/i.test(url) || url.length > MAX_URL) return null;
       return { url };
     }
     case "poll": {
@@ -317,7 +325,8 @@ function readPayload(type: LayerType, raw: unknown): LayerPayload | null {
     }
     case "location": {
       const place = text(p.place, MAX_PLACE);
-      return place ? { place } : null;
+      const area = text(p.area, MAX_AREA);
+      return place ? { place, ...(area ? { area } : {}) } : null;
     }
     case "hashtag": {
       const tag = typeof p.tag === "string" ? cleanTag(p.tag) : "";
@@ -359,6 +368,22 @@ function readPayload(type: LayerType, raw: unknown): LayerPayload | null {
 }
 
 /** A hashtag as typed, made into one: no #, no spaces, letters, digits and _. */
+/** A handle as it is typed: no @, lower case, only the characters handles use. */
+export function cleanUsername(raw: string): string {
+  return raw.replace(/^@+/, "").toLowerCase().replace(/[^a-z0-9_.]/g, "").slice(0, 32);
+}
+
+/**
+ * What was typed, as a link the sticker can hold, or "" — "hypefy.app" is
+ * a link people mean, so the scheme is added rather than the input refused.
+ */
+export function linkFrom(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  const full = /^https?:\/\//i.test(t) ? t.replace(/^http:\/\//i, "https://") : `https://${t}`;
+  return /^https:\/\/[^\s.]+\.[^\s]+$/i.test(full) && full.length <= MAX_URL ? full : "";
+}
+
 export function cleanTag(raw: string): string {
   return raw
     .replace(/^#+/, "")
@@ -371,7 +396,13 @@ export function cleanTag(raw: string): string {
  * The layers that are typed at the foot of the editor, and which field of
  * their payload the typing goes into.
  */
-export const TYPED_FIELD = { text: "text", location: "place", hashtag: "tag" } as const;
+export const TYPED_FIELD = {
+  text: "text",
+  location: "place",
+  hashtag: "tag",
+  mention: "username",
+  link: "url",
+} as const;
 export type TypedType = keyof typeof TYPED_FIELD;
 
 export function isTyped(type: LayerType): type is TypedType {
@@ -389,6 +420,8 @@ export function typedValue(layer: ShowLayer): string {
 export function typedPayload(type: TypedType, value: string): LayerPayload {
   if (type === "hashtag") return { tag: cleanTag(value) };
   if (type === "location") return { place: value.slice(0, MAX_PLACE) };
+  if (type === "mention") return { username: cleanUsername(value) };
+  if (type === "link") return { url: value.trim().slice(0, MAX_URL) };
   return { text: value.slice(0, MAX_LAYER_TEXT) };
 }
 
