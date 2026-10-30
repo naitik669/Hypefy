@@ -1,14 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { ALL_TILES, ASK_AND_PLAY, HYPE_AND_PLAN, TAGS, YOURS, nextRecent } from "@/components/shows/StickerTray";
+import { ALL_TILES, ASK_AND_PLAY, BOARD, HYPE_AND_PLAN, TAGS, YOURS, nextRecent } from "@/components/shows/StickerTray";
 import { readLayers } from "@/lib/show-layers";
 
 describe("the sticker tray", () => {
-  it("is arranged as approved: Ask & play, Hype & plan, Yours, Tags", () => {
+  it("is arranged as approved: the tags, then every big sticker on one board", () => {
     expect(ASK_AND_PLAY.map((t) => t.label)).toEqual(["Poll", "Quiz", "Question"]);
     expect(HYPE_AND_PLAN.map((t) => t.label)).toEqual(["Hype slider", "Countdown", "Add yours"]);
     expect(YOURS.map((t) => t.label)).toEqual(["Post or Shot"]);
-    expect(TAGS.map((t) => t.label)).toEqual(["Music", "Mention", "Link", "Location", "Hashtag", "Time"]);
+    expect(TAGS.map((t) => t.label)).toEqual(["Time", "Music", "Mention", "Link", "Location", "Hashtag"]);
+    expect(BOARD.map((t) => t.label)).toEqual(["Quiz", "Poll", "Countdown", "Question", "Add yours", "Hype slider", "Post or Shot"]);
     expect(new Set(ALL_TILES.map((t) => t.key)).size).toBe(13);
   });
 
@@ -42,7 +43,10 @@ describe("the tray's order", () => {
     const tray = readFileSync("src/components/shows/StickerTray.tsx", "utf8");
     const tags = tray.indexOf(">Tags</h2>");
     expect(tags).toBeGreaterThan(0);
-    expect(tags).toBeLessThan(tray.indexOf('<Shelf title="Ask & play"'));
+    expect(tags).toBeLessThan(tray.indexOf("data-board"));
+    // Every big sticker at once, two to a row: no shelves to swipe.
+    expect(tray).not.toContain("<Shelf");
+    expect(tray).toContain('const BOARD_ORDER: WidgetKey[] = ["quiz", "poll", "countdown", "question", "addyours", "slider", "embed"];');
   });
 
   it("and the editor's way on is one small Next, not a bar under the picture", () => {
