@@ -25,6 +25,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ShowViewersSheet } from "@/components/shows/ShowViewersSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
+  parseTrack,
   ensurePreviewPlaying,
   pausePreview,
   stopPreview,
@@ -268,6 +269,13 @@ function ShowScreen({
   }, [show.id, currentUserId, isOwner]);
 
   const showTrack = useMemo(() => showSong(show.track, readLayers(show.layers)), [show.track, show.layers]);
+  /**
+   * The song's name at the foot is for a song picked with "Add sound",
+   * which has nothing else on the picture saying what is playing. A music
+   * sticker is already that label — drawing the name again under it showed
+   * the same song twice.
+   */
+  const songLabel = useMemo(() => parseTrack(show.track), [show.track]);
 
   // Song on the Show: plays while this screen is up, pauses with the story
   // timer (hold / menus / sheets), and stops when the screen unmounts.
@@ -998,15 +1006,15 @@ function ShowScreen({
       )}
 
       {/* ── Song pill ── */}
-      {showTrack && !menuOpen && (
+      {songLabel && !menuOpen && (
         <div
           className="pointer-events-none absolute right-4 z-20 flex max-w-[60%] items-center gap-2 rounded-pill bg-black/50 py-1 pl-1 pr-3 backdrop-blur-sm"
           style={{ bottom: show.caption ? 128 : 96 }}
         >
-          {showTrack.artwork ? (
+          {songLabel.artwork ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={showTrack.artwork}
+              src={songLabel.artwork}
               alt=""
               className={`h-6 w-6 shrink-0 rounded-full object-cover ${
                 paused ? "" : "animate-[spin_4s_linear_infinite]"
@@ -1018,11 +1026,11 @@ function ShowScreen({
             </span>
           )}
           <p className="min-w-0 truncate text-[11px] font-semibold text-white/90">
-            {showTrack.title}
-            {showTrack.artist && (
+            {songLabel.title}
+            {songLabel.artist && (
               <span className="font-normal text-white/55">
                 {" "}
-                · {showTrack.artist}
+                · {songLabel.artist}
               </span>
             )}
           </p>
