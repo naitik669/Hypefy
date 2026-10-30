@@ -7,16 +7,11 @@ import {
   Undo2,
   Trash2,
   X,
-  Music,
-  AtSign,
-  Link2,
-  BarChart3,
-  MessageCircleQuestion,
-  LayoutGrid,
 } from "lucide-react";
 import { LayerBody, LayerView } from "@/components/shows/LayerView";
 import { TransformBox } from "@/components/shows/TransformBox";
 import { TrackPicker } from "@/components/music/TrackPicker";
+import { StickerTray, type WidgetKey } from "@/components/shows/StickerTray";
 import { PollComposer } from "@/components/messages/PollComposer";
 import {
   EmbedSheet,
@@ -76,26 +71,8 @@ function dropAt(count: number) {
   return { ...DROP, x: DROP.x + step * 0.035, y: DROP.y + step * 0.055 };
 }
 
-const STICKERS = ["🔥", "✨", "💀", "🫠", "❤️", "🎧", "🌙", "⚡"];
-
-/** Which sheet is open. */
-type Picker = "music" | "mention" | "link" | "poll" | "question" | "embed" | null;
-
-/**
- * The tray, in the order people reach for them.
- *
- * A song first because it is the one every story product has trained
- * people to look for; the embed last because it needs something of
- * yours to already exist.
- */
-const WIDGETS = [
-  { key: "music", label: "Music", icon: Music },
-  { key: "mention", label: "Mention", icon: AtSign },
-  { key: "link", label: "Link", icon: Link2 },
-  { key: "poll", label: "Poll", icon: BarChart3 },
-  { key: "question", label: "Question", icon: MessageCircleQuestion },
-  { key: "embed", label: "Embed", icon: LayoutGrid },
-] as const satisfies readonly { key: Exclude<Picker, null>; label: string; icon: unknown }[];
+/** Which sheet is open: one per widget the tray offers, so the two cannot drift apart. */
+type Picker = WidgetKey | null;
 
 function freshId(): string {
   // Collides with nothing and needs no library; the id only has to be
@@ -293,40 +270,17 @@ export function ShowEditor({
         )}
 
         {tray && (
-          <div className="absolute inset-x-3 bottom-28 z-30 space-y-3 rounded-2xl border border-border bg-elevated/95 p-3 backdrop-blur-xl">
-            <div className="flex flex-wrap justify-center gap-2">
-              {STICKERS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  aria-label={`Add ${emoji}`}
-                  className="flex h-11 w-11 items-center justify-center rounded-[30%] text-2xl transition active:scale-90"
-                  onClick={() => {
-                    add("sticker", { emoji });
-                    setTray(false);
-                  }}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-3 gap-2 border-t border-border pt-3">
-              {WIDGETS.map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    setTray(false);
-                    setPicking(key);
-                  }}
-                  className="flex flex-col items-center gap-1.5 rounded-xl bg-surface py-3 text-[11px] font-bold text-foreground transition active:scale-95"
-                >
-                  <Icon size={18} className="text-accent" />
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <StickerTray
+            onClose={() => setTray(false)}
+            onSticker={(emoji) => {
+              add("sticker", { emoji });
+              setTray(false);
+            }}
+            onWidget={(key) => {
+              setTray(false);
+              setPicking(key);
+            }}
+          />
         )}
       </div>
 

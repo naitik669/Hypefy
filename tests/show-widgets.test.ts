@@ -28,10 +28,10 @@ const create = read("src/components/create/CreateScreen.tsx");
 
 describe("every kind of layer can actually be added", () => {
   it("the tray covers the six that need a picker", () => {
-    // The whole point of the phase. Read off the WIDGETS table rather
-    // than from the rendered JSX, because that table is what the tray
-    // maps over.
-    const table = editor.slice(editor.indexOf("const WIDGETS = ["), editor.indexOf("] as const satisfies"));
+    // The whole point of the phase. Read off the tray's tile table rather
+    // than from the rendered JSX, because that table is what it maps over.
+    const tray = read("src/components/shows/StickerTray.tsx");
+    const table = tray.slice(tray.indexOf("const WIDGET_TILES"), tray.indexOf("const SAMPLE_EMBEDS"));
     for (const key of ["music", "mention", "link", "poll", "question", "embed"]) {
       expect(table, key).toContain(`key: "${key}"`);
     }
@@ -54,7 +54,8 @@ describe("every kind of layer can actually be added", () => {
   });
 
   it("the table is typed against the sheets, not kept in step by hand", () => {
-    expect(editor).toContain("satisfies readonly { key: Exclude<Picker, null>; label: string; icon: unknown }[]");
+    expect(editor).toContain("type Picker = WidgetKey | null;");
+    expect(read("src/components/shows/StickerTray.tsx")).toContain("{ key: WidgetKey; label: string; layer: ShowLayer; zoom: number }[]");
   });
 });
 
@@ -226,7 +227,7 @@ describe("two layers do not land on the same spot", () => {
   });
 
   it("and the walk wraps rather than running off the bottom", () => {
-    const fn = editor.slice(editor.indexOf("function dropAt(count: number) {"), editor.indexOf("const STICKERS"));
+    const fn = editor.slice(editor.indexOf("function dropAt(count: number) {"), editor.indexOf("function freshId()"));
     expect(fn).toContain("const step = count % 6;");
     // The sixth step is the furthest: it has to stay inside the frame.
     expect(0.45 + 5 * 0.055).toBeLessThan(0.8);
