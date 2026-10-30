@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   SNAP_DEGREES,
   dragged,
@@ -27,7 +27,6 @@ import { LAYER_POS_MAX, LAYER_POS_MIN, LAYER_SCALE_MAX, LAYER_SCALE_MIN } from "
  */
 
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
-const box = read("src/components/shows/TransformBox.tsx");
 const editor = read("src/components/shows/ShowEditor.tsx");
 
 const FRAME = { width: 390, height: 844 };
@@ -166,36 +165,43 @@ describe("what a tap landed on", () => {
   });
 });
 
-describe("the box survives a pointer it cannot capture", () => {
-  it("capture is guarded, and the listeners are attached either way", () => {
-    // This is the bug driving it found: the throw happened before the
-    // window listeners were added, so dragging worked — it starts on the
-    // body — and both handles did nothing at all.
-    expect(box).toContain("try {");
-    expect(box).toContain("(e.target as Element).setPointerCapture?.(e.pointerId);");
-    const after = box.slice(box.indexOf("setPointerCapture"));
-    expect(after).toContain('window.addEventListener("pointermove", move);');
+describe("no box: the picture itself takes the gestures", () => {
+  it("there is no selection box any more", () => {
+    expect(existsSync("src/components/shows/TransformBox.tsx")).toBe(false);
+    expect(editor).not.toContain("TransformBox");
   });
 
-  it("and the handles stay thumb-sized however small the layer is", () => {
-    // FramePlacer's trick: counter-scale the chrome by the layer's scale.
-    expect(box).toContain("const u = 1 / Math.max(0.0001, placed.scale);");
-    expect(box).toContain("transform: `scale(${u})`");
+  it("the browser's own drag and scroll cannot cancel a finger mid-move", () => {
+    // Found by driving it: a drag of the photo was an image drag, which
+    // fired pointercancel after one step, so nothing could be moved.
+    expect(editor).toContain('onDragStart={(e) => e.preventDefault()}');
+    expect(editor).toContain('style={{ touchAction: "none" }}');
+    expect(editor).toContain("draggable={false}");
   });
 
-  it("two fingers beat whichever handle started the gesture", () => {
-    // The live pointer map is read once at the start of the gesture and
-    // held as `live`, so the compiler can see the ref access happening
-    // inside a handler rather than during render.
-    expect(box).toContain("if (live.size >= 2) {");
-    expect(box).toContain("const live = touches.current;");
+  it("a second finger turns whatever is held into a pinch", () => {
+    expect(editor).toContain("const going = grip.current;");
+    expect(editor).toContain("going.pinch = true;");
+    expect(editor).toContain("const next = pinched(g.from, began.get(ids[0]) ?? a, began.get(ids[1]) ?? b, a, b);");
+  });
+
+  it("a still finger held down pops the colours up beside it", () => {
+    expect(editor).toContain("const HOLD_MS = 420;");
+    expect(editor).toContain("setHolding(id);");
+    // On its right, or its left when the right edge is too close.
+    expect(editor).toContain("const right = box.left + reach + 12 + 46 <= frame.width;");
+  });
+
+  it("let go over the bin and it is gone", () => {
+    expect(editor).toContain("const binned = g.moved && !g.pinch && overBin(ev);");
+    expect(editor).toContain("setLayers((l) => l.filter((layer) => layer.id !== g.id));");
   });
 });
 
 describe("the editor", () => {
-  it("a tap on a selected layer runs it through its looks", () => {
-    expect(editor).toContain("if (hit === selected) {");
-    expect(editor).toContain("look: nextLook(layer.type, layer.look)");
+  it("the colour wheel is one tap, the next colour", () => {
+    expect(editor).toContain("paint(nextLook(chosen.type, chosen.look));");
+    expect(editor).toContain("onClick={nextColour}");
   });
 
   it("a tap on nothing lets go of the selection", () => {
@@ -222,10 +228,8 @@ describe("the editor", () => {
     expect(editor).toContain("setLayers((l) => l.filter((layer) => layer.id !== id));");
   });
 
-  it("and the selected layer is drawn by the body alone, not twice", () => {
-    // The box owns where it sits; a positioned LayerView inside it would
-    // place the layer a second time and fight itself.
-    expect(editor).toContain("<LayerBody layer={chosen} editing embeds={embeds} />");
-    expect(editor).toContain("layer.id === selected ? null : (");
+  it("and the selected layer is drawn like every other one, with no box", () => {
+    expect(editor).toContain("<LayerView layer={layer} frame={frame} editing embeds={embeds} />");
+    expect(editor).not.toContain("layer.id === selected ? null : (");
   });
 });

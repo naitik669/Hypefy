@@ -822,6 +822,7 @@ html[data-dm-leave]::view-transition-old(root) {
   .animate-page-fan-b,
   .animate-page-pop,
   .animate-page-tag,
+  .animate-pop,
   .animate-rise {
     animation: none;
     opacity: 1;
@@ -927,6 +928,26 @@ html[data-dm-leave]::view-transition-old(root) {
 .animate-rise {
   opacity: 0;
   animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* A Show sticker's colours, popping up beside it one after another. */
+@keyframes pop {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-pop {
+  animation: pop 0.32s cubic-bezier(0.3, 1.5, 0.6, 1) both;
 }
 
 @keyframes toast-drop {

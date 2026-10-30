@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Undo2, Trash2, X } from "lucide-react";
-import { LayerBody, LayerView } from "@/components/shows/LayerView";
-import { TransformBox } from "@/components/shows/TransformBox";
+import { ChevronRight, Music, Trash2, Undo2, X } from "lucide-react";
+import { LayerView } from "@/components/shows/LayerView";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { StickerTray, type SheetKey, type WidgetKey } from "@/components/shows/StickerTray";
 import {
@@ -20,12 +19,14 @@ import {
   MentionSheet,
   type EmbedState,
 } from "@/components/shows/ShowWidgetPickers";
-import { COLOUR_SWATCHES, lookName, usesColours } from "@/lib/show-looks";
+import { COLOUR_SWATCHES, lookFor, lookName, usesColours } from "@/lib/show-looks";
+import { haptics } from "@/lib/haptics";
 import { ambientTint, photoAverage } from "@/lib/ambient";
 import {
   DESIGN_WIDTH,
   MAX_LAYERS,
   MAX_LAYER_TEXT,
+  LOOKS,
   layerBox,
   nextLook,
   AMBIENT_LOOK,
@@ -36,7 +37,7 @@ import {
   type LayerType,
   type ShowLayer,
 } from "@/lib/show-layers";
-import { topmostAt, type Placed } from "@/lib/transform-gesture";
+import { dragged, pinched, topmostAt, type Placed, type Point } from "@/lib/transform-gesture";
 
 /**
  * Arranging a Show.
@@ -77,6 +78,31 @@ function dropAt(count: number) {
   return { ...DROP, x: DROP.x + step * 0.035, y: DROP.y + step * 0.055 };
 }
 
+/** How long a still finger counts as holding, in ms. */
+const HOLD_MS = 420;
+/** How far a finger may wander, in frame px, and still be a tap or a hold. */
+const SLOP = 8;
+
+/**
+ * One finger (or two) on the picture: what it took hold of, where that
+ * was when it did, and what the gesture has turned into so far.
+ */
+type Grip = {
+  id: string;
+  /** Where the layer was when this stage of the gesture began. */
+  from: Placed;
+  /** Where it is now, so a second finger pinches from here. */
+  now: Placed;
+  start: Point;
+  moved: boolean;
+  pinch: boolean;
+  held: boolean;
+  /** It began on bare picture, for the selected layer: a pinch, or a tap that lets go. */
+  empty: boolean;
+  wasSelected: boolean;
+  timer: ReturnType<typeof setTimeout> | null;
+};
+
 /** Which sheet is open: one per widget the tray offers, so the two cannot drift apart. */
 type Picker = SheetKey | null;
 
@@ -110,6 +136,14 @@ export function ShowEditor({
   const [embeds, setEmbeds] = useState<Record<string, EmbedState>>({});
   /** One step back, which is the one people actually reach for. */
   const [previous, setPrevious] = useState<ShowLayer[] | null>(null);
+  /** The layer being dragged, and whether it is over the bin. */
+  const [drag, setDrag] = useState<{ id: string; hot: boolean } | null>(null);
+  /** The layer whose colours are popped up beside it, after a hold. */
+  const [holding, setHolding] = useState<string | null>(null);
+  /** Live fingers on the picture, and what they are holding. */
+  const touches = useRef(new Map<number, Point>());
+  const startPoints = useRef(new Map<number, Point>());
+  const grip = useRef<Grip | null>(null);
 
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [frame, setFrame] = useState({ width: DESIGN_WIDTH, height: 844 });
@@ -158,12 +192,6 @@ export function ShowEditor({
     setLayers((l) => l.map((layer) => (layer.id === id ? { ...layer, ...next } : layer)));
   }, []);
 
-  const removeChosen = useCallback(() => {
-    if (!selected) return;
-    remember();
-    setLayers((l) => l.filter((layer) => layer.id !== selected));
-    setSelected(null);
-  }, [selected, remember]);
 
   /**
    * What a tray tile does: a picker for the ones that need choosing, and
@@ -203,15 +231,44 @@ export function ShowEditor({
   }
 
   /**
-   * A tap on the picture selects what is under it, and a tap on what is
-   * already selected runs it through its looks — the gesture people know
-   * from every sticker they have used.
+   * Everything a finger does on the picture, with no box to aim at.
+   *
+   * A tap selects what is under it, and a tap on what is already selected
+   * opens it to be written on. A drag moves it, and the bin comes up while
+   * it does; let go over the bin and it is gone. Two fingers pinch it to
+   * size and twist it round, wherever the second one lands. A still finger
+   * held down pops its colours up beside it.
+   *
+   * The selection box this replaced put eight handles on the picture for
+   * three things two fingers already say.
    */
   function onFrameDown(e: React.PointerEvent) {
+    const live = touches.current;
+    const began = startPoints.current;
     const rect = frameRef.current?.getBoundingClientRect();
     if (!rect || rect.width <= 0) return;
     const k = frame.width / rect.width;
-    const at = { x: (e.clientX - rect.left) * k, y: (e.clientY - rect.top) * k };
+    const pointIn = (ev: { clientX: number; clientY: number }): Point => ({
+      x: (ev.clientX - rect.left) * k,
+      y: (ev.clientY - rect.top) * k,
+    });
+    const at = pointIn(e);
+    live.set(e.pointerId, at);
+    began.set(e.pointerId, at);
+
+    // A second finger joins the gesture already under way and makes it a
+    // pinch, measured from both fingers as they are now.
+    const going = grip.current;
+    if (going) {
+      if (going.timer) clearTimeout(going.timer);
+      going.pinch = true;
+      going.from = going.now;
+      for (const [id, point] of live) began.set(id, point);
+      if (!going.moved && !going.empty) remember();
+      going.moved = true;
+      setHolding(null);
+      return;
+    }
 
     const boxes = layers.map((layer) => {
       const box = layerBox(layer, frame);
@@ -220,30 +277,130 @@ export function ShowEditor({
       const side = 110 * layer.scale;
       return { id: layer.id, left: box.left - side / 2, top: box.top - side / 2, width: side, height: side };
     });
-
     const hit = topmostAt(at, boxes);
+    setHolding(null);
+
     if (!hit) {
-      setSelected(null);
-      return;
-    }
-    if (hit === selected) {
-      // A poll or a question opens to be written on again; other chips
-      // and cards pick a colour from the row below instead.
-      const layer = layers.find((x) => x.id === hit) ?? null;
-      if (isCard(layer)) {
-        setEditingCard(hit);
+      if (!selected) {
+        live.delete(e.pointerId);
+        began.delete(e.pointerId);
         return;
       }
-      if (layer && usesColours(layer.type)) return;
-      remember();
-      setLayers((l) =>
-        l.map((layer) =>
-          layer.id === hit ? { ...layer, look: nextLook(layer.type, layer.look) } : layer,
-        ),
-      );
-      return;
     }
-    setSelected(hit);
+    const id = hit ?? selected!;
+    const layer = layers.find((l) => l.id === id)!;
+    const placed: Placed = { x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation };
+    const g: Grip = {
+      id,
+      from: placed,
+      now: placed,
+      start: at,
+      moved: false,
+      pinch: false,
+      held: false,
+      empty: !hit,
+      wasSelected: id === selected,
+      timer: null,
+    };
+    grip.current = g;
+    if (hit) {
+      g.timer = setTimeout(() => {
+        if (g.moved || g.pinch || live.size !== 1) return;
+        g.held = true;
+        setSelected(id);
+        setHolding(id);
+        haptics.select();
+      }, HOLD_MS);
+    }
+
+    const overBin = (ev: PointerEvent) =>
+      ev.clientY > rect.bottom - 150 && Math.abs(ev.clientX - (rect.left + rect.width / 2)) < 90;
+
+    const move = (ev: PointerEvent) => {
+      if (!live.has(ev.pointerId)) return;
+      const now = pointIn(ev);
+      live.set(ev.pointerId, now);
+
+      if (g.pinch && live.size >= 2) {
+        const ids = [...live.keys()].slice(0, 2);
+        const a = live.get(ids[0])!;
+        const b = live.get(ids[1])!;
+        const next = pinched(g.from, began.get(ids[0]) ?? a, began.get(ids[1]) ?? b, a, b);
+        g.now = next;
+        update(g.id, next);
+        return;
+      }
+      if (g.held || g.empty) return;
+      if (!g.moved) {
+        if (Math.hypot(now.x - g.start.x, now.y - g.start.y) < SLOP) return;
+        g.moved = true;
+        if (g.timer) clearTimeout(g.timer);
+        remember();
+        setSelected(g.id);
+      }
+      const next = dragged(g.from, g.start, now, frame);
+      g.now = next;
+      update(g.id, next);
+      const hot = overBin(ev);
+      setDrag((d) => (d && d.id === g.id && d.hot === hot ? d : { id: g.id, hot }));
+    };
+
+    const end = (ev: PointerEvent) => {
+      live.delete(ev.pointerId);
+      began.delete(ev.pointerId);
+      if (live.size > 0) {
+        // One finger of a pinch lifted: the other carries on as a drag
+        // from where things now are.
+        const [rest] = [...live.values()];
+        g.pinch = false;
+        g.empty = false;
+        g.from = g.now;
+        g.start = rest;
+        return;
+      }
+      if (g.timer) clearTimeout(g.timer);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      grip.current = null;
+
+      const binned = g.moved && !g.pinch && overBin(ev);
+      setDrag(null);
+      if (binned) {
+        setLayers((l) => l.filter((layer) => layer.id !== g.id));
+        setSelected(null);
+        haptics.tap();
+        return;
+      }
+      if (g.moved || g.pinch || g.held) return;
+      if (g.empty) {
+        setSelected(null);
+        return;
+      }
+      if (g.wasSelected) {
+        // A poll or a question opens to be written on again, and words,
+        // a place or a tag open their field.
+        const chosenLayer = layers.find((x) => x.id === g.id) ?? null;
+        if (isCard(chosenLayer)) {
+          setEditingCard(g.id);
+          return;
+        }
+        if (chosenLayer && (chosenLayer.type === "text" || isTyped(chosenLayer.type))) setWriting(g.id);
+        return;
+      }
+      setSelected(g.id);
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+  }
+
+  /** The colour wheel: one tap, the next colour. */
+  function nextColour() {
+    if (!chosen) return;
+    paint(nextLook(chosen.type, chosen.look));
+    haptics.tap();
   }
 
   /** `done` is the field being left: only then does an empty layer go. */
@@ -274,36 +431,54 @@ export function ShowEditor({
 
   return (
     <div className="fixed inset-0 z-[200] flex flex-col bg-black">
-      <div ref={frameRef} className="relative flex-1 overflow-hidden" onPointerDown={onFrameDown}>
+      <div
+        ref={frameRef}
+        className="relative flex-1 overflow-hidden"
+        onPointerDown={onFrameDown}
+        // The browser's own gestures would take the finger first: a drag
+        // of the photo is an image drag, a slide is a scroll, and either
+        // one cancels the pointer mid-move.
+        onDragStart={(e) => e.preventDefault()}
+        style={{ touchAction: "none" }}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photoUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <img src={photoUrl} alt="" draggable={false} className="absolute inset-0 h-full w-full select-none object-cover" />
+
+        {/* The bin, while something is being dragged. Drawn before the
+            layers, so the sticker passes over it on its way in. */}
+        {drag && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-10 z-0 flex flex-col items-center gap-2" data-bin>
+            <span
+              className={`flex items-center justify-center rounded-[24px] border-[3px] border-white text-white shadow-[0_10px_26px_rgba(0,0,0,0.4)] transition-all duration-150 ${
+                drag.hot ? "h-[76px] w-[76px] bg-danger" : "h-16 w-16 bg-black/45 backdrop-blur-sm"
+              }`}
+            >
+              <Trash2 size={drag.hot ? 30 : 26} strokeWidth={2.4} />
+            </span>
+            <span className="text-[13px] font-extrabold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.6)]">
+              {drag.hot ? "Let go to delete" : "Drag here to delete"}
+            </span>
+          </div>
+        )}
 
         {/* Drawn by the same component the viewer uses, so what is
-            arranged here is what people get. */}
-        {layers.map((layer) =>
-          layer.id === selected ? null : (
-            <LayerView key={layer.id} layer={layer} frame={frame} editing embeds={embeds} />
-          ),
-        )}
-
-        {chosen && chosen.id !== editingCard && (
-          <TransformBox
-            placed={chosen}
-            frame={frame}
-            onChange={(next) => update(chosen.id, next)}
-            onCommit={remember}
+            arranged here is what people get — and with no box round the
+            one being moved, it looks exactly as it will. */}
+        {layers.map((layer) => (
+          <div
+            key={layer.id}
+            className="absolute inset-0 transition-opacity"
+            style={drag?.id === layer.id && drag.hot ? { opacity: 0.55 } : undefined}
           >
-            {/* The body alone: the box above already owns where it
-                sits, how big it is and which way it faces. */}
-            <LayerBody layer={chosen} editing embeds={embeds} />
-          </TransformBox>
-        )}
+            <LayerView layer={layer} frame={frame} editing embeds={embeds} />
+          </div>
+        ))}
 
         {/* The rail. */}
         {/* No plates: bold white with a soft shadow reads on any photo
             and leaves the picture alone. */}
         {/* Put away while a card is being written on: its own Done sits there. */}
-        <div className={`absolute right-2 top-2 z-20 flex flex-col gap-1.5 ${editingCard ? "hidden" : ""}`}>
+        <div className={`absolute right-2 top-2 z-20 flex flex-col gap-1.5 ${editingCard || selected || drag ? "hidden" : ""}`}>
           <RailButton
             label="Add text"
             disabled={full}
@@ -316,6 +491,9 @@ export function ShowEditor({
           </RailButton>
           <RailButton label="Add something" disabled={full} onClick={() => setTray((t) => !t)}>
             <PeelIcon />
+          </RailButton>
+          <RailButton label="Add music" disabled={full} onClick={() => setPicking("music")}>
+            <Music size={26} strokeWidth={2.5} />
           </RailButton>
           <RailButton label="Undo" disabled={!previous} onClick={() => {
             if (!previous) return;
@@ -330,7 +508,7 @@ export function ShowEditor({
         <button
           type="button"
           aria-label="Close"
-          data-hidden={!!editingCard}
+          data-hidden={!!editingCard || !!drag}
           onClick={onCancel}
           onPointerDown={(e) => e.stopPropagation()}
           className="absolute left-2 top-2 z-20 flex h-12 w-12 items-center justify-center text-white data-[hidden=true]:hidden [filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))_drop-shadow(0_0_8px_rgba(0,0,0,0.3))] transition active:scale-90"
@@ -338,43 +516,97 @@ export function ShowEditor({
           <X size={26} strokeWidth={2.6} />
         </button>
 
-        {chosen && usesColours(chosen.type) ? (
-          // The eight colours, as a row under the picture.
-          <div
-            role="radiogroup"
-            aria-label="Sticker colour"
+        {/* While something is selected: its colour wheel up top, and Done
+            where the rail was. One tap on the wheel is the next colour. */}
+        {chosen && !drag && !editingCard && writing === null && (
+          <>
+            <button
+              type="button"
+              onClick={nextColour}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-label={`Change colour (now ${lookName(chosen.type, chosen.look)})`}
+              className="absolute left-1/2 top-3 z-20 flex h-11 w-11 -translate-x-1/2 items-center justify-center rounded-[15px] border-[3px] border-white shadow-[0_4px_14px_rgba(0,0,0,0.35)] transition active:scale-90"
+              style={{ background: "conic-gradient(#ef4444, #f59e0b, #a3e635, #22d3ee, #6366f1, #d946ef, #ef4444)" }}
+              data-colour-wheel
+            >
+              <span
+                aria-hidden
+                className="block h-[18px] w-[18px] rounded-[7px] border-2 border-white"
+                style={{ background: swatchOf(chosen, ambient) }}
+              />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelected(null);
+                setHolding(null);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute right-3 top-3.5 z-20 h-10 rounded-[14px] bg-accent px-[18px] text-[15px] font-extrabold text-accent-ink transition active:scale-95"
+            >
+              Done
+            </button>
+          </>
+        )}
+
+        {/* Held: every colour pops up in a column beside it — on its right,
+            or on its left when the right edge is too close. */}
+        {(() => {
+          const held = layers.find((l) => l.id === holding) ?? null;
+          if (!held || drag) return null;
+          const looks = Array.from({ length: LOOKS[held.type] }, (_, i) => i);
+          const box = layerBox(held, frame);
+          const reach = 90 * held.scale;
+          const height = looks.length * 46;
+          const right = box.left + reach + 12 + 46 <= frame.width;
+          const left = right ? box.left + reach + 12 : Math.max(8, box.left - reach - 12 - 42);
+          const top = Math.min(Math.max(box.top - height / 2, 70), Math.max(70, frame.height - height - 24));
+          return (
+            <div
+              role="radiogroup"
+              aria-label="Colour"
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute z-30 flex flex-col gap-2"
+              style={{ left, top }}
+              data-colour-column
+            >
+              {looks.map((i) => {
+                const on = held.look === i;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    aria-label={lookName(held.type, i)}
+                    onClick={() => {
+                      paint(i);
+                      haptics.tap();
+                    }}
+                    style={{ background: swatchOf({ ...held, look: i }, ambient), animationDelay: `${i * 30}ms` }}
+                    className={`animate-pop h-[38px] w-[38px] rounded-[13px] shadow-[0_4px_12px_rgba(0,0,0,0.35)] ${
+                      on ? "border-[3px] border-accent" : "border-2 border-white"
+                    }`}
+                  />
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* The one way on: small, in the corner, out of the picture's way. */}
+        {!selected && !drag && !tray && !editingCard && writing === null && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onPublish(readLayers(layers))}
             onPointerDown={(e) => e.stopPropagation()}
-            // Above the card being written on, so its colour can change
-            // while you type.
-            className={`absolute inset-x-0 bottom-4 flex justify-center gap-2.5 ${editingCard ? "z-40" : "z-20"}`}
-            data-colour-row
+            className="absolute bottom-[max(1.5rem,var(--sab))] right-4 z-20 flex h-12 items-center gap-1.5 rounded-[17px] bg-accent pl-5 pr-4 text-[15px] font-extrabold text-accent-ink shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition active:scale-95 disabled:opacity-60"
           >
-            {COLOUR_SWATCHES.map((sw, i) => {
-              const on = chosen.look === i;
-              return (
-                <button
-                  key={sw.name}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  aria-label={sw.name}
-                  title={sw.name}
-                  onClick={() => paint(i)}
-                  style={{ background: i === AMBIENT_LOOK && ambient ? ambient : sw.background }}
-                  className={`rounded-[11px] shadow-[0_2px_8px_rgba(0,0,0,0.35)] transition active:scale-90 ${
-                    on ? "h-9 w-9 border-[3px] border-accent" : "h-8 w-8 border-2 border-white/80"
-                  } ${sw.name === "Glass" ? "backdrop-blur-md" : ""}`}
-                />
-              );
-            })}
-          </div>
-        ) : chosen ? (
-          <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center">
-            <span className="rounded-pill bg-black/65 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-white backdrop-blur-sm">
-              {lookName(chosen.type, chosen.look)} · tap again to change
-            </span>
-          </div>
-        ) : null}
+            {busy ? "Posting…" : "Next"}
+            <ChevronRight size={18} strokeWidth={2.8} />
+          </button>
+        )}
 
         {(() => {
           const card = layers.find((l) => l.id === editingCard) ?? null;
@@ -482,29 +714,18 @@ export function ShowEditor({
         }}
       />
 
-      {writing === null && (
-        <div className="flex items-center gap-2 border-t border-border bg-black p-3 pb-[max(var(--sab),12px)]">
-          <button
-            type="button"
-            disabled={!selected}
-            onClick={removeChosen}
-            aria-label="Remove this layer"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-elevated text-muted disabled:opacity-40"
-          >
-            <Trash2 size={18} />
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onPublish(readLayers(layers))}
-            className="h-12 flex-1 rounded-xl bg-accent text-sm font-extrabold text-accent-ink transition active:scale-[0.99] disabled:opacity-60"
-          >
-            {busy ? "Posting…" : "Add to your Show"}
-          </button>
-        </div>
-      )}
     </div>
   );
+}
+
+/** What a layer's look looks like, as one swatch. */
+function swatchOf(layer: ShowLayer, ambient: string | null): string {
+  if (usesColours(layer.type)) {
+    const sw = COLOUR_SWATCHES[layer.look] ?? COLOUR_SWATCHES[0];
+    return layer.look === AMBIENT_LOOK && ambient ? ambient : sw.background;
+  }
+  const bg = lookFor(layer.type, layer.look).box.background;
+  return typeof bg === "string" && bg !== "transparent" ? bg : "#ffffff";
 }
 
 function RailButton({
