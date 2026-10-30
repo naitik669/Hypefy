@@ -26,6 +26,8 @@ const retire = read("supabase/migrations/0185_retire_is_showcase.sql");
 const bar = read("src/components/shows/ShowAudienceBar.tsx");
 const picker = read("src/components/diary/AudiencePicker.tsx");
 const preview = read("src/components/create/ShotPreview.tsx");
+/** Where a Show is actually put up, for the single preview and the album alike. */
+const publishLib = read("src/lib/show-publish.ts");
 const row = read("src/components/home/ShowsRow.tsx");
 const grid = read("src/app/(app)/shows/page.tsx");
 const reap = read("src/app/api/shows/reap/route.ts");
@@ -168,13 +170,14 @@ describe("choosing the room, on the screen where it is posted", () => {
   it("and a failure to write the exclusions takes the Show back down", () => {
     // A row there is a promise. Publishing without it leaves the Show
     // standing in front of somebody it was meant to be kept from.
-    const publish = preview.slice(preview.indexOf('.from("shows").insert({'));
+    const publish = publishLib.slice(publishLib.indexOf('.from("shows")\n    .insert({'));
     expect(publish).toContain('await supabase.from("shows").delete().eq("id", row.id);');
-    expect(publish).toContain('toast("Couldn\'t set who it\'s hidden from. Nothing was posted.");');
+    expect(publish).toContain('return { ok: false, reason: "hidden" };');
+    expect(publishLib).toContain('if (reason === "hidden") return "Couldn\'t set who it\'s hidden from. Nothing was posted.";');
   });
 
   it("the exclusions are written only once there is a Show to point at", () => {
-    const publish = preview.slice(preview.indexOf('.from("shows").insert({'));
+    const publish = publishLib.slice(publishLib.indexOf('.from("shows")\n    .insert({'));
     expect(publish).toContain('.select("id")');
     expect(publish).toContain("show_id: row.id");
   });
@@ -359,7 +362,8 @@ describe("publishing a Show, which Phase 4 broke", () => {
   });
 
   it("the composer still reads the id back, because the exclusions need it", () => {
-    const publish = preview.slice(preview.indexOf('.from("shows").insert({'));
+    // publishShow is where the composer's insert lives now (shared with the album).
+    const publish = publishLib.slice(publishLib.indexOf('.from("shows")\n    .insert({'));
     expect(publish).toContain('.select("id")');
     expect(publish).toContain("show_id: row.id");
   });
