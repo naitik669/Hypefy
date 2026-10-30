@@ -471,7 +471,7 @@ function EmptyHypersTab() {
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface text-muted">
         <Star size={28} />
       </div>
-      <h2 className="text-lg font-bold">No Hypers yet</h2>
+      <h2 className="text-lg font-bold">No Hype buddies yet</h2>
       <p className="max-w-xs text-sm text-muted">
         Visit someone&apos;s profile and tap the ⋯ menu to add them as a Hyper.
       </p>

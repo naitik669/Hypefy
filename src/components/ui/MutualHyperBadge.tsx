@@ -10,12 +10,12 @@ import { Star } from "lucide-react";
 export function MutualHyperBadge({ className = "" }: { className?: string }) {
   return (
     <span
-      title="You're both Hypers"
+      title="You're each other's Hype buddies"
       className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none text-black ${className}`}
       style={{ background: "linear-gradient(135deg, #FFD000 0%, #FF7A00 55%, #A3E635 100%)" }}
     >
       <Star size={10} className="fill-black text-black" />
-      Hypers
+      Hype buddies
     </span>
   );
 }

@@ -118,7 +118,7 @@ export function HyperFavoriteButton({
       ? await supabase.from("close_friends").delete().eq("user_id", currentUserId).eq("friend_id", targetUserId)
       : await supabase.from("close_friends").insert({ user_id: currentUserId, friend_id: targetUserId });
     // Rolled back silently before, which just looked like a dead button.
-    if (error) { setIsHyper(prev); toast("Couldn't update your Hypers."); }
+    if (error) { setIsHyper(prev); toast("Couldn't update your Hype buddies."); }
     setPending(null);
   }
 
@@ -149,7 +149,7 @@ export function HyperFavoriteButton({
               <Star size={18} className={isHyper ? "fill-accent" : ""} />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">Hypers</p>
+              <p className="text-sm font-semibold">Hype buddies</p>
               <p className="text-xs text-muted">Your closest friends, see their posts here first</p>
             </div>
             {isHyper && <Check size={18} className="shrink-0 text-accent" />}

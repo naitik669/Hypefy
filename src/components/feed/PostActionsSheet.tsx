@@ -174,7 +174,7 @@ export function PostActionsSheet({
       : await supabase.from("close_friends").insert({ user_id: currentUserId, friend_id: postUserId });
     if (error) setIsHyper(prev);
     else {
-      toast(prev ? "Removed from Hypers" : "Added to Hypers ★", "success");
+      toast(prev ? "Removed from Hype buddies" : "Added to Hype buddies ★", "success");
       onHyperChange?.();
       router.refresh();
     }
@@ -273,7 +273,7 @@ export function PostActionsSheet({
             icon={Star}
             active={isHyper}
             pending={hyperPending}
-            label={isHyper ? "Remove from Hypers" : "Add to Hypers"}
+            label={isHyper ? "Remove from Hype buddies" : "Add to Hype buddies"}
             onClick={toggleHyper}
           />
         )}

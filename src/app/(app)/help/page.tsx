@@ -80,10 +80,10 @@ const ACTIONS: Entry[] = [
     // Not a star any more: Hype took it, and two identical glyphs two rows
     // apart in a glossary defeat the point of the glossary.
     icon: Users,
-    term: "Hyper",
-    what: "One of your closest people. Their posts come first in the Hypers feed. Your list is private — nobody is told they're on it.",
+    term: "Hype buddy",
+    what: "One of your closest people. Their posts come first in the Hype buddies feed. Your list is private — nobody is told they're on it.",
     href: "/hypers",
-    hrefLabel: "Your Hypers",
+    hrefLabel: "Your Hype buddies",
   },
   {
     icon: GhostShareIcon,

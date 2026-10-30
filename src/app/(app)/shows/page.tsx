@@ -83,7 +83,7 @@ function Tile({ s, badge }: { s: Row; badge: string }) {
       {isRestricted(s.audience) && (
         <span className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-pill bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-hype">
           <Star size={9} className="fill-hype" />
-          Hypers
+          Hype buddies
         </span>
       )}
     </Link>

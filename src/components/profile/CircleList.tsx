@@ -28,8 +28,8 @@ const SPEC: Record<
   hypers: {
     table: "close_friends",
     icon: Star,
-    verb: "Hyper",
-    blurb: "Your closest people. Their posts come first in the Hypers feed, and they're never told.",
+    verb: "Add",
+    blurb: "Your closest people. Their posts come first in the Hype buddies feed, and they're never told.",
   },
 };
 
@@ -162,8 +162,8 @@ export function CircleList({
       {rows.length === 0 ? (
         <EmptyState
           icon={Icon}
-          title="No Hypers yet"
-          text={`Pick a few below, or use the ··· menu on anyone's profile to ${spec.verb.toLowerCase()} them.`}
+          title="No Hype buddies yet"
+          text={`Pick a few below, or use the ··· menu on anyone's profile to ${spec.verb.toLowerCase()} them as a Hype buddy.`}
           variant="compact"
         />
       ) : (
