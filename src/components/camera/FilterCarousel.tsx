@@ -233,8 +233,8 @@ export function FilterRailButton({ open, onClick }: { open: boolean; onClick: ()
       aria-label={open ? "Hide filters" : "Filters"}
       className={`flex w-14 flex-col items-center gap-0.5 py-2 transition active:scale-90 ${open ? "text-accent" : "text-white"}`}
     >
-      <Blend size={22} />
-      <span className="text-[10px] font-bold">Filter</span>
+      <Blend size={26} strokeWidth={2.5} />
+      <span className="text-[11px] font-bold">Filter</span>
     </button>
   );
 }
