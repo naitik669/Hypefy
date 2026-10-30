@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Music, Trash2, Undo2, X } from "lucide-react";
+import { ChevronRight, Music, PenLine, Trash2, Undo2, X } from "lucide-react";
 import { LayerView } from "@/components/shows/LayerView";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { StickerTray, type SheetKey, type WidgetKey } from "@/components/shows/StickerTray";
@@ -16,6 +16,8 @@ import {
 import { EmbedSheet, type EmbedState } from "@/components/shows/ShowWidgetPickers";
 import { TagWriter, isTagType, type TagType } from "@/components/shows/TagWriter";
 import { MusicEditor } from "@/components/shows/MusicEditor";
+import { DrawCanvas, DrawTools } from "@/components/shows/DrawPad";
+import type { Stroke } from "@/lib/draw";
 import { COLOUR_SWATCHES, lookFor, lookName, usesColours } from "@/lib/show-looks";
 import { haptics } from "@/lib/haptics";
 import { ambientTint, photoAverage } from "@/lib/ambient";
@@ -111,6 +113,9 @@ function freshId(): string {
   return `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 }
 
+/** What was drawn, and the frame it was drawn on, to be painted into the photo. */
+export type ShowDrawing = { strokes: Stroke[]; frame: { width: number; height: number } };
+
 export function ShowEditor({
   photoUrl,
   busy = false,
@@ -121,13 +126,16 @@ export function ShowEditor({
   photoUrl: string;
   busy?: boolean;
   onCancel: () => void;
-  onPublish: (layers: ShowLayer[]) => void;
+  onPublish: (layers: ShowLayer[], drawing: ShowDrawing | null) => void;
 }) {
   const [layers, setLayers] = useState<ShowLayer[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [writing, setWriting] = useState<string | null>(null);
   /** The place, tag, person or link being typed on its own sticker. */
   const [tagging, setTagging] = useState<string | null>(null);
+  /** Everything drawn so far, and whether the pens are out. */
+  const [strokes, setStrokes] = useState<Stroke[]>([]);
+  const [drawing, setDrawing] = useState(false);
   /** The song whose style and part are being chosen, and how it was before. */
   const [tuning, setTuning] = useState<{ id: string; before: ShowLayer } | null>(null);
   /** The poll or question being written on, if any. */
@@ -476,6 +484,8 @@ export function ShowEditor({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={photoUrl} alt="" draggable={false} className="absolute inset-0 h-full w-full select-none object-cover" />
+        {/* What was drawn sits on the photo, under every sticker. */}
+        <DrawCanvas strokes={strokes} frame={frame} />
 
         {/* The bin, while something is being dragged. Drawn before the
             layers, so the sticker passes over it on its way in. */}
@@ -515,7 +525,7 @@ export function ShowEditor({
         {/* No plates: bold white with a soft shadow reads on any photo
             and leaves the picture alone. */}
         {/* Put away while a card is being written on: its own Done sits there. */}
-        <div className={`absolute right-2 top-2 z-20 flex flex-col gap-1.5 ${editingCard || selected || drag || tagging || tuning ? "hidden" : ""}`}>
+        <div className={`absolute right-2 top-2 z-20 flex flex-col gap-1.5 ${editingCard || selected || drag || tagging || tuning || drawing ? "hidden" : ""}`}>
           <RailButton
             label="Add text"
             disabled={full}
@@ -532,6 +542,9 @@ export function ShowEditor({
           <RailButton label="Add music" disabled={full} onClick={() => setPicking("music")}>
             <Music size={26} strokeWidth={2.5} />
           </RailButton>
+          <RailButton label="Draw" onClick={() => setDrawing(true)}>
+            <PenLine size={26} strokeWidth={2.5} />
+          </RailButton>
           <RailButton label="Undo" disabled={!previous} onClick={() => {
             if (!previous) return;
             setLayers(previous);
@@ -545,7 +558,7 @@ export function ShowEditor({
         <button
           type="button"
           aria-label="Close"
-          data-hidden={!!editingCard || !!drag || !!tagging || !!tuning}
+          data-hidden={!!editingCard || !!drag || !!tagging || !!tuning || drawing}
           onClick={onCancel}
           onPointerDown={(e) => e.stopPropagation()}
           className="absolute left-2 top-2 z-20 flex h-12 w-12 items-center justify-center text-white data-[hidden=true]:hidden [filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))_drop-shadow(0_0_8px_rgba(0,0,0,0.3))] transition active:scale-90"
@@ -632,11 +645,11 @@ export function ShowEditor({
         })()}
 
         {/* The one way on: small, in the corner, out of the picture's way. */}
-        {!selected && !drag && !tray && !editingCard && !tagging && !tuning && writing === null && (
+        {!selected && !drag && !tray && !editingCard && !tagging && !tuning && !drawing && writing === null && (
           <button
             type="button"
             disabled={busy}
-            onClick={() => onPublish(readLayers(layers))}
+            onClick={() => onPublish(readLayers(layers), strokes.length ? { strokes, frame } : null)}
             onPointerDown={(e) => e.stopPropagation()}
             className="absolute bottom-[max(1.5rem,var(--sab))] right-4 z-20 flex h-12 items-center gap-1.5 rounded-[17px] bg-accent pl-5 pr-4 text-[15px] font-extrabold text-accent-ink shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition active:scale-95 disabled:opacity-60"
           >
@@ -698,6 +711,17 @@ export function ShowEditor({
             />
           );
         })()}
+
+        {drawing && (
+          <DrawTools
+            frame={frame}
+            onStroke={(stroke) => setStrokes((all) => [...all, stroke])}
+            canUndo={strokes.length > 0}
+            onUndo={() => setStrokes((all) => all.slice(0, -1))}
+            onClear={() => setStrokes([])}
+            onDone={() => setDrawing(false)}
+          />
+        )}
 
         {tray && (
           <StickerTray

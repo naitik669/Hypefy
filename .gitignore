@@ -49,3 +49,6 @@ next-env.d.ts
 
 # Supabase CLI scratch
 supabase/.temp/
+
+# Throwaway preview routes used to check UI in a browser; never shipped.
+/src/app/zz-preview-*/

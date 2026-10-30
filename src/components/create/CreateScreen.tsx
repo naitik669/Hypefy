@@ -24,6 +24,8 @@ import { ShotPreview } from "@/components/create/ShotPreview";
 import { ShowEditor } from "@/components/shows/ShowEditor";
 import { useObjectUrl } from "@/lib/object-url";
 import type { ShowLayer } from "@/lib/show-layers";
+import { flattenDrawing } from "@/lib/draw";
+import type { ShowDrawing } from "@/components/shows/ShowEditor";
 import { ShotEditor } from "@/components/create/ShotEditor";
 import {
   FilterCarousel,
@@ -68,7 +70,7 @@ function ShowArrange({
 }: {
   file: File;
   onCancel: () => void;
-  onDone: (layers: ShowLayer[]) => void;
+  onDone: (layers: ShowLayer[], drawing: ShowDrawing | null) => void;
 }) {
   return <ShowEditor photoUrl={useObjectUrl(file)} onCancel={onCancel} onPublish={onDone} />;
 }
@@ -168,6 +170,8 @@ export function CreateScreen({
    * reason: stepping back to arrange again must not lose the layers.
    */
   const [arranged, setArranged] = useState<ShowLayer[] | null>(null);
+  /** The photo with what was drawn on it painted in, when anything was. */
+  const [drawn, setDrawn] = useState<File | null>(null);
   const [caption, setCaption] = useState("");
   /** The edit as it stands in the editor right now, for a draft saved from there. */
   const liveEdit = useRef<DraftEdit | null>(null);
@@ -200,7 +204,10 @@ export function CreateScreen({
       // the clip, so that is asked about first.
       if (captioning && mode === "shot") return setCaptioning(false);
       // A photo Show goes caption → arrange, which keeps everything.
-      if (arranged && mode === "show" && !isVideoFile(captured)) return setArranged(null);
+      if (arranged && mode === "show" && !isVideoFile(captured)) {
+        setDrawn(null);
+        return setArranged(null);
+      }
       return setLeaving(true);
     }
     if (albumFiles) return setAlbumFiles(null);
@@ -449,7 +456,19 @@ export function CreateScreen({
   if (captured && mode === "show" && !isVideoFile(captured) && arranged === null) {
     return (
       <>
-        <ShowArrange file={captured} onCancel={back} onDone={setArranged} />
+        <ShowArrange
+          file={captured}
+          onCancel={back}
+          onDone={(layers, drawing) => {
+            if (!drawing || drawing.strokes.length === 0) return setArranged(layers);
+            // The drawing goes into the photo itself before it is shown
+            // or sent: there is nothing to keep it apart for.
+            void flattenDrawing(captured, drawing.strokes, drawing.frame).then((file) => {
+              setDrawn(file);
+              setArranged(layers);
+            });
+          }}
+        />
         {leaveSheet}
       </>
     );
@@ -460,7 +479,7 @@ export function CreateScreen({
     return (
       <>
         <ShotPreview
-          file={captured}
+          file={drawn ?? captured}
           mode={mode}
           track={track}
           userId={userId}

@@ -220,7 +220,7 @@ describe("the editor", () => {
   it("what is published is what readLayers will accept", () => {
     // The editor holds layers in the same shape the column stores, so
     // the last thing before publishing is the same check the reader does.
-    expect(editor).toContain("onPublish(readLayers(layers))");
+    expect(editor).toContain("onPublish(readLayers(layers), strokes.length ? { strokes, frame } : null)");
   });
 
   it("an empty text layer removes itself rather than lurking invisibly", () => {

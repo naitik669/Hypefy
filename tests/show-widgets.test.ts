@@ -207,7 +207,8 @@ describe("the arrangement reaches the column", () => {
 
   it("and the editor is on the way there for a photo Show", () => {
     expect(create).toContain('if (captured && mode === "show" && !isVideoFile(captured) && arranged === null) {');
-    expect(create).toContain("<ShowArrange file={captured} onCancel={back} onDone={setArranged} />");
+    expect(create).toContain("<ShowArrange\n          file={captured}\n          onCancel={back}");
+    expect(create).toContain("if (!drawing || drawing.strokes.length === 0) return setArranged(layers);");
   });
 
   it("the blob URL is minted only once the editor is on screen", () => {
@@ -219,11 +220,11 @@ describe("the arrangement reaches the column", () => {
 
   it("and stepping back to it is one step, like the Shot's caption → editor", () => {
     const back = create.slice(create.indexOf("function back() {"), create.indexOf("useOverlayBackButton(true, back)"));
-    expect(back).toContain('if (arranged && mode === "show" && !isVideoFile(captured)) return setArranged(null);');
+    expect(back).toContain('if (arranged && mode === "show" && !isVideoFile(captured)) {\n        setDrawn(null);\n        return setArranged(null);');
   });
 
   it("what is published is what the parser accepts, not what the editor held", () => {
-    expect(editor).toContain("onPublish(readLayers(layers))");
+    expect(editor).toContain("onPublish(readLayers(layers), strokes.length ? { strokes, frame } : null)");
   });
 });
 
