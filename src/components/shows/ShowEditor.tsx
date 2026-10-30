@@ -512,9 +512,9 @@ export function ShowEditor({
             key={layer.id}
             className="absolute inset-0 transition-opacity"
             style={
-              // The song being tuned is drawn large by its editor; the one
-              // on the picture would show through behind it.
-              tuning?.id === layer.id ? { opacity: 0 } : drag?.id === layer.id && drag.hot ? { opacity: 0.55 } : undefined
+              // A song being tuned or a card being written on is drawn by
+              // its own editor; the one on the picture would show through.
+              tuning?.id === layer.id || editingCard === layer.id ? { opacity: 0 } : drag?.id === layer.id && drag.hot ? { opacity: 0.55 } : undefined
             }
           >
             <LayerView layer={layer} frame={frame} editing embeds={embeds} />
