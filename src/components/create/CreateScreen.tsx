@@ -582,9 +582,9 @@ export function CreateScreen({
           type="button"
           onClick={close}
           aria-label="Close"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm active:scale-95"
+          className={`flex h-10 w-10 items-center justify-center text-white active:scale-90 ${PEEL}`}
         >
-          <X size={20} />
+          <X size={26} strokeWidth={2.5} />
         </button>
 
         {/* A Show can carry a song as well; the other Show creator, now gone,
@@ -592,9 +592,9 @@ export function CreateScreen({
         <button
           type="button"
           onClick={() => setTrackOpen(true)}
-          className="flex items-center gap-2 rounded-pill bg-black/45 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm active:scale-95"
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-bold text-white active:scale-95 ${PEEL}`}
         >
-          <Music size={16} />
+          <Music size={18} strokeWidth={2.5} />
           <span className="max-w-[150px] truncate">
             {track ? track.title : "Add sound"}
           </span>
@@ -614,12 +614,12 @@ export function CreateScreen({
               haptics.tap();
               setWriting(true);
             }}
-            className="flex flex-col items-center gap-1 text-white active:scale-95"
+            className={`flex flex-col items-center gap-1 text-white active:scale-90 ${PEEL}`}
           >
-            <span className="flex h-[46px] w-[46px] items-center justify-center rounded-2xl border border-white/20 bg-black/50 text-lg font-extrabold tracking-tight backdrop-blur-sm">
+            <span className="flex h-[46px] w-[46px] items-center justify-center text-[26px] font-black tracking-tight">
               Aa
             </span>
-            <span className="text-[11px] font-semibold">Text</span>
+            <span className="text-[11px] font-bold">Text</span>
           </button>
           <button
             type="button"
@@ -627,7 +627,7 @@ export function CreateScreen({
               haptics.tap();
               albumRef.current?.click();
             }}
-            className="flex flex-col items-center gap-1 text-white active:scale-95"
+            className={`flex flex-col items-center gap-1 text-white active:scale-90 ${PEEL}`}
           >
             {/* A little stack of pictures, the album tile from design C. */}
             <span aria-hidden className="relative block h-[46px] w-[46px]">
@@ -637,14 +637,14 @@ export function CreateScreen({
                 <Plus size={16} strokeWidth={3} />
               </span>
             </span>
-            <span className="text-[11px] font-semibold">Album</span>
+            <span className="text-[11px] font-bold">Album</span>
           </button>
         </div>
       )}
 
       {/* ── Right rail ──────────────────────────────────────────── */}
       {wantsCamera && (
-        <div className="absolute right-3 top-1/2 z-10 flex -translate-y-1/2 flex-col items-center gap-1 rounded-pill bg-black/35 py-3 backdrop-blur-sm">
+        <div className={`absolute right-3 top-1/2 z-10 flex -translate-y-1/2 flex-col items-center gap-1 py-3 ${PEEL}`}>
           <RailButton label="Flip camera" onClick={cam.flip} icon={RefreshCw} />
           {mode === "shot" && (
             <RailButton
@@ -700,12 +700,12 @@ export function CreateScreen({
             <button
               type="button"
               onClick={() => galleryRef.current?.click()}
-              className="flex flex-col items-center gap-1 text-white active:scale-95"
+              className={`flex flex-col items-center gap-1 text-white active:scale-90 ${PEEL}`}
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/25 bg-black/40 backdrop-blur-sm">
-                <Images size={20} />
+              <span className="flex h-11 w-11 items-center justify-center">
+                <Images size={28} strokeWidth={2.25} />
               </span>
-              <span className="text-[11px] font-medium">Add</span>
+              <span className="text-[11px] font-bold">Add</span>
             </button>
 
             {/* Shutter. It only appears once the camera has been asked for;
@@ -764,12 +764,12 @@ export function CreateScreen({
                   setSource("pick");
                 }}
                 aria-label="Close the camera"
-                className="flex flex-col items-center gap-1 text-white active:scale-95"
+                className={`flex flex-col items-center gap-1 text-white active:scale-90 ${PEEL}`}
               >
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/25 bg-black/40 backdrop-blur-sm">
-                  <X size={20} />
+                <span className="flex h-11 w-11 items-center justify-center">
+                  <X size={28} strokeWidth={2.5} />
                 </span>
-                <span className="text-[11px] font-medium">Close</span>
+                <span className="text-[11px] font-bold">Close</span>
               </button>
             ) : (
               <span className="h-11 w-11" aria-hidden />
@@ -865,6 +865,12 @@ export function CreateScreen({
   );
 }
 
+/**
+ * The Peel look the Show editor's rail has: no plate behind a control,
+ * just bold white with a shadow that keeps it readable on a bright frame.
+ */
+const PEEL = "[filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))_drop-shadow(0_0_8px_rgba(0,0,0,0.3))]";
+
 function RailButton({
   label,
   icon: Icon,
@@ -887,8 +893,8 @@ function RailButton({
       title={label}
       className="flex w-14 flex-col items-center gap-0.5 py-2 text-white transition active:scale-90 disabled:opacity-35"
     >
-      <Icon size={22} />
-      {caption && <span className="text-[10px] font-bold">{caption}</span>}
+      <Icon size={26} strokeWidth={2.5} />
+      {caption && <span className="text-[11px] font-bold">{caption}</span>}
     </button>
   );
 }
