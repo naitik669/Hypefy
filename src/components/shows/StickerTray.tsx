@@ -6,7 +6,11 @@ import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
 import type { LayerType, ShowLayer } from "@/lib/show-layers";
 
 /** The widgets, each opening its own picker. Kept in the order people reach for them. */
-export type WidgetKey = "music" | "mention" | "link" | "poll" | "question" | "embed";
+/** The widgets that open a picker of their own. */
+export type SheetKey = "music" | "mention" | "link" | "poll" | "question" | "embed";
+/** Those placed straight onto the picture: typed at the foot, or stamped. */
+export type DirectKey = "location" | "hashtag" | "time";
+export type WidgetKey = SheetKey | DirectKey;
 
 /**
  * Emoji in four moods.

@@ -41,6 +41,9 @@ export const LAYER_TYPES = [
   "question",
   "post",
   "shot",
+  "location",
+  "hashtag",
+  "time",
 ] as const;
 
 export type LayerType = (typeof LAYER_TYPES)[number];
@@ -92,6 +95,9 @@ export const LOOKS: Record<LayerType, number> = {
   question: COLOUR_LOOKS,
   post: 4,
   shot: 4,
+  location: COLOUR_LOOKS,
+  hashtag: COLOUR_LOOKS,
+  time: COLOUR_LOOKS,
 };
 
 /** The look index that takes its colour from the photo (`tint`). */
@@ -112,6 +118,15 @@ export type PollPayload = { question: string; options: string[] };
 export type QuestionPayload = { prompt: string };
 export type PostPayload = { postId: string };
 export type ShotPayload = { shotId: string };
+/** A place, as typed. Not looked up: a name is all a story needs. */
+export type LocationPayload = { place: string };
+/** A tag without its #, in the shape the app's hashtags take. */
+export type HashtagPayload = { tag: string };
+/** When it was added, fixed then: a Show is a moment, and this says which. */
+export type TimePayload = { at: string };
+
+export const MAX_PLACE = 60;
+export const MAX_TAG = 40;
 
 export type LayerPayload =
   | TextPayload
@@ -122,7 +137,10 @@ export type LayerPayload =
   | PollPayload
   | QuestionPayload
   | PostPayload
-  | ShotPayload;
+  | ShotPayload
+  | LocationPayload
+  | HashtagPayload
+  | TimePayload;
 
 export type ShowLayer = {
   /** Stable for the life of the layer: votes and answers point at it. */
@@ -258,7 +276,53 @@ function readPayload(type: LayerType, raw: unknown): LayerPayload | null {
       const sid = id(p.shotId);
       return sid ? { shotId: sid } : null;
     }
+    case "location": {
+      const place = text(p.place, MAX_PLACE);
+      return place ? { place } : null;
+    }
+    case "hashtag": {
+      const tag = typeof p.tag === "string" ? cleanTag(p.tag) : "";
+      return tag ? { tag } : null;
+    }
+    case "time": {
+      const at = typeof p.at === "string" ? p.at : "";
+      return at && !Number.isNaN(Date.parse(at)) ? { at: new Date(at).toISOString() } : null;
+    }
   }
+}
+
+/** A hashtag as typed, made into one: no #, no spaces, letters, digits and _. */
+export function cleanTag(raw: string): string {
+  return raw
+    .replace(/^#+/, "")
+    .replace(/[^\p{L}\p{M}\p{N}_]/gu, "")
+    .toLowerCase()
+    .slice(0, MAX_TAG);
+}
+
+/**
+ * The layers that are typed at the foot of the editor, and which field of
+ * their payload the typing goes into.
+ */
+export const TYPED_FIELD = { text: "text", location: "place", hashtag: "tag" } as const;
+export type TypedType = keyof typeof TYPED_FIELD;
+
+export function isTyped(type: LayerType): type is TypedType {
+  return type in TYPED_FIELD;
+}
+
+/** What a typed layer currently says. */
+export function typedValue(layer: ShowLayer): string {
+  if (!isTyped(layer.type)) return "";
+  const v = (layer.payload as Record<string, unknown>)[TYPED_FIELD[layer.type]];
+  return typeof v === "string" ? v : "";
+}
+
+/** The payload a typed layer gets for what was typed, cleaned for its type. */
+export function typedPayload(type: TypedType, value: string): LayerPayload {
+  if (type === "hashtag") return { tag: cleanTag(value) };
+  if (type === "location") return { place: value.slice(0, MAX_PLACE) };
+  return { text: value.slice(0, MAX_LAYER_TEXT) };
 }
 
 /** One layer, or null. */

@@ -229,6 +229,9 @@ const BY_TYPE: Record<LayerType, Look[]> = {
   link: CHIP_LOOKS,
   poll: CARD_LOOKS,
   question: CARD_LOOKS,
+  location: CHIP_LOOKS,
+  hashtag: CHIP_LOOKS,
+  time: CHIP_LOOKS,
   post: embedLooks(),
   shot: embedLooks(),
 };

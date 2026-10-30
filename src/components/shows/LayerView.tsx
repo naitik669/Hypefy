@@ -17,6 +17,9 @@ import {
   type ShowLayer,
   type StickerPayload,
   type TextPayload,
+  type LocationPayload,
+  type HashtagPayload,
+  type TimePayload,
 } from "@/lib/show-layers";
 
 /**
@@ -324,6 +327,41 @@ export function LayerBody({
       // A layer whose thing is gone stops being a door to it.
       if (editing || embed?.gone) return body;
       return <Link href={href}>{body}</Link>;
+    }
+
+    case "location": {
+      const { place } = layer.payload as LocationPayload;
+      return (
+        <span style={{ ...look.box, display: "inline-flex", alignItems: "center", gap: 7, maxWidth: 260 }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={look.ink} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none" }} aria-hidden>
+            <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" />
+            <circle cx="12" cy="9.5" r="2.5" />
+          </svg>
+          <span style={{ ...look.title, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {place}
+          </span>
+        </span>
+      );
+    }
+
+    case "hashtag": {
+      const { tag } = layer.payload as HashtagPayload;
+      const body = (
+        <span style={{ ...look.box, ...look.title, display: "inline-block", fontSize: 15 }}>#{tag}</span>
+      );
+      return editing ? body : <Link href={`/tag/${encodeURIComponent(tag)}`}>{body}</Link>;
+    }
+
+    case "time": {
+      const { at } = layer.payload as TimePayload;
+      // Shown in the viewer's own clock: the moment is fixed, the reading
+      // of it is theirs.
+      const label = new Date(at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+      return (
+        <span style={{ ...look.box, ...look.title, display: "inline-block", fontSize: 17, fontVariantNumeric: "tabular-nums" }}>
+          {label}
+        </span>
+      );
     }
   }
 }

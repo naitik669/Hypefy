@@ -54,7 +54,7 @@ describe("every kind of layer can actually be added", () => {
   });
 
   it("the table is typed against the sheets, not kept in step by hand", () => {
-    expect(editor).toContain("type Picker = WidgetKey | null;");
+    expect(editor).toContain("type Picker = SheetKey | null;");
     expect(read("src/components/shows/StickerTray.tsx")).toContain("{ key: WidgetKey; label: string; layer: ShowLayer; zoom: number }[]");
   });
 });

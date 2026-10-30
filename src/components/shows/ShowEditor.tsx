@@ -5,7 +5,7 @@ import { Undo2, Trash2, X } from "lucide-react";
 import { LayerBody, LayerView } from "@/components/shows/LayerView";
 import { TransformBox } from "@/components/shows/TransformBox";
 import { TrackPicker } from "@/components/music/TrackPicker";
-import { StickerTray, type WidgetKey } from "@/components/shows/StickerTray";
+import { StickerTray, type SheetKey, type WidgetKey } from "@/components/shows/StickerTray";
 import { PollComposer } from "@/components/messages/PollComposer";
 import {
   EmbedSheet,
@@ -23,6 +23,9 @@ import {
   layerBox,
   nextLook,
   AMBIENT_LOOK,
+  isTyped,
+  typedPayload,
+  typedValue,
   readLayers,
   type LayerType,
   type ShowLayer,
@@ -68,7 +71,7 @@ function dropAt(count: number) {
 }
 
 /** Which sheet is open: one per widget the tray offers, so the two cannot drift apart. */
-type Picker = WidgetKey | null;
+type Picker = SheetKey | null;
 
 function freshId(): string {
   // Collides with nothing and needs no library; the id only has to be
@@ -153,6 +156,25 @@ export function ShowEditor({
     setSelected(null);
   }, [selected, remember]);
 
+  /**
+   * What a tray tile does: a picker for the ones that need choosing, and
+   * straight onto the picture for the rest — a place or a tag typed at the
+   * foot like words are, the time stamped as it is now.
+   */
+  function place(key: WidgetKey) {
+    if (key === "location") {
+      const id = add("location", { place: "" });
+      if (id) setWriting(id);
+    } else if (key === "hashtag") {
+      const id = add("hashtag", { tag: "" });
+      if (id) setWriting(id);
+    } else if (key === "time") {
+      add("time", { at: new Date().toISOString() });
+    } else {
+      setPicking(key);
+    }
+  }
+
   /** Dress the chosen layer in one of the eight colours. */
   function paint(look: number) {
     if (!chosen) return;
@@ -206,8 +228,15 @@ export function ShowEditor({
     setSelected(hit);
   }
 
-  function writeText(id: string | null, value: string) {
-    const text = value.slice(0, MAX_LAYER_TEXT);
+  /** `done` is the field being left: only then does an empty layer go. */
+  function writeText(id: string | null, value: string, done = false) {
+    const layer = layers.find((l) => l.id === id);
+    const type = layer && isTyped(layer.type) ? layer.type : "text";
+    const payload = typedPayload(type, value);
+    const text = typedValue({ ...(layer ?? { type: "text" }), payload } as ShowLayer);
+    // Mid-typing an empty value is just a start: "#" on its way to a tag
+    // cleans to nothing, and removing the layer there lost it.
+    if (!text.trim() && !done) return;
     if (!text.trim()) {
       // An empty text layer is nothing to look at; cancelling out of the
       // field removes it rather than leaving an invisible thing to find.
@@ -218,7 +247,7 @@ export function ShowEditor({
     }
     if (id) {
       setLayers((l) =>
-        l.map((layer) => (layer.id === id ? { ...layer, payload: { text } } : layer)),
+        l.map((layer) => (layer.id === id ? { ...layer, payload } : layer)),
       );
     }
   }
@@ -334,7 +363,7 @@ export function ShowEditor({
             }}
             onWidget={(key) => {
               setTray(false);
-              setPicking(key);
+              place(key);
             }}
           />
         )}
@@ -352,13 +381,15 @@ export function ShowEditor({
             id="layer-text"
             autoFocus
             maxLength={MAX_LAYER_TEXT}
-            defaultValue={(chosen?.payload as { text?: string } | undefined)?.text ?? ""}
+            defaultValue={chosen ? typedValue(chosen) : ""}
             onChange={(e) => writeText(writing, e.target.value)}
             onBlur={(e) => {
-              writeText(writing, e.target.value);
+              writeText(writing, e.target.value, true);
               setWriting(null);
             }}
-            placeholder="Say something"
+            placeholder={
+              chosen?.type === "location" ? "Where are you?" : chosen?.type === "hashtag" ? "#hashtag" : "Say something"
+            }
             className="h-12 w-full rounded-xl bg-surface px-4 text-sm text-foreground outline-none placeholder:text-muted"
           />
         </div>
