@@ -1,13 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Type,
-  Smile,
-  Undo2,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Undo2, Trash2, X } from "lucide-react";
 import { LayerBody, LayerView } from "@/components/shows/LayerView";
 import { TransformBox } from "@/components/shows/TransformBox";
 import { TrackPicker } from "@/components/music/TrackPicker";
@@ -20,13 +14,15 @@ import {
   QuestionSheet,
   type EmbedState,
 } from "@/components/shows/ShowWidgetPickers";
-import { lookName } from "@/lib/show-looks";
+import { COLOUR_SWATCHES, lookName, usesColours } from "@/lib/show-looks";
+import { ambientTint, photoAverage } from "@/lib/ambient";
 import {
   DESIGN_WIDTH,
   MAX_LAYERS,
   MAX_LAYER_TEXT,
   layerBox,
   nextLook,
+  AMBIENT_LOOK,
   readLayers,
   type LayerType,
   type ShowLayer,
@@ -119,6 +115,18 @@ export function ShowEditor({
 
   const chosen = useMemo(() => layers.find((l) => l.id === selected) ?? null, [layers, selected]);
 
+  /** The photo's own colour, deepened, for the Ambient look. Read once. */
+  const [ambient, setAmbient] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void photoAverage(photoUrl).then((avg) => {
+      if (live && avg) setAmbient(ambientTint(avg));
+    });
+    return () => {
+      live = false;
+    };
+  }, [photoUrl]);
+
   const remember = useCallback(() => setPrevious(layers), [layers]);
 
   const add = useCallback(
@@ -145,6 +153,20 @@ export function ShowEditor({
     setSelected(null);
   }, [selected, remember]);
 
+  /** Dress the chosen layer in one of the eight colours. */
+  function paint(look: number) {
+    if (!chosen) return;
+    remember();
+    setLayers((l) =>
+      l.map((layer) => {
+        if (layer.id !== chosen.id) return layer;
+        const { tint: _drop, ...rest } = layer;
+        void _drop;
+        return look === AMBIENT_LOOK && ambient ? { ...rest, look, tint: ambient } : { ...rest, look };
+      }),
+    );
+  }
+
   /**
    * A tap on the picture selects what is under it, and a tap on what is
    * already selected runs it through its looks — the gesture people know
@@ -170,6 +192,9 @@ export function ShowEditor({
       return;
     }
     if (hit === selected) {
+      // Chips and cards pick a colour from the row below instead.
+      const layer = layers.find((x) => x.id === hit);
+      if (layer && usesColours(layer.type)) return;
       remember();
       setLayers((l) =>
         l.map((layer) =>
@@ -228,7 +253,9 @@ export function ShowEditor({
         )}
 
         {/* The rail. */}
-        <div className="absolute right-3 top-3 z-20 flex flex-col gap-2">
+        {/* No plates: bold white with a soft shadow reads on any photo
+            and leaves the picture alone. */}
+        <div className="absolute right-2 top-2 z-20 flex flex-col gap-1.5">
           <RailButton
             label="Add text"
             disabled={full}
@@ -237,10 +264,10 @@ export function ShowEditor({
               if (id) setWriting(id);
             }}
           >
-            <Type size={18} />
+            <span className="text-[22px] font-extrabold tracking-[-0.06em]">Aa</span>
           </RailButton>
           <RailButton label="Add something" disabled={full} onClick={() => setTray((t) => !t)}>
-            <Smile size={18} />
+            <PeelIcon />
           </RailButton>
           <RailButton label="Undo" disabled={!previous} onClick={() => {
             if (!previous) return;
@@ -248,7 +275,7 @@ export function ShowEditor({
             setPrevious(null);
             setSelected(null);
           }}>
-            <Undo2 size={18} />
+            <Undo2 size={26} strokeWidth={2.5} />
           </RailButton>
         </div>
 
@@ -256,18 +283,47 @@ export function ShowEditor({
           type="button"
           aria-label="Close"
           onClick={onCancel}
-          className="absolute left-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-[30%] bg-black/50 text-white backdrop-blur-sm"
+          onPointerDown={(e) => e.stopPropagation()}
+          className="absolute left-2 top-2 z-20 flex h-12 w-12 items-center justify-center text-white [filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))_drop-shadow(0_0_8px_rgba(0,0,0,0.3))] transition active:scale-90"
         >
-          <X size={19} />
+          <X size={26} strokeWidth={2.6} />
         </button>
 
-        {chosen && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-28 z-20 flex justify-center">
+        {chosen && usesColours(chosen.type) ? (
+          // The eight colours, as a row under the picture.
+          <div
+            role="radiogroup"
+            aria-label="Sticker colour"
+            onPointerDown={(e) => e.stopPropagation()}
+            className="absolute inset-x-0 bottom-4 z-20 flex justify-center gap-2.5"
+            data-colour-row
+          >
+            {COLOUR_SWATCHES.map((sw, i) => {
+              const on = chosen.look === i;
+              return (
+                <button
+                  key={sw.name}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  aria-label={sw.name}
+                  title={sw.name}
+                  onClick={() => paint(i)}
+                  style={{ background: i === AMBIENT_LOOK && ambient ? ambient : sw.background }}
+                  className={`rounded-[11px] shadow-[0_2px_8px_rgba(0,0,0,0.35)] transition active:scale-90 ${
+                    on ? "h-9 w-9 border-[3px] border-accent" : "h-8 w-8 border-2 border-white/80"
+                  } ${sw.name === "Glass" ? "backdrop-blur-md" : ""}`}
+                />
+              );
+            })}
+          </div>
+        ) : chosen ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center">
             <span className="rounded-pill bg-black/65 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-white backdrop-blur-sm">
               {lookName(chosen.type, chosen.look)} · tap again to change
             </span>
           </div>
-        )}
+        ) : null}
 
         {tray && (
           <StickerTray
@@ -410,9 +466,21 @@ function RailButton({
       disabled={disabled}
       onClick={onClick}
       onPointerDown={(e) => e.stopPropagation()}
-      className="flex h-10 w-10 items-center justify-center rounded-[30%] bg-black/50 text-white backdrop-blur-sm transition active:scale-90 disabled:opacity-35"
+      className="flex h-12 w-12 items-center justify-center text-white [filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.6))_drop-shadow(0_0_8px_rgba(0,0,0,0.3))] transition active:scale-90 disabled:opacity-45"
     >
       {children}
     </button>
+  );
+}
+
+/** A square sticker with its corner lifting: the tray's button. */
+function PeelIcon() {
+  return (
+    <svg aria-hidden width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 13.5V8a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v8a4 4 0 0 0 4 4h5.5z" />
+      <path d="M13.5 20v-3a3.5 3.5 0 0 1 3.5-3.5h3" />
+      <path d="M9.5 10h.01M14.5 10h.01" />
+      <path d="M9 14c.9.8 2 1.1 3 .9" />
+    </svg>
   );
 }

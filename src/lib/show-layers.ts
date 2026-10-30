@@ -74,17 +74,28 @@ export const MAX_LAYER_TEXT = 200;
  * The index is stored, never the styling, so restyling a look later
  * reaches every Show already posted rather than only new ones.
  */
+/**
+ * The eight colours a chip or a card can wear — Night, Lime, Glass, White,
+ * Ambient, Sunset, Aurora, Grape — picked from a row under the selected
+ * layer. The first is the old first look, so a Show posted before keeps
+ * its default; the old looks 2 and 3 now read as Glass and White.
+ */
+export const COLOUR_LOOKS = 8;
+
 export const LOOKS: Record<LayerType, number> = {
   text: 4,
   sticker: 4,
-  music: 4,
-  mention: 4,
-  link: 4,
-  poll: 4,
-  question: 4,
+  music: COLOUR_LOOKS,
+  mention: COLOUR_LOOKS,
+  link: COLOUR_LOOKS,
+  poll: COLOUR_LOOKS,
+  question: COLOUR_LOOKS,
   post: 4,
   shot: 4,
 };
+
+/** The look index that takes its colour from the photo (`tint`). */
+export const AMBIENT_LOOK = 4;
 
 export type TextPayload = { text: string };
 export type StickerPayload = { emoji: string };
@@ -125,6 +136,12 @@ export type ShowLayer = {
   rotation: number;
   /** Which of this type's looks is showing. */
   look: number;
+  /**
+   * The colour the Ambient look wears: a deep shade of the photo under it,
+   * worked out once in the editor and stored, so the viewer draws the same
+   * thing without sampling the picture again. Absent on every other look.
+   */
+  tint?: string;
   payload: LayerPayload;
 };
 
@@ -273,6 +290,8 @@ function readLayer(raw: unknown, seen: Set<string>): ShowLayer | null {
     // Out of range reads as the first look rather than as no layer: a
     // look added and later removed should not delete somebody's Show.
     look: look >= 0 && look < looks ? look : 0,
+    // Only a plain #rrggbb: it goes straight into a style.
+    ...(typeof l.tint === "string" && /^#[0-9a-f]{6}$/i.test(l.tint) ? { tint: l.tint.toLowerCase() } : {}),
     payload,
   };
 }

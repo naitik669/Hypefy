@@ -85,7 +85,7 @@ export function LayerBody({
   polls?: Record<string, PollState>;
   embeds?: Record<string, EmbedState>;
 }) {
-  const look = lookFor(layer.type, layer.look);
+  const look = lookFor(layer.type, layer.look, layer.tint);
 
   switch (layer.type) {
     case "text": {
