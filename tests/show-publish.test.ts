@@ -1,27 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { publishShow, publishFailureMessage } from "@/lib/show-publish";
 
-/**
- * Publishing a Show is INSERT ... RETURNING, so the new row must pass the
- * SELECT policy as well as the INSERT one. 0183 made that policy a lookup by
- * id (can_see_show), which cannot see a row inside the statement inserting
- * it, and every Show was refused as a row-level security violation.
- */
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 
-describe("the shows read policy", () => {
-  it("its latest word lets the author see their own row first", () => {
-    const dir = "supabase/migrations";
-    const last = readdirSync(dir)
-      .filter((f) => f.endsWith(".sql") && read(`${dir}/${f}`).includes('alter policy "shows_select_public"'))
-      .sort()
-      .pop()!;
-    const sql = read(`${dir}/${last}`);
-    const stmt = sql.slice(sql.lastIndexOf('alter policy "shows_select_public"'));
-    expect(stmt).toContain("using ((select auth.uid()) = user_id or public.can_see_show(id));");
-  });
-});
+// The read policy that let a Show's own author see it during INSERT ...
+// RETURNING (0187) is covered in show-audience.test.ts.
 
 /** A Supabase client that records what was asked of it. */
 function fakeClient({ upload = null, insert = null, hide = null }: { upload?: unknown; insert?: unknown; hide?: unknown } = {}) {

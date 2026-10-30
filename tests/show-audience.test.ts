@@ -362,7 +362,8 @@ describe("publishing a Show, which Phase 4 broke", () => {
   });
 
   it("the composer still reads the id back, because the exclusions need it", () => {
-    const publish = preview.slice(preview.indexOf('.from("shows").insert({'));
+    // publishShow is where the composer's insert lives now (shared with the album).
+    const publish = publishLib.slice(publishLib.indexOf('.from("shows")\n    .insert({'));
     expect(publish).toContain('.select("id")');
     expect(publish).toContain("show_id: row.id");
   });
