@@ -325,3 +325,42 @@ describe("what else was still reading the retired flag", () => {
     expect(retire).toContain("revoke execute on function public.notify_show_posted() from public, anon, authenticated;");
   });
 });
+
+describe("publishing a Show, which Phase 4 broke", () => {
+  const fix = readFileSync("supabase/migrations/0187_shows_insert_returning.sql", "utf8").replace(/\r\n/g, "\n");
+
+  /**
+   * "Couldn't publish that. Try again." — reported from the app.
+   *
+   * can_see_show is STABLE and looks the row up by id. During an
+   * INSERT ... RETURNING, Postgres checks the SELECT policy against
+   * the new row, but a STABLE function runs on the snapshot from the
+   * start of the statement, in which that row does not exist yet. So
+   * it returned false for a row that is plainly the caller's own and
+   * the insert failed — reported as a WITH CHECK violation, which
+   * names the wrong cause.
+   *
+   * Latent since 0183; became "nobody can post a Show" when Phase 4
+   * added .select("id") so the exclusions had a Show to point at.
+   */
+  it("the author's own row is answered from the row, not from a lookup", () => {
+    expect(fix).toContain(
+      'using (user_id = (select auth.uid()) or public.can_see_show(id));',
+    );
+  });
+
+  it("and everybody else still goes through the one function", () => {
+    // Not a widening: can_see_show's first branch is already
+    // s.user_id = auth.uid(), so this says the same thing about the
+    // same rows — it just says it without needing the row to be
+    // visible first.
+    expect(fix).toContain("public.can_see_show(id)");
+    expect(fix).not.toContain("or true");
+  });
+
+  it("the composer still reads the id back, because the exclusions need it", () => {
+    const publish = preview.slice(preview.indexOf('.from("shows").insert({'));
+    expect(publish).toContain('.select("id")');
+    expect(publish).toContain("show_id: row.id");
+  });
+});

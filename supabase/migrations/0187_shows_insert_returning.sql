@@ -1,0 +1,32 @@
+-- Publishing a Show was failing: "Couldn't publish that. Try again."
+--
+-- A regression from Phase 4, and a subtle one.
+--
+-- 0183 made the SELECT policy `can_see_show(id)` so the policy and the
+-- SECURITY DEFINER RPCs could not drift apart. That was right, and it
+-- stays. What it quietly cost is INSERT ... RETURNING.
+--
+-- can_see_show is STABLE and looks the row up by id. During an
+-- INSERT ... RETURNING, Postgres checks the SELECT policy against the
+-- new row — but a STABLE function runs on the snapshot from the start
+-- of the statement, in which the row being inserted does not exist.
+-- can_see_show therefore returns false for a row that is plainly the
+-- caller's own, and the insert fails with
+--
+--     new row violates row-level security policy for table "shows"
+--
+-- which names the wrong cause and sends you looking at WITH CHECK.
+--
+-- Nothing inserted into shows with RETURNING until Phase 4 added
+-- `.select("id")` so the exclusions in show_hidden_from would have a
+-- Show to point at. That is when a two-migration-old latent fault
+-- became "nobody can post a Show".
+--
+-- The fix is to answer the author's own case from the row itself,
+-- with no lookup. It is not a widening: can_see_show's very first
+-- branch is already `s.user_id = auth.uid()`, so this says the same
+-- thing about the same rows — it just says it without needing the row
+-- to be visible first. Everyone else still goes through the one
+-- function.
+alter policy "shows_select_public" on public.shows
+  using (user_id = (select auth.uid()) or public.can_see_show(id));
