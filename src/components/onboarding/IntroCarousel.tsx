@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Star, Play, Compass, Bell } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
@@ -299,8 +300,7 @@ function MockProfile() {
         {/* Avatar + stats */}
         <div className="flex items-end justify-between">
           <div className="-mt-9 h-[68px] w-[68px] shrink-0 overflow-hidden rounded-[22px] ring-4 ring-surface">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img loading="lazy" decoding="async"
+            <Image width={512} height={512} sizes="96px"
               src="/onboarding/maya.webp"
               alt=""
               className="h-full w-full object-cover"
@@ -341,8 +341,7 @@ function MockProfile() {
         <div className="mt-3 flex gap-1.5">
           {thumbs.map((src, i) => (
             <div key={i} className="aspect-square flex-1 overflow-hidden rounded-lg bg-elevated">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img loading="lazy" decoding="async" src={src} alt="" className="h-full w-full object-cover" draggable={false} />
+              <Image width={512} height={512} sizes="64px" src={src} alt="" className="h-full w-full object-cover" draggable={false} />
             </div>
           ))}
         </div>
@@ -398,8 +397,7 @@ function WelcomeVisual() {
             <div key={r.img} className="rounded-[11px] bg-accent p-[1.5px]">
               <div className="rounded-[10px] bg-background p-[1.5px]">
                 <div className="h-[26px] w-[26px] overflow-hidden rounded-[8px]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img loading="lazy" decoding="async" src={r.img} alt="" className="h-full w-full object-cover" style={{ objectPosition: r.pos }} draggable={false} />
+                  <Image width={512} height={512} sizes="96px" src={r.img} alt="" className="h-full w-full object-cover" style={{ objectPosition: r.pos }} draggable={false} />
                 </div>
               </div>
             </div>
@@ -410,8 +408,7 @@ function WelcomeVisual() {
         <div className="px-3 pb-3">
           <div className="flex items-center gap-2 py-1.5">
             <div className="h-[22px] w-[22px] shrink-0 overflow-hidden rounded-[7px]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img loading="lazy" decoding="async" src="/onboarding/maya.webp" alt="" className="h-full w-full object-cover" style={{ objectPosition: "50% 18%" }} draggable={false} />
+              <Image width={512} height={512} sizes="64px" src="/onboarding/maya.webp" alt="" className="h-full w-full object-cover" style={{ objectPosition: "50% 18%" }} draggable={false} />
             </div>
             <div className="flex-1">
               <div className="h-1.5 w-16 rounded-full bg-elevated" />
@@ -419,8 +416,7 @@ function WelcomeVisual() {
             </div>
           </div>
           <div className="aspect-square w-full overflow-hidden rounded-xl bg-elevated">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img loading="lazy" decoding="async" src="/onboarding/post-sample.jpg" alt="" className="h-full w-full object-cover" draggable={false} />
+            <Image width={512} height={512} sizes="320px" src="/onboarding/post-sample.jpg" alt="" className="h-full w-full object-cover" draggable={false} />
           </div>
           <div className="flex items-center gap-3.5 pt-2">
             <span className="flex items-center gap-1">
@@ -540,8 +536,7 @@ function BgPost({ post }: { post: BgPostData }) {
       <div className="flex items-center gap-2">
         {post.avatar ? (
           <div className="h-[26px] w-[26px] shrink-0 overflow-hidden rounded-[30%]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img loading="lazy" decoding="async"
+            <Image width={512} height={512} sizes="64px"
               src={post.avatar}
               alt=""
               className="h-full w-full object-cover"
@@ -558,8 +553,7 @@ function BgPost({ post }: { post: BgPostData }) {
         </div>
       </div>
       <div className="mt-2 aspect-square w-full overflow-hidden rounded-xl bg-elevated">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img loading="lazy" decoding="async"
+        <Image width={512} height={512} sizes="320px"
           src={post.img}
           alt=""
           className="h-full w-full object-cover"
@@ -583,8 +577,7 @@ function MockPostCard() {
       <div className="flex items-center gap-3">
         {/* Face-focused square pfp */}
         <div className="h-[42px] w-[42px] shrink-0 overflow-hidden rounded-[30%]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img loading="lazy" decoding="async"
+          <Image width={512} height={512} sizes="96px"
             src="/onboarding/maya.webp"
             alt=""
             className="h-full w-full object-cover"
@@ -601,8 +594,7 @@ function MockPostCard() {
         className="mt-3.5 aspect-square w-full overflow-hidden rounded-3xl"
         style={{ background: "linear-gradient(135deg, #6d28d9, #2563eb)" }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img loading="lazy" decoding="async"
+        <Image width={512} height={512} sizes="320px"
           src="/onboarding/post-sample.jpg"
           alt=""
           className="h-full w-full object-cover"
@@ -670,8 +662,7 @@ function ReelCard({ data, w, h, active = false }: { data: ReelData; w: number; h
       className="relative overflow-hidden rounded-[26px] border border-border bg-elevated shadow-2xl"
       style={{ width: w, height: h }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img loading="lazy" decoding="async"
+      <Image width={512} height={512} sizes="384px"
         src={data.img}
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
@@ -708,8 +699,7 @@ function ReelCard({ data, w, h, active = false }: { data: ReelData; w: number; h
         <div className="flex items-center gap-2">
           {data.pfp ? (
             <div className="h-7 w-7 shrink-0 overflow-hidden rounded-[9px] ring-2 ring-white/60">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img loading="lazy" decoding="async"
+              <Image width={512} height={512} sizes="96px"
                 src={data.pfp}
                 alt=""
                 className="h-full w-full object-cover"
@@ -831,8 +821,7 @@ function MockDiscover() {
                     style={{ width: b.size, height: b.size }}
                   >
                     {b.img ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img loading="lazy" decoding="async"
+                      <Image width={512} height={512} sizes="96px"
                         src={b.img}
                         alt=""
                         className="h-full w-full object-cover"

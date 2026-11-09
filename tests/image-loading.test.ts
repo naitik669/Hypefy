@@ -175,14 +175,54 @@ describe("icon barrels", () => {
 describe("onboarding stops shipping 2 MB eagerly", () => {
   const intro = read("src/components/onboarding/IntroCarousel.tsx");
 
-  it("every image in the carousel defers", () => {
-    // ~2.2 MB of local webp/jpg across twelve raw <img> tags, none of
-    // which carried a loading attribute. Lazy is safe even for the
-    // first slide: an in-viewport image is fetched immediately
-    // regardless, and only off-screen slides are held back.
-    const tags = intro.match(/<img\b/g) ?? [];
-    const deferred = intro.match(/<img loading="lazy" decoding="async"/g) ?? [];
-    expect(tags.length).toBeGreaterThan(0);
-    expect(deferred).toHaveLength(tags.length);
+  it("every image in the carousel still defers", () => {
+    // next/image is lazy unless told otherwise, so what this guards
+    // is that nobody marks one `priority` — there is no LCP image on
+    // this screen worth making eager, and twelve eager ones would
+    // undo the point.
+    expect(intro).not.toContain("priority");
+  });
+});
+
+describe("the onboarding carousel is resized, not just deferred", () => {
+  const intro = read("src/components/onboarding/IntroCarousel.tsx");
+
+  /**
+   * Deferring alone turned out to achieve little here: the carousel
+   * keeps every slide mounted and positioned nearby, so the browser
+   * fetched all of them anyway — confirmed in a real browser, where
+   * all twelve requests fired on slide one. Resizing is the actual
+   * win. Measured against the dev optimiser: 1,303 KB of source
+   * became 361 KB served, a 72% cut, with maya.webp going from 138 KB
+   * to 4.5 KB.
+   */
+  it("no raw <img> is left in it", () => {
+    expect(intro).not.toContain("<img");
+    expect(intro).toContain('import Image from "next/image";');
+  });
+
+  it("and no orphaned lint suppressions either", () => {
+    // Each <img> carried an eslint-disable for no-img-element; with
+    // the tags gone those became unused directives, which lint counts.
+    expect(intro).not.toContain("no-img-element");
+  });
+
+  it("every image states the size it is actually drawn at", () => {
+    // Without `sizes`, next/image generates the full viewport ladder
+    // and the browser picks far too large for a 26px avatar. These
+    // values came from measuring the rendered boxes in a browser.
+    const images = intro.match(/<Image /g) ?? [];
+    const sized = intro.match(/sizes="\d+px"/g) ?? [];
+    expect(images).toHaveLength(12);
+    expect(sized).toHaveLength(12);
+  });
+
+  it("and none of them asks for more than the layout can use", () => {
+    // The largest box anywhere in the carousel measured 314px; the
+    // device pixel ratio is applied on top of `sizes`, so a value
+    // much beyond that is just wasted bytes.
+    const values = [...intro.matchAll(/sizes="(\d+)px"/g)].map((m) => Number(m[1]));
+    expect(values.length).toBe(12);
+    for (const v of values) expect(v).toBeLessThanOrEqual(384);
   });
 });
