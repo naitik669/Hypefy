@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { forgetAllIdentities } from "@/lib/e2ee/store";
 import { clearChatMediaCache } from "@/lib/chat-media-url";
-import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -17,7 +16,6 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
  * if you remember the password, which is exactly the person this catches.
  */
 export function SignOutButton() {
-  const router = useRouter();
   const supabase = createClient();
   const [confirm, setConfirm] = useState(false);
 
@@ -28,9 +26,21 @@ export function SignOutButton() {
     // Signed links are bearer links; do not leave the last account's in memory
     // for whoever signs in next in this tab.
     clearChatMediaCache();
-    await supabase.auth.signOut();
-    router.push("/");
-    router.refresh();
+    // An already-invalid session makes signOut reject, and this runs
+    // inside ConfirmDialog's onConfirm — an unhandled rejection there
+    // leaves the keys and media cache cleared and the dialog stuck,
+    // with the user still apparently signed in. Locally we are signed
+    // out either way, so the navigation below must happen regardless.
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      /* the local state is already gone; leaving is what matters */
+    }
+    // A hard navigation, not router.push. Next's router cache still
+    // holds payloads rendered for the account being left, so a soft
+    // navigation can show the previous user's shell. AuthCard makes
+    // exactly this point in two places and uses window.location there.
+    window.location.href = "/";
   }
 
   return (

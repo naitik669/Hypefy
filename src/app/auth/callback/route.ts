@@ -19,6 +19,47 @@ function safeNext(raw: string | null): string {
   return raw;
 }
 
+/**
+ * Where it is safe to send a browser that has just been given a session.
+ *
+ * Behind Vercel's proxy `origin` can be the internal host, so the
+ * forwarded host is worth preferring — but it arrives in a request
+ * header, which is attacker-suppliable. Taking it unchecked made this
+ * an open redirect on the one route that has just minted a session,
+ * right after `safeNext` had carefully refused host escapes in `next`.
+ *
+ * It also broke legitimately: on a preview or alias host the cookies
+ * were set for the requested host while the redirect sent the browser
+ * somewhere else, where they did not exist — "signed in" and then
+ * immediately signed out.
+ *
+ * NEXT_PUBLIC_SITE_URL is the answer when it is set. Otherwise the
+ * forwarded host is accepted only if it is the site's own apex or a
+ * subdomain of it, and anything else falls back to the request origin.
+ */
+function siteOrigin(request: Request, origin: string): string {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  if (configured) return configured.replace(/\/+$/, "");
+
+  const forwarded = request.headers.get("x-forwarded-host");
+  if (process.env.NODE_ENV === "development" || !forwarded) return origin;
+
+  // A host, not a host:port with a path smuggled in.
+  if (!/^[a-z0-9.-]+$/i.test(forwarded)) return origin;
+
+  let apex: string;
+  try {
+    apex = new URL(origin).hostname;
+  } catch {
+    return origin;
+  }
+  const base = apex.split(".").slice(-2).join(".");
+  if (forwarded === base || forwarded.endsWith(`.${base}`)) {
+    return `https://${forwarded}`;
+  }
+  return origin;
+}
+
 /** The app's own link, carrying only what the app needs to finish sign-in. */
 function appReturnUrl(params: URLSearchParams): string {
   const out = new URLSearchParams();
@@ -64,16 +105,14 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      // In production we sit behind a proxy (Vercel), so `origin` can be the
-      // internal host. Prefer the forwarded host to redirect to the real URL.
-      const forwardedHost = request.headers.get("x-forwarded-host");
-      const isLocalEnv = process.env.NODE_ENV === "development";
-      if (!isLocalEnv && forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`);
-      }
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(`${siteOrigin(request, origin)}${next}`);
     }
+    // Every failure used to look identical: an expired or replayed code,
+    // a PKCE verifier mismatch and a provider denial all became the same
+    // blank bounce. The reason is worth having in the server log even
+    // though the user is only told that it did not finish.
+    console.error("[auth/callback] code exchange failed:", error.message);
   }
 
-  return NextResponse.redirect(`${origin}/signin?error=auth_failed`);
+  return NextResponse.redirect(`${siteOrigin(request, origin)}/signin?error=auth_failed`);
 }
