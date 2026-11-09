@@ -119,3 +119,55 @@ describe("no raw <img> creeps back into the avatar path", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("the heavy screens behind the camera are split out", () => {
+  const create = read("src/components/create/CreateScreen.tsx");
+
+  it("all three are dynamic", () => {
+    for (const name of ["TrackPicker", "ShowEditor", "ShotEditor"]) {
+      expect(create, name).toContain(`const ${name} = dynamic(`);
+      expect(create, name).not.toContain(`import { ${name} }`);
+    }
+  });
+
+  it("and each was already rendered conditionally, so nothing changes behaviour", () => {
+    // dynamic() fetches on first render, so a component mounted
+    // unconditionally would load its chunk anyway.
+    expect(create).toContain("const songPicker = trackOpen ? (");
+    expect(create).toContain('if (captured && mode !== "show" && !captioning) {');
+    expect(create).toContain('if (captured && mode === "show" && !isVideoFile(captured) && arranged === null) {');
+  });
+});
+
+describe("the feed cards stop re-rendering on every append", () => {
+  const feedCard = read("src/components/feed/FeedCard.tsx");
+  const shotCard = read("src/components/feed/ShotFeedCard.tsx");
+
+  it("both are memoised", () => {
+    expect(feedCard).toContain("export const FeedCard = memo(FeedCardInner);");
+    expect(shotCard).toContain("export const ShotFeedCard = memo(ShotFeedCardInner);");
+  });
+
+  it("and the feed passes them only data, so a shallow compare is enough", () => {
+    // An inline arrow in any of these props would defeat the memo on
+    // every render.
+    const list = read("src/components/feed/FeedList.tsx");
+    const block = list.slice(list.indexOf("<ShotFeedCard"), list.indexOf("{/* Sentinel"));
+    expect(block).not.toContain("={() =>");
+    expect(block).not.toContain("={async");
+  });
+});
+
+describe("icon barrels", () => {
+  const config = read("next.config.ts");
+
+  it("phosphor is named, because Next does not optimise it by default", () => {
+    expect(config).toContain('optimizePackageImports: ["@phosphor-icons/react"]');
+  });
+
+  it("and lucide is not, because Next already does", () => {
+    // It is in Next's own built-in list; naming it here changes
+    // nothing and reads as though it were doing something.
+    expect(config).not.toContain('"lucide-react"');
+  });
+});

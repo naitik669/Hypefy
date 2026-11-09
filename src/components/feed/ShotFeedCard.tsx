@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import Link from "next/link";
 import { Play, VolumeX, Volume2, Star, Bookmark, MoreHorizontal, Flag, Ban, ChevronRight, Link2, Share2, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -132,7 +132,7 @@ function autoplayUnwelcome(): boolean {
   });
 }
 
-export function ShotFeedCard({
+function ShotFeedCardInner({
   shot,
   currentUserId,
   showId,
@@ -1112,3 +1112,14 @@ export function ShotFeedCard({
     </article>
   );
 }
+
+/**
+ * Memoised because the feed appends rather than replaces.
+ *
+ * Every new page re-ran this component's render for every card
+ * already on screen — content-visibility skips their layout and paint
+ * but not their reconciliation. All of this component's props are
+ * data: FeedList passes no inline callbacks, so a shallow comparison
+ * is enough and the identities hold across an append.
+ */
+export const ShotFeedCard = memo(ShotFeedCardInner);

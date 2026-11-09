@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
 import {
@@ -19,14 +20,35 @@ import { useCamera } from "@/lib/useCamera";
 import { useVideoRecorder } from "@/lib/useVideoRecorder";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { haptics } from "@/lib/haptics";
-import { TrackPicker } from "@/components/music/TrackPicker";
+/**
+ * The three heavy screens behind the camera, loaded when reached.
+ *
+ * Each is already rendered conditionally — the song picker only while
+ * it is open, the Shot editor only once a clip is in hand, the Show
+ * editor only on the arrange step — so splitting them costs nothing
+ * in behaviour and takes them out of the chunk that loads when the
+ * camera opens, before the user has even chosen what they are making.
+ * TrackPicker is the worst of the three to carry around: it is also
+ * statically imported by six other files, including AnthemChip, which
+ * puts it on every profile page.
+ */
+const TrackPicker = dynamic(
+  () => import("@/components/music/TrackPicker").then((m) => m.TrackPicker),
+  { ssr: false },
+);
 import { ShotPreview } from "@/components/create/ShotPreview";
-import { ShowEditor } from "@/components/shows/ShowEditor";
+const ShowEditor = dynamic(
+  () => import("@/components/shows/ShowEditor").then((m) => m.ShowEditor),
+  { ssr: false },
+);
 import { useObjectUrl } from "@/lib/object-url";
 import type { ShowLayer } from "@/lib/show-layers";
 import { flattenDrawing } from "@/lib/draw";
 import type { ShowDrawing } from "@/components/shows/ShowEditor";
-import { ShotEditor } from "@/components/create/ShotEditor";
+const ShotEditor = dynamic(
+  () => import("@/components/create/ShotEditor").then((m) => m.ShotEditor),
+  { ssr: false },
+);
 import {
   FilterCarousel,
   FilterRailButton,

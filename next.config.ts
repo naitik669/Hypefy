@@ -19,6 +19,18 @@ const nextConfig: NextConfig = {
     },
     // Lets a chat slide in over the inbox and back out (messages/[threadId]/layout.tsx).
     viewTransition: true,
+    /**
+     * Only load the icons actually used, rather than the whole barrel.
+     *
+     * lucide-react is deliberately absent: Next already ships it in its
+     * own default list (see the array in next/dist/server/config.js),
+     * so naming it here changes nothing. @phosphor-icons/react is not
+     * in that list, and six files import from it — BottomNav imports
+     * from both libraries for one nav bar, which is worth collapsing
+     * to one, but that is a visual change and belongs in a design pass
+     * rather than here.
+     */
+    optimizePackageImports: ["@phosphor-icons/react"],
   },
   images: {
     // Allow next/image to optimise user media served from Supabase storage.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 import dynamic from "next/dynamic";
 import { overlayCount } from "@/lib/overlay-stack";
 import Link from "next/link";
@@ -139,7 +139,7 @@ export function clampZoom(ratio: number): number {
   return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, ratio));
 }
 
-export function FeedCard({
+function FeedCardInner({
   post,
   currentUserId,
   initialIsHyper,
@@ -1432,3 +1432,14 @@ export function FeedCard({
     </article>
   );
 }
+
+/**
+ * Memoised because the feed appends rather than replaces.
+ *
+ * Every new page re-ran this component's render for every card
+ * already on screen — content-visibility skips their layout and paint
+ * but not their reconciliation. All of this component's props are
+ * data: FeedList passes no inline callbacks, so a shallow comparison
+ * is enough and the identities hold across an append.
+ */
+export const FeedCard = memo(FeedCardInner);
