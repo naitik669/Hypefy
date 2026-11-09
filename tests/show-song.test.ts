@@ -48,3 +48,31 @@ describe("the song a Show plays", () => {
     expect(preview).toContain("<LayerStack layers={layers} frame={frame} editing />");
   });
 });
+
+describe("the song's name at the foot of a Show", () => {
+  it("is only for a song added with Add sound, not one already on a sticker", () => {
+    const viewer = readFileSync("src/components/shows/ShowViewer.tsx", "utf8");
+    expect(viewer).toContain("const songLabel = useMemo(() => parseTrack(show.track), [show.track]);");
+    expect(viewer).toContain("{songLabel && !menuOpen && (");
+    expect(viewer).not.toContain("{showTrack && !menuOpen && (");
+  });
+});
+
+describe("stickers can be pressed on a Show", () => {
+  const viewer = readFileSync("src/components/shows/ShowViewer.tsx", "utf8");
+  const view = readFileSync("src/components/shows/LayerView.tsx", "utf8");
+  it("the stickers sit above the surface that moves between Shows", () => {
+    // They were below it, so every press on a poll or a link went to the
+    // surface and skipped to the next Show.
+    expect(viewer).toContain('className="pointer-events-none absolute inset-0 z-[11]"');
+    expect(viewer).toContain('className="absolute inset-x-0 z-10"');
+  });
+  it("and only the ones that do something take the press", () => {
+    expect(view).toContain('<div className={!editing && PRESSABLE.has(layer.type) ? "pointer-events-auto" : "pointer-events-none"}>');
+    expect(view).not.toMatch(/PRESSABLE[^;]*"text"/);
+  });
+  it("using one holds the Show", () => {
+    expect(viewer).toContain("onPointerDown={() => setPaused(true)}");
+    expect(viewer).toContain("onFocus={() => setPaused(true)}");
+  });
+});
