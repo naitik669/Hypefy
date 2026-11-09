@@ -171,3 +171,18 @@ describe("icon barrels", () => {
     expect(config).not.toContain('"lucide-react"');
   });
 });
+
+describe("onboarding stops shipping 2 MB eagerly", () => {
+  const intro = read("src/components/onboarding/IntroCarousel.tsx");
+
+  it("every image in the carousel defers", () => {
+    // ~2.2 MB of local webp/jpg across twelve raw <img> tags, none of
+    // which carried a loading attribute. Lazy is safe even for the
+    // first slide: an in-viewport image is fetched immediately
+    // regardless, and only off-screen slides are held back.
+    const tags = intro.match(/<img\b/g) ?? [];
+    const deferred = intro.match(/<img loading="lazy" decoding="async"/g) ?? [];
+    expect(tags.length).toBeGreaterThan(0);
+    expect(deferred).toHaveLength(tags.length);
+  });
+});
