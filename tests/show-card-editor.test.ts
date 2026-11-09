@@ -4,6 +4,16 @@ import { cardIsBlank, cardProblem, tidyCard, type CardLayer } from "@/components
 import { MAX_POLL_OPTIONS } from "@/lib/chat-poll";
 import { readLayers } from "@/lib/show-layers";
 
+/**
+ * Source, as the assertions below write it.
+ *
+ * These tests compare against multi-line source strings. A Windows
+ * checkout with core.autocrlf=true has CRLF on disk, so each of those
+ * assertions fails there while passing on Linux — green in CI and red
+ * on the machine the code is written on.
+ */
+const readSrc = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
+
 const poll = (question: string, options: string[]): CardLayer =>
   ({ id: "p", type: "poll", x: 0.5, y: 0.5, scale: 1, rotation: 0, look: 0, payload: { question, options } }) as CardLayer;
 const ask = (prompt: string): CardLayer =>
@@ -31,14 +41,14 @@ describe("writing a poll on the sticker", () => {
 
   it("goes up to the six options a Show poll can be voted on", () => {
     expect(MAX_POLL_OPTIONS).toBe(6);
-    const src = readFileSync("src/components/shows/CardEditor.tsx", "utf8");
+    const src = readSrc("src/components/shows/CardEditor.tsx");
     expect(src).toContain("{poll.options.length < MAX_POLL_OPTIONS && (");
     expect(src).toContain("{poll.options.length > MIN_POLL_OPTIONS && (");
   });
 });
 
 describe("the editor", () => {
-  const editor = readFileSync("src/components/shows/ShowEditor.tsx", "utf8");
+  const editor = readSrc("src/components/shows/ShowEditor.tsx");
   it("places a poll or question blank and opens it to be written on", () => {
     expect(editor).toContain("} else if (isCardType(key)) {");
     expect(editor).toContain("const id = add(key, blankCard(key));\n      if (id) setEditingCard(id);");
@@ -51,8 +61,8 @@ describe("the editor", () => {
 });
 
 describe("a countdown's end is picked like a scheduled message", () => {
-  const card = readFileSync("src/components/shows/CardEditor.tsx", "utf8");
-  const when = readFileSync("src/components/shows/CountdownWhen.tsx", "utf8");
+  const card = readSrc("src/components/shows/CardEditor.tsx");
+  const when = readSrc("src/components/shows/CountdownWhen.tsx");
   it("with the scheduler's offsets and drums, not the browser's date field", () => {
     expect(card).not.toContain('type="datetime-local"');
     expect(card).toContain("<CountdownWhen open at={at} onClose={() => setOpen(false)} onPick={onPick} />");
