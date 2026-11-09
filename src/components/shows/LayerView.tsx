@@ -28,6 +28,7 @@ import {
   type CountdownPayload,
   type AddYoursPayload,
   type SpotlightPayload,
+  type LayerType,
 } from "@/lib/show-layers";
 
 /**
@@ -44,6 +45,26 @@ import {
  * fraction of whatever frame it is given, so the same layer lands right
  * in the editor, the full-screen viewer, a ring preview and an export.
  */
+/**
+ * The layers that do something when pressed. Only these take a finger in
+ * the viewer; the rest let it through to the Show underneath, so a tap on
+ * words or the time still moves to the next Show.
+ */
+export const PRESSABLE: ReadonlySet<LayerType> = new Set<LayerType>([
+  "poll",
+  "question",
+  "quiz",
+  "slider",
+  "countdown",
+  "addyours",
+  "mention",
+  "link",
+  "hashtag",
+  "post",
+  "shot",
+  "spotlight",
+]);
+
 export function LayerView({
   layer,
   frame,
@@ -75,7 +96,7 @@ export function LayerView({
       className="pointer-events-none absolute"
       style={{ left: box.left, top: box.top, transform: box.transform, transformOrigin: "center" }}
     >
-      <div className={editing ? "pointer-events-none" : "pointer-events-auto"}>
+      <div className={!editing && PRESSABLE.has(layer.type) ? "pointer-events-auto" : "pointer-events-none"}>
         <LayerBody
           layer={layer}
           editing={editing}

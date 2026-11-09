@@ -784,11 +784,27 @@ function ShowScreen({
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
 
       {/* What was arranged on top of the picture. Above the scrim so the
-          words stay readable, below the chrome and the gesture surface so
-          a tap still moves between Shows — only a layer that is really
-          something to press takes the press, and LayerView decides that
-          per layer rather than the stack claiming the whole frame. */}
-      <div ref={frameRef} className="pointer-events-none absolute inset-0 z-[5]">
+          words stay readable, and above the gesture surface — it was
+          below it, so every press on a poll, a link or a slider went to
+          the surface and moved to the next Show instead. The stack itself
+          takes no press: only a layer that is really something to press
+          does (LayerView's PRESSABLE), and every other tap falls through
+          to the surface as before. Below the chrome. */}
+      <div
+        ref={frameRef}
+        className="pointer-events-none absolute inset-0 z-[11]"
+        // Using a sticker holds the Show: a finger on a slider, or an
+        // answer being typed, should not be cut off by the next Show.
+        onPointerDown={() => setPaused(true)}
+        onPointerUp={(e) => {
+          if (!e.currentTarget.contains(document.activeElement)) setPaused(false);
+        }}
+        onPointerCancel={() => setPaused(false)}
+        onFocus={() => setPaused(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPaused(false);
+        }}
+      >
         <LayerStack
           layers={layers}
           frame={frameSize}
