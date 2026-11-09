@@ -376,3 +376,44 @@ describe("publishing a Show, which Phase 4 broke", () => {
     expect(publish).toContain("show_id: row.id");
   });
 });
+
+describe("the reaper finally points at the right host", () => {
+  const fix = readFileSync(
+    "supabase/migrations/0192_reaper_posts_to_the_app_host.sql",
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+
+  /**
+   * It had never deleted anything. 0181 sent it to www.hypefy.chat
+   * while the deployment serves app.hypefy.chat, so every post came
+   * back 404 — thirty of them, last at the job's own 03:20 slot — and
+   * the backlog grew from 28 to 30 over ten days instead of draining.
+   * All eleven runs recorded "succeeded", because the function only
+   * queues the posts and pg_net delivers them afterwards.
+   */
+  it("posts to the host the app is actually served from", () => {
+    // Scoped to the url itself: the comment above it names the wrong
+    // host on purpose, to record what the bug was, and a file-wide
+    // "does not contain www" check failed on that prose.
+    const urls = fix.match(/url := '[^']+'/g) ?? [];
+    expect(urls).toEqual(["url := 'https://app.hypefy.chat/api/shows/reap'"]);
+  });
+
+  it("and agrees with every other cron in the database", () => {
+    // capacitor.config.ts loads this host too; it is the one answer.
+    const capacitor = readFileSync("capacitor.config.ts", "utf8");
+    expect(capacitor).toContain("https://app.hypefy.chat");
+  });
+
+  it("keeping the guard, the board check and the ceiling", () => {
+    expect(fix).toContain("if v_secret is null then return; end if;");
+    expect(fix).toContain("from public.showcase_items si");
+    expect(fix).toContain("limit 200");
+  });
+
+  it("and staying off the client's reach", () => {
+    expect(fix).toContain(
+      "revoke execute on function public.reap_expired_shows() from public, anon, authenticated;",
+    );
+  });
+});
