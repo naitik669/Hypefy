@@ -105,6 +105,13 @@ export function AuthCard({ mode }: { mode: Mode }) {
       setNotice("That email is already registered. Sign in to continue.");
     }
     if (params.get("add") === "1") setAddMode(true);
+    // Both OAuth failure paths redirect here with this, and until now
+    // nothing read it — two producers, zero consumers — so every
+    // failed Google sign-in was a silent round trip back to a blank
+    // card. That is what "the Google button does nothing" was.
+    if (params.get("error") === "auth_failed") {
+      setError("That didn't finish. Try signing in with Google again.");
+    }
     // Arrived from the intro's "Continue with Google": the age and consent
     // answers are still required before Google can create the account, so
     // say why this form is in the way.
@@ -112,6 +119,24 @@ export function AuthCard({ mode }: { mode: Mode }) {
       setNotice("Add your date of birth and accept the terms, then continue with Google.");
     }
   }, [mode]);
+
+  /**
+   * Coming back to a sign-in that never happened.
+   *
+   * Pressing Back from Google's consent screen restores this page from
+   * the back-forward cache exactly as it was left — which is with the
+   * Google button disabled and reading "Redirecting…", because nothing
+   * after the redirect ever ran. The page looks broken and only a
+   * reload fixes it. A bfcache restore is the one reliable signal that
+   * we are back without having gone anywhere.
+   */
+  useEffect(() => {
+    function onShow(e: PageTransitionEvent) {
+      if (e.persisted) setGoogleLoading(false);
+    }
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
 
   // Age from the entered date of birth (null if unset/invalid).
   const age = (() => {
@@ -396,7 +421,12 @@ export function AuthCard({ mode }: { mode: Mode }) {
         setError(message);
         setGoogleLoading(false);
       }
-      // Otherwise NativeShell finishes the flow when the deep link arrives.
+      // Otherwise NativeAuthLink finishes the flow when the deep link
+      // arrives. Clear the pending state regardless: the Custom Tab is
+      // a separate window, so if the user backs out of it nothing else
+      // ever runs here, and the button would stay on "Redirecting…"
+      // until the app was killed.
+      setGoogleLoading(false);
       return;
     }
 

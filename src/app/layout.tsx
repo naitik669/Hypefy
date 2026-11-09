@@ -12,6 +12,7 @@ import { UpdateGate } from "@/components/native/UpdateGate";
 import { RegisterSW } from "@/components/pwa/RegisterSW";
 import { ReferralTracker } from "@/components/growth/ReferralTracker";
 import { ClientErrorReporter } from "@/components/pwa/ClientErrorReporter";
+import { NativeAuthLink } from "@/components/native/NativeAuthLink";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { headers } from "next/headers";
@@ -209,6 +210,11 @@ export default async function RootLayout({
         <UpdateGate />
         <ReferralTracker />
         <ClientErrorReporter />
+        {/* The return leg of native Google sign-in. It belongs here and
+            not in NativeShell: that only renders for a signed-in user,
+            so on /signin nothing was listening for the deep link and
+            the sign-in could never finish. */}
+        <NativeAuthLink />
         {/* Finishes a Google sign-in that a full-page redirect cut short:
             the age gate for new accounts, and the session snapshot when
             adding one. Inert unless there is parked work. */}

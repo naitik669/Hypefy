@@ -9,8 +9,6 @@ import { isNative, isAndroidApp, safeNative } from "@/lib/native";
 import { closeTopOverlay } from "@/lib/overlay-stack";
 import { CHAT_PATH, leaveChatAnimated } from "@/lib/leave-chat";
 import { reloadIfNewBuild } from "@/lib/app-version";
-import { createClient } from "@/lib/supabase/client";
-import { isAuthCallbackUrl, completeNativeSignIn } from "@/lib/native-auth";
 
 /** Tab roots — back from here should leave the app, not unwind history. */
 /**
@@ -147,29 +145,13 @@ export function NativeShell() {
     return () => remove?.();
   }, [router]);
 
-  // ── Deep links: the return leg of native Google sign-in.
+  // ── Deep links for sign-in live in NativeAuthLink, in the root layout.
   //
-  // Google rejects OAuth in a WebView, so the consent screen opens in a
-  // Custom Tab and hands the code back through `chat.hypefy://auth/callback`.
-  // The exchange has to happen here, in the app, because a session created in
-  // the Custom Tab lives in a cookie jar the WebView cannot read.
-  useEffect(() => {
-    if (!isNative()) return;
-    let remove: (() => void) | undefined;
-
-    void App.addListener("appUrlOpen", ({ url }) => {
-      if (!isAuthCallbackUrl(url)) return;
-      void completeNativeSignIn(createClient(), url).then((ok) => {
-        // Either way land on "/" and let the existing entry router decide
-        // between onboarding, profile setup and home — duplicating that
-        // decision here would be a second source of truth for it.
-        router.replace(ok ? "/" : "/signin?error=auth_failed");
-        router.refresh();
-      });
-    }).then((handle) => { remove = () => void handle.remove(); });
-
-    return () => remove?.();
-  }, [router]);
+  // They used to be here, which meant they only existed for a signed-in
+  // user: the (app) layout returns a bare shell before it reaches this
+  // component when there is no session, so on /signin — the one screen
+  // where a Google sign-in starts — nothing was listening for the
+  // callback. See NativeAuthLink for the full account.
 
   // ── Resume: come back to exactly what you left.
   //
