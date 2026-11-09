@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { overlayCount } from "@/lib/overlay-stack";
 import Link from "next/link";
 import { Star, Bookmark, MoreHorizontal, Maximize2 } from "lucide-react";
@@ -11,11 +12,17 @@ import { ZoomViewer } from "@/components/ui/ZoomViewer";
 import { ExpandableText } from "@/components/ui/ExpandableText";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { timeAgoShort } from "@/lib/time";
-import { CommentsSheet } from "@/components/feed/CommentsSheet";
+const CommentsSheet = dynamic(
+  () => import("@/components/feed/CommentsSheet").then((m) => m.CommentsSheet),
+  { ssr: false },
+);
 import { FeedImpression } from "@/components/feed/FeedImpression";
 import { PostPeek } from "@/components/feed/PostPeek";
 import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
-import { ShareSheet } from "@/components/feed/ShareSheet";
+const ShareSheet = dynamic(
+  () => import("@/components/feed/ShareSheet").then((m) => m.ShareSheet),
+  { ssr: false },
+);
 import { ShareButton } from "@/components/feed/QuickShare";
 import { EditPostSheet } from "@/components/feed/EditPostSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
@@ -613,6 +620,26 @@ export function FeedCard({
   const [focusId, setFocusId] = useState(focusCommentId);
   const [commentCount, setCommentCount] = useState(post.comment_count);
   const [shareOpen, setShareOpen] = useState(false);
+  /**
+   * Whether each sheet has ever been opened on this card.
+   *
+   * They used to be mounted always, just with open={false} — so
+   * CommentsSheet (1,426 lines) and ShareSheet (796) sat in the chunk
+   * every feed card pulled, whether or not anyone tapped either.
+   * Mounting is deferred to the first open and then kept: a sheet that
+   * unmounts on close cannot animate out.
+   */
+  const [commentsUsed, setCommentsUsed] = useState(!!focusCommentId);
+  const [shareUsed, setShareUsed] = useState(false);
+
+  function openComments() {
+    setCommentsUsed(true);
+    setCommentsOpen(true);
+  }
+  function openShare() {
+    setShareUsed(true);
+    setShareOpen(true);
+  }
   const [actionsOpen, setActionsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleted, setDeleted] = useState(false);
@@ -1175,7 +1202,7 @@ export function FeedCard({
 
           <button
             type="button"
-            onClick={() => setCommentsOpen(true)}
+            onClick={openComments}
             aria-label="Comments"
             className="flex items-center gap-1.5 text-sm font-semibold text-foreground transition-transform duration-150 active:scale-90"
           >
@@ -1189,7 +1216,7 @@ export function FeedCard({
             postId={post.id}
             // The photo on screen goes with it, so the chat shows that one.
             slide={images.length > 1 ? imgIdx : undefined}
-            onOpenSheet={() => setShareOpen(true)}
+            onOpenSheet={openShare}
             className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 active:scale-90"
           >
             <ShareIcon size={21} weight="bold" />
@@ -1310,6 +1337,7 @@ export function FeedCard({
       )}
 
       {/* Sheets */}
+      {commentsUsed && (
       <CommentsSheet
         open={commentsOpen}
         onClose={() => {
@@ -1322,9 +1350,11 @@ export function FeedCard({
         onCountChange={(n) => setCommentCount(n)}
         focusCommentId={focusId}
       />
+      )}
 
       {saveMenus.overlays}
 
+      {shareUsed && (
       <ShareSheet
         open={shareOpen}
         onClose={() => setShareOpen(false)}
@@ -1332,6 +1362,7 @@ export function FeedCard({
         imageUrls={images.length > 0 ? images : undefined}
         initialImageIdx={imgIdx}
       />
+      )}
 
       {/* Opened by a hold and it stays. Given the card's own author, caption
           and actions so it is a post you can act on, not just a bigger photo
@@ -1360,8 +1391,8 @@ export function FeedCard({
           rehypeCount={rehypeCount}
           onRehype={toggleRehype}
           onHype={toggleHype}
-          onComment={() => setCommentsOpen(true)}
-          onShare={() => setShareOpen(true)}
+          onComment={openComments}
+          onShare={openShare}
           onSave={toggleSave}
           onClose={() => setPeekSrc(null)}
         />
