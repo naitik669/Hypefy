@@ -12,6 +12,8 @@ import { createClient } from "@/lib/supabase/client";
 import { useCallControls } from "@/components/calls/CallProvider";
 import { useGroupCall } from "@/components/calls/GroupCallProvider";
 import { Avatar } from "@/components/ui/Avatar";
+import { ChatActivity } from "@/components/messages/ChatActivity";
+import { createChatActivityStore } from "@/lib/chat-activity";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { VoiceRecorder } from "@/components/messages/VoiceRecorder";
 import { PageReplyEmbed, pageSnapshot } from "@/components/diary/PageReplyEmbed";
@@ -387,13 +389,21 @@ export function RealChatView({
   const [otherLastSeen, setOtherLastSeen] = useState<string | null>(other.lastSeenAt ?? null);
   const [, forcePresenceTick] = useState(0);
   // User ids currently typing (others only) — driven by realtime broadcast.
-  const [typingIds, setTypingIds] = useState<string[]>([]);
+  /**
+   * Who is typing or recording, held outside React state.
+   *
+   * A typing broadcast arrives on roughly every keystroke from every
+   * other person here, and this component renders every message in
+   * the thread — so one person typing used to re-render the whole
+   * conversation, repeatedly, for as long as they kept typing. The
+   * store moves that cost to ChatActivity, which re-renders alone.
+   */
+  const activity = useMemo(() => createChatActivityStore(), []);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const lastTypingSent = useRef(0);
   // User ids currently recording a voice note (others only) — same channel,
   // a separate event so it doesn't interfere with the typing timers.
-  const [recordingIds, setRecordingIds] = useState<string[]>([]);
   const recordingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const showToast = useToast();
   const [callChooser, setCallChooser] = useState(false);
@@ -1078,14 +1088,14 @@ export function RealChatView({
   useEffect(() => {
     const ch = supabase.channel(`typing:${conversationId}`, { config: { broadcast: { self: false } } });
     const forget = (uid: string) => {
-      setTypingIds((prev) => prev.filter((x) => x !== uid));
+      activity.remove("typing", uid);
       const t = typingTimers.current.get(uid);
       if (t) { clearTimeout(t); typingTimers.current.delete(uid); }
     };
     ch.on("broadcast", { event: "typing" }, ({ payload }) => {
       const uid = (payload as { userId?: string })?.userId;
       if (!uid || uid === currentUserId) return;
-      setTypingIds((prev) => (prev.includes(uid) ? prev : [...prev, uid]));
+      activity.add("typing", uid);
       const existing = typingTimers.current.get(uid);
       if (existing) clearTimeout(existing);
       typingTimers.current.set(uid, setTimeout(() => forget(uid), 4000));
@@ -1095,7 +1105,7 @@ export function RealChatView({
       if (uid) forget(uid);
     });
     const forgetRecording = (uid: string) => {
-      setRecordingIds((prev) => prev.filter((x) => x !== uid));
+      activity.remove("recording", uid);
       const t = recordingTimers.current.get(uid);
       if (t) { clearTimeout(t); recordingTimers.current.delete(uid); }
     };
@@ -1107,7 +1117,7 @@ export function RealChatView({
       const p = payload as { userId?: string; recording?: boolean };
       if (!p.userId || p.userId === currentUserId) return;
       if (p.recording) {
-        setRecordingIds((prev) => (prev.includes(p.userId!) ? prev : [...prev, p.userId!]));
+        activity.add("recording", p.userId!);
         const existing = recordingTimers.current.get(p.userId!);
         if (existing) clearTimeout(existing);
         // Longer grace period than typing — voice notes can run a couple
@@ -1127,7 +1137,9 @@ export function RealChatView({
       supabase.removeChannel(ch);
       typingChannelRef.current = null;
     };
-  }, [conversationId, currentUserId, supabase]);
+    // `activity` is a useMemo with no deps, so it never changes; it is
+    // listed because the effect reads it, not because it can.
+  }, [conversationId, currentUserId, supabase, activity]);
 
   /**
    * The other party's presence, plus a 30s ticker so "Active 4m ago" stays
@@ -1153,14 +1165,6 @@ export function RealChatView({
     return () => { supabase.removeChannel(ch); clearInterval(ticker); };
   }, [isGroup, other.id, other.showActivity, supabase]);
 
-  // When someone starts typing or recording and you're already near the
-  // bottom, nudge the view down so the indicator is visible.
-  useEffect(() => {
-    if ((typingIds.length > 0 || recordingIds.length > 0) && nearBottomRef.current) {
-      endRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [typingIds.length, recordingIds.length]);
-
   function emitTyping() {
     const now = Date.now();
     if (now - lastTypingSent.current < 1500) return; // throttle
@@ -1176,20 +1180,6 @@ export function RealChatView({
   }
 
   /** Resolve a typing user's display name (group member, the other DM party). */
-  function typingLabel(ids: string[]) {
-    const names = ids.map((id) => members?.[id]?.name ?? (id === other.id ? other.name : "Someone"));
-    if (names.length === 1) return `${names[0]} is typing…`;
-    if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
-    return `${names[0]} and ${names.length - 1} others are typing…`;
-  }
-
-  function recordingLabel(ids: string[]) {
-    const names = ids.map((id) => members?.[id]?.name ?? (id === other.id ? other.name : "Someone"));
-    if (names.length === 1) return `${names[0]} is recording a voice message…`;
-    if (names.length === 2) return `${names[0]} and ${names[1]} are recording voice messages…`;
-    return `${names[0]} and ${names.length - 1} others are recording…`;
-  }
-
   function toggleReaction(messageId: string, emoji: string) {
     setReactions((prev) => {
       const mineRow = prev.find((r) => r.message_id === messageId && r.user_id === currentUserId);
@@ -2811,44 +2801,14 @@ export function RealChatView({
                 will land, beside their face. Recording takes priority — it
                 replaces the text composer on the sender's side, so the two
                 never happen together. */}
-            {(recordingIds.length > 0 || typingIds.length > 0) && (() => {
-              const recording = recordingIds.length > 0;
-              const ids = recording ? recordingIds : typingIds;
-              const first = members?.[ids[0]] ?? { name: other.name, hue: other.hue, avatarUrl: other.avatarUrl };
-              return (
-                <div className="flex flex-col items-start gap-0.5" data-activity={recording ? "recording" : "typing"} role="status">
-                  {isGroup && (
-                    <span className="pl-9 text-[11px] font-semibold text-muted">
-                      {recording ? recordingLabel(ids) : typingLabel(ids)}
-                    </span>
-                  )}
-                  {!isGroup && <span className="sr-only">{recording ? recordingLabel(ids) : typingLabel(ids)}</span>}
-                  <div className="flex items-end gap-2">
-                    <Avatar name={first.name} hue={first.hue} size={28} src={first.avatarUrl ?? undefined} />
-                    {recording ? (
-                      <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-surface px-3.5 py-3">
-                        <Mic size={14} className="text-accent" />
-                        <div className="flex h-4 items-end gap-[3px]">
-                          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-                            <span
-                              key={i}
-                              className="w-[3px] animate-mic-wave rounded-full bg-accent"
-                              style={{ animationDelay: `${(i % 4) * 0.12 + (i > 3 ? 0.06 : 0)}s` }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-surface px-3.5 py-3">
-                        {[0, 0.15, 0.3].map((d, i) => (
-                          <span key={i} className="h-2 w-2 animate-dot-bounce rounded-full bg-muted" style={{ animationDelay: `${d}s` }} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
+            <ChatActivity
+              store={activity}
+              members={members}
+              other={other}
+              isGroup={isGroup}
+              nearBottomRef={nearBottomRef}
+              endRef={endRef}
+            />
 
             <div ref={endRef} />
           </div>
