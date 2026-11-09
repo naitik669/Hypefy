@@ -52,6 +52,22 @@ import { useSaveMenus } from "@/components/saved/SaveMenus";
  * unset while the sheet is closed, which is why every use of it falls back to
  * 100% — that is simply "the whole screen", the way a Shot normally is.
  */
+/**
+ * How many slides either side of the active one stay mounted.
+ *
+ * Every slide used to be rendered, and each carries a <video> with a
+ * committed `src`. Swiping forty Shots therefore left forty live
+ * decoders on the page: Android's WebView allows roughly six to sixteen
+ * and does not degrade gracefully past that — it stops decoding, then
+ * the system kills it. Desktop only janks, which is why this read as
+ * "freezes after a few interactions" rather than "slow from the start".
+ *
+ * Two either side keeps the next and previous swipe instant and caps
+ * the page at five videos. The neighbour buffering below (`preload`)
+ * is unchanged; it was never the problem — the unbounded mounting was.
+ */
+const SLIDE_WINDOW = 2;
+
 const SHEET_TOP = "--shot-sheet-top";
 
 /** How thick the playback bar is, and so how far above the sheet it sits. */
@@ -558,7 +574,11 @@ export function ReelsFeed({
       </div>
 
       {/* Absolute-positioned reels: each fills the container, translated by index offset */}
-      {slides.map((item, i) => (
+      {slides.map((item, i) =>
+        // Outside the window nothing is mounted at all. The ones that
+        // remain still position themselves from `i - activeIdx`, so the
+        // arithmetic below is untouched by the gap.
+        Math.abs(i - activeIdx) > SLIDE_WINDOW ? null : (
         <div
           key={
             item.kind === "ad"
@@ -621,7 +641,8 @@ export function ReelsFeed({
           />
           ) : null}
         </div>
-      ))}
+        ),
+      )}
     </div>
   );
 }

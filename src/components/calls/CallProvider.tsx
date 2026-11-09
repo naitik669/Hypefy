@@ -182,6 +182,13 @@ export function CallProvider({ userId, children }: { userId: string; children: R
       // Ring the receiver directly over broadcast (reliable, RLS-independent).
       const ring = supabase.channel(`user-calls:${a.peerId}`);
       ring.subscribe((status) => {
+        // Same leak as GroupCallProvider: the removal below only ran on
+        // SUBSCRIBED, so a ring channel that failed to connect was kept
+        // for the life of the page.
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          void supabase.removeChannel(ring);
+          return;
+        }
         if (status !== "SUBSCRIBED") return;
         ring.send({
           type: "broadcast",

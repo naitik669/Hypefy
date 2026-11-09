@@ -20,6 +20,23 @@ import { useAdFill, useAdSlots } from "@/components/feed/useAdSlots";
 import { useHypeProof } from "@/components/hype/useHypeProof";
 
 const PAGE_SIZE = 20;
+
+/**
+ * The most cards kept mounted at once.
+ *
+ * The list only ever grew. `content-visibility` (below) skips layout
+ * and paint for off-screen cards, which is real work and stays — but
+ * it does not skip React reconciliation, and it does not stop each
+ * card mounting its own IntersectionObservers and a `visibilitychange`
+ * listener. Eight pages in, that was ~200 cards, ~400 observers and
+ * ~200 listeners, every one of them firing each time the app went to
+ * the background.
+ *
+ * Five pages of history is far more than anyone scrolls back through
+ * in one sitting, and trimming from the head keeps the direction of
+ * travel cheap.
+ */
+const MAX_MOUNTED = 100;
 const POST_SELECT =
   "*, profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, profile_tags, is_verified, is_premium, name_font, name_glow, avatar_decoration)";
 
@@ -209,7 +226,10 @@ export function FeedList({
         seen: new Set(seenRef.current),
       });
       const withState = await withUserState(ranked);
-      setPosts((prev) => [...prev, ...withState]);
+      setPosts((prev) => {
+        const next = [...prev, ...withState];
+        return next.length > MAX_MOUNTED ? next.slice(next.length - MAX_MOUNTED) : next;
+      });
     }
 
     fresh.forEach((p) => seenRef.current.add(p.id));

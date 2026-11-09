@@ -435,9 +435,14 @@ export function FeedCard({
   }
 
   function endPinch() {
+    // Unconditionally, before the early return. These are non-passive
+    // touchmove listeners on `window` that call preventDefault, so one
+    // orphaned set does not merely leak — it stops the page scrolling,
+    // which is indistinguishable from a freeze. The guard below is
+    // about the spring-back, not about the listeners.
+    stopTracking();
     if (!pinchFrom.current) return;
     pinchFrom.current = null;
-    stopTracking();
     // Straight away, not after the spring: the photo settling is no
     // reason to keep the feed from moving.
     lockPage(false);
