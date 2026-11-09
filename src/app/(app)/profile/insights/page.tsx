@@ -89,7 +89,7 @@ export default async function InsightsPage() {
                 <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface">
                   {cover(p) ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={cover(p)!} alt="" className="h-full w-full object-cover" />
+                    <img loading="lazy" decoding="async" src={cover(p)!} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center p-1 text-[8px] text-faint">{p.caption ?? "Post"}</div>
                   )}

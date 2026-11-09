@@ -86,7 +86,7 @@ export function SharedShotCard({
     >
       {shot.poster_url ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <img loading="lazy" decoding="async"
           src={shot.poster_url}
           alt={shot.caption ?? ""}
           draggable={false}

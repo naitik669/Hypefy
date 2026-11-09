@@ -33,7 +33,7 @@ function Thumb({ file, className = "" }: { file: File; className?: string }) {
     </>
   ) : (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={url} alt="" className={`h-full w-full object-cover ${className}`} />
+    <img loading="lazy" decoding="async" src={url} alt="" className={`h-full w-full object-cover ${className}`} />
   );
 }
 

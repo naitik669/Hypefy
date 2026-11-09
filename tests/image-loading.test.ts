@@ -14,7 +14,6 @@ import { canOptimize } from "@/lib/image-hosts";
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const avatar = read("src/components/ui/Avatar.tsx");
 const optimized = read("src/components/ui/OptimizedImage.tsx");
-const hosts = read("src/lib/image-hosts.ts");
 const nextConfig = read("next.config.ts");
 const feedCard = read("src/components/feed/FeedCard.tsx");
 
@@ -224,5 +223,90 @@ describe("the onboarding carousel is resized, not just deferred", () => {
     const values = [...intro.matchAll(/sizes="(\d+)px"/g)].map((m) => Number(m[1]));
     expect(values.length).toBe(12);
     for (const v of values) expect(v).toBeLessThanOrEqual(384);
+  });
+});
+
+describe("thumbnails in scrolling lists are deferred", () => {
+  /**
+   * Not a repo-wide `loading="lazy"` sweep — that was the plan, and most of
+   * the ninety-one raw <img> tags in this repo should not have it. An image
+   * only gains from deferring if it can be off-screen when it mounts, and a
+   * good number of these are the opposite: the photo being edited, a
+   * filmstrip of frames just captured from the user's own video, a Show's
+   * embed while you are looking at it. Deferring those is a regression.
+   *
+   * So this pins the judgement rather than a count: the sixteen tags that sit
+   * in scrolling lists defer, every one of them, and the ones that must paint
+   * immediately still do not.
+   */
+  const tagsFor = (file: string, srcExpr: string) =>
+    (read(file).match(/<img[\s\S]*?\/>/g) ?? []).filter((t) => t.includes(`src=${srcExpr}`));
+
+  const deferred: ReadonlyArray<readonly [string, string, number]> = [
+    ["src/app/(app)/notifications/page.tsx", "{g.thumb.url}", 1],
+    ["src/app/(app)/profile/insights/page.tsx", "{cover(p)!}", 1],
+    ["src/components/diary/DiaryArchiveSheet.tsx", "{page.imageUrl}", 1],
+    // The blurred bed and the photo on top of it — same file, same source.
+    ["src/components/diary/FriendDiaryCard.tsx", "{entry.imageUrl!}", 2],
+    ["src/components/feed/ShareSheet.tsx", "{preview.thumb}", 1],
+    ["src/components/music/TrackPicker.tsx", "{t.artwork}", 1],
+    ["src/components/music/TrackPicker.tsx", "{art}", 1],
+    ["src/components/post/ScheduledList.tsx", "{p.image}", 1],
+    ["src/components/saved/SoundRow.tsx", "{track.artwork}", 1],
+    ["src/components/shows/AlbumSheet.tsx", "{url}", 1],
+    ["src/components/shows/CollabView.tsx", "{s.media_url}", 1],
+    ["src/components/shows/ShowWidgetPickers.tsx", "{item.thumb}", 1],
+    ["src/components/messages/SharedPostCard.tsx", "{image}", 1],
+    ["src/components/messages/SharedShotCard.tsx", "{shot.poster_url}", 1],
+  ];
+
+  it.each(deferred)("%s defers %s", (file, srcExpr, count) => {
+    const tags = tagsFor(file, srcExpr);
+    // Without the count a renamed source would make this assert nothing.
+    expect(tags, `<img src=${srcExpr}> in ${file}`).toHaveLength(count);
+    for (const tag of tags) {
+      expect(tag).toContain('loading="lazy"');
+      expect(tag).toContain('decoding="async"');
+    }
+  });
+
+  it("and nothing else quietly started deferring", () => {
+    // Counted from the repo rather than from the list above, so this fails
+    // both ways: a defer dropped, or one added without a thought about
+    // whether that image can actually be off-screen. 19 deferred before
+    // this change; the 16 named here bring it to 35.
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+        const full = `${dir}/${e.name}`;
+        if (e.isDirectory()) return walk(full);
+        return /\.tsx$/.test(e.name) ? [full] : [];
+      });
+    const lazy = walk("src")
+      .flatMap((f: string) => read(f).match(/<img[\s\S]*?\/>/g) ?? [])
+      .filter((tag: string) => tag.includes('loading="lazy"'));
+    expect(lazy).toHaveLength(35);
+    expect(deferred.reduce((n, [, , c]) => n + c, 0)).toBe(15);
+  });
+
+  it("a chat image defers by default but lets its caller decide", () => {
+    // ChatImg wraps every photo in a thread, and a thread scrolls a long
+    // way. The attributes go before the spread so a caller that wants one
+    // eager can still say so.
+    expect(read("src/components/messages/ChatMedia.tsx")).toContain(
+      '<img loading="lazy" decoding="async" {...rest}',
+    );
+  });
+
+  it("but the picture you are looking at is not deferred", () => {
+    const inView = [
+      ["src/components/shows/ShowEditor.tsx", "{photoUrl}"],
+      ["src/components/post/ShotTrimmer.tsx", "{f.url}"],
+      ["src/components/post/PostPreview.tsx", "{imageUrls[0]}"],
+    ] as const;
+    for (const [file, srcExpr] of inView) {
+      const tags = tagsFor(file, srcExpr);
+      expect(tags, `<img src=${srcExpr}> in ${file}`).toHaveLength(1);
+      expect(tags[0], file).not.toContain("loading=");
+    }
   });
 });

@@ -988,7 +988,7 @@ function NotifRow({
                 here showed its poster rather than a frame, and the poster was
                 blank, which is how every Shot row became an empty square. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={g.thumb.url} alt="" className="h-full w-full object-cover" />
+            <img loading="lazy" decoding="async" src={g.thumb.url} alt="" className="h-full w-full object-cover" />
           </div>
         )}
       </Link>

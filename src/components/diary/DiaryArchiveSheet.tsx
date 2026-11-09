@@ -221,7 +221,7 @@ function MiniPage({
       {page.imageUrl && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={page.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <img loading="lazy" decoding="async" src={page.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
         </>
       )}

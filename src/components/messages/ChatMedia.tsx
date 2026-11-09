@@ -27,7 +27,7 @@ export function ChatImg({ url, className, alt = "", ...rest }: ImgProps) {
   const { src, retry } = useChatMediaUrl(url);
   if (!src) return <span className={`block bg-surface ${className ?? ""}`} aria-hidden />;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img {...rest} src={src} alt={alt} className={className} onError={retry} />;
+  return <img loading="lazy" decoding="async" {...rest} src={src} alt={alt} className={className} onError={retry} />;
 }
 
 export function ChatVideo({ url, fragment, className, ...rest }: VideoProps) {

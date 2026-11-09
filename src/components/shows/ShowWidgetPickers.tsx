@@ -161,7 +161,7 @@ export function EmbedSheet({
                   </span>
                 ) : item.thumb ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.thumb} alt="" className="h-full w-full object-cover" />
+                  <img loading="lazy" decoding="async" src={item.thumb} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <span className="flex h-full w-full items-center justify-center text-muted">
                     {item.kind === "shot" ? <Film size={20} /> : <ImageIcon size={20} />}

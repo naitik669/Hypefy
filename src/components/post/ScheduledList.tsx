@@ -78,7 +78,7 @@ export function ScheduledList({ posts }: { posts: ScheduledPost[] }) {
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-elevated">
             {p.image ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={p.image} alt="" className="h-full w-full object-cover" />
+              <img loading="lazy" decoding="async" src={p.image} alt="" className="h-full w-full object-cover" />
             ) : (
               <ImageIcon size={18} className="text-faint" />
             )}
