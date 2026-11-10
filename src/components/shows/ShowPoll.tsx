@@ -191,19 +191,32 @@ export function ShowQuestion({
   question,
   look,
   isAuthor = false,
+  mine,
 }: {
   showId: string;
   layerId: string;
   question: QuestionPayload;
   look: Look;
-  /** Answering your own question means nothing, so you are told instead. */
+  /** Answering your own question means nothing, so you are sent to read them. */
   isAuthor?: boolean;
+  /**
+   * What you answered before, if you did. It used to look untouched on every
+   * re-open, which is how one viewer came to send the author four answers to
+   * the same question.
+   */
+  mine?: string;
 }) {
   const [supabase] = useState(createClient);
   const [body, setBody] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  /** Set when you choose to rewrite one you had already sent. */
+  const [rewriting, setRewriting] = useState(false);
+
+  // What is on screen: your earlier answer, unless you are rewriting it or
+  // have just sent a new one.
+  const already = !sent && !rewriting ? mine : undefined;
 
   async function send() {
     const text = body.trim();
@@ -222,6 +235,7 @@ export function ShowQuestion({
       return;
     }
     setSent(true);
+    setRewriting(false);
     setBody("");
   }
 
@@ -229,9 +243,45 @@ export function ShowQuestion({
     <span style={{ ...look.box, display: "flex", flexDirection: "column", gap: 10, width: 230 }}>
       <span style={{ ...look.title, fontSize: 12.5 }}>{question.prompt}</span>
       {isAuthor ? (
-        // Reading them comes next: the answers get their own screen, because
-        // nothing in the app can read show_answers today.
-        <span style={{ ...look.sub, fontSize: 12, paddingBlock: 9 }}>Answers only you can see.</span>
+        // Your own question is a way into the answers, not a box to fill in.
+        // A plain link, so it is a real navigation rather than a scripted one.
+        <a
+          href={`/shows/${showId}/answers`}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{ ...look.sub, fontSize: 12, paddingBlock: 9, fontWeight: 700, textDecoration: "none" }}
+        >
+          Read the answers →
+        </a>
+      ) : already ? (
+        <span style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ ...look.sub, fontSize: 12 }}>Sent — only they see it.</span>
+          <span style={{ ...look.title, fontSize: 12.5, fontWeight: 600 }}>“{already}”</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setBody(already);
+              setRewriting(true);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{
+              ...look.sub,
+              alignSelf: "flex-start",
+              background: "none",
+              border: "none",
+              padding: 0,
+              fontFamily: "inherit",
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+            }}
+          >
+            Change it
+          </button>
+        </span>
       ) : sent ? (
         <span style={{ ...look.sub, fontSize: 12, paddingBlock: 9 }}>Sent — only they see it.</span>
       ) : (

@@ -537,6 +537,38 @@ function ShowScreen({
   }, [show.id, hasLive, supabase]);
 
   /**
+   * What you answered a question sticker, so coming back shows it.
+   *
+   * Read straight from the table rather than through an RPC: the RLS policy on
+   * `show_answers` already returns the asker's own rows (and the author's),
+   * which is exactly this query. Only for a Show carrying a question, like the
+   * two above. Moves into `show_sticker_state` with 0194, where it becomes one
+   * call instead of two.
+   */
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const hasQuestion = useMemo(() => layers.some((l) => l.type === "question"), [layers]);
+  useEffect(() => {
+    if (!hasQuestion || !currentUserId) return;
+    let dropped = false;
+    void supabase
+      .from("show_answers")
+      .select("layer_id, body")
+      .eq("show_id", show.id)
+      .eq("asker_id", currentUserId)
+      .then(({ data }) => {
+        if (dropped || !data) return;
+        const mine: Record<string, string> = {};
+        // Newest wins while a viewer can still answer twice; 0194 makes that
+        // impossible with a unique index, and this keeps working either way.
+        for (const row of data) mine[row.layer_id as string] = row.body as string;
+        setAnswers(mine);
+      });
+    return () => {
+      dropped = true;
+    };
+  }, [show.id, hasQuestion, currentUserId, supabase]);
+
+  /**
    * What the embedded posts and Shots look like now.
    *
    * Read by id rather than copied onto the layer when it was placed, so
@@ -812,6 +844,7 @@ function ShowScreen({
           polls={polls}
           embeds={embeds}
           stickers={stickers}
+          answers={answers}
           isAuthor={isOwner}
         />
       </div>

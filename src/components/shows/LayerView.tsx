@@ -73,6 +73,7 @@ export function LayerView({
   polls,
   embeds,
   stickers,
+  answers,
   isAuthor = false,
 }: {
   layer: ShowLayer;
@@ -87,6 +88,8 @@ export function LayerView({
   embeds?: Record<string, EmbedState>;
   /** What viewers have done with the interactive stickers (show_sticker_state). */
   stickers?: StickerState;
+  /** Your own answer to each question sticker, by layer id. */
+  answers?: Record<string, string>;
   /** The person looking is the one who posted it. */
   isAuthor?: boolean;
 }) {
@@ -104,6 +107,7 @@ export function LayerView({
           polls={polls}
           embeds={embeds}
           stickers={stickers}
+          answers={answers}
           isAuthor={isAuthor}
         />
       </div>
@@ -125,6 +129,7 @@ export function LayerBody({
   polls,
   embeds,
   stickers,
+  answers,
   isAuthor = false,
 }: {
   layer: ShowLayer;
@@ -134,6 +139,8 @@ export function LayerBody({
   embeds?: Record<string, EmbedState>;
   /** What viewers have done with the interactive stickers (show_sticker_state). */
   stickers?: StickerState;
+  /** Your own answer to each question sticker, by layer id. */
+  answers?: Record<string, string>;
   /** The person looking is the one who posted it. */
   isAuthor?: boolean;
 }) {
@@ -287,7 +294,14 @@ export function LayerBody({
         );
       }
       return (
-        <ShowQuestion showId={showId} layerId={layer.id} question={question} look={look} isAuthor={isAuthor} />
+        <ShowQuestion
+          showId={showId}
+          layerId={layer.id}
+          question={question}
+          look={look}
+          isAuthor={isAuthor}
+          mine={answers?.[layer.id]}
+        />
       );
     }
 
@@ -408,6 +422,7 @@ export function LayerStack({
   polls,
   embeds,
   stickers,
+  answers,
   isAuthor = false,
 }: {
   layers: ShowLayer[];
@@ -418,6 +433,8 @@ export function LayerStack({
   embeds?: Record<string, EmbedState>;
   /** What viewers have done with the interactive stickers (show_sticker_state). */
   stickers?: StickerState;
+  /** Your own answer to each question sticker, by layer id. */
+  answers?: Record<string, string>;
   /** The person looking is the one who posted it. */
   isAuthor?: boolean;
 }) {
@@ -461,6 +478,7 @@ export function LayerStack({
           polls={polls}
           embeds={embeds}
           stickers={stickers}
+          answers={answers}
           isAuthor={isAuthor}
         />
       ))}
