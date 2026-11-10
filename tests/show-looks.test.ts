@@ -138,12 +138,24 @@ describe("one renderer, used by both", () => {
     // Two renderers would be two things to keep in step, and the one
     // that drifts is always the one nobody is looking at.
     expect(view).toContain("editing?: boolean;");
-    expect(view).toContain("return editing ? body : <Link href={`/u/${username}`}>{body}</Link>;");
+    /*
+     * The mention used to be `editing ? body : <Link …>`. It now opens a
+     * callout first, so that a mis-tap does not cost you the Show — but the
+     * rule being tested is unchanged: while it is being placed it is a shape,
+     * and the live behaviour is the same component with `editing` off.
+     */
+    expect(view).toContain("if (editing) return body;");
+    expect(view).toContain(" kind=\"Mention\"");
   });
 
   it("and a link opens safely when it is live", () => {
-    expect(view).toContain('rel="noopener noreferrer nofollow"');
-    expect(view).toContain('target="_blank"');
+    // The anchor moved into StickerCallout with the rest of the callout, so
+    // this is asserted where it now lives rather than deleted.
+    const callout = read("src/components/shows/StickerCallout.tsx");
+    expect(callout).toContain('rel: "noopener noreferrer nofollow"');
+    expect(callout).toContain('target: "_blank"');
+    // And only for a destination that leaves Hypefy.
+    expect(callout).toContain("external ?");
   });
 
   it("the viewer draws the stack it was given", () => {

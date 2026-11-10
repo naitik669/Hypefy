@@ -40,8 +40,14 @@ describe("every kind of layer can actually be added", () => {
 
   it("and words are made rather than picked", () => {
     expect(editor).toContain('add("text", { text: "" })');
-    // The emoji sticker is no longer added from the tray.
-    expect(editor).not.toContain('add("sticker"');
+  });
+
+  it("an emoji is chosen from a grid, never placed blank", () => {
+    // It used not to be addable at all. It is placed with its emoji already
+    // in it, because readLayers drops a sticker layer with an empty one — a
+    // blank placement would simply vanish on publish.
+    expect(editor).toContain('add("sticker", { emoji: e })');
+    expect(editor).not.toContain('add("sticker", {})');
   });
 
   it("so between them the editor reaches every type the model has", () => {
@@ -61,9 +67,16 @@ describe("every kind of layer can actually be added", () => {
     if (editor.includes("const id = add(key, blank);")) {
       for (const t of ["location", "hashtag", "mention", "link"]) reachable.add(t);
     }
-    // The emoji sticker left the tray (the keyboard has emoji, and a text
-    // layer takes them); it is still read, so Shows that carry one keep it.
-    expect([...LAYER_TYPES].filter((t) => !reachable.has(t))).toEqual(["sticker"]);
+    // The emoji picker places one directly.
+    if (editor.includes('add("sticker", { emoji: e })')) reachable.add("sticker");
+    /*
+     * Nothing left over. This used to expect ["sticker"] — a type read,
+     * styled and validated everywhere and creatable nowhere, which is a
+     * branch in every layer file that no Show could ever exercise. Now every
+     * type in the model has a way in, and an empty list here is the thing
+     * worth holding on to.
+     */
+    expect([...LAYER_TYPES].filter((t) => !reachable.has(t))).toEqual([]);
   });
 
   it("the table is typed against the sheets, not kept in step by hand", () => {

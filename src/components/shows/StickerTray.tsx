@@ -6,7 +6,7 @@ import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
 import { AMBIENT_LOOK, MAX_LAYERS, type LayerType, type ShowLayer } from "@/lib/show-layers";
 
 /** The widgets that open a picker of their own. */
-export type SheetKey = "music" | "mention" | "link" | "embed";
+export type SheetKey = "music" | "mention" | "link" | "embed" | "sticker";
 /**
  * Those placed straight onto the picture: written on the sticker itself
  * (poll, question, quiz, slider, countdown, Add yours), typed at the foot
@@ -66,6 +66,10 @@ export const TAGS: Tile[] = [
   { key: "link", label: "Link", layer: sample("link", { url: "https://hypefy.chat" }, 6), zoom: 0.8, tilt: 3 },
   { key: "location", label: "Location", layer: sample("location", { place: "Mumbai" }, 3), zoom: 0.8, tilt: -3 },
   { key: "hashtag", label: "Hashtag", layer: sample("hashtag", { tag: "weekend" }, 5), zoom: 0.8, tilt: 4 },
+  // The emoji layer had no way in at all. The note here used to read "No
+  // emoji: the keyboard has those" — true of a text layer, but it left a type
+  // that every file handled and nothing could create.
+  { key: "sticker", label: "Emoji", layer: sample("sticker", { emoji: "🌙" }, 0), zoom: 0.7, tilt: -4 },
 ];
 
 export const ALL_TILES: Tile[] = [...ASK_AND_PLAY, ...HYPE_AND_PLAN, ...YOURS, ...TAGS];
@@ -165,8 +169,12 @@ function Pinned({
  * Everything that can go on a Show, as a pinboard on glass.
  *
  * The photo you are decorating stays in view behind it, and tapping the
- * photo puts it away. No emoji: the keyboard has those, and a text layer
- * takes them.
+ * photo puts it away.
+ *
+ * This used to say "No emoji: the keyboard has those" — true of a text layer,
+ * but it left the `sticker` type read, styled and validated everywhere and
+ * creatable nowhere. The Emoji tile opens a short chosen grid, which is enough
+ * to make the type real without becoming a second keyboard.
  */
 export function StickerTray({
   onWidget,

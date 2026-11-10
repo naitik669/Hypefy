@@ -5,6 +5,7 @@ import Link from "next/link";
 import { lookFor, type Look } from "@/lib/show-looks";
 import { ShowPoll, ShowQuestion, type PollState } from "@/components/shows/ShowPoll";
 import { ShowAddYours, ShowCountdown, ShowQuiz, ShowSlider } from "@/components/shows/ShowStickers";
+import { StickerCallout, CALLOUT_FLIP_Y } from "@/components/shows/StickerCallout";
 import type { StickerState } from "@/lib/show-stickers";
 import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
 import {
@@ -63,6 +64,10 @@ export const PRESSABLE: ReadonlySet<LayerType> = new Set<LayerType>([
   "post",
   "shot",
   "spotlight",
+  // Both of these drew as if they were tappable and were not in here at all,
+  // so every tap went through them to the Show underneath.
+  "location",
+  "music",
 ]);
 
 export function LayerView({
@@ -182,7 +187,25 @@ export function LayerBody({
     }
 
     case "music":
-      return <MusicSticker track={layer.payload as MusicPayload} look={look} editing={editing} />;
+      {
+        const song = layer.payload as MusicPayload;
+        const body = <MusicSticker track={song} look={look} editing={editing} />;
+        // "only" draws nothing for a viewer, so there is nothing to press.
+        if (editing || song.style === "only") return body;
+        return (
+          <StickerCallout
+            look={look}
+            kind="Song"
+            title={song.title}
+            sub={song.artist}
+            go="Open song"
+            href={`/sound/${encodeURIComponent(song.id)}`}
+            up={layer.y > CALLOUT_FLIP_Y}
+          >
+            {body}
+          </StickerCallout>
+        );
+      }
 
     case "mention": {
       const { username } = layer.payload as MentionPayload;
@@ -193,7 +216,19 @@ export function LayerBody({
       );
       // While it is being placed it is a shape, not a link: a drag that
       // ends on it should not navigate away.
-      return editing ? body : <Link href={`/u/${username}`}>{body}</Link>;
+      if (editing) return body;
+      return (
+        <StickerCallout
+          look={look}
+          kind="Mention"
+          title={`@${username}`}
+          go="Open profile"
+          href={`/u/${username}`}
+          up={layer.y > CALLOUT_FLIP_Y}
+        >
+          {body}
+        </StickerCallout>
+      );
     }
 
     case "link": {
@@ -216,12 +251,22 @@ export function LayerBody({
           </span>
         </span>
       );
-      return editing ? (
-        body
-      ) : (
-        <a href={url} target="_blank" rel="noopener noreferrer nofollow">
+      if (editing) return body;
+      return (
+        <StickerCallout
+          look={look}
+          kind="Link"
+          title={host}
+          // The whole address, because a host alone does not say where a
+          // link goes and this is the moment somebody decides to follow it.
+          sub={url}
+          go="Open link"
+          href={url}
+          external
+          up={layer.y > CALLOUT_FLIP_Y}
+        >
           {body}
-        </a>
+        </StickerCallout>
       );
     }
 
@@ -312,7 +357,7 @@ export function LayerBody({
 
     case "location": {
       const { place, area } = layer.payload as LocationPayload;
-      return (
+      const body = (
         <span style={{ ...look.box, display: "inline-flex", alignItems: "center", gap: 7, maxWidth: 260 }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={look.ink} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none" }} aria-hidden>
             <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" />
@@ -330,6 +375,29 @@ export function LayerBody({
           </span>
         </span>
       );
+      if (editing) return body;
+      /*
+       * It looked exactly like something you would tap and was not in
+       * PRESSABLE at all, so a tap went straight through to the Show. A place
+       * has no page of its own here, so the callout opens a map search —
+       * encoded, and with the area if it was typed, because "Hauz Khas" alone
+       * finds the wrong city.
+       */
+      const query = [place, area].filter(Boolean).join(", ");
+      return (
+        <StickerCallout
+          look={look}
+          kind="Place"
+          title={place}
+          sub={area}
+          go="Open in Maps"
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`}
+          external
+          up={layer.y > CALLOUT_FLIP_Y}
+        >
+          {body}
+        </StickerCallout>
+      );
     }
 
     case "hashtag": {
@@ -337,7 +405,19 @@ export function LayerBody({
       const body = (
         <span style={{ ...look.box, ...look.title, display: "inline-block", fontSize: 15 }}>#{tag}</span>
       );
-      return editing ? body : <Link href={`/tag/${encodeURIComponent(tag)}`}>{body}</Link>;
+      if (editing) return body;
+      return (
+        <StickerCallout
+          look={look}
+          kind="Tag"
+          title={`#${tag}`}
+          go="Open tag"
+          href={`/tag/${encodeURIComponent(tag)}`}
+          up={layer.y > CALLOUT_FLIP_Y}
+        >
+          {body}
+        </StickerCallout>
+      );
     }
 
     case "quiz": {

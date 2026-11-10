@@ -5,6 +5,7 @@ import { ChevronRight, Music, PenLine, Trash2, Undo2, X } from "lucide-react";
 import { LayerView } from "@/components/shows/LayerView";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { StickerTray, type SheetKey, type WidgetKey } from "@/components/shows/StickerTray";
+import { CountdownWhen } from "@/components/shows/CountdownWhen";
 import {
   CardEditor,
   blankCard,
@@ -64,6 +65,16 @@ import { dragged, pinched, topmostAt, type Placed, type Point } from "@/lib/tran
  */
 
 /** A new layer lands here, and slightly off square so it reads as placed. */
+/**
+ * The emoji a Show can wear, one grapheme each so readLayers keeps them.
+ * Chosen rather than exhaustive: a grid you can take in at a glance beats a
+ * picker nobody scrolls, and the keyboard is still there for words.
+ */
+const EMOJI = [
+  "🌙", "✨", "🔥", "💚", "⭐", "🫶", "👀", "💀",
+  "😭", "🥹", "😮‍💨", "🤌", "🎧", "📸", "🛹", "🌴",
+] as const;
+
 const DROP = { x: 0.5, y: 0.45, scale: 1, rotation: -3 };
 
 /**
@@ -213,6 +224,9 @@ export function ShowEditor({
    * straight onto the picture for the rest — a place or a tag typed at the
    * foot like words are, the time stamped as it is now.
    */
+  /** The clock being set, if one is. */
+  const [clocking, setClocking] = useState<string | null>(null);
+
   function place(key: WidgetKey) {
     if (key === "location" || key === "hashtag" || key === "mention" || key === "link") {
       // Placed empty and typed on the sticker itself.
@@ -222,6 +236,10 @@ export function ShowEditor({
       if (id) setTagging(id);
     } else if (key === "time") {
       add("time", { at: new Date().toISOString() });
+    } else if (key === "sticker") {
+      // Opens the grid rather than placing a blank one: an emoji layer with
+      // no emoji is dropped by readLayers, so it would vanish on publish.
+      setPicking("sticker");
     } else if (isCardType(key)) {
       // Placed blank and written on the sticker itself.
       const id = add(key, blankCard(key));
@@ -404,6 +422,10 @@ export function ShowEditor({
         else if (chosenLayer?.type === "post" || chosenLayer?.type === "shot") setStyling({ id: g.id, before: chosenLayer });
         else if (chosenLayer && isTagType(chosenLayer.type)) setTagging(g.id);
         else if (chosenLayer?.type === "text") setWriting(g.id);
+        // The clock was stamped at the moment it was added and could never be
+        // changed — the only way to a different time was to delete it and add
+        // another. It opens the picker the countdown already uses.
+        else if (chosenLayer?.type === "time") setClocking(g.id);
         return;
       }
       setSelected(g.id);
@@ -781,6 +803,62 @@ export function ShowEditor({
             }
             className="h-12 w-full rounded-xl bg-surface px-4 text-sm text-foreground outline-none placeholder:text-muted"
           />
+        </div>
+      )}
+
+      {/*
+        The clock, set rather than stamped. The same sheet the countdown uses,
+        so there is one way to pick a time in a Show and not two.
+      */}
+      {clocking && (
+        <CountdownWhen
+          open
+          at={
+            (layers.find((x) => x.id === clocking)?.payload as { at?: string } | undefined)?.at ??
+            new Date().toISOString()
+          }
+          onClose={() => setClocking(null)}
+          onPick={(at) => {
+            remember();
+            setLayers((l) =>
+              l.map((x) => (x.id === clocking ? { ...x, payload: { at: at.toISOString() } } : x)),
+            );
+            setClocking(null);
+          }}
+        />
+      )}
+
+      {/*
+        Emoji, as a small chosen set rather than a picker.
+        The tray used to say "No emoji: the keyboard has those", and the type
+        was read, styled, validated and reachable by nothing — a dead branch in
+        every file that handled layers. A short grid is enough to make it real
+        without becoming a second keyboard.
+      */}
+      {picking === "sticker" && (
+        <div
+          role="dialog"
+          aria-label="Pick an emoji"
+          onPointerDown={(e) => e.stopPropagation()}
+          className="absolute inset-x-0 bottom-0 z-40 rounded-t-[28px] border-t border-white/10 bg-black/70 pb-[max(1.25rem,var(--sab))] pt-3 backdrop-blur-2xl"
+        >
+          <span aria-hidden className="mx-auto mb-3 block h-1 w-10 rounded-full bg-white/30" />
+          <div className="grid grid-cols-8 gap-1 px-3">
+            {EMOJI.map((e) => (
+              <button
+                key={e}
+                type="button"
+                aria-label={e}
+                onClick={() => {
+                  setPicking(null);
+                  add("sticker", { emoji: e });
+                }}
+                className="flex h-11 items-center justify-center rounded-xl text-[26px] transition active:scale-90 hover:bg-white/10"
+              >
+                {e}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

@@ -8,9 +8,18 @@ describe("the sticker tray", () => {
     expect(ASK_AND_PLAY.map((t) => t.label)).toEqual(["Poll", "Quiz", "Question"]);
     expect(HYPE_AND_PLAN.map((t) => t.label)).toEqual(["Hype slider", "Countdown", "Add yours"]);
     expect(YOURS.map((t) => t.label)).toEqual(["Post or Shot"]);
-    expect(TAGS.map((t) => t.label)).toEqual(["Time", "Music", "Mention", "Link", "Location", "Hashtag"]);
+    // Emoji joins the tags row: the one layer type that had no way in.
+    expect(TAGS.map((t) => t.label)).toEqual([
+      "Time",
+      "Music",
+      "Mention",
+      "Link",
+      "Location",
+      "Hashtag",
+      "Emoji",
+    ]);
     expect(BOARD.map((t) => t.label)).toEqual(["Quiz", "Poll", "Countdown", "Question", "Add yours", "Hype slider", "Post or Shot"]);
-    expect(new Set(ALL_TILES.map((t) => t.key)).size).toBe(13);
+    expect(new Set(ALL_TILES.map((t) => t.key)).size).toBe(14);
   });
 
   it("every tile is the real sticker, one the Show would keep", () => {
