@@ -28,8 +28,13 @@ export const WELL_RADIUS = 20;
  * The one piece of colour is the painted edge along the foot, and it takes
  * the owner's accent. They picked that colour once already; a card does not
  * need to ask a second time.
+ *
+ * On the profile that accent is the reader's own `--accent`, which is right
+ * there and wrong on a Show: a card of yours on somebody else's Show would
+ * be painted in *their* colour. So `edge` takes an explicit one, and the
+ * card sticker passes the owner's.
  */
-export function CardPlate({ children }: { children: ReactNode }) {
+export function CardPlate({ children, edge }: { children: ReactNode; edge?: string }) {
   return (
     <div
       className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[24px]"
@@ -41,7 +46,11 @@ export function CardPlate({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-      <span aria-hidden className="absolute inset-x-0 bottom-0 h-[3px] bg-accent" />
+      <span
+        aria-hidden
+        className={`absolute inset-x-0 bottom-0 h-[3px] ${edge ? "" : "bg-accent"}`}
+        style={edge ? { background: edge } : undefined}
+      />
     </div>
   );
 }

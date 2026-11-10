@@ -239,6 +239,18 @@ const BY_TYPE: Record<LayerType, Look[]> = {
   post: embedLooks(),
   shot: embedLooks(),
   spotlight: embedLooks().slice(0, 1),
+  // The card draws its own plate, down to the hairlines and the painted
+  // edge, so the look it is handed carries no box of its own: an embed's
+  // frame around it would read as a card inside a card.
+  hypecard: [
+    {
+      name: "Plate",
+      box: {},
+      title: { color: WHITE, fontWeight: 800 },
+      sub: { color: "#9a9a9a" },
+      ink: WHITE,
+    },
+  ],
 };
 
 /**

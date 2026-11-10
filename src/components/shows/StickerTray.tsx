@@ -21,7 +21,12 @@ export type DirectKey =
   | "addyours"
   | "location"
   | "hashtag"
-  | "time";
+  | "time"
+  // The two signature ones. `hypemeter` places a slider — the meter is a
+  // flag on that payload, not a type — so the key is what carries the
+  // difference from the tray to `place`.
+  | "hypemeter"
+  | "hypecard";
 export type WidgetKey = SheetKey | DirectKey;
 
 /**
@@ -52,10 +57,29 @@ export const HYPE_AND_PLAN: Tile[] = [
   { key: "slider", label: "Hype slider", layer: sample("slider", { prompt: "How hyped are you?" }, 1), zoom: 0.6, tilt: 3 },
   { key: "countdown", label: "Countdown", layer: sample("countdown", { title: "Trip to Goa", at: SOON }, 6), zoom: 0.58, tilt: -4 },
   { key: "addyours", label: "Add yours", layer: sample("addyours", { prompt: "Your desk setup" }, 3), zoom: 0.62, tilt: 4 },
+  {
+    key: "hypemeter",
+    label: "Hype meter",
+    // Drawn at the lime end on purpose: the tray is where somebody works
+    // out what this one does that the plain slider does not.
+    layer: sample("slider", { prompt: "How hyped are you?", hype: true }, 0, "tray-hypemeter"),
+    zoom: 0.6,
+    tilt: -3,
+  },
 ];
 
 export const YOURS: Tile[] = [
-  { key: "embed", label: "Post or Shot", layer: sample("post", { postId: "tray" }, 1, SAMPLE_EMBED_ID), zoom: 0.55, tilt: -3 },
+  // The picker behind this lists your Spotlight page first, so the label
+  // names it: a page reachable only by opening a tile called Post or Shot
+  // is a page nobody finds.
+  { key: "embed", label: "Post, Shot or page", layer: sample("post", { postId: "tray" }, 1, SAMPLE_EMBED_ID), zoom: 0.55, tilt: -3 },
+  {
+    key: "hypecard",
+    label: "Hype card",
+    layer: sample("hypecard", { ownerId: "tray" }, 0, "tray-hypecard"),
+    zoom: 0.46,
+    tilt: 3,
+  },
 ];
 
 /** The squircle chips. */
@@ -79,7 +103,17 @@ export const ALL_TILES: Tile[] = [...ASK_AND_PLAY, ...HYPE_AND_PLAN, ...YOURS, .
  * design canvas: no shelves to swipe and no headings over them — every
  * sticker is on the board at once.
  */
-const BOARD_ORDER: WidgetKey[] = ["quiz", "poll", "countdown", "question", "addyours", "slider", "embed"];
+const BOARD_ORDER: WidgetKey[] = [
+  "quiz",
+  "poll",
+  "countdown",
+  "question",
+  "addyours",
+  "slider",
+  "hypemeter",
+  "hypecard",
+  "embed",
+];
 export const BOARD: Tile[] = BOARD_ORDER.map((key) => ALL_TILES.find((t) => t.key === key)!);
 
 const SAMPLE_EMBEDS: Record<string, EmbedState> = {
@@ -137,17 +171,20 @@ function Pinned({
   index,
   onPick,
   full,
+  blocked = false,
 }: {
   tile: Tile;
   index: number;
   onPick: (key: WidgetKey) => void;
   full: boolean;
+  /** This one tile cannot place anything yet, whatever the cap says. */
+  blocked?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={() => onPick(tile.key)}
-      disabled={full}
+      disabled={full || blocked}
       aria-label={`Add ${tile.label.toLowerCase()}`}
       className="flex shrink-0 flex-col items-center gap-2.5 transition active:scale-95 disabled:pointer-events-none disabled:opacity-40"
       data-tile={tile.key}
@@ -180,6 +217,7 @@ export function StickerTray({
   onWidget,
   onClose,
   full = false,
+  blocked,
 }: {
   onWidget: (key: WidgetKey) => void;
   onClose: () => void;
@@ -189,6 +227,12 @@ export function StickerTray({
    * and said nothing about why.
    */
   full?: boolean;
+  /**
+   * Tiles that cannot place anything yet — the Hype card, before the editor
+   * has been told whose card it would be. Dimmed, rather than tapping to
+   * nothing, which is the same bug the cap had.
+   */
+  blocked?: ReadonlySet<WidgetKey>;
 }) {
   const [recent] = useState<WidgetKey[]>(readRecent);
   const pick = (key: WidgetKey) => {
@@ -248,7 +292,7 @@ export function StickerTray({
                 key={t.key}
                 type="button"
                 onClick={() => pick(t.key)}
-                disabled={full}
+                disabled={full || blocked?.has(t.key) === true}
                 aria-label={`Add ${t.label.toLowerCase()}`}
                 className="flex flex-col items-center gap-2 transition active:scale-95 disabled:pointer-events-none disabled:opacity-40"
                 data-tile={t.key}
@@ -266,7 +310,7 @@ export function StickerTray({
         <div className="mt-6 grid grid-cols-2 justify-items-center gap-x-3 gap-y-7 px-3 pb-2 pt-3" data-board>
           {BOARD.map((t, i) => (
             <div key={t.key} className={BOARD.length % 2 === 1 && i === BOARD.length - 1 ? "col-span-2" : undefined}>
-              <Pinned tile={t} index={i} onPick={pick} full={full} />
+              <Pinned tile={t} index={i} onPick={pick} full={full} blocked={blocked?.has(t.key) === true} />
             </div>
           ))}
         </div>

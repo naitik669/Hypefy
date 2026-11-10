@@ -586,7 +586,10 @@ function ShowScreen({
    */
   const [embeds, setEmbeds] = useState<Record<string, EmbedState>>({});
   const embedded = useMemo(
-    () => layers.filter((l) => l.type === "post" || l.type === "shot" || l.type === "spotlight"),
+    () =>
+      layers.filter(
+        (l) => l.type === "post" || l.type === "shot" || l.type === "spotlight" || l.type === "hypecard",
+      ),
     [layers],
   );
   useEffect(() => {
@@ -600,9 +603,13 @@ function ShowScreen({
       .filter((l) => l.type === "shot")
       .map((l) => (l.payload as { shotId: string }).shotId);
     const wantsSpotlight = embedded.some((l) => l.type === "spotlight");
+    // A Hype card keeps nothing but an id, so everything on it is read here.
+    const cardOwners = embedded
+      .filter((l) => l.type === "hypecard")
+      .map((l) => (l.payload as { ownerId: string }).ownerId);
 
     void (async () => {
-      const [posts, shots, notes] = await Promise.all([
+      const [posts, shots, notes, owners] = await Promise.all([
         postIds.length
           ? supabase
               .from("posts")
@@ -620,6 +627,13 @@ function ShowScreen({
         // A Spotlight page is read through get_notes, which already decides
         // who may see whose: one you may not see reads as ended.
         wantsSpotlight ? supabase.rpc("get_notes") : Promise.resolve({ data: [] as never[] }),
+        // Public columns only. A card shows what a profile shows.
+        cardOwners.length
+          ? supabase
+              .from("profiles")
+              .select("id, username, display_name, avatar_url, avatar_hue, member_no, created_at")
+              .in("id", cardOwners)
+          : Promise.resolve({ data: [] as never[] }),
       ]);
       if (dropped) return;
 
@@ -645,14 +659,30 @@ function ShowScreen({
         ]),
       );
 
+      const byOwner = new Map(
+        (owners.data ?? []).map((o) => [
+          o.id,
+          {
+            thumb: o.avatar_url ?? null,
+            caption: o.display_name ?? null,
+            author: o.username ?? null,
+            memberNo: o.member_no ?? null,
+            since: o.created_at ?? null,
+            hue: o.avatar_hue ?? null,
+          } satisfies EmbedState,
+        ]),
+      );
+
       const next: Record<string, EmbedState> = {};
       for (const layer of embedded) {
         const found =
-          layer.type === "spotlight"
-            ? spotlightOf(notes.data, (layer.payload as { ownerId: string }).ownerId)
-            : layer.type === "post"
-              ? byPost.get((layer.payload as { postId: string }).postId)
-              : byShot.get((layer.payload as { shotId: string }).shotId);
+          layer.type === "hypecard"
+            ? byOwner.get((layer.payload as { ownerId: string }).ownerId)
+            : layer.type === "spotlight"
+              ? spotlightOf(notes.data, (layer.payload as { ownerId: string }).ownerId)
+              : layer.type === "post"
+                ? byPost.get((layer.payload as { postId: string }).postId)
+                : byShot.get((layer.payload as { shotId: string }).shotId);
         next[layer.id] = found ?? { thumb: null, caption: null, gone: true };
       }
       setEmbeds(next);
@@ -854,6 +884,8 @@ function ShowScreen({
           answers={answers}
           isAuthor={isOwner}
           onResults={isOwner ? setResults : undefined}
+          hyped={hyped}
+          onHype={toggleShowHype}
         />
       </div>
 

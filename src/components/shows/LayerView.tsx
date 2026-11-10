@@ -6,6 +6,7 @@ import { lookFor, type Look } from "@/lib/show-looks";
 import { ShowPoll, ShowQuestion, type PollState } from "@/components/shows/ShowPoll";
 import { ShowAddYours, ShowCountdown, ShowQuiz, ShowSlider } from "@/components/shows/ShowStickers";
 import { StickerCallout, CALLOUT_FLIP_Y } from "@/components/shows/StickerCallout";
+import { HypeCardSticker } from "@/components/shows/HypeCard";
 import { isResultKind } from "@/lib/show-results";
 import type { StickerState } from "@/lib/show-stickers";
 import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
@@ -65,6 +66,7 @@ export const PRESSABLE: ReadonlySet<LayerType> = new Set<LayerType>([
   "post",
   "shot",
   "spotlight",
+  "hypecard",
   // Both of these drew as if they were tappable and were not in here at all,
   // so every tap went through them to the Show underneath.
   "location",
@@ -81,6 +83,8 @@ export function LayerView({
   stickers,
   answers,
   isAuthor = false,
+  hyped,
+  onHype,
   onResults,
 }: {
   layer: ShowLayer;
@@ -99,6 +103,16 @@ export function LayerView({
   answers?: Record<string, string>;
   /** The person looking is the one who posted it. */
   isAuthor?: boolean;
+  /**
+   * Whether the person looking has already hyped this Show, and how to.
+   *
+   * The Hype meter does not keep a hype of its own — it works the Show's,
+   * which the viewer already owns and already draws a button for. Passing
+   * the one piece of state down is what stops the meter and the button
+   * disagreeing about whether you hyped it.
+   */
+  hyped?: boolean;
+  onHype?: () => void;
   /**
    * Ask for the results of one sticker. Only the author gets this, and it is
    * handled here rather than inside each of the five interactive stickers:
@@ -134,6 +148,8 @@ export function LayerView({
           stickers={stickers}
           answers={answers}
           isAuthor={isAuthor}
+          hyped={hyped}
+          onHype={onHype}
         />
       </div>
     </div>
@@ -156,6 +172,8 @@ export function LayerBody({
   stickers,
   answers,
   isAuthor = false,
+  hyped,
+  onHype,
 }: {
   layer: ShowLayer;
   editing?: boolean;
@@ -168,6 +186,16 @@ export function LayerBody({
   answers?: Record<string, string>;
   /** The person looking is the one who posted it. */
   isAuthor?: boolean;
+  /**
+   * Whether the person looking has already hyped this Show, and how to.
+   *
+   * The Hype meter does not keep a hype of its own — it works the Show's,
+   * which the viewer already owns and already draws a button for. Passing
+   * the one piece of state down is what stops the meter and the button
+   * disagreeing about whether you hyped it.
+   */
+  hyped?: boolean;
+  onHype?: () => void;
 }) {
   const look = lookFor(layer.type, layer.look, layer.tint);
 
@@ -375,6 +403,12 @@ export function LayerBody({
     case "spotlight":
       return <EmbedSticker layer={layer} look={look} embed={embeds?.[layer.id]} editing={editing} />;
 
+    // Through the same `embeds` lookup, and deliberately not an EMBED_TYPE:
+    // those replace one another, one to a Show, and a card is not a thing
+    // you posted.
+    case "hypecard":
+      return <HypeCardSticker layer={layer} card={embeds?.[layer.id]} editing={editing} />;
+
     case "location": {
       const { place, area } = layer.payload as LocationPayload;
       const body = (
@@ -465,6 +499,8 @@ export function LayerBody({
           state={stickers?.sliders[layer.id]}
           isAuthor={isAuthor}
           preview={editing || !showId}
+          hyped={hyped}
+          onHype={onHype}
         />
       );
 
@@ -525,6 +561,8 @@ export function LayerStack({
   stickers,
   answers,
   isAuthor = false,
+  hyped,
+  onHype,
   onResults,
 }: {
   layers: ShowLayer[];
@@ -539,6 +577,16 @@ export function LayerStack({
   answers?: Record<string, string>;
   /** The person looking is the one who posted it. */
   isAuthor?: boolean;
+  /**
+   * Whether the person looking has already hyped this Show, and how to.
+   *
+   * The Hype meter does not keep a hype of its own — it works the Show's,
+   * which the viewer already owns and already draws a button for. Passing
+   * the one piece of state down is what stops the meter and the button
+   * disagreeing about whether you hyped it.
+   */
+  hyped?: boolean;
+  onHype?: () => void;
   /**
    * Ask for the results of one sticker. Only the author gets this, and it is
    * handled here rather than inside each of the five interactive stickers:
@@ -589,6 +637,8 @@ export function LayerStack({
           stickers={stickers}
           answers={answers}
           isAuthor={isAuthor}
+          hyped={hyped}
+          onHype={onHype}
           onResults={onResults}
         />
       ))}

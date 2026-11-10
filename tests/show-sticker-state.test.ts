@@ -197,7 +197,9 @@ describe("wired into the thread", () => {
     expect(editor).toContain("full={full}");
     // Both rows: the tags grid and the pinned board. Asserting one let the
     // other be removed with the test still passing.
-    expect(tray.match(/disabled=\{full\}/g)).toHaveLength(2);
+    // Both still, now reading `full || blocked`: the Hype card tile dims on
+    // its own before the editor knows whose card it would place.
+    expect(tray.match(/disabled=\{full \|\| /g)).toHaveLength(2);
     expect(tray).toContain("{MAX_LAYERS} of {MAX_LAYERS} stickers");
   });
 

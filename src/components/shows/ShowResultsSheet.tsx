@@ -16,7 +16,7 @@ import {
   resultValue,
   type StickerResults,
 } from "@/lib/show-results";
-import type { ShowLayer } from "@/lib/show-layers";
+import { isHypeMeter, type ShowLayer } from "@/lib/show-layers";
 import type { PollPayload, QuizPayload } from "@/lib/show-layers";
 
 /**
@@ -133,7 +133,9 @@ export function ShowResultsSheet({
               <section key={layer.id} id={`result-${layer.id}`}>
                 <h3 className="text-[15px] font-bold leading-snug">{heading(layer)}</h3>
                 <p className="pb-2.5 pt-0.5 text-xs text-faint">
-                  {KIND_WORD[kind]}
+                  {/* A meter is a slider to the server and a different sticker to
+                      the person who placed it, so the section says which. */}
+                  {isHypeMeter(layer) ? "Hype meter" : KIND_WORD[kind]}
                   {people.length > 0 ? ` · ${people.length}` : ""}
                 </p>
 

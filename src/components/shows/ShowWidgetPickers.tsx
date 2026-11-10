@@ -13,7 +13,7 @@ import { diaryTheme } from "@/components/diary/DiaryPage";
  * and links are typed on their stickers (TagWriter).
  */
 
-/** What a post or Shot embed shows once somebody is looking at it. */
+/** What an embedded thing — a post, a Shot, a page, a card — shows once somebody is looking at it. */
 export type EmbedState = {
   thumb: string | null;
   caption: string | null;
@@ -23,8 +23,19 @@ export type EmbedState = {
   video?: string | null;
   /** Whose it is. */
   author?: string | null;
-  /** A Spotlight page's own colour. */
+  /** A Spotlight page's own colour, or a Hype card owner's accent. */
   color?: string | null;
+  /**
+   * A Hype card's owner, looked up when the Show is opened rather than
+   * copied into the layer: see HypeCardPayload for why the card carries
+   * nothing but an id. `author` holds their handle and `caption` their
+   * name, the same two fields a post embed uses for the same two things.
+   */
+  memberNo?: number | null;
+  /** When they joined, as the card's month-and-year line. */
+  since?: string | null;
+  /** The hue their avatar falls back to. */
+  hue?: number | null;
 };
 
 /** One of your own posts or Shots, as the picker lists it. */

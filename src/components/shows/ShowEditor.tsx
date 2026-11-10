@@ -15,6 +15,10 @@ import {
   tidyCard,
 } from "@/components/shows/CardEditor";
 import { EmbedSheet, type EmbedState } from "@/components/shows/ShowWidgetPickers";
+import { createClient } from "@/lib/supabase/client";
+
+/** The one tile that needs to know who you are before it can place anything. */
+const HYPECARD_ONLY: ReadonlySet<WidgetKey> = new Set<WidgetKey>(["hypecard"]);
 import { TagWriter, isTagType, type TagType } from "@/components/shows/TagWriter";
 import { MusicEditor } from "@/components/shows/MusicEditor";
 import { DrawCanvas, DrawTools } from "@/components/shows/DrawPad";
@@ -234,6 +238,27 @@ export function ShowEditor({
   /** The clock being set, if one is. */
   const [clocking, setClocking] = useState<string | null>(null);
 
+  /**
+   * Whose card the Hype card places — the signed-in user, and nobody else.
+   *
+   * Asked for once here rather than written into the tile, because a card
+   * with no owner is dropped by readLayers and would vanish on publish: the
+   * same trap the emoji tile had. Until it lands the tile does nothing, so
+   * it is drawn dimmed rather than silently inert.
+   */
+  const [me, setMe] = useState<string | null>(null);
+  useEffect(() => {
+    let dropped = false;
+    void createClient()
+      .auth.getUser()
+      .then(({ data }) => {
+        if (!dropped) setMe(data.user?.id ?? null);
+      });
+    return () => {
+      dropped = true;
+    };
+  }, []);
+
   function place(key: WidgetKey) {
     if (key === "location" || key === "hashtag" || key === "mention" || key === "link") {
       // Placed empty and typed on the sticker itself.
@@ -243,6 +268,12 @@ export function ShowEditor({
       if (id) setTagging(id);
     } else if (key === "time") {
       add("time", { at: new Date().toISOString() });
+    } else if (key === "hypemeter") {
+      // A slider carrying the hype flag, written on like any other card.
+      const id = add("slider", { ...blankCard("slider"), hype: true });
+      if (id) setEditingCard(id);
+    } else if (key === "hypecard") {
+      if (me) add("hypecard", { ownerId: me });
     } else if (key === "sticker") {
       // Opens the grid rather than placing a blank one: an emoji layer with
       // no emoji is dropped by readLayers, so it would vanish on publish.
@@ -778,6 +809,7 @@ export function ShowEditor({
         {tray && (
           <StickerTray
             full={full}
+            blocked={me ? undefined : HYPECARD_ONLY}
             onClose={() => setTray(false)}
             onWidget={(key) => {
               setTray(false);

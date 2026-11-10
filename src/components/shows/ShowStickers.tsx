@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { voteLabel } from "@/lib/chat-poll";
 import type { Look } from "@/lib/show-looks";
-import type { AddYoursPayload, CountdownPayload, QuizPayload, ShowLayer, SliderPayload } from "@/lib/show-layers";
+import {
+  HYPE_METER_AT,
+  type AddYoursPayload,
+  type CountdownPayload,
+  type QuizPayload,
+  type ShowLayer,
+  type SliderPayload,
+} from "@/lib/show-layers";
 import { countdownParts, onInk, quizMark, revealed, seeded, stickerError, type Seeded } from "@/lib/show-stickers";
 import type { PollState } from "@/components/shows/ShowPoll";
 import { Celebrate } from "@/components/shows/Celebrate";
@@ -176,6 +183,8 @@ export function ShowSlider({
   state,
   isAuthor = false,
   preview = false,
+  hyped = false,
+  onHype,
 }: {
   showId?: string;
   layerId: string;
@@ -184,7 +193,20 @@ export function ShowSlider({
   state?: { avg: number; count: number; mine: number | null };
   isAuthor?: boolean;
   preview?: boolean;
+  /** The Show's own hype, which the Hype meter works rather than keeping one. */
+  hyped?: boolean;
+  onHype?: () => void;
 }) {
+  /**
+   * The Hype meter: the same slider, except letting go above HYPE_METER_AT
+   * also hypes the Show.
+   *
+   * Hypes, never un-hypes. A drag is a reading, not a switch — pulling the
+   * ★ back down means you are less excited than you were, which is not the
+   * same as taking back having liked the Show. The heart stays the one way
+   * to undo it, and it is right there.
+   */
+  const meter = slider.hype === true;
   const [supabase] = useState(createClient);
 
   /** What is drawn: where the ★ sits, and the average once the server has it. */
@@ -234,6 +256,10 @@ export function ShowSlider({
     }
     const d = data as { avg?: number; count?: number } | null;
     put(v, { avg: Number(d?.avg) || 0, count: Number(d?.count) || 0 });
+    // After the value is recorded, not before: a meter that hyped the Show
+    // and then failed to save the number would leave the two disagreeing,
+    // and the number is the thing being asked for.
+    if (meter && !hyped && v >= HYPE_METER_AT) onHype?.();
   }
 
   return (
@@ -284,7 +310,11 @@ export function ShowSlider({
             bottom: 0,
             width: `${value}%`,
             borderRadius: 5,
-            background: look.ink,
+            // On a meter the fill turns the brand's lime once it is far
+            // enough along to hype the Show, so the one thing that makes
+            // this sticker different is visible before you let go rather
+            // than explained underneath it afterwards.
+            background: meter && value >= HYPE_METER_AT ? HYPE_LIME : look.ink,
             transition: settling ? "width 420ms cubic-bezier(.34,1.56,.64,1)" : undefined,
           }}
         />
@@ -347,11 +377,20 @@ export function ShowSlider({
          * fallback before 0194.
          */
         <span style={label(look)}>
-          {sent?.count ? `${sent.count} hyped · avg ${sent.avg}% · see who` : "Hype slider · nobody yet"}
+          {sent?.count
+            ? `${sent.count} hyped · avg ${sent.avg}% · see who`
+            : `${meter ? "Hype meter" : "Hype slider"} · nobody yet`}
         </span>
       ) : (
         <span style={label(look)}>
-          {problem ?? (sent ? `${sent.count} hyped · avg ${sent.avg}%` : "Drag the ★")}
+          {problem ??
+            (sent
+              ? `${sent.count} hyped · avg ${sent.avg}%`
+              : meter
+                ? hyped
+                  ? "Drag the ★ — you hyped this"
+                  : "Drag the ★ past lime to hype it"
+                : "Drag the ★")}
         </span>
       )}
     </span>
