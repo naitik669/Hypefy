@@ -48,6 +48,24 @@ const TARGETS = 4;
 let cached: ShareTarget[] | null = null;
 
 /**
+ * The one request in flight, shared by everyone who asks while it is running.
+ *
+ * `cached` cannot do this on its own, because it is only assigned once the
+ * query comes back. A feed mounts one share button per card and each of them
+ * arms on idle, so twenty cards asked twenty times, concurrently, every one
+ * of them missing the cache — and twenty copies of the same ranking query
+ * then contend with each other on the way back. Measured in production:
+ * share_suggestions was called 20,091 times, and while the query runs in
+ * 12ms on its own, the mean was 415ms with a maximum of 7.9 seconds and no
+ * disk reads at all, which is the shape of work queueing behind itself.
+ *
+ * The chat thread's signed links already solve exactly this, and say so —
+ * "lookups that arrive together are sent as one call" (lib/chat-media-url).
+ * This is the same idea for one global list.
+ */
+let inFlight: Promise<ShareTarget[]> | null = null;
+
+/**
  * The same ranking the share sheet opens on (share_suggestions): the people
  * and group chats you actually interact with, best first. This row used to
  * ask a different, older question, so holding the button offered faces the
@@ -55,8 +73,19 @@ let cached: ShareTarget[] | null = null;
  */
 export async function loadShareTargets(): Promise<ShareTarget[]> {
   if (cached) return cached;
+  inFlight ??= fetchShareTargets().finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+async function fetchShareTargets(): Promise<ShareTarget[]> {
   const supabase = createClient();
-  const { data } = await supabase.rpc("share_suggestions", { p_limit: TARGETS });
+  const { data, error } = await supabase.rpc("share_suggestions", { p_limit: TARGETS });
+  // A blip must not cost the whole session its faces. Nothing is remembered
+  // on failure, so the next hold asks again; an empty answer is still an
+  // answer and is remembered, as it was before.
+  if (error) return [];
   cached = (data ?? []).map((r) => ({
     kind: r.kind === "group" ? ("group" as const) : ("person" as const),
     id: r.id,
