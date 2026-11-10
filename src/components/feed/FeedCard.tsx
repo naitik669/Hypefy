@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
+import dynamic from "next/dynamic";
 import { overlayCount } from "@/lib/overlay-stack";
 import Link from "next/link";
 import { Star, Bookmark, MoreHorizontal, Maximize2 } from "lucide-react";
@@ -11,11 +12,17 @@ import { ZoomViewer } from "@/components/ui/ZoomViewer";
 import { ExpandableText } from "@/components/ui/ExpandableText";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { timeAgoShort } from "@/lib/time";
-import { CommentsSheet } from "@/components/feed/CommentsSheet";
+const CommentsSheet = dynamic(
+  () => import("@/components/feed/CommentsSheet").then((m) => m.CommentsSheet),
+  { ssr: false },
+);
 import { FeedImpression } from "@/components/feed/FeedImpression";
 import { PostPeek } from "@/components/feed/PostPeek";
 import { PostActionsSheet } from "@/components/feed/PostActionsSheet";
-import { ShareSheet } from "@/components/feed/ShareSheet";
+const ShareSheet = dynamic(
+  () => import("@/components/feed/ShareSheet").then((m) => m.ShareSheet),
+  { ssr: false },
+);
 import { ShareButton } from "@/components/feed/QuickShare";
 import { EditPostSheet } from "@/components/feed/EditPostSheet";
 import { HypeParticles } from "@/components/feed/HypeParticles";
@@ -48,6 +55,15 @@ import { RehypeCount, RehypeIcon } from "@/components/ui/RehypeIcon";
 import { PollBlock, parsePoll } from "@/components/feed/PollBlock";
 import { useSaveMenus } from "@/components/saved/SaveMenus";
 import { CommentIcon } from "@/components/ui/CommentIcon";
+
+/**
+ * How far outside the viewport a card starts loading its rehype deck.
+ *
+ * Generous enough that the faces are there by the time the card is, and
+ * small enough that a feed of a hundred mounted cards does not ask about
+ * ninety of them. The chat thread arms its videos on the same margin.
+ */
+const DECK_MARGIN = "200px";
 
 export type FeedPost = {
   id: string;
@@ -132,7 +148,7 @@ export function clampZoom(ratio: number): number {
   return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, ratio));
 }
 
-export function FeedCard({
+function FeedCardInner({
   post,
   currentUserId,
   initialIsHyper,
@@ -201,7 +217,30 @@ export function FeedCard({
   const [rehypePending, setRehypePending] = useState(false);
   const [rehypePulse, setRehypePulse] = useState(0);
   /** The deck on the photo: who rehyped this, ranked for you, and you once you have. */
-  const seated = useRehypeDeck("post", post.id, uid, rehyped);
+  /**
+   * Whether this card is close enough to the screen to ask who rehyped it.
+   *
+   * `useRehypeDeck` takes this flag for exactly this reason — "enabled lets a
+   * feed load only what is on or near the screen" — and this card was the one
+   * caller that never passed it. Both Shot paths gate theirs. So a feed page
+   * mounted twenty cards and all twenty asked at once, before anyone had
+   * scrolled to any of them.
+   *
+   * Measured: rehype_deck was called 29,475 times at a mean of 112ms, with a
+   * maximum of 7.9 seconds and a standard deviation of 507ms — against a
+   * minimum of 1.3ms and no disk reads. A second entry in pg_stat_statements
+   * with a different parameter shape, and no burst behind it, ran at 1.5ms.
+   * The query was never slow; twenty copies of it arriving together were.
+   *
+   * Decided in the initialiser rather than the effect for the same reason as
+   * ChatVideo: a browser with no observer must still show its faces, nothing
+   * should set state in an effect body, and the `window` half keeps the
+   * server's answer false so it does not fetch during SSR.
+   */
+  const [deckNear, setDeckNear] = useState(
+    () => typeof window !== "undefined" && typeof IntersectionObserver === "undefined",
+  );
+  const seated = useRehypeDeck("post", post.id, uid, rehyped, deckNear);
   /**
    * The three faces this post shows: who passed it on, then who you follow
    * that hyped it. One row rather than two — six faces on a photograph read
@@ -221,6 +260,21 @@ export function FeedCard({
   // JS-controlled swipe: one image per gesture, no native scroll momentum
   /** The card itself, so an attached song plays with the post. */
   const cardRef = useRef<HTMLElement>(null);
+
+  // Arms `deckNear` above, once, when the card comes within DECK_MARGIN.
+  useEffect(() => {
+    if (deckNear) return;
+    const el = cardRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setDeckNear(true);
+      },
+      { rootMargin: DECK_MARGIN },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [deckNear]);
   const galleryTouchStartX = useRef(0);
   const galleryTouchStartY = useRef(0);
   /** When the finger landed, and whether it has since moved like a scroll. */
@@ -435,9 +489,14 @@ export function FeedCard({
   }
 
   function endPinch() {
+    // Unconditionally, before the early return. These are non-passive
+    // touchmove listeners on `window` that call preventDefault, so one
+    // orphaned set does not merely leak — it stops the page scrolling,
+    // which is indistinguishable from a freeze. The guard below is
+    // about the spring-back, not about the listeners.
+    stopTracking();
     if (!pinchFrom.current) return;
     pinchFrom.current = null;
-    stopTracking();
     // Straight away, not after the spring: the photo settling is no
     // reason to keep the feed from moving.
     lockPage(false);
@@ -608,6 +667,26 @@ export function FeedCard({
   const [focusId, setFocusId] = useState(focusCommentId);
   const [commentCount, setCommentCount] = useState(post.comment_count);
   const [shareOpen, setShareOpen] = useState(false);
+  /**
+   * Whether each sheet has ever been opened on this card.
+   *
+   * They used to be mounted always, just with open={false} — so
+   * CommentsSheet (1,426 lines) and ShareSheet (796) sat in the chunk
+   * every feed card pulled, whether or not anyone tapped either.
+   * Mounting is deferred to the first open and then kept: a sheet that
+   * unmounts on close cannot animate out.
+   */
+  const [commentsUsed, setCommentsUsed] = useState(!!focusCommentId);
+  const [shareUsed, setShareUsed] = useState(false);
+
+  function openComments() {
+    setCommentsUsed(true);
+    setCommentsOpen(true);
+  }
+  function openShare() {
+    setShareUsed(true);
+    setShareOpen(true);
+  }
   const [actionsOpen, setActionsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleted, setDeleted] = useState(false);
@@ -1170,7 +1249,7 @@ export function FeedCard({
 
           <button
             type="button"
-            onClick={() => setCommentsOpen(true)}
+            onClick={openComments}
             aria-label="Comments"
             className="flex items-center gap-1.5 text-sm font-semibold text-foreground transition-transform duration-150 active:scale-90"
           >
@@ -1184,7 +1263,7 @@ export function FeedCard({
             postId={post.id}
             // The photo on screen goes with it, so the chat shows that one.
             slide={images.length > 1 ? imgIdx : undefined}
-            onOpenSheet={() => setShareOpen(true)}
+            onOpenSheet={openShare}
             className="flex items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 active:scale-90"
           >
             <ShareIcon size={21} weight="bold" />
@@ -1305,6 +1384,7 @@ export function FeedCard({
       )}
 
       {/* Sheets */}
+      {commentsUsed && (
       <CommentsSheet
         open={commentsOpen}
         onClose={() => {
@@ -1317,9 +1397,11 @@ export function FeedCard({
         onCountChange={(n) => setCommentCount(n)}
         focusCommentId={focusId}
       />
+      )}
 
       {saveMenus.overlays}
 
+      {shareUsed && (
       <ShareSheet
         open={shareOpen}
         onClose={() => setShareOpen(false)}
@@ -1327,6 +1409,7 @@ export function FeedCard({
         imageUrls={images.length > 0 ? images : undefined}
         initialImageIdx={imgIdx}
       />
+      )}
 
       {/* Opened by a hold and it stays. Given the card's own author, caption
           and actions so it is a post you can act on, not just a bigger photo
@@ -1355,8 +1438,8 @@ export function FeedCard({
           rehypeCount={rehypeCount}
           onRehype={toggleRehype}
           onHype={toggleHype}
-          onComment={() => setCommentsOpen(true)}
-          onShare={() => setShareOpen(true)}
+          onComment={openComments}
+          onShare={openShare}
           onSave={toggleSave}
           onClose={() => setPeekSrc(null)}
         />
@@ -1396,3 +1479,14 @@ export function FeedCard({
     </article>
   );
 }
+
+/**
+ * Memoised because the feed appends rather than replaces.
+ *
+ * Every new page re-ran this component's render for every card
+ * already on screen — content-visibility skips their layout and paint
+ * but not their reconciliation. All of this component's props are
+ * data: FeedList passes no inline callbacks, so a shallow comparison
+ * is enough and the identities hold across an append.
+ */
+export const FeedCard = memo(FeedCardInner);

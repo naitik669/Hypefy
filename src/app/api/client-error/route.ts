@@ -27,12 +27,35 @@ export async function POST(req: NextRequest) {
 
     const stack = String(body?.stack ?? "").slice(0, 4000);
     const url = String(body?.url ?? "").slice(0, 300);
-    const kind = body?.kind === "unhandledrejection" ? "unhandledrejection" : "error";
+
+    /**
+     * Four kinds now, not two.
+     *
+     * "longtask" and "memory" are the health reports: a freeze throws
+     * nothing, so the only evidence of one is a blocked main thread or
+     * a heap that keeps climbing. They are tagged apart from real
+     * exceptions and sent at warning level, because on their own they
+     * are a symptom rather than a failure — and because mixing them
+     * into the error stream would bury the exceptions.
+     */
+    const KINDS = ["error", "unhandledrejection", "longtask", "memory"] as const;
+    type Kind = (typeof KINDS)[number];
+    const kind: Kind = KINDS.find((k) => k === body?.kind) ?? "error";
+    const health = kind === "longtask" || kind === "memory";
+
+    // The two counts the crash work is about, when the client sent them.
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+    const vitals = { nodes: num(body?.nodes), videos: num(body?.videos), heap: num(body?.heap) };
 
     Sentry.captureMessage(`[client] ${message}`, {
-      level: "error",
+      level: health ? "warning" : "error",
       tags: { route: "client-error", kind },
-      extra: { stack, url, ua: req.headers.get("user-agent")?.slice(0, 200) ?? "" },
+      extra: {
+        stack,
+        url,
+        ua: req.headers.get("user-agent")?.slice(0, 200) ?? "",
+        ...vitals,
+      },
     });
 
     return NextResponse.json({ ok: true });

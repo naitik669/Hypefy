@@ -4,6 +4,16 @@ import { clampStart, soundGraph } from "@/components/shows/MusicEditor";
 import { readLayers, showSong } from "@/lib/show-layers";
 import { parseTrack } from "@/lib/track";
 
+/**
+ * Source, as the assertions below write it.
+ *
+ * These tests compare against multi-line source strings. A Windows
+ * checkout with core.autocrlf=true has CRLF on disk, so each of those
+ * assertions fails there while passing on Linux — green in CI and red
+ * on the machine the code is written on.
+ */
+const readSrc = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
+
 const song = (extra: Record<string, unknown>) => ({
   id: "m",
   type: "music",
@@ -29,10 +39,10 @@ describe("the part of the song that plays", () => {
   });
 
   it("and the player goes round at the end of the part, not the end of the file", () => {
-    const music = readFileSync("src/lib/music.ts", "utf8");
+    const music = readSrc("src/lib/music.ts");
     expect(music).toContain("end: track.length ? start + track.length : null");
     expect(music).toContain("audio.currentTime >= loopFrom.end");
-    expect(readFileSync("src/components/shows/ShowViewer.tsx", "utf8")).toContain(
+    expect(readSrc("src/components/shows/ShowViewer.tsx")).toContain(
       "ensurePreviewPlaying(showTrack, showTrack.length ? { loop: true } : undefined);",
     );
   });
@@ -52,11 +62,11 @@ describe("the part of the song that plays", () => {
 
 describe("Music only", () => {
   it("is drawn for nobody but the person arranging it", () => {
-    const view = readFileSync("src/components/shows/LayerView.tsx", "utf8");
+    const view = readSrc("src/components/shows/LayerView.tsx");
     expect(view).toContain('if (style === "only") {\n    if (!editing) return null;');
   });
 
   it("and a Show picks its part on the sticker, so the song search skips its own step", () => {
-    expect(readFileSync("src/components/shows/ShowEditor.tsx", "utf8")).toContain("pickPart={false}");
+    expect(readSrc("src/components/shows/ShowEditor.tsx")).toContain("pickPart={false}");
   });
 });

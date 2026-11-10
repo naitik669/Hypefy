@@ -99,7 +99,7 @@ export function SharedPostCard({
       {image ? (
         <div className="relative overflow-hidden rounded-[11px] bg-black" style={{ aspectRatio: String(ratio) }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <img loading="lazy" decoding="async"
             src={image}
             alt={post.caption ?? ""}
             draggable={false}

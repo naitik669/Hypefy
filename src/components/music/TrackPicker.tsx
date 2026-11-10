@@ -82,7 +82,7 @@ function SongRow({
       >
         {t.artwork ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={t.artwork} alt="" className="h-full w-full object-cover" />
+          <img loading="lazy" decoding="async" src={t.artwork} alt="" className="h-full w-full object-cover" />
         ) : (
           <span className="flex h-full w-full items-center justify-center text-faint">
             <Music size={16} />
@@ -532,7 +532,7 @@ export function TrackPicker({
                     >
                       {art && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <img loading="lazy" decoding="async"
                           src={art}
                           alt=""
                           aria-hidden

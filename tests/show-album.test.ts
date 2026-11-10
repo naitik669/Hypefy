@@ -2,6 +2,16 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { ALBUM_MAX, addPicks, selectedPicks, toggleSelected } from "@/lib/show-album";
 
+/**
+ * Source, as the assertions below write it.
+ *
+ * These tests compare against multi-line source strings. A Windows
+ * checkout with core.autocrlf=true has CRLF on disk, so each of those
+ * assertions fails there while passing on Linux — green in CI and red
+ * on the machine the code is written on.
+ */
+const readSrc = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
+
 const img = (n: string, size = 1000) => new File([new Uint8Array(size)], `${n}.jpg`, { type: "image/jpeg" });
 let i = 0;
 const id = () => `p${i++}`;
@@ -46,7 +56,7 @@ describe("an album's picks", () => {
 });
 
 describe("the album on screen", () => {
-  const src = readFileSync("src/components/shows/AlbumSheet.tsx", "utf8");
+  const src = readSrc("src/components/shows/AlbumSheet.tsx");
   it("goes up through the same publish path as a single Show, one after another", () => {
     expect(src).toContain("const result = await publishShow(");
     expect(src).toContain("for (const [i, pick] of remaining.entries()) {");
@@ -58,7 +68,7 @@ describe("the album on screen", () => {
 });
 
 describe("the Show camera", () => {
-  const src = readFileSync("src/components/create/CreateScreen.tsx", "utf8");
+  const src = readSrc("src/components/create/CreateScreen.tsx");
   it("is already open when you arrive on Show, and when you switch to it", () => {
     expect(src).toContain('useState<"pick" | "camera">(initialMode === "show" ? "camera" : "pick")');
     expect(src).toContain('setSource(m.id === "show" ? "camera" : "pick");');

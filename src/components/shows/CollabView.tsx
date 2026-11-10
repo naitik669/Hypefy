@@ -226,7 +226,7 @@ export function CollabView({
                   />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={s.media_url} alt={s.caption ?? "Show"} className="h-full w-full object-cover" />
+                  <img loading="lazy" decoding="async" src={s.media_url} alt={s.caption ?? "Show"} className="h-full w-full object-cover" />
                 )}
                 {/* Whose it is. On a shared reel this is the thing you
                     most want to know about a tile, and it is the one

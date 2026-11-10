@@ -2,23 +2,8 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { canOptimize } from "@/lib/image-hosts";
 
-/**
- * Hosts configured in next.config `images.remotePatterns`. next/image throws at
- * runtime for any un-configured host, so we only hand it URLs we know it can
- * optimise; everything else falls through to a plain <img>.
- */
-const OPTIMIZABLE_HOSTS = new Set(["fyaioseridqabockidyp.supabase.co"]);
-
-function canOptimize(src: string): boolean {
-  // Local (public/) and inline data URLs are always safe for next/image.
-  if (src.startsWith("/") || src.startsWith("data:")) return true;
-  try {
-    return OPTIMIZABLE_HOSTS.has(new URL(src).hostname);
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Fill-mode image that optimises allowlisted hosts (resized srcset + WebP/AVIF)

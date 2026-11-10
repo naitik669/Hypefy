@@ -81,7 +81,7 @@ export function FriendDiaryCard({
               the chin; contained on a bed of itself, the frame is whole and
               the card still has no empty corners. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <img loading="lazy" decoding="async"
             src={entry.imageUrl!}
             alt=""
             aria-hidden
@@ -89,7 +89,7 @@ export function FriendDiaryCard({
             className="absolute inset-0 h-full w-full scale-125 object-cover blur-[22px] brightness-[0.42] saturate-[0.7]"
           />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={entry.imageUrl!} alt="" draggable={false} className="relative h-full w-full object-contain" />
+          <img loading="lazy" decoding="async" src={entry.imageUrl!} alt="" draggable={false} className="relative h-full w-full object-contain" />
           {/* Shade at the top and foot, so the name and the reply row read
               on any photo, however bright. Lighter than it was: the bed is
               already dark, and the foot no longer has a song sitting on it. */}

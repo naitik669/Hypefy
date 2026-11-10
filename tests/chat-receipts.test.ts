@@ -205,19 +205,23 @@ describe("in the thread", () => {
 
 describe("typing and recording", () => {
   const chat = readFileSync("src/components/messages/RealChatView.tsx", "utf8").replace(/\r\n/g, "\n");
-  const block = chat.slice(chat.indexOf("{/* Someone is recording or typing"), chat.indexOf("<div ref={endRef} />"));
+  // The indicator moved into its own component so a keystroke stops
+  // re-rendering every message in the thread. Same markup, no longer
+  // inside the view.
+  const block = readFileSync("src/components/messages/ChatActivity.tsx", "utf8").replace(/\r\n/g, "\n");
 
   it("one bubble where the message will land, beside the person's face", () => {
-    expect(block).toContain('data-activity={recording ? "recording" : "typing"}');
+    expect(block).toContain('data-activity={isRecording ? "recording" : "typing"}');
     expect(block).toContain("<Avatar name={first.name} hue={first.hue} size={28} src={first.avatarUrl ?? undefined} />");
     expect(block).toContain("animate-dot-bounce");
     expect(block).toContain("animate-mic-wave");
   });
 
   it("recording wins over typing, and both are said to a screen reader", () => {
-    expect(block).toContain("const recording = recordingIds.length > 0;");
+    expect(block).toContain("const isRecording = recording.length > 0;");
+    expect(block).toContain("const ids = isRecording ? recording : typing;");
     expect(block).toContain('role="status"');
-    expect(block).toContain('<span className="sr-only">{recording ? recordingLabel(ids) : typingLabel(ids)}</span>');
+    expect(block).toContain('<span className="sr-only">{label}</span>');
   });
 
   it("only so many faces fit under one message", () => {

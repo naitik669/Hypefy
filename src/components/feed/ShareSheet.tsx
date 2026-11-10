@@ -659,7 +659,7 @@ export function ShareSheet({
             <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[11px] bg-surface text-[13px] font-extrabold text-muted">
               {preview?.thumb ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={preview.thumb} alt="" className="h-full w-full object-cover" />
+                <img loading="lazy" decoding="async" src={preview.thumb} alt="" className="h-full w-full object-cover" />
               ) : (
                 "Aa"
               )}

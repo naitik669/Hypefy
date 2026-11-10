@@ -134,8 +134,11 @@ describe("the composer", () => {
   });
 
   it("only for a typed message, not an edit or an attachment", () => {
-    const handler = chat.slice(chat.indexOf("onPointerDown={() => {\n                  if (editing || !text.trim()) return;"));
-    expect(handler.slice(0, 120)).toContain("if (editing || !text.trim()) return;");
+    // The box is its own component now, so the guard asks it for the value
+    // at the moment of the press rather than reading a copy the thread held
+    // (see MessageInput, and tests/chat-typing-renders.test.ts).
+    const handler = chat.slice(chat.indexOf("onPointerDown={() => {\n                  if (editing || !draft().trim()) return;"));
+    expect(handler.slice(0, 120)).toContain("if (editing || !draft().trim()) return;");
   });
 
   it("the body is sealed the same way a live send seals it", () => {

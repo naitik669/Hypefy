@@ -115,9 +115,14 @@ export async function updateSession(request: NextRequest) {
         secure: request.nextUrl.protocol === "https:",
       });
     }
-    // Carry over any refreshed cookies so we never drop the session on redirect.
+    // Carry over any refreshed cookies so we never drop the session on
+    // redirect — the whole cookie, not just its name and value. Copying
+    // only those two dropped maxAge, expires, sameSite, secure, httpOnly
+    // and domain, so a token refreshed on a request that also redirected
+    // was rewritten as a *session* cookie with framework defaults, and
+    // the user was quietly signed out when they next closed the app.
     supabaseResponse.cookies.getAll().forEach((c) => {
-      redirectResponse.cookies.set(c.name, c.value);
+      redirectResponse.cookies.set(c);
     });
     return redirectResponse;
   }
@@ -171,7 +176,7 @@ export async function updateSession(request: NextRequest) {
       // refreshed during this request is dropped, and the user is signed out
       // on their way to the screen that exists to sign them in.
       supabaseResponse.cookies.getAll().forEach((c) => {
-        redirectResponse.cookies.set(c.name, c.value);
+        redirectResponse.cookies.set(c);
       });
       return redirectResponse;
     }

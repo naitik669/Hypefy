@@ -288,6 +288,16 @@ export function GroupCallProvider({
       a.members.forEach((m) => {
         const ring = supabase.channel(`group-ring:${m.id}`);
         ring.subscribe((st) => {
+          // Every terminal state has to let the channel go. The removal
+          // used to sit inside the SUBSCRIBED branch, so a channel that
+          // errored, timed out or closed — exactly what happens on a bad
+          // connection — was created, retained by the client, and never
+          // removed. One per member per attempt, leaking worst when the
+          // network is worst.
+          if (st === "CHANNEL_ERROR" || st === "TIMED_OUT" || st === "CLOSED") {
+            void supabase.removeChannel(ring);
+            return;
+          }
           if (st !== "SUBSCRIBED") return;
           ring.send({
             type: "broadcast",
