@@ -68,7 +68,12 @@ describe("stickers can be pressed on a Show", () => {
     expect(viewer).toContain('className="absolute inset-x-0 z-10"');
   });
   it("and only the ones that do something take the press", () => {
-    expect(view).toContain('<div className={!editing && PRESSABLE.has(layer.type) ? "pointer-events-auto" : "pointer-events-none"}>');
+    // The expression, not the one-line form it used to be written on: the
+    // wrapper now also carries the author's "show me the results" tap, so it
+    // spans several lines. What is being tested is unchanged.
+    expect(view).toContain(
+      'className={!editing && PRESSABLE.has(layer.type) ? "pointer-events-auto" : "pointer-events-none"}',
+    );
     expect(view).not.toMatch(/PRESSABLE[^;]*"text"/);
   });
   it("using one holds the Show", () => {

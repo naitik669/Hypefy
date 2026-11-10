@@ -84,6 +84,7 @@ import { HypeParticles } from "@/components/feed/HypeParticles";
 import { LayerStack } from "@/components/shows/LayerView";
 import type { PollState } from "@/components/shows/ShowPoll";
 import { EMPTY_STICKER_STATE, readStickerState, type StickerState } from "@/lib/show-stickers";
+import { ShowResultsSheet } from "@/components/shows/ShowResultsSheet";
 import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
 import { storyGesture, storyKey, type StoryMove } from "@/lib/story-gesture";
 
@@ -546,6 +547,12 @@ function ShowScreen({
    * call instead of two.
    */
   const [answers, setAnswers] = useState<Record<string, string>>({});
+
+  /**
+   * Which sticker's results are open, if any. Null means closed; a layer id
+   * means opened by tapping that one, and the sheet scrolls to it.
+   */
+  const [results, setResults] = useState<string | null>(null);
   const hasQuestion = useMemo(() => layers.some((l) => l.type === "question"), [layers]);
   useEffect(() => {
     if (!hasQuestion || !currentUserId) return;
@@ -846,8 +853,19 @@ function ShowScreen({
           stickers={stickers}
           answers={answers}
           isAuthor={isOwner}
+          onResults={isOwner ? setResults : undefined}
         />
       </div>
+
+      {isOwner && (
+        <ShowResultsSheet
+          showId={show.id}
+          layers={layers}
+          open={results !== null}
+          focus={results}
+          onClose={() => setResults(null)}
+        />
+      )}
 
       {/* ── The gesture surface ──
           Two tap zones became one. Diary's player has had tap, swipe

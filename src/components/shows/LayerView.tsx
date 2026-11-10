@@ -6,6 +6,7 @@ import { lookFor, type Look } from "@/lib/show-looks";
 import { ShowPoll, ShowQuestion, type PollState } from "@/components/shows/ShowPoll";
 import { ShowAddYours, ShowCountdown, ShowQuiz, ShowSlider } from "@/components/shows/ShowStickers";
 import { StickerCallout, CALLOUT_FLIP_Y } from "@/components/shows/StickerCallout";
+import { isResultKind } from "@/lib/show-results";
 import type { StickerState } from "@/lib/show-stickers";
 import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
 import {
@@ -80,6 +81,7 @@ export function LayerView({
   stickers,
   answers,
   isAuthor = false,
+  onResults,
 }: {
   layer: ShowLayer;
   frame: { width: number; height: number };
@@ -97,6 +99,13 @@ export function LayerView({
   answers?: Record<string, string>;
   /** The person looking is the one who posted it. */
   isAuthor?: boolean;
+  /**
+   * Ask for the results of one sticker. Only the author gets this, and it is
+   * handled here rather than inside each of the five interactive stickers:
+   * none of them offers the author a vote any more, so a tap on their own is
+   * free to mean "show me" — and one wrapper is one place to get that right.
+   */
+  onResults?: (layerId: string) => void;
 }) {
   const box = layerBox(layer, frame);
   return (
@@ -104,7 +113,18 @@ export function LayerView({
       className="pointer-events-none absolute"
       style={{ left: box.left, top: box.top, transform: box.transform, transformOrigin: "center" }}
     >
-      <div className={!editing && PRESSABLE.has(layer.type) ? "pointer-events-auto" : "pointer-events-none"}>
+      <div
+        className={!editing && PRESSABLE.has(layer.type) ? "pointer-events-auto" : "pointer-events-none"}
+        {...(!editing && isAuthor && onResults && isResultKind(layer.type)
+          ? {
+              onClick: (e: React.MouseEvent) => {
+                // The frame underneath takes a tap as "next Show".
+                e.stopPropagation();
+                onResults(layer.id);
+              },
+            }
+          : {})}
+      >
         <LayerBody
           layer={layer}
           editing={editing}
@@ -505,6 +525,7 @@ export function LayerStack({
   stickers,
   answers,
   isAuthor = false,
+  onResults,
 }: {
   layers: ShowLayer[];
   frame: { width: number; height: number };
@@ -518,6 +539,13 @@ export function LayerStack({
   answers?: Record<string, string>;
   /** The person looking is the one who posted it. */
   isAuthor?: boolean;
+  /**
+   * Ask for the results of one sticker. Only the author gets this, and it is
+   * handled here rather than inside each of the five interactive stickers:
+   * none of them offers the author a vote any more, so a tap on their own is
+   * free to mean "show me" — and one wrapper is one place to get that right.
+   */
+  onResults?: (layerId: string) => void;
 }) {
   // Everything inside a layer — a card's width, a sticker's size, the
   // point size of text — is written once at DESIGN_WIDTH, and the whole
@@ -561,6 +589,7 @@ export function LayerStack({
           stickers={stickers}
           answers={answers}
           isAuthor={isAuthor}
+          onResults={onResults}
         />
       ))}
     </div>

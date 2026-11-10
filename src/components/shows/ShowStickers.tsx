@@ -203,7 +203,6 @@ export function ShowSlider({
   if (next !== held) setHeld(next);
   const { pick: value, sent } = next.value;
 
-  const [who, setWho] = useState<{ name: string; value: number }[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   /** True from letting go until it has settled, so only then does it spring. */
   const [settling, setSettling] = useState(false);
@@ -235,14 +234,6 @@ export function ShowSlider({
     }
     const d = data as { avg?: number; count?: number } | null;
     put(v, { avg: Number(d?.avg) || 0, count: Number(d?.count) || 0 });
-  }
-
-  async function showWho() {
-    if (!showId || who) return;
-    const { data } = await supabase.rpc("show_slider_voters", { p_show_id: showId, p_layer_id: layerId });
-    setWho(
-      (data ?? []).map((r) => ({ name: r.display_name || r.username || "Someone", value: r.value })),
-    );
   }
 
   return (
@@ -347,31 +338,20 @@ export function ShowSlider({
         </span>
       </span>
       {isAuthor ? (
-        <Press
-          preview={preview}
-          disabled={preview || !sent?.count}
-          onPointerDown={stop}
-          onClick={(e) => {
-            stop(e);
-            void showWho();
-          }}
-          style={{ ...label(look), background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer", fontFamily: "inherit" }}
-        >
+        /*
+         * A label, not a button. Tapping anywhere on your own sticker opens
+         * the results sheet (LayerView handles that for all five of them), and
+         * a button in here as well meant one tap doing two things — and two
+         * surfaces answering the same question, which is what the sheet exists
+         * to stop. show_slider_voters stays in the database as the sheet's
+         * fallback before 0194.
+         */
+        <span style={label(look)}>
           {sent?.count ? `${sent.count} hyped · avg ${sent.avg}% · see who` : "Hype slider · nobody yet"}
-        </Press>
+        </span>
       ) : (
         <span style={label(look)}>
           {problem ?? (sent ? `${sent.count} hyped · avg ${sent.avg}%` : "Drag the ★")}
-        </span>
-      )}
-      {who && (
-        <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {who.slice(0, 8).map((w, i) => (
-            <span key={i} style={{ ...look.title, fontSize: 11.5, fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.name}</span>
-              <span>{w.value}%</span>
-            </span>
-          ))}
         </span>
       )}
     </span>
