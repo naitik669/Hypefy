@@ -56,6 +56,15 @@ import { PollBlock, parsePoll } from "@/components/feed/PollBlock";
 import { useSaveMenus } from "@/components/saved/SaveMenus";
 import { CommentIcon } from "@/components/ui/CommentIcon";
 
+/**
+ * How far outside the viewport a card starts loading its rehype deck.
+ *
+ * Generous enough that the faces are there by the time the card is, and
+ * small enough that a feed of a hundred mounted cards does not ask about
+ * ninety of them. The chat thread arms its videos on the same margin.
+ */
+const DECK_MARGIN = "200px";
+
 export type FeedPost = {
   id: string;
   user_id: string;
@@ -208,7 +217,30 @@ function FeedCardInner({
   const [rehypePending, setRehypePending] = useState(false);
   const [rehypePulse, setRehypePulse] = useState(0);
   /** The deck on the photo: who rehyped this, ranked for you, and you once you have. */
-  const seated = useRehypeDeck("post", post.id, uid, rehyped);
+  /**
+   * Whether this card is close enough to the screen to ask who rehyped it.
+   *
+   * `useRehypeDeck` takes this flag for exactly this reason — "enabled lets a
+   * feed load only what is on or near the screen" — and this card was the one
+   * caller that never passed it. Both Shot paths gate theirs. So a feed page
+   * mounted twenty cards and all twenty asked at once, before anyone had
+   * scrolled to any of them.
+   *
+   * Measured: rehype_deck was called 29,475 times at a mean of 112ms, with a
+   * maximum of 7.9 seconds and a standard deviation of 507ms — against a
+   * minimum of 1.3ms and no disk reads. A second entry in pg_stat_statements
+   * with a different parameter shape, and no burst behind it, ran at 1.5ms.
+   * The query was never slow; twenty copies of it arriving together were.
+   *
+   * Decided in the initialiser rather than the effect for the same reason as
+   * ChatVideo: a browser with no observer must still show its faces, nothing
+   * should set state in an effect body, and the `window` half keeps the
+   * server's answer false so it does not fetch during SSR.
+   */
+  const [deckNear, setDeckNear] = useState(
+    () => typeof window !== "undefined" && typeof IntersectionObserver === "undefined",
+  );
+  const seated = useRehypeDeck("post", post.id, uid, rehyped, deckNear);
   /**
    * The three faces this post shows: who passed it on, then who you follow
    * that hyped it. One row rather than two — six faces on a photograph read
@@ -228,6 +260,21 @@ function FeedCardInner({
   // JS-controlled swipe: one image per gesture, no native scroll momentum
   /** The card itself, so an attached song plays with the post. */
   const cardRef = useRef<HTMLElement>(null);
+
+  // Arms `deckNear` above, once, when the card comes within DECK_MARGIN.
+  useEffect(() => {
+    if (deckNear) return;
+    const el = cardRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setDeckNear(true);
+      },
+      { rootMargin: DECK_MARGIN },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [deckNear]);
   const galleryTouchStartX = useRef(0);
   const galleryTouchStartY = useRef(0);
   /** When the finger landed, and whether it has since moved like a scroll. */
