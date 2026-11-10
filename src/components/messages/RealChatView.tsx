@@ -37,7 +37,7 @@ import { ScheduleSendSheet } from "@/components/messages/ScheduleSendSheet";
 import { ScheduledStrip } from "@/components/messages/ScheduledStrip";
 import { haptics } from "@/lib/haptics";
 import { PresenceDot } from "@/components/presence/PresenceDot";
-import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
+import { MessageInput, type MessageInputHandle } from "./MessageInput";
 import { one } from "@/lib/supabase/typed";
 import { LinkCard } from "./LinkCard";
 import { PollBubble } from "./PollBubble";
@@ -78,7 +78,6 @@ import { canEncrypt, isEncrypted, openEnvelope, sealFor, useEnvelopeReader } fro
 import { openEncryptionSetup } from "@/lib/e2ee/open-setup";
 import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 import { ChatImg, ChatLink, ChatVideo } from "@/components/messages/ChatMedia";
-import { readDraft, writeDraft } from "@/lib/chat-drafts";
 import { displayNameFor } from "@/lib/nicknames";
 import { forwardedBody, isForwarded } from "@/lib/chat-forward";
 import { useNicknames } from "@/components/messages/useNicknames";
@@ -301,9 +300,33 @@ export function RealChatView({
   const firstEncryptedIndex = useMemo(() => messages.findIndex((m) => !!m._enc), [messages]);
   const [reactions, setReactions] = useState<ReactionRow[]>(initialReactions);
   const [readers, setReaders] = useState<Reader[]>(initialReaders);
-  const [text, setText] = useState("");
-  const [dmCursor, setDmCursor] = useState(0);
-  const { suggestions: pickerSuggestions, reset: resetPicker } = useMentionHashtag(text, dmCursor);
+  /**
+   * The box lives in its own component and keeps what you are typing there.
+   *
+   * It used to be state here, and this component renders every message in the
+   * conversation — so every keystroke re-rendered the whole thread. The other
+   * person's typing had the same problem and was moved to a store first; this
+   * is the same fix for your own. What is read back through the handle is read
+   * at the moment of a tap, never held.
+   */
+  const inputRef = useRef<MessageInputHandle>(null);
+  /** What is in the box right now, for the paths that act on it. */
+  const draft = () => inputRef.current?.getValue() ?? "";
+  /**
+   * The caption of a folder of photos, while it is being written.
+   *
+   * The one thing in the thread that draws the value as you type: the message
+   * shows its caption changing. So in that mode the box does report upward on
+   * every keystroke and the thread does re-render — which is the behaviour it
+   * always had, now confined to the one screen that needs it.
+   */
+  const [captionPreview, setCaptionPreview] = useState("");
+  /**
+   * Whether the box has anything in it, which is all the bar needs: a
+   * microphone or a send button. One bit, flipping twice a message rather
+   * than a string changing on every character.
+   */
+  const [hasText, setHasText] = useState(false);
   const [sending, setSending] = useState(false);
   /**
    * Which messages are picked, or null when nothing is being picked.
@@ -333,7 +356,7 @@ export function RealChatView({
     }
     const prefill = params.get("prefill");
     if (prefill) {
-      setText(prefill);
+      inputRef.current?.setValue(prefill);
       const url = new URL(window.location.href);
       url.searchParams.delete("prefill");
       window.history.replaceState({}, "", url.toString());
@@ -343,30 +366,8 @@ export function RealChatView({
   const [replyTo, setReplyTo] = useState<ChatMsg | null>(null);
   const [editing, setEditing] = useState<ChatMsg | null>(null);
 
-  // What was typed here and not sent is kept, and is back in the box when the
-  // chat is opened again (src/lib/chat-drafts.ts). Read after the first paint:
-  // the server has no drafts, and a box that started out filled would not
-  // match what it drew.
-  const draftReady = useRef(false);
-  useEffect(() => {
-    let live = true;
-    void Promise.resolve().then(() => {
-      if (!live) return;
-      const kept = readDraft(currentUserId, conversationId);
-      draftReady.current = true;
-      if (kept) setText((now) => now || kept);
-    });
-    return () => {
-      live = false;
-    };
-  }, [currentUserId, conversationId]);
-  // Saved as it changes, and gone the moment the box is empty: sending
-  // clears the box, which clears the draft. Not while an old message is being
-  // edited, when the box holds that message and not something new.
-  useEffect(() => {
-    if (!draftReady.current || editing) return;
-    writeDraft(currentUserId, conversationId, text);
-  }, [text, editing, currentUserId, conversationId]);
+  // The draft is read and written inside MessageInput, beside the value it
+  // is about.
   const [menu, setMenuState] = useState<{ msg: ChatMsg; rect: DOMRect; at: number } | null>(null);
   /**
    * Opening the menu stamps the time.
@@ -572,7 +573,6 @@ export function RealChatView({
   /** Tracks the last tap per message to detect double-tap (star reaction) */
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const composerRef = useRef<HTMLInputElement>(null);
   idsRef.current = messages.map((m) => m.id);
   messagesRef.current = messages;
 
@@ -1206,7 +1206,7 @@ export function RealChatView({
 
   /** Hold Send: seal what is typed and ask when it should go. */
   function openScheduleSheet() {
-    const body = text.trim();
+    const body = draft().trim();
     if (!body) return;
     const sealed = isGroup
       ? null
@@ -1271,11 +1271,11 @@ export function RealChatView({
 
   async function send(override?: string, replyOverride?: ChatMsg): Promise<boolean> {
     if (editing && !replyOverride) { await saveEdit(); return true; }
-    const body = (override ?? text).trim();
+    const body = (override ?? draft()).trim();
     if (!body || sending) return false;
     haptics.tap();
     setSending(true);
-    if (!replyOverride) setText("");
+    if (!replyOverride) inputRef.current?.setValue("");
     emitStopTyping();
     const replyId = replyOverride ? replyOverride.id : replyTo?.id ?? null;
     if (!replyOverride) setReplyTo(null);
@@ -1842,23 +1842,22 @@ export function RealChatView({
     }
     setEditing(m);
     setReplyTo(null);
-    setText(m.kind === "album" ? albumOf(m)?.caption ?? "" : m.body ?? "");
-    requestAnimationFrame(() => {
-      const el = composerRef.current;
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
-    });
+    const startingWith = m.kind === "album" ? albumOf(m)?.caption ?? "" : m.body ?? "";
+    // Set before the box reports back, so the caption on the message does
+    // not blink empty for a frame on the way into the edit.
+    if (m.kind === "album") setCaptionPreview(startingWith);
+    inputRef.current?.setValue(startingWith);
+    requestAnimationFrame(() => inputRef.current?.focusEnd());
   }
 
   async function saveEdit() {
     if (editing?.kind === "album") return saveCaption(editing);
-    if (!editing || !text.trim()) return;
+    if (!editing || !draft().trim()) return;
     const id = editing.id;
-    const newBody = text.trim();
+    const newBody = draft().trim();
     setMessages((p) => p.map((x) => (x.id === id ? { ...x, body: newBody, edited_at: new Date().toISOString() } : x)));
     setEditing(null);
-    setText("");
+    inputRef.current?.setValue("");
     const { error } = await supabase.rpc("edit_message", { p_message_id: id, p_body: newBody });
     if (error) showToast("Couldn't edit message");
   }
@@ -1866,10 +1865,10 @@ export function RealChatView({
   /** A folder's caption, which may be cleared. Only the caption changes on
    *  the server; the photos stay what was sent. */
   async function saveCaption(m: ChatMsg) {
-    const caption = text.trim().slice(0, ALBUM_CAPTION_MAX);
+    const caption = draft().trim().slice(0, ALBUM_CAPTION_MAX);
     const album = parseAlbum(m.body);
     setEditing(null);
-    setText("");
+    inputRef.current?.setValue("");
     if (!album || caption === album.caption) return;
     const before = messages.find((x) => x.id === m.id);
     setMessages((p) => p.map((x) => (x.id === m.id ? { ...x, body: encodeAlbum({ ...album, caption }), edited_at: new Date().toISOString() } : x)));
@@ -2564,7 +2563,7 @@ export function RealChatView({
                           className="relative"
                         >
                           <MediaFolder
-                            album={editing?.id === m.id ? { ...albumOf(m)!, caption: text } : albumOf(m)!}
+                            album={editing?.id === m.id ? { ...albumOf(m)!, caption: captionPreview } : albumOf(m)!}
                             mine={mine}
                             editing={editing?.id === m.id}
                             onOpen={(start) => setAlbumView({ album: albumOf(m)!, start, senderId: m.sender_id, at: m.created_at, msgId: m.id })}
@@ -2939,7 +2938,7 @@ export function RealChatView({
             <span className="min-w-0 flex-1 truncate text-muted">
               {editing.kind === "album" ? "Editing caption" : <>Editing: <span className="text-foreground">{editing.body}</span></>}
             </span>
-            <button onClick={() => { setEditing(null); setText(""); }} className="text-faint hover:text-muted"><X size={14} /></button>
+            <button onClick={() => { setEditing(null); inputRef.current?.setValue(""); }} className="text-faint hover:text-muted"><X size={14} /></button>
           </div>
         )}
 
@@ -3077,29 +3076,23 @@ export function RealChatView({
               </FloatingMenu>
             </div>
 
-            {/* Text input */}
-            <div className="relative flex-1">
-              <input
-                ref={composerRef}
-                value={text}
-                onChange={(e) => { setText(e.target.value); setDmCursor(e.target.selectionStart ?? 0); if (e.target.value) emitTyping(); }}
-                onSelect={(e) => setDmCursor((e.target as HTMLInputElement).selectionStart ?? 0)}
-                onBlur={() => setTimeout(resetPicker, 150)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-                placeholder={editing?.kind === "album" ? "Add a caption…" : "Message…"}
-                maxLength={editing?.kind === "album" ? ALBUM_CAPTION_MAX : undefined}
-                className="h-11 w-full rounded-2xl bg-surface px-4 text-sm outline-none placeholder:text-faint focus:border-white/25"
-              />
-              <SuggestionDropdown suggestions={pickerSuggestions} onSelect={(s) => {
-                const { newValue, newCursor } = applySuggestion(text, dmCursor, s);
-                setText(newValue);
-                setDmCursor(newCursor);
-                resetPicker();
-              }} />
-            </div>
+            {/* Text input — its own component, so a keystroke does not
+                re-render every message in the thread. See MessageInput. */}
+            <MessageInput
+              ref={inputRef}
+              currentUserId={currentUserId}
+              conversationId={conversationId}
+              editing={editing !== null}
+              placeholder={editing?.kind === "album" ? "Add a caption…" : "Message…"}
+              maxLength={editing?.kind === "album" ? ALBUM_CAPTION_MAX : undefined}
+              onEnter={send}
+              onTyping={emitTyping}
+              onHasTextChange={setHasText}
+              onValueChange={editing?.kind === "album" ? setCaptionPreview : undefined}
+            />
 
             {/* GIF toggle — only when no text and no attachment */}
-            {!text.trim() && !attachment && !editing && (
+            {!hasText && !attachment && !editing && (
               <button
                 type="button"
                 onClick={() => setGifPickerOpen((v) => !v)}
@@ -3115,7 +3108,7 @@ export function RealChatView({
             )}
 
             {/* Mic — only when no text and no attachment */}
-            {!text.trim() && !attachment && !editing && (
+            {!hasText && !attachment && !editing && (
               <button
                 type="button"
                 onClick={() => { setGifPickerOpen(false); setVoiceMode(true); }}
@@ -3127,7 +3120,7 @@ export function RealChatView({
             )}
 
             {/* Send — text (takes priority) or attachment */}
-            {(text.trim() || attachment || editing) && (
+            {(hasText || attachment || editing) && (
               <button
                 type="button"
                 // Scheduling is for a typed message: there is nothing to
@@ -3135,7 +3128,7 @@ export function RealChatView({
                 // attachment would mean holding an uploaded object with no
                 // message pointing at it.
                 onPointerDown={() => {
-                  if (editing || !text.trim()) return;
+                  if (editing || !draft().trim()) return;
                   const h = sendHold.current;
                   h.opened = false;
                   if (h.timer) clearTimeout(h.timer);
@@ -3151,7 +3144,7 @@ export function RealChatView({
                 onContextMenu={(e) => {
                   // Right-click and the Android long-press menu reach the
                   // same place, rather than offering to save the icon.
-                  if (editing || !text.trim()) return;
+                  if (editing || !draft().trim()) return;
                   e.preventDefault();
                   sendHold.current.opened = true;
                   openScheduleSheet();
@@ -3159,7 +3152,7 @@ export function RealChatView({
                 onClick={() => {
                   // The press that opened the sheet must not also send.
                   if (sendHold.current.opened) { sendHold.current.opened = false; return; }
-                  if (editing || text.trim()) void send();
+                  if (editing || draft().trim()) void send();
                   else void sendAttachment();
                 }}
                 disabled={sending || uploading}
@@ -3192,7 +3185,7 @@ export function RealChatView({
             // Only once the row exists: a failed schedule leaves the words
             // in the composer rather than eating them.
             onScheduled={() => {
-              setText("");
+              inputRef.current?.setValue("");
               setReplyTo(null);
               emitStopTyping();
             }}
