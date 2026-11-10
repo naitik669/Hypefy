@@ -220,7 +220,11 @@ describe("the arrangement reaches the column", () => {
 
   it("and the editor is on the way there for a photo Show", () => {
     expect(create).toContain('if (captured && mode === "show" && !isVideoFile(captured) && arranged === null) {');
-    expect(create).toContain("<ShowArrange\n          file={captured}\n          onCancel={back}");
+    // The collab goes with it now, so an Add yours can carry its sticker
+    // onto the Show being made. Everything else about the route is unchanged.
+    expect(create).toContain(
+      "<ShowArrange\n          file={captured}\n          collabId={collabId}\n          onCancel={back}",
+    );
     expect(create).toContain("if (!drawing || drawing.strokes.length === 0) return setArranged(layers);");
   });
 

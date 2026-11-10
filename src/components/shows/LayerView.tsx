@@ -467,6 +467,7 @@ export function LayerBody({
           showId={showId}
           layerId={layer.id}
           addYours={layer.payload as AddYoursPayload}
+          layer={layer}
           look={look}
           added={stickers?.added[layer.id] ?? 0}
           isAuthor={isAuthor}

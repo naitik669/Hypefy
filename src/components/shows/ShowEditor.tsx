@@ -132,16 +132,23 @@ export type ShowDrawing = { strokes: Stroke[]; frame: { width: number; height: n
 export function ShowEditor({
   photoUrl,
   busy = false,
+  initial = [],
   onCancel,
   onPublish,
 }: {
   /** The picture being decorated. */
   photoUrl: string;
   busy?: boolean;
+  /**
+   * Stickers the Show starts with. One case: answering an Add yours carries
+   * its sticker across in the place it was, so the answer and the prompt read
+   * as one thread. It counts against MAX_LAYERS like any other.
+   */
+  initial?: ShowLayer[];
   onCancel: () => void;
   onPublish: (layers: ShowLayer[], drawing: ShowDrawing | null) => void;
 }) {
-  const [layers, setLayers] = useState<ShowLayer[]>([]);
+  const [layers, setLayers] = useState<ShowLayer[]>(initial);
   const [selected, setSelected] = useState<string | null>(null);
   const [writing, setWriting] = useState<string | null>(null);
   /** The place, tag, person or link being typed on its own sticker. */

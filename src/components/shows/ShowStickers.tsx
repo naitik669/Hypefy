@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { voteLabel } from "@/lib/chat-poll";
 import type { Look } from "@/lib/show-looks";
-import type { AddYoursPayload, CountdownPayload, QuizPayload, SliderPayload } from "@/lib/show-layers";
+import type { AddYoursPayload, CountdownPayload, QuizPayload, ShowLayer, SliderPayload } from "@/lib/show-layers";
 import { countdownParts, onInk, quizMark, revealed, seeded, stickerError, type Seeded } from "@/lib/show-stickers";
 import type { PollState } from "@/components/shows/ShowPoll";
+import { Celebrate } from "@/components/shows/Celebrate";
+import { carryLayer } from "@/lib/show-carry";
 
 /**
  * The four stickers that do something: Quiz, Hype slider, Countdown and
@@ -25,6 +27,14 @@ const stop = (e: React.SyntheticEvent) => e.stopPropagation();
  * changes meaning as the look changes. Same value as show-looks.ts's LIME.
  */
 const HYPE_LIME = "#a3e635";
+
+/**
+ * How many seconds a finished countdown walks down before the party, and how
+ * long each one takes. Short: it is a flourish on the way to "It's happening",
+ * not a second countdown.
+ */
+const RUN_FROM = 3;
+const RUN_STEP_MS = 420;
 
 /**
  * A button, or in preview just its shape. A preview sits inside the tray's
@@ -397,6 +407,30 @@ export function ShowCountdown({
   }, []);
 
   const left = countdownParts(countdown.at, now);
+
+  /*
+   * A finished countdown runs its last seconds out and then the Show throws
+   * a party, rather than quietly reading "It's happening".
+   *
+   * It is a replay, not a live tick: the moment may have passed days ago, so
+   * the numbers start at RUN_FROM and walk down once, the first time somebody
+   * opens the Show with it on. Only live — in the tray and in the editor a
+   * finished countdown is a shape being arranged, and confetti over the
+   * picture you are decorating would be absurd.
+   */
+  const live = !preview && !!showId;
+  const [runOut, setRunOut] = useState(left.ended && live ? RUN_FROM : 0);
+
+  useEffect(() => {
+    if (!left.ended || !live || runOut <= 0) return;
+    const t = setTimeout(() => setRunOut((n) => n - 1), RUN_STEP_MS);
+    return () => clearTimeout(t);
+  }, [left.ended, live, runOut]);
+
+  // Derived, not stored: the party is simply "finished, and the seconds have
+  // run out". Keeping it in state meant setting it from inside the effect
+  // that counts down, which is a cascading render for something already known.
+  const partied = left.ended && live && runOut <= 0;
   const cell = (n: number, unit: string) => (
     <span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
       <span
@@ -434,7 +468,16 @@ export function ShowCountdown({
     <span style={{ ...look.box, display: "flex", flexDirection: "column", gap: 10, width: 230, alignItems: "stretch" }}>
       <span style={{ ...look.title, fontSize: 13, textAlign: "center" }}>{countdown.title}</span>
       {left.ended ? (
-        <span style={{ ...look.title, fontSize: 15, textAlign: "center" }}>It&rsquo;s happening</span>
+        runOut > 0 ? (
+          // The last seconds, walking down.
+          <span style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+            {cell(0, "DAYS")}
+            {cell(0, "HRS")}
+            {cell(runOut, "SEC")}
+          </span>
+        ) : (
+          <span style={{ ...look.title, fontSize: 15, textAlign: "center" }}>It&rsquo;s happening</span>
+        )
       ) : (
         <span style={{ display: "flex", justifyContent: "center", gap: 8 }}>
           {cell(left.days, "DAYS")}
@@ -466,6 +509,7 @@ export function ShowCountdown({
           {on ? "Reminder set ✓" : "Remind me"}
         </Press>
       )}
+      {partied && <Celebrate />}
     </span>
   );
 }
@@ -479,6 +523,7 @@ export function ShowAddYours({
   added = 0,
   isAuthor = false,
   preview = false,
+  layer,
 }: {
   showId?: string;
   layerId: string;
@@ -487,6 +532,12 @@ export function ShowAddYours({
   added?: number;
   isAuthor?: boolean;
   preview?: boolean;
+  /**
+   * The whole layer, so answering carries the sticker across in the place it
+   * was. The payload alone cannot: the position, angle and look are what make
+   * the answer read as part of the same thread.
+   */
+  layer?: ShowLayer;
 }) {
   const [supabase] = useState(createClient);
   const router = useRouter();
@@ -506,6 +557,9 @@ export function ShowAddYours({
       setProblem(error?.message.includes("full") ? "This one is full" : "Couldn't open it");
       return;
     }
+    // Stashed under the collab the server just gave us, for the editor on
+    // the other side of this navigation to pick up. See lib/show-carry.
+    if (layer) carryLayer(String(data), layer);
     router.push(`/create?mode=show&collab=${data}`);
   }
 
