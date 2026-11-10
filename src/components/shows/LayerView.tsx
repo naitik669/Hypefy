@@ -258,6 +258,7 @@ export function LayerBody({
           poll={poll}
           look={look}
           state={polls?.[layer.id]}
+          isAuthor={isAuthor}
         />
       );
     }
@@ -285,7 +286,9 @@ export function LayerBody({
           </span>
         );
       }
-      return <ShowQuestion showId={showId} layerId={layer.id} question={question} look={look} />;
+      return (
+        <ShowQuestion showId={showId} layerId={layer.id} question={question} look={look} isAuthor={isAuthor} />
+      );
     }
 
     case "post":
@@ -332,6 +335,7 @@ export function LayerBody({
           quiz={layer.payload as QuizPayload}
           look={look}
           state={polls?.[layer.id]}
+          isAuthor={isAuthor}
           preview={preview}
         />
       );
@@ -405,7 +409,6 @@ export function LayerStack({
   embeds,
   stickers,
   isAuthor = false,
-  version = "",
 }: {
   layers: ShowLayer[];
   frame: { width: number; height: number };
@@ -417,12 +420,6 @@ export function LayerStack({
   stickers?: StickerState;
   /** The person looking is the one who posted it. */
   isAuthor?: boolean;
-  /**
-   * Changes when what the server knows has arrived. The live stickers take
-   * their starting state once, when they mount, and that state lands a
-   * moment after the Show does — so they are drawn again when it lands.
-   */
-  version?: string;
 }) {
   // Everything inside a layer — a card's width, a sticker's size, the
   // point size of text — is written once at DESIGN_WIDTH, and the whole
@@ -446,7 +443,17 @@ export function LayerStack({
     >
       {layers.map((layer) => (
         <LayerView
-          key={`${layer.id}:${version}`}
+          /*
+           * The layer's own id, and nothing else.
+           *
+           * This used to carry a version that changed when the server's
+           * answer arrived, which threw every sticker away and built it
+           * again — the only route by which late state reached them, and the
+           * reason a half-typed answer or a dragged slider vanished mid-use.
+           * The state comes in as a prop now and the stickers seed from it
+           * (see `seeded` in lib/show-stickers), so the key can be stable.
+           */
+          key={layer.id}
           layer={layer}
           frame={design}
           editing={editing}

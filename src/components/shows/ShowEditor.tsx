@@ -748,6 +748,7 @@ export function ShowEditor({
 
         {tray && (
           <StickerTray
+            full={full}
             onClose={() => setTray(false)}
             onWidget={(key) => {
               setTray(false);

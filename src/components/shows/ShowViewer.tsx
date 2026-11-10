@@ -813,7 +813,6 @@ function ShowScreen({
           embeds={embeds}
           stickers={stickers}
           isAuthor={isOwner}
-          version={`${Object.keys(polls).length}:${stickers === EMPTY_STICKER_STATE ? 0 : 1}`}
         />
       </div>
 

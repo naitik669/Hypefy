@@ -144,8 +144,13 @@ describe("the widgets as the reader meets them", () => {
   it("counts stay hidden until you answer", () => {
     // Showing them first turns a question into a bandwagon, which is
     // the rule PollBubble already follows.
-    expect(poll).toContain("const answered = mine !== null;");
-    expect(poll).toContain("{answered && (");
+    //
+    // The test used to pin `const answered = mine !== null`. That asked the
+    // wrong question of the author, whose own poll hid its results until they
+    // voted in it — so the rule is now `revealed`, which is the same thing for
+    // a viewer and the opposite for the author. See lib/show-stickers.
+    expect(poll).toContain("const show = revealed(isAuthor, mine);");
+    expect(poll).toContain("{show && (");
   });
 
   it("and the bars measure against the leader, from chat's own helper", () => {
@@ -154,13 +159,19 @@ describe("the widgets as the reader meets them", () => {
   });
 
   it("the tick is optimistic, the counts are not", () => {
-    // Your own tap is a fact; the numbers are the server's.
-    expect(poll).toContain("setMine(was === index ? null : index);");
-    expect(poll).toContain("if (Array.isArray(next?.tally)) setTally(next.tally);");
+    // Your own tap is a fact; the numbers are the server's. Still set before
+    // the await, and still only the tick — the tally and the voter count come
+    // from whatever comes back.
+    const before = poll.slice(poll.indexOf("async function choose"), poll.indexOf("await supabase.rpc"));
+    expect(before).toContain("mine: was === index ? null : index");
+    expect(poll).toContain("tally: Array.isArray(answer?.tally) ? answer.tally : tally,");
   });
 
-  it("a refused vote puts the tick back", () => {
-    expect(poll).toContain("if (error) {\n      setMine(was);");
+  it("a refused vote puts the tick back, and says so", () => {
+    // It used to put the tick back and say nothing at all.
+    const refused = poll.slice(poll.indexOf("if (error) {"));
+    expect(refused.slice(0, 200)).toContain("mine: was");
+    expect(refused.slice(0, 200)).toContain("setProblem(stickerError(error));");
   });
 
   it("and pressing one does not also move the Show on", () => {

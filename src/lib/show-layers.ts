@@ -74,6 +74,26 @@ export const LAYER_SCALE_MAX = 3;
 export const LAYER_POS_MIN = -0.1;
 export const LAYER_POS_MAX = 1.1;
 
+/**
+ * How low a sticker's centre may be *placed*.
+ *
+ * The viewer draws the caption and the reply row over the foot of the frame,
+ * and the reply row takes taps — so a sticker put down there cannot be
+ * pressed at all, however live it is. A poll nobody can answer looks like a
+ * broken poll rather than a badly placed one.
+ *
+ * Deliberately not applied in `readLayers`: clamping on the way in would
+ * quietly move the stickers on every Show already posted, and somebody
+ * arranged those by hand. A Show from before this keeps exactly the placement
+ * it was given; only new drags are held back.
+ *
+ * It bounds the centre and not the bottom edge, because a layer's rendered
+ * height depends on its own content and is not known here — so a tall sticker
+ * dragged all the way down still reaches a little into the caption. The
+ * number wants checking against a real device.
+ */
+export const LAYER_PLACE_MAX_Y = 0.86;
+
 /** The longest a text layer can be before it stops being a story. */
 export const MAX_LAYER_TEXT = 200;
 
@@ -520,6 +540,26 @@ export function readLayers(value: unknown): ShowLayer[] {
     out.push(layer);
   }
   return out;
+}
+
+/**
+ * The layers a Showcase board item should draw.
+ *
+ * A board item either points at a Show or carries a picture of its own, and
+ * the board was selecting the Show without its `layers` — so a Show kept on a
+ * board played with every sticker missing. That is this function's reason to
+ * exist.
+ *
+ * It takes the item's own media as the deciding fact rather than its `kind`,
+ * because the rule is about the picture: a layer's x and y are fractions of
+ * the frame, arranged against one photograph. Put them over a different upload
+ * and all of them land somewhere nobody placed them. So the stickers come
+ * along only when the picture does.
+ */
+export function boardLayers(itemMedia: string | null | undefined, source: unknown): ShowLayer[] {
+  if (itemMedia) return [];
+  const row = source as { layers?: unknown } | null | undefined;
+  return readLayers(row?.layers);
 }
 
 /**

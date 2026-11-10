@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { LayerBody } from "@/components/shows/LayerView";
 import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
-import { AMBIENT_LOOK, type LayerType, type ShowLayer } from "@/lib/show-layers";
+import { AMBIENT_LOOK, MAX_LAYERS, type LayerType, type ShowLayer } from "@/lib/show-layers";
 
 /** The widgets that open a picker of their own. */
 export type SheetKey = "music" | "mention" | "link" | "embed";
@@ -128,13 +128,24 @@ function Shrunk({ tile }: { tile: Tile }) {
   );
 }
 
-function Pinned({ tile, index, onPick }: { tile: Tile; index: number; onPick: (key: WidgetKey) => void }) {
+function Pinned({
+  tile,
+  index,
+  onPick,
+  full,
+}: {
+  tile: Tile;
+  index: number;
+  onPick: (key: WidgetKey) => void;
+  full: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={() => onPick(tile.key)}
+      disabled={full}
       aria-label={`Add ${tile.label.toLowerCase()}`}
-      className="flex shrink-0 flex-col items-center gap-2.5 transition active:scale-95"
+      className="flex shrink-0 flex-col items-center gap-2.5 transition active:scale-95 disabled:pointer-events-none disabled:opacity-40"
       data-tile={tile.key}
     >
       <span className="relative block" style={{ transform: `rotate(${tile.tilt}deg)` }}>
@@ -160,9 +171,16 @@ function Pinned({ tile, index, onPick }: { tile: Tile; index: number; onPick: (k
 export function StickerTray({
   onWidget,
   onClose,
+  full = false,
 }: {
   onWidget: (key: WidgetKey) => void;
   onClose: () => void;
+  /**
+   * Twelve already on the picture. The rail buttons have always greyed out
+   * at the cap; the tray's tiles did not, so a tap on one did nothing at all
+   * and said nothing about why.
+   */
+  full?: boolean;
 }) {
   const [recent] = useState<WidgetKey[]>(readRecent);
   const pick = (key: WidgetKey) => {
@@ -189,6 +207,14 @@ export function StickerTray({
       >
         <span aria-hidden className="mx-auto mb-1 block h-1 w-10 rounded-full bg-white/30" />
 
+        {full && (
+          /* Says why everything is greyed out. The cap is about the
+             photograph still being visible underneath, not about storage. */
+          <p role="status" className="mt-3 px-5 text-[12px] font-semibold text-white/70">
+            {MAX_LAYERS} of {MAX_LAYERS} stickers — take one off to add another.
+          </p>
+        )}
+
         {recent.length > 0 && (
           <div className="mt-3 flex items-center gap-2 px-5" data-recent>
             <h2 className="mr-1 text-[11px] font-bold uppercase tracking-[0.14em] text-white/70">Recent</h2>
@@ -214,8 +240,9 @@ export function StickerTray({
                 key={t.key}
                 type="button"
                 onClick={() => pick(t.key)}
+                disabled={full}
                 aria-label={`Add ${t.label.toLowerCase()}`}
-                className="flex flex-col items-center gap-2 transition active:scale-95"
+                className="flex flex-col items-center gap-2 transition active:scale-95 disabled:pointer-events-none disabled:opacity-40"
                 data-tile={t.key}
               >
                 <span className="block" style={{ transform: `rotate(${t.tilt}deg)` }}>
@@ -231,7 +258,7 @@ export function StickerTray({
         <div className="mt-6 grid grid-cols-2 justify-items-center gap-x-3 gap-y-7 px-3 pb-2 pt-3" data-board>
           {BOARD.map((t, i) => (
             <div key={t.key} className={BOARD.length % 2 === 1 && i === BOARD.length - 1 ? "col-span-2" : undefined}>
-              <Pinned tile={t} index={i} onPick={pick} />
+              <Pinned tile={t} index={i} onPick={pick} full={full} />
             </div>
           ))}
         </div>

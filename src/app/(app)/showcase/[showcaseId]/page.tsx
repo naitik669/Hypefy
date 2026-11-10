@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ShowViewer, type ShowItem } from "@/components/shows/ShowViewer";
+import { boardLayers } from "@/lib/show-layers";
 
 /**
  * Playing a Showcase board.
@@ -41,7 +42,9 @@ export default async function ShowcasePage({
     supabase
       .from("showcase_items")
       .select(
-        "id, kind, media_url, poster_url, caption, position, created_at, shows(id, media_url, caption, created_at, track), shots(id, media_url, poster_url, caption, created_at, track)"
+        // `layers` on the Show, or a Show kept on a board plays with every
+        // sticker missing: no poll, no words, no song label. Shots carry none.
+        "id, kind, media_url, poster_url, caption, position, created_at, shows(id, media_url, caption, created_at, track, layers), shots(id, media_url, poster_url, caption, created_at, track)"
       )
       .eq("showcase_id", showcaseId)
       .order("position")
@@ -83,6 +86,8 @@ export default async function ShowcasePage({
           created_at:
             (src?.created_at as string | null) ?? (r.created_at as string),
           track: src?.track ?? null,
+          // Only when the picture is the Show's own — see boardLayers.
+          layers: boardLayers(r.media_url as string | null, show),
           profiles: (owner as ShowItem["profiles"]) ?? null,
         },
       ];

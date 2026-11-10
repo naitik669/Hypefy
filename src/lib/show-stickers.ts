@@ -55,6 +55,60 @@ export function quizMark(option: number, answer: number, mine: number | null): "
 }
 
 /**
+ * Whether the counts on a poll or a quiz should be showing.
+ *
+ * It used to be `mine !== null` alone, which answered the wrong question. A
+ * viewer earns the counts by answering, and that is the point — but the
+ * author is not a viewer. Their own poll was hiding its results from them
+ * until they voted in it, which is the one thing they should not be doing.
+ */
+export function revealed(isAuthor: boolean, mine: number | null): boolean {
+  return isAuthor || mine !== null;
+}
+
+/**
+ * What a live sticker should hold when the server's answer arrives after it
+ * has already mounted.
+ *
+ * The thread fetches poll tallies and sticker state once, a moment after the
+ * Show is on screen, and every sticker mounts before that lands. Until now the
+ * only route in was a remount: `LayerStack` keyed each layer on a version
+ * string, so the arriving state threw every sticker away and built it again.
+ * That is also why a half-typed answer or a dragged slider vanished.
+ *
+ * So the seed comes in as a prop instead, and this decides what to do with it:
+ * adopt it while the person has not touched the control, and once they have,
+ * remember the seed arrived but leave their own value alone. Their vote is
+ * newer than the server's idea of it.
+ *
+ * Returns the same object when nothing changed, because the caller adjusts
+ * state with it during render — a fresh object every time is a render loop.
+ */
+export type Seeded<T> = { value: T; seed: T };
+
+export function seeded<T>(held: Seeded<T>, seed: T, touched: boolean): Seeded<T> {
+  if (seed === held.seed) return held;
+  return touched ? { value: held.value, seed } : { value: seed, seed };
+}
+
+/**
+ * What to tell someone whose tap did not reach the server.
+ *
+ * Both the slider and the question used to do `if (error) return;` — the
+ * slider left the star wherever it was dragged, recording nothing and saying
+ * nothing, which is worse than refusing outright.
+ *
+ * `rate_limit()` raises a check violation, so that code is the one answer
+ * worth wording differently: it means try again shortly, not something broke.
+ */
+export function stickerError(error: unknown): string | null {
+  if (!error) return null;
+  const code = (error as { code?: unknown }).code;
+  if (code === "23514") return "Slow down a moment";
+  return "Couldn't save that";
+}
+
+/**
  * The colour for an icon drawn on a button filled with `ink`.
  *
  * A look's box background can be a gradient now, which is not a colour an
