@@ -21,10 +21,22 @@ export const GATE_MAX_AGE = 60 * 60 * 24 * 30;
 /**
  * Paths that must answer before the gate does.
  *
- * `/api/push` and `/api/oneshot/reap` are called by Supabase pg_cron via
- * pg_net, not by a browser — gating them would silently stop push
- * notifications and OneShot expiry. Both already carry their own shared
- * secret, so they lose nothing by being exempt.
+ * The four pg_cron endpoints are called by Supabase via pg_net, not by a
+ * browser, so none of them ever carries a gate cookie: `/api/push`,
+ * `/api/oneshot/reap`, `/api/shows/reap` and `/api/moderation/verify`.
+ * Gating one stops its job dead. Every one of them checks its own shared
+ * secret before doing anything, so being exempt opens nothing — and
+ * `tests/cron-endpoints-open.test.ts` reads the URLs straight out of the
+ * migrations, so a fifth cannot be added without being listed here.
+ *
+ * Two of the four were missing, and both failed the way a gated cron always
+ * fails — invisibly. `verify-media-hashes` ran every five minutes and got
+ * 401 `invite_required`; twelve fingerprints went unverified for sixteen
+ * days. `reap-expired-shows` was pointed at the wrong host (fixed in 0192)
+ * and the moment that was corrected it met this wall instead, turning its
+ * nightly 404 into a nightly 401. pg_net records the answer long after the
+ * function has returned "succeeded", which is why neither showed up as a
+ * failure anywhere.
  *
  * `/auth/callback` must stay open or the OAuth round-trip cannot complete
  * for someone who already passed the gate in a different tab.
@@ -69,6 +81,8 @@ const OPEN_PATHS = [
   "/api/mfa/recover",
   "/api/push",
   "/api/oneshot/reap",
+  "/api/shows/reap",
+  "/api/moderation/verify",
   // Razorpay's servers carry no gate cookie. The route checks its own
   // signature, so opening it lets nothing else in.
   "/api/billing/webhook",
