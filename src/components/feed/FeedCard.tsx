@@ -985,7 +985,8 @@ function FeedCardInner({
             />
           </AvatarFrame>
         </Link>
-        <div className="flex min-w-0 flex-1 items-center gap-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="flex min-w-0 items-center gap-1">
           <Link
             href={profileHref}
             className="flex min-w-0 text-sm font-semibold hover:underline"
@@ -1012,7 +1013,19 @@ function FeedCardInner({
           <span className="ml-1 text-xs text-faint">
             · {timeAgoShort(post.created_at)}
           </span>
+          </div>
+
+          {/* The song rides with the name rather than on the picture.
+              Watches the card, not itself: the song is the post's, so it
+              starts when the post is what you are looking at. */}
+          {postTrack && (
+            <TrackChip track={postTrack} autoPlayInView watch={cardRef} byline />
+          )}
         </div>
+        {/* Beside the song rather than in the opposite corner of the
+            photo. It still mutes everywhere, not just this post. */}
+        {postTrack && <MusicMuteButton />}
+
         {/* THREE DOTS -- fully functional */}
         <button
           type="button"
@@ -1187,22 +1200,6 @@ function FeedCardInner({
             </div>
           )}
 
-          {/* The song, in the corner of the picture it belongs to.
-              It used to sit in a row under the card, which is not where the
-              post is. The disc rolls while the song plays and its title
-              slides out from behind the case; tapping the case shows the
-              title rather than stopping the music, so the speaker opposite
-              is now the only way to silence it. */}
-          {postTrack && (
-            <>
-              <div className="absolute left-3 top-3 z-20">
-                <TrackChip track={postTrack} autoPlayInView watch={cardRef} overlay />
-              </div>
-              <div className="absolute bottom-3 right-3 z-20">
-                <MusicMuteButton onMedia />
-              </div>
-            </>
-          )}
 
         </div>
 
@@ -1382,17 +1379,8 @@ function FeedCardInner({
         />
       )}
 
-      {/* A song on a post with no picture has no corner to sit in, so it
-          keeps the row it always had. Everything else wears it on the
-          photo — see the overlay above. */}
-      {postTrack && images.length === 0 && (
-        <div className="flex items-center gap-1.5 px-4 pt-2">
-          {/* Watches the card, not itself: the song is the post's, so it
-              starts when the post is what you are looking at. */}
-          <TrackChip track={postTrack} autoPlayInView watch={cardRef} />
-          <MusicMuteButton />
-        </div>
-      )}
+      {/* No second home for a song on a text-only post: the byline is
+          above every post, with or without a picture. */}
 
       {/* Sheets */}
       {commentsUsed && (

@@ -2,50 +2,21 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
 /**
- * The song wears the picture it belongs to.
+ * A song on the media: a Shot's record, and the sleeve that unrolls.
  *
- * It used to sit in a row under the card, which is not where the post is.
- * Now the disc rides in the corner of the photo in its case, rolling while
- * the song plays, and the speaker opposite is the only thing that stops it.
+ * A post's song no longer lives here. It sat in the corner of the photo
+ * with the speaker in the opposite corner, and it now rides under the
+ * poster's name — song-in-the-byline.test.ts owns that placement, and
+ * track-chip.test.ts owns the chip's behaviour, since it mounts it.
  *
- * The behaviour of the case itself — that a tap shows the title instead of
- * silencing the post — is covered by track-chip.test.ts, which mounts it.
- * What is checked here is that the pieces ended up in the right corners and
- * that the one post shape without a corner still gets its song.
+ * What is left here is everything that is still on a picture: a Shot's
+ * record in its case, the speaker's wording, and the unroll itself, which
+ * both surfaces share.
  */
 
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
-const card = read("src/components/feed/FeedCard.tsx");
 const box = read("src/components/music/SoundBox.tsx");
 
-describe("on a post", () => {
-  it("the case sits inside the picture, top left", () => {
-    expect(card).toContain('<div className="absolute left-3 top-3 z-20">');
-    const overlay = card.slice(card.indexOf('<div className="absolute left-3 top-3 z-20">'));
-    expect(overlay.slice(0, 220)).toContain("overlay");
-  });
-
-  it("and the speaker opposite it, bottom right", () => {
-    expect(card).toContain('<div className="absolute bottom-3 right-3 z-20">');
-    const mute = card.slice(card.indexOf('<div className="absolute bottom-3 right-3 z-20">'));
-    expect(mute.slice(0, 180)).toContain("<MusicMuteButton onMedia />");
-  });
-
-  it("both are inside the frame the photo is clipped to", () => {
-    // Outside it they would float over the card's padding, and on a 1.91:1
-    // post there is no card left to float over.
-    const gallery = card.indexOf('className="group relative mx-4 overflow-hidden rounded-2xl"');
-    expect(gallery).toBeGreaterThan(-1);
-    expect(card.indexOf('<div className="absolute left-3 top-3 z-20">')).toBeGreaterThan(gallery);
-    expect(card.indexOf('<div className="absolute bottom-3 right-3 z-20">')).toBeGreaterThan(gallery);
-  });
-
-  it("a song on a post with no picture keeps the row it always had", () => {
-    // There is no corner to sit in, and dropping the song entirely would be
-    // a worse answer than the row.
-    expect(card).toContain("{postTrack && images.length === 0 && (");
-  });
-});
 
 describe("the speaker says what it really does", () => {
   const mute = read("src/components/music/MusicMuteButton.tsx");
