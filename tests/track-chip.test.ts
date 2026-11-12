@@ -125,17 +125,22 @@ describe("a song under a feed post", () => {
 });
 
 /**
- * The overlay variant: the disc in its case, inside the top-left of a post.
+ * The byline variant: the rolling disc under the poster's name.
  *
- * The case used to be the play/pause button. It is not any more — muting is
- * the only way to stop a song now, and tapping the case is how you find out
- * what is playing. Getting that wrong means a tap meant to read the title
- * silences the post instead, which is the thing this change exists to fix.
+ * It used to sit in the corner of the picture, with the mute in the
+ * opposite corner — two glass buttons on somebody's face for one feature.
+ * Moving it into the byline leaves the photograph alone and puts the song
+ * beside the mute, where the rest of the post's metadata already is.
+ *
+ * The disc is still not the play/pause button. Muting is the only way to
+ * stop a song, and tapping the disc is how you find out what is playing.
+ * Getting that wrong means a tap meant to read the title silences the post
+ * instead, which is the thing that trade exists to prevent.
  */
-async function renderOverlay() {
+async function renderByline() {
   const { TrackChip } = await import("@/components/music/TrackChip");
   await act(async () =>
-    root.render(createElement(TrackChip, { track: track("a"), autoPlayInView: true, overlay: true })),
+    root.render(createElement(TrackChip, { track: track("a"), autoPlayInView: true, byline: true })),
   );
 }
 
@@ -144,11 +149,11 @@ const titleLink = () => host.querySelector("a") as HTMLAnchorElement;
 const stage = () => host.querySelector("[data-sound-stage]") as HTMLElement;
 const isOpen = () => stage().getAttribute("data-open") === "true";
 
-describe("the disc in its case", () => {
+describe("the disc under the name", () => {
   it("does not stop the music when it is tapped", async () => {
     // The whole point of the change. A tap used to pause; now the mute
     // button is the only off switch and this one only shows the title.
-    await renderOverlay();
+    await renderByline();
     await scrollTo(0, 0.9);
     expect(played).toHaveLength(1);
     await act(async () => caseButton().click());
@@ -157,7 +162,7 @@ describe("the disc in its case", () => {
   });
 
   it("shows the title instead", async () => {
-    await renderOverlay();
+    await renderByline();
     expect(isOpen()).toBe(false);
     await act(async () => caseButton().click());
     expect(isOpen()).toBe(true);
@@ -165,7 +170,7 @@ describe("the disc in its case", () => {
 
   it("and tapping it again goes to the song's page rather than doing nothing", async () => {
     // Otherwise the second tap is a dead control sitting on top of a photo.
-    await renderOverlay();
+    await renderByline();
     let went = 0;
     await act(async () => caseButton().click());
     titleLink().addEventListener("click", (e) => {
@@ -179,7 +184,7 @@ describe("the disc in its case", () => {
   it("the song's page is reachable without seeing the title at all", async () => {
     // The reveal is a hover-and-tap affordance. A keyboard or screen reader
     // user never triggers it, so the link has to be in the page regardless.
-    await renderOverlay();
+    await renderByline();
     expect(isOpen()).toBe(false);
     expect(titleLink().getAttribute("href")).toContain("/sound/");
     expect(titleLink().textContent).toContain("a");
@@ -189,7 +194,7 @@ describe("the disc in its case", () => {
     // Someone reading it with the keyboard cannot hover and read quickly.
     vi.useFakeTimers();
     try {
-      await renderOverlay();
+      await renderByline();
       await act(async () => caseButton().focus());
       expect(isOpen()).toBe(true);
       await act(async () => {
@@ -204,7 +209,7 @@ describe("the disc in its case", () => {
   it("but a tap lets it tuck back on its own", async () => {
     vi.useFakeTimers();
     try {
-      await renderOverlay();
+      await renderByline();
       await act(async () => caseButton().click());
       expect(isOpen()).toBe(true);
       await act(async () => {
