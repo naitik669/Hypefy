@@ -88,7 +88,32 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     Sentry.captureException(error);
-    return NextResponse.json({ error: "query failed" }, { status: 500 });
+    /*
+     * Say which failure it was.
+     *
+     * This path had never run until the vault secret was set, and the first
+     * time it did it answered a bare `{"error":"query failed"}` — which is
+     * every cause at once: a stale service-role key, a dropped grant, a
+     * column that is not there any more. pg_cron files the run as
+     * "succeeded" whatever comes back, so this body is the only place the
+     * reason is ever written down, and it was written down as nothing.
+     *
+     * Safe to be specific. The caller is pg_cron and nothing else — the
+     * shared secret is checked above before any of this runs — and the
+     * answer lands in `net._http_response`, which only the database owner
+     * can read. The third generic failure report in one day is a worse
+     * trade than a Postgres error code in a secret-gated response.
+     */
+    console.error("[moderation/verify] fingerprint query failed", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    return NextResponse.json(
+      { error: "query failed", code: error.code ?? null, message: error.message ?? null },
+      { status: 500 },
+    );
   }
 
   const rows = (data ?? []) as unknown as Row[];
