@@ -5,6 +5,7 @@ import { ChevronRight, Music, PenLine, Trash2, Undo2, X } from "lucide-react";
 import { LayerView } from "@/components/shows/LayerView";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { StickerTray, type SheetKey, type WidgetKey } from "@/components/shows/StickerTray";
+import { CountdownWhen } from "@/components/shows/CountdownWhen";
 import {
   CardEditor,
   blankCard,
@@ -14,6 +15,10 @@ import {
   tidyCard,
 } from "@/components/shows/CardEditor";
 import { EmbedSheet, type EmbedState } from "@/components/shows/ShowWidgetPickers";
+import { createClient } from "@/lib/supabase/client";
+
+/** The one tile that needs to know who you are before it can place anything. */
+const HYPECARD_ONLY: ReadonlySet<WidgetKey> = new Set<WidgetKey>(["hypecard"]);
 import { TagWriter, isTagType, type TagType } from "@/components/shows/TagWriter";
 import { MusicEditor } from "@/components/shows/MusicEditor";
 import { DrawCanvas, DrawTools } from "@/components/shows/DrawPad";
@@ -64,6 +69,16 @@ import { dragged, pinched, topmostAt, type Placed, type Point } from "@/lib/tran
  */
 
 /** A new layer lands here, and slightly off square so it reads as placed. */
+/**
+ * The emoji a Show can wear, one grapheme each so readLayers keeps them.
+ * Chosen rather than exhaustive: a grid you can take in at a glance beats a
+ * picker nobody scrolls, and the keyboard is still there for words.
+ */
+const EMOJI = [
+  "🌙", "✨", "🔥", "💚", "⭐", "🫶", "👀", "💀",
+  "😭", "🥹", "😮‍💨", "🤌", "🎧", "📸", "🛹", "🌴",
+] as const;
+
 const DROP = { x: 0.5, y: 0.45, scale: 1, rotation: -3 };
 
 /**
@@ -121,16 +136,23 @@ export type ShowDrawing = { strokes: Stroke[]; frame: { width: number; height: n
 export function ShowEditor({
   photoUrl,
   busy = false,
+  initial = [],
   onCancel,
   onPublish,
 }: {
   /** The picture being decorated. */
   photoUrl: string;
   busy?: boolean;
+  /**
+   * Stickers the Show starts with. One case: answering an Add yours carries
+   * its sticker across in the place it was, so the answer and the prompt read
+   * as one thread. It counts against MAX_LAYERS like any other.
+   */
+  initial?: ShowLayer[];
   onCancel: () => void;
   onPublish: (layers: ShowLayer[], drawing: ShowDrawing | null) => void;
 }) {
-  const [layers, setLayers] = useState<ShowLayer[]>([]);
+  const [layers, setLayers] = useState<ShowLayer[]>(initial);
   const [selected, setSelected] = useState<string | null>(null);
   const [writing, setWriting] = useState<string | null>(null);
   /** The place, tag, person or link being typed on its own sticker. */
@@ -213,6 +235,30 @@ export function ShowEditor({
    * straight onto the picture for the rest — a place or a tag typed at the
    * foot like words are, the time stamped as it is now.
    */
+  /** The clock being set, if one is. */
+  const [clocking, setClocking] = useState<string | null>(null);
+
+  /**
+   * Whose card the Hype card places — the signed-in user, and nobody else.
+   *
+   * Asked for once here rather than written into the tile, because a card
+   * with no owner is dropped by readLayers and would vanish on publish: the
+   * same trap the emoji tile had. Until it lands the tile does nothing, so
+   * it is drawn dimmed rather than silently inert.
+   */
+  const [me, setMe] = useState<string | null>(null);
+  useEffect(() => {
+    let dropped = false;
+    void createClient()
+      .auth.getUser()
+      .then(({ data }) => {
+        if (!dropped) setMe(data.user?.id ?? null);
+      });
+    return () => {
+      dropped = true;
+    };
+  }, []);
+
   function place(key: WidgetKey) {
     if (key === "location" || key === "hashtag" || key === "mention" || key === "link") {
       // Placed empty and typed on the sticker itself.
@@ -222,6 +268,16 @@ export function ShowEditor({
       if (id) setTagging(id);
     } else if (key === "time") {
       add("time", { at: new Date().toISOString() });
+    } else if (key === "hypemeter") {
+      // A slider carrying the hype flag, written on like any other card.
+      const id = add("slider", { ...blankCard("slider"), hype: true });
+      if (id) setEditingCard(id);
+    } else if (key === "hypecard") {
+      if (me) add("hypecard", { ownerId: me });
+    } else if (key === "sticker") {
+      // Opens the grid rather than placing a blank one: an emoji layer with
+      // no emoji is dropped by readLayers, so it would vanish on publish.
+      setPicking("sticker");
     } else if (isCardType(key)) {
       // Placed blank and written on the sticker itself.
       const id = add(key, blankCard(key));
@@ -404,6 +460,10 @@ export function ShowEditor({
         else if (chosenLayer?.type === "post" || chosenLayer?.type === "shot") setStyling({ id: g.id, before: chosenLayer });
         else if (chosenLayer && isTagType(chosenLayer.type)) setTagging(g.id);
         else if (chosenLayer?.type === "text") setWriting(g.id);
+        // The clock was stamped at the moment it was added and could never be
+        // changed — the only way to a different time was to delete it and add
+        // another. It opens the picker the countdown already uses.
+        else if (chosenLayer?.type === "time") setClocking(g.id);
         return;
       }
       setSelected(g.id);
@@ -748,6 +808,8 @@ export function ShowEditor({
 
         {tray && (
           <StickerTray
+            full={full}
+            blocked={me ? undefined : HYPECARD_ONLY}
             onClose={() => setTray(false)}
             onWidget={(key) => {
               setTray(false);
@@ -780,6 +842,62 @@ export function ShowEditor({
             }
             className="h-12 w-full rounded-xl bg-surface px-4 text-sm text-foreground outline-none placeholder:text-muted"
           />
+        </div>
+      )}
+
+      {/*
+        The clock, set rather than stamped. The same sheet the countdown uses,
+        so there is one way to pick a time in a Show and not two.
+      */}
+      {clocking && (
+        <CountdownWhen
+          open
+          at={
+            (layers.find((x) => x.id === clocking)?.payload as { at?: string } | undefined)?.at ??
+            new Date().toISOString()
+          }
+          onClose={() => setClocking(null)}
+          onPick={(at) => {
+            remember();
+            setLayers((l) =>
+              l.map((x) => (x.id === clocking ? { ...x, payload: { at: at.toISOString() } } : x)),
+            );
+            setClocking(null);
+          }}
+        />
+      )}
+
+      {/*
+        Emoji, as a small chosen set rather than a picker.
+        The tray used to say "No emoji: the keyboard has those", and the type
+        was read, styled, validated and reachable by nothing — a dead branch in
+        every file that handled layers. A short grid is enough to make it real
+        without becoming a second keyboard.
+      */}
+      {picking === "sticker" && (
+        <div
+          role="dialog"
+          aria-label="Pick an emoji"
+          onPointerDown={(e) => e.stopPropagation()}
+          className="absolute inset-x-0 bottom-0 z-40 rounded-t-[28px] border-t border-white/10 bg-black/70 pb-[max(1.25rem,var(--sab))] pt-3 backdrop-blur-2xl"
+        >
+          <span aria-hidden className="mx-auto mb-3 block h-1 w-10 rounded-full bg-white/30" />
+          <div className="grid grid-cols-8 gap-1 px-3">
+            {EMOJI.map((e) => (
+              <button
+                key={e}
+                type="button"
+                aria-label={e}
+                onClick={() => {
+                  setPicking(null);
+                  add("sticker", { emoji: e });
+                }}
+                className="flex h-11 items-center justify-center rounded-xl text-[26px] transition active:scale-90 hover:bg-white/10"
+              >
+                {e}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

@@ -66,7 +66,12 @@ describe("one card, one plate", () => {
   });
 
   it("the one piece of colour is the painted edge, and it takes the owner's accent", () => {
-    expect(plate).toContain('className="absolute inset-x-0 bottom-0 h-[3px] bg-accent"');
+    // The plate takes an explicit edge now, because a card of yours on
+    // somebody else's Show would otherwise be painted in *their* --accent.
+    // On the profile nothing passes one, so it is still the reader's own.
+    expect(plate).toContain('${edge ? "" : "bg-accent"}');
+    expect(plate).toContain("style={edge ? { background: edge } : undefined}");
+    expect(plate).toContain("export function CardPlate({ children, edge }");
     // The card portals to body, so it re-applies the owner's accent itself.
     expect(card).toContain("accentVars(data.accentId)");
   });

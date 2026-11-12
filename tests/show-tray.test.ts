@@ -6,11 +6,33 @@ import { readLayers } from "@/lib/show-layers";
 describe("the sticker tray", () => {
   it("is arranged as approved: the tags, then every big sticker on one board", () => {
     expect(ASK_AND_PLAY.map((t) => t.label)).toEqual(["Poll", "Quiz", "Question"]);
-    expect(HYPE_AND_PLAN.map((t) => t.label)).toEqual(["Hype slider", "Countdown", "Add yours"]);
-    expect(YOURS.map((t) => t.label)).toEqual(["Post or Shot"]);
-    expect(TAGS.map((t) => t.label)).toEqual(["Time", "Music", "Mention", "Link", "Location", "Hashtag"]);
-    expect(BOARD.map((t) => t.label)).toEqual(["Quiz", "Poll", "Countdown", "Question", "Add yours", "Hype slider", "Post or Shot"]);
-    expect(new Set(ALL_TILES.map((t) => t.key)).size).toBe(13);
+    expect(HYPE_AND_PLAN.map((t) => t.label)).toEqual(["Hype slider", "Countdown", "Add yours", "Hype meter"]);
+    // The tile that opens this picker used to be called Post or Shot, and the
+    // picker has always listed your Spotlight page first — so the page was
+    // reachable and unfindable.
+    expect(YOURS.map((t) => t.label)).toEqual(["Post, Shot or page", "Hype card"]);
+    // Emoji joins the tags row: the one layer type that had no way in.
+    expect(TAGS.map((t) => t.label)).toEqual([
+      "Time",
+      "Music",
+      "Mention",
+      "Link",
+      "Location",
+      "Hashtag",
+      "Emoji",
+    ]);
+    expect(BOARD.map((t) => t.label)).toEqual([
+      "Quiz",
+      "Poll",
+      "Countdown",
+      "Question",
+      "Add yours",
+      "Hype slider",
+      "Hype meter",
+      "Hype card",
+      "Post, Shot or page",
+    ]);
+    expect(new Set(ALL_TILES.map((t) => t.key)).size).toBe(16);
   });
 
   it("every tile is the real sticker, one the Show would keep", () => {
@@ -46,7 +68,20 @@ describe("the tray's order", () => {
     expect(tags).toBeLessThan(tray.indexOf("data-board"));
     // Every big sticker at once, two to a row: no shelves to swipe.
     expect(tray).not.toContain("<Shelf");
-    expect(tray).toContain('const BOARD_ORDER: WidgetKey[] = ["quiz", "poll", "countdown", "question", "addyours", "slider", "embed"];');
+  });
+
+  it("and the board runs quiz-first, with the two signature ones before the embed", () => {
+    expect(BOARD.map((t) => t.key)).toEqual([
+      "quiz",
+      "poll",
+      "countdown",
+      "question",
+      "addyours",
+      "slider",
+      "hypemeter",
+      "hypecard",
+      "embed",
+    ]);
   });
 
   it("and the editor's way on is one small Next, not a bar under the picture", () => {

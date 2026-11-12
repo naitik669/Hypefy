@@ -50,6 +50,7 @@ export const LAYER_TYPES = [
   "countdown",
   "addyours",
   "spotlight",
+  "hypecard",
 ] as const;
 
 export type LayerType = (typeof LAYER_TYPES)[number];
@@ -73,6 +74,26 @@ export const LAYER_SCALE_MAX = 3;
 /** How far outside the frame a layer's centre may sit, so it stays grabbable. */
 export const LAYER_POS_MIN = -0.1;
 export const LAYER_POS_MAX = 1.1;
+
+/**
+ * How low a sticker's centre may be *placed*.
+ *
+ * The viewer draws the caption and the reply row over the foot of the frame,
+ * and the reply row takes taps — so a sticker put down there cannot be
+ * pressed at all, however live it is. A poll nobody can answer looks like a
+ * broken poll rather than a badly placed one.
+ *
+ * Deliberately not applied in `readLayers`: clamping on the way in would
+ * quietly move the stickers on every Show already posted, and somebody
+ * arranged those by hand. A Show from before this keeps exactly the placement
+ * it was given; only new drags are held back.
+ *
+ * It bounds the centre and not the bottom edge, because a layer's rendered
+ * height depends on its own content and is not known here — so a tall sticker
+ * dragged all the way down still reaches a little into the caption. The
+ * number wants checking against a real device.
+ */
+export const LAYER_PLACE_MAX_Y = 0.86;
 
 /** The longest a text layer can be before it stops being a story. */
 export const MAX_LAYER_TEXT = 200;
@@ -110,6 +131,10 @@ export const LOOKS: Record<LayerType, number> = {
   addyours: COLOUR_LOOKS,
   // A Spotlight page wears its own colour.
   spotlight: 1,
+  // So does a Hype card: the plate is black and the one piece of colour on
+  // it is the owner's own accent, picked once already on their profile.
+  // Eight looks here would be eight ways to repaint somebody's ID.
+  hypecard: 1,
 };
 
 /** The look index that takes its colour from the photo (`tint`). */
@@ -156,6 +181,17 @@ export type PostPayload = { postId: string; style?: EmbedStyle };
 export type ShotPayload = { shotId: string; style?: EmbedStyle };
 /** Your Spotlight page, as it is on the day the Show goes up. */
 export type SpotlightPayload = { ownerId: string };
+/**
+ * Somebody's Hypefy ID, as a sticker.
+ *
+ * Only the id is kept. Nothing about them is copied in here — not the
+ * handle, not the name, not the number — because a card is a credential
+ * and a credential that carries its own claims is a credential anyone can
+ * write. The viewer looks the owner up and draws what it finds, so a card
+ * pointing at somebody else draws *their* real handle, the way a mention
+ * does, rather than their name in our chrome.
+ */
+export type HypeCardPayload = { ownerId: string };
 
 /** The embeds, of which a Show carries one: a second replaces the first. */
 export const EMBED_TYPES = ["post", "shot", "spotlight"] as const;
@@ -180,7 +216,21 @@ export type TimePayload = { at: string };
 /** A poll with one right answer, by index. */
 export type QuizPayload = { question: string; options: string[]; answer: number };
 /** "How hyped are you?" — viewers drag a ★ along it. */
-export type SliderPayload = { prompt: string };
+export type SliderPayload = {
+  prompt: string;
+  /**
+   * The Hype meter: the same slider, except letting go high on it also
+   * hypes the Show.
+   *
+   * A flag rather than a type of its own, which is the whole reason it is
+   * cheap. The server already knows how to take a slider value, rate-limit
+   * it, refuse the author's, and tell the author who sent what — and every
+   * one of those is written against the string 'slider'. A second type
+   * would have meant teaching six places in 0194 a new word to get back to
+   * where this starts.
+   */
+  hype?: boolean;
+};
 /** Something coming up: what, and when. */
 export type CountdownPayload = { title: string; at: string };
 /**
@@ -188,6 +238,20 @@ export type CountdownPayload = { title: string; at: string };
  * Show their answers go into, made when the Show is published.
  */
 export type AddYoursPayload = { prompt: string; collabId?: string };
+
+/**
+ * How high you have to leave the Hype meter for it to hype the Show.
+ *
+ * Not 50: the middle is where the ★ starts for anyone who has not touched
+ * it, and a drag that ends a point above where it began should not count as
+ * saying yes. Seventy is a deliberate push to the top end.
+ */
+export const HYPE_METER_AT = 70;
+
+/** A slider that is the Hype meter rather than a plain one. */
+export function isHypeMeter(layer: { type: LayerType; payload: LayerPayload }): boolean {
+  return layer.type === "slider" && (layer.payload as SliderPayload).hype === true;
+}
 
 export const MAX_PLACE = 60;
 /** The rest of a place's address, under its name. */
@@ -215,7 +279,8 @@ export type LayerPayload =
   | SliderPayload
   | CountdownPayload
   | AddYoursPayload
-  | SpotlightPayload;
+  | SpotlightPayload
+  | HypeCardPayload;
 
 export type ShowLayer = {
   /** Stable for the life of the layer: votes and answers point at it. */
@@ -388,7 +453,11 @@ function readPayload(type: LayerType, raw: unknown): LayerPayload | null {
     }
     case "slider": {
       const prompt = text(p.prompt, MAX_POLL_QUESTION);
-      return prompt ? { prompt } : null;
+      if (!prompt) return null;
+      // Only ever true. An absent flag and a false one are the same slider,
+      // and storing `hype: false` would put a second spelling of it in the
+      // column for every slider ever placed.
+      return p.hype === true ? { prompt, hype: true } : { prompt };
     }
     case "countdown": {
       const title = text(p.title, MAX_STICKER_LINE);
@@ -402,7 +471,8 @@ function readPayload(type: LayerType, raw: unknown): LayerPayload | null {
       const collab = typeof p.collabId === "string" && /^[0-9a-f-]{36}$/i.test(p.collabId) ? p.collabId : null;
       return collab ? { prompt, collabId: collab } : { prompt };
     }
-    case "spotlight": {
+    case "spotlight":
+    case "hypecard": {
       const owner = id(p.ownerId);
       return owner ? { ownerId: owner } : null;
     }
@@ -520,6 +590,26 @@ export function readLayers(value: unknown): ShowLayer[] {
     out.push(layer);
   }
   return out;
+}
+
+/**
+ * The layers a Showcase board item should draw.
+ *
+ * A board item either points at a Show or carries a picture of its own, and
+ * the board was selecting the Show without its `layers` — so a Show kept on a
+ * board played with every sticker missing. That is this function's reason to
+ * exist.
+ *
+ * It takes the item's own media as the deciding fact rather than its `kind`,
+ * because the rule is about the picture: a layer's x and y are fractions of
+ * the frame, arranged against one photograph. Put them over a different upload
+ * and all of them land somewhere nobody placed them. So the stickers come
+ * along only when the picture does.
+ */
+export function boardLayers(itemMedia: string | null | undefined, source: unknown): ShowLayer[] {
+  if (itemMedia) return [];
+  const row = source as { layers?: unknown } | null | undefined;
+  return readLayers(row?.layers);
 }
 
 /**

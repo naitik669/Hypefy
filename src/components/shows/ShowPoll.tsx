@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { barWidth, voteLabel } from "@/lib/chat-poll";
 import type { Look } from "@/lib/show-looks";
 import type { PollPayload, QuestionPayload } from "@/lib/show-layers";
-import { onInk } from "@/lib/show-stickers";
+import { onInk, revealed, seeded, stickerError, type Seeded } from "@/lib/show-stickers";
 
 /** What the server knows about one poll on this Show. */
 export type PollState = { tally: number[]; voters: number; mine: number | null };
@@ -26,6 +26,11 @@ export type PollState = { tally: number[]; voters: number; mine: number | null }
  * The tick is optimistic; the counts are not. A vote appears chosen
  * straight away because that is a fact about your own tap, but the
  * numbers are whatever the server returns.
+ *
+ * `state` arrives a moment after this mounts, because the thread fetches it
+ * once the Show is already on screen. It comes in as a seed rather than
+ * through a remount — see `seeded` — so a vote cast in that window is not
+ * thrown away by the server's older idea of it.
  */
 export function ShowPoll({
   showId,
@@ -33,30 +38,56 @@ export function ShowPoll({
   poll,
   look,
   state,
+  isAuthor = false,
 }: {
   showId: string;
   layerId: string;
   poll: PollPayload;
   look: Look;
   state?: PollState;
+  /** Your own poll is for everyone else: you get the counts, not a vote. */
+  isAuthor?: boolean;
 }) {
   const [supabase] = useState(createClient);
-  const [mine, setMine] = useState<number | null>(state?.mine ?? null);
-  const [tally, setTally] = useState<number[]>(
-    state?.tally?.length === poll.options.length ? state.tally : poll.options.map(() => 0),
-  );
-  const [voters, setVoters] = useState(state?.voters ?? 0);
-  const [busy, setBusy] = useState(false);
 
-  const answered = mine !== null;
+  /**
+   * The server's answer, fitted to this poll's options.
+   *
+   * Memoised because it is the seed's identity that says whether the server
+   * has spoken again, and a fresh object every render would say yes for ever.
+   */
+  const seed = useMemo<PollState>(
+    () => ({
+      tally: state?.tally?.length === poll.options.length ? state.tally : poll.options.map(() => 0),
+      voters: state?.voters ?? 0,
+      mine: state?.mine ?? null,
+    }),
+    [state, poll.options],
+  );
+
+  const [held, setHeld] = useState<Seeded<PollState>>(() => ({ value: seed, seed }));
+  // State rather than a ref: this is read while rendering, to decide what the
+  // arriving seed is allowed to do, and a ref read in render is both a lint
+  // error and a real staleness bug.
+  const [touched, setTouched] = useState(false);
+  const next = seeded(held, seed, touched);
+  if (next !== held) setHeld(next);
+
+  const { tally, voters, mine } = next.value;
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const show = revealed(isAuthor, mine);
 
   async function choose(index: number) {
-    if (busy) return;
+    if (busy || isAuthor) return;
     setBusy(true);
+    setProblem(null);
+    setTouched(true);
     const was = mine;
     // Tapping the one you already chose takes it back, which is what a
     // second tap plainly means and what the chat poll does.
-    setMine(was === index ? null : index);
+    setHeld({ value: { tally, voters, mine: was === index ? null : index }, seed: next.seed });
 
     const { data, error } = await supabase.rpc("cast_show_vote", {
       p_show_id: showId,
@@ -66,12 +97,19 @@ export function ShowPoll({
     setBusy(false);
 
     if (error) {
-      setMine(was);
+      setHeld({ value: { tally, voters, mine: was }, seed: next.seed });
+      setProblem(stickerError(error));
       return;
     }
-    const next = data as { tally?: number[]; voters?: number } | null;
-    if (Array.isArray(next?.tally)) setTally(next.tally);
-    if (typeof next?.voters === "number") setVoters(next.voters);
+    const answer = data as { tally?: number[]; voters?: number } | null;
+    setHeld({
+      value: {
+        tally: Array.isArray(answer?.tally) ? answer.tally : tally,
+        voters: typeof answer?.voters === "number" ? answer.voters : voters,
+        mine: was === index ? null : index,
+      },
+      seed: next.seed,
+    });
   }
 
   return (
@@ -81,7 +119,7 @@ export function ShowPoll({
         <button
           key={i}
           type="button"
-          disabled={busy}
+          disabled={busy || isAuthor}
           onClick={(e) => {
             // The frame underneath moves between Shows on a tap.
             e.stopPropagation();
@@ -101,11 +139,11 @@ export function ShowPoll({
             fontFamily: "inherit",
             fontSize: 12,
             fontWeight: 700,
-            cursor: "pointer",
+            cursor: isAuthor ? "default" : "pointer",
             ...look.title,
           }}
         >
-          {answered && (
+          {show && (
             <span
               aria-hidden
               style={{
@@ -120,7 +158,7 @@ export function ShowPoll({
             />
           )}
           <span style={{ position: "relative" }}>{option}</span>
-          {answered && (
+          {show && (
             <span style={{ position: "relative", fontSize: 11, fontWeight: 800 }}>{tally[i] ?? 0}</span>
           )}
         </button>
@@ -134,7 +172,7 @@ export function ShowPoll({
           textTransform: "uppercase",
         }}
       >
-        {answered ? voteLabel(voters) : "Tap to answer"}
+        {problem ?? (show ? voteLabel(voters) : "Tap to answer")}
       </span>
     </span>
   );
@@ -152,36 +190,99 @@ export function ShowQuestion({
   layerId,
   question,
   look,
+  isAuthor = false,
+  mine,
 }: {
   showId: string;
   layerId: string;
   question: QuestionPayload;
   look: Look;
+  /** Answering your own question means nothing, so you are sent to read them. */
+  isAuthor?: boolean;
+  /**
+   * What you answered before, if you did. It used to look untouched on every
+   * re-open, which is how one viewer came to send the author four answers to
+   * the same question.
+   */
+  mine?: string;
 }) {
   const [supabase] = useState(createClient);
   const [body, setBody] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  /** Set when you choose to rewrite one you had already sent. */
+  const [rewriting, setRewriting] = useState(false);
+
+  // What is on screen: your earlier answer, unless you are rewriting it or
+  // have just sent a new one.
+  const already = !sent && !rewriting ? mine : undefined;
 
   async function send() {
     const text = body.trim();
     if (!text || busy) return;
     setBusy(true);
+    setProblem(null);
     const { error } = await supabase.rpc("answer_show_question", {
       p_show_id: showId,
       p_layer_id: layerId,
       p_body: text,
     });
     setBusy(false);
-    if (error) return;
+    if (error) {
+      // It used to fail silently, leaving the words in the box looking sent.
+      setProblem(stickerError(error));
+      return;
+    }
     setSent(true);
+    setRewriting(false);
     setBody("");
   }
 
   return (
     <span style={{ ...look.box, display: "flex", flexDirection: "column", gap: 10, width: 230 }}>
       <span style={{ ...look.title, fontSize: 12.5 }}>{question.prompt}</span>
-      {sent ? (
+      {isAuthor ? (
+        // Your own question is a way into the answers, not a box to fill in.
+        // A plain link, so it is a real navigation rather than a scripted one.
+        <a
+          href={`/shows/${showId}/answers`}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{ ...look.sub, fontSize: 12, paddingBlock: 9, fontWeight: 700, textDecoration: "none" }}
+        >
+          Read the answers →
+        </a>
+      ) : already ? (
+        <span style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ ...look.sub, fontSize: 12 }}>Sent — only they see it.</span>
+          <span style={{ ...look.title, fontSize: 12.5, fontWeight: 600 }}>“{already}”</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setBody(already);
+              setRewriting(true);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{
+              ...look.sub,
+              alignSelf: "flex-start",
+              background: "none",
+              border: "none",
+              padding: 0,
+              fontFamily: "inherit",
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+            }}
+          >
+            Change it
+          </button>
+        </span>
+      ) : sent ? (
         <span style={{ ...look.sub, fontSize: 12, paddingBlock: 9 }}>Sent — only they see it.</span>
       ) : (
         <span style={{ display: "flex", gap: 6 }}>
@@ -237,6 +338,11 @@ export function ShowQuestion({
               <path d="m22 2-7 20-4-9-9-4z" />
             </svg>
           </button>
+        </span>
+      )}
+      {problem && (
+        <span role="status" style={{ ...look.sub, fontSize: 11, fontWeight: 700 }}>
+          {problem}
         </span>
       )}
     </span>

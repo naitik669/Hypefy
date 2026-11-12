@@ -1,13 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { voteLabel } from "@/lib/chat-poll";
 import type { Look } from "@/lib/show-looks";
-import type { AddYoursPayload, CountdownPayload, QuizPayload, SliderPayload } from "@/lib/show-layers";
-import { countdownParts, onInk, quizMark } from "@/lib/show-stickers";
+import {
+  HYPE_METER_AT,
+  type AddYoursPayload,
+  type CountdownPayload,
+  type QuizPayload,
+  type ShowLayer,
+  type SliderPayload,
+} from "@/lib/show-layers";
+import { countdownParts, onInk, quizMark, revealed, seeded, stickerError, type Seeded } from "@/lib/show-stickers";
 import type { PollState } from "@/components/shows/ShowPoll";
+import { Celebrate } from "@/components/shows/Celebrate";
+import { carryLayer } from "@/lib/show-carry";
 
 /**
  * The four stickers that do something: Quiz, Hype slider, Countdown and
@@ -17,6 +26,22 @@ import type { PollState } from "@/components/shows/ShowPoll";
  */
 
 const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
+/**
+ * The brand's lime, for the one mark on a sticker that speaks for everybody
+ * rather than for the person looking at it — the hype slider's average. Every
+ * other colour on a sticker comes from its look; this one must not, or it
+ * changes meaning as the look changes. Same value as show-looks.ts's LIME.
+ */
+const HYPE_LIME = "#a3e635";
+
+/**
+ * How many seconds a finished countdown walks down before the party, and how
+ * long each one takes. Short: it is a flourish on the way to "It's happening",
+ * not a second countdown.
+ */
+const RUN_FROM = 3;
+const RUN_STEP_MS = 420;
 
 /**
  * A button, or in preview just its shape. A preview sits inside the tray's
@@ -53,6 +78,7 @@ export function ShowQuiz({
   quiz,
   look,
   state,
+  isAuthor = false,
   preview = false,
 }: {
   showId?: string;
@@ -60,37 +86,57 @@ export function ShowQuiz({
   quiz: QuizPayload;
   look: Look;
   state?: PollState;
+  /** Your own quiz shows you the answer and the count, and takes no guess. */
+  isAuthor?: boolean;
   preview?: boolean;
 }) {
   const [supabase] = useState(createClient);
-  const [mine, setMine] = useState<number | null>(state?.mine ?? null);
-  const [voters, setVoters] = useState(state?.voters ?? 0);
+
+  // Seeded rather than remounted when the server's answer arrives; see
+  // `seeded`, and ShowPoll for the same shape.
+  const seed = useMemo<{ mine: number | null; voters: number }>(
+    () => ({ mine: state?.mine ?? null, voters: state?.voters ?? 0 }),
+    [state],
+  );
+  const [held, setHeld] = useState<Seeded<{ mine: number | null; voters: number }>>(() => ({ value: seed, seed }));
+  // State, not a ref — it is read during render. See ShowPoll.
+  const [touched, setTouched] = useState(false);
+  const next = seeded(held, seed, touched);
+  if (next !== held) setHeld(next);
+
+  const { mine, voters } = next.value;
   const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
 
   async function choose(i: number) {
-    if (preview || !showId || busy || mine !== null) return;
+    if (preview || !showId || busy || mine !== null || isAuthor) return;
     setBusy(true);
-    setMine(i);
+    setProblem(null);
+    setTouched(true);
+    setHeld({ value: { mine: i, voters }, seed: next.seed });
     const { data, error } = await supabase.rpc("cast_show_vote", { p_show_id: showId, p_layer_id: layerId, p_choice: i });
     setBusy(false);
     if (error) {
-      setMine(null);
+      setHeld({ value: { mine: null, voters }, seed: next.seed });
+      setProblem(stickerError(error));
       return;
     }
-    const next = data as { voters?: number } | null;
-    if (typeof next?.voters === "number") setVoters(next.voters);
+    const answer = data as { voters?: number } | null;
+    setHeld({ value: { mine: i, voters: typeof answer?.voters === "number" ? answer.voters : voters }, seed: next.seed });
   }
 
   return (
     <span style={{ ...look.box, display: "flex", flexDirection: "column", gap: 7, width: 230 }}>
       <span style={{ ...look.title, fontSize: 12.5 }}>{quiz.question}</span>
       {quiz.options.map((option, i) => {
-        const mark = quizMark(i, quiz.answer, mine);
+        // The author never guessed, so there is no "your answer" to mark —
+        // they are shown which one is right, and nothing else.
+        const mark = isAuthor ? (i === quiz.answer ? "right" : null) : quizMark(i, quiz.answer, mine);
         return (
           <Press
           preview={preview}
             key={i}
-            disabled={preview || busy || mine !== null}
+            disabled={preview || busy || mine !== null || isAuthor}
             onPointerDown={stop}
             onClick={(e) => {
               stop(e);
@@ -108,7 +154,7 @@ export function ShowQuiz({
               fontFamily: "inherit",
               fontSize: 12,
               fontWeight: 700,
-              cursor: preview ? "default" : "pointer",
+              cursor: preview || isAuthor ? "default" : "pointer",
               ...look.title,
               ...(mark ? { color: "#ffffff" } : {}),
             }}
@@ -118,7 +164,9 @@ export function ShowQuiz({
           </Press>
         );
       })}
-      <span style={label(look)}>{mine === null ? "Quiz · tap to answer" : voteLabel(voters)}</span>
+      <span style={label(look)}>
+        {problem ?? (revealed(isAuthor, mine) ? voteLabel(voters) : "Quiz · tap to answer")}
+      </span>
     </span>
   );
 }
@@ -135,6 +183,8 @@ export function ShowSlider({
   state,
   isAuthor = false,
   preview = false,
+  hyped = false,
+  onHype,
 }: {
   showId?: string;
   layerId: string;
@@ -143,15 +193,48 @@ export function ShowSlider({
   state?: { avg: number; count: number; mine: number | null };
   isAuthor?: boolean;
   preview?: boolean;
+  /** The Show's own hype, which the Hype meter works rather than keeping one. */
+  hyped?: boolean;
+  onHype?: () => void;
 }) {
+  /**
+   * The Hype meter: the same slider, except letting go above HYPE_METER_AT
+   * also hypes the Show.
+   *
+   * Hypes, never un-hypes. A drag is a reading, not a switch — pulling the
+   * ★ back down means you are less excited than you were, which is not the
+   * same as taking back having liked the Show. The heart stays the one way
+   * to undo it, and it is right there.
+   */
+  const meter = slider.hype === true;
   const [supabase] = useState(createClient);
-  const [value, setValue] = useState<number>(state?.mine ?? (isAuthor ? state?.avg ?? 0 : 50));
-  const [sent, setSent] = useState<{ avg: number; count: number } | null>(
-    state && (state.mine !== null || isAuthor) ? { avg: state.avg, count: state.count } : null,
+
+  /** What is drawn: where the ★ sits, and the average once the server has it. */
+  type Hype = { pick: number; sent: { avg: number; count: number } | null };
+  const seed = useMemo<Hype>(
+    () => ({
+      pick: state?.mine ?? (isAuthor ? state?.avg ?? 0 : 50),
+      sent: state && (state.mine !== null || isAuthor) ? { avg: state.avg, count: state.count } : null,
+    }),
+    [state, isAuthor],
   );
-  const [who, setWho] = useState<{ name: string; value: number }[] | null>(null);
+  const [held, setHeld] = useState<Seeded<Hype>>(() => ({ value: seed, seed }));
+  // State, not a ref — it is read during render. See ShowPoll.
+  const [touched, setTouched] = useState(false);
+  const next = seeded(held, seed, touched);
+  if (next !== held) setHeld(next);
+  const { pick: value, sent } = next.value;
+
+  const [problem, setProblem] = useState<string | null>(null);
+  /** True from letting go until it has settled, so only then does it spring. */
+  const [settling, setSettling] = useState(false);
   const track = useRef<HTMLSpanElement | null>(null);
   const live = !preview && !!showId && !isAuthor;
+
+  function put(pick: number, s: Hype["sent"] = sent) {
+    setTouched(true);
+    setHeld({ value: { pick, sent: s }, seed: next.seed });
+  }
 
   function at(clientX: number) {
     const r = track.current?.getBoundingClientRect();
@@ -161,18 +244,22 @@ export function ShowSlider({
 
   async function send(v: number) {
     if (!live || !showId) return;
+    const was = value;
+    setProblem(null);
     const { data, error } = await supabase.rpc("set_show_slider", { p_show_id: showId, p_layer_id: layerId, p_value: v });
-    if (error) return;
+    if (error) {
+      // It used to leave the ★ wherever the thumb let go, recording nothing
+      // and saying nothing — the worst of the three options.
+      put(was === v ? seed.pick : was);
+      setProblem(stickerError(error));
+      return;
+    }
     const d = data as { avg?: number; count?: number } | null;
-    setSent({ avg: Number(d?.avg) || 0, count: Number(d?.count) || 0 });
-  }
-
-  async function showWho() {
-    if (!showId || who) return;
-    const { data } = await supabase.rpc("show_slider_voters", { p_show_id: showId, p_layer_id: layerId });
-    setWho(
-      (data ?? []).map((r) => ({ name: r.display_name || r.username || "Someone", value: r.value })),
-    );
+    put(v, { avg: Number(d?.avg) || 0, count: Number(d?.count) || 0 });
+    // After the value is recorded, not before: a meter that hyped the Show
+    // and then failed to save the number would leave the two disagreeing,
+    // and the number is the thing being asked for.
+    if (meter && !hyped && v >= HYPE_METER_AT) onHype?.();
   }
 
   return (
@@ -189,31 +276,69 @@ export function ShowSlider({
         onPointerDown={(e) => {
           stop(e);
           if (!live) return;
+          setSettling(false);
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-          setValue(at(e.clientX));
+          put(at(e.clientX));
         }}
         onPointerMove={(e) => {
           if (!live || !(e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) return;
-          setValue(at(e.clientX));
+          put(at(e.clientX));
         }}
         onPointerUp={(e) => {
           if (!live) return;
           const v = at(e.clientX);
-          setValue(v);
+          // Let go and it springs home to where it was left, rather than
+          // stopping dead under the thumb.
+          setSettling(true);
+          put(v);
           void send(v);
         }}
         onKeyDown={(e) => {
           if (!live || (e.key !== "ArrowRight" && e.key !== "ArrowLeft")) return;
           const v = Math.min(100, Math.max(0, value + (e.key === "ArrowRight" ? 10 : -10)));
-          setValue(v);
+          setSettling(true);
+          put(v);
           void send(v);
         }}
         style={{ position: "relative", height: 10, borderRadius: 5, background: `${look.ink}33`, touchAction: "none", cursor: live ? "pointer" : "default" }}
       >
-        <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${value}%`, borderRadius: 5, background: look.ink }} />
-        {sent && !isAuthor && (
-          // Where everyone else landed, as a tick on the track.
-          <span aria-hidden style={{ position: "absolute", top: -4, bottom: -4, left: `${sent.avg}%`, width: 2, background: String(look.title.color ?? "#fff"), opacity: 0.7 }} />
+        <span
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: `${value}%`,
+            borderRadius: 5,
+            // On a meter the fill turns the brand's lime once it is far
+            // enough along to hype the Show, so the one thing that makes
+            // this sticker different is visible before you let go rather
+            // than explained underneath it afterwards.
+            background: meter && value >= HYPE_METER_AT ? HYPE_LIME : look.ink,
+            transition: settling ? "width 420ms cubic-bezier(.34,1.56,.64,1)" : undefined,
+          }}
+        />
+        {sent && (
+          /*
+           * Where everyone else landed, in the brand's lime rather than the
+           * look's own text colour: it is the one mark on the sticker that is
+           * about everybody instead of you, and on half the looks a white tick
+           * at 0.7 opacity was invisible against the fill. Drawn for the
+           * author too — it is the only number their own slider has.
+           */
+          <span
+            aria-hidden
+            style={{
+              position: "absolute",
+              top: -5,
+              bottom: -5,
+              left: `${sent.avg}%`,
+              width: 2,
+              borderRadius: 2,
+              background: HYPE_LIME,
+              boxShadow: `0 0 8px ${HYPE_LIME}cc`,
+            }}
+          />
         )}
         <span
           aria-hidden
@@ -232,35 +357,40 @@ export function ShowSlider({
             justifyContent: "center",
             fontSize: 16,
             boxShadow: "0 3px 10px rgba(0,0,0,0.3)",
+            // Overshoots a little and comes back, so letting go feels like
+            // landing rather than stopping. Only after release: during the
+            // drag the ★ must sit exactly under the thumb.
+            transition: settling ? "left 420ms cubic-bezier(.34,1.56,.64,1)" : undefined,
           }}
+          onTransitionEnd={() => setSettling(false)}
         >
           ★
         </span>
       </span>
       {isAuthor ? (
-        <Press
-          preview={preview}
-          disabled={preview || !sent?.count}
-          onPointerDown={stop}
-          onClick={(e) => {
-            stop(e);
-            void showWho();
-          }}
-          style={{ ...label(look), background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer", fontFamily: "inherit" }}
-        >
-          {sent?.count ? `${sent.count} hyped · avg ${sent.avg}% · see who` : "Hype slider · nobody yet"}
-        </Press>
+        /*
+         * A label, not a button. Tapping anywhere on your own sticker opens
+         * the results sheet (LayerView handles that for all five of them), and
+         * a button in here as well meant one tap doing two things — and two
+         * surfaces answering the same question, which is what the sheet exists
+         * to stop. show_slider_voters stays in the database as the sheet's
+         * fallback before 0194.
+         */
+        <span style={label(look)}>
+          {sent?.count
+            ? `${sent.count} hyped · avg ${sent.avg}% · see who`
+            : `${meter ? "Hype meter" : "Hype slider"} · nobody yet`}
+        </span>
       ) : (
-        <span style={label(look)}>{sent ? `${sent.count} hyped · avg ${sent.avg}%` : "Drag the ★"}</span>
-      )}
-      {who && (
-        <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {who.slice(0, 8).map((w, i) => (
-            <span key={i} style={{ ...look.title, fontSize: 11.5, fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.name}</span>
-              <span>{w.value}%</span>
-            </span>
-          ))}
+        <span style={label(look)}>
+          {problem ??
+            (sent
+              ? `${sent.count} hyped · avg ${sent.avg}%`
+              : meter
+                ? hyped
+                  ? "Drag the ★ — you hyped this"
+                  : "Drag the ★ past lime to hype it"
+                : "Drag the ★")}
         </span>
       )}
     </span>
@@ -296,6 +426,30 @@ export function ShowCountdown({
   }, []);
 
   const left = countdownParts(countdown.at, now);
+
+  /*
+   * A finished countdown runs its last seconds out and then the Show throws
+   * a party, rather than quietly reading "It's happening".
+   *
+   * It is a replay, not a live tick: the moment may have passed days ago, so
+   * the numbers start at RUN_FROM and walk down once, the first time somebody
+   * opens the Show with it on. Only live — in the tray and in the editor a
+   * finished countdown is a shape being arranged, and confetti over the
+   * picture you are decorating would be absurd.
+   */
+  const live = !preview && !!showId;
+  const [runOut, setRunOut] = useState(left.ended && live ? RUN_FROM : 0);
+
+  useEffect(() => {
+    if (!left.ended || !live || runOut <= 0) return;
+    const t = setTimeout(() => setRunOut((n) => n - 1), RUN_STEP_MS);
+    return () => clearTimeout(t);
+  }, [left.ended, live, runOut]);
+
+  // Derived, not stored: the party is simply "finished, and the seconds have
+  // run out". Keeping it in state meant setting it from inside the effect
+  // that counts down, which is a cascading render for something already known.
+  const partied = left.ended && live && runOut <= 0;
   const cell = (n: number, unit: string) => (
     <span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
       <span
@@ -333,7 +487,16 @@ export function ShowCountdown({
     <span style={{ ...look.box, display: "flex", flexDirection: "column", gap: 10, width: 230, alignItems: "stretch" }}>
       <span style={{ ...look.title, fontSize: 13, textAlign: "center" }}>{countdown.title}</span>
       {left.ended ? (
-        <span style={{ ...look.title, fontSize: 15, textAlign: "center" }}>It&rsquo;s happening</span>
+        runOut > 0 ? (
+          // The last seconds, walking down.
+          <span style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+            {cell(0, "DAYS")}
+            {cell(0, "HRS")}
+            {cell(runOut, "SEC")}
+          </span>
+        ) : (
+          <span style={{ ...look.title, fontSize: 15, textAlign: "center" }}>It&rsquo;s happening</span>
+        )
       ) : (
         <span style={{ display: "flex", justifyContent: "center", gap: 8 }}>
           {cell(left.days, "DAYS")}
@@ -365,6 +528,7 @@ export function ShowCountdown({
           {on ? "Reminder set ✓" : "Remind me"}
         </Press>
       )}
+      {partied && <Celebrate />}
     </span>
   );
 }
@@ -378,6 +542,7 @@ export function ShowAddYours({
   added = 0,
   isAuthor = false,
   preview = false,
+  layer,
 }: {
   showId?: string;
   layerId: string;
@@ -386,6 +551,12 @@ export function ShowAddYours({
   added?: number;
   isAuthor?: boolean;
   preview?: boolean;
+  /**
+   * The whole layer, so answering carries the sticker across in the place it
+   * was. The payload alone cannot: the position, angle and look are what make
+   * the answer read as part of the same thread.
+   */
+  layer?: ShowLayer;
 }) {
   const [supabase] = useState(createClient);
   const router = useRouter();
@@ -405,6 +576,9 @@ export function ShowAddYours({
       setProblem(error?.message.includes("full") ? "This one is full" : "Couldn't open it");
       return;
     }
+    // Stashed under the collab the server just gave us, for the editor on
+    // the other side of this navigation to pick up. See lib/show-carry.
+    if (layer) carryLayer(String(data), layer);
     router.push(`/create?mode=show&collab=${data}`);
   }
 

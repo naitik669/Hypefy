@@ -43,6 +43,7 @@ const ShowEditor = dynamic(
 );
 import { useObjectUrl } from "@/lib/object-url";
 import type { ShowLayer } from "@/lib/show-layers";
+import { takeCarried } from "@/lib/show-carry";
 import { flattenDrawing } from "@/lib/draw";
 import type { ShowDrawing } from "@/components/shows/ShowEditor";
 const ShotEditor = dynamic(
@@ -87,14 +88,30 @@ export type CreateMode = "shot" | "show";
  */
 function ShowArrange({
   file,
+  collabId,
   onCancel,
   onDone,
 }: {
   file: File;
+  /** Answering a shared Show, so its sticker may be waiting to be carried. */
+  collabId?: string;
   onCancel: () => void;
   onDone: (layers: ShowLayer[], drawing: ShowDrawing | null) => void;
 }) {
-  return <ShowEditor photoUrl={useObjectUrl(file)} onCancel={onCancel} onPublish={onDone} />;
+  /*
+   * Taken once, when the editor opens. `takeCarried` also forgets it, so
+   * backing out and coming in again starts from a clean picture rather than
+   * stacking the same sticker twice — it belongs to the one Show being made.
+   */
+  const [carried] = useState<ShowLayer[]>(() => (collabId ? takeCarried(collabId) : []));
+  return (
+    <ShowEditor
+      photoUrl={useObjectUrl(file)}
+      initial={carried}
+      onCancel={onCancel}
+      onPublish={onDone}
+    />
+  );
 }
 
 /** How long the note on an unbuilt control stays up. */
@@ -480,6 +497,7 @@ export function CreateScreen({
       <>
         <ShowArrange
           file={captured}
+          collabId={collabId}
           onCancel={back}
           onDone={(layers, drawing) => {
             if (!drawing || drawing.strokes.length === 0) return setArranged(layers);

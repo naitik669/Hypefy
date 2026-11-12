@@ -17,7 +17,13 @@
  * here touches the DOM, so all of it is testable.
  */
 
-import { LAYER_POS_MAX, LAYER_POS_MIN, LAYER_SCALE_MAX, LAYER_SCALE_MIN } from "@/lib/show-layers";
+import {
+  LAYER_PLACE_MAX_Y,
+  LAYER_POS_MAX,
+  LAYER_POS_MIN,
+  LAYER_SCALE_MAX,
+  LAYER_SCALE_MIN,
+} from "@/lib/show-layers";
 
 export type Point = { x: number; y: number };
 
@@ -66,7 +72,9 @@ export function dragged(
   return {
     ...from,
     x: clamp(from.x + (now.x - start.x) / frame.width, LAYER_POS_MIN, LAYER_POS_MAX),
-    y: clamp(from.y + (now.y - start.y) / frame.height, LAYER_POS_MIN, LAYER_POS_MAX),
+    // Not LAYER_POS_MAX: the foot of the frame belongs to the caption and the
+    // reply row, and a sticker under the reply row cannot be pressed.
+    y: clamp(from.y + (now.y - start.y) / frame.height, LAYER_POS_MIN, LAYER_PLACE_MAX_Y),
   };
 }
 

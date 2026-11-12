@@ -211,6 +211,10 @@ export function notifHref(n: Notif): string {
 
   if (n.target_type === "post" && n.target_id) return `/p/${n.target_id}`;
   if (n.target_type === "shot" && n.target_id) return `/shots/${n.target_id}`;
+  // Somebody answered a question sticker. Its target_type is "show", so this
+  // has to come first: landing on the Show itself was landing on the one
+  // screen that cannot show you the answer.
+  if (n.type === "show_answer" && n.target_id) return `/shows/${n.target_id}/answers`;
   if (n.target_type === "show" && n.target_id) return `/shows/${n.target_id}`;
   // An invitation to a shared Show. Without this it falls through to
   // "#" below — a notification that goes nowhere, which is how every

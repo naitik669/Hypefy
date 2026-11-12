@@ -84,6 +84,7 @@ import { HypeParticles } from "@/components/feed/HypeParticles";
 import { LayerStack } from "@/components/shows/LayerView";
 import type { PollState } from "@/components/shows/ShowPoll";
 import { EMPTY_STICKER_STATE, readStickerState, type StickerState } from "@/lib/show-stickers";
+import { ShowResultsSheet } from "@/components/shows/ShowResultsSheet";
 import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
 import { storyGesture, storyKey, type StoryMove } from "@/lib/story-gesture";
 
@@ -537,6 +538,44 @@ function ShowScreen({
   }, [show.id, hasLive, supabase]);
 
   /**
+   * What you answered a question sticker, so coming back shows it.
+   *
+   * Read straight from the table rather than through an RPC: the RLS policy on
+   * `show_answers` already returns the asker's own rows (and the author's),
+   * which is exactly this query. Only for a Show carrying a question, like the
+   * two above. Moves into `show_sticker_state` with 0194, where it becomes one
+   * call instead of two.
+   */
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+
+  /**
+   * Which sticker's results are open, if any. Null means closed; a layer id
+   * means opened by tapping that one, and the sheet scrolls to it.
+   */
+  const [results, setResults] = useState<string | null>(null);
+  const hasQuestion = useMemo(() => layers.some((l) => l.type === "question"), [layers]);
+  useEffect(() => {
+    if (!hasQuestion || !currentUserId) return;
+    let dropped = false;
+    void supabase
+      .from("show_answers")
+      .select("layer_id, body")
+      .eq("show_id", show.id)
+      .eq("asker_id", currentUserId)
+      .then(({ data }) => {
+        if (dropped || !data) return;
+        const mine: Record<string, string> = {};
+        // Newest wins while a viewer can still answer twice; 0194 makes that
+        // impossible with a unique index, and this keeps working either way.
+        for (const row of data) mine[row.layer_id as string] = row.body as string;
+        setAnswers(mine);
+      });
+    return () => {
+      dropped = true;
+    };
+  }, [show.id, hasQuestion, currentUserId, supabase]);
+
+  /**
    * What the embedded posts and Shots look like now.
    *
    * Read by id rather than copied onto the layer when it was placed, so
@@ -547,7 +586,10 @@ function ShowScreen({
    */
   const [embeds, setEmbeds] = useState<Record<string, EmbedState>>({});
   const embedded = useMemo(
-    () => layers.filter((l) => l.type === "post" || l.type === "shot" || l.type === "spotlight"),
+    () =>
+      layers.filter(
+        (l) => l.type === "post" || l.type === "shot" || l.type === "spotlight" || l.type === "hypecard",
+      ),
     [layers],
   );
   useEffect(() => {
@@ -561,9 +603,13 @@ function ShowScreen({
       .filter((l) => l.type === "shot")
       .map((l) => (l.payload as { shotId: string }).shotId);
     const wantsSpotlight = embedded.some((l) => l.type === "spotlight");
+    // A Hype card keeps nothing but an id, so everything on it is read here.
+    const cardOwners = embedded
+      .filter((l) => l.type === "hypecard")
+      .map((l) => (l.payload as { ownerId: string }).ownerId);
 
     void (async () => {
-      const [posts, shots, notes] = await Promise.all([
+      const [posts, shots, notes, owners] = await Promise.all([
         postIds.length
           ? supabase
               .from("posts")
@@ -581,6 +627,13 @@ function ShowScreen({
         // A Spotlight page is read through get_notes, which already decides
         // who may see whose: one you may not see reads as ended.
         wantsSpotlight ? supabase.rpc("get_notes") : Promise.resolve({ data: [] as never[] }),
+        // Public columns only. A card shows what a profile shows.
+        cardOwners.length
+          ? supabase
+              .from("profiles")
+              .select("id, username, display_name, avatar_url, avatar_hue, member_no, created_at")
+              .in("id", cardOwners)
+          : Promise.resolve({ data: [] as never[] }),
       ]);
       if (dropped) return;
 
@@ -606,14 +659,30 @@ function ShowScreen({
         ]),
       );
 
+      const byOwner = new Map(
+        (owners.data ?? []).map((o) => [
+          o.id,
+          {
+            thumb: o.avatar_url ?? null,
+            caption: o.display_name ?? null,
+            author: o.username ?? null,
+            memberNo: o.member_no ?? null,
+            since: o.created_at ?? null,
+            hue: o.avatar_hue ?? null,
+          } satisfies EmbedState,
+        ]),
+      );
+
       const next: Record<string, EmbedState> = {};
       for (const layer of embedded) {
         const found =
-          layer.type === "spotlight"
-            ? spotlightOf(notes.data, (layer.payload as { ownerId: string }).ownerId)
-            : layer.type === "post"
-              ? byPost.get((layer.payload as { postId: string }).postId)
-              : byShot.get((layer.payload as { shotId: string }).shotId);
+          layer.type === "hypecard"
+            ? byOwner.get((layer.payload as { ownerId: string }).ownerId)
+            : layer.type === "spotlight"
+              ? spotlightOf(notes.data, (layer.payload as { ownerId: string }).ownerId)
+              : layer.type === "post"
+                ? byPost.get((layer.payload as { postId: string }).postId)
+                : byShot.get((layer.payload as { shotId: string }).shotId);
         next[layer.id] = found ?? { thumb: null, caption: null, gone: true };
       }
       setEmbeds(next);
@@ -812,10 +881,23 @@ function ShowScreen({
           polls={polls}
           embeds={embeds}
           stickers={stickers}
+          answers={answers}
           isAuthor={isOwner}
-          version={`${Object.keys(polls).length}:${stickers === EMPTY_STICKER_STATE ? 0 : 1}`}
+          onResults={isOwner ? setResults : undefined}
+          hyped={hyped}
+          onHype={toggleShowHype}
         />
       </div>
+
+      {isOwner && (
+        <ShowResultsSheet
+          showId={show.id}
+          layers={layers}
+          open={results !== null}
+          focus={results}
+          onClose={() => setResults(null)}
+        />
+      )}
 
       {/* ── The gesture surface ──
           Two tap zones became one. Diary's player has had tap, swipe

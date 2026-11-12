@@ -5,6 +5,9 @@ import Link from "next/link";
 import { lookFor, type Look } from "@/lib/show-looks";
 import { ShowPoll, ShowQuestion, type PollState } from "@/components/shows/ShowPoll";
 import { ShowAddYours, ShowCountdown, ShowQuiz, ShowSlider } from "@/components/shows/ShowStickers";
+import { StickerCallout, CALLOUT_FLIP_Y } from "@/components/shows/StickerCallout";
+import { HypeCardSticker } from "@/components/shows/HypeCard";
+import { isResultKind } from "@/lib/show-results";
 import type { StickerState } from "@/lib/show-stickers";
 import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
 import {
@@ -63,6 +66,11 @@ export const PRESSABLE: ReadonlySet<LayerType> = new Set<LayerType>([
   "post",
   "shot",
   "spotlight",
+  "hypecard",
+  // Both of these drew as if they were tappable and were not in here at all,
+  // so every tap went through them to the Show underneath.
+  "location",
+  "music",
 ]);
 
 export function LayerView({
@@ -73,7 +81,11 @@ export function LayerView({
   polls,
   embeds,
   stickers,
+  answers,
   isAuthor = false,
+  hyped,
+  onHype,
+  onResults,
 }: {
   layer: ShowLayer;
   frame: { width: number; height: number };
@@ -87,8 +99,27 @@ export function LayerView({
   embeds?: Record<string, EmbedState>;
   /** What viewers have done with the interactive stickers (show_sticker_state). */
   stickers?: StickerState;
+  /** Your own answer to each question sticker, by layer id. */
+  answers?: Record<string, string>;
   /** The person looking is the one who posted it. */
   isAuthor?: boolean;
+  /**
+   * Whether the person looking has already hyped this Show, and how to.
+   *
+   * The Hype meter does not keep a hype of its own — it works the Show's,
+   * which the viewer already owns and already draws a button for. Passing
+   * the one piece of state down is what stops the meter and the button
+   * disagreeing about whether you hyped it.
+   */
+  hyped?: boolean;
+  onHype?: () => void;
+  /**
+   * Ask for the results of one sticker. Only the author gets this, and it is
+   * handled here rather than inside each of the five interactive stickers:
+   * none of them offers the author a vote any more, so a tap on their own is
+   * free to mean "show me" — and one wrapper is one place to get that right.
+   */
+  onResults?: (layerId: string) => void;
 }) {
   const box = layerBox(layer, frame);
   return (
@@ -96,7 +127,18 @@ export function LayerView({
       className="pointer-events-none absolute"
       style={{ left: box.left, top: box.top, transform: box.transform, transformOrigin: "center" }}
     >
-      <div className={!editing && PRESSABLE.has(layer.type) ? "pointer-events-auto" : "pointer-events-none"}>
+      <div
+        className={!editing && PRESSABLE.has(layer.type) ? "pointer-events-auto" : "pointer-events-none"}
+        {...(!editing && isAuthor && onResults && isResultKind(layer.type)
+          ? {
+              onClick: (e: React.MouseEvent) => {
+                // The frame underneath takes a tap as "next Show".
+                e.stopPropagation();
+                onResults(layer.id);
+              },
+            }
+          : {})}
+      >
         <LayerBody
           layer={layer}
           editing={editing}
@@ -104,7 +146,10 @@ export function LayerView({
           polls={polls}
           embeds={embeds}
           stickers={stickers}
+          answers={answers}
           isAuthor={isAuthor}
+          hyped={hyped}
+          onHype={onHype}
         />
       </div>
     </div>
@@ -125,7 +170,10 @@ export function LayerBody({
   polls,
   embeds,
   stickers,
+  answers,
   isAuthor = false,
+  hyped,
+  onHype,
 }: {
   layer: ShowLayer;
   editing?: boolean;
@@ -134,8 +182,20 @@ export function LayerBody({
   embeds?: Record<string, EmbedState>;
   /** What viewers have done with the interactive stickers (show_sticker_state). */
   stickers?: StickerState;
+  /** Your own answer to each question sticker, by layer id. */
+  answers?: Record<string, string>;
   /** The person looking is the one who posted it. */
   isAuthor?: boolean;
+  /**
+   * Whether the person looking has already hyped this Show, and how to.
+   *
+   * The Hype meter does not keep a hype of its own — it works the Show's,
+   * which the viewer already owns and already draws a button for. Passing
+   * the one piece of state down is what stops the meter and the button
+   * disagreeing about whether you hyped it.
+   */
+  hyped?: boolean;
+  onHype?: () => void;
 }) {
   const look = lookFor(layer.type, layer.look, layer.tint);
 
@@ -175,7 +235,25 @@ export function LayerBody({
     }
 
     case "music":
-      return <MusicSticker track={layer.payload as MusicPayload} look={look} editing={editing} />;
+      {
+        const song = layer.payload as MusicPayload;
+        const body = <MusicSticker track={song} look={look} editing={editing} />;
+        // "only" draws nothing for a viewer, so there is nothing to press.
+        if (editing || song.style === "only") return body;
+        return (
+          <StickerCallout
+            look={look}
+            kind="Song"
+            title={song.title}
+            sub={song.artist}
+            go="Open song"
+            href={`/sound/${encodeURIComponent(song.id)}`}
+            up={layer.y > CALLOUT_FLIP_Y}
+          >
+            {body}
+          </StickerCallout>
+        );
+      }
 
     case "mention": {
       const { username } = layer.payload as MentionPayload;
@@ -186,7 +264,19 @@ export function LayerBody({
       );
       // While it is being placed it is a shape, not a link: a drag that
       // ends on it should not navigate away.
-      return editing ? body : <Link href={`/u/${username}`}>{body}</Link>;
+      if (editing) return body;
+      return (
+        <StickerCallout
+          look={look}
+          kind="Mention"
+          title={`@${username}`}
+          go="Open profile"
+          href={`/u/${username}`}
+          up={layer.y > CALLOUT_FLIP_Y}
+        >
+          {body}
+        </StickerCallout>
+      );
     }
 
     case "link": {
@@ -209,12 +299,22 @@ export function LayerBody({
           </span>
         </span>
       );
-      return editing ? (
-        body
-      ) : (
-        <a href={url} target="_blank" rel="noopener noreferrer nofollow">
+      if (editing) return body;
+      return (
+        <StickerCallout
+          look={look}
+          kind="Link"
+          title={host}
+          // The whole address, because a host alone does not say where a
+          // link goes and this is the moment somebody decides to follow it.
+          sub={url}
+          go="Open link"
+          href={url}
+          external
+          up={layer.y > CALLOUT_FLIP_Y}
+        >
           {body}
-        </a>
+        </StickerCallout>
       );
     }
 
@@ -258,6 +358,7 @@ export function LayerBody({
           poll={poll}
           look={look}
           state={polls?.[layer.id]}
+          isAuthor={isAuthor}
         />
       );
     }
@@ -285,7 +386,16 @@ export function LayerBody({
           </span>
         );
       }
-      return <ShowQuestion showId={showId} layerId={layer.id} question={question} look={look} />;
+      return (
+        <ShowQuestion
+          showId={showId}
+          layerId={layer.id}
+          question={question}
+          look={look}
+          isAuthor={isAuthor}
+          mine={answers?.[layer.id]}
+        />
+      );
     }
 
     case "post":
@@ -293,9 +403,15 @@ export function LayerBody({
     case "spotlight":
       return <EmbedSticker layer={layer} look={look} embed={embeds?.[layer.id]} editing={editing} />;
 
+    // Through the same `embeds` lookup, and deliberately not an EMBED_TYPE:
+    // those replace one another, one to a Show, and a card is not a thing
+    // you posted.
+    case "hypecard":
+      return <HypeCardSticker layer={layer} card={embeds?.[layer.id]} editing={editing} />;
+
     case "location": {
       const { place, area } = layer.payload as LocationPayload;
-      return (
+      const body = (
         <span style={{ ...look.box, display: "inline-flex", alignItems: "center", gap: 7, maxWidth: 260 }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={look.ink} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none" }} aria-hidden>
             <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" />
@@ -313,6 +429,29 @@ export function LayerBody({
           </span>
         </span>
       );
+      if (editing) return body;
+      /*
+       * It looked exactly like something you would tap and was not in
+       * PRESSABLE at all, so a tap went straight through to the Show. A place
+       * has no page of its own here, so the callout opens a map search —
+       * encoded, and with the area if it was typed, because "Hauz Khas" alone
+       * finds the wrong city.
+       */
+      const query = [place, area].filter(Boolean).join(", ");
+      return (
+        <StickerCallout
+          look={look}
+          kind="Place"
+          title={place}
+          sub={area}
+          go="Open in Maps"
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`}
+          external
+          up={layer.y > CALLOUT_FLIP_Y}
+        >
+          {body}
+        </StickerCallout>
+      );
     }
 
     case "hashtag": {
@@ -320,7 +459,19 @@ export function LayerBody({
       const body = (
         <span style={{ ...look.box, ...look.title, display: "inline-block", fontSize: 15 }}>#{tag}</span>
       );
-      return editing ? body : <Link href={`/tag/${encodeURIComponent(tag)}`}>{body}</Link>;
+      if (editing) return body;
+      return (
+        <StickerCallout
+          look={look}
+          kind="Tag"
+          title={`#${tag}`}
+          go="Open tag"
+          href={`/tag/${encodeURIComponent(tag)}`}
+          up={layer.y > CALLOUT_FLIP_Y}
+        >
+          {body}
+        </StickerCallout>
+      );
     }
 
     case "quiz": {
@@ -332,6 +483,7 @@ export function LayerBody({
           quiz={layer.payload as QuizPayload}
           look={look}
           state={polls?.[layer.id]}
+          isAuthor={isAuthor}
           preview={preview}
         />
       );
@@ -347,6 +499,8 @@ export function LayerBody({
           state={stickers?.sliders[layer.id]}
           isAuthor={isAuthor}
           preview={editing || !showId}
+          hyped={hyped}
+          onHype={onHype}
         />
       );
 
@@ -369,6 +523,7 @@ export function LayerBody({
           showId={showId}
           layerId={layer.id}
           addYours={layer.payload as AddYoursPayload}
+          layer={layer}
           look={look}
           added={stickers?.added[layer.id] ?? 0}
           isAuthor={isAuthor}
@@ -404,8 +559,11 @@ export function LayerStack({
   polls,
   embeds,
   stickers,
+  answers,
   isAuthor = false,
-  version = "",
+  hyped,
+  onHype,
+  onResults,
 }: {
   layers: ShowLayer[];
   frame: { width: number; height: number };
@@ -415,14 +573,27 @@ export function LayerStack({
   embeds?: Record<string, EmbedState>;
   /** What viewers have done with the interactive stickers (show_sticker_state). */
   stickers?: StickerState;
+  /** Your own answer to each question sticker, by layer id. */
+  answers?: Record<string, string>;
   /** The person looking is the one who posted it. */
   isAuthor?: boolean;
   /**
-   * Changes when what the server knows has arrived. The live stickers take
-   * their starting state once, when they mount, and that state lands a
-   * moment after the Show does — so they are drawn again when it lands.
+   * Whether the person looking has already hyped this Show, and how to.
+   *
+   * The Hype meter does not keep a hype of its own — it works the Show's,
+   * which the viewer already owns and already draws a button for. Passing
+   * the one piece of state down is what stops the meter and the button
+   * disagreeing about whether you hyped it.
    */
-  version?: string;
+  hyped?: boolean;
+  onHype?: () => void;
+  /**
+   * Ask for the results of one sticker. Only the author gets this, and it is
+   * handled here rather than inside each of the five interactive stickers:
+   * none of them offers the author a vote any more, so a tap on their own is
+   * free to mean "show me" — and one wrapper is one place to get that right.
+   */
+  onResults?: (layerId: string) => void;
 }) {
   // Everything inside a layer — a card's width, a sticker's size, the
   // point size of text — is written once at DESIGN_WIDTH, and the whole
@@ -446,7 +617,17 @@ export function LayerStack({
     >
       {layers.map((layer) => (
         <LayerView
-          key={`${layer.id}:${version}`}
+          /*
+           * The layer's own id, and nothing else.
+           *
+           * This used to carry a version that changed when the server's
+           * answer arrived, which threw every sticker away and built it
+           * again — the only route by which late state reached them, and the
+           * reason a half-typed answer or a dragged slider vanished mid-use.
+           * The state comes in as a prop now and the stickers seed from it
+           * (see `seeded` in lib/show-stickers), so the key can be stable.
+           */
+          key={layer.id}
           layer={layer}
           frame={design}
           editing={editing}
@@ -454,7 +635,11 @@ export function LayerStack({
           polls={polls}
           embeds={embeds}
           stickers={stickers}
+          answers={answers}
           isAuthor={isAuthor}
+          hyped={hyped}
+          onHype={onHype}
+          onResults={onResults}
         />
       ))}
     </div>
