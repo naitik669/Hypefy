@@ -9,7 +9,6 @@ import { ReportSheet } from "@/components/ui/ReportSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Avatar } from "@/components/ui/Avatar";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
-import { DisplayName } from "@/components/ui/DisplayName";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { ExpandableText } from "@/components/ui/ExpandableText";
 import { RichPostText } from "@/components/ui/RichPostText";
@@ -629,7 +628,19 @@ function ShotFeedCardInner({
         </Link>
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <Link href={profileHref} className="flex min-w-0 text-sm font-semibold hover:underline">
-            <DisplayName name={name} profile={profile} className="min-w-0 truncate" />
+            {/*
+              * Plain, deliberately.
+              *
+              * A name font and a glow are for the places a person is the
+              * subject — their profile, their card, the top of a chat with
+              * them. The feed is a list of other people's posts, and six
+              * different faces down one scroll reads as six different
+              * apps: the glow competes with the picture it sits above, and
+              * Script at 14px is simply harder to read than the name is
+              * worth. The cosmetics are not lost, they are just not worn
+              * here.
+              */}
+            <span className="min-w-0 truncate">{name}</span>
           </Link>
           {profile?.is_verified && (
             <VerifiedBadge className="h-3.5 w-3.5 shrink-0" userId={shot.user_id} />
