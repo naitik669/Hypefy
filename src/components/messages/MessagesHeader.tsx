@@ -6,6 +6,7 @@ import { Plus, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { upsertSavedAccount } from "@/lib/saved-accounts";
 import { AccountDropdown } from "@/components/messages/AccountDropdown";
+import { hideStyle, useHideOnScroll } from "@/lib/use-hide-on-scroll";
 
 /**
  * Messages header: the screen title, the call log, and starting a new chat.
@@ -29,6 +30,7 @@ export function MessagesHeader({
   avatarUrl: string | null;
   hue: number;
 }) {
+  const hidden = useHideOnScroll();
   const supabase = createClient();
 
   // Keeps this session in the saved-accounts list with fresh tokens. The
@@ -57,7 +59,10 @@ export function MessagesHeader({
   // but painted in the page's own colour so it never announces itself; the list
   // simply slides under it.
   return (
-    <header className="sticky top-0 z-20 flex h-[calc(4rem+var(--sat))] items-center justify-between bg-background px-4 pt-[var(--sat)]">
+    <header
+      className="sticky top-0 z-20 flex h-[calc(4rem+var(--sat))] items-center justify-between bg-background px-4 pt-[var(--sat)] will-change-transform motion-reduce:transition-none"
+      style={hideStyle(hidden)}
+    >
       {/* No truncate and no leading-none on the word: together they clipped
           it, because "Messages" has a descender. It is fixed and never needs
           truncating anyway. */}

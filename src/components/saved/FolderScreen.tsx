@@ -20,8 +20,9 @@ import { scheduleUndoable } from "@/lib/undoable";
 import { haptics } from "@/lib/haptics";
 import { folderFill, makeFolder, nextFolderColor, toFolder, type Folder } from "@/lib/folders";
 import { FOLDER_ITEM_COLS, folderItem, itemKey, type SavedItem } from "@/lib/saved";
+import { hideStyle, useHideOnScroll } from "@/lib/use-hide-on-scroll";
 
-const HEADER = "sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center gap-1 px-2 pt-[var(--sat)] transition-colors";
+const HEADER = "sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center gap-1 px-2 pt-[var(--sat)] transition-colors will-change-transform motion-reduce:transition-none";
 const ICON_BTN = "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5";
 const GLOW = "radial-gradient(75% 70% at 50% 0%, #000 10%, transparent 72%)";
 const PILL = "flex h-9 items-center gap-1.5 rounded-pill bg-elevated px-3 text-xs font-bold ring-1 ring-border transition-colors active:bg-white/10 disabled:opacity-40";
@@ -50,6 +51,8 @@ export function FolderScreen({
   const supabase = createClient();
   const router = useRouter();
   const toast = useToast();
+  // Named apart from this screen's own `hidden`, which is hidden ITEMS.
+  const headerHidden = useHideOnScroll();
 
   const [folder, setFolder] = useState(initialFolder);
   const [items, setItems] = useState(initialItems);
@@ -207,7 +210,7 @@ export function FolderScreen({
       />
 
       {selecting ? (
-        <header className={`${HEADER} border-b border-border/60 bg-background/90 backdrop-blur-xl`}>
+        <header className={`${HEADER} border-b border-border/60 bg-background/90 backdrop-blur-xl`} style={hideStyle(headerHidden)}>
           <button type="button" onClick={() => setSelected(new Map())} aria-label="Stop selecting" className={ICON_BTN}>
             <X size={22} />
           </button>

@@ -9,10 +9,16 @@ import { readFileSync } from "node:fs";
  * top bar rode the stretch down because it is sticky, and the bottom nav
  * lifted off the foot of the screen. And going down a long feed the bar sat
  * there taking a row of the screen with nothing to say.
+ *
+ * The rules themselves moved into src/lib/use-hide-on-scroll.ts when every
+ * other header started hiding too, so the guarantees below are read from
+ * the hook; what is left in HideOnScroll is the sticky wrapper Home needs
+ * because its bar is a server component. See headers-hide-on-scroll.test.ts.
  */
 
 const css = readFileSync("src/app/globals.css", "utf8").replace(/\r\n/g, "\n");
 const hide = readFileSync("src/components/layout/HideOnScroll.tsx", "utf8").replace(/\r\n/g, "\n");
+const hook = readFileSync("src/lib/use-hide-on-scroll.ts", "utf8").replace(/\r\n/g, "\n");
 const bar = readFileSync("src/components/layout/TopBar.tsx", "utf8").replace(/\r\n/g, "\n");
 const home = readFileSync("src/app/(app)/home/page.tsx", "utf8").replace(/\r\n/g, "\n");
 const ptr = readFileSync("src/components/ui/PullToRefresh.tsx", "utf8").replace(/\r\n/g, "\n");
@@ -56,16 +62,16 @@ describe("the top bar gets out of the way", () => {
   });
 
   it("goes up on the way down and comes back on the way up", () => {
-    expect(hide).toContain("else if (dy > DOWN) setHidden(true);");
-    expect(hide).toContain("else if (dy < -UP) setHidden(false);");
-    expect(hide).toContain('transform: hidden ? "translateY(-100%)" : "translateY(0)"');
+    expect(hook).toContain("else if (dy > DOWN) setHidden(true);");
+    expect(hook).toContain("else if (dy < -UP) setHidden(false);");
+    expect(hook).toContain('transform: hidden ? "translateY(-100%)" : "translateY(0)"');
   });
 
   it("coming back takes less movement than going away", () => {
     // Somebody reaching for the bar flicks rather than scrolls, and a bar
     // that needs a long drag to return feels stuck.
-    const down = Number(hide.match(/const DOWN = (\d+);/)?.[1]);
-    const up = Number(hide.match(/const UP = (\d+);/)?.[1]);
+    const down = Number(hook.match(/const DOWN = (\d+);/)?.[1]);
+    const up = Number(hook.match(/const UP = (\d+);/)?.[1]);
     expect(up).toBeGreaterThan(0);
     expect(up).toBeLessThan(down);
   });
@@ -73,21 +79,21 @@ describe("the top bar gets out of the way", () => {
   it("near the top it is always shown, whichever way you were going", () => {
     // That is where pull-to-refresh lives, and where the bar is least in
     // the way.
-    expect(hide).toContain("if (y <= FREE_ZONE) setHidden(false);");
-    const order = hide.indexOf("if (y <= FREE_ZONE)");
-    expect(order).toBeLessThan(hide.indexOf("else if (dy > DOWN)"));
+    expect(hook).toContain("if (y <= FREE_ZONE) setHidden(false);");
+    const order = hook.indexOf("if (y <= FREE_ZONE)");
+    expect(order).toBeLessThan(hook.indexOf("else if (dy > DOWN)"));
   });
 
   it("reads the scroll on a frame rather than on every event", () => {
     // Reading scrollY inside the listener is a layout request per event,
     // which on a long feed shows up as jank.
-    expect(hide).toContain("requestAnimationFrame(read)");
-    expect(hide).toContain('{ passive: true }');
+    expect(hook).toContain("requestAnimationFrame(read)");
+    expect(hook).toContain('{ passive: true }');
   });
 
   it("and cleans up after itself", () => {
-    expect(hide).toContain('window.removeEventListener("scroll", onScroll)');
-    expect(hide).toContain("cancelAnimationFrame");
+    expect(hook).toContain('window.removeEventListener("scroll", onScroll)');
+    expect(hook).toContain("cancelAnimationFrame");
   });
 
   it("with the slide skipped for anyone who asked for less motion", () => {
