@@ -56,7 +56,7 @@ export default async function HomePage() {
   // profiles table for anyone to read, its owner included.
   const privateProfile = getPrivateProfile(supabase);
 
-  const [{ data: followRows }, blockedIds, quiet] = await Promise.all([
+  const [{ data: followRows }, { data: requestRows }, blockedIds, quiet] = await Promise.all([
     // Capped, like close_friends below, and for a harder reason
     // than volume: every one of these ids is spread into `.in("user_id", …)`
     // further down, which PostgREST renders as a comma-separated value in a
@@ -69,6 +69,15 @@ export default async function HomePage() {
       .select("following_id")
       .eq("follower_id", user.id)
       .limit(2000),
+    // Requests sent to private accounts and not yet answered, so the
+    // Follow button on a feed card says "Requested" rather than offering
+    // to send the same request again. A prefix scan on the table's own
+    // primary key (requester_id, target_id), and nobody has thousands.
+    supabase
+      .from("follow_requests")
+      .select("target_id")
+      .eq("requester_id", user.id)
+      .limit(2000),
     getBlockedIds(supabase),
     // People this person muted, and single posts and Shots they hid.
     getFeedExclusions(supabase),
@@ -80,6 +89,9 @@ export default async function HomePage() {
   const followingIds = new Set(
     (followRows ?? []).map((r: any) => r.following_id as string)
   );
+  // No `any` here, unlike its neighbours: the select is one typed column, so
+  // the generated row type already says target_id is a string.
+  const requestedIds = (requestRows ?? []).map((r) => r.target_id);
   const feedUserIds = [...followingIds, user.id];
 
   // Fire all remaining queries concurrently.
@@ -582,6 +594,7 @@ export default async function HomePage() {
           initialShots={placedShots}
           currentUserId={user.id}
           followingIds={[...followingIds]}
+          requestedIds={requestedIds}
           hyperIds={hyperIds}
           mutualHyperIds={mutualHyperIds}
           blockedIds={[...blockedIds]}

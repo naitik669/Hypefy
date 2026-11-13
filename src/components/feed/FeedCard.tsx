@@ -37,6 +37,7 @@ import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { AvatarFrame } from "@/components/ui/AvatarFrame";
 import { HyperStar } from "@/components/ui/HyperStar";
 import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
+import { FollowButton } from "@/components/profile/FollowButton";
 import { formatCount } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
@@ -152,6 +153,8 @@ function FeedCardInner({
   currentUserId,
   initialIsHyper,
   initialIsMutualHyper,
+  initialFollowing,
+  initialRequested,
   focusCommentId = null,
   initialSlide = 0,
   showId,
@@ -174,6 +177,14 @@ function FeedCardInner({
    *  Undefined for standalone cards (post page, profile viewer), which self-fetch. */
   initialIsHyper?: boolean;
   initialIsMutualHyper?: boolean;
+  /**
+   * Whether you already follow the author, resolved by the parent the
+   * same way hyper status is — one query for the page rather than one
+   * per card. Undefined on a standalone card, which self-fetches.
+   */
+  initialFollowing?: boolean;
+  /** A request sent to a private account and not yet answered. */
+  initialRequested?: boolean;
   /**
    * Open comments on mount, landing on this one. Passed only by /p/[postId]
    * from ?comment= in the URL, so a "replied to your comment" notification
@@ -802,6 +813,35 @@ function FeedCardInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post.id, uid]);
 
+  /**
+   * Do you follow the author?
+   *
+   * Resolved by the parent for feed cards and fetched here for the
+   * standalone ones — the post page, the profile viewer — exactly as
+   * hyper status is. Two rows at most, and only when nobody has
+   * answered already.
+   */
+  const [following, setFollowing] = useState(initialFollowing ?? false);
+  const [requested, setRequested] = useState(initialRequested ?? false);
+  useEffect(() => {
+    if (initialFollowing !== undefined) return;
+    if (!uid || uid === post.user_id) return;
+    let active = true;
+    void (async () => {
+      const [{ data: f }, { data: r }] = await Promise.all([
+        supabase.from("follows").select("id").eq("follower_id", uid).eq("following_id", post.user_id).maybeSingle(),
+        supabase.from("follow_requests").select("target_id").eq("requester_id", uid).eq("target_id", post.user_id).maybeSingle(),
+      ]);
+      if (!active) return;
+      setFollowing(!!f);
+      setRequested(!!r);
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, post.user_id, initialFollowing]);
+
   const profile = post.profiles;
   const name = profile?.display_name ?? profile?.username ?? "User";
   const username = profile?.username;
@@ -1013,6 +1053,26 @@ function FeedCardInner({
             · {timeAgoShort(post.created_at)}
           </span>
         </div>
+        {/* Follow, beside the ⋯ rather than inside it.
+
+            Never on your own post: there is nothing to follow, and a
+            disabled button there would only ask to be pressed. The
+            button keeps itself in step with every other copy of itself
+            through FollowButton's own window event, so following
+            somebody from one of their posts updates the rest of their
+            posts in the feed without a refetch. */}
+        {uid && uid !== post.user_id && (
+          <FollowButton
+            targetUserId={post.user_id}
+            targetUsername={profile?.username ?? null}
+            currentUserId={uid}
+            initialFollowing={following}
+            initialRequested={requested}
+            variant="mini"
+            className="-mr-0.5 shrink-0"
+          />
+        )}
+
         {/* THREE DOTS -- fully functional */}
         <button
           type="button"
