@@ -22,10 +22,11 @@ import { scheduleUndoable } from "@/lib/undoable";
 import { haptics } from "@/lib/haptics";
 import { makeFolder, nextFolderColor, toFolder, type Folder } from "@/lib/folders";
 import { fetchSavedPage, foundItem, itemKey, mergeSaved, type SavedItem, type SavedOrder } from "@/lib/saved";
+import { hideStyle, useHideOnScroll } from "@/lib/use-hide-on-scroll";
 
 type Tab = "all" | "posts" | "shots" | "sounds";
 
-const HEADER = "sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center gap-1 border-b border-border/60 chrome-bar px-2 pt-[var(--sat)]";
+const HEADER = "sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center gap-1 border-b border-border/60 chrome-bar px-2 pt-[var(--sat)] will-change-transform motion-reduce:transition-none";
 const ICON_BTN = "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5";
 
 /**
@@ -77,6 +78,8 @@ export function SavedScreen({
 
   const [folders, setFolders] = useState(initialFolders);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  // `hidden` above is hidden ITEMS; this is the header.
+  const headerHidden = useHideOnScroll();
 
   const [selected, setSelected] = useState<Map<string, SavedItem>>(new Map());
   const selecting = selected.size > 0;
@@ -281,7 +284,7 @@ export function SavedScreen({
     <div className="flex min-h-full flex-col pb-10">
       {/* The header is the screen's mode: plain, searching, or selecting. */}
       {selecting ? (
-        <header className={HEADER}>
+        <header className={HEADER} style={hideStyle(headerHidden)}>
           <button type="button" onClick={clearSelection} aria-label="Stop selecting" className={ICON_BTN}>
             <X size={22} />
           </button>
@@ -302,7 +305,7 @@ export function SavedScreen({
           </button>
         </header>
       ) : searching ? (
-        <header className={HEADER}>
+        <header className={HEADER} style={hideStyle(headerHidden)}>
           <button type="button" onClick={closeSearch} aria-label="Close search" className={ICON_BTN}>
             <ChevronLeft size={24} />
           </button>
@@ -337,7 +340,7 @@ export function SavedScreen({
           <span className="w-1" />
         </header>
       ) : (
-        <header className={HEADER}>
+        <header className={HEADER} style={hideStyle(headerHidden)}>
           <button type="button" onClick={() => safeBack(router)} aria-label="Back" className={ICON_BTN}>
             <ChevronLeft size={24} />
           </button>

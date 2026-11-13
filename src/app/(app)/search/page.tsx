@@ -18,6 +18,7 @@ import { LEGACY_RECENT_KEY, latestOnly, recentSearchKey } from "@/lib/search-run
 import { ListRowSkeleton } from "@/components/skeletons/Skeletons";
 import { SearchDiscovery } from "@/components/search/SearchDiscovery";
 import Link from "next/link";
+import { hideStyle, useHideOnScroll } from "@/lib/use-hide-on-scroll";
 
 type Profile = {
   id: string;
@@ -55,6 +56,7 @@ function persistRecent(userId: string, list: string[]) {
 }
 
 export default function SearchPage() {
+  const hidden = useHideOnScroll();
   const router = useRouter();
   const supabase = createClient();
   const [query, setQuery] = useState(() =>
@@ -296,7 +298,10 @@ export default function SearchPage() {
   return (
     <>
       {/* Header */}
-      <header className="sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center pt-[var(--sat)] gap-2 border-b border-border/60 chrome-bar px-2">
+      <header
+        className="sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center pt-[var(--sat)] gap-2 border-b border-border/60 chrome-bar px-2 will-change-transform motion-reduce:transition-none"
+        style={hideStyle(hidden)}
+      >
         <button
           type="button"
           onClick={() => safeBack(router)}
