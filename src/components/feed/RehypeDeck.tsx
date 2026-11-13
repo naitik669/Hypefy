@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { Star } from "lucide-react";
+
 import { Avatar } from "@/components/ui/Avatar";
 import { RehypeIcon } from "@/components/ui/RehypeIcon";
 import type { DeckPerson } from "@/lib/rehype";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /**
  * The rehype deck: who passed this on, as a small loose row of floating faces.
@@ -463,7 +464,7 @@ function DeckMark({ size, scale, mark }: { size: number; scale: number; mark: "r
             wears an outline when you have NOT hyped something, and the
             stroke matches the fill: the round join on a same-coloured
             stroke is what makes the points curved rather than spiked. */}
-        <Star
+        <HypeIcon
           size={Math.round(size * scale)}
           strokeWidth={2.2}
           fill={`url(#${HYPE_GRAD})`}

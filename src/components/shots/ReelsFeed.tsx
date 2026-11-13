@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Star, Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, EyeOff, Pencil, Archive, MessageCircle, MessageCircleOff } from "lucide-react";
+import { Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, EyeOff, Pencil, Archive, MessageCircle, MessageCircleOff } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { setArchived, setCommentsOff } from "@/lib/post-controls";
@@ -122,6 +122,7 @@ import { ShotSound } from "@/components/music/ShotSound";
 import { ShotsEndCard, type NewCheck } from "@/components/shots/ShotsEndCard";
 import { forgetSeenAtOpen, markShotSeen, orderReel, seenAtOpen, SEEN_AFTER_MS, THIN_REEL } from "@/lib/shots-seen";
 import { hideContent, muteUser, QUIET_COPY } from "@/lib/feed-quiet";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 type ReelProfile = {
   display_name: string | null;
@@ -1479,7 +1480,7 @@ function ReelCard({
       {/* Double-tap Hype burst â€” matches the feed */}
       {hypeBurst && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <Star
+          <HypeIcon
             size={88}
             className="animate-hype-pop text-hype drop-shadow-[0_4px_20px_rgba(255,208,0,0.5)]"
             fill="currentColor"
@@ -1564,7 +1565,7 @@ function ReelCard({
           disabled={hypePending}
         >
           <span className="relative">
-            <Star
+            <HypeIcon
               size={32}
               className={`${
                 hypeBurst

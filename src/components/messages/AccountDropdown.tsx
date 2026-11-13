@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Chat } from "@phosphor-icons/react";
-import { Check, ChevronDown, Loader2, Plus, Star } from "lucide-react";
+import { Check, ChevronDown, Loader2, Plus } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { FloatingMenu } from "@/components/ui/FloatingMenu";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { haptics } from "@/lib/haptics";
 import { getSavedAccounts, removeSavedAccount, type SavedAccount } from "@/lib/saved-accounts";
 import { hasAny, unreadForAll, type UnreadResult } from "@/lib/account-unread";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /**
  * The Messages title, with the other accounts on this device behind it.
@@ -213,7 +214,7 @@ function Row({
             )}
             {unread.activity > 0 && (
               <span className="flex items-center gap-1" aria-label={`${unread.activity} new activity`}>
-                <Star size={12} strokeWidth={2.4} aria-hidden />
+                <HypeIcon size={12} strokeWidth={2.4} aria-hidden />
                 {unread.activity}
               </span>
             )}

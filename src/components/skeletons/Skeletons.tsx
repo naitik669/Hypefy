@@ -1,5 +1,6 @@
-import { ChevronLeft, Compass, Star } from "lucide-react";
+import { ChevronLeft, Compass } from "lucide-react";
 import { Skeleton, SkeletonLine } from "@/components/ui/Skeleton";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /*
  * Loading shapes.
@@ -56,7 +57,7 @@ export function HomeTopBarStatic() {
       </span>
       <div className="flex w-20 justify-end">
         <span className="flex h-9 w-9 items-center justify-center text-foreground">
-          <Star size={22} strokeWidth={2.2} />
+          <HypeIcon size={22} strokeWidth={2.2} />
         </span>
       </div>
     </header>

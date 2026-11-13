@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Star, Loader2, Check } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { haptics } from "@/lib/haptics";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 type Person = {
   id: string;
@@ -101,7 +102,7 @@ export function AddHypersPrompt({ currentUserId }: { currentUserId: string }) {
     <div className="animate-rise flex flex-col gap-4 px-4 py-8">
       <div className="flex flex-col items-center gap-3 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface text-muted">
-          <Star size={28} />
+          <HypeIcon size={28} />
         </div>
         <h2 className="text-lg font-bold">No Hype buddies yet</h2>
         <p className="max-w-xs text-sm text-muted">

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, Star, Users } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyScene, ctaClass } from "@/components/empty/EmptyScene";
@@ -10,6 +10,7 @@ import { SHOW_ARCHIVE_DAYS } from "@/lib/show-media";
 import { NewCollabButton } from "@/components/shows/NewCollabButton";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { isVideoUrl } from "@/lib/video-mime";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /**
  * Your Shows.
@@ -82,7 +83,7 @@ function Tile({ s, badge }: { s: Row; badge: string }) {
           read, and then the one that matters is not read either. */}
       {isRestricted(s.audience) && (
         <span className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-pill bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-hype">
-          <Star size={9} className="fill-hype" />
+          <HypeIcon size={9} className="fill-hype" />
           Hype buddies
         </span>
       )}

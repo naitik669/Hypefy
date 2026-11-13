@@ -1,5 +1,6 @@
-import { Star } from "lucide-react";
+
 import { formatCount } from "@/lib/format";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /** A shared post rendered inside a chat bubble â€” links messaging to the feed. */
 export function PostPreviewCard({
@@ -19,7 +20,7 @@ export function PostPreviewCard({
         <p className="text-xs font-semibold">{post.username}</p>
         <p className="mt-0.5 line-clamp-2 text-xs text-muted">{post.caption}</p>
         <div className="mt-2 flex items-center gap-1 text-xs font-semibold text-hype">
-          <Star size={12} fill="currentColor" />
+          <HypeIcon size={12} fill="currentColor" />
           {formatCount(post.hypes)}
         </div>
       </div>

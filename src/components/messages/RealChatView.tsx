@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Star, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock, AlertCircle, Search, Pin as PinIcon, BarChart2 } from "lucide-react";
+import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock, AlertCircle, Search, Pin as PinIcon, BarChart2 } from "lucide-react";
 import { SendIcon, ShareIcon } from "@/components/ui/ShareIcon";
 import { FACES_SHOWN, lastMine, readMarkers, receiptFor } from "@/lib/chat-receipts";
 import { ChatSearch, type FoundMessage } from "@/components/messages/ChatSearch";
@@ -100,6 +100,7 @@ import {
   type ForwardedComment,
 } from "@/components/messages/ForwardedComment";
 import { EmbedLabel } from "@/components/ui/EmbedLabel";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 import {
   DOC_ACCEPT,
   DOC_MIMES,
@@ -2548,7 +2549,7 @@ export function RealChatView({
                           </span>
                           {starBurstId === m.id && (
                             <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-                              <Star size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
+                              <HypeIcon size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
                             </span>
                           )}
                         </div>
@@ -2570,7 +2571,7 @@ export function RealChatView({
                           />
                           {starBurstId === m.id && (
                             <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-                              <Star size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
+                              <HypeIcon size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
                             </span>
                           )}
                         </div>
@@ -2592,7 +2593,7 @@ export function RealChatView({
                           </span>
                           {starBurstId === m.id && (
                             <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-                              <Star size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
+                              <HypeIcon size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
                             </span>
                           )}
                         </div>
@@ -2621,7 +2622,7 @@ export function RealChatView({
                             <VoiceMessage url={voiceUrl} storedDuration={voiceDuration} peaks={voicePeaks} mine={mine} />
                             {starBurstId === m.id && (
                               <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-                                <Star size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
+                                <HypeIcon size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
                               </span>
                             )}
                           </div>
@@ -2682,7 +2683,7 @@ export function RealChatView({
                           {/* Double-tap star burst — reuses Hypefy hype-pop keyframe */}
                           {starBurstId === m.id && (
                             <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-                              <Star size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
+                              <HypeIcon size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
                             </span>
                           )}
                         </div>
@@ -3350,7 +3351,7 @@ export function RealChatView({
           <BottomSheet open onClose={() => setReactionSheet(null)} title="Reactions">
             <div className="flex flex-col pb-3">
               {rows.length === 0 ? (
-                <EmptyState variant="compact" icon={Star} title="No reactions yet" text="Long-press a message to drop the first one." />
+                <EmptyState variant="compact" icon={HypeIcon} title="No reactions yet" text="Long-press a message to drop the first one." />
               ) : (
                 rows.map((r) => {
                   const isMine = r.user_id === currentUserId;

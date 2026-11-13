@@ -1,4 +1,4 @@
-import { Star } from "lucide-react";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /**
  * A star snapping in two and falling — played when a hype is TAKEN BACK.
@@ -22,13 +22,13 @@ export function HypeBreak({ size = 23 }: { size?: number }) {
         // inset(top right bottom left): keep the left half, clip the right.
         style={{ clipPath: "inset(0 50% 0 0)" }}
       >
-        <Star size={size} fill="currentColor" strokeWidth={2.2} />
+        <HypeIcon size={size} fill="currentColor" strokeWidth={2.2} />
       </span>
       <span
         className="animate-hype-break-right absolute text-hype"
         style={{ clipPath: "inset(0 0 0 50%)" }}
       >
-        <Star size={size} fill="currentColor" strokeWidth={2.2} />
+        <HypeIcon size={size} fill="currentColor" strokeWidth={2.2} />
       </span>
     </span>
   );

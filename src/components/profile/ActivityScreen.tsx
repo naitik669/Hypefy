@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, History, MessageCircle, Play, Repeat2, Star, Trash2, X } from "lucide-react";
+import { Eye, History, MessageCircle, Play, Repeat2, Trash2, X } from "lucide-react";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -14,8 +15,14 @@ import { forgetOneView, forgetViews } from "@/lib/watched";
 import { timeAgoShort } from "@/lib/time";
 import type { ActivityComment, ActivityItem, ActivityTab } from "@/lib/your-activity";
 
-const TABS: { id: ActivityTab; label: string; Icon: typeof Star }[] = [
-  { id: "hypes", label: "Hypes", Icon: Star },
+// Icon is widened from `typeof Star` because the tabs now mix the app's own
+// hype mark with lucide's for the other three; a ComponentType holds both.
+const TABS: {
+  id: ActivityTab;
+  label: string;
+  Icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+}[] = [
+  { id: "hypes", label: "Hypes", Icon: HypeIcon },
   { id: "comments", label: "Comments", Icon: MessageCircle },
   { id: "watched", label: "Watched", Icon: Eye },
   { id: "rehypes", label: "Rehypes", Icon: Repeat2 },

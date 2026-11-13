@@ -8,23 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  Star,
-  Loader2,
-  Flag,
-  ChevronDown,
-  Trash2,
-  CornerUpLeft,
-  Copy,
-  Check,
-  Pencil,
-  Pin,
-  PinOff,
-  Image as ImageIcon,
-  MoreHorizontal,
-  Forward as SendIcon2,
-  X,
-} from "lucide-react";
+import { Loader2, Flag, ChevronDown, Trash2, CornerUpLeft, Copy, Check, Pencil, Pin, PinOff, Image as ImageIcon, MoreHorizontal, Forward as SendIcon2, X } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { setCommentPinned, wasEdited } from "@/lib/post-controls";
@@ -50,6 +34,7 @@ import { isCommentPhotoType, uploadCommentPhoto } from "@/lib/comment-photo";
 import { RichPostText } from "@/components/ui/RichPostText";
 import { ExpandableText } from "@/components/ui/ExpandableText";
 import { timeAgoShort } from "@/lib/time";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /** Comments per round trip. Was unbounded. */
 const PAGE = 100;
@@ -1383,7 +1368,7 @@ const Row = memo(function Row({
               node.hyped ? "text-hype" : "text-faint hover:text-muted"
             }`}
           >
-            <Star size={13} fill={node.hyped ? "currentColor" : "none"} />
+            <HypeIcon size={13} fill={node.hyped ? "currentColor" : "none"} />
             {node.hypeCount > 0 && formatCount(node.hypeCount)}
           </button>
 

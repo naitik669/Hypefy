@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Star, Bookmark, Volume2, VolumeX } from "lucide-react";
+import { Bookmark, Volume2, VolumeX } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
@@ -13,6 +13,7 @@ import { haptics } from "@/lib/haptics";
 import { ShareButton } from "@/components/feed/QuickShare";
 import { CommentIcon } from "@/components/ui/CommentIcon";
 import { RehypeCount, RehypeIcon } from "@/components/ui/RehypeIcon";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /**
  * Hold a post or a Shot to lift it out of wherever it is: the feed, a grid,
@@ -310,7 +311,7 @@ export function PostPeek({
           </div>
           {burst > 0 && (
             <div key={burst} className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <Star
+              <HypeIcon
                 size={96}
                 className="animate-hype-pop text-hype drop-shadow-[0_4px_20px_rgba(255,208,0,0.5)]"
                 fill="currentColor"
@@ -336,7 +337,7 @@ export function PostPeek({
             }}
           >
             <span className="relative">
-              <Star
+              <HypeIcon
                 key={hypeBurst}
                 size={24}
                 strokeWidth={2.2}

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ArrowUp, Loader2, Star } from "lucide-react";
+import { ArrowUp, Loader2 } from "lucide-react";
 import { flyEmoji, starBurst } from "@/components/diary/flyEmoji";
 import { ReactFan } from "@/components/diary/ReactFan";
 import { EmojiPicker } from "@/components/ui/EmojiPicker";
 import { QUICK_EMOJIS, useDiaryActions } from "@/components/diary/useDiaryActions";
 import { lastReaction, rememberReaction } from "@/lib/emoji";
 import type { DiaryEntry } from "@/lib/diary";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 type Actions = {
   entry: DiaryEntry;
@@ -190,7 +191,7 @@ export function HypeStar({ className = "", ...actions }: Actions & { className?:
       aria-pressed={hyped}
       className={`flex shrink-0 items-center justify-center rounded-full transition-colors ${className}`}
     >
-      <Star size={17} strokeWidth={2.3} className={hyped ? "fill-current" : ""} />
+      <HypeIcon size={17} strokeWidth={2.3} className={hyped ? "fill-current" : ""} />
     </button>
   );
 }

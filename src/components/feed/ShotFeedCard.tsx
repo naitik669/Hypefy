@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import Link from "next/link";
-import { Play, VolumeX, Volume2, Star, Bookmark, MoreHorizontal, Flag, Ban, ChevronRight, Link2, Share2, EyeOff } from "lucide-react";
+import { Play, VolumeX, Volume2, Bookmark, MoreHorizontal, Flag, Ban, ChevronRight, Link2, Share2, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ReportSheet } from "@/components/ui/ReportSheet";
@@ -49,6 +49,7 @@ import { useLongPress } from "@/lib/useLongPress";
 import { claimPreview, parseTrack } from "@/lib/music";
 import { SoundPill } from "@/components/music/SoundPill";
 import { hideContent, muteUser, QUIET_COPY } from "@/lib/feed-quiet";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /**
  * A Shot, sitting in the post feed.
@@ -783,7 +784,7 @@ function ShotFeedCardInner({
             className="flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-transform duration-150 active:scale-90 disabled:opacity-70"
           >
             <span className="relative">
-              <Star
+              <HypeIcon
                 size={23}
                 strokeWidth={2.2}
                 className={`${

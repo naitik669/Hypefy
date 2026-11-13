@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Star, PlusCircle } from "lucide-react";
+import { PlusCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { FeedCard, type FeedPost } from "@/components/feed/FeedCard";
 import { Reveal } from "@/components/ui/Reveal";
@@ -18,6 +18,7 @@ import { AdFeedCard } from "@/components/feed/AdFeedCard";
 import { noteAdShown } from "@/lib/ads";
 import { useAdFill, useAdSlots } from "@/components/feed/useAdSlots";
 import { useHypeProof } from "@/components/hype/useHypeProof";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 const PAGE_SIZE = 20;
 
@@ -497,7 +498,7 @@ function EmptyHypersTab() {
   return (
     <div className="animate-rise flex flex-col items-center justify-center gap-3 px-8 py-24 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface text-muted">
-        <Star size={28} />
+        <HypeIcon size={28} />
       </div>
       <h2 className="text-lg font-bold">No Hype buddies yet</h2>
       <p className="max-w-xs text-sm text-muted">

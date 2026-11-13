@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Star } from "lucide-react";
+import { HypeIcon } from "@/components/ui/HypeIcon";
+
 
 /** Compact room Hype Meter — a lime→gold bar that fills in on mount. */
 export function HypeMeter({ value }: { value: number }) {
@@ -15,7 +16,7 @@ export function HypeMeter({ value }: { value: number }) {
 
   return (
     <div className="flex items-center gap-1.5" aria-label={`Hype ${target}%`}>
-      <Star size={12} className="text-hype" fill="currentColor" />
+      <HypeIcon size={12} className="text-hype" fill="currentColor" />
       <div className="h-1.5 w-20 overflow-hidden rounded-full bg-border">
         <div
           className="h-full rounded-full bg-gradient-to-r from-accent to-hype transition-[width] duration-700 ease-out"

@@ -4,15 +4,14 @@ import {
   Clapperboard,
   ImageIcon,
   Lock,
-  Mail,
-  Star,
-  Users,
+  Mail,  Users,
   Zap,
 } from "lucide-react";
 import { SpotlightIcon } from "@/components/diary/SpotlightIcon";
 import { GhostShareIcon } from "@/components/ui/GhostShareIcon";
 import { ReportProblem } from "@/components/settings/ReportProblem";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /**
  * The glossary.
@@ -72,7 +71,7 @@ const ACTIONS: Entry[] = [
   {
     // Moved off the bolt when Shot took it, and a star is what you actually
     // tap in the feed — the bolt only ever appeared on Discover's counters.
-    icon: Star,
+    icon: HypeIcon,
     term: "Hype",
     what: "The applause. Hyping a post or a Shot tells the person you liked it, and pushes more like it into your feed.",
   },

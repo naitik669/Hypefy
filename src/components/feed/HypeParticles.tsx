@@ -1,4 +1,4 @@
-import { Star } from "lucide-react";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 const dirs = [
   { dx: "-22px", dy: "-26px" },
@@ -13,7 +13,7 @@ export function HypeParticles({ size = 10 }: { size?: number }) {
   return (
     <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
       {dirs.map((d, i) => (
-        <Star
+        <HypeIcon
           key={i}
           size={size}
           fill="currentColor"

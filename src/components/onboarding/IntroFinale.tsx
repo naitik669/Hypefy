@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { haptics } from "@/lib/haptics";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /**
  * The moment between the last intro slide and signing up.
@@ -56,13 +57,11 @@ const FIELD: FieldItem[] = [
 const CARD = "overflow-hidden rounded-[28px] border border-border bg-surface shadow-[0_14px_28px_-10px_#000e]";
 const PFP = "shrink-0 bg-cover bg-[50%_18%] rounded-[30%]";
 
-function Star() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="#a3e635" aria-hidden>
-      <path d="M12 2.4l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.6 5.9 21l1.4-6.8L2.2 9.5l6.9-.8z" />
-    </svg>
-  );
-}
+/*
+ * A local star lived here, hand-drawn with its own path — and a fattened
+ * one, which is the shape the app has now settled on. It is gone because
+ * HypeIcon is that shape for everybody; one mark, not a copy per screen.
+ */
 
 function PostCard({ pfp, img, name, time, hypes }: { pfp: string; img: string; name: string; time: string; hypes: string }) {
   return (
@@ -77,7 +76,7 @@ function PostCard({ pfp, img, name, time, hypes }: { pfp: string; img: string; n
       <div className="mt-[9px] aspect-square rounded-[18px] bg-cover bg-center" style={{ backgroundImage: IMG(img) }} />
       <div className="mt-[9px] flex items-center gap-[13px] text-muted">
         <span className="flex items-center gap-[5px]">
-          <Star />
+          <HypeIcon />
           <b className="text-[11.5px] font-extrabold text-foreground">{hypes}</b>
         </span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -146,7 +145,7 @@ const PIECES: Record<string, React.ReactNode> = {
   ),
   chip: (
     <span className="flex items-center gap-[5px] whitespace-nowrap rounded-[11px] bg-accent px-3 py-[7px] text-xs font-extrabold text-accent-ink shadow-[0_14px_28px_-10px_#000e]">
-      <Star /> HYPED
+      <HypeIcon /> HYPED
     </span>
   ),
   bubble: <span className="whitespace-nowrap rounded-[16px_16px_16px_5px] bg-[#2b2b2b] px-3 py-2 text-xs font-semibold shadow-[0_14px_28px_-10px_#000e]">slide in?</span>,

@@ -2,22 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  X,
-  Star,
-  ChevronLeft,
-  ChevronRight,
-  ExternalLink,
-  MoreHorizontal,
-  Trash2,
-  Bookmark,
-  BookmarkCheck,
-  Loader2,
-  FileText,
-  Eye,
-  Flag,
-  Ban,
-} from "lucide-react";
+import { X, ChevronLeft, ChevronRight, ExternalLink, MoreHorizontal, Trash2, Bookmark, BookmarkCheck, Loader2, FileText, Eye, Flag, Ban } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { shieldProps } from "@/lib/overlay-shield";
 import { createClient } from "@/lib/supabase/client";
@@ -87,6 +72,7 @@ import { EMPTY_STICKER_STATE, readStickerState, type StickerState } from "@/lib/
 import { ShowResultsSheet } from "@/components/shows/ShowResultsSheet";
 import type { EmbedState } from "@/components/shows/ShowWidgetPickers";
 import { storyGesture, storyKey, type StoryMove } from "@/lib/story-gesture";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -1226,7 +1212,7 @@ function ShowScreen({
               className="relative flex flex-col items-center gap-0.5 transition-transform active:scale-90 disabled:opacity-60"
             >
               {hypeBurst && <HypeParticles size={11} />}
-              <Star
+              <HypeIcon
                 size={28}
                 className={`transition-colors ${hypeBurst ? "animate-hype-burst" : ""} ${
                   hyped ? "text-hype" : "text-white"

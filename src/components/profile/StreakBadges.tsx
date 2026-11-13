@@ -1,5 +1,6 @@
-import { Flame, Star, Grid3x3 } from "lucide-react";
+import { Flame, Grid3x3 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 type Streak = {
   current_streak: number;
@@ -22,7 +23,7 @@ function milestones(s: Streak): { icon: React.ReactNode; label: string }[] {
 
   const hypeTier = [10000, 1000, 100].find((n) => s.hypes_received >= n);
   if (hypeTier) {
-    out.push({ icon: <Star size={12} className="fill-current" />, label: `${formatTier(hypeTier)} hypes` });
+    out.push({ icon: <HypeIcon size={12} className="fill-current" />, label: `${formatTier(hypeTier)} hypes` });
   }
 
   // Best streak ever, shown only when it beats the live one (which has its
