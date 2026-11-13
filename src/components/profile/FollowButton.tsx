@@ -116,9 +116,22 @@ export function FollowButton({
           ? "rounded-[14px] px-5 py-2.5 text-sm font-extrabold active:scale-95"
           : "h-10 flex-1 rounded-xl text-sm"
       } ${
+        /*
+         * A raised chip, not a slab.
+         *
+         * This was the brand's lime and then pure white, and both were the
+         * loudest thing on the card — brighter than the name above the
+         * photo, and a feed is twenty of them down one scroll. It is the
+         * app's raised surface now, lifted off the card by a hairline, so
+         * it reads as a control without competing with the post.
+         *
+         * Following is quieter still: hollow, and grey rather than white.
+         * Follow is a thing to do and Following is a state you are already
+         * in, so the one that still wants pressing is the one with a fill.
+         */
         filled
-          ? "bg-foreground text-background hover:bg-foreground/90"
-          : "border border-border bg-surface text-foreground hover:bg-elevated"
+          ? "border border-white/[0.14] bg-elevated text-foreground hover:bg-border"
+          : "border border-border bg-transparent text-muted hover:text-foreground"
       } ${className}`}
     >
       <span className="grid">

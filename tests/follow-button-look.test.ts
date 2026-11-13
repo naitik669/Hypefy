@@ -43,21 +43,31 @@ describe("one size in every state", () => {
   });
 });
 
-describe("not lime", () => {
-  it("the unpressed state is the app's white fill", () => {
-    // The same pair the style editor's tabs and the call controls use.
-    expect(button).toContain('"bg-foreground text-background hover:bg-foreground/90"');
+describe("a raised chip, not a slab", () => {
+  it("Follow is the app's raised surface, lifted by a hairline", () => {
+    expect(button).toContain('"border border-white/[0.14] bg-elevated text-foreground hover:bg-border"');
   });
 
-  it("the accent is gone from it entirely", () => {
+  it("neither the lime nor the white slab is left", () => {
     // Lime is already carrying the hype star, the slider's average and the
-    // rehype mark. A Follow button in it reads as another of those.
+    // rehype mark, so a Follow button in it read as another of those; the
+    // white that replaced it was the brightest thing on the card.
     expect(button).not.toContain("bg-accent");
     expect(button).not.toContain("text-accent-ink");
+    expect(button).not.toContain("bg-foreground text-background");
   });
 
-  it("and Following still reads as the quieter of the two", () => {
-    expect(button).toContain('"border border-border bg-surface text-foreground hover:bg-elevated"');
+  it("and Following is quieter than Follow, not louder", () => {
+    // Follow is a thing to do; Following is a state you are already in. So
+    // the one that still wants pressing is the one with a fill, and the
+    // settled one goes hollow and grey.
+    expect(button).toContain('"border border-border bg-transparent text-muted hover:text-foreground"');
+  });
+
+  it("built from tokens, not from hexes picked off a mockup", () => {
+    // elevated, border, muted and foreground are all in globals.css. A raw
+    // #262626 here would be a colour nothing else in the app could match.
+    expect(button).not.toMatch(/#[0-9a-fA-F]{6}/);
   });
 });
 
