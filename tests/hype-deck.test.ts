@@ -80,7 +80,9 @@ describe("the mark on the face", () => {
     // the fill, at that weight. Reusing the component is the only way the
     // two stay the same shape.
     const hype = deck.slice(deck.indexOf('if (mark === "hype")'), deck.indexOf("const box ="));
-    expect(hype).toContain("<Star");
+    // HypeIcon now, not lucide's Star: the mark the deck shares with the
+    // button is the app's own, so "reuse the component" means that one.
+    expect(hype).toContain("<HypeIcon");
     expect(hype).toContain("strokeWidth={2.2}");
     const card = readFileSync("src/components/feed/FeedCard.tsx", "utf8");
     expect(card, "the button's own weight").toContain("strokeWidth={2.2}");

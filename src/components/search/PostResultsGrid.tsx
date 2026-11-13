@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Star } from "lucide-react";
+
 import { GridPeek } from "@/components/feed/GridPeek";
 import { formatCount } from "@/lib/format";
 import type { FeedPost } from "@/components/feed/FeedCard";
 import { CommentIcon } from "@/components/ui/CommentIcon";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 function firstImage(p: FeedPost): string | null {
   return p.image_urls?.[0] ?? p.image_url ?? null;
@@ -101,7 +102,7 @@ export function PostResultsGrid({
                 <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2.5 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-5 text-[10px] font-bold text-white">
                   {(p.hype_count ?? 0) > 0 && (
                     <span className="flex items-center gap-0.5">
-                      <Star size={10} className="fill-white" />
+                      <HypeIcon size={10} className="fill-white" />
                       {formatCount(p.hype_count ?? 0)}
                     </span>
                   )}

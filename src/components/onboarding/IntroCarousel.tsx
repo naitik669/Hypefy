@@ -3,12 +3,13 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Star, Play, Compass, Bell } from "lucide-react";
+import { ArrowRight, Play, Compass, Bell } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { IntroFinale } from "@/components/onboarding/IntroFinale";
 import { Avatar } from "@/components/ui/Avatar";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { CommentIcon } from "@/components/ui/CommentIcon";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 const SLIDES = ["welcome", "posts", "shots", "discover", "identity"] as const;
 
@@ -420,7 +421,7 @@ function WelcomeVisual() {
           </div>
           <div className="flex items-center gap-3.5 pt-2">
             <span className="flex items-center gap-1">
-              <Star size={17} className="fill-hype text-hype" />
+              <HypeIcon size={17} className="fill-hype text-hype" />
               <span className="text-[11px] font-bold">2.4k</span>
             </span>
             <CommentIcon size={15} className="text-muted" />
@@ -431,7 +432,7 @@ function WelcomeVisual() {
 
       {/* Hype badge popping off the corner */}
       <div className="absolute -right-6 top-[42%] flex items-center gap-1.5 rounded-pill border border-accent/30 bg-surface px-3 py-2 shadow-2xl">
-        <Star size={15} className="fill-hype text-hype" />
+        <HypeIcon size={15} className="fill-hype text-hype" />
         <span className="text-xs font-bold">2.4k Hypes</span>
       </div>
     </div>
@@ -562,7 +563,7 @@ function BgPost({ post }: { post: BgPostData }) {
         />
       </div>
       <div className="mt-2 flex items-center gap-2">
-        <Star size={13} className="fill-hype text-hype" />
+        <HypeIcon size={13} className="fill-hype text-hype" />
         <span className="text-[10px] font-bold">{post.hypes}</span>
         <CommentIcon size={12} className="text-muted" />
         <ShareIcon size={11} className="text-muted" />
@@ -606,7 +607,7 @@ function MockPostCard() {
       </div>
       <div className="mt-3.5 flex items-center gap-5">
         <span className="flex items-center gap-1.5">
-          <Star size={24} className="fill-hype text-hype" />
+          <HypeIcon size={24} className="fill-hype text-hype" />
           <span className="text-[15px] font-bold">2.4k</span>
         </span>
         <CommentIcon size={23} className="text-muted" />
@@ -684,7 +685,7 @@ function ReelCard({ data, w, h, active = false }: { data: ReelData; w: number; h
       {/* Hype rail */}
       <div className="absolute bottom-12 right-2.5 flex flex-col items-center gap-3 text-white">
         <span className="flex flex-col items-center gap-0.5">
-          <Star
+          <HypeIcon
             size={big ? 26 : 20}
             className={`fill-hype text-hype ${active ? "animate-star-pop" : ""}`}
           />

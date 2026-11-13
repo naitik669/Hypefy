@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Globe2, Star, Music } from "lucide-react";
+import { Loader2, Globe2, Music } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CenterModal } from "@/components/ui/CenterModal";
 import { Avatar } from "@/components/ui/Avatar";
@@ -18,6 +18,7 @@ import { THOUGHT_SHELL, ThoughtDots } from "@/components/diary/ThoughtBubble";
 import { haptics } from "@/lib/haptics";
 import { scheduleUndoable } from "@/lib/undoable";
 import { useToast } from "@/components/ui/ToastProvider";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 // Notes store one 60-char string; the emoji rides at the front of it.
 const MAX = 60;
@@ -272,7 +273,7 @@ export function NoteEditorSheet({
               audience === "close" ? "bg-elevated text-foreground shadow-sm" : "text-muted"
             }`}
           >
-            <Star size={14} /> Close friends
+            <HypeIcon size={14} /> Close friends
           </button>
         </div>
 

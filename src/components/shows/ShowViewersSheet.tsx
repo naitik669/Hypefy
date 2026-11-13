@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, Star, Loader2 } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { haptics } from "@/lib/haptics";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 type Viewer = {
   id: string;
@@ -170,7 +171,7 @@ export function ShowViewersSheet({
                     {pendingId === v.id ? (
                       <Loader2 size={18} className="animate-spin text-muted" />
                     ) : (
-                      <Star
+                      <HypeIcon
                         size={18}
                         className={isPinned ? "text-hype" : "text-muted"}
                         fill={isPinned ? "currentColor" : "none"}

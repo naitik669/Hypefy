@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Star } from "lucide-react";
+
 import { createClient } from "@/lib/supabase/client";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 const REVEAL_KEY = "hypefy:notif-badge-revealed";
 const REVEAL_MS = 5000;
@@ -19,7 +20,7 @@ export function NotificationBell({ userId, initialUnread }: { userId: string; in
     if (typeof window === "undefined") return true;
     return !window.sessionStorage.getItem(REVEAL_KEY);
   });
-  // Bumped on every incoming notification so the <Star> remounts and its
+  // Bumped on every incoming notification so the <HypeIcon> remounts and its
   // bulge animation restarts (CSS animations don't replay on their own).
   const [bulgeKey, setBulgeKey] = useState(0);
 
@@ -73,7 +74,7 @@ export function NotificationBell({ userId, initialUnread }: { userId: string; in
       aria-label="Notifications"
       className="relative flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-white/5"
     >
-      <Star key={bulgeKey} size={22} strokeWidth={2.2} className={bulgeKey > 0 ? "animate-notif-bulge" : ""} />
+      <HypeIcon key={bulgeKey} size={22} strokeWidth={2.2} className={bulgeKey > 0 ? "animate-notif-bulge" : ""} />
       {unread > 0 && (
         showCount ? (
           <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-ink ring-2 ring-background transition-all">

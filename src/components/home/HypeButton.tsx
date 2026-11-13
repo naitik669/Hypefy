@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Star } from "lucide-react";
+
 import { formatCount } from "@/lib/format";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { haptics } from "@/lib/haptics";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /** Controlled Hype button â€” state lives in the parent (PostCard). */
 export function HypeButton({
@@ -39,7 +40,7 @@ export function HypeButton({
       className="flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-transform duration-150 active:scale-90"
     >
       <span className="relative">
-        <Star
+        <HypeIcon
           size={24}
           strokeWidth={2.2}
           className={`${burst ? "animate-hype-burst" : ""} transition-colors ${

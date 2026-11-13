@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ChevronLeft, Globe, Music, Star } from "lucide-react";
+import { ArrowLeft, ChevronLeft, Globe, Music } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -23,6 +23,7 @@ import { LayerStack } from "@/components/shows/LayerView";
 import { publishFailureMessage, publishShow } from "@/lib/show-publish";
 import { ShowAudienceBar } from "@/components/shows/ShowAudienceBar";
 import type { ShowAudience } from "@/lib/show-audience";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /**
  * Preview and publish step for the camera-first creator.
@@ -286,7 +287,7 @@ export function ShotPreview({
                 <Globe size={15} />
               </ShareButton>
               <ShareButton label={busy && audience === "hypers" ? "Posting…" : "Hype buddies"} tone="lime" disabled={busy || tooBig || badType} onClick={() => { setAudience("hypers"); void publish("hypers"); }}>
-                <Star size={15} className="fill-current" />
+                <HypeIcon size={15} className="fill-current" />
               </ShareButton>
             </>
           )}

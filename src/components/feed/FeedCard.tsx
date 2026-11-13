@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, memo } from "react";
 import dynamic from "next/dynamic";
 import { overlayCount } from "@/lib/overlay-stack";
 import Link from "next/link";
-import { Star, Bookmark, MoreHorizontal, Maximize2 } from "lucide-react";
+import { Bookmark, MoreHorizontal, Maximize2 } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui/Avatar";
@@ -55,6 +55,7 @@ import { RehypeCount, RehypeIcon } from "@/components/ui/RehypeIcon";
 import { PollBlock, parsePoll } from "@/components/feed/PollBlock";
 import { useSaveMenus } from "@/components/saved/SaveMenus";
 import { CommentIcon } from "@/components/ui/CommentIcon";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /**
  * How far outside the viewport a card starts loading its rehype deck.
@@ -1188,7 +1189,7 @@ function FeedCardInner({
           {/* Double-tap burst (centred over the gallery) */}
           {hypeBurst && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <Star
+              <HypeIcon
                 size={88}
                 className="animate-hype-pop text-hype drop-shadow-[0_4px_20px_rgba(255,208,0,0.5)]"
                 fill="currentColor"
@@ -1289,7 +1290,7 @@ function FeedCardInner({
             className="flex items-center gap-1.5 text-sm font-semibold tabular-nums transition-transform duration-150 active:scale-90 disabled:opacity-70"
           >
             <span className="relative">
-              <Star
+              <HypeIcon
                 size={23}
                 strokeWidth={2.2}
                 className={`${

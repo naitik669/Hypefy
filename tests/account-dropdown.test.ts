@@ -123,7 +123,7 @@ describe("the arrow on the title", () => {
     // Outline, like every other icon in the app. Phosphor's default weight
     // is the outline one, so saying nothing is saying outline.
     expect(src).toContain("<Chat size={13} aria-hidden />");
-    expect(src).toContain("<Star size={12} strokeWidth={2.4} aria-hidden />");
+    expect(src).toContain("<HypeIcon size={12} strokeWidth={2.4} aria-hidden />");
     expect(src).not.toContain('weight="fill"');
     expect(src).not.toContain('fill="currentColor"');
     // The digits are read out as what they count, not left as bare numbers.

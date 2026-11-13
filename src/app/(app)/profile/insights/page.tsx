@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Eye, Star, Bookmark } from "lucide-react";
+import { Eye, Bookmark } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatCount } from "@/lib/format";
 import { InsightsChart, type SeriesPoint } from "@/components/profile/InsightsChart";
 import { CommentIcon } from "@/components/ui/CommentIcon";
+import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /** Owner-only creator analytics: per-post and total reach/engagement. */
 export default async function InsightsPage() {
@@ -66,7 +67,7 @@ export default async function InsightsPage() {
           {/* Totals */}
           <div className="grid grid-cols-2 gap-2.5">
             <TotalCard icon={<Eye size={16} />} label="Views" value={totals.views} />
-            <TotalCard icon={<Star size={16} className="text-hype" />} label="Hypes" value={totals.hypes} />
+            <TotalCard icon={<HypeIcon size={16} className="text-hype" />} label="Hypes" value={totals.hypes} />
             <TotalCard icon={<CommentIcon size={16} />} label="Comments" value={totals.comments} />
             <TotalCard icon={<Bookmark size={16} />} label="Saves" value={totals.saves} />
           </div>
@@ -97,7 +98,7 @@ export default async function InsightsPage() {
                 <p className="min-w-0 flex-1 truncate text-sm text-muted">{p.caption ?? "Untitled post"}</p>
                 <div className="flex shrink-0 items-center gap-3 text-xs font-semibold tabular-nums text-muted">
                   <span className="flex items-center gap-1"><Eye size={13} /> {formatCount(p.view_count ?? 0)}</span>
-                  <span className="flex items-center gap-1"><Star size={13} /> {formatCount(p.hype_count ?? 0)}</span>
+                  <span className="flex items-center gap-1"><HypeIcon size={13} /> {formatCount(p.hype_count ?? 0)}</span>
                 </div>
               </Link>
             ))}
