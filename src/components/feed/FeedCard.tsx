@@ -1216,19 +1216,6 @@ function FeedCardInner({
         </div>
       )}
 
-      {/* The song, under the post rather than on it.
-
-          The disc keeps the case it had in the corner of the photo — the
-          roll, and the title unrolling out from behind it — but the
-          picture is left alone. Watches the card, not itself: the song is
-          the post's, so it starts when the post is what you are looking
-          at, not once you have scrolled past the picture. */}
-      {postTrack && (
-        <div className="flex items-center px-4 pt-2.5">
-          <TrackChip track={postTrack} autoPlayInView watch={cardRef} overlay />
-        </div>
-      )}
-
       {/* Actions */}
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-5">
@@ -1375,6 +1362,23 @@ function FeedCardInner({
             </p>
           )}
         </ExpandableText>
+      )}
+
+      {/* The song, under the words.
+
+          The disc keeps the case it had in the corner of the photo — the
+          roll, and the title unrolling out from behind it — but the
+          picture is left alone. It sits with the caption because a song
+          is something the post says rather than something you do to it,
+          which is what the row of buttons above is for.
+
+          Watches the card, not itself: the song is the post's, so it
+          starts when the post is what you are looking at, not once you
+          have scrolled all the way down to the caption. */}
+      {postTrack && (
+        <div className="flex items-center px-4 pt-2.5">
+          <TrackChip track={postTrack} autoPlayInView watch={cardRef} overlay />
+        </div>
       )}
 
       {/* Poll */}
