@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/TopBar";
+import { HideOnScroll } from "@/components/layout/HideOnScroll";
 import { isRestricted } from "@/lib/show-audience";
 import { ShowsRow } from "@/components/home/ShowsRow";
 import { FeedList } from "@/components/feed/FeedList";
@@ -560,7 +561,9 @@ export default async function HomePage() {
 
   return (
     <>
-      <TopBar />
+      <HideOnScroll>
+        <TopBar />
+      </HideOnScroll>
       <PullToRefresh>
         <ShowsRow shows={shows} currentUser={currentUserForRow} viewerId={user.id} />
 
