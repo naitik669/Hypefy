@@ -82,6 +82,7 @@ export function FeedList({
   followingIds = [],
   hyperIds = [],
   mutualHyperIds = [],
+  requestedIds = [],
   blockedIds = [],
   hiddenPostIds = [],
   showByUser = {},
@@ -95,6 +96,8 @@ export function FeedList({
   followingIds?: string[];
   hyperIds?: string[];
   mutualHyperIds?: string[];
+  /** Requests sent to private accounts and not yet answered. */
+  requestedIds?: string[];
   blockedIds?: string[];
   /** Posts this person chose not to see again ("Not interested"). */
   hiddenPostIds?: string[];
@@ -110,12 +113,15 @@ export function FeedList({
   // Authors the viewer has blocked — pagination batches skip them too.
   const blockedSet = new Set(blockedIds);
   const hiddenPosts = new Set(hiddenPostIds);
-  // Authors the viewer follows — the tail ranker needs this to award the
-  // social bonus, exactly as the server does for the first page.
+  // Authors the viewer follows. The tail ranker needs this to award the
+  // social bonus, exactly as the server does for the first page — and the
+  // Follow button on each card reads it too, so following somebody is one
+  // set already in hand rather than a query per card.
   const followingSet = new Set(followingIds);
   // Hyper status resolved once per page (avoids a close_friends query per card).
   const hyperSet = new Set(hyperIds);
   const mutualHyperSet = new Set(mutualHyperIds);
+  const requestedSet = new Set(requestedIds);
 
   // For You — seeded by the server.
   const [posts, setPosts] = useState<FeedPost[]>(initialPosts);
@@ -433,6 +439,8 @@ export function FeedList({
                 currentUserId={currentUserId}
                 initialIsHyper={hyperSet.has(item.post.user_id)}
                 initialIsMutualHyper={mutualHyperSet.has(item.post.user_id)}
+                initialFollowing={followingSet.has(item.post.user_id)}
+                initialRequested={requestedSet.has(item.post.user_id)}
                 showId={showByUser[item.post.user_id]}
                 proof={postProof.get(item.post.id)}
                 // The first card above the fold carries the page LCP.
