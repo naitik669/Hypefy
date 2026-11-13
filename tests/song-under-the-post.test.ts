@@ -30,15 +30,24 @@ describe("where the song sits", () => {
     expect(card).toContain('<div className="flex items-center px-4 pt-2.5">');
   });
 
-  it("under the picture, not on it and not above it", () => {
-    // Between the gallery and the action row: after the photo it belongs to,
-    // before the buttons, so it reads as this post's sound.
-    const gallery = card.indexOf(GALLERY);
+  it("under the caption, where the post's own words end", () => {
+    // A song is something the post says rather than something you do to it,
+    // so it belongs with the words and not in the row of buttons.
+    const caption = card.indexOf("</ExpandableText>");
     const chip = card.indexOf(CHIP);
+    const poll = card.indexOf("{/* Poll */}");
+    expect(caption).toBeGreaterThan(-1);
+    expect(chip).toBeGreaterThan(caption);
+    expect(chip).toBeLessThan(poll);
+  });
+
+  it("which is below the picture and below the buttons", () => {
+    const gallery = card.indexOf(GALLERY);
     const actions = card.indexOf("{/* Actions */}");
+    const chip = card.indexOf(CHIP);
     expect(gallery).toBeGreaterThan(-1);
     expect(chip).toBeGreaterThan(gallery);
-    expect(chip).toBeLessThan(actions);
+    expect(chip).toBeGreaterThan(actions);
   });
 
   it("watching the card rather than itself", () => {
