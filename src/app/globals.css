@@ -168,6 +168,18 @@ body {
   overflow-x: hidden;
   overflow-x: clip;
   width: 100%;
+  /* No rubber band at either end.
+     Scrolled to the very top or the very bottom, the whole document
+     stretched and sprang back — and the chrome went with it: the top bar is
+     sticky, so it rode the stretch down, and the bottom nav lifted off the
+     foot of the screen. Chrome that detaches from the edge it is pinned to
+     reads as broken rather than springy.
+     This does not cost the pull-to-refresh on Home, Discover, Messages,
+     Notifications and Profile. PullToRefresh is entirely touch-driven — it
+     reads window.scrollY and the touchmove delta and draws its own rubber
+     band — so it never used the browser's. If anything it is steadier now,
+     with no native bounce moving underneath it. */
+  overscroll-behavior-y: none;
 }
 
 /* Route transition — every app page fades + rises in on navigation.

@@ -4,7 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { FeedTabDropdown } from "@/components/layout/FeedTabDropdown";
 
-/** Home top bar — server component so it can seed the real unread count. */
+/**
+ * Home top bar — a server component so it can seed the real unread count.
+ *
+ * It is no longer the sticky element: HideOnScroll is, so that the bar can
+ * slide away going down the feed and come back going up. Sticky positioning
+ * on both would have pinned the inner one to the outer one and moved
+ * nothing.
+ */
 export async function TopBar() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -20,7 +27,7 @@ export async function TopBar() {
   }
 
   return (
-    <header className="sticky top-0 z-20 flex h-[calc(3.5rem+var(--sat))] items-center justify-between border-b border-border/60 chrome-bar px-4 pt-[var(--sat)]">
+    <header className="flex h-[calc(3.5rem+var(--sat))] items-center justify-between border-b border-border/60 chrome-bar px-4 pt-[var(--sat)]">
       {/* Search briefly sat here beside the compass. Two icons crowded the
           wordmark and read as bolted on, so it moved to a hold on the Home tab
           alongside Discover, Activity and Saved — and swiping right from the
