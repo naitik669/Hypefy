@@ -985,8 +985,7 @@ function FeedCardInner({
             />
           </AvatarFrame>
         </Link>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <div className="flex min-w-0 items-center gap-1">
+        <div className="flex min-w-0 flex-1 items-center gap-1">
           <Link
             href={profileHref}
             className="flex min-w-0 text-sm font-semibold hover:underline"
@@ -1013,19 +1012,7 @@ function FeedCardInner({
           <span className="ml-1 text-xs text-faint">
             · {timeAgoShort(post.created_at)}
           </span>
-          </div>
-
-          {/* The song rides with the name rather than on the picture.
-              Watches the card, not itself: the song is the post's, so it
-              starts when the post is what you are looking at. */}
-          {postTrack && (
-            <TrackChip track={postTrack} autoPlayInView watch={cardRef} byline />
-          )}
         </div>
-        {/* Beside the song rather than in the opposite corner of the
-            photo. It still mutes everywhere, not just this post. */}
-        {postTrack && <MusicMuteButton />}
-
         {/* THREE DOTS -- fully functional */}
         <button
           type="button"
@@ -1200,6 +1187,14 @@ function FeedCardInner({
             </div>
           )}
 
+          {/* The speaker, in the corner of the picture the sound is
+              coming from. It mutes everywhere, not only this post —
+              MusicMuteButton says so the first time it is used. */}
+          {postTrack && (
+            <div className="absolute bottom-3 right-3 z-20">
+              <MusicMuteButton onMedia />
+            </div>
+          )}
 
         </div>
 
@@ -1218,6 +1213,19 @@ function FeedCardInner({
               }
             />
           </div>
+        </div>
+      )}
+
+      {/* The song, under the post rather than on it.
+
+          The disc keeps the case it had in the corner of the photo — the
+          roll, and the title unrolling out from behind it — but the
+          picture is left alone. Watches the card, not itself: the song is
+          the post's, so it starts when the post is what you are looking
+          at, not once you have scrolled past the picture. */}
+      {postTrack && (
+        <div className="flex items-center px-4 pt-2.5">
+          <TrackChip track={postTrack} autoPlayInView watch={cardRef} overlay />
         </div>
       )}
 
@@ -1379,8 +1387,6 @@ function FeedCardInner({
         />
       )}
 
-      {/* No second home for a song on a text-only post: the byline is
-          above every post, with or without a picture. */}
 
       {/* Sheets */}
       {commentsUsed && (

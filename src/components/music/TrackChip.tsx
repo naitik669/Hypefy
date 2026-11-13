@@ -35,59 +35,23 @@ const MIDDLE_BAND = "-38% 0px -38% 0px";
  * you had scrolled past the picture, which is not where the post begins.
  */
 /**
- * The disc itself, rolling.
+ * The disc in its case, for sitting inside the corner of a picture.
  *
- * Drawn rather than illustrated: a conic sheen for the iridescence, the
- * artwork as the label printed on it, and the spindle hole punched through
- * the middle. The artwork is not discarded for a generic disc — a CD has a
- * printed label, so the real one goes where a real one would be.
+ * A CD in its sleeve: the disc stays round because it is a record, the case
+ * around it is the app's squircle, and the title slides out from behind it
+ * like the insert and tucks back.
  *
- * One element rotates, and it rotates `transform` only, so the roll is a
- * compositor job on a strip 22px tall. `animation-play-state` rather than
- * dropping the class: restarting the animation on every play and pause made
- * the disc jump back to the top of its turn each time.
- */
-function Disc({ artwork, playing }: { artwork: string | null; playing: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className="relative block h-[22px] w-[22px] shrink-0 rounded-full animate-[spin_3.4s_linear_infinite] motion-reduce:animate-none"
-      style={{
-        animationPlayState: playing ? "running" : "paused",
-        background:
-          "conic-gradient(from 210deg, #f4f4f4, #a3e635 25%, #7cc4f5 50%, #f0a0cf 75%, #f4f4f4)",
-        boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.5)",
-      }}
-    >
-      <span className="absolute left-1/2 top-1/2 block h-[11px] w-[11px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-elevated">
-        {artwork ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={artwork} alt="" className="h-full w-full object-cover" />
-        ) : null}
-      </span>
-      <span
-        className="absolute left-1/2 top-1/2 block h-[4px] w-[4px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-background"
-        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.38)" }}
-      />
-    </span>
-  );
-}
-
-/**
- * The disc under the poster's name, and the sleeve that unrolls from it.
- *
- * Tapping the disc rolls the title out from behind it and tucks it back;
- * tapping it again when the title is already out follows it to the song's
- * page. The disc is not the play/pause button — the speaker beside it is
- * what stops the music — because the old tap target sat on a photograph
- * and silenced the post when someone only meant to read the song's name.
+ * The case is no longer the play/pause button. Tapping it shows what is
+ * playing; the speaker in the other corner is what stops it. That trade is
+ * deliberate — the old tap target sat on top of a photo and silenced the
+ * post when someone only meant to read the song's name.
  *
  * The title is an ordinary link and is in the page whether or not it is
  * shown. The reveal is a thing for cursors and thumbs; a keyboard or a
  * screen reader never triggers it, and the song's page has to be reachable
  * all the same.
  */
-function BylineChip({
+function OverlayChip({
   track,
   playing,
   rootRef,
@@ -141,20 +105,15 @@ function BylineChip({
     else reveal(true);
   }
 
-  /*
-   * On the card's own ground now, not on a photograph, so the case is a
-   * faint tint rather than black glass: glass over near-black reads as a
-   * smudge, and the backdrop-blur it needed was being composited for a
-   * strip 22px tall on every post in the feed.
-   */
-  const sleeve = "bg-white/[0.07]";
+  const glass =
+    "bg-black/[0.46] backdrop-blur-md border border-white/[0.16]";
 
   return (
     <div
       ref={rootRef}
       data-sound-stage=""
       data-open={open ? "true" : "false"}
-      className={`relative h-[22px] ${className}`}
+      className={`relative h-9 ${className}`}
       onMouseEnter={() => {
         held.current = true;
         reveal(false);
@@ -176,11 +135,11 @@ function BylineChip({
         prefetch={false}
         onClick={(e) => e.stopPropagation()}
         style={{ pointerEvents: open ? "auto" : "none" }}
-        className="absolute left-0 top-0 flex h-[22px] max-w-[232px] items-center whitespace-nowrap pl-[27px] pr-3 text-[11px] text-foreground"
+        className="absolute left-1 top-0 flex h-9 max-w-[220px] items-center whitespace-nowrap pl-[38px] pr-3 text-[11px] text-white"
       >
         <span
           aria-hidden
-          className={`absolute inset-0 rounded-full will-change-transform motion-reduce:transition-none ${sleeve}`}
+          className={`absolute inset-0 rounded-[13px] will-change-transform motion-reduce:transition-none ${glass}`}
           style={{
             transform: open ? "scaleX(1)" : "scaleX(0)",
             transformOrigin: "0% 50%",
@@ -198,7 +157,7 @@ function BylineChip({
           }}
         >
           <span className="font-semibold">{track.title}</span>
-          {track.artist && <span className="text-muted"> · {track.artist}</span>}
+          {track.artist && <span className="text-white/70"> · {track.artist}</span>}
         </span>
       </Link>
 
@@ -219,9 +178,22 @@ function BylineChip({
         }}
         aria-expanded={open}
         aria-label={`Sound: ${track.title}${track.artist ? ` by ${track.artist}` : ""}`}
-        className="absolute left-0 top-0 flex h-[22px] w-[22px] items-center justify-center rounded-full"
+        className={`absolute left-0 top-0 flex h-9 w-9 items-center justify-center rounded-[13px] ${glass}`}
       >
-        <Disc artwork={track.artwork} playing={playing} />
+        <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-elevated">
+          {track.artwork ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={track.artwork}
+              alt=""
+              className={`h-full w-full object-cover motion-reduce:animate-none ${
+                playing ? "animate-[spin_4s_linear_infinite]" : ""
+              }`}
+            />
+          ) : (
+            <Music size={12} className="text-accent" />
+          )}
+        </span>
       </button>
     </div>
   );
@@ -240,7 +212,7 @@ export function TrackChip({
   onRemove,
   autoPlayInView = false,
   watch,
-  byline = false,
+  overlay = false,
   className = "",
 }: {
   track: Track;
@@ -249,16 +221,10 @@ export function TrackChip({
   /** What has to be on screen for the song to play; the chip itself by default. */
   watch?: React.RefObject<HTMLElement | null>;
   /**
-   * Draw it as a rolling disc under the poster's name rather than as a
-   * row of its own.
-   *
-   * It used to sit in the corner of the picture, which cost a 36px glass
-   * button on somebody's face and put the mute control in the opposite
-   * corner — two buttons, two corners, one feature. In the byline the
-   * photo is left alone and the song sits with the rest of the post's
-   * metadata, where the mute can sit beside it.
+   * Draw it as a disc in its case, to sit inside the corner of a picture
+   * rather than in a row beneath it.
    */
-  byline?: boolean;
+  overlay?: boolean;
   className?: string;
 }) {
   const playing = useIsPlaying(track.id);
@@ -295,8 +261,8 @@ export function TrackChip({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPlayInView, track.id, watch]);
 
-  if (byline) {
-    return <BylineChip track={track} playing={playing} rootRef={rootRef} className={className} />;
+  if (overlay) {
+    return <OverlayChip track={track} playing={playing} rootRef={rootRef} className={className} />;
   }
 
   return (
