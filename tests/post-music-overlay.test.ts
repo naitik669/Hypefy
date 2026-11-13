@@ -4,14 +4,13 @@ import { readFileSync } from "node:fs";
 /**
  * A song on the media: a Shot's record, and the sleeve that unrolls.
  *
- * A post's song no longer lives here. It sat in the corner of the photo
- * with the speaker in the opposite corner, and it now rides under the
- * poster's name — song-in-the-byline.test.ts owns that placement, and
+ * A post's disc no longer lives here. It sat in the corner of the photo
+ * and now sits in a row under it, with only the speaker left on the
+ * picture — song-under-the-post.test.ts owns that placement, and
  * track-chip.test.ts owns the chip's behaviour, since it mounts it.
  *
- * What is left here is everything that is still on a picture: a Shot's
- * record in its case, the speaker's wording, and the unroll itself, which
- * both surfaces share.
+ * What is left here is everything else: a Shot's record in its case, the
+ * speaker's wording, and the unroll itself, which both surfaces share.
  */
 
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
