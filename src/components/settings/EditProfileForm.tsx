@@ -168,7 +168,12 @@ export function EditProfileForm({
     const { error: upErr } = await supabase.storage
       .from(bucket)
       .upload(path, blob, {
-        upsert: true,
+        // Not upsert: the path carries Date.now(), so it is new every time and
+        // there is nothing to overwrite. Asking for an upsert made storage read
+        // the row back, and this bucket has no select policy, so the insert came
+        // back as "new row violates row-level security policy" — an error about
+        // the write, caused by the read.
+        upsert: false,
         cacheControl: "3600",
         contentType,
       });
