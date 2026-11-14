@@ -85,3 +85,23 @@ create policy "post-videos: own delete"
     bucket_id = 'post-videos'
     and (storage.foldername(name))[1] = (select auth.uid())::text
   );
+
+-- And a select policy, which the sentence above ("only writing needs a
+-- policy") gets wrong in a way that cost a day on avatars and banners.
+--
+-- A public bucket needs no select policy to be READ — that goes over the
+-- CDN path, which never consults RLS. But storage reads the row back on an
+-- upsert, and Postgres applies select policies to a row an insert RETURNS.
+-- With no select policy that insert is refused as "new row violates
+-- row-level security policy", an error about the write caused by the read.
+-- avatars and banners were in exactly this state; see 0196.
+--
+-- Same predicate as the two above, so it grants nothing new: every object
+-- here is already world-readable over the CDN.
+drop policy if exists "post-videos: own select" on storage.objects;
+create policy "post-videos: own select"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'post-videos'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
