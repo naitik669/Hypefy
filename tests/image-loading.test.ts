@@ -244,7 +244,10 @@ describe("thumbnails in scrolling lists are deferred", () => {
 
   const deferred: ReadonlyArray<readonly [string, string, number]> = [
     ["src/app/(app)/notifications/page.tsx", "{g.thumb.url}", 1],
-    ["src/app/(app)/profile/insights/page.tsx", "{cover(p)!}", 1],
+    // Was {cover(p)!} until Insights moved onto creator_item_stats, which
+    // returns the cover already chosen rather than making the page derive
+    // it from image_url/image_urls.
+    ["src/app/(app)/profile/insights/page.tsx", "{p.cover}", 1],
     ["src/components/diary/DiaryArchiveSheet.tsx", "{page.imageUrl}", 1],
     // The blurred bed and the photo on top of it — same file, same source.
     ["src/components/diary/FriendDiaryCard.tsx", "{entry.imageUrl!}", 2],

@@ -1,5 +1,7 @@
 "use client";
 
+import { shrinkForUpload } from "@/lib/post-image";
+
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
@@ -154,7 +156,10 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         const path = `${a.userId}/${Date.now()}-${i}.${kind.ext}`;
         const { error } = await supabase.storage
           .from("post-images")
-          .upload(path, a.files[i], { contentType: kind.contentType, upsert: false });
+          // Shrunk first. Auto mode hands over whatever the camera made, which
+          // is routinely 3-6MB; fitting it inside UPLOAD_MAX_EDGE keeps the
+          // whole frame and makes the usual upload about a megabyte.
+          .upload(path, await shrinkForUpload(a.files[i]), { contentType: kind.contentType, upsert: false });
         if (error) throw error;
         urls.push(supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl);
         setProgress(Math.min(85, 10 + ((i + 1) / a.files.length) * 72));

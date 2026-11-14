@@ -1956,6 +1956,7 @@ export type Database = {
           id: string
           image_url: string | null
           image_urls: string[]
+          media: Json | null
           mentions: string[]
           pinned_at: string | null
           poll: Json | null
@@ -1983,6 +1984,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           image_urls?: string[]
+          media?: Json | null
           mentions?: string[]
           pinned_at?: string | null
           poll?: Json | null
@@ -2010,6 +2012,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           image_urls?: string[]
+          media?: Json | null
           mentions?: string[]
           pinned_at?: string | null
           poll?: Json | null
@@ -3759,6 +3762,22 @@ export type Database = {
         Returns: string
       }
       create_show_collab: { Args: { p_title: string }; Returns: string }
+      creator_item_stats: {
+        Args: { p_limit?: number }
+        Returns: {
+          caption: string
+          comments: number
+          cover: string
+          created_at: string
+          hypes: number
+          id: string
+          kind: string
+          reach: number
+          saves: number
+          views: number
+        }[]
+      }
+      creator_totals: { Args: never; Returns: Json }
       decide_join_request: {
         Args: {
           p_accept: boolean
@@ -4288,6 +4307,7 @@ export type Database = {
         Returns: undefined
       }
       run_media_verification: { Args: never; Returns: undefined }
+      safe_timestamptz: { Args: { p: string }; Returns: string }
       schedule_message: {
         Args: {
           p_body: string
@@ -4343,6 +4363,7 @@ export type Database = {
           id: string
           image_url: string | null
           image_urls: string[]
+          media: Json | null
           mentions: string[]
           pinned_at: string | null
           poll: Json | null
@@ -4585,6 +4606,11 @@ export type Database = {
       }
       shared_follows: { Args: { p_other: string }; Returns: Json }
       show_collab_cap: { Args: never; Returns: number }
+      show_layer: {
+        Args: { p_layer: string; p_show: string; p_types: string[] }
+        Returns: Json
+      }
+      show_options_len: { Args: { p_layer: Json }; Returns: number }
       show_poll_tallies: { Args: { p_show_id: string }; Returns: Json }
       show_slider_voters: {
         Args: { p_layer_id: string; p_show_id: string }
@@ -4597,6 +4623,7 @@ export type Database = {
           value: number
         }[]
       }
+      show_sticker_results: { Args: { p_show_id: string }; Returns: Json }
       show_sticker_state: { Args: { p_show_id: string }; Returns: Json }
       spotify_connection_status: {
         Args: never

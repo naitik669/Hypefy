@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
+import { MAX_POST_IMAGE_MB } from "@/lib/post-image";
 import {
   LEGACY_POST_DRAFT_KEY,
   POST_IMAGE_TYPES,
@@ -31,7 +32,9 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SchedulePicker } from "@/components/post/SchedulePicker";
 import type { Track } from "@/lib/music";
 
-const MAX_SIZE_MB = 10;
+// One number, shared with the bucket ceiling 0197 sets. These were two
+// numbers that disagreed by 8.5MB, and every photo in the gap was lost.
+const MAX_SIZE_MB = MAX_POST_IMAGE_MB;
 const MAX_IMAGES = 10;
 
 /** `origFile` is kept alongside the cropped `file` so switching to Auto can
