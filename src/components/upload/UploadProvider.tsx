@@ -14,10 +14,12 @@ import { trimToStore, type Trim } from "@/lib/shot-trim";
 import { uploadContentType } from "@/lib/video-mime";
 import { postImageUpload } from "@/lib/post-compose";
 import { uploadFailureMessage } from "@/lib/upload-error";
+import { coverOf, imageUrlsOf, type PostSlot } from "@/lib/post-media";
+import type { PostPick } from "@/lib/post-compose";
 
 type PostUpload = {
   userId: string;
-  files: File[];
+  files: PostPick[];
   caption: string | null;
   body: string | null;
   hashtags: string[];
@@ -171,7 +173,12 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       // a phone uplink. A file that will not decode hashes to null, which
       // means "we do not know" and must read as "let it through": refusing
       // an upload over a decoder quirk is a far worse outcome than a miss.
-      const hashes = await Promise.all(a.files.map((f) => hashImageFile(f)));
+      //
+      // Only the photos. A clip is fingerprinted by its poster, which does
+      // not exist yet — it is captured in the loop below, and checked there.
+      const hashes = await Promise.all(
+        a.files.map((pick) => (pick.kind === "image" ? hashImageFile(pick.file) : null)),
+      );
       for (const hash of hashes) {
         if (!hash) continue;
         const { data: blocked } = await supabase.rpc("check_media", { p_hash: hash });
@@ -185,31 +192,105 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      const urls: string[] = [];
+      // Slot by slot, in the order they were picked — the order is the
+      // post, so [photo, clip, photo] has to survive the upload.
+      const slots: PostSlot[] = [];
       for (let i = 0; i < a.files.length; i++) {
+        const pick = a.files[i];
+
+        if (pick.kind === "video") {
+          const localUrl = URL.createObjectURL(pick.file);
+          let posterUrl: string | null = null;
+          try {
+            // The poster first, before the long upload, for the reason the
+            // Shot path gives: a backgrounded WebView does not decode, and
+            // putting the phone down during the upload is exactly what
+            // people do.
+            const poster = await capturePoster(localUrl, null);
+            if (poster) {
+              // Checked against the blocklist like any other image, since
+              // the poster is a real frame and the thing people see.
+              const ph = await hashImageFile(poster);
+              if (ph) {
+                const { data: blocked } = await supabase.rpc("check_media", { p_hash: ph });
+                if (blocked) {
+                  stopTrickle();
+                  setProgress(null);
+                  await discardUploaded(supabase, stored);
+                  toast("That video can't be posted.", "error");
+                  return;
+                }
+              }
+              const pPath = `${a.userId}/${Date.now()}-${i}-poster.jpg`;
+              const { error: pErr } = await supabase.storage
+                .from("post-videos")
+                .upload(pPath, poster, { contentType: "image/jpeg", upsert: false });
+              if (!pErr) {
+                stored.push({ bucket: "post-videos", path: pPath });
+                posterUrl = supabase.storage.from("post-videos").getPublicUrl(pPath).data.publicUrl;
+              }
+            }
+
+            const ext = pick.file.name.split(".").pop() || "mp4";
+            const vPath = `${a.userId}/${Date.now()}-${i}.${ext}`;
+            const { error: vErr } = await supabase.storage
+              .from("post-videos")
+              .upload(vPath, pick.file, {
+                contentType: uploadContentType(pick.file, "video/mp4"),
+                upsert: false,
+              });
+            if (vErr) throw vErr;
+            stored.push({ bucket: "post-videos", path: vPath });
+            slots.push({
+              kind: "video",
+              url: supabase.storage.from("post-videos").getPublicUrl(vPath).data.publicUrl,
+              poster: posterUrl,
+              duration: pick.duration,
+            });
+          } finally {
+            URL.revokeObjectURL(localUrl);
+          }
+          setProgress(Math.min(85, 10 + ((i + 1) / a.files.length) * 72));
+          continue;
+        }
+
         // Named and served as what it is: a photo posted in Auto is sent
         // as picked, and may be a PNG or WebP rather than a JPEG.
-        const kind = postImageUpload(a.files[i]);
+        const kind = postImageUpload(pick.file);
         const path = `${a.userId}/${Date.now()}-${i}.${kind.ext}`;
         const { error } = await supabase.storage
           .from("post-images")
           // Shrunk first. Auto mode hands over whatever the camera made, which
           // is routinely 3-6MB; fitting it inside UPLOAD_MAX_EDGE keeps the
           // whole frame and makes the usual upload about a megabyte.
-          .upload(path, await shrinkForUpload(a.files[i]), { contentType: kind.contentType, upsert: false });
+          .upload(path, await shrinkForUpload(pick.file), { contentType: kind.contentType, upsert: false });
         if (error) throw error;
         stored.push({ bucket: "post-images", path });
-        urls.push(supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl);
+        slots.push({
+          kind: "image",
+          url: supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl,
+        });
         setProgress(Math.min(85, 10 + ((i + 1) / a.files.length) * 72));
       }
+
+      // The photos, in order, for every reader that predates `media`.
+      const urls = imageUrlsOf(slots);
 
       const record = {
         user_id: a.userId,
         caption: a.caption,
         body: a.body,
-        image_url: urls[0] ?? null,
+        // The cover, which for a video-first post is its poster. Not
+        // simply urls[0]: a post that opens with a clip would otherwise
+        // have no thumbnail anywhere a grid or a share card looks, and a
+        // video-only post would be blank in all of them.
+        image_url: coverOf(slots),
         // NOT NULL column with a [] default — sending null breaks text-only posts.
+        // Photos only, so an old reader shows what it has always shown.
         image_urls: urls,
+        // The truth about what this post carries, in order. Null for a
+        // text-only post rather than an empty array: nothing to describe.
+        media: slots.length ? slots : null,
         hashtags: a.hashtags,
         mentions: a.mentions,
         track: a.track ?? null,

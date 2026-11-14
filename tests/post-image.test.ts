@@ -99,7 +99,9 @@ describe("the two numbers that disagreed", () => {
 
   it("the upload actually shrinks before it sends", () => {
     const uploader = read("src/components/upload/UploadProvider.tsx");
-    expect(uploader).toContain("shrinkForUpload(a.files[i])");
+    // Named pick, not a.files[i], since the loop gained a video branch
+    // and each slot is read once at the top of it.
+    expect(uploader).toContain("shrinkForUpload(pick.file)");
   });
 
   it("and the box is smaller than the ceiling it protects", () => {

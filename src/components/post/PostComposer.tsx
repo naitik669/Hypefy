@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { MAX_POST_IMAGE_MB } from "@/lib/post-image";
+import { MAX_POST_VIDEO_SECS } from "@/lib/post-media";
+import { ALLOWED_VIDEO_MIME, isAllowedVideo, isVideoFile } from "@/lib/video-mime";
+import { clipSeconds } from "@/lib/clip-seconds";
 import {
   LEGACY_POST_DRAFT_KEY,
   POST_IMAGE_TYPES,
@@ -40,12 +43,27 @@ const MAX_IMAGES = 10;
 /** `origFile` is kept alongside the cropped `file` so switching to Auto can
  *  hand the untouched original back — a crop is destructive, and without the
  *  original there is no way to return to the photo's real shape. */
+/**
+ * A slot in the composer.
+ *
+ * "Img" is now a misnomer and kept anyway: renaming it touches sixty call
+ * sites in this file for no behaviour, and the kind field says what it
+ * really is at every point that matters.
+ *
+ * A video never goes near the cropper. Cropping re-encodes through a
+ * canvas, which for a clip would mean decoding and re-encoding the whole
+ * thing on a phone — and the aspect picker is about how photos are framed,
+ * not about cutting a video down.
+ */
 type Img = {
   id: string;
   file: File;
   url: string;
   origSrc: string;
   origFile: File;
+  kind: "image" | "video";
+  /** Seconds, for a video. Null for a photo, or when it could not be read. */
+  duration: number | null;
 };
 
 /** Supported aspect ratios for posts. value = width / height;
@@ -304,7 +322,7 @@ export function PostComposer({
     setCrop(next ?? null);
   }
 
-  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (fileRef.current) fileRef.current.value = "";
     if (!files.length) return;
@@ -312,10 +330,44 @@ export function PostComposer({
 
     const slots = MAX_IMAGES - imgs.length;
     const raw: { id: string; origSrc: string; file: File }[] = [];
+    // Videos go straight in: no cropper, no re-encode, measured on the way.
+    const clips: Img[] = [];
     for (const f of files.slice(0, slots)) {
+      if (isVideoFile(f)) {
+        if (!isAllowedVideo(f)) {
+          setFileError("That video format isn't supported.");
+          continue;
+        }
+        if (f.size > MAX_SIZE_MB * 1024 * 1024) {
+          setFileError(`Each file must be under ${MAX_SIZE_MB}MB.`);
+          continue;
+        }
+        // Measured here because this is the only moment the file is in
+        // front of a decoder before the upload commits to it. A clip whose
+        // length cannot be read is let through rather than refused: null
+        // means "we do not know", and refusing over a decoder quirk is the
+        // same bad trade the upload path already declined to make.
+        const url = URL.createObjectURL(f);
+        const secs = await clipSeconds(url);
+        if (secs !== null && secs > MAX_POST_VIDEO_SECS) {
+          URL.revokeObjectURL(url);
+          setFileError(`A clip can be up to ${MAX_POST_VIDEO_SECS} seconds.`);
+          continue;
+        }
+        clips.push({
+          id: crypto.randomUUID(),
+          file: f,
+          url,
+          origSrc: url,
+          origFile: f,
+          kind: "video",
+          duration: secs,
+        });
+        continue;
+      }
       // By type, or by extension when the gallery gives no type at all.
       if (!isAllowedPostImage(f)) {
-        setFileError("Only JPEG, PNG, and WebP images are allowed.");
+        setFileError("Only JPEG, PNG, WebP or a video are allowed.");
         continue;
       }
       if (f.size > MAX_SIZE_MB * 1024 * 1024) {
@@ -328,6 +380,7 @@ export function PostComposer({
         file: f,
       });
     }
+    if (clips.length) setImgs((prev) => [...prev, ...clips]);
     if (files.length > slots)
       setFileError(`You can add up to ${MAX_IMAGES} images.`);
     if (!raw.length) return;
@@ -341,6 +394,8 @@ export function PostComposer({
         url: r.origSrc,
         origSrc: r.origSrc,
         origFile: r.file,
+        kind: "image",
+        duration: null,
       }));
       setImgs((prev) => [...prev, ...added]);
       if (imgs.length === 0) measureAuto(added[0].origSrc);
@@ -374,6 +429,7 @@ export function PostComposer({
     if (RATIOS[nextIdx].value === null) {
       setImgs((prev) =>
         prev.map((p) => {
+          if (p.kind === "video") return p;
           if (p.url !== p.origSrc) URL.revokeObjectURL(p.url);
           return { ...p, file: p.origFile, url: p.origSrc };
         })
@@ -381,11 +437,11 @@ export function PostComposer({
       measureAuto(imgs[0].origSrc);
       return;
     }
-    queueRef.current = imgs.map((p) => ({
-      id: p.id,
-      origSrc: p.origSrc,
-      file: p.origFile,
-    }));
+    // Photos only. The aspect picker is about how photos are framed; a
+    // clip has no crop step and must not be fed to one.
+    queueRef.current = imgs
+      .filter((p) => p.kind === "image")
+      .map((p) => ({ id: p.id, origSrc: p.origSrc, file: p.origFile }));
     advanceCrop();
   }
 
@@ -397,6 +453,8 @@ export function PostComposer({
       url,
       origSrc: crop.origSrc,
       origFile: crop.file,
+      kind: "image",
+      duration: null,
     };
     setImgs((prev) => {
       const i = prev.findIndex((p) => p.id === crop.id);
@@ -471,7 +529,7 @@ export function PostComposer({
     // Home shows a progress bar + a toast when it finishes.
     uploadPost({
       userId,
-      files: imgs.map((i) => i.file),
+      files: imgs.map((i) => ({ file: i.file, kind: i.kind, duration: i.duration })),
       caption: caption.trim() || null,
       body: body.trim() || null,
       hashtags,
@@ -566,7 +624,7 @@ export function PostComposer({
                 <ImageIcon size={32} className="text-faint" />
                 <p className="text-sm text-muted">Tap to add photos</p>
                 <p className="text-xs text-faint">
-                  Up to {MAX_IMAGES} · JPEG, PNG, WebP · max {MAX_SIZE_MB}MB
+                  Up to {MAX_IMAGES} · photos or a clip up to {MAX_POST_VIDEO_SECS}s · max {MAX_SIZE_MB}MB
                   each
                 </p>
               </div>
@@ -813,7 +871,7 @@ export function PostComposer({
         <input
           ref={fileRef}
           type="file"
-          accept={POST_IMAGE_TYPES.join(",")}
+          accept={[...POST_IMAGE_TYPES, ...ALLOWED_VIDEO_MIME].join(",")}
           multiple
           className="hidden"
           onChange={onFileChange}

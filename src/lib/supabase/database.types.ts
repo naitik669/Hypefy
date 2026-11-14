@@ -2719,6 +2719,7 @@ export type Database = {
           id: string
           image_url: string | null
           image_urls: string[]
+          media: Json | null
           mentions: string[]
           poll: Json | null
           scheduled_at: string
@@ -2734,6 +2735,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           image_urls?: string[]
+          media?: Json | null
           mentions?: string[]
           poll?: Json | null
           scheduled_at: string
@@ -2749,6 +2751,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           image_urls?: string[]
+          media?: Json | null
           mentions?: string[]
           poll?: Json | null
           scheduled_at?: string

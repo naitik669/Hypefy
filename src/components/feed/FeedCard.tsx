@@ -40,6 +40,7 @@ import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { formatCount } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
+import { postSlots, type PostSlot } from "@/lib/post-media";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { feedRatio } from "@/lib/aspect";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -73,6 +74,8 @@ export type FeedPost = {
   body: string | null;
   image_url: string | null;
   image_urls?: string[];
+  /** The ordered slots, which may include a clip. Validated by postSlots. */
+  media?: unknown;
   /** width / height chosen in the composer. Null on posts made before 0035
    *  and on text-only posts — those keep rendering square, which is the shape
    *  they were actually composed and cropped at. */
@@ -109,14 +112,35 @@ export type FeedPost = {
   _repostedById?: string | null;
 };
 
-/** Deduplicate and merge single/multi image fields */
-function getImages(post: FeedPost): string[] {
-  const urls = post.image_urls?.length
-    ? post.image_urls
-    : post.image_url
-    ? [post.image_url]
-    : [];
-  return [...new Set(urls)];
+/**
+ * What this post actually carries, slot by slot.
+ *
+ * postSlots prefers `media` and falls back to the photo columns, so a post
+ * made before video existed behaves exactly as it always did — there is no
+ * backfill and none is needed.
+ *
+ * The de-duplication the old getImages did is gone on purpose. It was
+ * guarding against image_url being repeated inside image_urls, which the
+ * fallback branch already avoids by choosing one or the other; applied to
+ * slots it would silently drop a post that deliberately repeats a photo.
+ */
+function slotsFor(post: FeedPost): PostSlot[] {
+  return postSlots({
+    media: post.media,
+    image_urls: post.image_urls ?? null,
+    image_url: post.image_url ?? null,
+  });
+}
+
+/**
+ * One still per slot, for everything that needs a picture rather than a
+ * player: the zoom viewer, the peek, the share preview.
+ *
+ * A video contributes its poster. A clip with no poster contributes an
+ * empty string, which those callers already treat as nothing to show.
+ */
+function stillsOf(slots: readonly PostSlot[]): string[] {
+  return slots.map((slot) => (slot.kind === "image" ? slot.url : slot.poster ?? ""));
 }
 
 /** How far a feed photo may be pinched. */
@@ -205,7 +229,8 @@ function FeedCardInner({
   priority?: boolean;
 }) {
   const supabase = createClient();
-  const images = getImages(post);
+  const slots = slotsFor(post);
+  const images = stillsOf(slots);
 
   // Resolve the current user ourselves when the parent didn't pass one,
   // so hype/save work on every surface (profile modal, search, discover...).
@@ -1142,7 +1167,7 @@ function FeedCardInner({
             className="flex transition-transform duration-300 ease-out will-change-transform"
             style={{ transform: `translateX(-${imgIdx * 100}%)` }}
           >
-            {images.map((src, i) => (
+            {slots.map((slot, i) => (
               // Frame the post in the shape it was composed at, within the
               // shapes the feed draws (see feedRatio). This was hardcoded to
               // aspect-square, so a 3:4 or 16:9 post got cropped a second time
@@ -1172,8 +1197,33 @@ function FeedCardInner({
                     : null),
                 }}
               >
+                {slot.kind === "video" ? (
+                  /*
+                   * Muted, looping and inline, the way the feed's Shot card
+                   * plays: sound in a feed you are scrolling past is not
+                   * something anybody asked for, and an unmuted autoplay is
+                   * refused by the browser anyway, which would leave a
+                   * frozen frame instead of a playing clip.
+                   *
+                   * object-contain, not cover. A post's clip is framed by
+                   * the composer's aspect picker like every photo beside
+                   * it, and cropping it again here would be the same
+                   * mistake the Shots player just had fixed.
+                   */
+                  <video
+                    src={slot.url}
+                    poster={slot.poster ?? undefined}
+                    className="absolute inset-0 h-full w-full bg-black object-contain"
+                    muted
+                    loop
+                    playsInline
+                    autoPlay
+                    preload="metadata"
+                    draggable={false}
+                  />
+                ) : (
                 <OptimizedImage
-                  src={src}
+                  src={slot.url}
                   alt={post.caption ?? "Post"}
                   sizes="(max-width: 480px) 100vw, 448px"
                   className="object-cover"
@@ -1182,6 +1232,7 @@ function FeedCardInner({
                   // the gallery is off to the side behind a swipe.
                   priority={priority && i === 0}
                 />
+                )}
               </div>
             ))}
           </div>

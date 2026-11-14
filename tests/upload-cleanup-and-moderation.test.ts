@@ -76,9 +76,25 @@ describe("saying what went wrong", () => {
 });
 
 describe("a failed upload takes its files back out", () => {
-  it("there is one helper, used by both paths", () => {
+  it("there is one helper, used everywhere a path can give up", () => {
     expect(up).toContain("async function discardUploaded(");
-    expect((up.match(/await discardUploaded\(supabase, stored\)/g) ?? [])).toHaveLength(2);
+    // Three sites now, not two: both catch blocks, plus the early return
+    // when a post's clip is refused by the blocklist — that one has
+    // already stored a poster by the time it turns back.
+    const calls = up.match(/await discardUploaded\(supabase, stored\)/g) ?? [];
+    expect(calls.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("including the branch that turns back rather than throwing", () => {
+    // An early return skips the catch entirely, so it has to clean up on
+    // its own — and by this point a poster has already been stored.
+    // The VIDEO branch specifically. There are three `if (blocked)` sites
+    // and indexOf found the first — the photo pre-check, which correctly
+    // has no cleanup because it runs before anything is uploaded.
+    const toastAt = up.indexOf(`toast("That video can't be posted."`);
+    expect(toastAt, "the refused-video branch").toBeGreaterThan(-1);
+    const branch = up.slice(up.lastIndexOf("if (blocked) {", toastAt), toastAt);
+    expect(branch).toContain("await discardUploaded(supabase, stored)");
   });
 
   it("the post path records every object it stores", () => {
