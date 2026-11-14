@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, EyeOff, Pencil, Archive, MessageCircle, MessageCircleOff } from "lucide-react";
@@ -8,6 +8,13 @@ import { ShareIcon } from "@/components/ui/ShareIcon";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { setArchived, setCommentsOff } from "@/lib/post-controls";
 import { WATCH_MS, recordWatch } from "@/lib/watched";
+import {
+  advanceWatch,
+  completionOf,
+  startWatch,
+  worthRecording,
+  type WatchSession,
+} from "@/lib/watch-session";
 import { RehypeIcon } from "@/components/ui/RehypeIcon";
 import { isRehyped, setRehype, type DeckPerson } from "@/lib/rehype";
 import { useRehypeDeck } from "@/lib/use-rehype-deck";
@@ -706,6 +713,52 @@ function ReelCard({
     const t = setTimeout(() => void recordWatch(supabase, reel.id, currentUserId), WATCH_MS);
     return () => clearTimeout(t);
   }, [isActive, playing, reel.id, currentUserId, supabase]);
+
+  /*
+   * How much of it they watched, as opposed to whether they saw it.
+   *
+   * Folded in on the player's own timeupdate — about four a second — and
+   * sent once, when this stops being the reel on screen. Per-tick writes on
+   * a feed somebody scrolls for an hour would be thousands of round trips
+   * for one number, and this component already runs a story clock, a video
+   * and a song.
+   *
+   * Measured against the trimmed window rather than the file: the author
+   * chose nine seconds out of a minute, so watching those nine is watching
+   * all of it.
+   */
+  const watch = useRef<WatchSession>(startWatch());
+  const watchWindow = useRef(0);
+
+  const flushWatch = useCallback(() => {
+    const s = watch.current;
+    const dur = watchWindow.current;
+    watch.current = startWatch();
+    if (!currentUserId || !worthRecording(s)) return;
+    void supabase.rpc("record_shot_watch", {
+      p_shot_id: reel.id,
+      p_watched_ms: Math.round(s.watchedMs),
+      p_duration_ms: Math.round(dur * 1000),
+      p_completion: Math.round(completionOf(s, dur) * 100),
+      p_replays: s.replays,
+    });
+  }, [currentUserId, reel.id, supabase]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    watch.current = startWatch();
+    // Backgrounding the app is the common way a session ends on a phone,
+    // and it fires no unmount — without this the last reel watched before
+    // the screen locked would never be counted.
+    const onHide = () => flushWatch();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onHide);
+      flushWatch();
+    };
+  }, [isActive, reel.id, flushWatch]);
 
   useEffect(() => {
     if (!track || !isActive || !playing || muted) return;
@@ -1461,6 +1514,12 @@ function ReelCard({
           const from = window0.start;
           const to = window0.end ?? v.duration;
           if (to > from) setProgress(Math.min(1, Math.max(0, (v.currentTime - from) / (to - from))));
+          // Watch time, folded in against the trimmed window. The loop below
+          // pulls currentTime back to the start, which reads as a replay.
+          if (to > from) {
+            watchWindow.current = to - from;
+            watch.current = advanceWatch(watch.current, v.currentTime - from);
+          }
           // A seek landing before the window (or a browser that ignored the
           // initial one) is pulled back in rather than left playing outside.
           if (v.currentTime < from - 0.25) v.currentTime = from;

@@ -153,6 +153,16 @@ export default async function InsightsPage() {
                   <span className="flex items-center gap-1">
                     <HypeIcon size={13} /> {formatCount(p.hypes ?? 0)}
                   </span>
+                  {/* Null, not zero, when nobody has watched it yet — and a
+                      post has no completion to have at all. */}
+                  {p.avg_completion !== null && p.avg_completion !== undefined && (
+                    <span
+                      className="text-accent"
+                      title="Average amount watched"
+                    >
+                      {p.avg_completion}%
+                    </span>
+                  )}
                 </div>
               </Link>
             ))}
