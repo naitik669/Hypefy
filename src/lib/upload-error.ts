@@ -14,6 +14,33 @@
 
 export type UploadKind = "post" | "Shot";
 
+/**
+ * Thrown to unwind an upload somebody asked to stop.
+ *
+ * An error rather than a flag checked at every step, because the upload is
+ * a straight line of awaits and unwinding is what an exception is for. The
+ * catch that already cleans up storage then handles cancelling for free —
+ * the files go, the row is never written — and only the reporting differs,
+ * since a cancelled upload is not a failed one and must not leave a banner
+ * offering to retry something the person just stopped.
+ *
+ * What this does NOT do is abort the request already in flight. The storage
+ * client takes no AbortSignal on upload in this version — it has one for
+ * download and not for this — so a chunk already on its way finishes, and
+ * its object is removed immediately afterwards. The post never exists
+ * either way, which is what cancelling means here.
+ */
+export class UploadCancelled extends Error {
+  constructor() {
+    super("Upload cancelled");
+    this.name = "UploadCancelled";
+  }
+}
+
+export function isCancelled(err: unknown): boolean {
+  return err instanceof UploadCancelled;
+}
+
 /** Pull a message out of whatever was thrown. */
 function textOf(err: unknown): string {
   if (!err) return "";
