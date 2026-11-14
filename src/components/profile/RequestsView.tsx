@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 import { haptics } from "@/lib/haptics";
 import { formatCount } from "@/lib/format";
+import { underHeaderStyle, useHideOnScroll } from "@/lib/use-hide-on-scroll";
 
 export type RequestRow = {
   id: string;
@@ -47,6 +48,10 @@ export function RequestsView({
   incoming: RequestRow[];
   sent: RequestRow[];
 }) {
+  // Rides with the header: this row is attached to it, so when the header
+  // slides away this goes with it instead of staying pinned 56px down with
+  // the page scrolling in the gap above it.
+  const headerHidden = useHideOnScroll();
   const supabase = createClient();
   const router = useRouter();
   const toast = useToast();
@@ -98,7 +103,7 @@ export function RequestsView({
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-14 z-10 flex gap-1 border-b border-border/60 chrome-bar px-4 py-2">
+      <div style={underHeaderStyle(headerHidden)} className="sticky z-10 flex gap-1 border-b border-border/60 chrome-bar px-4 py-2">
         {(["incoming", "sent"] as Tab[]).map((t) => {
           const count = t === "incoming" ? inRows.length : sentRows.length;
           const on = t === tab;

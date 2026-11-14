@@ -8,6 +8,7 @@ import { ChatImg, ChatLink, ChatVideo } from "@/components/messages/ChatMedia";
 import { AlbumViewer } from "@/components/messages/MediaFolder";
 import { VoiceMessage } from "@/components/messages/VoiceMessage";
 import { BLANK_POSTER } from "@/lib/blank-poster";
+import { underHeaderStyle, useHideOnScroll } from "@/lib/use-hide-on-scroll";
 import {
   byMonth,
   bySender,
@@ -70,11 +71,15 @@ export function ConversationMedia({
   isGroup?: boolean;
   initialTab?: SharedTab;
 }) {
+  // Rides with the header: this row is attached to it, so when the header
+  // slides away this goes with it instead of staying pinned 56px down with
+  // the page scrolling in the gap above it.
+  const headerHidden = useHideOnScroll();
   const [tab, setTab] = useState<SharedTab>(initialTab);
 
   return (
     <div className="flex flex-col pb-10">
-      <div className="sticky top-14 z-10 chrome-bar border-b border-border/60 px-4 pb-2.5 pt-2">
+      <div style={underHeaderStyle(headerHidden)} className="sticky z-10 chrome-bar border-b border-border/60 px-4 pb-2.5 pt-2">
         <div role="tablist" aria-label="Shared in this chat" className="flex gap-1 rounded-pill bg-surface p-1">
           {SHARED_TAB_ICONS.map(({ id, label, Icon }) => {
             const on = id === tab;

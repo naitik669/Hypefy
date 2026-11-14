@@ -16,6 +16,7 @@ import { formatCount } from "@/lib/format";
 import { reshuffle } from "@/lib/discover-mix";
 import { HypedByYourPeople } from "@/components/discover/HypedByYourPeople";
 import { CommentIcon } from "@/components/ui/CommentIcon";
+import { underHeaderStyle, useHideOnScroll } from "@/lib/use-hide-on-scroll";
 
 type Shot = {
   id: string;
@@ -91,6 +92,10 @@ export function DiscoverView({
   categoryRails?: { label: string; posts: Pin[] }[];
   tags: Tag[];
 }) {
+  // Rides with the header: this row is attached to it, so when the header
+  // slides away this goes with it instead of staying pinned 56px down with
+  // the page scrolling in the gap above it.
+  const headerHidden = useHideOnScroll();
   const router = useRouter();
   const [cat, setCat] = useState<string>("For You");
   /** Bumped by Refresh at the end of the feed. Also the shuffle seed: asking
@@ -131,7 +136,7 @@ export function DiscoverView({
           They used to be a scrolling row of chips under the search bar: ten
           of them, most off the right edge, taking a band of every screen to
           say what you are looking at — which is almost always "For You". */}
-      <div className="sticky top-14 z-10 chrome-bar flex items-center gap-2 px-4 py-2.5">
+      <div style={underHeaderStyle(headerHidden)} className="sticky z-10 chrome-bar flex items-center gap-2 px-4 py-2.5">
         <div className="min-w-0 flex-1">
           <SearchBar placeholder="Search people, posts, #tags" href="/search" />
         </div>

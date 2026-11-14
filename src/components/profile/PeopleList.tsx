@@ -11,6 +11,7 @@ import { formatCount } from "@/lib/format";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 import { QUIET_COPY, removeFollower } from "@/lib/feed-quiet";
+import { underHeaderStyle, useHideOnScroll } from "@/lib/use-hide-on-scroll";
 
 export type PersonRow = {
   id: string;
@@ -48,6 +49,10 @@ export function PeopleList({
   lockedName: string;
   pageSize: number;
 }) {
+  // Rides with the header: this row is attached to it, so when the header
+  // slides away this goes with it instead of staying pinned 56px down with
+  // the page scrolling in the gap above it.
+  const headerHidden = useHideOnScroll();
   const supabase = createClient();
   const [rows, setRows] = useState(initial);
   const [done, setDone] = useState(initial.length >= total || initial.length < pageSize);
@@ -158,7 +163,7 @@ export function PeopleList({
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-14 z-10 border-b border-border/60 chrome-bar px-4 py-2">
+      <div style={underHeaderStyle(headerHidden)} className="sticky z-10 border-b border-border/60 chrome-bar px-4 py-2">
         <div className="flex h-10 items-center gap-2 rounded-pill border border-border bg-surface px-3">
           <Search size={15} className="shrink-0 text-faint" />
           <input

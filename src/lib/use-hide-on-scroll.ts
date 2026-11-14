@@ -79,3 +79,29 @@ export function hideStyle(hidden: boolean): React.CSSProperties {
     transition: "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
   };
 }
+
+/** What PageHeader occupies: its own bar, plus the status-bar inset. */
+export const HEADER_H = "calc(3.5rem + var(--sat))";
+
+/**
+ * The style for a row that sits directly under the header — Discover's
+ * search row, a profile's tab strip, a filter bar.
+ *
+ * These were `sticky top-14` and stayed there, which was right while the
+ * header was always present. Once the header started sliding away they were
+ * left pinned 56px down with the page scrolling in the gap above them, so
+ * the search bar appeared to float. They belong to the header, so they
+ * travel with it.
+ *
+ * Hidden, the row goes up by its own height AND the header's, which puts
+ * its bottom edge at the top of the viewport rather than part-way down.
+ * `top` is the header's real height, inset included — `top-14` was 56px
+ * flat and sat that inset's worth too high on a phone with a status bar.
+ */
+export function underHeaderStyle(hidden: boolean): React.CSSProperties {
+  return {
+    top: HEADER_H,
+    transform: hidden ? `translateY(calc(-100% - ${HEADER_H}))` : "translateY(0)",
+    transition: "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+  };
+}

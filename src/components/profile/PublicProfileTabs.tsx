@@ -14,6 +14,7 @@ import {
 import { RehypesGrid } from "@/components/profile/RehypesGrid";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { PostsGrid, ShotsGrid } from "@/components/profile/ProfileGrids";
+import { underHeaderStyle, useHideOnScroll } from "@/lib/use-hide-on-scroll";
 
 type Tab = "Posts" | "Shots" | "Rehypes";
 
@@ -46,6 +47,10 @@ export function PublicProfileTabs({
   initialFollowing?: boolean;
   initialRequested?: boolean;
 }) {
+  // Rides with the header: this row is attached to it, so when the header
+  // slides away this goes with it instead of staying pinned 56px down with
+  // the page scrolling in the gap above it.
+  const headerHidden = useHideOnScroll();
   // Rehypes are public, like a reshare anywhere else; the database still
   // hides a private account's from people who do not follow it.
   const tabs: Tab[] = ["Posts", "Shots", "Rehypes"];
@@ -54,7 +59,7 @@ export function PublicProfileTabs({
   return (
     <div className="mt-2">
       {/* Tab bar — thin hairline dividers, blends with the page background */}
-      <div className="sticky top-14 z-10 flex border-y border-border chrome-bar">
+      <div style={underHeaderStyle(headerHidden)} className="sticky z-10 flex border-y border-border chrome-bar">
         {tabs.map((t) => {
           const Icon = t === "Posts" ? Grid3x3 : t === "Shots" ? Zap : Repeat2;
           return (
