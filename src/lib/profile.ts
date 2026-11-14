@@ -200,6 +200,8 @@ export type PrivateProfile = {
   referralCount: number;
   /** Who may reach them by writing @them. */
   mentionPrivacy: "everyone" | "following" | "nobody";
+  /** Whether the creator dashboard is unlocked. Private: see 0208. */
+  creatorMode: boolean;
 };
 
 /** What my_private_profile() hands back, read without trusting its shape. */
@@ -215,6 +217,7 @@ export function parsePrivateProfile(raw: unknown): PrivateProfile | null {
     referralCount: typeof r.referral_count === "number" ? r.referral_count : 0,
     mentionPrivacy:
       r.mention_privacy === "following" || r.mention_privacy === "nobody" ? r.mention_privacy : "everyone",
+    creatorMode: r.creator_mode === true,
   };
 }
 
