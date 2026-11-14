@@ -6,6 +6,21 @@
 /** What a post may carry, as the post-images bucket allows it. */
 export const POST_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
+/**
+ * One thing picked in the composer, before any of it is uploaded.
+ *
+ * Carries its kind because a video takes a different path from here on: no
+ * cropper, no re-encode, a poster captured from it, and a different bucket.
+ * Duration is measured at pick time because that is the only moment the
+ * file is in front of a decoder before the upload commits to it.
+ */
+export type PostPick = {
+  file: File;
+  kind: "image" | "video";
+  /** Seconds, or null when it could not be measured. */
+  duration: number | null;
+};
+
 const BY_EXTENSION: Record<string, string> = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
