@@ -199,7 +199,7 @@ export function BottomNav({
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto flex h-[72px] w-full max-w-[480px] items-center justify-around border-t border-border/60 chrome-bar px-2 pb-[var(--sab)]">
+      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto flex h-[var(--nav-h)] w-full max-w-[480px] items-center justify-around border-t border-border/60 chrome-bar px-2 pb-[var(--sab)]">
         {/* Tap goes home; holding raises the shortcuts. Search lives here
             rather than as a second icon in the top bar, where it crowded the
             wordmark and looked bolted on. */}

@@ -185,7 +185,7 @@ export default async function AppLayout({
               <TabScrollTop />
               {/* Wraps only the scrolling content, never the nav — the bar
                   has to stay put while the page slides under the finger. */}
-              <div className="flex-1 pb-[84px]">
+              <div className="flex-1 pb-[var(--nav-space)]">
                 <SwipeNav>{children}</SwipeNav>
               </div>
               <BottomNav

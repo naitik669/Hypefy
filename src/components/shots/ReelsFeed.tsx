@@ -176,9 +176,11 @@ export const PINCH_MAX = 4;
 /**
  * Where a pinch has got to, from the gap between the fingers.
  *
- * Floored at 1 rather than allowed below it: a reel is object-cover, so
- * shrinking it past the screen exposes bars where the video used to be,
- * which reads as something broken rather than as zooming out.
+ * Floored at 1 rather than allowed below it: shrinking a reel past its
+ * resting size pulls it away from the edges of the screen, which reads as
+ * something broken rather than as zooming out. (A clip that is not 9:16
+ * has bands at rest now that the player contains rather than crops it —
+ * those are the clip's own shape, and pinching below 1 would add to them.)
  */
 /**
  * What a released swipe on the reel does. Only a vertical gesture counts: a
@@ -1416,15 +1418,26 @@ function ReelCard({
         ref={videoRef}
         src={reel.media_url}
         poster={reel.poster_url || BLANK_POSTER}
-        className={`absolute top-0 bg-black object-cover ${
+        className={`absolute top-0 bg-black object-contain ${
           commentsOpen ? "" : "inset-x-0 h-full w-full"
         }`}
         style={{
           // A Shot is a vertical thing, so the stage stays vertical even
           // once it is small: a 9:16 box as tall as the space allows,
-          // centred, filled the same way it is full-screen. Fitting the
-          // whole frame into a wide box instead was what turned a Shot
-          // filmed wider than 9:16 into a letterboxed horizontal strip.
+          // centred.
+          //
+          // The video inside it is object-contain, not cover. Cover meant a
+          // clip that was not already 9:16 got zoomed until it filled the
+          // stage, and the sides or the ends were simply gone — you uploaded
+          // one framing and the app showed another. Nothing re-encodes the
+          // file on the way up, so the whole frame was always there; only
+          // the player was throwing it away.
+          //
+          // The trade, stated plainly because the previous comment here
+          // argued the other way: a Shot filmed wider than 9:16 now shows
+          // with black bands above and below instead of being cropped to
+          // its middle. That is the clip as it was filmed, which is what
+          // was asked for. A true 9:16 Shot looks identical either way.
           ...shotStage(commentsOpen, pinchScale),
           // Snap back under its own power once the fingers leave, but track
           // them exactly while they are down.

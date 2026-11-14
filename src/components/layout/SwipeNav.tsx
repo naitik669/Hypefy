@@ -551,7 +551,7 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
               dx.current = 0;
               paint(0, SETTLE);
             }}
-            className="h-full w-full max-w-[480px] overflow-hidden bg-background pb-[84px]"
+            className="h-full w-full max-w-[480px] overflow-hidden bg-background pb-[var(--nav-space)]"
             style={{ touchAction: "pan-y" }}
           >
             <TabSkeleton tab={standIn.tab} />
@@ -574,7 +574,7 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
             }}
             data-side={inbound.side}
             data-incoming-tab={inbound.tab}
-            className="h-full w-full max-w-[480px] overflow-hidden bg-background pb-[84px]"
+            className="h-full w-full max-w-[480px] overflow-hidden bg-background pb-[var(--nav-space)]"
           >
             <TabSkeleton tab={inbound.tab} />
           </div>

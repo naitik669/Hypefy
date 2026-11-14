@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ChevronLeft, Globe, Music } from "lucide-react";
+import { ArrowLeft, ChevronLeft, Globe, Music, Volume2, VolumeX } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -75,6 +75,10 @@ export function ShotPreview({
     onCaptionChange?.(next);
   }
   const [cursor, setCursor] = useState(0);
+  /** The caption screen was hard-muted, so you wrote the caption against a
+   *  silent clip. Starts true only because autoplay demands it; the sound
+   *  button is a gesture, which is what lets it be turned on. */
+  const [previewMuted, setPreviewMuted] = useState(true);
   const [busy, setBusy] = useState(false);
   /** Who the Show goes to, and who it is kept from. Shows only. */
   const [audience, setAudience] = useState<ShowAudience>("everyone");
@@ -304,7 +308,12 @@ export function ShotPreview({
           className="absolute inset-0 h-full w-full object-contain"
           autoPlay
           loop
-          muted
+          // Starts silent because a browser refuses to autoplay a clip with
+          // sound, and a refused play leaves a still frame rather than a
+          // muted one. The control above turns it on, which is a gesture, so
+          // it is allowed. Before this the caption screen was muted with no
+          // way out of it: you wrote the caption to a silent clip.
+          muted={previewMuted}
           playsInline
         />
       ) : (
@@ -331,12 +340,25 @@ export function ShotPreview({
         >
           <ArrowLeft size={20} />
         </button>
-        {track && (
-          <span className="flex items-center gap-1.5 rounded-pill bg-black/45 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
-            <Music size={13} />
-            <span className="max-w-[160px] truncate">{track.title}</span>
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {track && (
+            <span className="flex items-center gap-1.5 rounded-pill bg-black/45 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+              <Music size={13} />
+              <span className="max-w-[160px] truncate">{track.title}</span>
+            </span>
+          )}
+          {isVideo && (
+            <button
+              type="button"
+              onClick={() => setPreviewMuted((m) => !m)}
+              aria-label={previewMuted ? "Turn sound on" : "Turn sound off"}
+              aria-pressed={!previewMuted}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm active:scale-95"
+            >
+              {previewMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="relative z-10 mt-auto flex flex-col gap-3 px-4 pb-[max(1rem,var(--sab))]">

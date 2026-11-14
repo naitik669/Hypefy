@@ -79,6 +79,16 @@
 :root {
   --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+
+  /* The bottom nav bar's own height, and the room scrolling content has to
+     leave clear below it. BottomNav wears --nav-h; every scroll container
+     reserves --nav-space. One number each, because these were two: the bar
+     is --nav-h tall PLUS the inset it pads by, and the feed reserved a flat
+     84px. On a phone with a gesture bar that is short by the inset, so the
+     last card's action row — hype, comment, share, save — sat under the bar.
+     The 12px is air, so the row ends up clear of it rather than flush. */
+  --nav-h: 72px;
+  --nav-space: calc(var(--nav-h) + var(--sab) + 12px);
 }
 
 html {

@@ -124,3 +124,50 @@ describe("what stays put", () => {
     expect(notHiding.sort(), notHiding.join(", ")).toEqual([...PINNED].sort());
   });
 });
+
+/**
+ * The rows that belong to the header travel with it.
+ *
+ * Discover's search row, the profile tab strips, the filter bars — seven of
+ * them — were `sticky top-14`, which was right while the header was always
+ * there. Once the header started sliding away they stayed pinned 56px down
+ * with the page scrolling in the gap above, so the search bar looked like it
+ * was floating in mid-air. Reported on Discover; it was all seven.
+ */
+const ATTACHED = [
+  "src/components/discover/DiscoverView.tsx",
+  "src/components/messages/ConversationMedia.tsx",
+  "src/components/profile/ActivityScreen.tsx",
+  "src/components/profile/PeopleList.tsx",
+  "src/components/profile/ProfileTabs.tsx",
+  "src/components/profile/PublicProfileTabs.tsx",
+  "src/components/profile/RequestsView.tsx",
+];
+
+describe("rows attached to the header", () => {
+  it("move by their own height and the header's, so they clear the top", () => {
+    // Its own height alone would only lift it by its own height and leave it
+    // part-way down the screen, which is the bug wearing a transition.
+    expect(hook).toContain("export const HEADER_H");
+    expect(hook).toContain("translateY(calc(-100% - ${HEADER_H}))");
+  });
+
+  it("and sit at the header's real height, inset included", () => {
+    expect(hook).toContain('export const HEADER_H = "calc(3.5rem + var(--sat))"');
+    expect(hook).toContain("top: HEADER_H");
+  });
+
+  it("every one of them rides", () => {
+    for (const f of ATTACHED) {
+      expect(read(f), f).toContain("underHeaderStyle(headerHidden)");
+      expect(read(f), f).toContain("useHideOnScroll()");
+    }
+  });
+
+  it("and nothing is left pinned under a header that moves", () => {
+    // The class is the smell: a flat top-14 under a sliding header is the
+    // exact shape of the bug.
+    const stuck = tsxFiles().filter((f) => /className="[^"]*\bsticky top-14\b/.test(read(f)));
+    expect(stuck, stuck.join(", ")).toEqual([]);
+  });
+});

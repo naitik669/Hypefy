@@ -14,6 +14,7 @@ import { setRehype } from "@/lib/rehype";
 import { forgetOneView, forgetViews } from "@/lib/watched";
 import { timeAgoShort } from "@/lib/time";
 import type { ActivityComment, ActivityItem, ActivityTab } from "@/lib/your-activity";
+import { underHeaderStyle, useHideOnScroll } from "@/lib/use-hide-on-scroll";
 
 // Icon is widened from `typeof Star` because the tabs now mix the app's own
 // hype mark with lucide's for the other three; a ComponentType holds both.
@@ -60,6 +61,10 @@ export function ActivityScreen({
   comments: ActivityComment[];
   userId: string;
 }) {
+  // Rides with the header: this row is attached to it, so when the header
+  // slides away this goes with it instead of staying pinned 56px down with
+  // the page scrolling in the gap above it.
+  const headerHidden = useHideOnScroll();
   const supabase = createClient();
   const router = useRouter();
   const showToast = useToast();
@@ -134,7 +139,7 @@ export function ActivityScreen({
 
   return (
     <div className="flex flex-col pb-10">
-      <div className="sticky top-14 z-10 chrome-bar border-b border-border/60 px-4 pb-2.5 pt-2">
+      <div style={underHeaderStyle(headerHidden)} className="sticky z-10 chrome-bar border-b border-border/60 px-4 pb-2.5 pt-2">
         <div role="tablist" aria-label="Your interactions" className="flex gap-1 rounded-pill bg-surface p-1">
           {TABS.map(({ id, label, Icon }) => {
             const on = id === tab;
