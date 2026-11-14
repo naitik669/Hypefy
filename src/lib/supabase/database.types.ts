@@ -2801,6 +2801,54 @@ export type Database = {
           },
         ]
       }
+      shot_watch_stats: {
+        Row: {
+          duration_ms: number
+          max_completion: number
+          replays: number
+          shot_id: string
+          updated_at: string
+          viewer_id: string
+          watched_ms: number
+          watched_on: string
+        }
+        Insert: {
+          duration_ms?: number
+          max_completion?: number
+          replays?: number
+          shot_id: string
+          updated_at?: string
+          viewer_id: string
+          watched_ms?: number
+          watched_on?: string
+        }
+        Update: {
+          duration_ms?: number
+          max_completion?: number
+          replays?: number
+          shot_id?: string
+          updated_at?: string
+          viewer_id?: string
+          watched_ms?: number
+          watched_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shot_watch_stats_shot_id_fkey"
+            columns: ["shot_id"]
+            isOneToOne: false
+            referencedRelation: "shots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shot_watch_stats_viewer_id_fkey"
+            columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shots: {
         Row: {
           archived_at: string | null
@@ -3765,6 +3813,7 @@ export type Database = {
       creator_item_stats: {
         Args: { p_limit?: number }
         Returns: {
+          avg_completion: number
           caption: string
           comments: number
           cover: string
@@ -4239,6 +4288,16 @@ export type Database = {
         Args: { p_label?: string; p_session_id: string }
         Returns: undefined
       }
+      record_shot_watch: {
+        Args: {
+          p_completion: number
+          p_duration_ms: number
+          p_replays: number
+          p_shot_id: string
+          p_watched_ms: number
+        }
+        Returns: undefined
+      }
       rehype_deck: {
         Args: { p_kind: string; p_target: string }
         Returns: {
@@ -4605,6 +4664,7 @@ export type Database = {
         }[]
       }
       shared_follows: { Args: { p_other: string }; Returns: Json }
+      shot_watch_summary: { Args: { p_shot_id: string }; Returns: Json }
       show_collab_cap: { Args: never; Returns: number }
       show_layer: {
         Args: { p_layer: string; p_show: string; p_types: string[] }
