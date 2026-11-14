@@ -54,6 +54,16 @@ describe("room under the bottom bar", () => {
     expect(nav).not.toMatch(/h-\[72px\]/);
   });
 
+  it("and nothing positions itself off a hardcoded bar height either", () => {
+    // ShotUploadCard sat at bottom-[calc(72px+var(--sab))] — the same two
+    // numbers that had to agree, disagreeing in a second place. The padding
+    // sweep below could not see it, because it is a position and not a pad.
+    const offenders = sourceFiles()
+      .filter((f) => /(bottom|top|height|h)-\[calc\(\s*72px/.test(read(f)))
+      .map((f) => f.split("\\").join("/"));
+    expect(offenders, offenders.join(", ")).toEqual([]);
+  });
+
   it("and nothing reserves a flat number of its own", () => {
     // A hard-coded pad is the thing that drifted. Only nav-sized ones: a
     // card padding its own 11px is not clearing the bar, and sweeping those

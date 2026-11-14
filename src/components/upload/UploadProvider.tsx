@@ -13,7 +13,12 @@ import { capturePoster } from "@/lib/video-poster";
 import { trimToStore, type Trim } from "@/lib/shot-trim";
 import { uploadContentType } from "@/lib/video-mime";
 import { postImageUpload } from "@/lib/post-compose";
-import { uploadFailureMessage } from "@/lib/upload-error";
+import {
+  UploadCancelled,
+  isCancelled,
+  uploadFailureMessage,
+  worthRetrying,
+} from "@/lib/upload-error";
 import { coverOf, imageUrlsOf, type PostSlot } from "@/lib/post-media";
 import type { PostPick } from "@/lib/post-compose";
 
@@ -47,10 +52,22 @@ type ShotUpload = {
   trim: Trim;
 };
 
-/** What failed, and enough of it to try again. */
-type Failed =
+/**
+ * What failed, and enough of it to try again.
+ *
+ * Carries the message as well as the payload. The banner used to print
+ * "Couldn't share your post." from a literal of its own, so the specific
+ * reason only ever appeared in the toast — which is gone in three seconds,
+ * while the banner is the thing that stays on screen.
+ *
+ * canRetry comes from worthRetrying: a file over the bucket ceiling or of
+ * a type the bucket will not take cannot succeed on a second attempt, and
+ * a Retry button there is a taunt rather than a control.
+ */
+type Failed = { message: string; canRetry: boolean } & (
   | { kind: "post"; post: PostUpload }
-  | { kind: "shot"; shot: ShotUpload };
+  | { kind: "shot"; shot: ShotUpload }
+);
 
 type Ctx = {
   progress: number | null;
@@ -62,6 +79,8 @@ type Ctx = {
   uploadShot: (a: ShotUpload) => void;
   retryUpload: () => void;
   dismissFailed: () => void;
+  /** Stop the upload in progress. See UploadCancelled for what that means. */
+  cancelUpload: () => void;
 };
 const UploadCtx = createContext<Ctx>({
   progress: null,
@@ -71,6 +90,7 @@ const UploadCtx = createContext<Ctx>({
   uploadShot: () => {},
   retryUpload: () => {},
   dismissFailed: () => {},
+  cancelUpload: () => {},
 });
 export const useUpload = () => useContext(UploadCtx);
 
@@ -148,6 +168,23 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState<"post" | "shot" | null>(null);
   const [failed, setFailed] = useState<Failed | null>(null);
   const trickle = useRef<ReturnType<typeof setInterval> | null>(null);
+  /*
+   * Set by the Cancel button, read between slots.
+   *
+   * A ref, not state: the upload loop is a closure that started before the
+   * button was pressed, and a state value it captured would still be false
+   * however many times the component re-rendered.
+   */
+  const cancelled = useRef(false);
+
+  const cancelUpload = useCallback(() => {
+    cancelled.current = true;
+  }, []);
+
+  /** Throw out of the upload if the person asked it to stop. */
+  const bailIfCancelled = () => {
+    if (cancelled.current) throw new UploadCancelled();
+  };
 
   const stopTrickle = () => { if (trickle.current) { clearInterval(trickle.current); trickle.current = null; } };
   const startTrickle = () => {
@@ -163,6 +200,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setActive("post");
     setProgress(6);
     setFailed(null);
+    cancelled.current = false;
     startTrickle();
     // What has actually landed in the bucket, so a failure part-way through
     // can take it back out again. Outside the try so the catch can see it.
@@ -196,6 +234,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       // post, so [photo, clip, photo] has to survive the upload.
       const slots: PostSlot[] = [];
       for (let i = 0; i < a.files.length; i++) {
+        // Between slots, not mid-file: the request in flight cannot be
+        // aborted, so this is the first moment stopping is possible.
+        bailIfCancelled();
         const pick = a.files[i];
 
         if (pick.kind === "video") {
@@ -298,6 +339,10 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         aspect_ratio: a.aspectRatio ?? null,
       };
 
+      // Last chance: past this the post exists, and cancelling would mean
+      // deleting something already published rather than never making it.
+      bailIfCancelled();
+
       // Scheduled → its own table (a pg_cron job publishes it when due); the
       // feed queries never see it, so nothing else changes.
       if (a.scheduledAt) {
@@ -332,8 +377,19 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       // Nothing references these: the row they were for was never written,
       // or was written and failed. Leaving them is a bucket that only grows.
       await discardUploaded(supabase, stored);
+      // A cancelled upload is not a failed one. No banner, and nothing
+      // offering to retry the thing somebody just stopped.
+      if (isCancelled(err)) {
+        toast("Upload cancelled", "success");
+        return;
+      }
       // Stash the payload (Files still valid) so the user can one-tap retry.
-      setFailed({ kind: "post", post: a });
+      setFailed({
+        kind: "post",
+        post: a,
+        message: uploadFailureMessage(err, "post"),
+        canRetry: worthRetrying(err),
+      });
       toast(uploadFailureMessage(err, "post"), "error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -351,6 +407,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setActive("shot");
     setProgress(6);
     setFailed(null);
+    cancelled.current = false;
     startTrickle();
     // Its own object URL: the composer that made one has already unmounted
     // and revoked it by the time the poster is captured.
@@ -396,6 +453,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      bailIfCancelled();
       const ext = a.file.name.split(".").pop() || "webm";
       const path = `${a.userId}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
@@ -420,6 +478,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      bailIfCancelled();
       const { data: createdShot, error: insErr } = await supabase.from("shots").insert({
         user_id: a.userId,
         media_url: mediaUrl,
@@ -451,7 +510,16 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       // points at. The Show path has always removed its object on failure;
       // this one never did.
       await discardUploaded(supabase, stored);
-      setFailed({ kind: "shot", shot: a });
+      if (isCancelled(err)) {
+        toast("Upload cancelled", "success");
+        return;
+      }
+      setFailed({
+        kind: "shot",
+        shot: a,
+        message: uploadFailureMessage(err, "Shot"),
+        canRetry: worthRetrying(err),
+      });
       toast(uploadFailureMessage(err, "Shot"), "error");
     } finally {
       URL.revokeObjectURL(localUrl);
@@ -468,7 +536,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const dismissFailed = useCallback(() => setFailed(null), []);
 
   return (
-    <UploadCtx.Provider value={{ progress, active, failed, uploadPost, uploadShot, retryUpload, dismissFailed }}>
+    <UploadCtx.Provider
+      value={{ progress, active, failed, uploadPost, uploadShot, retryUpload, dismissFailed, cancelUpload }}
+    >
       {children}
     </UploadCtx.Provider>
   );
@@ -479,23 +549,26 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
  * progress line while uploading, or a retry banner when the last upload failed.
  */
 export function UploadProgressBar() {
-  const { progress, active, failed, retryUpload, dismissFailed } = useUpload();
+  const { progress, active, failed, retryUpload, dismissFailed, cancelUpload } = useUpload();
 
   if (active === "shot" || failed?.kind === "shot") return null;
 
   if (progress == null && failed) {
     return (
       <div className="flex items-center gap-3 border-b border-border/60 bg-danger/10 px-4 py-2.5">
-        <p className="min-w-0 flex-1 text-sm font-medium text-foreground">
-          Couldn&apos;t share your post.
-        </p>
-        <button
-          type="button"
-          onClick={retryUpload}
-          className="shrink-0 rounded-pill bg-accent px-3.5 py-1.5 text-xs font-bold text-accent-ink transition-transform active:scale-95"
-        >
-          Retry
-        </button>
+        {/* The reason, not a literal. This said "Couldn't share your post."
+            whatever had happened, so the one surface that stays on screen
+            was the one that never told you anything. */}
+        <p className="min-w-0 flex-1 text-sm font-medium text-foreground">{failed.message}</p>
+        {failed.canRetry && (
+          <button
+            type="button"
+            onClick={retryUpload}
+            className="shrink-0 rounded-pill bg-accent px-3.5 py-1.5 text-xs font-bold text-accent-ink transition-transform active:scale-95"
+          >
+            Retry
+          </button>
+        )}
         <button
           type="button"
           onClick={dismissFailed}
@@ -510,11 +583,20 @@ export function UploadProgressBar() {
 
   if (progress == null) return null;
   return (
-    <div className="h-0.5 w-full bg-border/40">
-      <div
-        className="h-full bg-accent transition-[width] duration-300 ease-out"
-        style={{ width: `${progress}%`, boxShadow: "0 0 8px rgba(163,230,53,0.6)" }}
-      />
+    <div className="flex items-center gap-2 border-b border-border/60 px-4 py-1.5">
+      <div className="h-0.5 min-w-0 flex-1 bg-border/40">
+        <div
+          className="h-full bg-accent transition-[width] duration-300 ease-out"
+          style={{ width: `${progress}%`, boxShadow: "0 0 8px rgba(163,230,53,0.6)" }}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={cancelUpload}
+        className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-muted transition-colors hover:text-foreground"
+      >
+        Cancel
+      </button>
     </div>
   );
 }
@@ -530,25 +612,30 @@ export function UploadProgressBar() {
  * ever shows the other's kind.
  */
 export function ShotUploadCard() {
-  const { progress, active, failed, retryUpload, dismissFailed } = useUpload();
+  const { progress, active, failed, retryUpload, dismissFailed, cancelUpload } = useUpload();
 
   const isShotFailure = failed?.kind === "shot";
   if (!isShotFailure && active !== "shot") return null;
   if (progress == null && !isShotFailure) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(72px+var(--sab))] z-[120] flex justify-center px-3">
+    /* --nav-h, not a second copy of 72. The bar's height and the things
+       that sit above it were two numbers that disagreed by the gesture
+       inset once already; this was the last hardcoded copy left. */
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--nav-h)+var(--sab))] z-[120] flex justify-center px-3">
       <div className="pointer-events-auto flex w-full max-w-[420px] items-center gap-3 rounded-2xl border border-border bg-elevated/95 px-4 py-3 shadow-lg backdrop-blur-xl">
         {isShotFailure ? (
           <>
-            <p className="min-w-0 flex-1 text-sm font-semibold">Couldn&apos;t post your Shot.</p>
-            <button
-              type="button"
-              onClick={retryUpload}
-              className="shrink-0 rounded-pill bg-accent px-3.5 py-1.5 text-xs font-bold text-accent-ink transition-transform active:scale-95"
-            >
-              Retry
-            </button>
+            <p className="min-w-0 flex-1 text-sm font-semibold">{failed.message}</p>
+            {failed.canRetry && (
+              <button
+                type="button"
+                onClick={retryUpload}
+                className="shrink-0 rounded-pill bg-accent px-3.5 py-1.5 text-xs font-bold text-accent-ink transition-transform active:scale-95"
+              >
+                Retry
+              </button>
+            )}
             <button
               type="button"
               onClick={dismissFailed}
@@ -572,6 +659,15 @@ export function ShotUploadCard() {
             <span className="shrink-0 text-xs font-bold tabular-nums text-muted">
               {Math.round(progress ?? 0)}%
             </span>
+            {/* A Shot is the fifty-megabyte one. If cancelling belongs
+                anywhere it belongs here. */}
+            <button
+              type="button"
+              onClick={cancelUpload}
+              className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-muted transition-colors hover:text-foreground"
+            >
+              Cancel
+            </button>
           </>
         )}
       </div>
