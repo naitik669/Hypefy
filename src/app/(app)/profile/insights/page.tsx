@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Eye, Bookmark, Users, Zap } from "lucide-react";
+import { Eye, Bookmark, Users, UserRound, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -32,7 +32,7 @@ export default async function InsightsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
 
-  const [{ data: items }, { data: totalsRaw }, { data: series }, { data: history }] =
+  const [{ data: items }, { data: totalsRaw }, { data: series }, { data: visitsRaw }, { data: history }] =
     await Promise.all([
       supabase.rpc("creator_item_stats", { p_limit: 200 }),
       // Totals are their own query rather than a sum of the list above: the
@@ -40,6 +40,8 @@ export default async function InsightsPage() {
       // wrong the day somebody passes the cap.
       supabase.rpc("creator_totals"),
       supabase.rpc("get_creator_timeseries", { p_days: 30 }),
+      // Profile visits. Counts only — how many, never who. See 0205.
+      supabase.rpc("profile_view_stats", { p_days: 30 }),
       supabase
         .from("creator_daily_stats")
         .select("day, views, followers")
@@ -59,6 +61,9 @@ export default async function InsightsPage() {
     comments: t.comments ?? 0,
     saves: t.saves ?? 0,
   };
+
+  const v = (visitsRaw ?? {}) as Record<string, number>;
+  const visits = { visits: v.visits ?? 0, visitors: v.visitors ?? 0 };
 
   const chartSeries = (series ?? []) as SeriesPoint[];
   const days = history ?? [];
@@ -92,6 +97,18 @@ export default async function InsightsPage() {
             <TotalCard icon={<HypeIcon size={16} className="text-hype" />} label="Hypes" value={totals.hypes} />
             <TotalCard icon={<CommentIcon size={16} />} label="Comments" value={totals.comments} />
             <TotalCard icon={<Bookmark size={16} />} label="Saves" value={totals.saves} />
+            {/* Nothing recorded profile visits before 0205, so this counts
+                from the day it shipped rather than from the archive. */}
+            <TotalCard
+              icon={<UserRound size={16} />}
+              label="Profile visits"
+              value={visits.visitors}
+              note={
+                visits.visits > visits.visitors
+                  ? formatCount(visits.visits) + ' visits in 30 days'
+                  : undefined
+              }
+            />
           </div>
 
           {/* Who it reached. The one number that answers "is this leaving my
