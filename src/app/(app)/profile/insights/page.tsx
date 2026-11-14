@@ -53,6 +53,8 @@ export default async function InsightsPage() {
   const totals = {
     views: t.views ?? 0,
     reach: t.reach ?? 0,
+    reachFollowing: t.reach_following ?? 0,
+    reachNew: t.reach_new ?? 0,
     hypes: t.hypes ?? 0,
     comments: t.comments ?? 0,
     saves: t.saves ?? 0,
@@ -91,6 +93,18 @@ export default async function InsightsPage() {
             <TotalCard icon={<CommentIcon size={16} />} label="Comments" value={totals.comments} />
             <TotalCard icon={<Bookmark size={16} />} label="Saves" value={totals.saves} />
           </div>
+
+          {/* Who it reached. The one number that answers "is this leaving my
+              bubble" — 300 views that never left your followers is a very
+              different week from 300 that did. */}
+          {totals.reach > 0 && (
+            <>
+              <h2 className="px-1 pb-2 pt-6 text-xs font-bold uppercase tracking-widest text-faint">
+                Who saw it
+              </h2>
+              <ReachSplit following={totals.reachFollowing} fresh={totals.reachNew} />
+            </>
+          )}
 
           <h2 className="px-1 pb-2 pt-6 text-xs font-bold uppercase tracking-widest text-faint">
             Over time
@@ -146,6 +160,49 @@ export default async function InsightsPage() {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Followers against people who do not follow you, as one bar.
+ *
+ * A bar rather than two more number cards: the point is the proportion,
+ * and two figures side by side make you do the division yourself. Drawn
+ * with divs rather than SVG because it is one dimension — a chart kit for
+ * a single ratio would be more code than the ratio.
+ */
+function ReachSplit({ following, fresh }: { following: number; fresh: number }) {
+  const total = following + fresh;
+  if (total <= 0) return null;
+  const pct = Math.round((fresh / total) * 100);
+  return (
+    <div className="rounded-2xl border border-border bg-surface px-4 py-3.5">
+      <div
+        className="flex h-2 w-full overflow-hidden rounded-pill bg-border"
+        role="img"
+        aria-label={`${fresh} of ${total} people who saw your posts do not follow you`}
+      >
+        <span className="bg-accent" style={{ width: `${100 - pct}%` }} />
+        <span className="bg-hype" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="mt-2.5 flex items-center justify-between text-xs">
+        <span className="flex items-center gap-1.5 text-muted">
+          <span className="h-2 w-2 rounded-full bg-accent" />
+          <span className="font-semibold tabular-nums text-foreground">{formatCount(following)}</span>
+          follow you
+        </span>
+        <span className="flex items-center gap-1.5 text-muted">
+          <span className="h-2 w-2 rounded-full bg-hype" />
+          <span className="font-semibold tabular-nums text-foreground">{formatCount(fresh)}</span>
+          {fresh === 1 ? "is new" : "are new"}
+        </span>
+      </div>
+      <p className="mt-1.5 text-[11px] text-faint">
+        {pct >= 50
+          ? `Most of your reach is people who don't follow you yet.`
+          : `Most of your reach is people who already follow you.`}
+      </p>
+    </div>
   );
 }
 
