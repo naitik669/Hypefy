@@ -302,8 +302,28 @@ export function ShareSheet({
     ? `${window.location.origin}${path}`
     : `https://app.hypefy.chat${path}`;
 
+  /*
+   * Where a share actually went.
+   *
+   * posts.share_count has only ever counted DM sends — bump_share_count()
+   * fires on a messages insert — so copying a link, using the system sheet
+   * and sending to WhatsApp all counted as nothing, and the number called
+   * "shares" meant "times someone sent this in a Hypefy DM".
+   *
+   * Fire and forget: a share has already happened by the time this runs,
+   * and failing to record it must not make the share look like it failed.
+   */
+  function noteShare(destination: "copy" | "native" | "whatsapp" | "show" | "dm") {
+    void supabase.rpc("record_share", {
+      p_target_type: targetType,
+      p_target_id: postId,
+      p_destination: destination,
+    });
+  }
+
   async function copyLink() {
     try { await navigator.clipboard.writeText(postUrl); } catch {}
+    noteShare("copy");
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
@@ -313,8 +333,9 @@ export function ShareSheet({
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {
         await navigator.share({ url: postUrl });
+        noteShare("native");
       } catch {
-        /* dismissed */
+        /* dismissed — and a dismissed sheet is not a share */
       }
       return;
     }
@@ -368,6 +389,9 @@ export function ShareSheet({
         }
       }
 
+      // Past every early return above, so this is the point the Show
+      // actually gained the post rather than the point we tried.
+      noteShare("show");
       setShowAdded(true);
       setTimeout(() => { setShowAdded(false); onClose(); }, 1100);
     } finally {
@@ -415,6 +439,10 @@ export function ShareSheet({
               p_comment_id: commentId,
             });
         if (sendErr) return false;
+        // Counted per conversation it reached, and only once the send
+        // succeeded — the existing share_count trigger fires on the
+        // message row, so this and that agree about what happened.
+        noteShare("dm");
         // What you wrote goes after the post, as its own message — the way it
         // reads in the chat: the thing, then what you said about it.
         if (message) {
@@ -569,9 +597,10 @@ export function ShareSheet({
       </Action>
       <Action
         label="WhatsApp"
-        onClick={() =>
-          window.open(`https://wa.me/?text=${encodeURIComponent(postUrl)}`, "_blank", "noopener")
-        }
+        onClick={() => {
+          noteShare("whatsapp");
+          window.open(`https://wa.me/?text=${encodeURIComponent(postUrl)}`, "_blank", "noopener");
+        }}
         tint="bg-[#1f3b27] text-[#4ade80]"
       >
         <CommentIcon size={19} />

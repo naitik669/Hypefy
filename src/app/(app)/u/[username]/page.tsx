@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { JoinBanner } from "@/components/growth/JoinBanner";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
+import { ProfileViewPing } from "@/components/profile/ProfileViewPing";
 import { PublicProfileTabs } from "@/components/profile/PublicProfileTabs";
 import { ShowcaseRail } from "@/components/showcase/ShowcaseRail";
 import { StreakBadges } from "@/components/profile/StreakBadges";
@@ -143,6 +144,10 @@ export default async function PublicProfilePage({
 
   return (
     <PullToRefresh>
+      {/* Counted from the client, because a server render fires on route
+          prefetch — Next prefetches links in the viewport, which on a feed
+          is every author whose post you scrolled past. */}
+      <ProfileViewPing profileId={profile.id} />
       <ProfileHeader
         name={name}
         username={profile.username}

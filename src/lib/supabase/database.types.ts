@@ -2117,6 +2117,42 @@ export type Database = {
           },
         ]
       }
+      profile_views: {
+        Row: {
+          created_at: string
+          profile_id: string
+          viewed_on: string
+          viewer_id: string
+        }
+        Insert: {
+          created_at?: string
+          profile_id: string
+          viewed_on?: string
+          viewer_id: string
+        }
+        Update: {
+          created_at?: string
+          profile_id?: string
+          viewed_on?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_views_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_views_viewer_id_fkey"
+            columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           accent_id: string
@@ -2720,6 +2756,41 @@ export type Database = {
           {
             foreignKeyName: "scheduled_posts_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      share_events: {
+        Row: {
+          created_at: string
+          destination: string
+          id: string
+          sharer_id: string
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          created_at?: string
+          destination: string
+          id?: string
+          sharer_id: string
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          created_at?: string
+          destination?: string
+          id?: string
+          sharer_id?: string
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "share_events_sharer_id_fkey"
+            columns: ["sharer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -4254,6 +4325,7 @@ export type Database = {
           username: string
         }[]
       }
+      profile_view_stats: { Args: { p_days?: number }; Returns: Json }
       prune_retention: { Args: never; Returns: undefined }
       public_keys: {
         Args: { p_user_ids: string[] }
@@ -4286,6 +4358,18 @@ export type Database = {
       recently_authenticated: { Args: { p_seconds?: number }; Returns: boolean }
       record_login_session: {
         Args: { p_label?: string; p_session_id: string }
+        Returns: undefined
+      }
+      record_profile_view: {
+        Args: { p_profile_id: string }
+        Returns: undefined
+      }
+      record_share: {
+        Args: {
+          p_destination: string
+          p_target_id: string
+          p_target_type: string
+        }
         Returns: undefined
       }
       record_shot_watch: {
@@ -4649,6 +4733,10 @@ export type Database = {
       set_verified_hash: {
         Args: { p_hash: string; p_id: string }
         Returns: undefined
+      }
+      share_breakdown: {
+        Args: { p_target_id: string; p_target_type: string }
+        Returns: Json
       }
       share_suggestions: {
         Args: { p_limit?: number }
