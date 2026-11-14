@@ -437,6 +437,23 @@ export default async function HomePage() {
   //
   // Same refresh seed as the posts, so pulling to refresh re-rolls the
   // selection instead of showing the same three every time.
+  // Which of these Shots you have already watched. shot_views has recorded
+  // this since 0132 and nothing read it, so a Shot you had seen scored
+  // exactly as high as one you had not and kept returning to the top.
+  // Same shape as the post impressions above, one table along.
+  const shotIds = ((shotRows ?? []) as { id: string }[]).map((s) => s.id);
+  const { data: watchedRows } =
+    shotIds.length > 0
+      ? await supabase
+          .from("shot_views")
+          .select("shot_id")
+          .eq("viewer_id", user.id)
+          .in("shot_id", shotIds)
+      : { data: [] };
+  const watchedShotIds = new Set(
+    (watchedRows ?? []).map((v: { shot_id: string }) => v.shot_id)
+  );
+
   const shotCandidates = ((shotRows ?? []) as any[])
     .map((s) => ({
       ...s,
@@ -451,7 +468,9 @@ export default async function HomePage() {
           s.user_id === user.id,
           followingIds.has(s.user_id),
           now,
-          authorAff[s.user_id] ?? 0
+          authorAff[s.user_id] ?? 0,
+          false,
+          watchedShotIds.has(s.id)
         ) + refreshJitter(s.id, seed),
     }))
     .sort((a, b) => b._score - a._score);

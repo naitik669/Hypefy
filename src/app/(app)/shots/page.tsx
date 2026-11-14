@@ -12,8 +12,22 @@ import { getAdContext } from "@/lib/ads-server";
 const SHOT_COLS =
   "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, save_count, repost_count, duration_secs, trim_start, trim_end, track, profiles(display_name, avatar_hue, avatar_url, username)";
 
+/**
+ * How far a Shot you have already watched drops.
+ *
+ * Enough to put it behind anything comparable you have not seen, not
+ * enough to hide it: with a small catalogue the alternative to a watched
+ * Shot is often no Shot, and an empty reel is worse than a repeat.
+ */
+export const WATCHED_PENALTY = 30;
+
 /** Personalized Shot score: engagement (capped) + tiered recency + author affinity. */
-function shotScore(s: any, now: number, authorAff: Record<string, number>) {
+function shotScore(
+  s: any,
+  now: number,
+  authorAff: Record<string, number>,
+  watched = false,
+) {
   const h = (now - new Date(s.created_at).getTime()) / 3_600_000;
   const recency = h < 2 ? 24 : h < 24 ? 14 : h < 72 ? 6 : 0;
   const engagement = Math.min(
@@ -21,7 +35,9 @@ function shotScore(s: any, now: number, authorAff: Record<string, number>) {
     60,
   );
   const authorBoost = Math.min(Math.max(authorAff[s.user_id] ?? 0, 0) * 1.5, 30);
-  return recency + engagement + authorBoost;
+  // shot_views has recorded what you have watched since 0132 and this feed
+  // never read it, so the reel re-served the same Shots indefinitely.
+  return recency + engagement + authorBoost - (watched ? WATCHED_PENALTY : 0);
 }
 
 /**
@@ -102,13 +118,28 @@ export default async function ShotsPage() {
     }
   }
 
+  // What you have already watched, for the penalty above.
+  const candidateShotIds = [...byId.keys()];
+  const { data: watchedRows } =
+    user && candidateShotIds.length > 0
+      ? await supabase
+          .from("shot_views")
+          .select("shot_id")
+          .eq("viewer_id", user.id)
+          .in("shot_id", candidateShotIds)
+      : { data: [] };
+  const watched = new Set(
+    (watchedRows ?? []).map((v: { shot_id: string }) => v.shot_id)
+  );
+
   const ranked = diversify(
     [...byId.values()]
       .filter((s) => !isQuieted(s, "shot", quiet))
       .map((s) => {
-        const own = shotScore(s, now, authorAff);
+        const seen = watched.has(s.id);
+        const own = shotScore(s, now, authorAff, seen);
         const viaRehype = s._rehypedAt
-          ? shotScore({ ...s, created_at: s._rehypedAt }, now, authorAff) + REHYPE_BOOST
+          ? shotScore({ ...s, created_at: s._rehypedAt }, now, authorAff, seen) + REHYPE_BOOST
           : -Infinity;
         return { ...s, _score: Math.max(own, viaRehype) };
       })

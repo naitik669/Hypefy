@@ -167,8 +167,11 @@ export function diversify<T extends { user_id: string }>(ranked: T[]): T[] {
  * feed-mix.ts), so the shortfall changes the ORDER shots are chosen in, never
  * whether they appear.
  *
- * `seen` is not exposed because there is no shot_views table — there is no
- * impression signal for Shots to read.
+ * `seen` comes from shot_views, which has existed since 0132. This comment
+ * used to say there was no such table and the parameter was hard-coded to
+ * false, so a Shot you had already watched scored exactly as high as one you
+ * had never seen and kept coming back to the top of the feed. The table was
+ * being written the whole time by recordWatch; nothing read it.
  */
 export function shotFeedScore(
   s: {
@@ -181,7 +184,8 @@ export function shotFeedScore(
   isFollowed: boolean,
   now: number,
   authorAffinity = 0,
-  interacted = false
+  interacted = false,
+  seen = false
 ): number {
   return feedScore(
     {
@@ -197,7 +201,7 @@ export function shotFeedScore(
     authorAffinity,
     0,
     interacted,
-    false
+    seen
   );
 }
 
