@@ -13,6 +13,7 @@ import { capturePoster } from "@/lib/video-poster";
 import { trimToStore, type Trim } from "@/lib/shot-trim";
 import { uploadContentType } from "@/lib/video-mime";
 import { postImageUpload } from "@/lib/post-compose";
+import { uploadFailureMessage } from "@/lib/upload-error";
 
 type PostUpload = {
   userId: string;
@@ -104,6 +105,39 @@ async function recordFingerprints(
   );
 }
 
+/**
+ * Throw away objects an upload managed to store before it failed.
+ *
+ * A post with four photos that died on the fourth left three in the bucket
+ * for ever: nothing referenced them, so nothing would ever clean them up,
+ * and a retry wrote three more. publishShow has done this since it was
+ * written — it removes the object when the insert fails — and the post and
+ * Shot paths never did.
+ *
+ * Best effort by definition. This runs inside a catch, so it is already
+ * handling a failure and must not produce another one; an orphan left
+ * behind is a wasted megabyte, while a throw here would replace the real
+ * error with a confusing one.
+ */
+async function discardUploaded(
+  supabase: ReturnType<typeof createClient>,
+  stored: { bucket: string; path: string }[],
+): Promise<void> {
+  const byBucket = new Map<string, string[]>();
+  for (const { bucket, path } of stored) {
+    byBucket.set(bucket, [...(byBucket.get(bucket) ?? []), path]);
+  }
+  await Promise.all(
+    [...byBucket.entries()].map(async ([bucket, paths]) => {
+      try {
+        await supabase.storage.from(bucket).remove(paths);
+      } catch {
+        /* an orphan is a wasted megabyte; a throw here loses the real error */
+      }
+    }),
+  );
+}
+
 export function UploadProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const router = useRouter();
@@ -128,6 +162,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setProgress(6);
     setFailed(null);
     startTrickle();
+    // What has actually landed in the bucket, so a failure part-way through
+    // can take it back out again. Outside the try so the catch can see it.
+    const stored: { bucket: string; path: string }[] = [];
     try {
       // Hashed before anything is uploaded, so a picture that has already
       // been taken down is refused in a second rather than after a minute on
@@ -161,6 +198,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           // whole frame and makes the usual upload about a megabyte.
           .upload(path, await shrinkForUpload(a.files[i]), { contentType: kind.contentType, upsert: false });
         if (error) throw error;
+        stored.push({ bucket: "post-images", path });
         urls.push(supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl);
         setProgress(Math.min(85, 10 + ((i + 1) / a.files.length) * 72));
       }
@@ -207,12 +245,15 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       toast(a.scheduledAt ? "Post scheduled" : "Post shared", "success");
       router.refresh();
       setTimeout(() => setProgress(null), 700);
-    } catch {
+    } catch (err) {
       stopTrickle();
       setProgress(null);
+      // Nothing references these: the row they were for was never written,
+      // or was written and failed. Leaving them is a bucket that only grows.
+      await discardUploaded(supabase, stored);
       // Stash the payload (Files still valid) so the user can one-tap retry.
       setFailed({ kind: "post", post: a });
-      toast("Couldn't share your post", "error");
+      toast(uploadFailureMessage(err, "post"), "error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, router, toast]);
@@ -233,6 +274,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     // Its own object URL: the composer that made one has already unmounted
     // and revoked it by the time the poster is captured.
     const localUrl = URL.createObjectURL(a.file);
+    const stored: { bucket: string; path: string }[] = [];
     try {
       // The poster comes FIRST, before the long upload. It is drawn by
       // decoding the clip in a hidden <video>, and a backgrounded WebView
@@ -242,12 +284,44 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       // moment it takes.
       const poster = await capturePoster(localUrl, a.coverTime);
 
+      /*
+       * The blocklist check, which only the post path has ever run.
+       *
+       * check_media and claim_media (0157) take a perceptual hash of an
+       * image, and recordFingerprints has accepted "post" | "shot" since it
+       * was written — the Shot half was simply never called. So a picture
+       * taken down for good reason could be posted again as a still, or as
+       * the cover of a clip, and nothing looked.
+       *
+       * The poster is what gets hashed. It is a real frame of the video and
+       * it is the image people actually see in a grid, so it is both the
+       * honest thing to fingerprint and the thing a re-upload would reuse.
+       * Hashing the whole clip is a different problem — video fingerprinting
+       * is not frame hashing — and is not pretended at here.
+       *
+       * A clip with no poster is not blocked. A null hash means "we do not
+       * know", and the post path already decided that reads as let it
+       * through: refusing an upload over a decoder quirk is far worse than
+       * a miss.
+       */
+      const posterHash = poster ? await hashImageFile(poster) : null;
+      if (posterHash) {
+        const { data: blocked } = await supabase.rpc("check_media", { p_hash: posterHash });
+        if (blocked) {
+          stopTrickle();
+          setProgress(null);
+          toast("That video can't be posted.", "error");
+          return;
+        }
+      }
+
       const ext = a.file.name.split(".").pop() || "webm";
       const path = `${a.userId}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("shot-media")
         .upload(path, a.file, { contentType: uploadContentType(a.file), upsert: false });
       if (upErr) throw upErr;
+      stored.push({ bucket: "shot-media", path });
       setProgress(80);
       const mediaUrl = supabase.storage.from("shot-media").getPublicUrl(path).data.publicUrl;
 
@@ -260,11 +334,12 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           .from("shot-media")
           .upload(posterPath, poster, { contentType: "image/jpeg" });
         if (!pErr) {
+          stored.push({ bucket: "shot-media", path: posterPath });
           posterUrl = supabase.storage.from("shot-media").getPublicUrl(posterPath).data.publicUrl;
         }
       }
 
-      const { error: insErr } = await supabase.from("shots").insert({
+      const { data: createdShot, error: insErr } = await supabase.from("shots").insert({
         user_id: a.userId,
         media_url: mediaUrl,
         caption: a.caption,
@@ -274,19 +349,29 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         mentions: a.mentions,
         duration_secs: a.duration > 0 ? Number(a.duration.toFixed(3)) : null,
         ...trimToStore(a.trim, a.duration),
-      });
+      }).select("id").single();
       if (insErr) throw insErr;
+
+      // Recorded against the Shot now it exists, so a later takedown can
+      // find it — the same arrangement the post path has had since 0157.
+      if (createdShot && posterUrl) {
+        await recordFingerprints(supabase, "shot", createdShot.id, [posterUrl], [posterHash]);
+      }
 
       stopTrickle();
       setProgress(100);
       toast("Shot posted", "success");
       router.refresh();
       setTimeout(() => setProgress(null), 700);
-    } catch {
+    } catch (err) {
       stopTrickle();
       setProgress(null);
+      // A clip that uploaded and then failed to insert is 50MB nothing
+      // points at. The Show path has always removed its object on failure;
+      // this one never did.
+      await discardUploaded(supabase, stored);
       setFailed({ kind: "shot", shot: a });
-      toast("Couldn't post your Shot", "error");
+      toast(uploadFailureMessage(err, "Shot"), "error");
     } finally {
       URL.revokeObjectURL(localUrl);
     }
