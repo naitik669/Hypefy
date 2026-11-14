@@ -248,6 +248,7 @@ describe("thumbnails in scrolling lists are deferred", () => {
     // returns the cover already chosen rather than making the page derive
     // it from image_url/image_urls.
     ["src/app/(app)/profile/insights/page.tsx", "{p.cover}", 1],
+    ["src/app/(app)/creator/page.tsx", "{best.cover}", 1],
     ["src/components/diary/DiaryArchiveSheet.tsx", "{page.imageUrl}", 1],
     // The blurred bed and the photo on top of it — same file, same source.
     ["src/components/diary/FriendDiaryCard.tsx", "{entry.imageUrl!}", 2],
@@ -276,8 +277,8 @@ describe("thumbnails in scrolling lists are deferred", () => {
   it("and nothing else quietly started deferring", () => {
     // Counted from the repo rather than from the list above, so this fails
     // both ways: a defer dropped, or one added without a thought about
-    // whether that image can actually be off-screen. 19 deferred before
-    // this change; the 16 named here bring it to 35.
+    // whether that image can actually be off-screen. 20 sit outside the
+    // named list below; the 16 named in it bring the total to 36.
     const walk = (dir: string): string[] =>
       readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
         const full = `${dir}/${e.name}`;
@@ -287,8 +288,8 @@ describe("thumbnails in scrolling lists are deferred", () => {
     const lazy = walk("src")
       .flatMap((f: string) => read(f).match(/<img[\s\S]*?\/>/g) ?? [])
       .filter((tag: string) => tag.includes('loading="lazy"'));
-    expect(lazy).toHaveLength(35);
-    expect(deferred.reduce((n, [, , c]) => n + c, 0)).toBe(15);
+    expect(lazy).toHaveLength(36);
+    expect(deferred.reduce((n, [, , c]) => n + c, 0)).toBe(16);
   });
 
   it("a chat image defers by default but lets its caller decide", () => {

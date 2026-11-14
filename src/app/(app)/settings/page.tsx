@@ -10,6 +10,7 @@ import {
   Lock,
   Bell,
   Hash,
+  BarChart3,
   Star,
   UserPlus,
   CalendarClock,
@@ -78,6 +79,15 @@ const ITEMS = [
     label: "Topics you follow",
     sub: "Hashtags in your feed",
     icon: Hash,
+  },
+  // Always listed, on or off. The switch itself lives on the page it
+  // unlocks: a toggle buried in settings that reveals a screen elsewhere
+  // is two steps and no explanation of what the second one is for.
+  {
+    href: "/creator",
+    label: "Creator tools",
+    sub: "Your reach, and what is working",
+    icon: BarChart3,
   },
 ];
 

@@ -12,7 +12,12 @@ import { attemptAllowed, attemptKey } from "@/lib/api-guard";
  */
 
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
-const PRIVATE = ["date_of_birth", "is_admin", "suspension_reason", "suspended_by", "referred_by", "notif_prefs", "ghost_no_target"];
+// creator_mode joined this in 0208. 0207 granted select on it, which on
+// this table means every row — profiles revoked its table-wide select in
+// 0130 and grants per column, and its select policy is "viewable by
+// everyone". So "who has creator tools on" was briefly a public list,
+// which the switch itself promises it is not. This test caught it.
+const PRIVATE = ["date_of_birth", "is_admin", "suspension_reason", "suspended_by", "referred_by", "notif_prefs", "ghost_no_target", "creator_mode"];
 
 function sources(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -99,6 +104,9 @@ describe("private profile columns", () => {
       notifPrefs: {},
       referralCount: 0,
       mentionPrivacy: "everyone",
+      // Absent means off, not on: a row that predates the column must not
+      // come back with the dashboard already unlocked.
+      creatorMode: false,
     });
     expect(
       parsePrivateProfile({
@@ -108,6 +116,7 @@ describe("private profile columns", () => {
         notif_prefs: { hypes: false },
         referral_count: 3,
         mention_privacy: "nobody",
+        creator_mode: true,
       }),
     ).toEqual({
       dateOfBirth: "2008-08-28",
@@ -116,7 +125,10 @@ describe("private profile columns", () => {
       notifPrefs: { hypes: false },
       referralCount: 3,
       mentionPrivacy: "nobody",
+      creatorMode: true,
     });
+    // "true" is not true here either.
+    expect(parsePrivateProfile({ creator_mode: "true" })!.creatorMode).toBe(false);
     // A rule that is not one of the three reads as the open default.
     expect(parsePrivateProfile({ mention_privacy: "sometimes" })!.mentionPrivacy).toBe("everyone");
     // "true" is not true: nobody becomes an admin by a string.

@@ -2170,6 +2170,7 @@ export type Database = {
           card_layout: string
           card_theme: string
           created_at: string
+          creator_mode: boolean
           current_vibe: string | null
           date_of_birth: string | null
           display_name: string | null
@@ -2219,6 +2220,7 @@ export type Database = {
           card_layout?: string
           card_theme?: string
           created_at?: string
+          creator_mode?: boolean
           current_vibe?: string | null
           date_of_birth?: string | null
           display_name?: string | null
@@ -2268,6 +2270,7 @@ export type Database = {
           card_layout?: string
           card_theme?: string
           created_at?: string
+          creator_mode?: boolean
           current_vibe?: string | null
           date_of_birth?: string | null
           display_name?: string | null
