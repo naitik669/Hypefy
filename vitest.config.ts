@@ -3,7 +3,22 @@ import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   resolve: {
-    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+    /*
+     * Vitest resolves these itself — it does not read tsconfig `paths`, which
+     * is why adding a path there is not enough on its own and both files have
+     * to agree.
+     *
+     * Ordered, and @hypefy/core comes first: Vite takes the first `find` that
+     * matches and does not fall through, so a broader alias listed above a
+     * narrower one would swallow it.
+     */
+    alias: [
+      {
+        find: "@hypefy/core",
+        replacement: fileURLToPath(new URL("./packages/core/src", import.meta.url)),
+      },
+      { find: "@", replacement: fileURLToPath(new URL("./src", import.meta.url)) },
+    ],
   },
   test: {
     environment: "jsdom",

@@ -1,8 +1,9 @@
-/** Compact number formatting for engagement counts (e.g. 1200 → "1.2k"). */
-export function formatCount(n: number): string {
-  if (n >= 1000) {
-    const v = n / 1000;
-    return `${v >= 10 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, "")}k`;
-  }
-  return `${n}`;
-}
+/**
+ * Moved to @hypefy/core/format.
+ *
+ * This re-export exists so that the files importing it did not have to
+ * change when it moved — the module is the same module at a new address.
+ * Delete this file once every caller imports from @hypefy/core directly;
+ * until then, both paths are the same code.
+ */
+export * from "@hypefy/core/format";

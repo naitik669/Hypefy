@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,8 +23,15 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "sharp": ["./node_modules/sharp/lib/index.d.ts"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@hypefy/core/*": [
+        "./packages/core/src/*"
+      ],
+      "sharp": [
+        "./node_modules/sharp/lib/index.d.ts"
+      ]
     }
   },
   "include": [
@@ -31,5 +42,9 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "playwright.config.ts", "tests/e2e/**"]
+  "exclude": [
+    "node_modules",
+    "playwright.config.ts",
+    "tests/e2e/**"
+  ]
 }
