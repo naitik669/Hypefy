@@ -1,0 +1,24 @@
+-- rate_events joins the other thirteen server-only tables.
+--
+-- Fourteen tables in public have RLS on and no policy at all, which is the
+-- right shape for something only the server touches: RLS with no policy
+-- returns no rows to anybody who is not the owner, and the grant is revoked
+-- as well, so the lock is on twice.
+--
+-- Thirteen of them do both. rate_events does only the first: `anon` and
+-- `authenticated` still hold SELECT on it. Nothing is exposed today, because
+-- the empty policy set denies every row — but the belt is missing while the
+-- braces hold, and the day somebody adds a permissive policy to this table
+-- for a dashboard, rate-limit history becomes world-readable with no second
+-- line of defence and nothing in the diff to suggest it.
+--
+-- Verified safe before writing this:
+--   * no client call site anywhere — `from("rate_events")` appears 0 times in
+--     src/, and the name only survives in the generated database types
+--   * the two functions that do read it, rate_limit() and ops_readiness(),
+--     are both SECURITY DEFINER owned by postgres, so they run as the owner
+--     and the grant is nothing to do with them
+--
+-- A revoke can only ever remove reach, and there is no reader to lose.
+
+revoke all on public.rate_events from anon, authenticated;

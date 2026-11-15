@@ -119,6 +119,16 @@ jobs:
         run: |
           echo "::warning title=Debug-signed bundle::hypefy-aab is signed with the debug key and Google Play will reject it. Set KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD to produce an upload-signed bundle."
 
+      # The same treatment for Firebase. google-services.json used to be
+      # committed, so this step's "if set" was harmless — the file was there
+      # either way. Now that it is untracked, an unset secret means an APK
+      # that installs, runs, and silently never receives a notification.
+      # build.gradle treats the file as optional, so nothing else complains.
+      - name: Warn when push is not configured
+        if: env.GOOGLE_SERVICES_JSON == ''
+        run: |
+          echo "::warning title=No Firebase config::google-services.json was not restored, so push notifications will not work in this build. Set the GOOGLE_SERVICES_JSON secret (base64 of the file)."
+
       - name: Send to testers
         if: env.FIREBASE_APP_ID != ''
         uses: wzieba/Firebase-Distribution-Github-Action@v1
