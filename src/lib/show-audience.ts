@@ -15,6 +15,24 @@
 
 export const SHOW_AUDIENCES = ["everyone", "hypers"] as const;
 
+/**
+ * How long a Show stays up.
+ *
+ * Two for now, and the CHECK on shows.lifetime_hours says the same two —
+ * a third is a line here, a line there and a dropdown entry.
+ *
+ * The hours are what the client sends; expires_at is computed from them
+ * by a trigger (0212), so a browser cannot set its own expiry.
+ */
+export const SHOW_LIFETIMES = [24, 48] as const;
+
+export type ShowLifetime = (typeof SHOW_LIFETIMES)[number];
+
+/** Whatever was chosen, as a lifetime. Unknown reads as the short one. */
+export function readLifetime(value: unknown): ShowLifetime {
+  return SHOW_LIFETIMES.find((h) => h === value) ?? 24;
+}
+
 export type ShowAudience = (typeof SHOW_AUDIENCES)[number];
 
 /** Whatever the column held, as an audience. Unknown reads as the open one. */

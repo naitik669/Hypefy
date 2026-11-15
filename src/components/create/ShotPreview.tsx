@@ -24,7 +24,7 @@ import { DESIGN_WIDTH, type ShowLayer } from "@/lib/show-layers";
 import { LayerStack } from "@/components/shows/LayerView";
 import { publishFailureMessage, publishShow } from "@/lib/show-publish";
 import { ShowAudienceBar } from "@/components/shows/ShowAudienceBar";
-import type { ShowAudience } from "@/lib/show-audience";
+import { SHOW_LIFETIMES, type ShowAudience, type ShowLifetime } from "@/lib/show-audience";
 import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /**
@@ -86,6 +86,8 @@ export function ShotPreview({
   const [audience, setAudience] = useState<ShowAudience>("everyone");
   /** When it should go up, or null for now. Shots only. */
   const [scheduleAt, setScheduleAt] = useState<string | null>(null);
+  /** How long a Show stays up. Shows only; a Shot does not expire. */
+  const [lifetime, setLifetime] = useState<ShowLifetime>(24);
   const [schedulePicker, setSchedulePicker] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [hiddenFrom, setHiddenFrom] = useState<string[]>([]);
@@ -185,6 +187,7 @@ export function ShotPreview({
       track,
       layers,
       audience: room,
+      lifetimeHours: lifetime,
       hiddenFrom,
       collabId,
     });
@@ -288,7 +291,26 @@ export function ShotPreview({
           </div>
         </div>
 
-        <div className="mt-3 flex items-center gap-2 px-1" data-share-row>
+        {/* How long it stays up. Two for now; expires_at is computed from
+            this by a trigger, so the browser never names its own expiry. */}
+        <div className="mt-3 flex items-center gap-1.5 px-1">
+          <Clock size={13} className="shrink-0 text-white/40" />
+          {SHOW_LIFETIMES.map((h) => (
+            <button
+              key={h}
+              type="button"
+              onClick={() => setLifetime(h)}
+              aria-pressed={lifetime === h}
+              className={`h-7 rounded-pill px-2.5 text-[11px] font-bold transition active:scale-95 ${
+                lifetime === h ? "bg-white text-black" : "border border-white/25 text-white/70"
+              }`}
+            >
+              {h}h
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-2 flex items-center gap-2 px-1" data-share-row>
           <ShowAudienceBar
             userId={userId}
             audience="everyone"

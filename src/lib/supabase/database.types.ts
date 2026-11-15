@@ -3521,6 +3521,7 @@ export type Database = {
           id: string
           is_showcase: boolean | null
           layers: Json
+          lifetime_hours: number
           linked_post_id: string | null
           media_url: string
           mentions: string[]
@@ -3540,6 +3541,7 @@ export type Database = {
           id?: string
           is_showcase?: boolean | null
           layers?: Json
+          lifetime_hours?: number
           linked_post_id?: string | null
           media_url: string
           mentions?: string[]
@@ -3559,6 +3561,7 @@ export type Database = {
           id?: string
           is_showcase?: boolean | null
           layers?: Json
+          lifetime_hours?: number
           linked_post_id?: string | null
           media_url?: string
           mentions?: string[]
