@@ -258,7 +258,10 @@ describe("thumbnails in scrolling lists are deferred", () => {
     ["src/components/post/ScheduledList.tsx", "{p.image}", 1],
     ["src/components/saved/SoundRow.tsx", "{track.artwork}", 1],
     ["src/components/shows/AlbumSheet.tsx", "{url}", 1],
-    ["src/components/shows/CollabView.tsx", "{s.media_url}", 1],
+    // Was {s.media_url}: the tile drew the clip itself. It draws the
+    // poster now, and only an old Show with none falls back to a player.
+    ["src/components/shows/CollabView.tsx", "{showStill(s)!}", 1],
+    ["src/app/(app)/shows/page.tsx", "{showStill(s)!}", 1],
     ["src/components/shows/ShowWidgetPickers.tsx", "{item.thumb}", 1],
     ["src/components/messages/SharedPostCard.tsx", "{image}", 1],
     ["src/components/messages/SharedShotCard.tsx", "{shot.poster_url}", 1],
@@ -288,8 +291,8 @@ describe("thumbnails in scrolling lists are deferred", () => {
     const lazy = walk("src")
       .flatMap((f: string) => read(f).match(/<img[\s\S]*?\/>/g) ?? [])
       .filter((tag: string) => tag.includes('loading="lazy"'));
-    expect(lazy).toHaveLength(36);
-    expect(deferred.reduce((n, [, , c]) => n + c, 0)).toBe(16);
+    expect(lazy).toHaveLength(37);
+    expect(deferred.reduce((n, [, , c]) => n + c, 0)).toBe(17);
   });
 
   it("a chat image defers by default but lets its caller decide", () => {

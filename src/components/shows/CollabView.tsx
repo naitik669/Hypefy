@@ -10,7 +10,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { isVideoUrl } from "@/lib/video-mime";
+import { showStill } from "@/lib/show-still";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import {
   canPostInto,
@@ -42,6 +42,7 @@ export type CollabPerson = {
 export type CollabShow = {
   id: string;
   media_url: string;
+  poster_url?: string | null;
   caption: string | null;
   user_id: string;
   expires_at: string;
@@ -215,7 +216,16 @@ export function CollabView({
                 href={`/shows/${s.id}`}
                 className="relative aspect-[3/4] overflow-hidden rounded-xl bg-black"
               >
-                {isVideoUrl(s.media_url) ? (
+                {showStill(s) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    loading="lazy"
+                    decoding="async"
+                    src={showStill(s)!}
+                    alt={s.caption ?? "Show"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
                   <video
                     poster={BLANK_POSTER}
                     src={s.media_url}
@@ -224,9 +234,6 @@ export function CollabView({
                     preload="metadata"
                     className="h-full w-full object-cover"
                   />
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img loading="lazy" decoding="async" src={s.media_url} alt={s.caption ?? "Show"} className="h-full w-full object-cover" />
                 )}
                 {/* Whose it is. On a shared reel this is the thing you
                     most want to know about a tile, and it is the one

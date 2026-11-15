@@ -5,6 +5,7 @@ import { extractMentions } from "@/lib/content-utils";
 import { layerMentions, type AddYoursPayload, type ShowLayer } from "@/lib/show-layers";
 import { readLifetime, type ShowAudience, type ShowLifetime } from "@/lib/show-audience";
 import { isVideoFile, uploadContentType } from "@/lib/video-mime";
+import { capturePoster } from "@/lib/video-poster";
 
 /**
  * Putting one Show up: the file into show-media, then the row, then who it
@@ -50,6 +51,42 @@ export async function publishShow(
   if (upErr) return { ok: false, reason: "upload" };
 
   const mediaUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+
+  /*
+   * A still for a video Show.
+   *
+   * Without one, every place a Show is drawn small — a collab grid, a
+   * showcase, a reply card — has to mount a live <video> with BLANK_POSTER
+   * and wait for the decoder. A grid of eight is eight decoders running to
+   * display eight still pictures.
+   *
+   * Best effort, and deliberately after the clip is already stored: a
+   * poster that fails to capture or fails to upload is a Show that falls
+   * back to what every Show did before this, which is not a failure worth
+   * losing somebody's post over. capturePoster has been sitting in this
+   * file's imports' reach the whole time — the Shot path calls it.
+   */
+  let posterUrl: string | null = null;
+  if (isVideoFile(d.file)) {
+    const localUrl = URL.createObjectURL(d.file);
+    try {
+      const poster = await capturePoster(localUrl, null);
+      if (poster) {
+        const posterPath = `${d.userId}/${Date.now()}${index ? `-${index}` : ""}-poster.jpg`;
+        const { error: pErr } = await supabase.storage
+          .from(bucket)
+          .upload(posterPath, poster, { contentType: "image/jpeg", upsert: false });
+        if (!pErr) {
+          posterUrl = supabase.storage.from(bucket).getPublicUrl(posterPath).data.publicUrl;
+        }
+      }
+    } catch {
+      /* no poster is a Show that behaves as every Show did before this */
+    } finally {
+      URL.revokeObjectURL(localUrl);
+    }
+  }
+
   const text = d.caption.trim();
 
   // An Add yours prompt needs somewhere for the answers to go: a shared
@@ -79,6 +116,7 @@ export async function publishShow(
     .insert({
       user_id: d.userId,
       media_url: mediaUrl,
+      poster_url: posterUrl,
       caption: text || null,
       track: (d.track ?? null) as unknown as Json,
       // A name typed into the caption and one placed on the picture both

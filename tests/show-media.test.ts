@@ -151,13 +151,18 @@ describe("the viewer draws what it was given", () => {
 });
 
 describe("the grid draws what it was given too", () => {
-  it("a photo tile is an image", () => {
-    expect(grid).toContain("{isVideoUrl(s.media_url) ? (");
+  it("a tile with a still is an image", () => {
+    // Was keyed on isVideoUrl. Since 0213 a video Show has a poster too,
+    // so the question is no longer "is it a video" but "is there a still"
+    // — and nearly every tile now has one.
+    expect(grid).toContain("{showStill(s) ? (");
     expect(grid).toContain('alt={s.caption ?? "Show"}');
   });
 
-  it("and a video tile keeps its poster", () => {
-    // BLANK_POSTER exists to stop a black first frame flashing in.
+  it("and only one with no still falls back to a player", () => {
+    // A video Show posted before 0213 has no frame stored and no way to
+    // make one without downloading the clip. BLANK_POSTER stops a black
+    // first frame flashing in while it decodes.
     expect(grid).toContain("<video poster={BLANK_POSTER}");
   });
 });

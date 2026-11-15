@@ -44,7 +44,7 @@ export default async function CollabPage({
       .eq("collab_id", collabId),
     supabase
       .from("shows")
-      .select("id, media_url, caption, user_id, expires_at")
+      .select("id, media_url, poster_url, caption, user_id, expires_at")
       .eq("collab_id", collabId)
       .order("created_at", { ascending: false })
       .limit(60),

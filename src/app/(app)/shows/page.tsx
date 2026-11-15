@@ -9,7 +9,7 @@ import { isRestricted } from "@/lib/show-audience";
 import { SHOW_ARCHIVE_DAYS } from "@/lib/show-media";
 import { NewCollabButton } from "@/components/shows/NewCollabButton";
 import { BLANK_POSTER } from "@/lib/blank-poster";
-import { isVideoUrl } from "@/lib/video-mime";
+import { showStill } from "@/lib/show-still";
 import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /**
@@ -53,20 +53,26 @@ function Tile({ s, badge }: { s: Row; badge: string }) {
     >
       {/* Every tile was a <video>, so an ordinary photo Show — which is
           nearly all of them — drew as a blank black square in its own
-          author's list. The viewer had the mirror of this bug. */}
-      {isVideoUrl(s.media_url) ? (
+          author's list. The viewer had the mirror of this bug.
+
+          A video Show now has a poster too (0213), so the player is only
+          for the ones posted before that: those have no frame stored and
+          no way to make one without downloading the clip. */}
+      {showStill(s) ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          loading="lazy"
+          decoding="async"
+          src={showStill(s)!}
+          alt={s.caption ?? "Show"}
+          className="h-full w-full object-cover"
+        />
+      ) : (
         <video poster={BLANK_POSTER}
           src={s.media_url}
           muted
           playsInline
           preload="metadata"
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={s.media_url}
-          alt={s.caption ?? "Show"}
           className="h-full w-full object-cover"
         />
       )}
@@ -123,7 +129,7 @@ export default async function ShowsPage() {
 
   const { data } = await supabase
     .from("shows")
-    .select("id, media_url, caption, expires_at, hype_count, audience")
+    .select("id, media_url, poster_url, caption, expires_at, hype_count, audience")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(200);
