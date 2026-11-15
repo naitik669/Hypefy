@@ -3,7 +3,7 @@ import type { Database, Json } from "@/lib/supabase/database.types";
 import type { Track } from "@/lib/music";
 import { extractMentions } from "@/lib/content-utils";
 import { layerMentions, type AddYoursPayload, type ShowLayer } from "@/lib/show-layers";
-import type { ShowAudience } from "@/lib/show-audience";
+import { readLifetime, type ShowAudience, type ShowLifetime } from "@/lib/show-audience";
 import { isVideoFile, uploadContentType } from "@/lib/video-mime";
 
 /**
@@ -22,6 +22,8 @@ export type ShowDraft = {
   track: Track | null;
   layers: ShowLayer[];
   audience: ShowAudience;
+  /** How long it stays up. Defaults to the short one. See 0212. */
+  lifetimeHours?: ShowLifetime;
   hiddenFrom: string[];
   collabId?: string;
 };
@@ -84,6 +86,9 @@ export async function publishShow(
       mentions: [...new Set([...extractMentions(text), ...layerMentions(layers)])],
       layers: layers as unknown as Json,
       audience: d.audience,
+      // Hours, not a timestamp: the trigger computes expires_at, because a
+      // timestamp from a browser is one a browser can be wrong about.
+      lifetime_hours: readLifetime(d.lifetimeHours),
       collab_id: d.collabId ?? null,
     })
     .select("id")
