@@ -3,5 +3,12 @@
     <string name="app_name">Hypefy</string>
     <string name="title_activity_main">Hypefy</string>
     <string name="package_name">chat.hypefy.app</string>
-    <string name="custom_url_scheme">chat.hypefy.app</string>
+    <!-- Must match the scheme in AndroidManifest.xml and NATIVE_AUTH_REDIRECT in
+         src/lib/native-auth-link.ts, which are both `chat.hypefy`. Nothing reads
+         this string today — the manifest hard-codes the scheme — so it was free
+         to be wrong, and it was: it said `chat.hypefy.app`. Capacitor's own
+         template wires the manifest to @string/custom_url_scheme, so the day
+         anyone restores that form, Google sign-in would stop completing with
+         nothing to point at. -->
+    <string name="custom_url_scheme">chat.hypefy</string>
 </resources>
