@@ -40,7 +40,7 @@ import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { FollowButton } from "@/components/profile/FollowButton";
 import { formatCount } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
-import { postSlots, type PostSlot } from "@/lib/post-media";
+import { altFor, postSlots, type PostSlot } from "@/lib/post-media";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { feedRatio } from "@/lib/aspect";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -1213,6 +1213,7 @@ function FeedCardInner({
                   <video
                     src={slot.url}
                     poster={slot.poster ?? undefined}
+                    aria-label={altFor(slots, i)}
                     className="absolute inset-0 h-full w-full bg-black object-contain"
                     muted
                     loop
@@ -1224,7 +1225,10 @@ function FeedCardInner({
                 ) : (
                 <OptimizedImage
                   src={slot.url}
-                  alt={post.caption ?? "Post"}
+                  /* What the author wrote, or the position in the post.
+                     This was the caption on every photo of a carousel —
+                     the same sentence ten times, describing none of them. */
+                  alt={altFor(slots, i)}
                   sizes="(max-width: 480px) 100vw, 448px"
                   className="object-cover"
                   draggable={false}

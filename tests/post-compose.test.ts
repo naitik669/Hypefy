@@ -27,7 +27,14 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/safe-back", () => ({ safeBack: () => { nav.left += 1; } }));
 vi.mock("@/lib/overlay-stack", () => ({
-  useOverlayBackButton: (_open: boolean, onClose: () => void) => { overlay.back = onClose; },
+  // Honours `open`, as the real hook does — it returns before registering
+  // when the overlay is shut. Ignoring it here meant whichever component
+  // called the hook LAST won the back button, so adding a closed
+  // BottomSheet to the composer silently stole it and two unrelated tests
+  // failed. The mock was wrong, not the code.
+  useOverlayBackButton: (open: boolean, onClose: () => void) => {
+    if (open) overlay.back = onClose;
+  },
 }));
 vi.mock("@/components/upload/UploadProvider", () => ({
   useUpload: () => ({ uploadPost: (a: Record<string, unknown>) => { uploads.push(a); } }),
