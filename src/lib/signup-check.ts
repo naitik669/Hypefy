@@ -1,36 +1,9 @@
 /**
- * What stands between a filled-in sign-up form and its button.
- */
-
-/**
- * The shortest password a new account may have.
+ * Moved to @hypefy/core/signup-check.
  *
- * Sign-up took six characters while changing or resetting a password
- * demanded eight, so the weakest passwords in the system were the ones
- * people chose first. One number for all three now. Existing accounts with a
- * shorter password can still sign in: this is only asked of new ones.
+ * This re-export exists so that the files importing it did not have to
+ * change when it moved — the module is the same module at a new address.
+ * Delete this file once every caller imports from @hypefy/core directly;
+ * until then, both paths are the same code.
  */
-export const MIN_PASSWORD = 8;
-
-/**
- * Why Create account is not available yet, in words, or null when it is.
- *
- * The button was simply greyed out until a date of birth and the consent box
- * were both in, with nothing saying which was missing. One thing at a time,
- * in the order the form asks for them. Being under 13 has its own line on
- * the form and is not repeated here.
- */
-export function signupMissing(form: {
-  email: string;
-  password: string;
-  dob: string;
-  age: number | null;
-  consent: boolean;
-}): string | null {
-  if (!form.email.trim()) return "Add your email to continue.";
-  if (form.password.length < MIN_PASSWORD) return `Choose a password of at least ${MIN_PASSWORD} characters.`;
-  if (!form.dob || form.age === null) return "Add your date of birth to continue.";
-  if (form.age < 13) return null;
-  if (!form.consent) return "Tick the box to agree to the terms.";
-  return null;
-}
+export * from "@hypefy/core/signup-check";

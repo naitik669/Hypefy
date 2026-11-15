@@ -1,23 +1,9 @@
 /**
- * Which image URLs next/image is allowed to touch.
+ * Moved to @hypefy/core/image-hosts.
  *
- * next/image throws at runtime for any host missing from
- * `images.remotePatterns` in next.config, so every caller has to ask
- * before handing one over. This list and that config are a pair: add a
- * host to one and you must add it to the other.
- *
- * Kept here rather than inside a component because two of them need
- * it — OptimizedImage for post and Shot media, Avatar for faces — and
- * a second copy is the kind that quietly stops matching the config.
+ * This re-export exists so that the files importing it did not have to
+ * change when it moved — the module is the same module at a new address.
+ * Delete this file once every caller imports from @hypefy/core directly;
+ * until then, both paths are the same code.
  */
-const OPTIMIZABLE_HOSTS = new Set(["fyaioseridqabockidyp.supabase.co"]);
-
-export function canOptimize(src: string): boolean {
-  // Local (public/) and inline data URLs are always safe for next/image.
-  if (src.startsWith("/") || src.startsWith("data:")) return true;
-  try {
-    return OPTIMIZABLE_HOSTS.has(new URL(src).hostname);
-  } catch {
-    return false;
-  }
-}
+export * from "@hypefy/core/image-hosts";
