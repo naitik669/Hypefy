@@ -176,7 +176,8 @@ export function mediaThumb(
 ): { url: string } | null {
   if (!row) return null;
   if (row.poster_url) return { url: row.poster_url };
-  // A Show has no poster column at all and may be either, so the file says.
+  // A Show posted before 0213 has no poster and may be either, so the
+  // file extension is all there is to go on.
   if (row.media_url && !isVideoUrl(row.media_url)) return { url: row.media_url };
   return null;
 }
