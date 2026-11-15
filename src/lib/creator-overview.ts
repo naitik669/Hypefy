@@ -73,3 +73,18 @@ export function dayLabel(day: string): string {
   if (Number.isNaN(d.getTime())) return "";
   return `${d.getUTCDate()}/${d.getUTCMonth() + 1}`;
 }
+
+/**
+ * The rows back in oldest-first order, for a chart that reads left to right.
+ *
+ * Needed because the query has to ask for them newest-first. "Order by day
+ * ascending, limit 30" takes the thirty OLDEST days, which is what the
+ * dashboard shipped with: eighty-one days of history existed and the chart
+ * on the first screen was a window from eleven weeks earlier that never
+ * moved, with a "last 30 days" follower change measured across the wrong
+ * month. The limit has to be applied from the newest end, so the reversal
+ * happens here where a test can see it rather than inline in the JSX.
+ */
+export function oldestFirst<T>(rows: readonly T[]): T[] {
+  return [...rows].reverse();
+}
