@@ -6,6 +6,7 @@ import { layerMentions, type AddYoursPayload, type ShowLayer } from "@/lib/show-
 import { readLifetime, type ShowAudience, type ShowLifetime } from "@/lib/show-audience";
 import { isVideoFile, uploadContentType } from "@/lib/video-mime";
 import { capturePoster } from "@/lib/video-poster";
+import { hashImageFile } from "@/lib/media-hash-client";
 
 /**
  * Putting one Show up: the file into show-media, then the row, then who it
@@ -31,7 +32,7 @@ export type ShowDraft = {
 
 export type ShowPublishResult =
   | { ok: true; id: string }
-  | { ok: false; reason: "upload" | "insert" | "hidden" | "prompt" };
+  | { ok: false; reason: "upload" | "insert" | "hidden" | "prompt" | "blocked" };
 
 export async function publishShow(
   supabase: SupabaseClient<Database>,
@@ -43,6 +44,59 @@ export async function publishShow(
   const ext = d.file.name.split(".").pop() || (isVideoFile(d.file) ? "webm" : "jpg");
   const path = `${d.userId}/${Date.now()}${index ? `-${index}` : ""}.${ext}`;
 
+  /*
+   * A still for a video Show.
+   *
+   * Without one, every place a Show is drawn small — a collab grid, a
+   * showcase, a reply card — has to mount a live <video> with BLANK_POSTER
+   * and wait for the decoder. A grid of eight is eight decoders running to
+   * display eight still pictures.
+   *
+   * Captured before anything is stored. 0213 put this after the upload so
+   * that a failure cost nothing, which the catch below already guarantees
+   * on its own — and the Shot path has always captured first, for a reason
+   * that applies here just as much: a backgrounded WebView does not
+   * decode, and putting the phone down during the upload is exactly what
+   * people do. Going first also means the blocklist check below can refuse
+   * a clip in a second rather than after a minute on a phone uplink.
+   */
+  let poster: Blob | null = null;
+  if (isVideoFile(d.file)) {
+    const localUrl = URL.createObjectURL(d.file);
+    try {
+      poster = await capturePoster(localUrl, null);
+    } catch {
+      /* no poster is a Show that behaves as every Show did before 0213 */
+    } finally {
+      URL.revokeObjectURL(localUrl);
+    }
+  }
+
+  /*
+   * The blocklist check, which the Show path never ran (0214).
+   *
+   * 0157 wired the perceptual-hash blocklist to posts, shots, comments and
+   * messages, and every other link in the chain already handled Shows —
+   * reports accept them, admin_remove_content removes them. Only these two
+   * calls were missing, so a picture a moderator took down could go
+   * straight back up as a Show and nothing looked.
+   *
+   * A photo Show is hashed as itself; a video one by its poster, which is a
+   * real frame and the image people see in a grid. Hashing a whole clip is
+   * video fingerprinting, a different problem, and is not pretended at.
+   *
+   * A null hash is not a refusal. It means "we do not know" — an undecodable
+   * file, a clip with no poster — and the post path settled long ago that
+   * this reads as let it through: refusing an upload over a decoder quirk is
+   * a far worse outcome than a miss.
+   */
+  const fingerprintOf = isVideoFile(d.file) ? poster : d.file;
+  const hash = fingerprintOf ? await hashImageFile(fingerprintOf) : null;
+  if (hash) {
+    const { data: blocked } = await supabase.rpc("check_media", { p_hash: hash });
+    if (blocked) return { ok: false, reason: "blocked" };
+  }
+
   const { error: upErr } = await supabase.storage
     .from(bucket)
     // The base type, so the object is served as video/webm rather than
@@ -52,38 +106,16 @@ export async function publishShow(
 
   const mediaUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 
-  /*
-   * A still for a video Show.
-   *
-   * Without one, every place a Show is drawn small — a collab grid, a
-   * showcase, a reply card — has to mount a live <video> with BLANK_POSTER
-   * and wait for the decoder. A grid of eight is eight decoders running to
-   * display eight still pictures.
-   *
-   * Best effort, and deliberately after the clip is already stored: a
-   * poster that fails to capture or fails to upload is a Show that falls
-   * back to what every Show did before this, which is not a failure worth
-   * losing somebody's post over. capturePoster has been sitting in this
-   * file's imports' reach the whole time — the Shot path calls it.
-   */
+  // The poster, best effort: a Show with none still plays and still draws,
+  // so a failure here must not cost an upload that has already succeeded.
   let posterUrl: string | null = null;
-  if (isVideoFile(d.file)) {
-    const localUrl = URL.createObjectURL(d.file);
-    try {
-      const poster = await capturePoster(localUrl, null);
-      if (poster) {
-        const posterPath = `${d.userId}/${Date.now()}${index ? `-${index}` : ""}-poster.jpg`;
-        const { error: pErr } = await supabase.storage
-          .from(bucket)
-          .upload(posterPath, poster, { contentType: "image/jpeg", upsert: false });
-        if (!pErr) {
-          posterUrl = supabase.storage.from(bucket).getPublicUrl(posterPath).data.publicUrl;
-        }
-      }
-    } catch {
-      /* no poster is a Show that behaves as every Show did before this */
-    } finally {
-      URL.revokeObjectURL(localUrl);
+  if (poster) {
+    const posterPath = `${d.userId}/${Date.now()}${index ? `-${index}` : ""}-poster.jpg`;
+    const { error: pErr } = await supabase.storage
+      .from(bucket)
+      .upload(posterPath, poster, { contentType: "image/jpeg", upsert: false });
+    if (!pErr) {
+      posterUrl = supabase.storage.from(bucket).getPublicUrl(posterPath).data.publicUrl;
     }
   }
 
@@ -156,6 +188,32 @@ export async function publishShow(
     }
   }
 
+  /*
+   * The other half of 0214: record what was posted, against the Show it was
+   * posted to, so that taking this Show down puts its hash on the blocklist
+   * and it cannot come back as anything else.
+   *
+   * Never allowed to fail the publish. The Show is live by the time this
+   * runs; a fingerprint that does not write means a weaker blocklist later,
+   * which is not worth showing anybody an error over — the same bargain
+   * recordFingerprints makes on the post path.
+   *
+   * Keyed to the poster's URL for a video Show, because that is the object
+   * the hash actually describes.
+   */
+  if (hash) {
+    try {
+      await supabase.rpc("claim_media", {
+        p_target_type: "show",
+        p_target_id: row.id,
+        p_url: posterUrl ?? mediaUrl,
+        p_hash: hash,
+      });
+    } catch {
+      /* a weaker blocklist, not a failed post */
+    }
+  }
+
   return { ok: true, id: row.id };
 }
 
@@ -165,7 +223,13 @@ async function undoCollabs(supabase: SupabaseClient<Database>, ids: string[]) {
 }
 
 /** What to tell someone when a Show did not go up. */
-export function publishFailureMessage(reason: "upload" | "insert" | "hidden" | "prompt"): string {
+export function publishFailureMessage(
+  reason: "upload" | "insert" | "hidden" | "prompt" | "blocked",
+): string {
+  // Deliberately not "this matches something we removed". Describing the
+  // rule is how somebody works out what to change to get round it — the
+  // same wording the post path uses.
+  if (reason === "blocked") return "That can't be posted.";
   if (reason === "upload") return "Upload failed. Check your connection and try again.";
   if (reason === "prompt") return "Couldn't set up the Add yours prompt. Nothing was posted.";
   if (reason === "hidden") return "Couldn't set who it's hidden from. Nothing was posted.";
