@@ -8,7 +8,7 @@ import { CaughtUp } from "@/components/feed/CaughtUp";
 import { Play } from "lucide-react";
 import { ShotPreview } from "@/components/shots/ShotPreview";
 import { clampRatio, distribute, pinHeight } from "@/lib/masonry";
-import { mixShots, type Mixed } from "@/lib/discover-mix";
+import { mixShots, mixShotsSplit, type Mixed } from "@/lib/discover-mix";
 
 export type Pin = {
   id: string;
@@ -114,11 +114,17 @@ export function PinFeed({
   // What is drawn: the Shots mixed through the posts that came with the page,
   // then every post loaded since. Shots mix only into that first stretch, so
   // a page arriving later is appended after them and never moves one.
-  const mixed = useMemo(() => mixShots(posts, shots), [posts, shots]);
-  const tiles = useMemo<Tile[]>(
-    () => [...mixed, ...extra.map((item) => ({ kind: "post" as const, item }))],
-    [mixed, extra]
-  );
+  //
+  // `rest` is the Shots the first stretch had no room for, now that a run of
+  // them is capped at MAX_RUN. They are mixed into the later pages rather
+  // than dropped: with few posts and several Shots, dropping them would hide
+  // exactly the new Shots this feed exists to surface. Stable as pages
+  // arrive, because each Shot's gap comes from its own id and `extra` only
+  // ever grows at the end — so a longer `extra` extends the tail without
+  // reordering what is already drawn.
+  const { mixed, rest } = useMemo(() => mixShotsSplit(posts, shots), [posts, shots]);
+  const tail = useMemo(() => mixShots(extra, rest), [extra, rest]);
+  const tiles = useMemo<Tile[]>(() => [...mixed, ...tail], [mixed, tail]);
   const visible = useMemo(
     () => (Number.isFinite(shown) ? tiles.slice(0, shown) : tiles),
     [tiles, shown]

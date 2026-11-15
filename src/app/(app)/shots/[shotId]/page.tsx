@@ -11,7 +11,15 @@ const SELECT =
 // Shared between generateMetadata and the page render (deduped per request).
 const getShot = cache(async (shotId: string) => {
   const supabase = await createClient();
-  const { data } = await supabase.from("shots").select(SELECT).eq("id", shotId).maybeSingle();
+  // A removed Shot is gone for everybody here, its author included: the
+  // select policy still hands it to them, and GoneScreen is the honest
+  // answer rather than playing something a moderator took down.
+  const { data } = await supabase
+    .from("shots")
+    .select(SELECT)
+    .eq("id", shotId)
+    .is("removed_at", null)
+    .maybeSingle();
   return data;
 });
 
@@ -70,6 +78,7 @@ export default async function ShotPage({
       .from("shots")
       .select(SELECT)
       .neq("id", shotId)
+      .is("removed_at", null)
       .order("created_at", { ascending: false })
       .limit(49),
     getAdContext(supabase, user?.id),

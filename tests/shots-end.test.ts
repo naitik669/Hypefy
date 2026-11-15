@@ -118,10 +118,25 @@ describe("the card at the end", () => {
   const onCheck = vi.fn();
   const onContinue = vi.fn();
 
-  async function mount(props: { variant: "caught-up" | "end"; thin: boolean; check?: "idle" | "checking" | "none" }) {
+  async function mount(props: {
+    variant: "caught-up" | "end";
+    thin: boolean;
+    /** How many Shots the reel held. Defaults to a reel that is not bare. */
+    total?: number;
+    check?: "idle" | "checking" | "none";
+  }) {
     const { ShotsEndCard } = await import("@/components/shots/ShotsEndCard");
     await act(async () =>
-      root.render(createElement(ShotsEndCard, { check: "idle", onAgain, onCheck, onContinue, ...props })),
+      root.render(
+        createElement(ShotsEndCard, {
+          check: "idle",
+          total: 9,
+          onAgain,
+          onCheck,
+          onContinue,
+          ...props,
+        }),
+      ),
     );
   }
   const q = (sel: string) => host.querySelector(sel) as HTMLElement | null;
@@ -140,11 +155,34 @@ describe("the card at the end", () => {
     host.remove();
   });
 
-  it("leads with Make a Shot while the reel is short", async () => {
-    await mount({ variant: "end", thin: true });
+  it("leads with Make a Shot only when the reel is nearly empty", async () => {
+    await mount({ variant: "end", thin: true, total: 2 });
     expect(leading()).toHaveLength(1);
     expect(leading()[0].getAttribute("href")).toBe("/create?mode=shot");
     expect(host.textContent).toContain("add one of yours");
+  });
+
+  it("but a short reel that is not empty leads with Watch again", async () => {
+    // Reported as a bug, and it was one. THIN_REEL is 20, so nine Shots
+    // counted as "thin" and the card led with a big Make a Shot — which
+    // reads as "there are no Shots", to somebody who has just watched nine.
+    await mount({ variant: "end", thin: true, total: 9 });
+    expect(leading()).toHaveLength(1);
+    expect(leading()[0].textContent).toContain("Watch again");
+    expect(q("[data-end-make]")).toBeTruthy();
+  });
+
+  it("and says how many there were, so it cannot read as an empty reel", async () => {
+    await mount({ variant: "end", thin: true, total: 9 });
+    expect(host.textContent).toContain("all 9 Shots");
+    // Still honest that the catalogue is small, just not as the headline.
+    expect(host.textContent).toContain("add one of yours");
+  });
+
+  it("counting one Shot in the singular", async () => {
+    await mount({ variant: "end", thin: true, total: 1 });
+    expect(host.textContent).toContain("all 1 Shot for now");
+    expect(host.textContent).not.toContain("1 Shots");
   });
 
   it("leads with Watch again once there is plenty", async () => {

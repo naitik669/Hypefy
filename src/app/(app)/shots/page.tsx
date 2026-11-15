@@ -71,6 +71,12 @@ export default async function ShotsPage() {
     supabase
       .from("shots")
       .select(SHOT_COLS)
+      // Never a removed Shot, even to the one person who can still read it.
+      // The select policy allows `removed_at is null OR user_id = auth.uid()
+      // OR is_admin()`, which is right for an author's own archive and wrong
+      // for a feed: a Shot taken down by a moderator was still served into
+      // its author's reel, and every removed Shot on Hypefy into an admin's.
+      .is("removed_at", null)
       .order("created_at", { ascending: false })
       .limit(80),
     user ? supabase.rpc("get_affinity", { p_lookback_days: 60 }) : Promise.resolve({ data: null }),

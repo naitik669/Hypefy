@@ -50,6 +50,14 @@ export type Mixed<P, S> = { kind: "post"; item: P } | { kind: "shot"; item: S };
 const MIN_GAP = 3;
 const MAX_GAP = 7;
 
+/**
+ * The most Shot previews that may sit together.
+ *
+ * Two. One is a video in a feed of pictures; three is a video feed with
+ * some pictures in it, on a screen that is not the Shots tab.
+ */
+export const MAX_RUN = 2;
+
 /** FNV-1a — small, fast, and stable across runtimes. */
 function hash(s: string): number {
   let h = 0x811c9dc5;
@@ -64,10 +72,20 @@ export function gapFor(id: string): number {
   return MIN_GAP + (hash(id) % (MAX_GAP - MIN_GAP + 1));
 }
 
-export function mixShots<P, S extends { id: string }>(
+/**
+ * The mix, plus the Shots there was no room for.
+ *
+ * `rest` matters because the caller cannot re-mix. Discover mixes Shots
+ * into the posts that arrived with the page and appends every later page
+ * after them, so that a page loading does not move a Shot somebody is
+ * looking at. A Shot dropped here is therefore dropped for good — which
+ * is the opposite of what Discover is for. The caller mixes `rest` into
+ * the later pages as they arrive.
+ */
+export function mixShotsSplit<P, S extends { id: string }>(
   posts: readonly P[],
   shots: readonly S[]
-): Mixed<P, S>[] {
+): { mixed: Mixed<P, S>[]; rest: S[] } {
   const out: Mixed<P, S>[] = [];
   let s = 0;
   // The first Shot comes a little earlier than the rest, so a video is on
@@ -87,9 +105,37 @@ export function mixShots<P, S extends { id: string }>(
   // More Shots than the posts could space out: the rest go at the end rather
   // than being dropped. Posts loaded later are appended after these, so they
   // still never move.
-  while (s < shots.length) {
+  //
+  // At most MAX_RUN in a row, which this loop used to ignore entirely. With
+  // few posts and several Shots — which is Hypefy today — every leftover
+  // went out back to back, so the bottom of Discover was an unbroken wall
+  // of video previews. The gap logic above exists precisely to stop that,
+  // and then this loop undid it.
+  //
+  // The ones that will not fit are handed back rather than clumped, so the
+  // caller can place them against the next page of posts.
+  let run = trailingShots(out);
+  while (s < shots.length && run < MAX_RUN) {
     out.push({ kind: "shot", item: shots[s] });
     s += 1;
+    run += 1;
   }
-  return out;
+  return { mixed: out, rest: shots.slice(s) };
+}
+
+/**
+ * The mix alone, for callers with nowhere to put the leftovers.
+ */
+export function mixShots<P, S extends { id: string }>(
+  posts: readonly P[],
+  shots: readonly S[]
+): Mixed<P, S>[] {
+  return mixShotsSplit(posts, shots).mixed;
+}
+
+/** How many Shots are already sitting at the end of the mix. */
+function trailingShots<P, S>(out: readonly Mixed<P, S>[]): number {
+  let n = 0;
+  for (let i = out.length - 1; i >= 0 && out[i].kind === "shot"; i--) n += 1;
+  return n;
 }

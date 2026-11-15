@@ -22,6 +22,7 @@ export type NewCheck = "idle" | "checking" | "none";
 export function ShotsEndCard({
   variant,
   thin,
+  total,
   check,
   onAgain,
   onCheck,
@@ -30,6 +31,14 @@ export function ShotsEndCard({
   variant: "caught-up" | "end";
   /** Few Shots exist: lead with "Make a Shot". */
   thin: boolean;
+  /**
+   * How many Shots the reel held.
+   *
+   * Said out loud, because "That's every Shot for now" next to a big Make a
+   * Shot button reads as "there are no Shots" — which is what it was
+   * reported as. Nobody reads "That's all 9 Shots for now" that way.
+   */
+  total: number;
   check: NewCheck;
   onAgain: () => void;
   onCheck: () => void;
@@ -39,13 +48,17 @@ export function ShotsEndCard({
   const main = "flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-accent text-sm font-extrabold text-accent-ink active:scale-[0.99]";
   const quiet = "flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white/10 text-sm font-bold text-white active:scale-[0.99]";
 
+  // Not thin: a reel of nine is "thin" by THIN_REEL's reckoning, and
+  // leading with Make a Shot there is what made the card read as an empty
+  // state. Only a reel with almost nothing in it leads with making one.
+  const bare = total < 5;
   const make = (
-    <Link href="/create?mode=shot" className={thin ? main : quiet} data-end-make>
+    <Link href="/create?mode=shot" className={bare ? main : quiet} data-end-make>
       <Plus size={17} strokeWidth={2.6} /> Make a Shot
     </Link>
   );
   const again = (
-    <button type="button" onClick={onAgain} className={thin ? quiet : main} data-end-again>
+    <button type="button" onClick={onAgain} className={bare ? quiet : main} data-end-again>
       <RotateCcw size={16} strokeWidth={2.4} /> Watch again
     </button>
   );
@@ -59,23 +72,23 @@ export function ShotsEndCard({
       <p className="mt-1.5 max-w-[28ch] text-sm leading-relaxed text-white/60">
         {variant === "caught-up"
           ? "That's every new Shot. The ones you've watched are below."
-          : thin
-            ? "That's every Shot for now. The reel is short: add one of yours."
-            : "That's every Shot for now."}
+          : `That's all ${total} Shot${total === 1 ? "" : "s"} for now.${
+              thin ? " The reel is short — add one of yours." : ""
+            }`}
       </p>
 
       <div className="mt-6 flex w-full max-w-[280px] flex-col gap-2">
         {variant === "caught-up" ? (
           <>
-            <button type="button" onClick={onContinue} className={thin ? quiet : main} data-end-continue>
+            <button type="button" onClick={onContinue} className={bare ? quiet : main} data-end-continue>
               <ChevronDown size={18} strokeWidth={2.6} /> Keep watching
             </button>
             {make}
           </>
         ) : (
           <>
-            {thin ? make : again}
-            {thin ? again : make}
+            {bare ? make : again}
+            {bare ? again : make}
             <Link href="/discover" className="flex h-11 w-full items-center justify-center gap-2 text-sm font-bold text-white/70">
               <Compass size={16} /> Find people to follow
             </Link>

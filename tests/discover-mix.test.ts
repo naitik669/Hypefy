@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mixShots, gapFor } from "@/lib/discover-mix";
+import { MAX_RUN, mixShots, mixShotsSplit, gapFor } from "@/lib/discover-mix";
 
 const posts = (n: number) => Array.from({ length: n }, (_, i) => `p${i}`);
 const shots = (n: number) =>
@@ -49,9 +49,29 @@ describe("mixShots", () => {
     expect(out.findIndex((x) => x.kind === "shot")).toBeLessThan(7);
   });
 
-  it("appends leftover shots rather than dropping them", () => {
+  it("hands leftover shots back rather than clumping or dropping them", () => {
+    // This used to append all four in a row. The gap logic exists to stop
+    // two videos sitting together, and the tail loop undid it: with few
+    // posts and several Shots the bottom of Discover was a wall of video.
+    //
+    // They are not dropped either — the caller mixes `rest` into the pages
+    // that arrive later, because a dropped Shot in Discover is a new Shot
+    // nobody ever sees.
+    const { mixed, rest } = mixShotsSplit(posts(3), shots(4));
+    const placed = mixed.filter((x) => x.kind === "shot");
+    expect(placed.length + rest.length).toBe(4);
+    expect(rest.length).toBeGreaterThan(0);
+  });
+
+  it("and never more than two of them together", () => {
     const out = mixShots(posts(3), shots(4));
-    expect(out.filter((x) => x.kind === "shot")).toHaveLength(4);
+    let run = 0;
+    let worst = 0;
+    for (const t of out) {
+      run = t.kind === "shot" ? run + 1 : 0;
+      worst = Math.max(worst, run);
+    }
+    expect(worst).toBeLessThanOrEqual(MAX_RUN);
   });
 
   it("handles no shots and no posts", () => {
