@@ -59,7 +59,7 @@ import {
 import type { Track } from "@/lib/music";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { MAX_SHOT_MB } from "@/lib/video-poster";
-import { MAX_SHOT_SECS, type Trim } from "@/lib/shot-trim";
+import { MAX_SHOT_SECS, MAX_SHOW_SECS, type Trim } from "@/lib/shot-trim";
 import { pickProblem } from "@/lib/pick-check";
 import { capturePoster } from "@/lib/video-poster";
 import { isVideoFile } from "@/lib/video-mime";
@@ -241,7 +241,8 @@ export function CreateScreen({
     if (captured) {
       // Caption → editor keeps everything. Anything further back would drop
       // the clip, so that is asked about first.
-      if (captioning && mode === "shot") return setCaptioning(false);
+      // A video Show steps back to its editor too, now that it has one.
+      if (captioning && (mode === "shot" || isVideoFile(captured))) return setCaptioning(false);
       // A photo Show goes caption → arrange, which keeps everything.
       if (arranged && mode === "show" && !isVideoFile(captured)) {
         setDrawn(null);
@@ -467,7 +468,11 @@ export function CreateScreen({
     );
   }
 
-  if (captured && mode !== "show" && !captioning) {
+  // The edit stage. A Shot has always come through here; a video Show
+  // now does too, for its trim and its cover frame (0216). A photo Show
+  // goes to the arrange step below instead — there is nothing to trim on
+  // a still, and a cover frame is the still itself.
+  if (captured && !captioning && (mode !== "show" || isVideoFile(captured))) {
     return (
       <>
         <ShotEditor
@@ -478,6 +483,11 @@ export function CreateScreen({
           onPickSound={() => setTrackOpen(true)}
           onClearSound={() => setTrack(null)}
           onBack={back}
+          // A Show plays only its first 30 seconds whatever the file
+          // holds, so the window it may pick is 30 — the editor and the
+          // viewer agreeing is the whole point of passing this.
+          maxSecs={mode === "show" ? MAX_SHOW_SECS : MAX_SHOT_SECS}
+          what={mode === "show" ? "Show" : "Shot"}
           onNext={(edit) => {
             setEdited(edit);
             setCaptioning(true);

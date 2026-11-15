@@ -47,6 +47,7 @@ export type PendingPost = {
   poll: { options: string[] } | null;
   aspectRatio: number | null;
   scheduledAt: string | null;
+  commentsOff: boolean;
 };
 
 /** Enough of a Shot to send it again. Mirrors ShotUpload. */
@@ -63,6 +64,7 @@ export type PendingShot = {
   trim: Trim;
   audience: ShowAudience;
   scheduledAt: string | null;
+  commentsOff: boolean;
 };
 
 export type PendingUpload = (PendingPost | PendingShot) & {

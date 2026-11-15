@@ -72,7 +72,11 @@ describe("capturing it", () => {
     // during the upload is exactly what people do; and the 0214 blocklist
     // check needs the poster to refuse a clip in a second rather than
     // after a minute on a phone uplink.
-    const captureAt = publish.indexOf("capturePoster(localUrl, null)");
+    // The second argument stopped being null in 0216: the still is taken
+    // at the frame the Show actually starts on, because a picture of
+    // second 0 on a Show that begins at 0:40 is a picture of something
+    // else. Anchored on the call, not on its arguments.
+    const captureAt = publish.indexOf("capturePoster(localUrl,");
     const checkAt = publish.indexOf('rpc("check_media"');
     const uploadAt = publish.indexOf(".upload(path, d.file");
     expect(captureAt).toBeGreaterThan(-1);

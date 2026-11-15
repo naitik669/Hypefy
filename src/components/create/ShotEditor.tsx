@@ -43,6 +43,8 @@ export function ShotEditor({
   onEdit,
   onBack,
   onNext,
+  maxSecs = MAX_SHOT_SECS,
+  what = "Shot",
 }: {
   file: File;
   /**
@@ -59,6 +61,15 @@ export function ShotEditor({
   onClearSound: () => void;
   onBack: () => void;
   onNext: (edit: { duration: number; trim: Trim; coverTime: number | null }) => void;
+  /**
+   * The longest window this may select, and what to call the thing.
+   *
+   * A video Show comes through here too since it gained a trim, and it
+   * caps at 30s because that is all its viewer ever plays. Defaulted to
+   * the Shot values so the Shot path is untouched.
+   */
+  maxSecs?: number;
+  what?: string;
 }) {
   const url = useObjectUrl(file);
 
@@ -77,9 +88,9 @@ export function ShotEditor({
   const selected = trim.end - trim.start;
   const blocked =
     duration > 0 && tooShort(duration)
-      ? `Shots need to be at least ${MIN_SHOT_SECS}s.`
-      : duration > 0 && selected > MAX_SHOT_SECS + 0.001
-        ? `That is ${fmtSecs(selected)}. Trim it to ${fmtSecs(MAX_SHOT_SECS)} or less.`
+      ? `${what}s need to be at least ${MIN_SHOT_SECS}s.`
+      : duration > 0 && selected > maxSecs + 0.001
+        ? `That is ${fmtSecs(selected)}. Trim it to ${fmtSecs(maxSecs)} or less.`
         : null;
 
   // The clip plays the part that will become the Shot, on a loop, so the
@@ -126,8 +137,8 @@ export function ShotEditor({
               // Clamped against this clip, in case what was kept does not fit it.
               setTrim(
                 initial && initial.trim.end > initial.trim.start
-                  ? clampTrim(initial.trim.start, initial.trim.end, secs)
-                  : defaultTrim(secs),
+                  ? clampTrim(initial.trim.start, initial.trim.end, secs, maxSecs)
+                  : defaultTrim(secs, maxSecs),
               );
             }}
             onTimeUpdate={(e) => {
@@ -208,7 +219,13 @@ export function ShotEditor({
             </button>
           </div>
           {tool === "trim" && duration > 0 && (
-            <ShotTrimmer src={url} duration={duration} value={trim} onChange={setTrim} />
+            <ShotTrimmer
+              src={url}
+              duration={duration}
+              value={trim}
+              onChange={setTrim}
+              maxSecs={maxSecs}
+            />
           )}
           {tool === "cover" && (
             <ShotCoverPicker src={url} value={coverTime} onChange={setCoverTime} />

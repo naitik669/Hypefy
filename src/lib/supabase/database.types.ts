@@ -2714,6 +2714,7 @@ export type Database = {
           aspect_ratio: number | null
           body: string | null
           caption: string | null
+          comments_off: boolean
           created_at: string
           hashtags: string[]
           id: string
@@ -2730,6 +2731,7 @@ export type Database = {
           aspect_ratio?: number | null
           body?: string | null
           caption?: string | null
+          comments_off?: boolean
           created_at?: string
           hashtags?: string[]
           id?: string
@@ -2746,6 +2748,7 @@ export type Database = {
           aspect_ratio?: number | null
           body?: string | null
           caption?: string | null
+          comments_off?: boolean
           created_at?: string
           hashtags?: string[]
           id?: string
@@ -2772,6 +2775,7 @@ export type Database = {
         Row: {
           audience: string
           caption: string | null
+          comments_off: boolean
           created_at: string
           duration_secs: number | null
           hashtags: string[]
@@ -2788,6 +2792,7 @@ export type Database = {
         Insert: {
           audience?: string
           caption?: string | null
+          comments_off?: boolean
           created_at?: string
           duration_secs?: number | null
           hashtags?: string[]
@@ -2804,6 +2809,7 @@ export type Database = {
         Update: {
           audience?: string
           caption?: string | null
+          comments_off?: boolean
           created_at?: string
           duration_secs?: number | null
           hashtags?: string[]
@@ -3530,6 +3536,8 @@ export type Database = {
           removed_at: string | null
           removed_by: string | null
           track: Json | null
+          trim_end: number | null
+          trim_start: number | null
           user_id: string
         }
         Insert: {
@@ -3551,6 +3559,8 @@ export type Database = {
           removed_at?: string | null
           removed_by?: string | null
           track?: Json | null
+          trim_end?: number | null
+          trim_start?: number | null
           user_id: string
         }
         Update: {
@@ -3572,6 +3582,8 @@ export type Database = {
           removed_at?: string | null
           removed_by?: string | null
           track?: Json | null
+          trim_end?: number | null
+          trim_start?: number | null
           user_id?: string
         }
         Relationships: [

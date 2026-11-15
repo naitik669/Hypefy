@@ -115,7 +115,33 @@ describe("the viewer draws what it was given", () => {
   it("a video Show gets a video element", () => {
     expect(viewer).toContain('kind === "video" ? (');
     expect(viewer).toContain("<video");
-    expect(viewer).toContain("onLoadedMetadata={(e) => setMediaSecs(e.currentTarget.duration)}");
+    expect(viewer).toContain("onLoadedMetadata={(e) => {");
+  });
+
+  it("and it measures the part that will play, not the whole file", () => {
+    // Since 0216 a video Show can choose which 30 seconds plays. The bar
+    // has to describe that window: measured over the file instead, it runs
+    // out while the picture carries on, or sits full while it still plays.
+    expect(viewer).toContain("const win = playbackWindow(show);");
+    expect(viewer).toContain("const stop = win.end ?? v.duration;");
+    expect(viewer).toContain("setMediaSecs(Math.max(0, stop - win.start));");
+  });
+
+  it("starts at the chosen frame rather than at zero", () => {
+    expect(viewer).toContain("if (win.start > 0) v.currentTime = win.start;");
+  });
+
+  it("and stops at the chosen end rather than running on past it", () => {
+    // Without this a window of 0:10-0:40 on a minute-long clip plays its
+    // thirty seconds and then keeps going while the bar sits full.
+    expect(viewer).toContain("if (win.end != null && e.currentTarget.currentTime >= win.end) {");
+    expect(viewer).toContain("e.currentTarget.pause();");
+  });
+
+  it("reading the window with the same helper a Shot uses", () => {
+    // A Show and a Shot store this identically on purpose, so two readers
+    // of one shape would be two chances to disagree about it.
+    expect(viewer).toContain('from "@/lib/shot-trim"');
   });
 
   it("and the clock comes from the media, not from a constant", () => {

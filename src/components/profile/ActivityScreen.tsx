@@ -140,15 +140,15 @@ export function ActivityScreen({
   return (
     <div className="flex flex-col pb-10">
       <div style={underHeaderStyle(headerHidden)} className="sticky z-10 chrome-bar border-b border-border/60 px-4 pb-2.5 pt-2">
-        <div role="tablist" aria-label="Your interactions" className="flex gap-1 rounded-pill bg-surface p-1">
+        {/* Same correction as CreatorTabs: links, not an ARIA tab widget. */}
+        <nav aria-label="Your interactions" className="flex gap-1 rounded-pill bg-surface p-1">
           {TABS.map(({ id, label, Icon }) => {
             const on = id === tab;
             return (
               <Link
                 key={id}
                 href={`/activity?tab=${id}`}
-                role="tab"
-                aria-selected={on}
+                aria-current={on ? "page" : undefined}
                 aria-label={label}
                 data-activity-tab={id}
                 prefetch={false}
@@ -161,7 +161,7 @@ export function ActivityScreen({
               </Link>
             );
           })}
-        </div>
+        </nav>
       </div>
 
       {tab === "watched" && !nothing && (

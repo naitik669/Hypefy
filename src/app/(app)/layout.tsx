@@ -7,7 +7,8 @@ import { getProfile } from "@/lib/profile";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { CallProvider } from "@/components/calls/CallProvider";
 import { GroupCallProvider } from "@/components/calls/GroupCallProvider";
-import { UploadProvider, ShotUploadCard } from "@/components/upload/UploadProvider";
+import { UploadProvider } from "@/components/upload/UploadProvider";
+import { UploadStatus } from "@/components/upload/UploadStatus";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { FrameCatalogProvider } from "@/components/ui/FrameCatalogProvider";
 import { loadFrames } from "@/lib/frames-load";
@@ -171,7 +172,7 @@ export default async function AppLayout({
             {/* A Shot keeps uploading after you have left the composer, and
                 lands you on the Shots feed — which is fixed and full-screen,
                 with nowhere to put an inline bar. */}
-            <ShotUploadCard />
+            <UploadStatus />
             <NativeShell />
             <ConnectionNotice />
             <ReturnToDestination />

@@ -48,12 +48,19 @@ export function ShotTrimmer({
   duration,
   value,
   onChange,
+  maxSecs = MAX_SHOT_SECS,
 }: {
   src: string;
   /** Length of the clip, in seconds. 0 until the video reports it. */
   duration: number;
   value: Trim;
   onChange: (trim: Trim) => void;
+  /**
+   * The longest window this may select. A Show caps at 30s because that
+   * is all its viewer plays; a Shot at 60. Defaulted so every existing
+   * caller is unchanged.
+   */
+  maxSecs?: number;
 }) {
   const [frames, setFrames] = useState<Frame[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,8 +93,8 @@ export function ShotTrimmer({
     const at = timeAt(clientX);
     const next =
       edge === "start"
-        ? clampTrim(at, value.end, duration)
-        : clampTrim(value.start, at, duration);
+        ? clampTrim(at, value.end, duration, maxSecs)
+        : clampTrim(value.start, at, duration, maxSecs);
     onChange(next);
   }
 
@@ -112,7 +119,7 @@ export function ShotTrimmer({
   const leftPct = (value.start / span) * 100;
   const widthPct = Math.max(2, ((value.end - value.start) / span) * 100);
   const selected = value.end - value.start;
-  const tooLong = selected > MAX_SHOT_SECS + 0.001;
+  const tooLong = selected > maxSecs + 0.001;
 
   return (
     <div className="flex flex-col gap-2">
@@ -124,7 +131,7 @@ export function ShotTrimmer({
           </span>
         </span>
         <span className="text-faint">
-          max <span className="tabular-nums">{fmtSecs(MAX_SHOT_SECS)}</span>
+          max <span className="tabular-nums">{fmtSecs(maxSecs)}</span>
         </span>
       </div>
 
@@ -190,8 +197,8 @@ export function ShotTrimmer({
               const delta = e.key === "ArrowLeft" ? -step : step;
               onChange(
                 edge === "start"
-                  ? clampTrim(value.start + delta, value.end, duration)
-                  : clampTrim(value.start, value.end + delta, duration),
+                  ? clampTrim(value.start + delta, value.end, duration, maxSecs)
+                  : clampTrim(value.start, value.end + delta, duration, maxSecs),
               );
             }}
             className="absolute inset-y-0 flex w-7 items-center justify-center"
@@ -211,8 +218,8 @@ export function ShotTrimmer({
       </div>
 
       <p className="text-[11px] text-faint">
-        {duration > MAX_SHOT_SECS
-          ? `This clip is ${fmtSecs(duration)}. Drag the handles to pick the ${fmtSecs(MAX_SHOT_SECS)} that plays.`
+        {duration > maxSecs
+          ? `This clip is ${fmtSecs(duration)}. Drag the handles to pick the ${fmtSecs(maxSecs)} that plays.`
           : `Drag the handles to trim. At least ${MIN_SHOT_SECS}s.`}
       </p>
     </div>
