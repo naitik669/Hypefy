@@ -190,3 +190,23 @@ function clamp01(n: number): number {
 function round(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+/**
+ * A series moved down so the zero-based helpers above can draw it.
+ *
+ * A follower count going 1,204 → 1,241 over a month is a real month of
+ * work and, plotted from zero, a flat line at the top of the box. So the
+ * floor comes out of the values and goes back on the axis labels: the
+ * shape is the change, and the numbers still say where it started.
+ *
+ * A series that never moves is the awkward case. Drawn on its own floor
+ * it sits exactly on the axis, which reads as nought rather than as
+ * steady, so it is given a span and placed in the middle of the box.
+ */
+export function rebase(values: number[]): { values: number[]; max: number; floor: number } {
+  if (values.length === 0) return { values: [], max: 1, floor: 0 };
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  if (hi === lo) return { values: values.map(() => 1), max: 2, floor: lo - 1 };
+  return { values: values.map((v) => v - lo), max: hi - lo, floor: lo };
+}

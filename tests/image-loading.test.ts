@@ -291,7 +291,7 @@ describe("thumbnails in scrolling lists are deferred", () => {
     const lazy = walk("src")
       .flatMap((f: string) => read(f).match(/<img[\s\S]*?\/>/g) ?? [])
       .filter((tag: string) => tag.includes('loading="lazy"'));
-    expect(lazy).toHaveLength(37);
+    expect(lazy).toHaveLength(38);
     expect(deferred.reduce((n, [, , c]) => n + c, 0)).toBe(17);
   });
 

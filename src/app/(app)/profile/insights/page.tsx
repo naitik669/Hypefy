@@ -9,6 +9,7 @@ import { InsightsChart, type SeriesPoint } from "@/components/profile/InsightsCh
 import { CommentIcon } from "@/components/ui/CommentIcon";
 import { HypeIcon } from "@/components/ui/HypeIcon";
 import { itemHref, itemTitle, viewsPerPerson, type ItemKind } from "@/lib/creator-insights";
+import { oldestFirst } from "@/lib/creator-overview";
 
 /**
  * Owner-only creator analytics.
@@ -46,7 +47,10 @@ export default async function InsightsPage() {
         .from("creator_daily_stats")
         .select("day, views, followers")
         .eq("user_id", user.id)
-        .order("day", { ascending: true })
+        // Newest first, then reversed by oldestFirst: ascending with a
+        // limit takes the thirty OLDEST days, which made the follower
+        // change below a measurement across the wrong month.
+        .order("day", { ascending: false })
         .limit(30),
     ]);
 
@@ -66,7 +70,7 @@ export default async function InsightsPage() {
   const visits = { visits: v.visits ?? 0, visitors: v.visitors ?? 0 };
 
   const chartSeries = (series ?? []) as SeriesPoint[];
-  const days = history ?? [];
+  const days = oldestFirst(history ?? []);
   const followerDelta =
     days.length >= 2
       ? (days[days.length - 1].followers ?? 0) - (days[0].followers ?? 0)

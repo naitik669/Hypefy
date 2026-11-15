@@ -180,8 +180,10 @@ describe("the dashboard draws from the real aggregates", () => {
       expect(pkg, lib).not.toContain(`"${lib}"`);
     }
     expect(page).toContain("<BarChart");
-    expect(page).toContain("<Donut");
-    expect(page).toContain("<Sparkline");
+    // The Donut and the Sparkline moved: the reach split is the Audience
+    // tab's and the sparkline lives in the Figure card both tabs share.
+    expect(read("src/components/creator/Audience.tsx")).toContain("<Donut");
+    expect(read("src/components/creator/Figures.tsx")).toContain("<Sparkline");
   });
 
   it("every chart that carries meaning has a text equivalent", () => {
