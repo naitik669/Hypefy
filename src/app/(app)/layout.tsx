@@ -163,7 +163,7 @@ export default async function AppLayout({
     <ToastProvider>
       <CallProvider userId={user!.id}>
         <GroupCallProvider userId={user!.id}>
-          <UploadProvider>
+          <UploadProvider userId={user!.id}>
           {/* One realtime channel for the whole shell. BottomNav, the
               notifier and the inbox each used to open their own, with an
               unfiltered messages subscription in each. */}

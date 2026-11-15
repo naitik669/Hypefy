@@ -2,7 +2,7 @@
 
 import { shrinkForUpload } from "@/lib/post-image";
 
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -22,6 +22,7 @@ import {
 import { coverOf, imageUrlsOf, type PostSlot } from "@/lib/post-media";
 import type { PostPick } from "@/lib/post-compose";
 import type { ShowAudience } from "@/lib/show-audience";
+import { clearPending, keepPending, readPending } from "@/lib/pending-upload";
 
 type PostUpload = {
   userId: string;
@@ -165,7 +166,14 @@ async function discardUploaded(
   );
 }
 
-export function UploadProvider({ children }: { children: React.ReactNode }) {
+export function UploadProvider({
+  children,
+  userId,
+}: {
+  children: React.ReactNode;
+  /** Whose device this is. A pending upload belongs to one account. */
+  userId: string;
+}) {
   const supabase = createClient();
   const router = useRouter();
   const toast = useToast();
@@ -181,6 +189,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
    * however many times the component re-rendered.
    */
   const cancelled = useRef(false);
+  /** Read by the restore effect, which must not interrupt a live upload. */
+  const progressRef = useRef<number | null>(null);
 
   const cancelUpload = useCallback(() => {
     cancelled.current = true;
@@ -190,6 +200,14 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const bailIfCancelled = () => {
     if (cancelled.current) throw new UploadCancelled();
   };
+
+  // Mirrors progress so the restore effect can read it without listing
+  // it as a dependency and re-running on every tick of the bar. Written in
+  // an effect rather than during render, which React forbids and which the
+  // refs lint rule catches.
+  useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
 
   const stopTrickle = () => { if (trickle.current) { clearInterval(trickle.current); trickle.current = null; } };
   const startTrickle = () => {
@@ -207,6 +225,24 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setFailed(null);
     cancelled.current = false;
     startTrickle();
+    /*
+     * Written down before a byte goes, so closing the app mid-upload does
+     * not lose the work. Not awaited: the upload should not wait on a
+     * disk, and an upload that cannot be remembered is still an upload.
+     */
+    void keepPending({
+      kind: "post",
+      userId: a.userId,
+      files: a.files,
+      caption: a.caption,
+      body: a.body,
+      hashtags: a.hashtags,
+      mentions: a.mentions,
+      track: a.track ?? null,
+      poll: a.poll ?? null,
+      aspectRatio: a.aspectRatio ?? null,
+      scheduledAt: a.scheduledAt ?? null,
+    });
     // What has actually landed in the bucket, so a failure part-way through
     // can take it back out again. Outside the try so the catch can see it.
     const stored: { bucket: string; path: string }[] = [];
@@ -373,6 +409,10 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         await recordFingerprints(supabase, "post", created.id, urls, hashes);
       }
 
+      // It exists now, so there is nothing left to come back to. This is
+      // the window the header of pending-upload describes: the row is
+      // written and this has not run yet. Milliseconds, against minutes.
+      void clearPending();
       stopTrickle();
       setProgress(100);
       toast(a.scheduledAt ? "Post scheduled" : "Post shared", "success");
@@ -387,6 +427,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       // A cancelled upload is not a failed one. No banner, and nothing
       // offering to retry the thing somebody just stopped.
       if (isCancelled(err)) {
+        // Cancelling means it is not coming back on the next launch either.
+        void clearPending();
         toast("Upload cancelled", "success");
         return;
       }
@@ -416,6 +458,20 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setFailed(null);
     cancelled.current = false;
     startTrickle();
+    void keepPending({
+      kind: "shot",
+      userId: a.userId,
+      file: a.file,
+      caption: a.caption,
+      hashtags: a.hashtags,
+      mentions: a.mentions,
+      track: a.track ?? null,
+      coverTime: a.coverTime,
+      duration: a.duration,
+      trim: a.trim,
+      audience: a.audience,
+      scheduledAt: a.scheduledAt ?? null,
+    });
     // Its own object URL: the composer that made one has already unmounted
     // and revoked it by the time the poster is captured.
     const localUrl = URL.createObjectURL(a.file);
@@ -514,6 +570,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           ...trimToStore(a.trim, a.duration),
         });
         if (schErr) throw schErr;
+        void clearPending();
         stopTrickle();
         setProgress(100);
         toast("Shot scheduled", "success");
@@ -542,6 +599,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         await recordFingerprints(supabase, "shot", createdShot.id, [posterUrl], [posterHash]);
       }
 
+      void clearPending();
       stopTrickle();
       setProgress(100);
       toast("Shot posted", "success");
@@ -555,6 +613,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       // this one never did.
       await discardUploaded(supabase, stored);
       if (isCancelled(err)) {
+        void clearPending();
         toast("Upload cancelled", "success");
         return;
       }
@@ -577,7 +636,49 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     else uploadShot(failed.shot);
   }, [failed, uploadPost, uploadShot]);
 
-  const dismissFailed = useCallback(() => setFailed(null), []);
+  /*
+   * An upload that was going when the app went away.
+   *
+   * Offered as the same banner a failure leaves, with the same Retry, and
+   * NOT re-sent on its own. The row is written at the end of an upload and
+   * the record cleared straight after, so there is a window of
+   * milliseconds where the post exists and the record survives — auto
+   * resuming would post it twice. A duplicate post is a worse outcome than
+   * a question, so this asks.
+   */
+  useEffect(() => {
+    let alive = true;
+    void readPending(userId).then((p) => {
+      if (!alive || !p) return;
+      // Something started since this began: do not talk over it.
+      if (progressRef.current !== null) return;
+      if (p.kind === "post") {
+        setFailed({
+          kind: "post",
+          post: { ...p, track: p.track, poll: p.poll },
+          message: "An upload didn't finish. Try again?",
+          canRetry: true,
+        });
+      } else {
+        setFailed({
+          kind: "shot",
+          shot: p,
+          message: "A Shot didn't finish uploading. Try again?",
+          canRetry: true,
+        });
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
+
+  const dismissFailed = useCallback(() => {
+    // Dismissing is a decision, not a postponement: it must not come back
+    // on the next launch.
+    void clearPending();
+    setFailed(null);
+  }, []);
 
   return (
     <UploadCtx.Provider
