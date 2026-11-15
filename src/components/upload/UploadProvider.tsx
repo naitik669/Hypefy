@@ -50,6 +50,8 @@ type ShotUpload = {
   coverTime: number | null;
   /** Everybody who could already see you, or your Hypers. See 0210. */
   audience: ShowAudience;
+  /** ISO timestamp to publish later — routes it to scheduled_shots. */
+  scheduledAt?: string | null;
   /** The clip's length and the window that plays. */
   duration: number;
   trim: Trim;
@@ -484,6 +486,42 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       }
 
       bailIfCancelled();
+
+      /*
+       * Scheduled goes to its own table, as a post's does (0017). The clip
+       * and its poster are already uploaded and stay uploaded: a phone that
+       * is off at the scheduled minute cannot send fifty megabytes, so
+       * deferring the FILE would mean a scheduled Shot that silently never
+       * happened. Only the row waits.
+       *
+       * No fingerprints, for the reason the post path gives: it becomes a
+       * row in shots with a different id when pg_cron publishes it, and
+       * there is nothing to attach them to until then. The blocklist check
+       * above has already run.
+       */
+      if (a.scheduledAt) {
+        const { error: schErr } = await supabase.from("scheduled_shots").insert({
+          user_id: a.userId,
+          media_url: mediaUrl,
+          poster_url: posterUrl,
+          caption: a.caption,
+          hashtags: a.hashtags,
+          mentions: a.mentions,
+          track: a.track ?? null,
+          duration_secs: a.duration > 0 ? Number(a.duration.toFixed(3)) : null,
+          audience: a.audience,
+          scheduled_at: a.scheduledAt,
+          ...trimToStore(a.trim, a.duration),
+        });
+        if (schErr) throw schErr;
+        stopTrickle();
+        setProgress(100);
+        toast("Shot scheduled", "success");
+        router.refresh();
+        setTimeout(() => setProgress(null), 700);
+        return;
+      }
+
       const { data: createdShot, error: insErr } = await supabase.from("shots").insert({
         user_id: a.userId,
         media_url: mediaUrl,

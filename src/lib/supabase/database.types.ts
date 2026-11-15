@@ -2768,6 +2768,65 @@ export type Database = {
           },
         ]
       }
+      scheduled_shots: {
+        Row: {
+          audience: string
+          caption: string | null
+          created_at: string
+          duration_secs: number | null
+          hashtags: string[]
+          id: string
+          media_url: string
+          mentions: string[]
+          poster_url: string | null
+          scheduled_at: string
+          track: Json | null
+          trim_end: number | null
+          trim_start: number | null
+          user_id: string
+        }
+        Insert: {
+          audience?: string
+          caption?: string | null
+          created_at?: string
+          duration_secs?: number | null
+          hashtags?: string[]
+          id?: string
+          media_url: string
+          mentions?: string[]
+          poster_url?: string | null
+          scheduled_at: string
+          track?: Json | null
+          trim_end?: number | null
+          trim_start?: number | null
+          user_id: string
+        }
+        Update: {
+          audience?: string
+          caption?: string | null
+          created_at?: string
+          duration_secs?: number | null
+          hashtags?: string[]
+          id?: string
+          media_url?: string
+          mentions?: string[]
+          poster_url?: string | null
+          scheduled_at?: string
+          track?: Json | null
+          trim_end?: number | null
+          trim_start?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_shots_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       share_events: {
         Row: {
           created_at: string
@@ -4346,6 +4405,7 @@ export type Database = {
         }[]
       }
       publish_due_scheduled_posts: { Args: never; Returns: number }
+      publish_due_scheduled_shots: { Args: never; Returns: number }
       purge_expired_messages: { Args: never; Returns: undefined }
       quick_reply_call: {
         Args: { p_call_id: string; p_reply: string }

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ChevronLeft, Globe, Music, Users, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, ChevronLeft, Clock, Globe, Music, Users, Volume2, VolumeX, X } from "lucide-react";
+import { SchedulePicker } from "@/components/post/SchedulePicker";
+import { scheduleState } from "@/lib/post-compose";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -82,6 +84,10 @@ export function ShotPreview({
   const [busy, setBusy] = useState(false);
   /** Who the Show goes to, and who it is kept from. Shows only. */
   const [audience, setAudience] = useState<ShowAudience>("everyone");
+  /** When it should go up, or null for now. Shots only. */
+  const [scheduleAt, setScheduleAt] = useState<string | null>(null);
+  const [schedulePicker, setSchedulePicker] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [hiddenFrom, setHiddenFrom] = useState<string[]>([]);
   /** The cover frame, in seconds, as the edit stage left it. It was asked
    *  for again on this screen, a second time for the same Shot. */
@@ -145,6 +151,15 @@ export function ShotPreview({
     // A Show stays inline: it is a photo, it is quick, and it has none of the
     // trim or poster work that makes the Shot path worth moving.
     if (mode === "shot") {
+      // Checked here rather than only when it was picked: a composer left
+      // open for ten minutes can carry a time that has since passed, and
+      // a Shot scheduled for the past would sit in the table until the
+      // next minute and then publish immediately with no warning.
+      const when = scheduleState(scheduleAt);
+      if (when === "passed") {
+        setScheduleError("That time has passed. Pick another.");
+        return;
+      }
       uploadShot({
         userId,
         file,
@@ -156,6 +171,7 @@ export function ShotPreview({
         duration: edit?.duration ?? 0,
         trim: edit?.trim ?? { start: 0, end: 0 },
         audience: room,
+        scheduledAt: scheduleAt,
       });
       onDone();
       return;
@@ -362,6 +378,17 @@ export function ShotPreview({
         </div>
       </div>
 
+      <SchedulePicker
+        open={schedulePicker}
+        value={scheduleAt}
+        onClose={() => setSchedulePicker(false)}
+        onConfirm={(next) => {
+          setScheduleAt(next);
+          setScheduleError(null);
+          setSchedulePicker(false);
+        }}
+      />
+
       <div className="relative z-10 mt-auto flex flex-col gap-3 px-4 pb-[max(1rem,var(--sab))]">
         {(tooBig || badType) && (
           <p className="rounded-lg bg-danger/15 px-3 py-2 text-xs text-danger">
@@ -399,7 +426,35 @@ export function ShotPreview({
           >
             <Users size={13} />
           </RoomButton>
+          <span className="flex-1" />
+          {/* Posts have had this since 0017 and Shots never did, which is
+              the wrong way round if anything: a Shot is the thing people
+              film in the evening and want out when somebody is awake. */}
+          <RoomButton
+            label={scheduleAt ? "Scheduled" : "Later"}
+            active={!!scheduleAt}
+            onClick={() => setSchedulePicker(true)}
+          >
+            <Clock size={13} />
+          </RoomButton>
+          {scheduleAt && (
+            <button
+              type="button"
+              onClick={() => {
+                setScheduleAt(null);
+                setScheduleError(null);
+              }}
+              aria-label="Post now instead"
+              className="text-white/50 transition-colors hover:text-white"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
+
+        {scheduleError && (
+          <p className="rounded-lg bg-danger/15 px-3 py-2 text-xs text-danger">{scheduleError}</p>
+        )}
 
         <div className="flex items-center justify-between gap-3">
           <span className="text-[11px] text-white/50">
@@ -411,7 +466,7 @@ export function ShotPreview({
             disabled={busy || tooBig || badType}
             className="flex items-center gap-2 rounded-pill bg-accent px-6 py-3 text-sm font-bold text-accent-ink transition active:scale-95 disabled:opacity-50"
           >
-            {busy ? "Posting…" : "Post Shot"}
+            {busy ? (scheduleAt ? "Scheduling…" : "Posting…") : scheduleAt ? "Schedule" : "Post Shot"}
             {!busy && <SendIcon size={15} weight="fill" />}
           </button>
         </div>
