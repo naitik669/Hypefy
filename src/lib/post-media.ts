@@ -18,7 +18,20 @@ import { MAX_SHOT_SECS } from "@/lib/shot-trim";
 /** The two things a slot can be. */
 export type PostSlotKind = "image" | "video";
 
-export type PostImageSlot = { kind: "image"; url: string };
+/**
+ * What a slot is described as, for somebody who cannot see it.
+ *
+ * Null means nobody wrote one, which is not the same as an empty string
+ * and is the honest default: the app had no alt text at all until this,
+ * so every image before it genuinely has none, and inventing one from the
+ * caption would put the same sentence on all ten photos of a carousel.
+ *
+ * A reader falls back to the caption only when it has nothing better, and
+ * says so by labelling the group rather than each picture.
+ */
+export type PostAlt = string | null;
+
+export type PostImageSlot = { kind: "image"; url: string; alt: PostAlt };
 
 export type PostVideoSlot = {
   kind: "video";
@@ -27,6 +40,7 @@ export type PostVideoSlot = {
   poster: string | null;
   /** Seconds, after any trim. Null when it could not be measured. */
   duration: number | null;
+  alt: PostAlt;
 };
 
 export type PostSlot = PostImageSlot | PostVideoSlot;
@@ -54,6 +68,24 @@ export const MAX_POST_VIDEO_SECS = 60;
 /** The longest URL a slot will hold, matching the sticker model's cap. */
 const MAX_URL = 2048;
 
+/**
+ * How long a description may be.
+ *
+ * Longer than a caption on purpose — a description does a different job
+ * and often needs more words than the joke above the photo — but bounded,
+ * because it is read aloud and because it lands in a JSONB column with a
+ * size check on the whole array.
+ */
+export const MAX_ALT = 420;
+
+/** A description, trimmed, or null when there is not a usable one. */
+function alt(value: unknown): PostAlt {
+  if (typeof value !== "string") return null;
+  const clean = value.trim();
+  if (!clean) return null;
+  return clean.length > MAX_ALT ? clean.slice(0, MAX_ALT) : clean;
+}
+
 /** A stored media URL, or null. Https only — these are our own buckets. */
 function url(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -78,9 +110,15 @@ function slot(raw: unknown): PostSlot | null {
   // than one fewer slot: the carousel would show a blank page mid-swipe.
   if (!href) return null;
 
-  if (s.kind === "image") return { kind: "image", url: href };
+  if (s.kind === "image") return { kind: "image", url: href, alt: alt(s.alt) };
   if (s.kind === "video") {
-    return { kind: "video", url: href, poster: url(s.poster), duration: duration(s.duration) };
+    return {
+      kind: "video",
+      url: href,
+      poster: url(s.poster),
+      duration: duration(s.duration),
+      alt: alt(s.alt),
+    };
   }
   // An unknown kind is left out rather than guessed at. Guessing from the
   // extension would mean a future audio or document slot silently rendering
@@ -126,7 +164,9 @@ export function postSlots(row: {
     : row.image_url
       ? [row.image_url]
       : [];
-  return readPostMedia(urls.map((u) => ({ kind: "image", url: u })));
+  // Every post made before alt text existed has none, and that is written
+  // down rather than guessed at.
+  return readPostMedia(urls.map((u) => ({ kind: "image", url: u, alt: null })));
 }
 
 /** Just the photos, in order — what `image_urls` is written with. */
@@ -149,6 +189,27 @@ export function coverOf(slots: readonly PostSlot[]): string | null {
   if (!first) return null;
   if (first.kind === "image") return first.url;
   return first.poster ?? imageUrlsOf(slots)[0] ?? null;
+}
+
+/**
+ * What to put in the alt attribute for one slot.
+ *
+ * The description when there is one. Otherwise the position in the post,
+ * which is genuinely useful — "photo 2 of 3" tells a reader where they are
+ * in a carousel — and never the caption, which would repeat the same
+ * sentence on every picture and say nothing about any of them.
+ */
+export function altFor(slots: readonly PostSlot[], index: number): string {
+  const s = slots[index];
+  if (!s) return "";
+  if (s.alt) return s.alt;
+  const what = s.kind === "video" ? "Video" : "Photo";
+  return slots.length > 1 ? `${what} ${index + 1} of ${slots.length}` : what;
+}
+
+/** Whether anybody described any of it. */
+export function hasAlt(slots: readonly PostSlot[]): boolean {
+  return slots.some((s) => !!s.alt);
 }
 
 export function hasVideo(slots: readonly PostSlot[]): boolean {

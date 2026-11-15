@@ -38,7 +38,10 @@ const photo = { kind: "image", url: A };
 describe("a post made before video still behaves exactly as it did", () => {
   it("its slots come from the photo columns", () => {
     const slots = postSlots({ image_urls: [A], image_url: A });
-    expect(slots).toEqual([{ kind: "image", url: A }]);
+    // alt is null, not absent and not derived: every post made before
+    // descriptions existed genuinely has none, and inventing one from the
+    // caption would put the same sentence on all ten photos.
+    expect(slots).toEqual([{ kind: "image", url: A, alt: null }]);
   });
 
   it("and a text-only post has none", () => {

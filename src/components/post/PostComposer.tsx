@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { MAX_POST_IMAGE_MB } from "@/lib/post-image";
-import { MAX_POST_VIDEO_SECS } from "@/lib/post-media";
+import { MAX_ALT, MAX_POST_VIDEO_SECS } from "@/lib/post-media";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { BLANK_POSTER } from "@/lib/blank-poster";
 import { ALLOWED_VIDEO_MIME, isAllowedVideo, isVideoFile } from "@/lib/video-mime";
 import { clipSeconds } from "@/lib/clip-seconds";
 import {
@@ -64,6 +66,8 @@ type Img = {
   kind: "image" | "video";
   /** Seconds, for a video. Null for a photo, or when it could not be read. */
   duration: number | null;
+  /** What it shows, written by the person posting it. Null until they do. */
+  alt: string | null;
 };
 
 /** Supported aspect ratios for posts. value = width / height;
@@ -122,6 +126,56 @@ function formatSchedule(v: string): string {
  *  indicator is bars, deliberately unlabelled. */
 const STEPS = [{ label: "New Post" }, { label: "Preview" }] as const;
 
+/**
+ * The description field.
+ *
+ * Its own component with its own state, keyed on the picture's id, so
+ * typing does not re-render the whole composer on every keystroke and
+ * switching pictures starts clean rather than carrying the last one's
+ * half-written sentence.
+ */
+function AltEditor({
+  initial,
+  isVideo,
+  onSave,
+}: {
+  initial: string;
+  isVideo: boolean;
+  onSave: (text: string) => void;
+}) {
+  const [text, setText] = useState(initial);
+  const left = MAX_ALT - text.length;
+
+  return (
+    <div className="flex flex-col gap-3 px-5 pb-5">
+      <p className="text-xs leading-relaxed text-muted">
+        What is in {isVideo ? "the clip" : "the photo"}? This is read aloud to people
+        using a screen reader, and shown if the {isVideo ? "clip" : "photo"} does not load.
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value.slice(0, MAX_ALT))}
+        rows={4}
+        autoFocus
+        placeholder={isVideo ? "A short clip of…" : "A photo of…"}
+        className="w-full resize-none rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none transition focus:border-white/25"
+      />
+      <div className="flex items-center justify-between">
+        <span className={`text-xs tabular-nums ${left < 40 ? "text-muted" : "text-faint"}`}>
+          {left} left
+        </span>
+        <button
+          type="button"
+          onClick={() => onSave(text)}
+          className="rounded-pill bg-accent px-5 py-2 text-sm font-bold text-accent-ink transition-transform active:scale-95"
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function PostComposer({
   userId,
   author,
@@ -138,6 +192,8 @@ export function PostComposer({
   const queueRef = useRef<{ id: string; origSrc: string; file: File }[]>([]);
 
   const [imgs, setImgs] = useState<Img[]>([]);
+  /** Which picture is being described, by id. Null when the sheet is shut. */
+  const [describing, setDescribing] = useState<string | null>(null);
   const [crop, setCrop] = useState<{
     id: string;
     origSrc: string;
@@ -362,6 +418,7 @@ export function PostComposer({
           origFile: f,
           kind: "video",
           duration: secs,
+          alt: null,
         });
         continue;
       }
@@ -396,6 +453,7 @@ export function PostComposer({
         origFile: r.file,
         kind: "image",
         duration: null,
+        alt: null,
       }));
       setImgs((prev) => [...prev, ...added]);
       if (imgs.length === 0) measureAuto(added[0].origSrc);
@@ -455,6 +513,9 @@ export function PostComposer({
       origFile: crop.file,
       kind: "image",
       duration: null,
+      // Cropping does not change what the picture shows, so a description
+      // already written survives the aspect picker.
+      alt: imgs.find((p) => p.id === crop.id)?.alt ?? null,
     };
     setImgs((prev) => {
       const i = prev.findIndex((p) => p.id === crop.id);
@@ -529,7 +590,12 @@ export function PostComposer({
     // Home shows a progress bar + a toast when it finishes.
     uploadPost({
       userId,
-      files: imgs.map((i) => ({ file: i.file, kind: i.kind, duration: i.duration })),
+      files: imgs.map((i) => ({
+        file: i.file,
+        kind: i.kind,
+        duration: i.duration,
+        alt: i.alt,
+      })),
       caption: caption.trim() || null,
       body: body.trim() || null,
       hashtags,
@@ -636,12 +702,36 @@ export function PostComposer({
                     className={`relative shrink-0 overflow-hidden rounded-2xl bg-surface ${frameClass}`}
                     style={{ ...frameStyle, width: frameWidth }}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={img.url}
-                      alt={`Image ${i + 1}`}
-                      className="h-full w-full object-cover"
-                    />
+                    {img.kind === "video" ? (
+                      /* A clip in an img tag is a broken image icon. The
+                         strip rendered every pick as one, which was fine
+                         while only photos could be picked.
+
+                         No real poster exists yet — it is captured at upload
+                         time from the file itself — so BLANK_POSTER stands
+                         in, which is what the rest of the app uses to stop a
+                         player flashing the browser default while it
+                         decodes. Kept out of the tag: a comment inside one
+                         that mentions a bracket ends the tag as far as the
+                         poster sweep in video-poster.test is concerned. */
+                      <video
+                        src={img.url}
+                        poster={BLANK_POSTER}
+                        className="h-full w-full bg-black object-contain"
+                        muted
+                        loop
+                        playsInline
+                        autoPlay
+                        preload="metadata"
+                      />
+                    ) : (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={img.url}
+                        alt={img.alt ?? `Photo ${i + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                    )}
                     <button
                       type="button"
                       onClick={() => recrop(img)}
@@ -661,6 +751,24 @@ export function PostComposer({
                     <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
                       {i + 1}/{imgs.length}
                     </span>
+                    {/* Lit when something has been written, so the strip
+                        shows at a glance which pictures still have none —
+                        the whole reason the badge sits on the thumbnail
+                        rather than behind a menu. */}
+                    <button
+                      type="button"
+                      onClick={() => setDescribing(img.id)}
+                      aria-label={
+                        img.alt
+                          ? `Edit description for ${img.kind === "video" ? "video" : "photo"} ${i + 1}`
+                          : `Describe ${img.kind === "video" ? "video" : "photo"} ${i + 1}`
+                      }
+                      className={`absolute bottom-1.5 right-1.5 rounded-full px-2 py-0.5 text-[10px] font-black tracking-wide backdrop-blur-sm transition-colors ${
+                        img.alt ? "bg-accent text-accent-ink" : "bg-black/55 text-white"
+                      }`}
+                    >
+                      ALT
+                    </button>
                   </div>
                 ))}
                 {imgs.length < MAX_IMAGES && (
@@ -1108,6 +1216,39 @@ export function PostComposer({
           </div>
         )}
       </div>
+
+      {/*
+        Describing a picture.
+
+        A sheet rather than a field under each thumbnail: ten photos would
+        mean ten text boxes stacked down the composer, and the description
+        is a thing you write once per picture and rarely come back to.
+
+        MAX_ALT is longer than the caption limit on purpose. A description
+        does a different job — it says what is in the picture, where the
+        caption says what you think about it — and that often takes more
+        words, not fewer.
+      */}
+      <BottomSheet
+        open={describing !== null}
+        onClose={() => setDescribing(null)}
+        title="Describe this"
+      >
+        {describing !== null && (
+          <AltEditor
+            key={describing}
+            initial={imgs.find((x) => x.id === describing)?.alt ?? ""}
+            isVideo={imgs.find((x) => x.id === describing)?.kind === "video"}
+            onSave={(text) => {
+              const clean = text.trim();
+              setImgs((prev) =>
+                prev.map((x) => (x.id === describing ? { ...x, alt: clean || null } : x)),
+              );
+              setDescribing(null);
+            }}
+          />
+        )}
+      </BottomSheet>
     </>
   );
 }

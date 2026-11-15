@@ -19,6 +19,8 @@ export type PostPick = {
   kind: "image" | "video";
   /** Seconds, or null when it could not be measured. */
   duration: number | null;
+  /** What it shows, for somebody who cannot see it. Null when unwritten. */
+  alt: string | null;
 };
 
 const BY_EXTENSION: Record<string, string> = {

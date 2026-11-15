@@ -287,6 +287,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
               url: supabase.storage.from("post-videos").getPublicUrl(vPath).data.publicUrl,
               poster: posterUrl,
               duration: pick.duration,
+              alt: pick.alt,
             });
           } finally {
             URL.revokeObjectURL(localUrl);
@@ -310,6 +311,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         slots.push({
           kind: "image",
           url: supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl,
+          alt: pick.alt,
         });
         setProgress(Math.min(85, 10 + ((i + 1) / a.files.length) * 72));
       }
