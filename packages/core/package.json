@@ -1,0 +1,11 @@
+{
+  "name": "@hypefy/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Platform-free domain logic shared by the web app and (from Phase 5) the Expo app. No React, no Next, no DOM, no Capacitor — enforced by tests/core-boundary.test.ts.",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "sideEffects": false
+}
