@@ -311,7 +311,18 @@ export function ReelsFeed({
   const swipeStartedAt = useRef(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const fetchingMore = useRef(false);
-  const [noMore, setNoMore] = useState(initialReels.length < 5);
+  /**
+   * Whether the table is exhausted.
+   *
+   * Starts false and is only ever set by a page that came back short.
+   * It used to start at `initialReels.length < 5`, a guess against a magic
+   * 5 with a page size of 10 — so a catalogue of four declared itself
+   * finished before asking, and the end card appeared without a single
+   * page having been fetched. One cheap query on a small catalogue is
+   * worth more than a guess that is wrong in exactly the case that
+   * matters.
+   */
+  const [noMore, setNoMore] = useState(false);
 
   // Fetch the next batch when the viewer nears the end of the loaded reels
   useEffect(() => {
@@ -336,6 +347,9 @@ export function ReelsFeed({
         "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, duration_secs, trim_start, trim_end, track, profiles(display_name, avatar_hue, username, avatar_url)"
       )
       .lt("created_at", oldest)
+      // Same as the first page on the server. Without it the second page
+      // onwards could serve an author their own removed Shots.
+      .is("removed_at", null)
       .order("created_at", { ascending: false })
       .limit(10)
       .then(
@@ -619,6 +633,7 @@ export function ReelsFeed({
             <ShotsEndCard
               variant={item.kind}
               thin={reels.length < THIN_REEL}
+              total={reels.length}
               check={check}
               onAgain={watchAgain}
               onCheck={() => void checkForNew()}

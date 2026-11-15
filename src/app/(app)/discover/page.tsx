@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DiscoverView } from "@/components/discover/DiscoverView";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
-import { tagAffinityFor } from "@/lib/feed-rank";
+import { diversify, tagAffinityFor } from "@/lib/feed-rank";
 import { getBlockedIds } from "@/lib/blocked";
+import { baseScore } from "@/lib/discover-rank";
 import { one as unwrap, jsonRecord } from "@/lib/supabase/typed";
 
 /** Flatten a row's embedded `profiles` join from `T | T[]` down to `T | null`. */
@@ -12,14 +13,7 @@ function one(p: any) {
   return { ...p, profiles: unwrap(p.profiles) };
 }
 
-/** Tiered recency boost (newer content surfaces higher). */
-function recencyBoost(createdAt: string, now: number) {
-  const h = (now - new Date(createdAt).getTime()) / 3_600_000;
-  if (h < 2) return 20;
-  if (h < 24) return 10;
-  if (h < 72) return 5;
-  return 0;
-}
+
 function score(
   x: any,
   now: number,
@@ -38,16 +32,11 @@ function score(
     30
   );
   const tagBoost = Math.min(tagAffinityFor(x, tagAff, followedTags) * 1.5, 15);
-  return (
-    (x.hype_count ?? 0) * 3 +
-    (x.comment_count ?? 0) * 2 +
-    (x.save_count ?? 0) * 2 +
-    (x.share_count ?? 0) * 2 +
-    recencyBoost(x.created_at, now) +
-    interestBoost +
-    authorBoost +
-    tagBoost
-  );
+  // baseScore decays engagement by age; this used to add the raw counts,
+  // so a Shot from June with eight hypes scored 44 against 5 for one
+  // posted yesterday, and every new Shot sat at the bottom of Discover.
+  // See src/lib/discover-rank.ts for the measurement.
+  return baseScore(x, now) + interestBoost + authorBoost + tagBoost;
 }
 
 export default async function DiscoverPage() {
@@ -85,6 +74,8 @@ export default async function DiscoverPage() {
         "id, media_url, poster_url, caption, hype_count, comment_count, save_count, share_count, created_at, user_id, profiles!shots_user_id_fkey(id, display_name, username, avatar_hue, avatar_url)"
       )
       .neq("user_id", user.id)
+      // As on the reel: never a removed Shot, whoever is looking.
+      .is("removed_at", null)
       .order("created_at", { ascending: false })
       .limit(80),
     supabase
@@ -152,7 +143,11 @@ export default async function DiscoverPage() {
     : null;
   // All of them, ranked, for scattering through the For You feed; the top 12
   // are still what the Shots chip shows.
-  const feedShots = [...shots].sort((a, b) => b._score - a._score);
+  // Ranked, then spread by author. Without diversify one person who posted
+  // four Shots yesterday owns the top four slots of Discover — which is what
+  // happens the moment recency carries real weight, and is not discovery.
+  // The helper is lossless: it reorders and never drops.
+  const feedShots = diversify([...shots].sort((a, b) => b._score - a._score));
   const trendingShots = feedShots.slice(0, 12);
 
   // Velocity-based trending tags (rising, not raw count)
