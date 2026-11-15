@@ -15,8 +15,16 @@ import type { Trim } from "@/lib/shot-trim";
  */
 
 const DB = "hypefy-drafts";
-const DB_VERSION = 1;
+/*
+ * Shared with lib/pending-upload, which keeps its own store in this same
+ * database. Both must open it at the SAME version: indexedDB.open with a
+ * version lower than the one on disk fails outright, so if one file
+ * bumped and the other did not, whichever opened second would get null
+ * and its feature would silently stop working. Bump both together.
+ */
+const DB_VERSION = 2;
 const STORE = "drafts";
+const PENDING_STORE = "pending-upload";
 
 /**
  * How many one person may hold. A Shot can be 50MB, so this is a limit on
@@ -50,9 +58,15 @@ function open(): Promise<IDBDatabase | null> {
     } catch {
       return resolve(null);
     }
+    // Creates both stores, because either file may be the one that
+    // triggers the upgrade and the other store has to exist afterwards.
     req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(STORE)) {
-        req.result.createObjectStore(STORE, { keyPath: "id" });
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        db.createObjectStore(STORE, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(PENDING_STORE)) {
+        db.createObjectStore(PENDING_STORE, { keyPath: "id" });
       }
     };
     req.onsuccess = () => resolve(req.result);
