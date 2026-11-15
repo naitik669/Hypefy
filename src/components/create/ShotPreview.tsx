@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ChevronLeft, Globe, Music, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, ChevronLeft, Globe, Music, Users, Volume2, VolumeX } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -155,6 +155,7 @@ export function ShotPreview({
         coverTime,
         duration: edit?.duration ?? 0,
         trim: edit?.trim ?? { start: 0, end: 0 },
+        audience: room,
       });
       onDone();
       return;
@@ -372,6 +373,34 @@ export function ShotPreview({
 
         {captionField}
 
+        {/*
+          Who it goes to.
+        
+          Shows have had this since they existed and a Shot never did —
+          every one was public to whoever could already see you, with no
+          say in it. Two buttons rather than a menu: there are two rooms,
+          and a menu to choose between two things is a menu too many.
+        
+          The rule itself is in the shots select policy (0210), not here.
+          This only decides what gets written.
+        */}
+        <div className="flex items-center gap-2" role="group" aria-label="Who can see this Shot">
+          <RoomButton
+            label="Everyone"
+            active={audience === "everyone"}
+            onClick={() => setAudience("everyone")}
+          >
+            <Globe size={13} />
+          </RoomButton>
+          <RoomButton
+            label="Hype buddies"
+            active={audience === "hypers"}
+            onClick={() => setAudience("hypers")}
+          >
+            <Users size={13} />
+          </RoomButton>
+        </div>
+
         <div className="flex items-center justify-between gap-3">
           <span className="text-[11px] text-white/50">
             {caption.length}/280
@@ -388,6 +417,35 @@ export function ShotPreview({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Which room a Shot goes to. Lit when chosen; outlined when not. */
+function RoomButton({
+  label,
+  active,
+  onClick,
+  children,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex h-9 items-center gap-1.5 rounded-pill px-3 text-xs font-bold transition active:scale-95 ${
+        active
+          ? "bg-white text-black"
+          : "border border-white/25 text-white/70"
+      }`}
+    >
+      {children}
+      {label}
+    </button>
   );
 }
 

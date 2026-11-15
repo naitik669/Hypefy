@@ -2929,6 +2929,7 @@ export type Database = {
       shots: {
         Row: {
           archived_at: string | null
+          audience: string
           caption: string | null
           comment_count: number
           comments_off: boolean
@@ -2954,6 +2955,7 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          audience?: string
           caption?: string | null
           comment_count?: number
           comments_off?: boolean
@@ -2979,6 +2981,7 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          audience?: string
           caption?: string | null
           comment_count?: number
           comments_off?: boolean
@@ -4209,6 +4212,7 @@ export type Database = {
       is_comment_image: { Args: { p_url: string }; Returns: boolean }
       is_conv_admin: { Args: { p_conversation_id: string }; Returns: boolean }
       is_conv_member: { Args: { conv: string }; Returns: boolean }
+      is_hyper_of: { Args: { p_author: string }; Returns: boolean }
       is_media_blocked: { Args: { p_hash: unknown }; Returns: boolean }
       is_suspended: { Args: { p_user?: string }; Returns: boolean }
       join_add_yours: {
@@ -4549,6 +4553,7 @@ export type Database = {
         Args: { p_limit?: number; p_q: string }
         Returns: {
           archived_at: string | null
+          audience: string
           caption: string | null
           comment_count: number
           comments_off: boolean
