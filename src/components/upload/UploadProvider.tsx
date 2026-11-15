@@ -21,6 +21,7 @@ import {
 } from "@/lib/upload-error";
 import { coverOf, imageUrlsOf, type PostSlot } from "@/lib/post-media";
 import type { PostPick } from "@/lib/post-compose";
+import type { ShowAudience } from "@/lib/show-audience";
 
 type PostUpload = {
   userId: string;
@@ -47,6 +48,8 @@ type ShotUpload = {
   track?: Track | null;
   /** Which frame becomes the poster, in seconds. Null takes the default. */
   coverTime: number | null;
+  /** Everybody who could already see you, or your Hypers. See 0210. */
+  audience: ShowAudience;
   /** The clip's length and the window that plays. */
   duration: number;
   trim: Trim;
@@ -490,6 +493,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         hashtags: a.hashtags,
         mentions: a.mentions,
         duration_secs: a.duration > 0 ? Number(a.duration.toFixed(3)) : null,
+        audience: a.audience,
         ...trimToStore(a.trim, a.duration),
       }).select("id").single();
       if (insErr) throw insErr;
