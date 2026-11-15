@@ -11,15 +11,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Needed by the changed-files lint below, which diffs against the
+          # base branch.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
       - run: npm ci
 
-      # Lint is non-blocking for now (pre-existing debt) — surfaced, not gated.
-      - name: Lint (non-blocking)
+      # The whole repo, surfaced and not gated. Measured on 16 Nov 2026: 294
+      # errors and 40 warnings. Making this blocking would turn CI red on the
+      # first run and the only ways out would be fixing 294 things at once or
+      # reverting the gate — so it stays a report.
+      - name: Lint (whole repo, non-blocking)
         run: npm run lint || true
+
+      # The ratchet. New and changed code must be clean even though the
+      # existing debt is not, so the number goes down over time instead of up.
+      # This is the same comparison the house convention already makes by hand
+      # ("lint the changed files against a stash of main for parity"), moved
+      # into CI so it is not optional.
+      - name: Lint changed files (blocking)
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+          files=$(git diff --name-only --diff-filter=ACMR \
+            "origin/$GITHUB_BASE_REF...HEAD" -- '*.ts' '*.tsx' | tr '\n' ' ')
+          if [ -z "$files" ]; then
+            echo "No TypeScript changed in this PR."
+            exit 0
+          fi
+          echo "Linting: $files"
+          npx eslint $files
 
       - name: Typecheck
         run: npm run typecheck
@@ -36,6 +61,55 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
 
-# NOTE: Playwright e2e is intentionally deferred — the critical flows need a
-# seeded Supabase test project + a confirmed test user (email confirmation is
-# on), which CI doesn't have yet. Add an e2e job once that test env exists.
+  # Playwright. This used to be deferred with the note that "the critical flows
+  # need a seeded Supabase test project + a confirmed test user", which was
+  # true and is still true of the signed-in flows — they skip here.
+  #
+  # What changed is that tests/e2e/public-surface.spec.ts needs no account at
+  # all: the auth wall, the offline page, the service worker, the manifest, the
+  # security headers and the no-sideways-scroll contract. Twelve checks that
+  # run anywhere. And tests/e2e/core-flows.spec.ts now SKIPS without
+  # credentials rather than failing at import, so this job is honest either way
+  # and gets more useful the moment a test account exists.
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      # Public by design — the anon key ships to every browser — but kept in
+      # secrets so the repo is not pinned to one Supabase project and the key
+      # can be rotated without a commit.
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      # Optional. Unset means the signed-in flows skip; the public ones still run.
+      E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Without a Supabase URL the dev server starts but every page that talks
+      # to it fails, and the auth-wall checks would report a redirect that
+      # happened for the wrong reason. Better to say so than to pass by
+      # accident.
+      - name: Skip note when Supabase is not configured
+        if: env.NEXT_PUBLIC_SUPABASE_URL == ''
+        run: |
+          echo "::warning title=E2E not configured::Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in repo secrets to run the Playwright suite. Add E2E_EMAIL and E2E_PASSWORD for the signed-in flows as well."
+
+      - name: Playwright
+        if: env.NEXT_PUBLIC_SUPABASE_URL != ''
+        run: npm run test:e2e
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
