@@ -1,10 +1,9 @@
 /**
- * Status is switched off for now.
+ * Moved to @hypefy/core/status-feature.
  *
- * Hidden rather than deleted: every surface below is behind this one flag, so
- * turning it back on is changing false to true. The table, the RPCs, the
- * editor and the bubble component all stay exactly where they are, and no
- * existing status is destroyed — people who set one simply stop seeing it
- * shown until this flips.
+ * This re-export exists so that the files importing it did not have to
+ * change when it moved — the module is the same module at a new address.
+ * Delete this file once every caller imports from @hypefy/core directly;
+ * until then, both paths are the same code.
  */
-export const STATUS_ENABLED = false;
+export * from "@hypefy/core/status-feature";
