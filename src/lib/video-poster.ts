@@ -23,19 +23,6 @@ export const MAX_SHOT_MB = 50;
  */
 export const MAX_SHOW_MB = 25;
 
-/**
- * Mirrors the bucket's allowed MIME list.
- *
- * video/ogg was in here and is NOT in the bucket, so an ogg clip passed the
- * client and was rejected server-side. Nothing in the app produces ogg —
- * useVideoRecorder only ever emits webm or mp4 — so the entry went rather than
- * the bucket widening.
- */
-export const ALLOWED_SHOT_TYPES = [
-  "video/mp4",
-  "video/webm",
-  "video/quicktime",
-];
 
 const POSTER_WIDTH = 720;
 /** Long enough for a phone to decode a big clip, short enough not to hold a publish. */

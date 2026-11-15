@@ -9,6 +9,8 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { haptics } from "@/lib/haptics";
 import { MAX_SHOW_MB } from "@/lib/video-poster";
 import { BLANK_POSTER } from "@/lib/blank-poster";
+import { uploadContentType } from "@/lib/video-mime";
+import { hashImageFile } from "@/lib/media-hash-client";
 
 type Show = { id: string; media_url: string; caption: string | null };
 type Shot = {
@@ -118,6 +120,33 @@ export function ShowcaseEditor({
     }
     setBusy(true);
 
+    /*
+     * The blocklist check, before anything is stored.
+     *
+     * A Showcase upload went straight into the bucket with nothing looking
+     * at it, so a picture a moderator took down could be put back up inside
+     * a board. check_media is a read and needs no row of its own, which is
+     * why this works here even though a Showcase is not fingerprinted: it
+     * cannot be removed by a moderator yet, so there would be nothing for a
+     * fingerprint on one to be harvested by. See 0214.
+     *
+     * Photos only. No poster is captured for a Showcase clip, and a null
+     * hash means "we do not know", which reads as let it through.
+     */
+    for (const p of picks) {
+      if (p.kind !== "upload" || p.isVideo) continue;
+      const hash = await hashImageFile(p.file);
+      if (!hash) continue;
+      const { data: blocked } = await supabase.rpc("check_media", { p_hash: hash });
+      if (blocked) {
+        setBusy(false);
+        // Not "it matches something we removed": describing the rule is how
+        // somebody works out what to change to get round it.
+        toast("One of those images can't be posted", "error");
+        return;
+      }
+    }
+
     // Uploads first: a board that exists with half its contents missing is
     // worse than one that was never created, and an upload is the only step
     // here that can fail slowly.
@@ -128,7 +157,11 @@ export function ShowcaseEditor({
       const path = `${userId}/showcase-${Date.now()}-${uploaded.size}.${ext}`;
       const { error } = await supabase.storage
         .from("show-media")
-        .upload(path, p.file, { contentType: p.file.type });
+        // The base type. Raw file.type on a recorded clip is
+        // "video/webm;codecs=vp9,opus", which is stored as the content type
+        // and then served as a type no browser will play — the exact bug
+        // video-mime.ts was written to fix, still live here.
+        .upload(path, p.file, { contentType: uploadContentType(p.file) });
       if (error) {
         setBusy(false);
         toast("An upload failed — nothing was created", "error");

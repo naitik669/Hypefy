@@ -64,17 +64,30 @@ describe("capturing it", () => {
     expect(publish).toContain("if (isVideoFile(d.file)) {");
   });
 
-  it("after the clip is already stored, so a failure costs nothing", () => {
-    // A poster that will not capture is a Show that behaves as every Show
-    // did before this. It is not worth losing somebody's post over.
+  it("before the clip is uploaded, so the blocklist can refuse it early", () => {
+    // This was the other way round when 0213 landed, so that a poster
+    // failure cost nothing — which the catch below guarantees on its own,
+    // wherever the capture sits. Going first buys two things: a
+    // backgrounded WebView does not decode, and putting the phone down
+    // during the upload is exactly what people do; and the 0214 blocklist
+    // check needs the poster to refuse a clip in a second rather than
+    // after a minute on a phone uplink.
     const captureAt = publish.indexOf("capturePoster(localUrl, null)");
+    const checkAt = publish.indexOf('rpc("check_media"');
     const uploadAt = publish.indexOf(".upload(path, d.file");
-    expect(captureAt).toBeGreaterThan(uploadAt);
+    expect(captureAt).toBeGreaterThan(-1);
+    expect(captureAt).toBeLessThan(checkAt);
+    expect(checkAt).toBeLessThan(uploadAt);
   });
 
   it("and a failure leaves the Show, not an error", () => {
+    // Scoped to the capture block alone. It used to run to `const text =`,
+    // which now also swallows the blocklist check — and THAT one does
+    // return { ok: false }, on purpose, so the wider slice would assert
+    // the opposite of what it means.
     const block = publish.slice(publish.indexOf("if (isVideoFile(d.file)) {"));
-    const body = block.slice(0, block.indexOf("const text ="));
+    const body = block.slice(0, block.indexOf("const fingerprintOf"));
+    expect(body.length).toBeGreaterThan(50);
     expect(body).toContain("catch {");
     expect(body).not.toContain("return { ok: false");
   });
