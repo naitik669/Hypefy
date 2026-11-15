@@ -1,23 +1,38 @@
-import { Page, expect } from "@playwright/test";
+import { Page, expect, test } from "@playwright/test";
 
 /**
  * Test account credentials — env-only, never committed. Set E2E_EMAIL and
- * E2E_PASSWORD in .env.local (gitignored) or CI secrets. Previously these had
- * hardcoded fallbacks, which leaked a live account password into git history.
+ * E2E_PASSWORD in .env.local (gitignored) or CI secrets. These once had
+ * hardcoded fallbacks, which leaked a live account password into git history;
+ * do not reintroduce them.
+ *
+ * Read, not required. They used to go through a `required()` that threw at
+ * module load, so importing this file without the env set failed the whole
+ * spec at COLLECTION — every test in it reported as a failure, including the
+ * ones that need no account at all. That is also why Playwright could not be
+ * turned on in CI: a repo without the secrets would have gone permanently
+ * red rather than reporting honest skips.
  */
-function required(name: string): string {
-  const v = process.env[name];
-  if (!v) {
-    throw new Error(
-      `${name} is not set. E2E tests need a throwaway account: ` +
-        `set E2E_EMAIL and E2E_PASSWORD in .env.local or your CI secrets.`,
-    );
-  }
-  return v;
+export const TEST_EMAIL = process.env.E2E_EMAIL ?? "";
+export const TEST_PASSWORD = process.env.E2E_PASSWORD ?? "";
+
+/** Whether a test account is configured in this environment. */
+export function hasCredentials(): boolean {
+  return Boolean(TEST_EMAIL && TEST_PASSWORD);
 }
 
-export const TEST_EMAIL = required("E2E_EMAIL");
-export const TEST_PASSWORD = required("E2E_PASSWORD");
+/**
+ * Skip the current test (or describe block) when no account is configured.
+ *
+ * Says which variables are missing, because "skipped" with no reason is how a
+ * suite quietly stops covering anything.
+ */
+export function needsAccount() {
+  test.skip(
+    !hasCredentials(),
+    "No test account: set E2E_EMAIL and E2E_PASSWORD in .env.local or CI secrets.",
+  );
+}
 
 /** Sign in through the real /signin UI and land on an authenticated page. */
 export async function signIn(page: Page) {
@@ -35,4 +50,29 @@ export async function signIn(page: Page) {
 export async function waitForHome(page: Page) {
   await page.goto("/home");
   await expect(page.locator('a[href="/messages"]').first()).toBeVisible({ timeout: 90_000 });
+}
+
+/**
+ * The widest the page may scroll horizontally.
+ *
+ * Not zero: sub-pixel layout rounding and a scrollbar gutter both show up as a
+ * stray pixel or two on a perfectly correct layout, and a test that fails on
+ * those gets switched off rather than fixed.
+ */
+export const SCROLL_SLOP = 2;
+
+/**
+ * Assert the page does not scroll sideways at the current viewport.
+ *
+ * The check Phase 4 (responsive web) will lean on hardest, which is why it
+ * lives here rather than in one spec: today's app is a 480px column centred on
+ * a wide page, so this passes trivially at desktop width and will keep passing
+ * as the real layout arrives — unless something overflows, which is the whole
+ * point.
+ */
+export async function noHorizontalScroll(page: Page) {
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(SCROLL_SLOP);
 }
