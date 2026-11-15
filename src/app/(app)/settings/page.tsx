@@ -126,7 +126,7 @@ const LISTS = [
   },
   {
     href: "/create/scheduled",
-    label: "Scheduled posts",
+    label: "Scheduled",
     sub: "Waiting to go out",
     icon: CalendarClock,
   },

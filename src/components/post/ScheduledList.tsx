@@ -13,6 +13,15 @@ export type ScheduledPost = {
   body: string | null;
   image: string | null;
   scheduledAt: string;
+  /**
+   * Which table the row is in.
+   *
+   * Shots are scheduled too since 0211, and they live in their own table
+   * — so cancelling has to delete from the right one. Defaulted rather
+   * than required so the shape stays compatible with callers that only
+   * ever had posts.
+   */
+  kind?: "post" | "shot";
 };
 
 function whenLabel(iso: string) {
@@ -44,7 +53,11 @@ export function ScheduledList({ posts }: { posts: ScheduledPost[] }) {
     setList((l) => l.filter((p) => p.id !== id));
     // Held for five seconds so Undo can stop it.
     const stop = scheduleUndoable(async () => {
-      const { error } = await supabase.from("scheduled_posts").delete().eq("id", id);
+      // The right table. Deleting a Shot's id from scheduled_posts
+      // succeeds and removes nothing, so the row would quietly publish
+      // anyway after the list had said it was cancelled.
+      const table = post.kind === "shot" ? "scheduled_shots" : "scheduled_posts";
+      const { error } = await supabase.from(table).delete().eq("id", id);
       if (error) {
         putBack(post);
         toast("Couldn't cancel", "error");
