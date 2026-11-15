@@ -26,7 +26,11 @@ export default async function ShowPage({
   const nowIso = new Date().toISOString();
   // profiles must be disambiguated: show_views adds a second shows<->profiles
   // relationship path, which makes a bare profiles(...) embed error (PGRST201).
-  const baseSelect = `id, user_id, media_url, caption, created_at, hype_count, track, layers, profiles!shows_user_id_fkey(display_name, avatar_hue, username)`;
+  // trim_start/trim_end carry which part of a video Show plays (0216).
+  // The quiet way that breaks: the columns are written, the viewer honours
+  // them, and the query never asks — so every trimmed Show plays from the
+  // start for ever and nothing looks wrong in the code.
+  const baseSelect = `id, user_id, media_url, poster_url, trim_start, trim_end, caption, created_at, hype_count, track, layers, profiles!shows_user_id_fkey(display_name, avatar_hue, username)`;
 
   // Whether each one is kept comes from the boards rather than the old
   // is_showcase flag, which 0185 stopped reading: a flagged Show

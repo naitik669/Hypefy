@@ -45,6 +45,9 @@ export type ShowItem = {
   id: string;
   user_id: string;
   media_url: string | null;
+  /** Which part of a video Show plays. Null either side means no bound (0216). */
+  trim_start?: number | null;
+  trim_end?: number | null;
   caption: string | null;
   created_at: string;
   hype_count?: number;
@@ -60,6 +63,7 @@ export type ShowItem = {
 };
 
 import { showDurationMs, showMediaKind } from "@/lib/show-media";
+import { playbackWindow } from "@/lib/shot-trim";
 import { isVideoUrl } from "@/lib/video-mime";
 import { BLANK_POSTER } from "@/lib/blank-poster";
 import { readLayers, showSong } from "@/lib/show-layers";
@@ -680,6 +684,18 @@ function ShowScreen({
   }, [embedded, supabase]);
 
   const kind = showMediaKind(show.media_url);
+  /**
+   * The part of the clip that plays.
+   *
+   * Read with the same helper a Shot uses, because a Show and a Shot
+   * store this identically on purpose. Null either side is no bound,
+   * which is every Show posted before 0216 and every photo one.
+   */
+  const win = playbackWindow(show);
+  // Measured over the window, not the file: the progress bar has to
+  // describe what will actually play, or it runs out while the picture
+  // carries on. mediaSecs is already the window length — see the
+  // loadedmetadata handler below.
   const duration = showDurationMs(show.media_url, mediaSecs);
 
   /**
@@ -822,7 +838,23 @@ function ShowScreen({
           className="absolute inset-0 h-full w-full object-cover"
           playsInline
           autoPlay
-          onLoadedMetadata={(e) => setMediaSecs(e.currentTarget.duration)}
+          onLoadedMetadata={(e) => {
+            const v = e.currentTarget;
+            const stop = win.end ?? v.duration;
+            setMediaSecs(Math.max(0, stop - win.start));
+            // Straight to the chosen start, so the first frame somebody
+            // sees is the one the author picked.
+            if (win.start > 0) v.currentTime = win.start;
+          }}
+          onTimeUpdate={(e) => {
+            // Stop at the chosen end rather than running on into the part
+            // that was trimmed off. Without this a window of 0:10–0:40 on
+            // a minute-long clip plays 0:10 to 0:40 and then keeps going
+            // while the bar sits full.
+            if (win.end != null && e.currentTarget.currentTime >= win.end) {
+              e.currentTarget.pause();
+            }
+          }}
           aria-label={show.caption ?? "Show"}
         />
       ) : show.media_url ? (

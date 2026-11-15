@@ -230,7 +230,14 @@ describe("the screen", () => {
 
   it("has the four tabs, each its own address", () => {
     expect(screen).toContain("href={`/activity?tab=${id}`}");
-    expect(screen).toContain('role="tablist"');
+    // nav, not role="tablist". The ARIA tab pattern commits the author to
+    // arrow-key navigation, a roving tabindex and a tabpanel tied by
+    // aria-controls, and none of that is here or can be: these are links
+    // that load a page. A screen reader announced "tab, selected", the user
+    // pressed the arrows, and nothing happened.
+    expect(screen).toContain('<nav aria-label="Your interactions"');
+    expect(screen).toContain('aria-current={on ? "page" : undefined}');
+    expect(screen).not.toContain('role="tablist"');
     for (const id of ACTIVITY_TABS) expect(screen).toContain(`id: "${id}"`);
   });
 

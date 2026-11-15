@@ -133,7 +133,9 @@ describe("the heavy screens behind the camera are split out", () => {
     // dynamic() fetches on first render, so a component mounted
     // unconditionally would load its chunk anyway.
     expect(create).toContain("const songPicker = trackOpen ? (");
-    expect(create).toContain('if (captured && mode !== "show" && !captioning) {');
+    expect(create).toContain(
+      'if (captured && !captioning && (mode !== "show" || isVideoFile(captured))) {',
+    );
     expect(create).toContain('if (captured && mode === "show" && !isVideoFile(captured) && arranged === null) {');
   });
 });

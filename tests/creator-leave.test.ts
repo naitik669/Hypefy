@@ -216,11 +216,31 @@ describe("Back, with a clip in hand", () => {
     expect(nav.left).toBe(0);
   });
 
-  it("but a video Show goes straight to the caption — there is nothing to place on it", async () => {
+  it("but a video Show goes to the edit step, where its trim is chosen", async () => {
+    // It used to go straight to the caption, because there is nothing to
+    // PLACE on something that moves. That was the right reason for skipping
+    // arrange and the wrong reason for skipping the editor: a video Show has
+    // always played only its first 30 seconds (SHOW_VIDEO_MAX_MS) and had no
+    // say in which 30. Since 0216 it picks, through the same editor a Shot
+    // uses, and it still gets no layers.
     await open({ initialMode: "show" });
     await pickClip("sky.mp4", "video/mp4");
+    expect(at()).toBe("edit");
+  });
+
+  it("and steps back from its caption to that editor, not out of the flow", async () => {
+    // Without this the back button from a video Show's caption asked to
+    // leave, which would throw away the trim that had just been set.
+    await open({ initialMode: "show" });
+    await pickClip("sky.mp4", "video/mp4");
+    await tap("editor next");
     expect(at()).toBe("caption");
+    // And nothing is placed on it: a video Show skips arrange, which is
+    // what it always did and the one thing that has not changed.
     expect(stage.previewLayers).toEqual([]);
+    await tap("caption back");
+    expect(at()).toBe("edit");
+    expect(asking()).toBeNull();
   });
 });
 

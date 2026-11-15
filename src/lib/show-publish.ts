@@ -6,6 +6,7 @@ import { layerMentions, type AddYoursPayload, type ShowLayer } from "@/lib/show-
 import { readLifetime, type ShowAudience, type ShowLifetime } from "@/lib/show-audience";
 import { isVideoFile, uploadContentType } from "@/lib/video-mime";
 import { capturePoster } from "@/lib/video-poster";
+import { trimToStore, type Trim } from "@/lib/shot-trim";
 import { hashImageFile } from "@/lib/media-hash-client";
 
 /**
@@ -28,6 +29,17 @@ export type ShowDraft = {
   lifetimeHours?: ShowLifetime;
   hiddenFrom: string[];
   collabId?: string;
+  /**
+   * Which part of a video Show plays, and how long the clip is.
+   *
+   * The viewer has only ever played the first 30 seconds of a video
+   * Show (SHOW_VIDEO_MAX_MS); this is the say in which 30 it has never
+   * had. Metadata, not a cut — see 0216. Absent for a photo Show, and
+   * absent for a video one posted from a path with no editor, which is
+   * stored as null and plays from the start exactly as before.
+   */
+  trim?: Trim | null;
+  duration?: number;
 };
 
 export type ShowPublishResult =
@@ -64,7 +76,9 @@ export async function publishShow(
   if (isVideoFile(d.file)) {
     const localUrl = URL.createObjectURL(d.file);
     try {
-      poster = await capturePoster(localUrl, null);
+      // At the frame the Show actually starts on. A still of second 0 on
+      // a Show that begins at 0:40 is a picture of something else.
+      poster = await capturePoster(localUrl, d.trim?.start ?? null);
     } catch {
       /* no poster is a Show that behaves as every Show did before 0213 */
     } finally {
@@ -159,6 +173,9 @@ export async function publishShow(
       // Hours, not a timestamp: the trigger computes expires_at, because a
       // timestamp from a browser is one a browser can be wrong about.
       lifetime_hours: readLifetime(d.lifetimeHours),
+      // Null for a whole clip rather than 0-to-duration: null means "no
+      // bound", which is what every Show before 0216 already says.
+      ...(d.trim && d.duration ? trimToStore(d.trim, d.duration) : {}),
       collab_id: d.collabId ?? null,
     })
     .select("id")

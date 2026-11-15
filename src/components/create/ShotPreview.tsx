@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ChevronLeft, Clock, Globe, Music, Users, Volume2, VolumeX, X } from "lucide-react";
+import { ArrowLeft, ChevronLeft, Clock, Globe, MessageCircle, MessageCircleOff, Music, Users, Volume2, VolumeX, X } from "lucide-react";
 import { SchedulePicker } from "@/components/post/SchedulePicker";
 import { scheduleState } from "@/lib/post-compose";
 import { SendIcon } from "@/components/ui/ShareIcon";
@@ -53,8 +53,13 @@ export function ShotPreview({
   userId: string;
   /**
    * What the edit stage decided: the clip's length, the window that plays,
-   * and which frame is the cover. Absent for a Show, which is a photo and
-   * has none of them.
+   * and which frame is the cover.
+   *
+   * Absent for a PHOTO Show, which has none of them. A video Show now
+   * comes through the same editor and carries all three — it reached
+   * publishShow with no edit at all before 0216, which is why its still
+   * was always frame zero and its first 30 seconds were always the ones
+   * that played.
    */
   edit?: { duration: number; trim: Trim; coverTime: number | null };
   /** What was written last time, when this is a draft or a step back. */
@@ -81,6 +86,15 @@ export function ShotPreview({
    *  silent clip. Starts true only because autoplay demands it; the sound
    *  button is a gesture, which is what lets it be turned on. */
   const [previewMuted, setPreviewMuted] = useState(true);
+  /**
+   * Comments closed from the moment it exists (0215).
+   *
+   * Shots only. A Show has no comments_off column — the thing people
+   * leave on a Show is a reply, which is a different table and a
+   * different control, so offering this on the Show screen would be a
+   * switch that silently did nothing.
+   */
+  const [closeComments, setCloseComments] = useState(false);
   const [busy, setBusy] = useState(false);
   /** Who the Show goes to, and who it is kept from. Shows only. */
   const [audience, setAudience] = useState<ShowAudience>("everyone");
@@ -174,6 +188,7 @@ export function ShotPreview({
         trim: edit?.trim ?? { start: 0, end: 0 },
         audience: room,
         scheduledAt: scheduleAt,
+        commentsOff: closeComments,
       });
       onDone();
       return;
@@ -188,6 +203,12 @@ export function ShotPreview({
       layers,
       audience: room,
       lifetimeHours: lifetime,
+      // Which 30 seconds plays, for a video Show. Undefined for a photo
+      // one, and for a video one that reached here without an editor —
+      // both store null and play from the start, as every Show did
+      // before 0216.
+      trim: edit?.trim ?? null,
+      duration: edit?.duration,
       hiddenFrom,
       collabId,
     });
@@ -472,6 +493,18 @@ export function ShotPreview({
               <X size={14} />
             </button>
           )}
+        </div>
+
+        {/* Its own line. The row above already holds four controls and a
+            fifth overflows a 375px screen. */}
+        <div className="flex items-center gap-2">
+          <RoomButton
+            label={closeComments ? "Comments off" : "Comments on"}
+            active={closeComments}
+            onClick={() => setCloseComments((v) => !v)}
+          >
+            {closeComments ? <MessageCircleOff size={13} /> : <MessageCircle size={13} />}
+          </RoomButton>
         </div>
 
         {scheduleError && (

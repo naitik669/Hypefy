@@ -18,7 +18,7 @@ import {
   scheduleState,
 } from "@/lib/post-compose";
 import { PostLeaveSheet } from "@/components/create/CreateExtras";
-import { Image as ImageIcon, X, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Image as ImageIcon, X, Crop, Plus, Music, FileText, BarChart2, Clock, CalendarClock, ChevronLeft, ChevronRight, MessageCircle, MessageCircleOff } from "lucide-react";
 import { SendIcon } from "@/components/ui/ShareIcon";
 import Link from "next/link";
 import { extractHashtags, extractMentions } from "@/lib/content-utils";
@@ -35,6 +35,7 @@ import { TrackChip } from "@/components/music/TrackChip";
 import { PostPreview, type PreviewAuthor } from "@/components/post/PostPreview";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SchedulePicker } from "@/components/post/SchedulePicker";
+import { haptics } from "@/lib/haptics";
 import type { Track } from "@/lib/music";
 
 // One number, shared with the bucket ceiling 0197 sets. These were two
@@ -216,6 +217,15 @@ export function PostComposer({
   const [track, setTrack] = useState<Track | null>(null);
   const [trackPickerOpen, setTrackPickerOpen] = useState(false);
   const [schedulePickerOpen, setSchedulePickerOpen] = useState(false);
+  /**
+   * Comments closed from the moment it exists.
+   *
+   * The only route to this was the actions sheet on a post that was
+   * already up, so closing comments meant publishing it open and then
+   * closing it — and the post is live and open in between. For the one
+   * kind of post somebody most wants closed, that is the wrong window.
+   */
+  const [closeComments, setCloseComments] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
   // Poll: null = no poll; otherwise 2-4 option strings (blanks dropped on post).
   const [pollOptions, setPollOptions] = useState<string[] | null>(null);
@@ -605,6 +615,7 @@ export function PostComposer({
       // Only meaningful with photos; a text-only post has no frame to keep.
       aspectRatio: imgs.length ? postAspect : null,
       scheduledAt: willSchedule ? new Date(scheduleAt!).toISOString() : null,
+      commentsOff: closeComments,
     });
     try {
       localStorage.removeItem(DRAFT_KEY);
@@ -1106,6 +1117,25 @@ export function PostComposer({
                   </p>
                 </div>
               )}
+
+              <button
+                type="button"
+                aria-pressed={closeComments}
+                data-close-comments={closeComments ? "on" : "off"}
+                onClick={() => {
+                  haptics.select();
+                  setCloseComments((v) => !v);
+                }}
+                className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-white/[0.03]"
+              >
+                {closeComments ? (
+                  <MessageCircleOff size={16} className="shrink-0 text-accent" />
+                ) : (
+                  <MessageCircle size={16} className="shrink-0 text-muted" />
+                )}
+                <span className="flex-1 text-sm font-semibold">Comments</span>
+                <span className="text-xs text-faint">{closeComments ? "Off" : "On"}</span>
+              </button>
 
               {scheduleAt === null ? (
                 <button

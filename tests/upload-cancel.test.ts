@@ -24,6 +24,9 @@ import { UploadCancelled, isCancelled, worthRetrying } from "@/lib/upload-error"
 
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const up = read("src/components/upload/UploadProvider.tsx");
+const status = read("src/components/upload/UploadStatus.tsx");
+const layout = read("src/app/(app)/layout.tsx");
+const home = read("src/app/(app)/home/page.tsx");
 
 describe("cancelling", () => {
   it("is its own kind of ending, not a failure", () => {
@@ -73,11 +76,36 @@ describe("cancelling", () => {
     expect((up.match(/cancelled\.current = false;/g) ?? [])).toHaveLength(2);
   });
 
-  it("and both surfaces offer it", () => {
-    // Both, counted. The post bar and the Shot card are separate
-    // components that never show each other's kind, so one button is one
-    // surface without a way out.
-    expect((up.match(/onClick=\{cancelUpload\}/g) ?? [])).toHaveLength(2);
+  it("and the one surface that reports an upload offers it", () => {
+    // This counted TWO, because there were two components: a bar at the top
+    // of Home that drew nothing for a Shot, and a card above the navbar that
+    // drew nothing for a post. Sharing a post and walking to another tab left
+    // nothing on screen at all — still uploading, with no way to watch it,
+    // cancel it, or learn that it had failed.
+    //
+    // One now, so one is the right count. The guarantees under it are the
+    // stronger ones: nothing bails out by kind any more.
+    expect((status.match(/onClick=\{cancelUpload\}/g) ?? [])).toHaveLength(1);
+  });
+
+  it("and that surface covers both kinds", () => {
+    // The exact shape of the old bug: an early return keyed on the kind.
+    expect(status).not.toContain('active === "shot"');
+    expect(status).not.toContain('active !== "shot"');
+    expect(status).toContain("const kind = failed?.kind ?? active;");
+  });
+
+  it("and neither of the two it replaced is left behind", () => {
+    // A dead copy still exported is a dead copy somebody renders again.
+    expect(up).not.toContain("UploadProgressBar");
+    expect(up).not.toContain("ShotUploadCard");
+    expect(home).not.toContain("UploadProgressBar");
+  });
+
+  it("rendered from the layout, so it survives walking to another tab", () => {
+    // The whole point. Rendered by a page it disappears the moment you
+    // navigate, which is exactly when a long upload is still running.
+    expect(layout).toContain("<UploadStatus />");
   });
 });
 
@@ -86,13 +114,13 @@ describe("the banner says what happened", () => {
     // It said "Couldn't share your post." whatever had happened, so the one
     // surface that stays on screen was the one that never told you
     // anything — the specific message was only ever in a toast.
-    expect(up).toContain("{failed.message}");
-    expect(up).not.toContain("Couldn&apos;t share your post.");
-    expect(up).not.toContain("Couldn&apos;t post your Shot.");
+    expect(status).toContain("{failed!.message}");
+    expect(status).not.toContain("Couldn&apos;t share your post.");
+    expect(status).not.toContain("Couldn&apos;t post your Shot.");
   });
 
   it("and only offers Retry where a retry could work", () => {
-    expect((up.match(/\{failed\.canRetry && \(/g) ?? [])).toHaveLength(2);
+    expect((status.match(/\{failed!\.canRetry && \(/g) ?? [])).toHaveLength(1);
   });
 
   it("with worthRetrying actually deciding it", () => {
@@ -104,11 +132,20 @@ describe("the banner says what happened", () => {
   });
 });
 
-describe("the Shot card sits off the bar's own height", () => {
+describe("the status card sits off the bar's own height", () => {
   it("not a second copy of 72px", () => {
     // The last hardcoded copy. --nav-h and the things above it were two
     // numbers that disagreed by the gesture inset once already.
-    expect(up).toContain("bottom-[calc(var(--nav-h)+var(--sab))]");
-    expect(up).not.toContain("calc(72px");
+    expect(status).toContain("bottom-[calc(var(--nav-h)+var(--sab))]");
+    expect(status).not.toContain("calc(72px");
+  });
+
+  it("and announces itself, since it can appear while you read another tab", () => {
+    // The one case a screen reader user has no other way to learn about: an
+    // upload that fails somewhere they are not looking.
+    expect(status).toContain('role="status"');
+    expect(status).toContain('aria-live="polite"');
+    expect(status).toContain('role="progressbar"');
+    expect(status).toContain("aria-valuenow={Math.round(progress ?? 0)}");
   });
 });

@@ -4,7 +4,6 @@ import { shrinkForUpload } from "@/lib/post-image";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { hashImageFile } from "@/lib/media-hash-client";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -22,7 +21,9 @@ import {
 import { coverOf, imageUrlsOf, type PostSlot } from "@/lib/post-media";
 import type { PostPick } from "@/lib/post-compose";
 import type { ShowAudience } from "@/lib/show-audience";
+import { setCommentsOff } from "@/lib/post-controls";
 import { clearPending, keepPending, readPending } from "@/lib/pending-upload";
+import { START_PCT, creepCeiling, storedPercent } from "@/lib/upload-progress";
 
 type PostUpload = {
   userId: string;
@@ -36,6 +37,15 @@ type PostUpload = {
   /** width / height the post was composed at; null for text-only posts. The
    *  feed frames the gallery with it instead of forcing every post square. */
   aspectRatio?: number | null;
+  /**
+   * Comments closed from the moment it exists.
+   *
+   * Before 0215 the only route to this was PostActionsSheet, which
+   * meant posting it open and then closing it — and between those two
+   * taps the post is live and open, which for the one kind of post
+   * somebody most wants closed is exactly the wrong window.
+   */
+  commentsOff?: boolean;
   /** ISO timestamp to publish later — routes the post to scheduled_posts. */
   scheduledAt?: string | null;
 };
@@ -56,6 +66,8 @@ type ShotUpload = {
   /** The clip's length and the window that plays. */
   duration: number;
   trim: Trim;
+  /** Comments closed from the moment it exists. See 0215.  */
+  commentsOff?: boolean;
 };
 
 /**
@@ -210,21 +222,36 @@ export function UploadProvider({
   }, [progress]);
 
   const stopTrickle = () => { if (trickle.current) { clearInterval(trickle.current); trickle.current = null; } };
-  const startTrickle = () => {
+  /**
+   * Keep the bar alive between real milestones, up to a ceiling.
+   *
+   * storage.upload() reports nothing while a request body is in flight, so
+   * something has to move or the bar looks wedged. What changed is the
+   * ceiling: this used to creep to 90% whatever was happening, so a bar at
+   * 88% might have had one byte left or eight megabytes. The caller now says
+   * where the NEXT real milestone lands and the creep stops short of it, so
+   * the distance it invents is bounded by the file in flight rather than by
+   * a constant.
+   */
+  const startTrickle = (ceiling: number) => {
     stopTrickle();
-    // Storage uploads don't expose byte progress, so creep toward 90% so the
-    // bar always feels alive; real milestones jump it forward.
     trickle.current = setInterval(() => {
-      setProgress((p) => (p == null || p >= 90 ? p : p + Math.max(0.4, (92 - p) * 0.03)));
+      setProgress((p) =>
+        p == null || p >= ceiling ? p : p + Math.max(0.3, (ceiling - p) * 0.06),
+      );
     }, 220);
   };
 
   const uploadPost = useCallback(async (a: PostUpload) => {
     setActive("post");
-    setProgress(6);
+    setProgress(START_PCT);
     setFailed(null);
     cancelled.current = false;
-    startTrickle();
+    // What the bar is weighted by. Taken once, before anything is sent:
+      // four photos of 200KB, 200KB, 200KB and 9MB used to report three
+    // quarters done with nine tenths of the bytes still to go.
+    const sizes = a.files.map((f) => f.file.size);
+    startTrickle(creepCeiling(sizes, 0));
     /*
      * Written down before a byte goes, so closing the app mid-upload does
      * not lose the work. Not awaited: the upload should not wait on a
@@ -242,6 +269,7 @@ export function UploadProvider({
       poll: a.poll ?? null,
       aspectRatio: a.aspectRatio ?? null,
       scheduledAt: a.scheduledAt ?? null,
+      commentsOff: !!a.commentsOff,
     });
     // What has actually landed in the bucket, so a failure part-way through
     // can take it back out again. Outside the try so the catch can see it.
@@ -279,6 +307,9 @@ export function UploadProvider({
         // aborted, so this is the first moment stopping is possible.
         bailIfCancelled();
         const pick = a.files[i];
+        // Re-aimed at this file's own boundary, so a small file's creep
+        // covers a little and a large one's covers a lot.
+        startTrickle(creepCeiling(sizes, i));
 
         if (pick.kind === "video") {
           const localUrl = URL.createObjectURL(pick.file);
@@ -333,7 +364,7 @@ export function UploadProvider({
           } finally {
             URL.revokeObjectURL(localUrl);
           }
-          setProgress(Math.min(85, 10 + ((i + 1) / a.files.length) * 72));
+          setProgress(storedPercent(sizes, i + 1));
           continue;
         }
 
@@ -354,7 +385,7 @@ export function UploadProvider({
           url: supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl,
           alt: pick.alt,
         });
-        setProgress(Math.min(85, 10 + ((i + 1) / a.files.length) * 72));
+        setProgress(storedPercent(sizes, i + 1));
       }
 
       // The photos, in order, for every reader that predates `media`.
@@ -391,7 +422,9 @@ export function UploadProvider({
       if (a.scheduledAt) {
         const { error: insErr } = await supabase
           .from("scheduled_posts")
-          .insert({ ...record, scheduled_at: a.scheduledAt });
+          // Carried rather than applied: the row in posts does not exist
+          // yet, so the choice has to survive until pg_cron makes it. See 0215.
+          .insert({ ...record, scheduled_at: a.scheduledAt, comments_off: !!a.commentsOff });
         if (insErr) throw insErr;
         // No fingerprints for a scheduled post: it becomes a row in `posts`
         // with a different id when pg_cron publishes it, and there is nothing
@@ -403,6 +436,10 @@ export function UploadProvider({
           .select("id")
           .single();
         if (insErr) throw insErr;
+        // comments_off is SELECT-only for authenticated on purpose, so this
+        // goes through the definer function rather than into the insert.
+        // Only when it was asked for: the column already defaults to open.
+        if (a.commentsOff) await setCommentsOff(supabase, "post", created.id, true);
         // Recorded after the post exists, so a takedown can find them. Not
         // awaited as a group with the insert: a fingerprint that fails to
         // write is a weaker blocklist later, not a post that failed now.
@@ -454,10 +491,13 @@ export function UploadProvider({
    */
   const uploadShot = useCallback(async (a: ShotUpload) => {
     setActive("shot");
-    setProgress(6);
+    setProgress(START_PCT);
     setFailed(null);
     cancelled.current = false;
-    startTrickle();
+    // One file, so one boundary: the clip itself. Its poster is a fraction
+    // of its size and is uploaded after, inside the same span.
+    const sizes = [a.file.size];
+    startTrickle(creepCeiling(sizes, 0));
     void keepPending({
       kind: "shot",
       userId: a.userId,
@@ -471,6 +511,7 @@ export function UploadProvider({
       trim: a.trim,
       audience: a.audience,
       scheduledAt: a.scheduledAt ?? null,
+      commentsOff: !!a.commentsOff,
     });
     // Its own object URL: the composer that made one has already unmounted
     // and revoked it by the time the poster is captured.
@@ -524,7 +565,7 @@ export function UploadProvider({
         .upload(path, a.file, { contentType: uploadContentType(a.file), upsert: false });
       if (upErr) throw upErr;
       stored.push({ bucket: "shot-media", path });
-      setProgress(80);
+      setProgress(storedPercent(sizes, 1));
       const mediaUrl = supabase.storage.from("shot-media").getPublicUrl(path).data.publicUrl;
 
       // Best effort: a Shot with no poster still plays, so a failure here
@@ -567,6 +608,7 @@ export function UploadProvider({
           duration_secs: a.duration > 0 ? Number(a.duration.toFixed(3)) : null,
           audience: a.audience,
           scheduled_at: a.scheduledAt,
+          comments_off: !!a.commentsOff,
           ...trimToStore(a.trim, a.duration),
         });
         if (schErr) throw schErr;
@@ -592,6 +634,10 @@ export function UploadProvider({
         ...trimToStore(a.trim, a.duration),
       }).select("id").single();
       if (insErr) throw insErr;
+
+      // Through the definer function: comments_off is SELECT-only for
+      // authenticated, and only touched when it was actually asked for.
+      if (a.commentsOff) await setCommentsOff(supabase, "shot", createdShot.id, true);
 
       // Recorded against the Shot now it exists, so a later takedown can
       // find it — the same arrangement the post path has had since 0157.
@@ -686,136 +732,5 @@ export function UploadProvider({
     >
       {children}
     </UploadCtx.Provider>
-  );
-}
-
-/**
- * Upload status — rendered on Home beneath the Shows row. Shows the thin
- * progress line while uploading, or a retry banner when the last upload failed.
- */
-export function UploadProgressBar() {
-  const { progress, active, failed, retryUpload, dismissFailed, cancelUpload } = useUpload();
-
-  if (active === "shot" || failed?.kind === "shot") return null;
-
-  if (progress == null && failed) {
-    return (
-      <div className="flex items-center gap-3 border-b border-border/60 bg-danger/10 px-4 py-2.5">
-        {/* The reason, not a literal. This said "Couldn't share your post."
-            whatever had happened, so the one surface that stays on screen
-            was the one that never told you anything. */}
-        <p className="min-w-0 flex-1 text-sm font-medium text-foreground">{failed.message}</p>
-        {failed.canRetry && (
-          <button
-            type="button"
-            onClick={retryUpload}
-            className="shrink-0 rounded-pill bg-accent px-3.5 py-1.5 text-xs font-bold text-accent-ink transition-transform active:scale-95"
-          >
-            Retry
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={dismissFailed}
-          aria-label="Dismiss"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:text-foreground"
-        >
-          <X size={16} />
-        </button>
-      </div>
-    );
-  }
-
-  if (progress == null) return null;
-  return (
-    <div className="flex items-center gap-2 border-b border-border/60 px-4 py-1.5">
-      <div className="h-0.5 min-w-0 flex-1 bg-border/40">
-        <div
-          className="h-full bg-accent transition-[width] duration-300 ease-out"
-          style={{ width: `${progress}%`, boxShadow: "0 0 8px rgba(163,230,53,0.6)" }}
-        />
-      </div>
-      <button
-        type="button"
-        onClick={cancelUpload}
-        className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-muted transition-colors hover:text-foreground"
-      >
-        Cancel
-      </button>
-    </div>
-  );
-}
-
-/**
- * A Shot on its way up, from wherever you are.
- *
- * Posting a Shot lands you on /shots, where Home's inline bar is not
- * rendered — and the Shots feed is a fixed, full-screen surface with nothing
- * to slot a bar into. So this floats above the tab bar instead, and is the
- * only place a Shot upload reports itself. It is deliberately not the same
- * component as the post bar: the two live on different screens and neither
- * ever shows the other's kind.
- */
-export function ShotUploadCard() {
-  const { progress, active, failed, retryUpload, dismissFailed, cancelUpload } = useUpload();
-
-  const isShotFailure = failed?.kind === "shot";
-  if (!isShotFailure && active !== "shot") return null;
-  if (progress == null && !isShotFailure) return null;
-
-  return (
-    /* --nav-h, not a second copy of 72. The bar's height and the things
-       that sit above it were two numbers that disagreed by the gesture
-       inset once already; this was the last hardcoded copy left. */
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--nav-h)+var(--sab))] z-[120] flex justify-center px-3">
-      <div className="pointer-events-auto flex w-full max-w-[420px] items-center gap-3 rounded-2xl border border-border bg-elevated/95 px-4 py-3 shadow-lg backdrop-blur-xl">
-        {isShotFailure ? (
-          <>
-            <p className="min-w-0 flex-1 text-sm font-semibold">{failed.message}</p>
-            {failed.canRetry && (
-              <button
-                type="button"
-                onClick={retryUpload}
-                className="shrink-0 rounded-pill bg-accent px-3.5 py-1.5 text-xs font-bold text-accent-ink transition-transform active:scale-95"
-              >
-                Retry
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={dismissFailed}
-              aria-label="Dismiss"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:text-foreground"
-            >
-              <X size={16} />
-            </button>
-          </>
-        ) : (
-          <>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold">Posting your Shot…</span>
-              <span className="mt-1.5 block h-1 w-full overflow-hidden rounded-pill bg-border/60">
-                <span
-                  className="block h-full rounded-pill bg-accent transition-[width] duration-300 ease-out"
-                  style={{ width: `${progress ?? 0}%` }}
-                />
-              </span>
-            </span>
-            <span className="shrink-0 text-xs font-bold tabular-nums text-muted">
-              {Math.round(progress ?? 0)}%
-            </span>
-            {/* A Shot is the fifty-megabyte one. If cancelling belongs
-                anywhere it belongs here. */}
-            <button
-              type="button"
-              onClick={cancelUpload}
-              className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-muted transition-colors hover:text-foreground"
-            >
-              Cancel
-            </button>
-          </>
-        )}
-      </div>
-    </div>
   );
 }

@@ -29,7 +29,10 @@ export function CreatorTabs({ tab }: { tab: CreatorTab }) {
       style={underHeaderStyle(hidden)}
       className="sticky z-10 chrome-bar border-b border-border/60 px-4 pb-2.5 pt-2"
     >
-      <div role="tablist" aria-label="Creator tools" className="flex gap-1 rounded-pill bg-surface p-1">
+      {/* nav, not role="tablist": these are links that load a page, and
+          the tab pattern would promise arrow-key navigation that cannot
+          exist here. See aria-current below. */}
+      <nav aria-label="Creator tools" className="flex gap-1 rounded-pill bg-surface p-1">
         {CREATOR_TABS.map((id) => {
           const { label, Icon } = LABELS[id];
           const on = id === tab;
@@ -37,8 +40,7 @@ export function CreatorTabs({ tab }: { tab: CreatorTab }) {
             <Link
               key={id}
               href={id === "overview" ? "/creator" : `/creator?tab=${id}`}
-              role="tab"
-              aria-selected={on}
+              aria-current={on ? "page" : undefined}
               data-creator-tab={id}
               prefetch={false}
               className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-pill px-1.5 py-2 text-xs font-bold transition-colors ${
@@ -50,7 +52,7 @@ export function CreatorTabs({ tab }: { tab: CreatorTab }) {
             </Link>
           );
         })}
-      </div>
+      </nav>
     </div>
   );
 }

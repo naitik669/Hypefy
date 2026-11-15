@@ -167,7 +167,9 @@ export function ItemDetailSheet({ item, onClose }: { item: ItemRow | null; onClo
           {loading && !shares ? (
             <Waiting />
           ) : sharedTotal === 0 ? (
-            <p className="px-1 py-1 text-xs text-faint">Not shared anywhere yet.</p>
+            // A div, not a p: dl takes dt/dd pairs and div groups, and a
+            // bare p inside one is invalid markup.
+            <div className="px-1 py-1 text-xs text-faint">Not shared anywhere yet.</div>
           ) : (
             SHARE_DESTINATIONS.filter((d) => num(shares?.[d.key]) > 0).map((d) => (
               <Row key={d.key} label={d.label} value={formatCount(num(shares?.[d.key]))} />
@@ -185,9 +187,11 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
       <h3 className="px-1 pb-1.5 text-xs font-bold uppercase tracking-widest text-faint">
         {title}
       </h3>
-      <div className="divide-y divide-border/60 rounded-2xl border border-border bg-surface px-3">
+      {/* A definition list, so each line is read as the pair it is —
+          “Views, 2,087” rather than two unrelated runs of text. */}
+      <dl className="divide-y divide-border/60 rounded-2xl border border-border bg-surface px-3">
         {children}
-      </div>
+      </dl>
     </section>
   );
 }
@@ -195,11 +199,11 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 function Row({ label, value, foot }: { label: string; value: string; foot?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-2.5">
-      <span className="min-w-0 text-sm text-muted">
+      <dt className="min-w-0 text-sm text-muted">
         {label}
         {foot && <span className="block text-[11px] text-faint">{foot}</span>}
-      </span>
-      <span className="shrink-0 text-sm font-bold tabular-nums">{value}</span>
+      </dt>
+      <dd className="m-0 shrink-0 text-sm font-bold tabular-nums">{value}</dd>
     </div>
   );
 }

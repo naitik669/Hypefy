@@ -8,7 +8,6 @@ import { ShowsRow } from "@/components/home/ShowsRow";
 import { FeedList } from "@/components/feed/FeedList";
 import { HintPointer } from "@/components/ui/CoachMarks";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
-import { UploadProgressBar } from "@/components/upload/UploadProvider";
 import {
   feedScore,
   diversify,
@@ -602,7 +601,6 @@ export default async function HomePage() {
           ]}
         />
 
-        <UploadProgressBar />
 
         {/* Always the feed — FeedList renders the warm-up prompt at the END
             when there's nothing (more) to scroll, so it never opens on a

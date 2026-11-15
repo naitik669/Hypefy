@@ -15,6 +15,20 @@
 export const MAX_SHOT_SECS = 60;
 
 /**
+ * The longest a video Show may play.
+ *
+ * Not a new rule — the viewer has capped a video Show at 30 seconds on
+ * screen since show-media was written, however long the file is, so a run
+ * of Shows cannot trap you behind one clip. What a Show never had was any
+ * say in WHICH 30 seconds: it was always the first.
+ *
+ * Kept equal to SHOW_VIDEO_MAX_MS by the test that reads both. The editor
+ * and the viewer disagreeing about the length would mean choosing a window
+ * the viewer then ignores, which is worse than not offering the choice.
+ */
+export const MAX_SHOW_SECS = 30;
+
+/**
  * The shortest a Shot may play.
  *
  * Below about a second a Shot is a flicker rather than a thing to watch, and
@@ -29,8 +43,8 @@ const PRECISION = 3;
 const round = (n: number) => Number(n.toFixed(PRECISION));
 
 /** A clip this long cannot be posted whole. */
-export function needsTrim(duration: number): boolean {
-  return Number.isFinite(duration) && duration > MAX_SHOT_SECS;
+export function needsTrim(duration: number, maxSecs = MAX_SHOT_SECS): boolean {
+  return Number.isFinite(duration) && duration > maxSecs;
 }
 
 /** A clip this short cannot be posted at all, trimmed or not. */
@@ -48,9 +62,9 @@ export type Trim = { start: number; end: number };
  * one opens on its first allowed minute, because the start of a clip is far
  * more often the wanted part than the middle.
  */
-export function defaultTrim(duration: number): Trim {
+export function defaultTrim(duration: number, maxSecs = MAX_SHOT_SECS): Trim {
   if (!Number.isFinite(duration) || duration <= 0) return { start: 0, end: 0 };
-  return { start: 0, end: round(Math.min(duration, MAX_SHOT_SECS)) };
+  return { start: 0, end: round(Math.min(duration, maxSecs)) };
 }
 
 /**
@@ -60,9 +74,14 @@ export function defaultTrim(duration: number): Trim {
  * start dragged past the end pushes the end along rather than swapping them,
  * which is what dragging feels like it should do.
  */
-export function clampTrim(start: number, end: number, duration: number): Trim {
+export function clampTrim(
+  start: number,
+  end: number,
+  duration: number,
+  maxSecs = MAX_SHOT_SECS,
+): Trim {
   if (!Number.isFinite(duration) || duration <= 0) return { start: 0, end: 0 };
-  const span = Math.min(duration, MAX_SHOT_SECS);
+  const span = Math.min(duration, maxSecs);
   const floor = Math.min(MIN_SHOT_SECS, duration);
 
   let s = Math.min(Math.max(0, start), Math.max(0, duration - floor));
