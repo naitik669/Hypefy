@@ -17,6 +17,7 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { headers } from "next/headers";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
+import { InstallKv } from "@/components/providers/InstallKv";
 import { ConsentBanner } from "@/components/consent/ConsentBanner";
 import { PostAuthTasks } from "@/components/auth/PostAuthTasks";
 import { SavedAccountSync } from "@/components/auth/SavedAccountSync";
@@ -197,6 +198,10 @@ export default async function RootLayout({
             Vercel, so local dev and the Android build are unaffected.
             The native shell loads app.hypefy.chat, so app traffic is measured
             here too rather than needing a separate mobile SDK. */}
+        {/* Hands @hypefy/core the web key-value store before anything
+            reads from it. Renders nothing; see InstallKv for why it is a
+            component rather than a bare import. */}
+        <InstallKv />
         <Analytics />
         {/* Google Analytics 4. Separate from Vercel's above, which is
             server-side and cookieless and measures delivery rather than

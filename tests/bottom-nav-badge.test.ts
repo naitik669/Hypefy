@@ -49,6 +49,38 @@ vi.mock("@/components/layout/AccountSwitchPad", () => ({ AccountSwitchPad: passt
 vi.mock("@/components/ui/Avatar", () => ({ Avatar: () => createElement("div") }));
 vi.mock("@/lib/haptics", () => ({ haptics: { tap: () => {}, select: () => {} } }));
 
+/**
+ * The two icon barrels, stubbed.
+ *
+ * Not for isolation — for time. `@phosphor-icons/react` is one module
+ * exporting every icon in the set, and importing BottomNav made Vite
+ * compile the whole of it. The first test here took 5.4 seconds on its own,
+ * then timed out at thirty under a full-suite run: a test failing on the
+ * clock rather than on anything it was checking.
+ *
+ * Named explicitly rather than through a Proxy. A Proxy namespace is the
+ * tidier-looking version and it does not work — Vitest needs a real module
+ * object, and handing it one that answers every property made the run hang
+ * rather than fail. An icon added to BottomNav later arrives here as
+ * undefined and React says so loudly, which is a good enough signal.
+ */
+const Icon = () => createElement("span");
+vi.mock("@phosphor-icons/react", () => ({
+  House: Icon,
+  Chat: Icon,
+  Lightning: Icon,
+  Plus: Icon,
+  ImageSquare: Icon,
+  FilmSlate: Icon,
+  Broadcast: Icon,
+}));
+vi.mock("lucide-react", () => ({
+  LibraryBig: Icon,
+  Search: Icon,
+  Settings: Icon,
+  ShoppingBag: Icon,
+}));
+
 let root: Root;
 let host: HTMLDivElement;
 

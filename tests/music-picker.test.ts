@@ -56,12 +56,50 @@ describe("what you looked for last", () => {
     expect(loadRecentSearches()).toEqual([]);
   });
 
+  /**
+   * Two guards that were only ever exercised through the writer, so
+   * removing either left the suite green.
+   *
+   * Both matter for the same reason: what is in storage was not necessarily
+   * put there by this version of the code. A list written by an older build
+   * with a larger cap, or a value hand-edited, arrives here as-is.
+   */
+  it("caps a list that was stored longer than the cap", () => {
+    const tooMany = Array.from({ length: 25 }, (_, i) => `q${i}`);
+    localStorage.setItem("hypefy:music:recent", JSON.stringify(tooMany));
+    expect(loadRecentSearches()).toHaveLength(RECENT_MAX);
+    expect(loadRecentSearches()[0]).toBe("q0");
+  });
+
+  it("and refuses a stored list that is not all strings", () => {
+    // The picker renders these straight into a list. A number or an object
+    // reaching it would render as "[object Object]" at best.
+    localStorage.setItem("hypefy:music:recent", JSON.stringify(["ok", 7, { a: 1 }, null]));
+    expect(loadRecentSearches()).toEqual([]);
+  });
+
   it("stays on the device", () => {
     // A half-typed search is a thought, not a setting; syncing those
     // between phones is a privacy cost with nothing on the other side.
-    const lib = read("src/lib/recent-searches.ts");
-    expect(lib).toContain("localStorage");
+    //
+    // This asserted `toContain("localStorage")` while the module lived in
+    // src/lib. It now lives in @hypefy/core behind the Kv interface, which
+    // is what lets the native client keep the same list in MMKV — and core
+    // may not mention localStorage at all, so the old spelling of this
+    // guarantee had to change with it.
+    //
+    // A GENUINE assertion change, not a path literal: what is checked is
+    // different text. The guarantee is the same one and is still the point —
+    // device-local storage, and no server anywhere near it.
+    const lib = read("packages/core/src/recent-searches.ts");
+    expect(lib).toContain("@hypefy/core/kv");
     expect(lib).not.toContain("supabase");
+    expect(lib).not.toContain("fetch(");
+    // And the store it reaches for is a device store rather than the
+    // network: the interface itself is three synchronous methods.
+    const kvSrc = read("packages/core/src/kv.ts");
+    expect(kvSrc).not.toContain("supabase");
+    expect(kvSrc).not.toContain("fetch(");
   });
 });
 
