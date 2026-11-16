@@ -148,6 +148,71 @@ export function columnWidth(viewportWidth: number): number {
   return Math.min(w, columns[shapeFor(w)]);
 }
 
+/**
+ * The corner radii, keyed as the CSS custom properties are.
+ *
+ * Three, not a scale: `card` is every card and most panels, `show` is the
+ * slightly rounder Show frame, and `pill` is a number large enough that the
+ * ends go fully round whatever the height. Everything else in the app uses
+ * Tailwind's own `rounded-2xl` and friends, which the native client will
+ * express in its own terms.
+ *
+ * Here because they were in @theme only, so a native client would have had a
+ * second copy of them — the same way the palette would have.
+ */
+export const radii = {
+  card: 16,
+  show: 18,
+  /** Not a radius so much as "as round as this can go". */
+  pill: 100,
+} as const;
+
+export type RadiusName = keyof typeof radii;
+
+/** The CSS custom-property name for a radius, e.g. card -> --radius-card. */
+export function radiusVarName(name: RadiusName): string {
+  return `--radius-${name}`;
+}
+
+/**
+ * The typeface, and the weights the app actually uses.
+ *
+ * The web loads Plus Jakarta Sans as a VARIABLE font through next/font, so
+ * every weight in its range works without naming any of them. React Native
+ * does not do that reliably: it wants one file per weight, registered by
+ * name. So the weights are listed here, measured from the 1,234 font-*
+ * classes in use rather than guessed.
+ *
+ * `black` is 900 on the web and Plus Jakarta Sans only goes to 800 — so the
+ * 33 `font-black` sites are already being rendered at 800 by the variable
+ * font clamping the request. Native should map it to 800 deliberately rather
+ * than ask for a file that does not exist.
+ */
+export const fonts = {
+  /** The family, as next/font and Google Fonts name it. */
+  sans: "Plus Jakarta Sans",
+  /** Fallbacks for the web, in order. */
+  sansFallback: ["system-ui", "sans-serif"],
+} as const;
+
+/** CSS weight -> the file weight to ship on native. */
+export const weights = {
+  normal: 400,
+  medium: 500,
+  semibold: 600,
+  bold: 700,
+  extrabold: 800,
+  /** 900 clamps to 800: the family has nothing heavier. */
+  black: 800,
+} as const;
+
+export type WeightName = keyof typeof weights;
+
+/** The distinct font files a native client has to bundle. */
+export function nativeFontWeights(): number[] {
+  return [...new Set(Object.values(weights))].sort((a, b) => a - b);
+}
+
 /** The CSS custom-property name for a colour, e.g. accentInk -> --color-accent-ink. */
 export function cssVarName(name: ColorName): string {
   return `--color-${name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;

@@ -84,6 +84,96 @@ test.describe("security headers reach the browser", () => {
     expect(h["strict-transport-security"] ?? "").toContain("max-age=");
   });
 
+  /**
+   * The CSP, which is report-only on purpose.
+   *
+   * There was none at all, and that matters more here than on most apps:
+   * saved-accounts.ts keeps every signed-in account's Supabase refresh token
+   * in localStorage so the account switcher can call setSession() with it.
+   * Any script on this origin reads those, and a refresh token is a durable
+   * credential — persistent takeover of every account that ever signed in on
+   * that browser, not a defaced page.
+   *
+   * Report-only because the app loads third-party script from Google's ad
+   * network, Tag Manager, Razorpay and Spotify, and an enforcing policy with
+   * one origin wrong breaks that feature silently for everybody.
+   */
+  test("a report-only CSP reaches the browser", async ({ request }) => {
+    const res = await request.get("/signin");
+    const csp = res.headers()["content-security-policy-report-only"] ?? "";
+    expect(csp, "no report-only CSP header").not.toBe("");
+
+    // Enforcing by accident is the thing to catch: the enforcing header must
+    // NOT be set, or a wrong origin takes the app down rather than reporting.
+    expect(
+      res.headers()["content-security-policy"],
+      "the CSP is ENFORCING — that was meant to be a later, separate change",
+    ).toBeUndefined();
+  });
+
+  test("and it names the directives that actually matter", async ({ request }) => {
+    const res = await request.get("/signin");
+    const csp = res.headers()["content-security-policy-report-only"] ?? "";
+    for (const directive of [
+      "default-src 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "report-uri /api/csp-report",
+    ]) {
+      expect(csp, `${directive} is missing`).toContain(directive);
+    }
+    // The third-party script origins the app genuinely loads. A policy that
+    // omits one of these would bury the real findings in known noise.
+    for (const origin of [
+      "pagead2.googlesyndication.com",
+      "checkout.razorpay.com",
+      "sdk.scdn.co",
+    ]) {
+      expect(csp, `${origin} is not allowed for script`).toContain(origin);
+    }
+  });
+
+  test("violations have somewhere to go", async ({ request }) => {
+    // The browser POSTs the old report-uri shape.
+    const res = await request.post("/api/csp-report", {
+      headers: { "content-type": "application/csp-report" },
+      data: {
+        "csp-report": {
+          "document-uri": "https://app.hypefy.chat/signin",
+          "effective-directive": "script-src",
+          "blocked-uri": "https://evil.example.com/x.js",
+          disposition: "report",
+        },
+      },
+    });
+    expect(res.status()).toBe(204);
+  });
+
+  test("and the collector rejects a report with nothing in it", async ({ request }) => {
+    // Otherwise an unauthenticated endpoint happily records empty noise.
+    const res = await request.post("/api/csp-report", { data: { "csp-report": {} } });
+    expect(res.status()).toBe(400);
+  });
+
+  test("the collector also takes the Reporting API shape", async ({ request }) => {
+    // Newer browsers post an array of { body } via report-to rather than a
+    // single { "csp-report" } object.
+    const res = await request.post("/api/csp-report", {
+      data: [
+        {
+          body: {
+            effectiveDirective: "img-src",
+            blockedURL: "https://evil.example.com/pixel.gif",
+            documentURL: "https://app.hypefy.chat/home",
+          },
+        },
+      ],
+    });
+    expect(res.status()).toBe(204);
+  });
+
   test("and the app is not marked noindex", async ({ request }) => {
     // X-Robots-Tag was deliberately removed when the app stopped being
     // invite-only: with it, shared profiles, posts and Shots — and the
