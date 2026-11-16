@@ -2035,7 +2035,7 @@ export function RealChatView({
   }
 
   return (
-    <div data-chat-view className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col overflow-hidden bg-background">
+    <div data-chat-view className="fixed inset-0 z-50 mx-auto flex app-column flex-col overflow-hidden bg-background">
       {/* Header */}
       <header className="flex h-[calc(3.5rem+var(--sat))] items-center gap-2 border-b border-border/60 chrome-bar px-2 pt-[var(--sat)]">
         <button type="button" onClick={() => leaveChatAnimated(() => safeBack(router, "/messages"))} aria-label="Back"

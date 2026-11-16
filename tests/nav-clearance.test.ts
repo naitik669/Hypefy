@@ -89,14 +89,17 @@ describe("room under the bottom bar", () => {
    * must keep frames identical to ReelsFeed's. Named, with the reason, so
    * the list cannot quietly grow.
    */
-  const EDGE_HOLDOUTS = [
-    // ReelsFeed still has 3 react-hooks/set-state-in-effect errors, which
-    // are correctness rather than typing and need a signed-in Shots feed to
-    // verify. Skeletons.tsx has no debt of its own and is only here because
-    // its frame must stay identical to ReelsFeed's — see loading-shapes.
-    "src/components/shots/ReelsFeed.tsx",
-    "src/components/skeletons/Skeletons.tsx",
-  ];
+  /**
+   * No holdouts left.
+   *
+   * There were two, and the reason was the lint ratchet rather than the
+   * layout: it required ZERO eslint errors in every changed file, so
+   * ReelsFeed could not be touched without first paying 5 unrelated errors
+   * in a signed-in video feed. The ratchet compares against a recorded
+   * baseline now, so a one-line positioning fix no longer carries an
+   * unrelated refactor with it.
+   */
+  const EDGE_HOLDOUTS: string[] = [];
 
   /**
    * Scoped to `fixed`, and to the same class string.
@@ -122,10 +125,12 @@ describe("room under the bottom bar", () => {
     return out;
   }
 
-  it("the sweep can see a real offender at all", () => {
-    // ReelsFeed is on the holdout list precisely because it still has one.
-    // If this came back empty the assertion below would pass on nothing.
-    expect(fixedNavOffsets(read("src/components/shots/ReelsFeed.tsx"))).toContain(72);
+  it("the sweep can see an offender at all", () => {
+    // Nothing in src has one any more, so the sweep is checked against a
+    // made-up class string instead. Without this, the assertion below would
+    // pass on a function that had stopped matching anything.
+    expect(fixedNavOffsets(`<div className="fixed inset-x-0 bottom-[72px]" />`)).toContain(72);
+    expect(fixedNavOffsets(`<div className="fixed bottom-[96px]" />`)).toContain(96);
   });
 
   it("and ignores an absolute offset of the same size", () => {
@@ -133,7 +138,7 @@ describe("room under the bottom bar", () => {
     expect(fixedNavOffsets(read("src/components/shows/MusicEditor.tsx"))).toEqual([]);
   });
 
-  it("nor off a bare nav-sized offset, except the two the ratchet holds", () => {
+  it("nor off a bare nav-sized offset, and there are none left", () => {
     const offenders = sourceFiles()
       .filter((f) => fixedNavOffsets(read(f)).length > 0)
       .map((f) => f.split("\\").join("/"))

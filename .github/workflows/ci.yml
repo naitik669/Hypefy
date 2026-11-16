@@ -28,23 +28,28 @@ jobs:
       - name: Lint (whole repo, non-blocking)
         run: npm run lint || true
 
-      # The ratchet. New and changed code must be clean even though the
-      # existing debt is not, so the number goes down over time instead of up.
-      # This is the same comparison the house convention already makes by hand
-      # ("lint the changed files against a stash of main for parity"), moved
-      # into CI so it is not optional.
-      - name: Lint changed files (blocking)
+      # The ratchet, against a recorded baseline (.eslint-debt.json).
+      #
+      # This step used to run `npx eslint $files` and require ZERO errors in
+      # every changed file. That is not a ratchet, it is a freeze: a file
+      # carrying pre-existing debt could not be touched at all. It blocked two
+      # legitimate one-line changes — a CSS class rename could not touch
+      # RealChatView or ReelsFeed without also paying 18 unrelated
+      # no-explicit-any and 12 react-hooks errors in chat and call code, which
+      # cannot be verified without an account and, for the call ones, two
+      # devices. The visible consequence was the chat view and the Shots feed
+      # staying 480px wide on a desktop because their files were untouchable.
+      #
+      # It compares each changed file with its baseline now, and fails in BOTH
+      # directions: more errors is new debt; fewer means the baseline is stale
+      # and must be lowered. Touching a file is when the ratchet clicks.
+      - name: Lint changed files (ratchet)
         if: github.event_name == 'pull_request'
         run: |
           git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
           files=$(git diff --name-only --diff-filter=ACMR \
             "origin/$GITHUB_BASE_REF...HEAD" -- '*.ts' '*.tsx' | tr '\n' ' ')
-          if [ -z "$files" ]; then
-            echo "No TypeScript changed in this PR."
-            exit 0
-          fi
-          echo "Linting: $files"
-          npx eslint $files
+          node scripts/lint-ratchet.mjs $files
 
       - name: Typecheck
         run: npm run typecheck

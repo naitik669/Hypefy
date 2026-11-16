@@ -429,7 +429,7 @@ function IncomingGroup({
 }) {
   useOverlayShield(true, stayOnCall);
   return (
-    <div {...shieldProps} className="animate-page-enter fixed inset-0 z-[230] mx-auto flex max-w-[480px] flex-col items-center justify-between bg-black px-6 py-16">
+    <div {...shieldProps} className="animate-page-enter fixed inset-0 z-[230] mx-auto flex app-column flex-col items-center justify-between bg-black px-6 py-16">
       <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
         <span className="flex h-24 w-24 items-center justify-center rounded-full bg-white/10 text-white">
           <Users size={44} />
@@ -503,7 +503,7 @@ function GroupCallUI({
   const nameById = new Map(call.members.map((m) => [m.id, m]));
 
   return (
-    <div {...shieldProps} className="animate-page-enter fixed inset-0 z-[230] mx-auto flex max-w-[480px] flex-col bg-black">
+    <div {...shieldProps} className="animate-page-enter fixed inset-0 z-[230] mx-auto flex app-column flex-col bg-black">
       <div className="flex items-center justify-between px-4 pt-12 pb-2">
         <p className="text-sm font-bold text-white">{call.title}</p>
         <span className="flex items-center gap-1 rounded-pill bg-white/10 px-2.5 py-1 text-xs font-semibold text-white/80">
