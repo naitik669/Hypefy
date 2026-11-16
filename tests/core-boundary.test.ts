@@ -75,7 +75,12 @@ describe("packages/core is importable from React Native", () => {
 
   const FORBIDDEN_GLOBALS: [string, RegExp][] = [
     ["document", /\bdocument\./],
-    ["window", /\bwindow\./],
+    // `\bwindow\b` and not `\bwindow\.`, which is what this was. A core
+    // module carrying `typeof window === "undefined"` — the guard every one
+    // of the key-value modules had before the Kv interface took it over —
+    // has no dot after window, and sailed straight past. That guard is
+    // precisely the thing a platform-free module should not need.
+    ["window", /\bwindow\b/],
     ["localStorage or sessionStorage", /\b(local|session)Storage\b/],
     ["navigator", /\bnavigator\./],
     ["indexedDB", /\bindexedDB\b/],
