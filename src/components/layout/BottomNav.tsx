@@ -147,10 +147,22 @@ export function BottomNav({
     messagesActiveRef.current = messagesActive;
   }, [messagesActive]);
 
-  // Clear badge immediately when viewing /messages
-  useEffect(() => {
-    if (messagesActive) setUnreadMsgs(0);
-  }, [messagesActive]);
+  /**
+   * Standing on /messages clears the badge.
+   *
+   * Adjusted during render, not in an effect — the same pattern `seen`
+   * above uses, and for the same reason. As an effect this was a setState
+   * called synchronously from one, which react-hooks flags: the bar renders
+   * once with the old count, commits, then immediately renders again with
+   * zero. On the tab you just opened, that is a badge that flashes the
+   * number you came to clear.
+   *
+   * Guarded on the current value so it is not an unconditional setState in
+   * render, which would loop. And genuinely state rather than a derived
+   * `messagesActive ? 0 : unreadMsgs` — leaving the tab must not bring the
+   * old number back, and refresh() deliberately skips while you are on it.
+   */
+  if (messagesActive && unreadMsgs !== 0) setUnreadMsgs(0);
 
   /**
    * Realtime: refetch the count when anything could have changed it.
@@ -199,7 +211,12 @@ export function BottomNav({
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto flex h-[var(--nav-h)] w-full max-w-[480px] items-center justify-around border-t border-border/60 chrome-bar px-2 pb-[var(--sab)]">
+      {/* lg:hidden — the side rail replaces this bar at desktop. Not
+          cosmetic: --nav-space, the room every scroll container leaves below
+          itself for this bar, is overridden to 0 at the same breakpoint. The
+          two have to agree, or the bar sits over content that reserved
+          nothing for it. See tests/responsive-shell.test.ts. */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto flex h-[var(--nav-h)] w-full max-w-[480px] items-center justify-around border-t border-border/60 chrome-bar px-2 pb-[var(--sab)] lg:hidden">
         {/* Tap goes home; holding raises the shortcuts. Search lives here
             rather than as a second icon in the top bar, where it crowded the
             wordmark and looked bolted on. */}
@@ -246,7 +263,20 @@ export function BottomNav({
                 // right below it. The background-coloured ring cuts the bubble's
                 // stroke away behind the badge so the two shapes stay readable
                 // where they overlap.
-                <span className="absolute -right-2 -top-1.5 flex h-[18px] min-w-[18px] animate-react-pop items-center justify-center rounded-full bg-danger px-1 text-[10px] font-black leading-none text-white ring-[3px] ring-background">
+                <span
+                  // The locked dot below carries a label and this did not,
+                  // so the count was announced as a bare "3" with nothing
+                  // saying what of. An aria-label replaces the content for a
+                  // screen reader, so the digits are not read twice.
+                  //
+                  // "conversations", not messages: the number is
+                  // unread_dm_count(), which counts CONVERSATIONS with
+                  // something unread — skipping muted ones and ones you
+                  // spoke in last. Five messages in one chat is 1.
+                  aria-label={`${unreadMsgs} unread ${unreadMsgs === 1 ? "conversation" : "conversations"}`}
+                  data-unread-badge=""
+                  className="absolute -right-2 -top-1.5 flex h-[18px] min-w-[18px] animate-react-pop items-center justify-center rounded-full bg-danger px-1 text-[10px] font-black leading-none text-white ring-[3px] ring-background"
+                >
                   {unreadMsgs > 9 ? "9+" : unreadMsgs}
                 </span>
               )}
