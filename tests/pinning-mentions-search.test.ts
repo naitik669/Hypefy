@@ -119,7 +119,7 @@ describe("who can reach you by mentioning you", () => {
     // Not in the public column grant (0130), so it comes with the owner's own fields.
     expect(read("supabase/migrations/0130_private_profile_columns.sql")).not.toContain("mention_privacy");
     expect(sql).toContain("'mention_privacy', p.mention_privacy");
-    expect(read("src/lib/profile.ts")).toContain("mentionPrivacy:");
+    expect(read("packages/core/src/profile.ts")).toContain("mentionPrivacy:");
   });
 
   it("the Privacy screen offers all three, and says what the setting actually does", () => {

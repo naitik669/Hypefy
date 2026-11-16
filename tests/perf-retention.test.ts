@@ -55,7 +55,7 @@ describe("the signed-in user is asked for once per request", () => {
     // It is imported by client components, which cannot reach the cached
     // helper — so the old behaviour has to survive, and an explicit null
     // must not be mistaken for "not supplied".
-    const profile = read("src/lib/profile.ts");
+    const profile = read("packages/core/src/profile.ts");
     expect(profile).toContain("if (user === undefined) {");
     expect(profile).not.toContain('import { cache } from "react"');
   });

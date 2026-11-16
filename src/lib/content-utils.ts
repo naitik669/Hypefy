@@ -1,51 +1,9 @@
 /**
- * Hypefy content utilities.
- * Parse hashtags and mentions from post caption/body text.
- * Used in the post composer and for storing structured data.
- */
-
-/**
- * Extract hashtags from text.
- * Returns lowercase tag names without the '#' prefix.
- * Deduplicates results.
+ * Moved to @hypefy/core/content-utils.
  *
- * @example extractHashtags("Working on #Hypefy and #Design")
- * // → ["hypefy", "design"]
+ * This re-export exists so that the files importing it did not have to
+ * change when it moved — the module is the same module at a new address.
+ * Delete this file once every caller imports from @hypefy/core directly;
+ * until then, both paths are the same code.
  */
-export function extractHashtags(text: string): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  const re = /#([a-zA-Z0-9_]+)/g;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    const tag = m[1].toLowerCase();
-    if (!seen.has(tag)) {
-      seen.add(tag);
-      out.push(tag);
-    }
-  }
-  return out;
-}
-
-/**
- * Extract mentions from text.
- * Returns lowercase usernames without the '@' prefix.
- * Deduplicates results.
- *
- * @example extractMentions("Working with @aman and @crazie.extra")
- * // → ["aman", "crazie.extra"]
- */
-export function extractMentions(text: string): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  const re = /@([a-zA-Z0-9_.]+)/g;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    const handle = m[1].toLowerCase();
-    if (!seen.has(handle)) {
-      seen.add(handle);
-      out.push(handle);
-    }
-  }
-  return out;
-}
+export * from "@hypefy/core/content-utils";

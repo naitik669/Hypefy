@@ -21,7 +21,7 @@ import { readFileSync } from "node:fs";
  */
 
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
-const rank = read("src/lib/feed-rank.ts");
+const rank = read("packages/core/src/feed-rank.ts");
 const home = read("src/app/(app)/home/page.tsx");
 const shots = read("src/app/(app)/shots/page.tsx");
 const m201 = read("supabase/migrations/0201_reach_is_people_not_sums.sql");

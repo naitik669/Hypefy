@@ -142,7 +142,7 @@ describe("the two thresholds cannot drift apart", () => {
     // The hash is computed in TS and compared in SQL. If these two numbers
     // ever differ, the check silently means something different from what
     // the measurement in media-hash.ts chose.
-    const ts = /export const MATCH_DISTANCE = (\d+);/.exec(read("src/lib/media-hash.ts"));
+    const ts = /export const MATCH_DISTANCE = (\d+);/.exec(read("packages/core/src/media-hash.ts"));
     const pg = /create or replace function public\.media_match_distance\(\)[\s\S]*?select (\d+)/.exec(sql157);
     expect(ts?.[1]).toBeDefined();
     expect(pg?.[1]).toBeDefined();

@@ -95,7 +95,7 @@ describe("scheduling is checked while the sender is looking at it", () => {
 describe("the limits in the database and in the sheet agree", () => {
   it("the same lead time and the same horizon", () => {
     // If these drift, the sheet offers a time the database then refuses.
-    const lib = read("src/lib/schedule-send.ts");
+    const lib = read("packages/core/src/schedule-send.ts");
     expect(sql).toContain("interval '30 seconds'");
     expect(lib).toContain("MIN_LEAD_MS = 30_000");
     expect(sql).toContain("interval '90 days'");
