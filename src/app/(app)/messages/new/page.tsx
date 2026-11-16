@@ -31,9 +31,13 @@ export default function NewChatPage() {
         supabase.from("notifications").select("actor_id").eq("user_id", user.id).not("actor_id", "is", null).limit(50),
       ]);
       const ids = new Set<string>();
-      followingRes.data?.forEach((r: any) => ids.add(r.following_id));
-      followerRes.data?.forEach((r: any) => ids.add(r.follower_id));
-      notifRes.data?.forEach((r: any) => r.actor_id && ids.add(r.actor_id));
+      // No annotations: the Supabase client is typed from
+      // supabase/database.types.ts, so each select infers its own row.
+      // These were `(r: any)`, which turned that off at the one place it
+      // was doing any work.
+      followingRes.data?.forEach((r) => ids.add(r.following_id));
+      followerRes.data?.forEach((r) => ids.add(r.follower_id));
+      notifRes.data?.forEach((r) => r.actor_id && ids.add(r.actor_id));
       ids.delete(user.id);
       if (ids.size === 0) { setPeople([]); setLoading(false); return; }
       const { data } = await supabase
@@ -173,7 +177,7 @@ export default function NewChatPage() {
 
       {/* Bottom action */}
       {selected.size > 0 && (
-        <div className="fixed inset-x-0 bottom-[72px] z-20 mx-auto max-w-[480px] bg-gradient-to-t from-background via-background to-transparent px-4 pb-3 pt-4">
+        <div className="fixed inset-x-0 bottom-[var(--nav-edge)] z-20 mx-auto app-column bg-gradient-to-t from-background via-background to-transparent px-4 pb-3 pt-4">
           <button
             type="button"
             onClick={start}

@@ -90,8 +90,10 @@ describe("room under the bottom bar", () => {
    * the list cannot quietly grow.
    */
   const EDGE_HOLDOUTS = [
-    "src/app/(app)/messages/new/page.tsx",
-    "src/components/pwa/InstallPrompt.tsx",
+    // ReelsFeed still has 3 react-hooks/set-state-in-effect errors, which
+    // are correctness rather than typing and need a signed-in Shots feed to
+    // verify. Skeletons.tsx has no debt of its own and is only here because
+    // its frame must stay identical to ReelsFeed's — see loading-shapes.
     "src/components/shots/ReelsFeed.tsx",
     "src/components/skeletons/Skeletons.tsx",
   ];
@@ -131,7 +133,7 @@ describe("room under the bottom bar", () => {
     expect(fixedNavOffsets(read("src/components/shows/MusicEditor.tsx"))).toEqual([]);
   });
 
-  it("nor off a bare nav-sized offset, except the four the ratchet holds", () => {
+  it("nor off a bare nav-sized offset, except the two the ratchet holds", () => {
     const offenders = sourceFiles()
       .filter((f) => fixedNavOffsets(read(f)).length > 0)
       .map((f) => f.split("\\").join("/"))

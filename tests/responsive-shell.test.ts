@@ -264,14 +264,16 @@ describe("the column is defined once", () => {
   /**
    * The literal still exists in exactly seven files, and why.
    *
-   * 28 of the 35 sites migrated. These seven did not, and it is the lint
+   * 30 of the 35 sites migrated. These five did not, and it is the lint
    * ratchet's doing rather than an oversight: CI blocks on eslint errors in
-   * changed files, and six of these carry 33 pre-existing errors between
-   * them — 18 `no-explicit-any` in WebRTC signalling payloads and 12
-   * react-hooks correctness errors in the chat and call views. Swapping one
-   * class in each would have pulled all 33 into this change's scope. That
-   * debt is real and worth paying, but not inside a CSS rename, and not in
-   * code only verifiable with an account and two devices.
+   * changed files, so a file cannot be touched until its debt is paid.
+   *
+   * Three were paid and migrated — messages/new, CallProvider and
+   * InstallPrompt — because their errors were type-level (`no-explicit-any`
+   * over Supabase rows and WebRTC payloads) or the same setMounted portal
+   * guard BottomSheet had. The four below are different in kind: each has a
+   * react-hooks CORRECTNESS error, and verifying a change to one needs an
+   * account, or two devices on a real call.
    *
    * Skeletons.tsx has no debt of its own. It is here because its frames must
    * be character-for-character identical to RealChatView's and ReelsFeed's —
@@ -284,12 +286,15 @@ describe("the column is defined once", () => {
    * being updated.
    */
   const LITERAL_HOLDOUTS = [
-    "src/app/(app)/messages/new/page.tsx",
-    "src/components/calls/CallProvider.tsx",
+    // Each still carries a react-hooks CORRECTNESS error — refs read during
+    // render, or setState inside an effect — in realtime, call or chat code.
+    // Those are not type-level and cannot be fixed blind: verifying them
+    // needs an account, and the call ones need two devices on a real call.
     "src/components/calls/GroupCallProvider.tsx",
     "src/components/messages/InAppNotifier.tsx",
     "src/components/messages/RealChatView.tsx",
     "src/components/shots/ReelsFeed.tsx",
+    // No debt of its own; paired with ReelsFeed, see below.
     "src/components/skeletons/Skeletons.tsx",
   ];
 

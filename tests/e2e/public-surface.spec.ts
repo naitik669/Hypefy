@@ -382,6 +382,38 @@ test.describe("the breakpoint contract fires in a real browser", () => {
     };
   })()`;
 
+  /**
+   * The served stylesheet is the one on disk.
+   *
+   * Turbopack has served a stale CSS chunk across a dev-server restart three
+   * times during this work, and it does not fail loudly: once `--app-col`
+   * came back EMPTY, which made `max-width: var(--app-col)` invalid rather
+   * than an error, so every column in the app was unbounded while the source
+   * looked perfectly correct; twice a figure was simply the old one, which
+   * reads as a test asserting the wrong number.
+   *
+   * So the source is parsed here and compared with what the browser
+   * computes. A mismatch now says what it is — clear .next — instead of
+   * looking like a wrong expectation.
+   */
+  test("the stylesheet the browser has is the one in the repo", async ({ page }) => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/app/globals.css", "utf8");
+    // The last --app-col declaration in the file is the desktop one.
+    const declared = [...src.matchAll(/--app-col:\s*(\d+)px/g)].pop();
+    expect(declared, "--app-col is not declared in globals.css").toBeTruthy();
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/signin");
+    const served = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--app-col").trim(),
+    );
+    expect(
+      served,
+      "the served CSS disagrees with globals.css — stale Turbopack chunk, clear .next",
+    ).toBe(`${declared![1]}px`);
+  });
+
   for (const [label, width, col, edge] of [
     ["phone", 390, "480px", 72],
     ["tablet", 800, "600px", 72],
