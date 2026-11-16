@@ -138,20 +138,76 @@ test.describe("the pages that must render for somebody else's review", () => {
   });
 });
 
+const SHAPES = [
+  ["phone", 390, 844],
+  ["tablet", 768, 1024],
+  ["laptop", 1024, 768],
+  ["desktop", 1440, 900],
+] as const;
+
 test.describe("the layout contract", () => {
-  // The check Phase 4 leans on. Today the app is a 480px column centred on a
-  // wide page, so these pass trivially; they are here so that the responsive
-  // work cannot introduce a sideways scroll without a test saying so.
-  for (const [label, width, height] of [
-    ["phone", 390, 844],
-    ["tablet", 768, 1024],
-    ["laptop", 1024, 768],
-    ["desktop", 1440, 900],
-  ] as const) {
-    test(`/signin does not scroll sideways at ${label} (${width}px)`, async ({ page }) => {
-      await page.setViewportSize({ width, height });
-      await page.goto("/signin");
-      await noHorizontalScroll(page);
+  // The check Phase 4 leans on: no sideways scroll at any shape. /signin plus
+  // the legal pages, which are the widest account-free exercise of the layout
+  // available — a full server render through the root layout at each width.
+  for (const [label, width, height] of SHAPES) {
+    for (const path of ["/signin", "/privacy", "/terms"]) {
+      test(`${path} does not scroll sideways at ${label} (${width}px)`, async ({ page }) => {
+        await page.setViewportSize({ width, height });
+        await page.goto(path);
+        await noHorizontalScroll(page);
+      });
+    }
+  }
+});
+
+test.describe("the breakpoint contract fires in a real browser", () => {
+  /**
+   * --nav-space is the room a scroll container leaves below itself for the
+   * bottom bar. At >= 1024 there is no bar — the side rail replaces it — so
+   * the variable is overridden to 0, and a page that still padded by it would
+   * carry 84px of dead space at the foot of every screen.
+   *
+   * Asserted here rather than only as CSS text because a media query is one
+   * of the few things a source-reading test genuinely cannot prove: the
+   * declaration can be present and still lose to a later rule, or sit in a
+   * block that never matches. This runs the cascade.
+   */
+  async function navSpacePx(page: import("@playwright/test").Page): Promise<number> {
+    return page.evaluate(() => {
+      const v = getComputedStyle(document.documentElement).getPropertyValue("--nav-space");
+      // calc() is resolved for a custom property only when it is used, so
+      // measure it on a real element rather than parsing the declaration.
+      const probe = document.createElement("div");
+      probe.style.height = "var(--nav-space)";
+      probe.style.position = "absolute";
+      probe.style.visibility = "hidden";
+      document.body.appendChild(probe);
+      const px = probe.getBoundingClientRect().height;
+      probe.remove();
+      return v.trim() === "" ? -1 : px;
     });
   }
+
+  test("the bar's space is reserved below the rail's breakpoint", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto("/signin");
+    // 72px bar + inset + 12px air. The exact figure depends on the device's
+    // safe-area inset, which is 0 in a desktop browser; the guarantee is that
+    // room IS reserved, not how much.
+    expect(await navSpacePx(page)).toBeGreaterThan(0);
+  });
+
+  test("and is zero at the rail's breakpoint, where there is no bar", async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto("/signin");
+    expect(await navSpacePx(page)).toBe(0);
+  });
+
+  test("the rail's width is published for the shell to read", async ({ page }) => {
+    await page.goto("/signin");
+    const w = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--sidenav-w").trim(),
+    );
+    expect(w).toBe("240px");
+  });
 });

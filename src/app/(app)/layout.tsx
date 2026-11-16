@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { readSessionId, deviceLabel } from "@/lib/login-alert";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profile";
+import { SideNav } from "@/components/layout/SideNav";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { CallProvider } from "@/components/calls/CallProvider";
 import { GroupCallProvider } from "@/components/calls/GroupCallProvider";
@@ -48,7 +49,12 @@ export default async function AppLayout({
   if (!user) {
     return (
       <FrameCatalogProvider frames={await loadFrames()}>
-        <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background">
+        {/* The same three widths as the signed-in column. Anonymous visitors
+            arrive here on shared links — a post, a profile, a Shot — which is
+            exactly the traffic most likely to be on a desktop, and it was
+            getting the phone column. No rail: there is nothing to navigate
+            to without an account. */}
+        <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background md:max-w-[600px] lg:max-w-[680px]">
           <TabScrollTop />
           <div className="flex-1">{children}</div>
         </div>
@@ -92,7 +98,27 @@ export default async function AppLayout({
   // who is suspended.
   // The admin desk is a tool, not a feed: it gets the whole window.
   const pathname = (await headers()).get("x-pathname") ?? "";
-  const column = pathname.startsWith("/admin") ? "max-w-[1400px]" : "max-w-[480px]";
+  /*
+   * How wide the content column gets, by shape.
+   *
+   * This was one of two values — 1400px for /admin, 480px for everything
+   * else — and the 480 was the whole app: thirty-five call sites and a
+   * hard-coded 480 inside SwipeNav's own arithmetic. A desktop browser was
+   * getting the phone build rendered in a 480px slot on a 1440px screen,
+   * which is not a degraded experience so much as an unhandled one.
+   *
+   * Three widths now, matching @hypefy/tokens' `columns`: the phone figure
+   * unchanged so nothing about that layout moves, then wider at tablet, then
+   * wider again beside the rail at desktop. Not the full window at desktop —
+   * a line of feed text 1400px long is unreadable, which is why every social
+   * feed on a wide screen is a column with space either side.
+   *
+   * The admin desk keeps the whole window: it is a tool with tables, not a
+   * feed, and it is the one route that was already allowed to say so.
+   */
+  const column = pathname.startsWith("/admin")
+    ? "max-w-[1400px]"
+    : "max-w-[480px] md:max-w-[600px] lg:max-w-[680px]";
 
   const suspendedNow =
     !!profile.suspendedAt &&
@@ -182,21 +208,37 @@ export default async function AppLayout({
             <VaultAutoLock />
             <EncryptionSetup userId={user!.id} />
             <InstallPrompt />
-            <div className={`relative mx-auto flex min-h-dvh w-full flex-col bg-background ${column}`}>
-              <TabScrollTop />
-              {/* Wraps only the scrolling content, never the nav — the bar
-                  has to stay put while the page slides under the finger. */}
-              <div className="flex-1 pb-[var(--nav-space)]">
-                <SwipeNav>{children}</SwipeNav>
+            {/*
+              The rail and the column, side by side.
+
+              `lg:justify-center` rather than centring the column on its own:
+              the pair is centred as a unit, so the content does not sit
+              off-centre by half the rail's width on a wide screen.
+
+              SideNav renders at every size and hides itself below lg. Chosen
+              by breakpoint, never by measuring the window — the app is
+              server-rendered, and a layout that needs to know the viewport
+              width either guesses on the server or flashes the wrong one.
+            */}
+            <div className="flex min-h-dvh w-full lg:justify-center">
+              <SideNav />
+              <div className={`relative mx-auto flex min-h-dvh w-full flex-col bg-background lg:mx-0 ${column}`}>
+                <TabScrollTop />
+                {/* Wraps only the scrolling content, never the nav — the bar
+                    has to stay put while the page slides under the finger.
+                    --nav-space becomes 0 at lg, where there is no bar. */}
+                <div className="flex-1 pb-[var(--nav-space)]">
+                  <SwipeNav>{children}</SwipeNav>
+                </div>
+                <BottomNav
+                  avatarUrl={profile.avatarUrl}
+                  avatarHue={profile.avatarHue ?? 200}
+                  displayName={profile.displayName ?? "U"}
+                  currentUserId={user!.id}
+                  initialUnreadMsgs={initialUnreadMsgs}
+                  lockedUnread={toVaultOverview(vaultRows).unread}
+                />
               </div>
-              <BottomNav
-                avatarUrl={profile.avatarUrl}
-                avatarHue={profile.avatarHue ?? 200}
-                displayName={profile.displayName ?? "U"}
-                currentUserId={user!.id}
-                initialUnreadMsgs={initialUnreadMsgs}
-                lockedUnread={toVaultOverview(vaultRows).unread}
-              />
             </div>
           </MessageStreamProvider>
           </UploadProvider>

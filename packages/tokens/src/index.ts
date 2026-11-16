@@ -81,6 +81,50 @@ export function navSpace(bottomInset: number): number {
   return layout.navHeight + Math.max(0, bottomInset) + layout.navGap;
 }
 
+/**
+ * Where the layout changes shape.
+ *
+ * These are Tailwind's own `md` and `lg`, not new numbers — deliberately, so
+ * there is one vocabulary in the markup rather than a custom set sitting
+ * beside the default one and nobody sure which to reach for. Named here
+ * because the tests and (from Phase 5) the native client need the same
+ * figures, and because `md:` in a class list does not say *why* 768.
+ *
+ *   phone   < 768   one column, bottom bar
+ *   tablet  >= 768  wider column, bottom bar still
+ *   desktop >= 1024 side rail, no bottom bar
+ */
+export const breakpoints = {
+  /** Tailwind `md`. Below this, the phone layout. */
+  tablet: 768,
+  /** Tailwind `lg`. At and above this, the side rail replaces the bottom bar. */
+  desktop: 1024,
+} as const;
+
+/**
+ * The widest the content column gets, per shape.
+ *
+ * The phone figure is the one the whole app was built around — it appears at
+ * 35 call sites and is hard-coded in SwipeNav's own arithmetic — so it is
+ * named here rather than repeated again.
+ */
+export const columns = {
+  phone: 480,
+  tablet: 600,
+  /** Beside the rail, not the whole window: a feed line that long is unreadable. */
+  desktop: 680,
+} as const;
+
+/** The side rail's width at desktop. */
+export const sideNavWidth = 240;
+
+/** Which shape a viewport width gets. */
+export function shapeFor(width: number): "phone" | "tablet" | "desktop" {
+  if (width >= breakpoints.desktop) return "desktop";
+  if (width >= breakpoints.tablet) return "tablet";
+  return "phone";
+}
+
 /** The CSS custom-property name for a colour, e.g. accentInk -> --color-accent-ink. */
 export function cssVarName(name: ColorName): string {
   return `--color-${name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;

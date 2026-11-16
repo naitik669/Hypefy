@@ -43,6 +43,12 @@ const PINNED = new Set([
   // Loading placeholders, never scrolled and never interactive.
   "src/components/skeletons/Skeletons.tsx",
   "src/components/skeletons/TabSkeleton.tsx",
+  // The desktop side rail: a full-height column BESIDE the content, not a
+  // header over it. It is sticky so it stays while the column scrolls, which
+  // is the behaviour — and at >= lg it is the only navigation on screen,
+  // because the bottom bar is gone. Hiding it on scroll would leave a wide
+  // screen with no way to navigate at all.
+  "src/components/layout/SideNav.tsx",
 ]);
 
 describe("one set of rules", () => {
