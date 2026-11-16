@@ -94,7 +94,7 @@ describe("the two tables that must NOT be published", () => {
 
 describe("presence travels on a channel instead", () => {
   it("sender and listener derive the same topic from one helper", () => {
-    const lib = read("src/lib/presence.ts");
+    const lib = read("packages/core/src/presence.ts");
     expect(lib).toContain("export function presenceTopic(userId: string): string");
     expect(read("src/components/presence/PresenceHeartbeat.tsx")).toContain("presenceTopic(userId)");
     expect(read("src/components/messages/RealChatView.tsx")).toContain("presenceTopic(other.id)");

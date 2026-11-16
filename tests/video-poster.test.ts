@@ -5,7 +5,7 @@ import { join } from "node:path";
 /**
  * Every <video> sets a poster. Without one, Android's WebView paints its own
  * grey play-button placeholder while the first frame loads, which is what
- * showed on Shots tiles before they loaded (see src/lib/blank-poster.ts).
+ * showed on Shots tiles before they loaded (see packages/core/src/blank-poster.ts).
  */
 
 function tsxFiles(dir: string): string[] {

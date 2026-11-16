@@ -79,7 +79,7 @@ describe("the handles it finds are the ones the composer offered", () => {
     // If these drift, the app offers a name the trigger cannot find.
     expect(fn).toContain("'@([a-zA-Z0-9_.]+)'");
     expect(fn).toContain("select distinct lower(m[1])");
-    expect(read("src/lib/content-utils.ts")).toContain("/@([a-zA-Z0-9_.]+)/g");
+    expect(read("packages/core/src/content-utils.ts")).toContain("/@([a-zA-Z0-9_.]+)/g");
   });
 
   it("and the client agrees about what a handle looks like", () => {

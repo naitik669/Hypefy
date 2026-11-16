@@ -194,7 +194,7 @@ describe("where a Shot's sound is wired", () => {
   });
 
   it("the song parser can be used on the server", () => {
-    expect(read("src/lib/track.ts")).not.toContain('"use client"');
-    expect(read("src/lib/sound-lookup.ts")).toContain('from "@/lib/track"');
+    expect(read("packages/core/src/track.ts")).not.toContain('"use client"');
+    expect(read("packages/core/src/sound-lookup.ts")).toContain('from "@hypefy/core/track"');
   });
 });

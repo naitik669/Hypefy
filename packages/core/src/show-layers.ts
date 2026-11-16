@@ -1,0 +1,690 @@
+/**
+ * What is arranged on top of a Show.
+ *
+ * A Show was one picture and a caption. It becomes a picture and an
+ * ordered list of layers — words, a sticker, a song, a poll, somebody's
+ * name — stored as jsonb and rendered live rather than flattened into the
+ * image at publish. That is what keeps a poll votable, a song playable, a
+ * mention tappable and a post embed real, and what lets a Show be edited
+ * afterwards. Flattening happens only when somebody saves the picture out,
+ * through the compositor page-image.ts already has.
+ *
+ * **Positions are fractions of the frame, never pixels.** The same choice
+ * framePlacement makes for avatar frames ("stored in avatar widths and
+ * degrees, so a frame placed once is placed everywhere"), for the same
+ * reason: one Show has to come out right in the editor, in the
+ * full-screen viewer, in a ring preview and in an exported image, and
+ * those are four different widths.
+ *
+ * `readLayers` is deliberately unforgiving and never throws. A jsonb
+ * column can hold a row written by an older client, a half-written row,
+ * or one from a version that does not exist yet; all of those have to
+ * read as "not a layer" and leave the picture standing, which is the
+ * stance readPoll already takes for the same reason.
+ */
+
+import { parseTrack, type Track } from "@hypefy/core/track";
+import {
+  MAX_POLL_OPTION,
+  MAX_POLL_OPTIONS,
+  MAX_POLL_QUESTION,
+  MIN_POLL_OPTIONS,
+  tidyOptions,
+} from "@hypefy/core/chat-poll";
+
+export const LAYER_TYPES = [
+  "text",
+  "sticker",
+  "music",
+  "mention",
+  "link",
+  "poll",
+  "question",
+  "post",
+  "shot",
+  "location",
+  "hashtag",
+  "time",
+  "quiz",
+  "slider",
+  "countdown",
+  "addyours",
+  "spotlight",
+  "hypecard",
+] as const;
+
+export type LayerType = (typeof LAYER_TYPES)[number];
+
+/**
+ * How many layers one Show may carry.
+ *
+ * Not a storage limit — twelve of these is a few kilobytes. It is a
+ * legibility limit: past about a dozen the picture underneath has gone.
+ */
+export const MAX_LAYERS = 12;
+
+/**
+ * The same bounds the frame placer uses, stated here rather than imported
+ * from a component under admin/. A quarter size is still readable; three
+ * times is most of the frame.
+ */
+export const LAYER_SCALE_MIN = 0.25;
+export const LAYER_SCALE_MAX = 3;
+
+/** How far outside the frame a layer's centre may sit, so it stays grabbable. */
+export const LAYER_POS_MIN = -0.1;
+export const LAYER_POS_MAX = 1.1;
+
+/**
+ * How low a sticker's centre may be *placed*.
+ *
+ * The viewer draws the caption and the reply row over the foot of the frame,
+ * and the reply row takes taps — so a sticker put down there cannot be
+ * pressed at all, however live it is. A poll nobody can answer looks like a
+ * broken poll rather than a badly placed one.
+ *
+ * Deliberately not applied in `readLayers`: clamping on the way in would
+ * quietly move the stickers on every Show already posted, and somebody
+ * arranged those by hand. A Show from before this keeps exactly the placement
+ * it was given; only new drags are held back.
+ *
+ * It bounds the centre and not the bottom edge, because a layer's rendered
+ * height depends on its own content and is not known here — so a tall sticker
+ * dragged all the way down still reaches a little into the caption. The
+ * number wants checking against a real device.
+ */
+export const LAYER_PLACE_MAX_Y = 0.86;
+
+/** The longest a text layer can be before it stops being a story. */
+export const MAX_LAYER_TEXT = 200;
+
+/**
+ * How many looks each type cycles through on a tap.
+ *
+ * The index is stored, never the styling, so restyling a look later
+ * reaches every Show already posted rather than only new ones.
+ */
+/**
+ * The eight colours a chip or a card can wear — Night, Lime, Glass, White,
+ * Ambient, Sunset, Aurora, Grape — picked from a row under the selected
+ * layer. The first is the old first look, so a Show posted before keeps
+ * its default; the old looks 2 and 3 now read as Glass and White.
+ */
+export const COLOUR_LOOKS = 8;
+
+export const LOOKS: Record<LayerType, number> = {
+  text: 4,
+  sticker: 4,
+  music: COLOUR_LOOKS,
+  mention: COLOUR_LOOKS,
+  link: COLOUR_LOOKS,
+  poll: COLOUR_LOOKS,
+  question: COLOUR_LOOKS,
+  post: 4,
+  shot: 4,
+  location: COLOUR_LOOKS,
+  hashtag: COLOUR_LOOKS,
+  time: COLOUR_LOOKS,
+  quiz: COLOUR_LOOKS,
+  slider: COLOUR_LOOKS,
+  countdown: COLOUR_LOOKS,
+  addyours: COLOUR_LOOKS,
+  // A Spotlight page wears its own colour.
+  spotlight: 1,
+  // So does a Hype card: the plate is black and the one piece of colour on
+  // it is the owner's own accent, picked once already on their profile.
+  // Eight looks here would be eight ways to repaint somebody's ID.
+  hypecard: 1,
+};
+
+/** The look index that takes its colour from the photo (`tint`). */
+export const AMBIENT_LOOK = 4;
+
+export type TextPayload = { text: string };
+export type StickerPayload = { emoji: string };
+export type MusicPayload = {
+  id: string;
+  title: string;
+  artist: string;
+  artwork: string | null;
+  preview: string | null;
+  /**
+   * `spotify:track:…`. Spotify tracks come with no preview mp3, and the
+   * sticker used to keep only the mp3 — so a Spotify song on a Show had
+   * nothing to play, and most songs are Spotify songs now.
+   */
+  uri?: string;
+  /** Seconds into the song where the part that plays begins. */
+  start?: number;
+  /** How many seconds of it play, from `start`: 5 to 30. */
+  length?: number;
+  /** How the sticker looks; "only" is the song with nothing on the picture. */
+  style?: MusicStyle;
+};
+
+export const MUSIC_STYLES = ["banner", "cd", "waves", "type", "cover", "only"] as const;
+export type MusicStyle = (typeof MUSIC_STYLES)[number];
+/** The lengths a Show's song can play for. Every song is a 30-second preview for now. */
+export const MUSIC_LENGTHS = [5, 10, 15, 20, 25, 30] as const;
+export const SONG_SPAN = 30;
+export type MentionPayload = { username: string };
+export type LinkPayload = { url: string };
+export type PollPayload = { question: string; options: string[] };
+export type QuestionPayload = { prompt: string };
+/**
+ * How a post or Shot sits on a Show: a polaroid card, a tall card that
+ * plays (a Shot's default), a compact ticket, or a round bubble.
+ */
+export const EMBED_STYLES = ["card", "tall", "compact", "bubble"] as const;
+export type EmbedStyle = (typeof EMBED_STYLES)[number];
+export type PostPayload = { postId: string; style?: EmbedStyle };
+export type ShotPayload = { shotId: string; style?: EmbedStyle };
+/** Your Spotlight page, as it is on the day the Show goes up. */
+export type SpotlightPayload = { ownerId: string };
+/**
+ * Somebody's Hypefy ID, as a sticker.
+ *
+ * Only the id is kept. Nothing about them is copied in here — not the
+ * handle, not the name, not the number — because a card is a credential
+ * and a credential that carries its own claims is a credential anyone can
+ * write. The viewer looks the owner up and draws what it finds, so a card
+ * pointing at somebody else draws *their* real handle, the way a mention
+ * does, rather than their name in our chrome.
+ */
+export type HypeCardPayload = { ownerId: string };
+
+/** The embeds, of which a Show carries one: a second replaces the first. */
+export const EMBED_TYPES = ["post", "shot", "spotlight"] as const;
+export function isEmbedType(type: LayerType): type is (typeof EMBED_TYPES)[number] {
+  return (EMBED_TYPES as readonly string[]).includes(type);
+}
+
+function embedStyle(raw: unknown): { style?: EmbedStyle } {
+  return typeof raw === "string" && (EMBED_STYLES as readonly string[]).includes(raw) ? { style: raw as EmbedStyle } : {};
+}
+/** A place, as typed. Not looked up: a name is all a story needs. */
+export type LocationPayload = {
+  place: string;
+  /** The rest of the address, under the name: "Uttar Pradesh, India". */
+  area?: string;
+};
+/** A tag without its #, in the shape the app's hashtags take. */
+export type HashtagPayload = { tag: string };
+/** When it was added, fixed then: a Show is a moment, and this says which. */
+export type TimePayload = { at: string };
+
+/** A poll with one right answer, by index. */
+export type QuizPayload = { question: string; options: string[]; answer: number };
+/** "How hyped are you?" — viewers drag a ★ along it. */
+export type SliderPayload = {
+  prompt: string;
+  /**
+   * The Hype meter: the same slider, except letting go high on it also
+   * hypes the Show.
+   *
+   * A flag rather than a type of its own, which is the whole reason it is
+   * cheap. The server already knows how to take a slider value, rate-limit
+   * it, refuse the author's, and tell the author who sent what — and every
+   * one of those is written against the string 'slider'. A second type
+   * would have meant teaching six places in 0194 a new word to get back to
+   * where this starts.
+   */
+  hype?: boolean;
+};
+/** Something coming up: what, and when. */
+export type CountdownPayload = { title: string; at: string };
+/**
+ * A prompt others answer with a Show of their own. `collabId` is the shared
+ * Show their answers go into, made when the Show is published.
+ */
+export type AddYoursPayload = { prompt: string; collabId?: string };
+
+/**
+ * How high you have to leave the Hype meter for it to hype the Show.
+ *
+ * Not 50: the middle is where the ★ starts for anyone who has not touched
+ * it, and a drag that ends a point above where it began should not count as
+ * saying yes. Seventy is a deliberate push to the top end.
+ */
+export const HYPE_METER_AT = 70;
+
+/** A slider that is the Hype meter rather than a plain one. */
+export function isHypeMeter(layer: { type: LayerType; payload: LayerPayload }): boolean {
+  return layer.type === "slider" && (layer.payload as SliderPayload).hype === true;
+}
+
+export const MAX_PLACE = 60;
+/** The rest of a place's address, under its name. */
+export const MAX_AREA = 80;
+/** The longest link a sticker holds. */
+export const MAX_URL = 2048;
+/** A countdown or an Add yours prompt is a line, not a paragraph. */
+export const MAX_STICKER_LINE = 60;
+export const MAX_TAG = 40;
+
+export type LayerPayload =
+  | TextPayload
+  | StickerPayload
+  | MusicPayload
+  | MentionPayload
+  | LinkPayload
+  | PollPayload
+  | QuestionPayload
+  | PostPayload
+  | ShotPayload
+  | LocationPayload
+  | HashtagPayload
+  | TimePayload
+  | QuizPayload
+  | SliderPayload
+  | CountdownPayload
+  | AddYoursPayload
+  | SpotlightPayload
+  | HypeCardPayload;
+
+export type ShowLayer = {
+  /** Stable for the life of the layer: votes and answers point at it. */
+  id: string;
+  type: LayerType;
+  /** The layer's centre, as a fraction of the frame. */
+  x: number;
+  y: number;
+  scale: number;
+  /** Degrees, positive clockwise. */
+  rotation: number;
+  /** Which of this type's looks is showing. */
+  look: number;
+  /**
+   * The colour the Ambient look wears: a deep shade of the photo under it,
+   * worked out once in the editor and stored, so the viewer draws the same
+   * thing without sampling the picture again. Absent on every other look.
+   */
+  tint?: string;
+  payload: LayerPayload;
+};
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, n));
+}
+
+function num(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+/** A trimmed string of at most `max`, or null if there is nothing left. */
+function text(value: unknown, max: number): string | null {
+  if (typeof value !== "string") return null;
+  // Control characters and newlines collapse: a layer is drawn in a box
+  // on a picture, and a run of newlines is a way to push it off one.
+  const clean = value.replace(/[\s\u0000-\u001f\u007f]+/g, " ").trim();
+  if (!clean) return null;
+  return clean.slice(0, max);
+}
+
+/**
+ * How many characters a reader would count.
+ *
+ * Not code points: "👩‍👩‍👧" is five of those and one of these. Segmenter
+ * is present everywhere the app runs, but the fallback keeps a server
+ * render or an old WebView from throwing on a sticker.
+ */
+function graphemes(value: string): number {
+  if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
+    return [...new Intl.Segmenter().segment(value)].length;
+  }
+  return [...value].length;
+}
+
+/** A string that is plausibly an id, without pretending to check a uuid. */
+function id(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const clean = value.trim();
+  if (!clean || clean.length > 64) return null;
+  return clean;
+}
+
+/**
+ * The payload for one type, or null if it is not one.
+ *
+ * Every field is checked. A payload that is half right is not half
+ * rendered — the layer is dropped, because a music chip with no title is
+ * a worse thing to draw than nothing.
+ */
+function readPayload(type: LayerType, raw: unknown): LayerPayload | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const p = raw as Record<string, unknown>;
+
+  switch (type) {
+    case "text": {
+      const t = text(p.text, MAX_LAYER_TEXT);
+      return t ? { text: t } : null;
+    }
+    case "sticker": {
+      // One character as a reader counts them, which is not one code
+      // point: a family emoji is five joined by zero-width joiners, and
+      // counting code points refused it. Intl.Segmenter is already how
+      // StatusComposer and caption-runs count these.
+      const e = typeof p.emoji === "string" ? p.emoji.trim() : "";
+      if (!e || graphemes(e) > 1) return null;
+      return { emoji: e };
+    }
+    case "music": {
+      const tid = id(p.id);
+      const title = text(p.title, 120);
+      const artist = text(p.artist, 120);
+      if (!tid || !title || !artist) return null;
+      return {
+        id: tid,
+        title,
+        artist,
+        artwork: typeof p.artwork === "string" ? p.artwork : null,
+        preview: typeof p.preview === "string" ? p.preview : null,
+        ...(typeof p.uri === "string" && SPOTIFY_URI.test(p.uri) ? { uri: p.uri } : {}),
+        ...(typeof p.start === "number" && Number.isFinite(p.start) && p.start > 0 && p.start <= MAX_SONG_START
+          ? { start: Math.round(p.start * 10) / 10 }
+          : {}),
+        ...(typeof p.length === "number" && (MUSIC_LENGTHS as readonly number[]).includes(p.length)
+          ? { length: p.length }
+          : {}),
+        ...(typeof p.style === "string" && (MUSIC_STYLES as readonly string[]).includes(p.style) && p.style !== "banner"
+          ? { style: p.style as MusicStyle }
+          : {}),
+      };
+    }
+    case "mention": {
+      const u = typeof p.username === "string" ? p.username.trim().toLowerCase() : "";
+      // The shape the app's own handles take; see extractMentions.
+      if (!/^[a-z0-9_.]{1,32}$/.test(u)) return null;
+      return { username: u };
+    }
+    case "link": {
+      const url = typeof p.url === "string" ? p.url.trim() : "";
+      // Whether the host is one we will unfurl is link-preview's job, and
+      // it is asked again at render. This only refuses what is not a URL.
+      if (!/^https:\/\/[^\s]+$/i.test(url) || url.length > MAX_URL) return null;
+      return { url };
+    }
+    case "poll": {
+      const question = text(p.question, MAX_POLL_QUESTION);
+      const options = Array.isArray(p.options)
+        ? tidyOptions(p.options.filter((o): o is string => typeof o === "string"))
+        : [];
+      if (!question) return null;
+      if (options.length < MIN_POLL_OPTIONS || options.length > MAX_POLL_OPTIONS) return null;
+      if (options.some((o) => o.length > MAX_POLL_OPTION)) return null;
+      return { question, options };
+    }
+    case "question": {
+      const prompt = text(p.prompt, MAX_POLL_QUESTION);
+      return prompt ? { prompt } : null;
+    }
+    case "post": {
+      const pid = id(p.postId);
+      return pid ? { postId: pid, ...embedStyle(p.style) } : null;
+    }
+    case "shot": {
+      const sid = id(p.shotId);
+      return sid ? { shotId: sid, ...embedStyle(p.style) } : null;
+    }
+    case "location": {
+      const place = text(p.place, MAX_PLACE);
+      const area = text(p.area, MAX_AREA);
+      return place ? { place, ...(area ? { area } : {}) } : null;
+    }
+    case "hashtag": {
+      const tag = typeof p.tag === "string" ? cleanTag(p.tag) : "";
+      return tag ? { tag } : null;
+    }
+    case "time": {
+      const at = typeof p.at === "string" ? p.at : "";
+      return at && !Number.isNaN(Date.parse(at)) ? { at: new Date(at).toISOString() } : null;
+    }
+    case "quiz": {
+      const question = text(p.question, MAX_POLL_QUESTION);
+      const raw = Array.isArray(p.options) ? p.options.filter((o): o is string => typeof o === "string") : [];
+      const options = tidyOptions(raw);
+      // tidied options must be the written ones in the same order, or the
+      // stored answer index would point at a different option.
+      if (!question || options.length !== raw.length) return null;
+      if (options.length < MIN_POLL_OPTIONS || options.length > MAX_POLL_OPTIONS) return null;
+      const answer = typeof p.answer === "number" && Number.isInteger(p.answer) ? p.answer : -1;
+      if (answer < 0 || answer >= options.length) return null;
+      return { question, options, answer };
+    }
+    case "slider": {
+      const prompt = text(p.prompt, MAX_POLL_QUESTION);
+      if (!prompt) return null;
+      // Only ever true. An absent flag and a false one are the same slider,
+      // and storing `hype: false` would put a second spelling of it in the
+      // column for every slider ever placed.
+      return p.hype === true ? { prompt, hype: true } : { prompt };
+    }
+    case "countdown": {
+      const title = text(p.title, MAX_STICKER_LINE);
+      const at = typeof p.at === "string" ? p.at : "";
+      if (!title || !at || Number.isNaN(Date.parse(at))) return null;
+      return { title, at: new Date(at).toISOString() };
+    }
+    case "addyours": {
+      const prompt = text(p.prompt, MAX_STICKER_LINE);
+      if (!prompt) return null;
+      const collab = typeof p.collabId === "string" && /^[0-9a-f-]{36}$/i.test(p.collabId) ? p.collabId : null;
+      return collab ? { prompt, collabId: collab } : { prompt };
+    }
+    case "spotlight":
+    case "hypecard": {
+      const owner = id(p.ownerId);
+      return owner ? { ownerId: owner } : null;
+    }
+  }
+}
+
+/** A hashtag as typed, made into one: no #, no spaces, letters, digits and _. */
+/** A handle as it is typed: no @, lower case, only the characters handles use. */
+export function cleanUsername(raw: string): string {
+  return raw.replace(/^@+/, "").toLowerCase().replace(/[^a-z0-9_.]/g, "").slice(0, 32);
+}
+
+/**
+ * What was typed, as a link the sticker can hold, or "" — "hypefy.app" is
+ * a link people mean, so the scheme is added rather than the input refused.
+ */
+export function linkFrom(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  const full = /^https?:\/\//i.test(t) ? t.replace(/^http:\/\//i, "https://") : `https://${t}`;
+  return /^https:\/\/[^\s.]+\.[^\s]+$/i.test(full) && full.length <= MAX_URL ? full : "";
+}
+
+export function cleanTag(raw: string): string {
+  return raw
+    .replace(/^#+/, "")
+    .replace(/[^\p{L}\p{M}\p{N}_]/gu, "")
+    .toLowerCase()
+    .slice(0, MAX_TAG);
+}
+
+/**
+ * The layers that are typed at the foot of the editor, and which field of
+ * their payload the typing goes into.
+ */
+export const TYPED_FIELD = {
+  text: "text",
+  location: "place",
+  hashtag: "tag",
+  mention: "username",
+  link: "url",
+} as const;
+export type TypedType = keyof typeof TYPED_FIELD;
+
+export function isTyped(type: LayerType): type is TypedType {
+  return type in TYPED_FIELD;
+}
+
+/** What a typed layer currently says. */
+export function typedValue(layer: ShowLayer): string {
+  if (!isTyped(layer.type)) return "";
+  const v = (layer.payload as Record<string, unknown>)[TYPED_FIELD[layer.type]];
+  return typeof v === "string" ? v : "";
+}
+
+/** The payload a typed layer gets for what was typed, cleaned for its type. */
+export function typedPayload(type: TypedType, value: string): LayerPayload {
+  if (type === "hashtag") return { tag: cleanTag(value) };
+  if (type === "location") return { place: value.slice(0, MAX_PLACE) };
+  if (type === "mention") return { username: cleanUsername(value) };
+  if (type === "link") return { url: value.trim().slice(0, MAX_URL) };
+  return { text: value.slice(0, MAX_LAYER_TEXT) };
+}
+
+/** One layer, or null. */
+function readLayer(raw: unknown, seen: Set<string>): ShowLayer | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const l = raw as Record<string, unknown>;
+
+  const lid = id(l.id);
+  if (!lid || seen.has(lid)) return null;
+
+  const type = LAYER_TYPES.find((t) => t === l.type);
+  if (!type) return null;
+
+  const payload = readPayload(type, l.payload);
+  if (!payload) return null;
+
+  const looks = LOOKS[type];
+  const look = Math.trunc(num(l.look, 0));
+
+  return {
+    id: lid,
+    type,
+    x: clamp(num(l.x, 0.5), LAYER_POS_MIN, LAYER_POS_MAX),
+    y: clamp(num(l.y, 0.5), LAYER_POS_MIN, LAYER_POS_MAX),
+    scale: clamp(num(l.scale, 1), LAYER_SCALE_MIN, LAYER_SCALE_MAX),
+    // Wrapped rather than clamped: turning a sticker all the way round
+    // should come back to where it started, not stick at 180.
+    rotation: ((((num(l.rotation, 0) + 180) % 360) + 360) % 360) - 180,
+    // Out of range reads as the first look rather than as no layer: a
+    // look added and later removed should not delete somebody's Show.
+    look: look >= 0 && look < looks ? look : 0,
+    // Only a plain #rrggbb: it goes straight into a style.
+    ...(typeof l.tint === "string" && /^#[0-9a-f]{6}$/i.test(l.tint) ? { tint: l.tint.toLowerCase() } : {}),
+    payload,
+  };
+}
+
+/**
+ * Every layer this Show really has, in order, back to front.
+ *
+ * Never throws and never returns a half-built layer. Anything it does not
+ * recognise is left out, and the picture renders without it.
+ */
+export function readLayers(value: unknown): ShowLayer[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: ShowLayer[] = [];
+  for (const raw of value) {
+    if (out.length >= MAX_LAYERS) break;
+    const layer = readLayer(raw, seen);
+    if (!layer) continue;
+    seen.add(layer.id);
+    out.push(layer);
+  }
+  return out;
+}
+
+/**
+ * The layers a Showcase board item should draw.
+ *
+ * A board item either points at a Show or carries a picture of its own, and
+ * the board was selecting the Show without its `layers` — so a Show kept on a
+ * board played with every sticker missing. That is this function's reason to
+ * exist.
+ *
+ * It takes the item's own media as the deciding fact rather than its `kind`,
+ * because the rule is about the picture: a layer's x and y are fractions of
+ * the frame, arranged against one photograph. Put them over a different upload
+ * and all of them land somewhere nobody placed them. So the stickers come
+ * along only when the picture does.
+ */
+export function boardLayers(itemMedia: string | null | undefined, source: unknown): ShowLayer[] {
+  if (itemMedia) return [];
+  const row = source as { layers?: unknown } | null | undefined;
+  return readLayers(row?.layers);
+}
+
+/**
+ * Where to draw a layer inside a frame of this size.
+ *
+ * The centre is the anchor, so scaling and turning happen about the thing
+ * itself and the other two are untouched — the same composition
+ * framePlacement relies on.
+ */
+export function layerBox(
+  layer: Pick<ShowLayer, "x" | "y" | "scale" | "rotation">,
+  frame: { width: number; height: number },
+): { left: number; top: number; transform: string } {
+  return {
+    left: layer.x * frame.width,
+    top: layer.y * frame.height,
+    transform: `translate(-50%, -50%) rotate(${layer.rotation}deg) scale(${layer.scale})`,
+  };
+}
+
+/** The next look, wrapping — what one tap on a layer does. */
+export function nextLook(type: LayerType, look: number): number {
+  const looks = LOOKS[type];
+  const at = Number.isFinite(look) ? Math.trunc(look) : 0;
+  return ((at + 1) % looks + looks) % looks;
+}
+
+/**
+ * Everybody @-mentioned by a layer, lowercased and each once.
+ *
+ * A mention layer has to reach the person the same way one typed into
+ * the caption does. shows.mentions is what the notification trigger
+ * reads, and it is a plain array the client supplies — so a mention
+ * placed on the picture is added to it rather than being a second kind
+ * of mention that quietly reaches nobody, which is what the caption's
+ * own mentions did before 0180.
+ */
+export function layerMentions(layers: readonly ShowLayer[]): string[] {
+  const out: string[] = [];
+  for (const layer of layers) {
+    if (layer.type !== "mention") continue;
+    const { username } = layer.payload as MentionPayload;
+    if (!out.includes(username)) out.push(username);
+  }
+  return out;
+}
+
+/**
+ * The width every layer's own sizes are written against.
+ *
+ * A card's width, a sticker's size, the point size of text: all authored
+ * once at this width, and the whole stack scaled to whatever frame it is
+ * drawn in. Without it each component does its own arithmetic against
+ * the screen, and the first version of the text layer — a plate authored
+ * at 300px — hung out of both sides of a 260px preview.
+ *
+ * 390 is the phone the app is designed on, so the numbers in a layer
+ * component read as the pixels a designer would name.
+ */
+export const DESIGN_WIDTH = 390;
+
+const SPOTIFY_URI = /^spotify:track:[A-Za-z0-9]{22}$/;
+/** Ten minutes: further in than any song worth a sticker. */
+const MAX_SONG_START = 600;
+
+/**
+ * The song a Show plays: the one picked with "Add sound" on the camera, or
+ * failing that the first music sticker on it. A sticker used to be only a
+ * label — it named a song and nothing played.
+ */
+export function showSong(track: unknown, layers: readonly ShowLayer[]): Track | null {
+  const picked = parseTrack(track);
+  if (picked) return picked;
+  const layer = layers.find((l) => l.type === "music");
+  if (!layer) return null;
+  const m = layer.payload as MusicPayload;
+  return parseTrack({ ...m, artwork: m.artwork ?? "", preview: m.preview ?? "" });
+}

@@ -146,7 +146,7 @@ describe("how often a caller may ask for relay credentials", () => {
 });
 
 function KEEP_MS_FROM_SOURCE(): number {
-  const src = readFileSync("src/lib/call-setup.ts", "utf8");
+  const src = readFileSync("packages/core/src/call-setup.ts", "utf8");
   return Number(/const KEEP_MS = (\d+) \* 60 \* 1000/.exec(src)![1]) * 60 * 1000;
 }
 

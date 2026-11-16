@@ -112,7 +112,7 @@ describe("the pickers that already existed are the ones used", () => {
   it("a link cannot be kept that the parser would refuse", () => {
     // readPayload takes https only. Leaving a link sticker checks the same
     // shape, so a link is never silently dropped at publish.
-    const layers = read("src/lib/show-layers.ts");
+    const layers = read("packages/core/src/show-layers.ts");
     const check = layers.slice(layers.indexOf("export function linkFrom"), layers.indexOf("export function cleanTag"));
     expect(check).toContain('`https://${t}`');
     expect(check).toContain('replace(/^http:\\/\\//i, "https://")');

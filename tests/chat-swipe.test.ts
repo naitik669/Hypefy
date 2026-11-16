@@ -199,7 +199,7 @@ describe("the distances", () => {
   it("and forwarding is not one of them, but is still reachable", () => {
     // It left the gesture, not the app: the hold menu still offers it,
     // where it cannot be reached by a thumb going the wrong way.
-    const gestures = read("src/lib/chat-gestures.ts");
+    const gestures = read("packages/core/src/chat-gestures.ts");
     expect(gestures).not.toContain('"forward"');
     expect(read("src/components/messages/RealChatView.tsx")).toContain('label="Forward"');
   });

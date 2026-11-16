@@ -141,7 +141,7 @@ describe("what is worth a round trip", () => {
     // The floor matches WATCH_MS in lib/watched, so a Shot counted as
     // viewed is a Shot whose watch time is recorded; the two tables cannot
     // disagree about what happened.
-    const watched = read("src/lib/watched.ts");
+    const watched = read("packages/core/src/watched.ts");
     expect(watched).toContain("WATCH_MS = 1200");
     // Built to land exactly on the threshold. playThrough(1.2, 0.25) stops
     // at 1.0s because the step does not divide 1.2, which is how this test

@@ -28,7 +28,7 @@ const front = read("src/components/profile/ProfileCardFaces.tsx");
 const back = read("src/components/profile/HypefyIdFace.tsx");
 const flip = read("src/components/profile/CardFlip.tsx");
 const editor = read("src/components/profile/ProfileCardEditor.tsx");
-const lib = read("src/lib/profile-card.ts");
+const lib = read("packages/core/src/profile-card.ts");
 
 /**
  * The profile card: one machined black plate with two faces.
@@ -268,7 +268,7 @@ describe("the member number", () => {
   });
 
   it("the column is granted and listed, or it cannot be read at all", () => {
-    expect(read("src/lib/profile.ts")).toContain("member_no");
+    expect(read("packages/core/src/profile.ts")).toContain("member_no");
   });
 });
 
@@ -470,7 +470,7 @@ describe("the remark", () => {
   });
 
   it("is set lowercase against the uppercase labels", () => {
-    const written = read("src/lib/card-remarks.ts").match(/"[a-z][^"]*"/g) ?? [];
+    const written = read("packages/core/src/card-remarks.ts").match(/"[a-z][^"]*"/g) ?? [];
     expect(written.length).toBeGreaterThan(60);
     expect(back).toContain("{remark.map((row) => (");
   });

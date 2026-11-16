@@ -1,12 +1,9 @@
 /**
- * A transparent 1x1 GIF, used as every <video>'s poster when it has no cover
- * image of its own.
+ * Moved to @hypefy/core/blank-poster.
  *
- * Android's WebView paints its own placeholder on a video with no poster
- * while the first frame is on its way: a big grey circle with a play
- * triangle. In the app that showed on Shots tiles and chat videos before
- * they loaded. Any poster at all suppresses it, and a transparent one lets
- * the tile's own background show instead.
+ * This re-export exists so that the files importing it did not have to
+ * change when it moved — the module is the same module at a new address.
+ * Delete this file once every caller imports from @hypefy/core directly;
+ * until then, both paths are the same code.
  */
-export const BLANK_POSTER =
-  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+export * from "@hypefy/core/blank-poster";

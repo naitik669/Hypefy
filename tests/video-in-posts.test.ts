@@ -13,7 +13,7 @@ import {
 /**
  * A post can carry a clip.
  *
- * 0195 added posts.media and the bucket, src/lib/post-media.ts was written
+ * 0195 added posts.media and the bucket, packages/core/src/post-media.ts was written
  * and tested, and then nothing imported it: the composer took images only,
  * nothing wrote the column, and post-videos appeared nowhere in src. The
  * model sat finished and unused.
