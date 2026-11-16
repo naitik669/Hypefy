@@ -30,8 +30,40 @@ export function LockedChatsRow({ count, unread }: { count: number; unread: boole
       if (e.target instanceof Node && row.current?.contains(e.target)) return;
       setShown(false);
     }
+    /**
+     * Scrolling away hides it; coming back to the top brings it back, but
+     * only where there is a pointer.
+     *
+     * On a phone the way to bring it back is to pull the list down, and a
+     * pull is not something a mouse does — so once the row had lingered out
+     * on a desktop the only way back was to leave Messages and return. The
+     * analogue of "pull the list down" for a pointer is "scroll back to the
+     * very top", which is the same movement without the overscroll, and
+     * Home does it from the keyboard.
+     *
+     * Gated on a fine pointer so touch behaviour is exactly as it was: there
+     * the pull already does this, and re-showing at scrollTop 0 as well
+     * would make the row flicker in during the pull itself.
+     *
+     * `returned` is what keeps it from re-showing on every small scroll near
+     * the top: it has to have been genuinely scrolled away first.
+     */
+    let returned = false;
+    const finePointer =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(pointer: fine)").matches === true;
+
     function onScroll() {
-      if (window.scrollY > 8) setShown(false);
+      if (window.scrollY > 8) {
+        setShown(false);
+        returned = true;
+        return;
+      }
+      if (finePointer && returned) {
+        returned = false;
+        setShown(true);
+        linger();
+      }
     }
     function onPull() {
       setShown(true);
