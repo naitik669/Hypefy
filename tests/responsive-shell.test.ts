@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import {
   DESTINATIONS,
   bottomBarDestinations,
@@ -31,6 +32,17 @@ import { breakpoints, columns, sideNavWidth, shapeFor, columnWidth } from "@hype
 
 const bottomNav = readFileSync("src/components/layout/BottomNav.tsx", "utf8");
 const swipeNav = readFileSync("src/components/layout/SwipeNav.tsx", "utf8");
+
+/** Every .ts/.tsx file under src, for the whole-codebase assertions. */
+function sourceFiles(dir = "src"): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) out.push(...sourceFiles(p));
+    else if (name.endsWith(".ts") || name.endsWith(".tsx")) out.push(p);
+  }
+  return out;
+}
 const sideNav = readFileSync("src/components/layout/SideNav.tsx", "utf8");
 const appLayout = readFileSync("src/app/(app)/layout.tsx", "utf8");
 const css = readFileSync("src/app/globals.css", "utf8");
@@ -192,7 +204,124 @@ describe("the rail is links, not a tablist", () => {
   });
 });
 
-describe("the column widths", () => {
+describe("the column is defined once", () => {
+  /**
+   * `.app-column`'s three widths, read out of globals.css.
+   *
+   * The width used to be the literal `max-w-[480px]` at 35 call sites, which
+   * is how the shell came to widen at tablet while thirteen full-screen
+   * surfaces standing in for it stayed 480px — a narrow strip over a 680px
+   * page. Adding two more literals at each of the 35 would have made the
+   * next change a 105-edit job.
+   */
+  /**
+   * Every `--app-col` declaration, as [the breakpoint it applies from, px].
+   *
+   * The width lives on a custom property rather than on the class, because
+   * things that position themselves against the column's EDGE need it as a
+   * value — `calc(max(0px, (100vw - var(--app-col)) / 2) + 14px)` pins a
+   * card to the column's right side, and that cannot be done with a
+   * max-width class. `.app-column` is then just `max-width: var(--app-col)`.
+   *
+   * 0 means the unconditional declaration. The breakpoint is the nearest
+   * preceding `@media (min-width: …)` within 240 characters, so a
+   * declaration moved out of its media block reads as 0 and fails rather
+   * than quietly matching the wrong one.
+   */
+  function appColumnRules(): Array<[number, number]> {
+    const out: Array<[number, number]> = [];
+    for (const m of css.matchAll(/--app-col:\s*(\d+)px\s*;/g)) {
+      const before = css.slice(Math.max(0, m.index - 240), m.index);
+      const media = [...before.matchAll(/@media \(min-width:\s*(\d+)px\)\s*\{\s*:root\s*\{\s*$/g)].pop();
+      out.push([media ? Number(media[1]) : 0, Number(m[1])]);
+    }
+    return out.sort((a, b) => a[0] - b[0]);
+  }
+
+  it("reads three declarations out of the stylesheet at all", () => {
+    // A comparison over an empty list passes and proves nothing.
+    expect(appColumnRules().length).toBe(3);
+  });
+
+  it("and the class is defined in terms of that one value", () => {
+    // Two sources for the same width — the class and the variable — is the
+    // drift this whole change removes.
+    expect(css).toContain("max-width: var(--app-col);");
+    expect(css).not.toMatch(/\.app-column\s*\{\s*max-width:\s*\d+px/);
+  });
+
+  it("and they are the same three figures @hypefy/tokens holds", () => {
+    // Two copies of a number is how a layout drifts. The native client reads
+    // the tokens; the web reads the class. Asserted as a whole, so a width
+    // present under the wrong breakpoint fails too.
+    expect(appColumnRules()).toEqual([
+      [0, columns.phone],
+      [breakpoints.tablet, columns.tablet],
+      [breakpoints.desktop, columns.desktop],
+    ]);
+  });
+
+  /**
+   * The literal still exists in exactly seven files, and why.
+   *
+   * 30 of the 35 sites migrated. These five did not, and it is the lint
+   * ratchet's doing rather than an oversight: CI blocks on eslint errors in
+   * changed files, so a file cannot be touched until its debt is paid.
+   *
+   * Three were paid and migrated — messages/new, CallProvider and
+   * InstallPrompt — because their errors were type-level (`no-explicit-any`
+   * over Supabase rows and WebRTC payloads) or the same setMounted portal
+   * guard BottomSheet had. The four below are different in kind: each has a
+   * react-hooks CORRECTNESS error, and verifying a change to one needs an
+   * account, or two devices on a real call.
+   *
+   * Skeletons.tsx has no debt of its own. It is here because its frames must
+   * be character-for-character identical to RealChatView's and ReelsFeed's —
+   * that is what stops the screen jumping as the real thing lands, and
+   * loading-shapes.test.ts asserts it. Migrating one side alone would have
+   * made the skeleton 600px over a 480px chat at tablet.
+   *
+   * Asserted as an exact set, not a maximum: a new literal somewhere else
+   * fails here, and so does a file leaving the list without this comment
+   * being updated.
+   */
+  const LITERAL_HOLDOUTS = [
+    // Each still carries a react-hooks CORRECTNESS error — refs read during
+    // render, or setState inside an effect — in realtime, call or chat code.
+    // Those are not type-level and cannot be fixed blind: verifying them
+    // needs an account, and the call ones need two devices on a real call.
+    "src/components/calls/GroupCallProvider.tsx",
+    "src/components/messages/InAppNotifier.tsx",
+    "src/components/messages/RealChatView.tsx",
+    "src/components/shots/ReelsFeed.tsx",
+    // No debt of its own; paired with ReelsFeed, see below.
+    "src/components/skeletons/Skeletons.tsx",
+  ];
+
+  it("the literal survives only in the files the ratchet kept it in", () => {
+    const offenders = sourceFiles()
+      .filter((f) => readFileSync(f, "utf8").includes("max-w-[480px]"))
+      .map((f) => f.split("\\").join("/"))
+      .sort();
+    expect(offenders).toEqual([...LITERAL_HOLDOUTS].sort());
+  });
+
+  it("and the chat's two frames still match each other exactly", () => {
+    // The reason Skeletons.tsx is on that list. If one of these is ever
+    // migrated the other must move in the same commit.
+    const chat = readFileSync("src/components/messages/RealChatView.tsx", "utf8");
+    const skeleton = readFileSync("src/components/skeletons/Skeletons.tsx", "utf8");
+    const frame = "fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col overflow-hidden bg-background";
+    expect(chat).toContain(frame);
+    expect(skeleton).toContain(frame);
+  });
+
+  it("the shell and the sliding panes use the class", () => {
+    expect(signedInShell()).toContain("app-column");
+    expect(anonShell()).toContain("app-column");
+    expect((swipeNav.match(/app-column/g) ?? []).length).toBe(2);
+  });
+
   it("gets wider at each shape and never narrower", () => {
     expect(columns.phone).toBeLessThan(columns.tablet);
     expect(columns.tablet).toBeLessThan(columns.desktop);
@@ -225,17 +354,20 @@ describe("the column widths", () => {
   });
 
   it("is what the signed-in shell actually applies", () => {
-    const shell = signedInShell();
-    expect(shell).toContain(`max-w-[${columns.phone}px]`);
-    expect(shell).toContain(`md:max-w-[${columns.tablet}px]`);
-    expect(shell).toContain(`lg:max-w-[${columns.desktop}px]`);
+    expect(signedInShell()).toContain("app-column");
   });
 
-  it("gives the anonymous shell the same widths as the signed-in one", () => {
+  it("gives the anonymous shell the same width as the signed-in one", () => {
     // Shared links — a post, a profile, a Shot — are the traffic most likely
     // to arrive on a desktop, and that shell was getting the phone column.
-    expect(anonShell()).toContain(`md:max-w-[${columns.tablet}px]`);
-    expect(anonShell()).toContain(`lg:max-w-[${columns.desktop}px]`);
+    // Now there is one class, so "the same" is structural rather than three
+    // literals that have to be kept in step.
+    expect(anonShell()).toContain("app-column");
+  });
+
+  it("and the admin desk still opts out, because it is a tool not a feed", () => {
+    // 1400px of tables. The one route that was always allowed to say so.
+    expect(signedInShell()).toContain("max-w-[1400px]");
   });
 });
 
@@ -297,15 +429,11 @@ describe("the sliding tabs agree with the column they slide", () => {
     expect(code(swipeNav)).not.toContain("const width = window.innerWidth || 1;");
   });
 
-  it("draws both travelling panes at the column's three widths", () => {
+  it("draws both travelling panes as the column itself", () => {
     // The stand-in and the incoming tab. Narrower than the column they
-    // replace and a strip of the page underneath shows beside them.
-    const panes = swipeNav.match(/max-w-\[480px\][^"]*/g) ?? [];
-    expect(panes.length).toBe(2);
-    for (const p of panes) {
-      expect(p).toContain(`md:max-w-[${columns.tablet}px]`);
-      expect(p).toContain(`lg:max-w-[${columns.desktop}px]`);
-    }
+    // replace and a strip of the page underneath shows beside them — so they
+    // read the same class, not a copy of its figures.
+    expect((swipeNav.match(/app-column/g) ?? []).length).toBe(2);
   });
 });
 

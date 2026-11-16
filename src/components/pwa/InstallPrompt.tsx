@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { X, Share, PlusSquare, Download } from "lucide-react";
 import { CenterModal } from "@/components/ui/CenterModal";
 import { HypefyLogo } from "@/components/HypefyLogo";
@@ -18,8 +18,10 @@ type BeforeInstallPromptEvent = Event & {
 function isStandalone() {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
-    // iOS Safari's non-standard flag
-    (navigator as any).standalone === true
+    // iOS Safari's non-standard flag. Declared here rather than cast to
+    // any: the only unknown is this one optional boolean, and `as any`
+    // turns off checking for the whole expression.
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
   );
 }
 
@@ -38,7 +40,19 @@ export function InstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
   const [iosHelpOpen, setIosHelpOpen] = useState(false);
-  const [ios, setIos] = useState(false);
+  /**
+   * Whether this is iOS — read from the user agent, which never changes.
+   *
+   * Was state set from inside the effect below, which react-hooks flags:
+   * it schedules a second render as soon as the first commits. It is not
+   * state at all, it is a fact about the browser, so it is read like one.
+   * The server snapshot is false because `navigator` does not exist there.
+   */
+  const ios = useSyncExternalStore(
+    () => () => {},
+    () => isIos(),
+    () => false,
+  );
 
   useEffect(() => {
     if (isStandalone()) return;
@@ -54,8 +68,6 @@ export function InstallPrompt() {
       return; // storage unavailable (private mode), skip quietly
     }
     if (visits < MIN_VISITS) return;
-
-    setIos(isIos());
 
     function onBeforeInstall(e: Event) {
       e.preventDefault();
@@ -97,7 +109,7 @@ export function InstallPrompt() {
 
   return (
     <>
-      <div className="animate-toast-drop fixed inset-x-0 bottom-[96px] z-[140] flex justify-center px-4">
+      <div className="animate-toast-drop fixed inset-x-0 bottom-[var(--nav-space)] z-[140] flex justify-center px-4">
         <div className="flex w-full max-w-[440px] items-center gap-3 rounded-2xl border border-border bg-elevated/95 px-3.5 py-3 shadow-[0_12px_36px_rgba(0,0,0,0.5)] backdrop-blur-xl">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface">
             <HypefyLogo className="h-6 w-6 text-foreground" />

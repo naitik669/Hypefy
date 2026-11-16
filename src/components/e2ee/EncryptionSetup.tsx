@@ -156,7 +156,7 @@ export function EncryptionSetup({ userId }: { userId: string }) {
   if (view.kind === "code") {
     return (
       <div className="fixed inset-0 z-[120] overflow-y-auto bg-background">
-        <div className="mx-auto w-full max-w-[480px]">
+        <div className="mx-auto w-full app-column">
           <RecoveryCodeScreen
             code={view.code}
             onDone={async () => {

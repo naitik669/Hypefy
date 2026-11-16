@@ -159,7 +159,7 @@ export function GhostShareFlow({
       aria-modal="true"
       aria-label="Ghost Share"
       data-ghost-step={step}
-      className="fixed inset-0 z-[240] mx-auto flex max-w-[480px] flex-col bg-background"
+      className="fixed inset-0 z-[240] mx-auto flex app-column flex-col bg-background"
     >
       <header className="flex h-[calc(3.5rem+var(--sat))] items-center gap-1 border-b border-border/60 px-2 pt-[var(--sat)]">
         <button

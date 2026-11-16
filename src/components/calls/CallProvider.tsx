@@ -15,6 +15,49 @@ import { BLANK_POSTER } from "@/lib/blank-poster";
 import { CommentIcon } from "@/components/ui/CommentIcon";
 
 type CallType = "audio" | "video";
+
+/**
+ * What one side of a call broadcasts to the other on the signal channel.
+ *
+ * A discriminated union rather than optional fields, so `kind` narrows
+ * `sdp` and `candidate` to definite values in each branch — with optionals
+ * the compiler could not tell that an "answer" always carries an sdp, and
+ * every use needed a non-null assertion.
+ *
+ * `from` is added by send() and is how each side ignores its own
+ * broadcasts.
+ *
+ * This is an ASSERTION about data off the network, not a guarantee: nothing
+ * validates the payload. That is strictly better than the `any` it replaces
+ * — narrowing works and a misspelled kind is now a compile error — but
+ * parsing it properly (Zod, as the boundary rules ask) is its own change,
+ * and one that alters runtime behaviour in code only testable with two
+ * devices on a real call.
+ */
+type CallSignal =
+  | { from: string; kind: "ready" }
+  | { from: string; kind: "offer"; sdp: RTCSessionDescriptionInit; callType: CallType }
+  | { from: string; kind: "answer"; sdp: RTCSessionDescriptionInit }
+  | { from: string; kind: "ice"; candidate: RTCIceCandidateInit }
+  | { from: string; kind: "end" }
+  | { from: string; kind: "decline" };
+
+/** The columns this file reads off a call_sessions row arriving by realtime. */
+type CallSessionRow = {
+  id: string;
+  status: string;
+  conversation_id: string;
+  caller_id: string;
+  type: CallType;
+};
+
+/** The caller's own "incoming" broadcast, which beats the row to the callee. */
+type IncomingPing = {
+  id: string;
+  conversationId: string;
+  callerId: string;
+  type: CallType;
+};
 type Role = "caller" | "callee";
 type Status = "outgoing" | "incoming" | "connected";
 
@@ -149,10 +192,10 @@ export function CallProvider({ userId, children }: { userId: string; children: R
 
   // Channel is keyed by the call SESSION id (not conversation) to avoid
   // crossing signals between an old and a new call in the same DM.
-  function openChannel(callSessionId: string, onSignal: (s: any) => void) {
+  function openChannel(callSessionId: string, onSignal: (s: CallSignal) => void) {
     chanReadyRef.current = false;
     const ch = supabase.channel(`call:${callSessionId}`, { config: { broadcast: { self: false } } });
-    ch.on("broadcast", { event: "signal" }, ({ payload }) => onSignal(payload));
+    ch.on("broadcast", { event: "signal" }, ({ payload }) => onSignal(payload as CallSignal));
     ch.subscribe((status) => {
       if (status === "SUBSCRIBED") {
         chanReadyRef.current = true;
@@ -211,7 +254,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
       };
       setCall(active);
 
-      openChannel(createdId, async (s: any) => {
+      openChannel(createdId, async (s) => {
         if (s.from === userId) return;
         if (s.kind === "ready") {
           send({ kind: "offer", sdp: offer, callType: a.type });
@@ -240,7 +283,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
         .on("postgres_changes",
           { event: "UPDATE", schema: "public", table: "call_sessions", filter: `id=eq.${createdId}` },
           (payload) => {
-            const st = (payload.new as any).status as string;
+            const st = (payload.new as CallSessionRow).status;
             if (st === "accepted") {
               if (ringTimer.current) { clearTimeout(ringTimer.current); ringTimer.current = null; }
               setCall((c) => (c && c.status === "outgoing" ? { ...c, status: "connected" } : c));
@@ -271,7 +314,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
   // â”€â”€ incoming: subscribe to channel & wait for offer â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const beginIncoming = useCallback((c: ActiveCall) => {
     setCall(c);
-    openChannel(c.id, async (s: any) => {
+    openChannel(c.id, async (s) => {
       if (s.from === userId) return;
       const pc = pcRef.current;
       if (s.kind === "offer") {
@@ -380,7 +423,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
     const bc = supabase
       .channel(`user-calls:${userId}`)
       .on("broadcast", { event: "incoming" }, ({ payload }) => {
-        const i = payload as any;
+        const i = payload as IncomingPing;
         ringIncoming({ id: i.id, conversationId: i.conversationId, callerId: i.callerId, type: i.type });
       })
       .subscribe();
@@ -391,7 +434,7 @@ export function CallProvider({ userId, children }: { userId: string; children: R
       .on("postgres_changes",
         { event: "INSERT", schema: "public", table: "call_sessions", filter: `receiver_id=eq.${userId}` },
         (payload) => {
-          const row = payload.new as any;
+          const row = payload.new as CallSessionRow;
           if (row.status !== "ringing") return;
           ringIncoming({ id: row.id, conversationId: row.conversation_id, callerId: row.caller_id, type: row.type });
         })
@@ -482,7 +525,7 @@ function CallUI({
   const showRemoteVideo = call.type === "video" && call.status === "connected" && !!remoteStream;
 
   return (
-    <div {...shieldProps} className="animate-page-enter fixed inset-0 z-[230] mx-auto flex max-w-[480px] flex-col items-center justify-between overflow-hidden bg-black px-6 py-14">
+    <div {...shieldProps} className="animate-page-enter fixed inset-0 z-[230] mx-auto flex app-column flex-col items-center justify-between overflow-hidden bg-black px-6 py-14">
       {showRemoteVideo && <video poster={BLANK_POSTER} ref={remoteVid} autoPlay playsInline className="absolute inset-0 h-full w-full object-cover" />}
       {call.type === "audio" && <video poster={BLANK_POSTER} ref={remoteVid} autoPlay playsInline className="hidden" />}
       {call.type === "video" && call.status === "connected" && (

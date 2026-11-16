@@ -88,7 +88,7 @@ export function IntroCarousel() {
   if (finale) return <IntroFinale />;
 
   return (
-    <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] select-none flex-col overflow-hidden bg-background">
+    <div className="relative mx-auto flex min-h-dvh w-full app-column select-none flex-col overflow-hidden bg-background">
       {/* Top bar — wordmark + Skip */}
       <div className="z-10 flex items-center justify-between px-6 pt-5">
         <span className="text-lg font-extrabold tracking-tight">

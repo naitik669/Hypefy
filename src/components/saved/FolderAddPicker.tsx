@@ -129,7 +129,7 @@ function Picker({
   const all = postsDone && shotsDone;
 
   return (
-    <div className="fixed inset-0 z-[150] mx-auto flex max-w-[480px] flex-col bg-background">
+    <div className="fixed inset-0 z-[150] mx-auto flex app-column flex-col bg-background">
       <header className="flex h-[calc(3.5rem+var(--sat))] shrink-0 items-center gap-2 border-b border-border/60 px-4 pt-[var(--sat)]">
         <p className="min-w-0 flex-1 truncate text-[17px] font-extrabold tracking-tight">Add to {folderName}</p>
         <button

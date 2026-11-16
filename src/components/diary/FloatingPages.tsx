@@ -340,9 +340,9 @@ export function FloatingPages({
       // Its sideways swipes are the deck's. Without this Messages read them
       // as a swipe between tabs and took you to the next one.
       data-hswipe=""
-      className="fixed bottom-[86px] z-20 block select-none rounded-[18px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+      className="fixed bottom-[var(--nav-space)] z-20 block select-none rounded-[18px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
       style={{
-        right: "calc(max(0px, (100vw - 480px) / 2) + 14px)",
+        right: "calc(max(0px, (100vw - var(--app-col)) / 2) + 14px)",
         width,
         height: top ? 132 : 122,
         transform: resting.transform,

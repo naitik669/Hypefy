@@ -94,7 +94,7 @@ export function MarketPreviewSheet({
     >
       <button type="button" aria-label="Close preview" onClick={onClose} className="absolute inset-0 bg-black/60" />
 
-      <div className="animate-rise relative flex w-full max-w-[480px] flex-col gap-3 px-3 pb-[calc(var(--sab,0px)+14px)]">
+      <div className="animate-rise relative flex w-full app-column flex-col gap-3 px-3 pb-[calc(var(--sab,0px)+14px)]">
         <div className="flex flex-col gap-3 rounded-[28px] bg-elevated p-3 ring-1 ring-white/10">
           <div className="flex items-center gap-2">
             <button

@@ -68,7 +68,7 @@ export function PremiumPlans({
   }
 
   return (
-    <div className="relative isolate mx-auto min-h-[calc(100dvh-84px)] w-full max-w-[480px] overflow-hidden">
+    <div className="relative isolate mx-auto min-h-[calc(100dvh-var(--nav-space))] w-full app-column overflow-hidden">
       {/* Black, a green glow through the middle, black again */}
       <div
         aria-hidden
@@ -79,7 +79,7 @@ export function PremiumPlans({
         }}
       />
 
-      <div className="flex min-h-[calc(100dvh-84px)] flex-col px-5 pb-4 pt-[calc(0.5rem+var(--sat))]">
+      <div className="flex min-h-[calc(100dvh-var(--nav-space))] flex-col px-5 pb-4 pt-[calc(0.5rem+var(--sat))]">
         {/* Close and wordmark */}
         <div className="relative flex h-10 items-center justify-center">
           <button

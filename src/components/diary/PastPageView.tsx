@@ -29,7 +29,7 @@ import type { ArchivedDiary } from "@/lib/diary";
  */
 
 /** How wide a page is here. Narrower than the screen, so it reads as a card. */
-const CARD_W = "clamp(232px, calc(min(100vw, 480px) - 96px), 300px)";
+const CARD_W = "clamp(232px, calc(min(100vw, var(--app-col)) - 96px), 300px)";
 
 function dayAndTime(iso: string) {
   const d = new Date(iso);
@@ -151,7 +151,7 @@ export function PastPageView({
       role="dialog"
       aria-modal
       aria-label={`Page from ${dayAndTime(page.writtenAt)}`}
-      className="fixed inset-0 z-[210] mx-auto flex max-w-[480px] flex-col bg-background"
+      className="fixed inset-0 z-[210] mx-auto flex app-column flex-col bg-background"
       {...shieldProps}
     >
       <div className="flex shrink-0 items-center gap-2 px-3 pb-1 pt-[calc(var(--sat)+10px)]">

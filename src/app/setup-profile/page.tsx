@@ -25,7 +25,7 @@ export default async function SetupProfilePage() {
   };
 
   return (
-    <main className="relative mx-auto w-full max-w-[480px] bg-background">
+    <main className="relative mx-auto w-full app-column bg-background">
       <SetupStepper userId={user.id} initial={initial} />
     </main>
   );

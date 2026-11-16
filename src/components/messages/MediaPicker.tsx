@@ -195,7 +195,7 @@ export function MediaPicker({
   return (
     <>
       <BottomSheet open={open && !camera} onClose={onClose} size="half" footer={count ? sendBar : tabs}>
-        <div className="-mx-5 grid grid-cols-3 gap-[2px]" style={{ gridAutoRows: "calc((min(100vw, 480px) - 4px) / 3)" }} data-picker-grid>
+        <div className="-mx-5 grid grid-cols-3 gap-[2px]" style={{ gridAutoRows: "calc((min(100vw, var(--app-col)) - 4px) / 3)" }} data-picker-grid>
           <LiveTile active={open && !camera} onOpen={() => setCamera(true)} />
           <button
             type="button"

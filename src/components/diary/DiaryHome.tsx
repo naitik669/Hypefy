@@ -33,7 +33,7 @@ const NONE: DiaryReaction[] = [];
 
 /** The first screen, exactly: all of the window between the header and the tab bar. */
 const SPOTLIGHT_HEIGHT =
-  "calc(100dvh - 3.5rem - 72px - var(--sat) - var(--sab))";
+  "calc(100dvh - 3.5rem - var(--sat) - var(--nav-edge))";
 
 /**
  * Spotlight — the screen of pages, one tap from Messages.
@@ -219,7 +219,7 @@ export function DiaryHome({
             // Only a little taller than it is wide — a tenth — so it reads as a
             // card, not a column. Its width is the screen less the margins
             // (2 × (12 + 40)px); a very short screen can take it down to 260px.
-            ["--card-h" as string]: `clamp(260px, calc((min(100vw, 480px) - 104px) * 1.1), calc(${SPOTLIGHT_HEIGHT} - 250px))`,
+            ["--card-h" as string]: `clamp(260px, calc((min(100vw, var(--app-col)) - 104px) * 1.1), calc(${SPOTLIGHT_HEIGHT} - 250px))`,
           }}
         >
           {/* A light from above, onto the deck — just a touch. */}

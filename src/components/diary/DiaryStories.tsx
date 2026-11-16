@@ -146,7 +146,7 @@ export function DiaryStories({
       role="dialog"
       aria-modal="true"
       aria-label={`${entry.name}'s page`}
-      className="fixed inset-0 z-[80] mx-auto flex max-w-[480px] flex-col overflow-hidden text-white"
+      className="fixed inset-0 z-[80] mx-auto flex app-column flex-col overflow-hidden text-white"
       style={{ background: diaryTheme(entry.color, entry.hue).screen }}
       {...shieldProps}
     >

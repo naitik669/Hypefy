@@ -498,8 +498,11 @@ export function EditProfileForm({
       </Field>
 
       {/* Sticky save */}
-      {/* On the bottom nav (72px), not behind it at the screen edge. */}
-      <div className="fixed inset-x-0 bottom-[72px] z-20 mx-auto max-w-[480px] bg-gradient-to-t from-background via-background to-transparent px-5 pb-3 pt-4">
+      {/* On the bottom nav's top edge, not behind it at the screen edge.
+          --nav-edge, not a literal 72: the bar is --nav-h tall PLUS the
+          inset it pads by, so 72 alone overlapped the gesture bar. It is 0
+          at lg, where there is no bar to sit on. */}
+      <div className="fixed inset-x-0 bottom-[var(--nav-edge)] z-20 mx-auto app-column bg-gradient-to-t from-background via-background to-transparent px-5 pb-3 pt-4">
         {error && (
           <p className="mb-2 rounded-lg bg-danger/10 px-3 py-2 text-center text-xs text-danger">
             {error}

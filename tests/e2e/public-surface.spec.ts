@@ -314,6 +314,141 @@ test.describe("the breakpoint contract fires in a real browser", () => {
     expect(s.navSpace).toBeGreaterThan(0);
   });
 
+  /**
+   * `.app-column` resolving on a real element.
+   *
+   * The column width was `max-w-[480px]` at 35 sites and is now one class.
+   * It is plain unlayered CSS sitting beside Tailwind utilities on the same
+   * elements, and it only works because unlayered rules beat layered ones —
+   * which is a property of how the stylesheet is assembled, not of anything
+   * readable in the source. A Tailwind upgrade or an @layer wrapper would
+   * break every column in the app at once and no source-reading test would
+   * notice.
+   */
+  for (const [label, width, expected] of [
+    ["phone", 390, "480px"],
+    ["tablet", 800, "600px"],
+    ["desktop", 1440, "680px"],
+  ] as const) {
+    test(`the content column is ${expected} at ${label} (${width}px)`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/signin");
+      const got = await page.evaluate(() => {
+        // The shell's own class list, so the utilities that sit beside the
+        // class in the real markup are present and competing.
+        const d = document.createElement("div");
+        d.className = "relative mx-auto flex min-h-dvh w-full app-column flex-col bg-background";
+        document.body.appendChild(d);
+        const w = getComputedStyle(d).maxWidth;
+        d.remove();
+        return w;
+      });
+      expect(got).toBe(expected);
+    });
+  }
+
+  /**
+   * The nav variables, resolved.
+   *
+   * --nav-space is what a scroll container CLEARS (height + inset + 12px of
+   * air). --nav-edge is what something SITS ON (height + inset, no air): a
+   * save bar pinned above the nav should touch it. Six sites wrote a bare
+   * `bottom-[72px]`, which is the height with the inset left out, so on a
+   * phone with a gesture bar they overlapped it — the same arithmetic error
+   * --nav-space was introduced to fix, in a position rather than a pad.
+   *
+   * Measured, not read: a var() that resolves to nothing is not a CSS error,
+   * it silently makes the property invalid. `--app-col` came back empty once
+   * during this work and `max-width: var(--app-col)` quietly became no limit
+   * at all — every column in the app unbounded, with the source looking
+   * perfectly correct.
+   */
+  const VARS = `(() => {
+    const px = (v) => {
+      const d = document.createElement("div");
+      d.style.position = "absolute";
+      d.style.visibility = "hidden";
+      d.style.height = v;
+      document.body.appendChild(d);
+      const h = d.getBoundingClientRect().height;
+      d.remove();
+      return h;
+    };
+    const cs = getComputedStyle(document.documentElement);
+    return {
+      appCol: cs.getPropertyValue("--app-col").trim(),
+      navEdge: px("var(--nav-edge)"),
+      navSpace: px("var(--nav-space)"),
+    };
+  })()`;
+
+  /**
+   * The served stylesheet is the one on disk.
+   *
+   * Turbopack has served a stale CSS chunk across a dev-server restart three
+   * times during this work, and it does not fail loudly: once `--app-col`
+   * came back EMPTY, which made `max-width: var(--app-col)` invalid rather
+   * than an error, so every column in the app was unbounded while the source
+   * looked perfectly correct; twice a figure was simply the old one, which
+   * reads as a test asserting the wrong number.
+   *
+   * So the source is parsed here and compared with what the browser
+   * computes. A mismatch now says what it is — clear .next — instead of
+   * looking like a wrong expectation.
+   */
+  test("the stylesheet the browser has is the one in the repo", async ({ page }) => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/app/globals.css", "utf8");
+    // The last --app-col declaration in the file is the desktop one.
+    const declared = [...src.matchAll(/--app-col:\s*(\d+)px/g)].pop();
+    expect(declared, "--app-col is not declared in globals.css").toBeTruthy();
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/signin");
+    const served = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--app-col").trim(),
+    );
+    expect(
+      served,
+      "the served CSS disagrees with globals.css — stale Turbopack chunk, clear .next",
+    ).toBe(`${declared![1]}px`);
+  });
+
+  for (const [label, width, col, edge] of [
+    ["phone", 390, "480px", 72],
+    ["tablet", 800, "600px", 72],
+    ["desktop", 1440, "680px", 0],
+  ] as const) {
+    test(`the nav and column variables resolve at ${label} (${width}px)`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/signin");
+      const v = await page.evaluate(VARS);
+      // Non-empty, or `max-width: var(--app-col)` is no limit at all.
+      expect(v.appCol).toBe(col);
+      // The inset is 0 in a desktop browser, so this is the bar's height
+      // below lg and nothing at it.
+      expect(v.navEdge).toBe(edge);
+      // Always 12px more than the edge, except where both are gone.
+      expect(v.navSpace).toBe(edge === 0 ? 0 : edge + 12);
+    });
+  }
+
+  test("and the admin desk opts out of it entirely", async ({ page }) => {
+    // 1400px of tables, not a feed. If the class ever started applying to
+    // this, the one route allowed to use the whole window would lose it.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/signin");
+    const got = await page.evaluate(() => {
+      const d = document.createElement("div");
+      d.className = "mx-auto w-full max-w-[1400px]";
+      document.body.appendChild(d);
+      const w = getComputedStyle(d).maxWidth;
+      d.remove();
+      return w;
+    });
+    expect(got).toBe("1400px");
+  });
+
   test("the rail's width is published for the shell to read", async ({ page }) => {
     await page.goto("/signin");
     const w = await page.evaluate(() =>
