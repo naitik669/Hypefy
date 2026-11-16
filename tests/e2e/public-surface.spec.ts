@@ -347,6 +347,60 @@ test.describe("the breakpoint contract fires in a real browser", () => {
     });
   }
 
+  /**
+   * The nav variables, resolved.
+   *
+   * --nav-space is what a scroll container CLEARS (height + inset + 12px of
+   * air). --nav-edge is what something SITS ON (height + inset, no air): a
+   * save bar pinned above the nav should touch it. Six sites wrote a bare
+   * `bottom-[72px]`, which is the height with the inset left out, so on a
+   * phone with a gesture bar they overlapped it — the same arithmetic error
+   * --nav-space was introduced to fix, in a position rather than a pad.
+   *
+   * Measured, not read: a var() that resolves to nothing is not a CSS error,
+   * it silently makes the property invalid. `--app-col` came back empty once
+   * during this work and `max-width: var(--app-col)` quietly became no limit
+   * at all — every column in the app unbounded, with the source looking
+   * perfectly correct.
+   */
+  const VARS = `(() => {
+    const px = (v) => {
+      const d = document.createElement("div");
+      d.style.position = "absolute";
+      d.style.visibility = "hidden";
+      d.style.height = v;
+      document.body.appendChild(d);
+      const h = d.getBoundingClientRect().height;
+      d.remove();
+      return h;
+    };
+    const cs = getComputedStyle(document.documentElement);
+    return {
+      appCol: cs.getPropertyValue("--app-col").trim(),
+      navEdge: px("var(--nav-edge)"),
+      navSpace: px("var(--nav-space)"),
+    };
+  })()`;
+
+  for (const [label, width, col, edge] of [
+    ["phone", 390, "480px", 72],
+    ["tablet", 800, "600px", 72],
+    ["desktop", 1440, "680px", 0],
+  ] as const) {
+    test(`the nav and column variables resolve at ${label} (${width}px)`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/signin");
+      const v = await page.evaluate(VARS);
+      // Non-empty, or `max-width: var(--app-col)` is no limit at all.
+      expect(v.appCol).toBe(col);
+      // The inset is 0 in a desktop browser, so this is the bar's height
+      // below lg and nothing at it.
+      expect(v.navEdge).toBe(edge);
+      // Always 12px more than the edge, except where both are gone.
+      expect(v.navSpace).toBe(edge === 0 ? 0 : edge + 12);
+    });
+  }
+
   test("and the admin desk opts out of it entirely", async ({ page }) => {
     // 1400px of tables, not a feed. If the class ever started applying to
     // this, the one route allowed to use the whole window would lose it.

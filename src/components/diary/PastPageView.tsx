@@ -29,7 +29,7 @@ import type { ArchivedDiary } from "@/lib/diary";
  */
 
 /** How wide a page is here. Narrower than the screen, so it reads as a card. */
-const CARD_W = "clamp(232px, calc(min(100vw, 480px) - 96px), 300px)";
+const CARD_W = "clamp(232px, calc(min(100vw, var(--app-col)) - 96px), 300px)";
 
 function dayAndTime(iso: string) {
   const d = new Date(iso);

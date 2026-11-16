@@ -316,7 +316,7 @@ export function ShowcaseEditor({
 
       {/* Sits on the bottom nav (72px, which already clears the phone's own
           bar), not at the screen's bottom edge, where the nav covered it. */}
-      <div className="fixed inset-x-0 bottom-[72px] z-20 mx-auto app-column border-t border-border bg-background/95 px-4 pb-3 pt-3 backdrop-blur-xl">
+      <div className="fixed inset-x-0 bottom-[var(--nav-edge)] z-20 mx-auto app-column border-t border-border bg-background/95 px-4 pb-3 pt-3 backdrop-blur-xl">
         <button
           type="button"
           onClick={create}

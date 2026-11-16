@@ -215,28 +215,39 @@ describe("the column is defined once", () => {
    * next change a 105-edit job.
    */
   /**
-   * Every `.app-column` rule, as [the breakpoint it applies from, the width].
+   * Every `--app-col` declaration, as [the breakpoint it applies from, px].
    *
-   * 0 means the unconditional rule. The breakpoint is the nearest preceding
-   * `@media (min-width: …)` in the 240 characters before the selector, so a
-   * rule moved out of its media block reads as 0 and fails rather than
-   * quietly matching the wrong one.
+   * The width lives on a custom property rather than on the class, because
+   * things that position themselves against the column's EDGE need it as a
+   * value — `calc(max(0px, (100vw - var(--app-col)) / 2) + 14px)` pins a
+   * card to the column's right side, and that cannot be done with a
+   * max-width class. `.app-column` is then just `max-width: var(--app-col)`.
+   *
+   * 0 means the unconditional declaration. The breakpoint is the nearest
+   * preceding `@media (min-width: …)` within 240 characters, so a
+   * declaration moved out of its media block reads as 0 and fails rather
+   * than quietly matching the wrong one.
    */
   function appColumnRules(): Array<[number, number]> {
     const out: Array<[number, number]> = [];
-    for (const m of css.matchAll(/\.app-column\s*\{([^}]*)\}/g)) {
-      const width = m[1].match(/max-width:\s*(\d+)px/);
-      if (!width) continue;
+    for (const m of css.matchAll(/--app-col:\s*(\d+)px\s*;/g)) {
       const before = css.slice(Math.max(0, m.index - 240), m.index);
-      const media = [...before.matchAll(/@media \(min-width:\s*(\d+)px\)\s*\{\s*$/g)].pop();
-      out.push([media ? Number(media[1]) : 0, Number(width[1])]);
+      const media = [...before.matchAll(/@media \(min-width:\s*(\d+)px\)\s*\{\s*:root\s*\{\s*$/g)].pop();
+      out.push([media ? Number(media[1]) : 0, Number(m[1])]);
     }
     return out.sort((a, b) => a[0] - b[0]);
   }
 
-  it("reads three rules out of the stylesheet at all", () => {
+  it("reads three declarations out of the stylesheet at all", () => {
     // A comparison over an empty list passes and proves nothing.
     expect(appColumnRules().length).toBe(3);
+  });
+
+  it("and the class is defined in terms of that one value", () => {
+    // Two sources for the same width — the class and the variable — is the
+    // drift this whole change removes.
+    expect(css).toContain("max-width: var(--app-col);");
+    expect(css).not.toMatch(/\.app-column\s*\{\s*max-width:\s*\d+px/);
   });
 
   it("and they are the same three figures @hypefy/tokens holds", () => {

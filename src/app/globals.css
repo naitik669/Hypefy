@@ -90,6 +90,16 @@
   --nav-h: 72px;
   --nav-space: calc(var(--nav-h) + var(--sab) + 12px);
 
+  /* The bar's TOP EDGE — what something sits on rather than clears.
+     --nav-space is for a scroll container, which wants air below its last
+     row; a save bar or a toast pinned above the nav wants to touch it, with
+     no gap. Those six sites each wrote `bottom-[72px]`, which is --nav-h and
+     leaves out --sab — so on a phone with a gesture bar they overlapped the
+     bar by exactly the inset. The same arithmetic error --nav-space was
+     introduced to fix, in a position instead of a pad, which is why the test
+     that swept the pads did not see it. */
+  --nav-edge: calc(var(--nav-h) + var(--sab));
+
   /* The side rail's width, used by SideNav and by the shell that leaves room
      for it. One number, because two would be a gap or an overlap. */
   --sidenav-w: 240px;
@@ -108,6 +118,10 @@
 @media (min-width: 1024px) {
   :root {
     --nav-space: 0px;
+    /* And nothing sits ON a bar that is not there. A save bar pinned at
+       --nav-edge would otherwise float 72px above the bottom of a desktop
+       window with a gap under it. */
+    --nav-edge: 0px;
   }
 }
 
@@ -134,17 +148,26 @@
   Anything that wants a different width — the admin desk's 1400px, a 280px
   confirm — says so itself and does not use this.
 */
+:root {
+  /* The same width as a value, for the things that cannot use the class:
+     anything positioning itself against the column's EDGE rather than
+     living inside it. FloatingPages pins a card to the column's right edge
+     with calc(max(0px, (100vw - var(--app-col)) / 2) + 14px), and had the
+     480 written into that sum — so on a desktop the card sat against a
+     column boundary that had moved 100px outward. */
+  --app-col: 480px;
+}
 .app-column {
-  max-width: 480px;
+  max-width: var(--app-col);
 }
 @media (min-width: 768px) {
-  .app-column {
-    max-width: 600px;
+  :root {
+    --app-col: 600px;
   }
 }
 @media (min-width: 1024px) {
-  .app-column {
-    max-width: 680px;
+  :root {
+    --app-col: 680px;
   }
 }
 

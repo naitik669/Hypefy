@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createPortal } from "react-dom";
 import { Check, AlertCircle, Trash2 } from "lucide-react";
 import { UNDO_MS } from "@/lib/undoable";
@@ -47,10 +55,22 @@ const ACTION_DURATION = UNDO_MS;
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState<ToastState>(null);
   const [leaving, setLeaving] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  /**
+   * Past the server render? The portal needs document.body.
+   *
+   * useSyncExternalStore rather than state plus an effect — the same
+   * correction BottomSheet needed, flagged by the same react-hooks rule.
+   * This reads the environment; it does not hold state, and setting it from
+   * an effect scheduled a second render of the whole app shell on mount.
+   * Server snapshot false, client true, so the output is unchanged.
+   */
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  useEffect(() => { setMounted(true); }, []);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
   const show = useCallback(
@@ -92,7 +112,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           toast.action ? (
             // An offer to take something back: what went, its picture, Undo,
             // and a line along the bottom draining over the time left.
-            <div className="pointer-events-none fixed inset-x-0 bottom-[84px] z-[215] flex justify-center px-3">
+            <div className="pointer-events-none fixed inset-x-0 bottom-[var(--nav-space)] z-[215] flex justify-center px-3">
               <div
                 key={toast.id}
                 role="status"
@@ -129,7 +149,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           ) : (
-            <div className="pointer-events-none fixed inset-x-0 bottom-[96px] z-[215] flex justify-center px-6">
+            <div className="pointer-events-none fixed inset-x-0 bottom-[var(--nav-space)] z-[215] flex justify-center px-6">
               <div
                 key={toast.id}
                 role="status"
