@@ -23,8 +23,23 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 const CORE = "packages/core/src";
 const SHIM_DIR = "src/lib";
 
-const files = (): string[] =>
-  existsSync(CORE) ? readdirSync(CORE).filter((f) => f.endsWith(".ts")) : [];
+/** Every .ts under a directory, including subdirectories. */
+function walk(dir: string, base = ""): string[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const rel = base ? `${base}/${e.name}` : e.name;
+    if (e.isDirectory()) return walk(`${dir}/${e.name}`, rel);
+    return e.name.endsWith(".ts") ? [rel] : [];
+  });
+}
+
+// Recursive on purpose. It was a flat readdir until core gained
+// supabase/ and billing/ subdirectories, at which point the shims inside them
+// were silently unchecked — including supabase/database.types, which the
+// Supabase CLI REGENERATES to its old path. A regeneration landing on top of
+// a shim would restore a second, stale copy of the types with nothing to say
+// so; now it fails the "shims carry no logic" check below.
+const files = (): string[] => walk(CORE);
 
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 
@@ -79,34 +94,47 @@ describe("packages/core is importable from React Native", () => {
 });
 
 describe("the re-exports left behind at the old paths", () => {
-  /** Shims: a src/lib file whose whole job is to forward to core. */
-  const shims = (): string[] =>
-    readdirSync(SHIM_DIR)
-      .filter((f) => f.endsWith(".ts"))
-      .filter((f) => /export \* from "@hypefy\/core\//.test(read(`${SHIM_DIR}/${f}`)));
+  /*
+   * Driven from what is IN CORE, not from what still looks like a shim.
+   *
+   * The first version of this listed src/lib files whose contents matched
+   * `export * from "@hypefy/core/`, which cannot detect the failure that
+   * matters: a shim that stops being a shim simply drops out of the list
+   * instead of failing. Overwriting supabase/database.types.ts with a
+   * regenerated copy — the exact hazard, since the Supabase CLI writes to
+   * that old path — left the suite green.
+   *
+   * So: for every module in core, if the old path still exists, it must be
+   * a one-line re-export pointing at that same module. A module with no old
+   * path is fine; that is either one born in core or a shim already retired.
+   */
+  const oldPathOf = (m: string) => `${SHIM_DIR}/${m}.ts`;
 
-  it("exist, and each points at a module that is really there", () => {
-    const found = shims();
-    expect(found.length).toBeGreaterThan(0);
-    for (const f of found) {
-      const target = read(`${SHIM_DIR}/${f}`).match(/@hypefy\/core\/([a-z0-9-]+)/)?.[1];
-      expect(target, `${f} has no target`).toBeTruthy();
-      expect(
-        existsSync(`${CORE}/${target}.ts`),
-        `${f} forwards to @hypefy/core/${target}, which does not exist`,
-      ).toBe(true);
+  it("point at the module they claim, and only that", () => {
+    const checked: string[] = [];
+    for (const rel of files()) {
+      const m = rel.replace(/.ts$/, "");
+      const old = oldPathOf(m);
+      if (!existsSync(old)) continue;
+      checked.push(m);
+      expect(code(old).trim(), `${old} should re-export @hypefy/core/${m}`).toBe(
+        `export * from "@hypefy/core/${m}";`,
+      );
     }
+    // A boundary test over nothing passes and proves nothing.
+    expect(checked.length).toBeGreaterThan(0);
   });
 
-  it("and carry no logic of their own", () => {
-    // A shim that grows a function is a second implementation nobody knows
-    // about: callers of @/lib/x and callers of @hypefy/core/x would get
-    // different code.
-    for (const f of shims()) {
-      const body = code(`${SHIM_DIR}/${f}`).trim();
-      expect(body, `${f} should be one re-export`).toMatch(
-        /^export \* from "@hypefy\/core\/[a-z0-9-]+";$/,
-      );
+  it("and nothing in src/lib forwards to a module that is not there", () => {
+    for (const rel of walk(SHIM_DIR)) {
+      const target = read(`${SHIM_DIR}/${rel}`).match(
+        /export \* from "@hypefy\/core\/([a-z0-9\/.-]+)"/,
+      )?.[1];
+      if (!target) continue;
+      expect(
+        existsSync(`${CORE}/${target}.ts`),
+        `${rel} forwards to @hypefy/core/${target}, which does not exist`,
+      ).toBe(true);
     }
   });
 });
