@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import {
   type Kv,
   absentKv,
@@ -293,5 +293,95 @@ describe("the app installs a store", () => {
     expect(setup).toContain("installKv(webKv)");
     // Which is what let the moved modules' own tests go unedited.
     expect(read("vitest.config.ts")).toContain("setupFiles");
+  });
+});
+
+/**
+ * The accounting, asserted.
+ *
+ * Twenty modules touched key-value storage. Eleven were pure key-value and
+ * were the ones the interface was for. Where each of the twenty ended up is
+ * the kind of thing that drifts silently — a module moved back, a new one
+ * written against localStorage directly — so it is written down here, with
+ * the reason for each group.
+ */
+describe("where the storage modules ended up", () => {
+  /** Still reaching for localStorage directly, each for its own reason. */
+  const STAYED = {
+    // Not key-value at all: these use sessionStorage too, which has no
+    // native equivalent — there is no "until the tab closes" on a phone.
+    "src/lib/chat-media-url.ts": "sessionStorage",
+    "src/lib/pending-oauth.ts": "sessionStorage",
+    "src/lib/sound.ts": "sessionStorage",
+    // Reaches for the DOM or navigator as well, so it is platform code.
+    "src/lib/camera.ts": "also DOM/navigator",
+    "src/lib/chat-drafts.ts": "also DOM/navigator",
+    "src/lib/chat-outbox.ts": "also DOM/navigator",
+    // Blocked: imports @/lib/music, which imports react and uses document.
+    // A genuine architectural dependency rather than an incidental one.
+    "src/lib/diary.ts": "imports a React module",
+    // SECRETS. Supabase access and refresh tokens, which on a phone belong
+    // in the Keychain or Keystore — async, and a different interface. Also
+    // the reason the report-only CSP exists.
+    "src/lib/saved-accounts.ts": "holds auth tokens",
+    // The web implementation itself.
+    "src/lib/kv-web.ts": "is the web store",
+  };
+
+  /** Moved into core behind the Kv interface. */
+  const MOVED = [
+    "emoji",
+    "feed-seen",
+    "ghost-share",
+    "hint-schedule",
+    "photo-filters",
+    "recent-searches",
+    "shots-seen",
+    "spotlight-nudge",
+    "voice-speed",
+  ];
+
+  it("nine of the eleven pure ones are in core", () => {
+    for (const m of MOVED) {
+      expect(
+        existsSync(`packages/core/src/${m}.ts`),
+        `${m} is not in core`,
+      ).toBe(true);
+    }
+    expect(MOVED).toHaveLength(9);
+  });
+
+  it("and each left a shim, so no caller had to change", () => {
+    for (const m of MOVED) {
+      const shim = read(`src/lib/${m}.ts`);
+      expect(shim, `${m}'s old path is not a shim`).toContain(
+        `export * from "@hypefy/core/${m}"`,
+      );
+    }
+  });
+
+  it("the ones that stayed are exactly the ones with a reason", () => {
+    // Not a maximum: an exact set. A new module written straight against
+    // localStorage fails here, and so does one of these moving without the
+    // reasoning above being updated.
+    const using = readdirSync("src/lib")
+      .filter((f) => f.endsWith(".ts"))
+      .filter((f) => /\blocalStorage\b/.test(read(`src/lib/${f}`)))
+      .map((f) => `src/lib/${f}`)
+      .sort();
+    expect(using).toEqual(Object.keys(STAYED).sort());
+  });
+
+  it("nothing in core reaches for it, which is the point", () => {
+    const offenders = readdirSync("packages/core/src")
+      .filter((f) => f.endsWith(".ts"))
+      .filter((f) =>
+        /\b(local|session)Storage\b/.test(
+          read(`packages/core/src/${f}`)
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/(^|[^:])\/\/.*$/gm, "$1"),
+        ),
+      );
+    expect(offenders, offenders.join(", ")).toEqual([]);
   });
 });
