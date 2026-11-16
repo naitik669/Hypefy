@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useFocusTrap } from "@/lib/useFocusTrap";
@@ -130,10 +137,26 @@ export function BottomSheet({
    */
   dim?: boolean;
 }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  /**
+   * Are we past the server render? The portal needs document.body.
+   *
+   * Was `useState(false)` plus an effect that set it true, which is the
+   * familiar shape and which react-hooks flags as an error: a setState
+   * called synchronously in an effect schedules a second render of this
+   * component and everything inside it, immediately, every time a sheet
+   * opens — and 45 call sites open one.
+   *
+   * useSyncExternalStore is what that shape actually wanted. This is reading
+   * the environment, not holding state. The server snapshot is false and the
+   * client's is true, so the rendered output is what it was before — null
+   * through hydration, then the portal — with no second render to schedule.
+   * subscribe is a no-op: the answer never changes once it is true.
+   */
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
 /**
    * Whether the sheet is on screen, which outlives `open` by the length of
@@ -191,6 +214,9 @@ export function BottomSheet({
             : `${screenH * (expanded ? 0.94 : rest)}px`,
       }
     : { maxHeight: expanded ? "95dvh" : "85dvh" };
+
+  /** For aria-labelledby. useId so two open sheets never collide. */
+  const titleId = `sheet-title-${useId()}`;
 
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const veilRef = useRef<HTMLDivElement | null>(null);
@@ -565,6 +591,7 @@ export function BottomSheet({
   return createPortal(
     <div
       ref={veilRef}
+      data-sheet-veil=""
       className={`fixed inset-0 z-[200] flex items-end justify-center ${
         dim ? "bg-black/70 backdrop-blur-[6px]" : ""
       }`}
@@ -595,6 +622,7 @@ export function BottomSheet({
         }}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         data-sheet=""
         data-expanded={expanded ? "" : undefined}
         className="flex w-full max-w-[480px] flex-col rounded-t-3xl border-t border-border bg-elevated"
@@ -610,10 +638,12 @@ export function BottomSheet({
           style={{ touchAction: "none" }}
           {...handleTouch}
         >
-          <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-border" />
+          <div data-sheet-grip="" className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-border" />
           {title && (
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold">{title}</h2>
+              <h2 id={titleId} className="text-base font-bold">
+                {title}
+              </h2>
               <button
                 type="button"
                 onClick={onClose}

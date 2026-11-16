@@ -284,6 +284,63 @@ describe("the sliding tabs agree with the column they slide", () => {
   });
 });
 
+describe("a sheet becomes a dialog where there is a mouse", () => {
+  const sheet = readFileSync("src/components/ui/BottomSheet.tsx", "utf8");
+
+  /** The one media block that re-shapes the sheet. */
+  function dialogBlock(): string {
+    const q = "@media (min-width: 1024px) and (pointer: fine)";
+    const at = css.indexOf(q);
+    expect(at, `${q} is not in globals.css`).toBeGreaterThan(-1);
+    // To the closing brace of the media block: the last line that is a lone
+    // "}" at column 0.
+    const end = css.indexOf("\n}", css.indexOf("[data-sheet-grip]", at));
+    expect(end).toBeGreaterThan(at);
+    return css.slice(at, end);
+  }
+
+  it("keys off the input device, not only the width", () => {
+    // A 1024px touch tablet in landscape is still something you throw a
+    // sheet on. Width alone would have given it a centred dialog with a
+    // grab handle it could use but that had been hidden.
+    const b = dialogBlock();
+    expect(b).toContain("pointer: fine");
+    expect(b).toContain("min-width: 1024px");
+  });
+
+  it("centres it, closes its corners and rings it", () => {
+    const b = dialogBlock();
+    expect(b).toMatch(/\[data-sheet-veil\][\s\S]*align-items:\s*center/);
+    expect(b).toMatch(/border-radius:/);
+    expect(b).toMatch(/border:\s*1px solid/);
+  });
+
+  it("hides the grip, which cannot be grabbed with a mouse", () => {
+    // The drag is implemented with touch handlers only — there is no
+    // onPointerDown on the handle — so on a fine pointer the grip promises
+    // a gesture that cannot happen.
+    expect(dialogBlock()).toMatch(/\[data-sheet-grip\]\s*\{\s*display:\s*none/);
+    const handle = sheet.slice(sheet.indexOf("data-sheet-handle"));
+    expect(handle.slice(0, 400)).not.toContain("onPointerDown");
+  });
+
+  it("the component publishes the hooks the CSS needs", () => {
+    // The CSS is the whole mechanism, so a renamed attribute would leave
+    // the rule matching nothing and fail silently.
+    for (const attr of ["data-sheet-veil", "data-sheet=", "data-sheet-grip", "data-sheet-footer"]) {
+      expect(sheet, `${attr} is gone from BottomSheet`).toContain(attr);
+    }
+  });
+
+  it("and the dialog has an accessible name", () => {
+    // role="dialog" aria-modal with no name is announced as just "dialog".
+    // 43 of the 45 call sites pass a title.
+    expect(sheet).toContain("aria-labelledby={title ? titleId : undefined}");
+    expect(sheet).toContain("id={titleId}");
+    expect(sheet).toContain("useId()");
+  });
+});
+
 describe("shapeFor", () => {
   it("names each shape at its own boundary", () => {
     expect(shapeFor(breakpoints.tablet)).toBe("tablet");

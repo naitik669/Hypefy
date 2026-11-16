@@ -203,6 +203,74 @@ test.describe("the breakpoint contract fires in a real browser", () => {
     expect(await navSpacePx(page)).toBe(0);
   });
 
+  /**
+   * The sheet-to-dialog rule, measured rather than read.
+   *
+   * It has to beat Tailwind's own utilities on the same element —
+   * `max-w-[480px]`, `rounded-t-3xl`, `border-t` — and an attribute selector
+   * has exactly the same specificity as a class. Whether it wins comes down
+   * to cascade layers, which no amount of reading the file can settle. So a
+   * probe is built with the component's real class list and the computed
+   * style is read off it.
+   *
+   * Deliberately not the real BottomSheet: every one of the 45 call sites is
+   * behind authentication, and this asserts the CSS rule, which is the whole
+   * mechanism.
+   */
+  const PROBE = `(() => {
+    const veil = document.createElement("div");
+    veil.setAttribute("data-sheet-veil", "");
+    veil.className = "fixed inset-0 z-[200] flex items-end justify-center";
+    const sheet = document.createElement("div");
+    sheet.setAttribute("data-sheet", "");
+    sheet.className = "flex w-full max-w-[480px] flex-col rounded-t-3xl border-t border-border bg-elevated";
+    const grip = document.createElement("div");
+    grip.setAttribute("data-sheet-grip", "");
+    grip.className = "mx-auto mb-3 h-1.5 w-10 rounded-full bg-border";
+    sheet.appendChild(grip);
+    veil.appendChild(sheet);
+    document.body.appendChild(veil);
+    const s = getComputedStyle(sheet), v = getComputedStyle(veil), g = getComputedStyle(grip);
+    const out = {
+      align: v.alignItems,
+      maxWidth: s.maxWidth,
+      topLeft: s.borderTopLeftRadius,
+      bottomLeft: s.borderBottomLeftRadius,
+      bottomBorder: s.borderBottomWidth,
+      grip: g.display,
+    };
+    veil.remove();
+    return out;
+  })()`;
+
+  test("a sheet is a centred dialog where there is a mouse and room", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/signin");
+    const s = await page.evaluate(PROBE);
+    expect(s.align).toBe("center");
+    expect(s.maxWidth).toBe("560px");
+    // All four corners, not just the top two.
+    expect(s.bottomLeft).toBe(s.topLeft);
+    expect(s.bottomLeft).not.toBe("0px");
+    // Ringed, not just capped with a top edge.
+    expect(s.bottomBorder).toBe("1px");
+    // The grab handle is touch-only; a mouse cannot grab it.
+    expect(s.grip).toBe("none");
+  });
+
+  test("and is still a sheet just below that width", async ({ page }) => {
+    // 1023px with the same (fine) pointer: isolates the width half of the
+    // rule, so a pass at 1440 cannot be coming from the pointer alone.
+    await page.setViewportSize({ width: 1023, height: 800 });
+    await page.goto("/signin");
+    const s = await page.evaluate(PROBE);
+    expect(s.align).toBe("flex-end");
+    expect(s.maxWidth).toBe("480px");
+    expect(s.bottomLeft).toBe("0px");
+    expect(s.bottomBorder).toBe("0px");
+    expect(s.grip).not.toBe("none");
+  });
+
   test("the rail's width is published for the shell to read", async ({ page }) => {
     await page.goto("/signin");
     const w = await page.evaluate(() =>

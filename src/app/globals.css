@@ -111,6 +111,55 @@
   }
 }
 
+/*
+  A sheet becomes a centred dialog where there is a mouse and room for one.
+
+  BottomSheet is the overlay all 45 of them arrive in, and it is a sheet in
+  the phone sense: it lives on the bottom edge, it is rounded on top only,
+  and you take hold of it and throw it away. Dropped on a 1440px screen that
+  reads as a phone's drawer stuck to the floor of a desktop window — and its
+  grab handle is worse than cosmetic, because the drag is implemented with
+  TOUCH handlers only. A mouse cannot grab it. The affordance promises a
+  gesture that cannot happen.
+
+  Done here rather than as responsive utilities in the component, because
+  the component is 653 lines of drag arithmetic that writes transforms every
+  frame. Threading breakpoints through it would mean the geometry and the
+  gesture disagreeing at a width, which is exactly the class of bug this
+  phase keeps finding. Nothing about the drag changes; only where the thing
+  sits, and whether it claims to be grabbable.
+
+  `and (pointer: fine)`, not width alone: a 1024px touch tablet in landscape
+  is still a device you throw a sheet on. The plan said "at tablet"; this is
+  narrower on purpose, and the reason is that the pattern follows the input
+  device rather than the pixel count.
+*/
+@media (min-width: 1024px) and (pointer: fine) {
+  [data-sheet-veil] {
+    align-items: center;
+  }
+
+  [data-sheet] {
+    max-width: 560px;
+    border-radius: 1.5rem;
+    border: 1px solid var(--color-border);
+    /* The detent sheets (comments) set an explicit dvh height inline, which
+       wins over a class. A centred panel still must not touch the window's
+       edges, so the ceiling is applied here where it can. */
+    max-height: 85dvh;
+  }
+
+  /* The footer's bottom padding carries the phone's home-area inset. There
+     is no home area here, and on a centred panel it reads as a gap. */
+  [data-sheet-footer] {
+    padding-bottom: 0.625rem;
+  }
+
+  [data-sheet-grip] {
+    display: none;
+  }
+}
+
 html {
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
