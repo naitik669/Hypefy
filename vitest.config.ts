@@ -14,6 +14,10 @@ export default defineConfig({
      */
     alias: [
       {
+        find: "@hypefy/tokens",
+        replacement: fileURLToPath(new URL("./packages/tokens/src/index.ts", import.meta.url)),
+      },
+      {
         find: "@hypefy/core",
         replacement: fileURLToPath(new URL("./packages/core/src", import.meta.url)),
       },

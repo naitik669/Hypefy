@@ -1,0 +1,11 @@
+{
+  "name": "@hypefy/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Design tokens as values. The web reads them from @theme in globals.css; React Native reads them from here. tests/tokens.test.ts asserts the two agree.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "sideEffects": false
+}

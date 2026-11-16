@@ -31,6 +31,9 @@
       ],
       "sharp": [
         "./node_modules/sharp/lib/index.d.ts"
+      ],
+      "@hypefy/tokens": [
+        "./packages/tokens/src/index.ts"
       ]
     }
   },
