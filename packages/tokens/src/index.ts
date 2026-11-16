@@ -125,6 +125,29 @@ export function shapeFor(width: number): "phone" | "tablet" | "desktop" {
   return "phone";
 }
 
+/**
+ * How wide the content column actually is, in a viewport of this width.
+ *
+ * The cap for the shape, or the viewport itself when that is narrower — a
+ * 390px phone gets 390, not 480.
+ *
+ * This is not a styling convenience: anything that MOVES the column has to
+ * agree with how wide it is. SwipeNav travels the outgoing and incoming tabs
+ * exactly one column apart and commits a swipe at a fraction of that
+ * distance, and it had the phone figure hard-coded — so widening the column
+ * at tablet left a swipe landing 120px short of the edge and needing 28% of
+ * the whole WINDOW of travel to commit rather than 28% of the page.
+ */
+export function columnWidth(viewportWidth: number): number {
+  // Non-finite falls back to the phone column rather than propagating.
+  // Math.max(1, NaN) is NaN, so the obvious clamp does not catch it — and a
+  // NaN here is a travel distance of NaN and a commit threshold of NaN,
+  // which makes every swipe commit on the first pixel.
+  if (!Number.isFinite(viewportWidth)) return columns.phone;
+  const w = Math.max(1, viewportWidth);
+  return Math.min(w, columns[shapeFor(w)]);
+}
+
 /** The CSS custom-property name for a colour, e.g. accentInk -> --color-accent-ink. */
 export function cssVarName(name: ColorName): string {
   return `--color-${name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;

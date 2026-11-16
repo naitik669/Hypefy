@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { haptics } from "@/lib/haptics";
 import { overlayCount } from "@/lib/overlay-stack";
 import { TabSkeleton, type TabPath } from "@/components/skeletons/TabSkeleton";
+import { columnWidth } from "@hypefy/tokens";
 
 /**
  * Swipe sideways to move between the bottom-nav tabs.
@@ -202,10 +203,17 @@ const SETTLE = "transform 260ms cubic-bezier(0.16,1,0.3,1), opacity 260ms ease";
 /** Longest the incoming page waits for a route that never commits. */
 const HANDOFF_MS = 2500;
 
-/** The width the pages travel: the app's own column, not the whole desktop. */
+/**
+ * The width the pages travel: the app's own column, not the whole window.
+ *
+ * Was `Math.min(innerWidth, 480)` — the phone column, hard-coded. Once the
+ * column widens at tablet the two figures disagree, and the disagreement is
+ * visible: the incoming tab comes to rest 120px short of the edge, with a
+ * strip of the outgoing page still showing beside it.
+ */
 function pageWidth(): number {
   if (typeof window === "undefined") return 1;
-  return Math.min(window.innerWidth || 1, 480);
+  return columnWidth(window.innerWidth || 1);
 }
 
 /**
@@ -494,7 +502,10 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
     axis.current = null;
     reach.current = 0;
 
-    const width = window.innerWidth || 1;
+    // The column, not the window. COMMIT_RATIO is a fraction of the distance
+    // the page travels, and on a wide screen the window is more than twice
+    // that: a swipe had to cross 28% of 1440px to commit a 680px page.
+    const width = pageWidth();
     const outcome = swipeOutcome({
       dx: dx.current,
       width,
@@ -551,7 +562,7 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
               dx.current = 0;
               paint(0, SETTLE);
             }}
-            className="h-full w-full max-w-[480px] overflow-hidden bg-background pb-[var(--nav-space)]"
+            className="h-full w-full max-w-[480px] overflow-hidden bg-background pb-[var(--nav-space)] md:max-w-[600px] lg:max-w-[680px]"
             style={{ touchAction: "pan-y" }}
           >
             <TabSkeleton tab={standIn.tab} />
@@ -574,7 +585,7 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
             }}
             data-side={inbound.side}
             data-incoming-tab={inbound.tab}
-            className="h-full w-full max-w-[480px] overflow-hidden bg-background pb-[var(--nav-space)]"
+            className="h-full w-full max-w-[480px] overflow-hidden bg-background pb-[var(--nav-space)] md:max-w-[600px] lg:max-w-[680px]"
           >
             <TabSkeleton tab={inbound.tab} />
           </div>

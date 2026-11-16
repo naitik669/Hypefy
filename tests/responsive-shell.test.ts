@@ -6,7 +6,7 @@ import {
   sideNavDestinations,
   destinationFor,
 } from "@hypefy/core/navigation";
-import { breakpoints, columns, sideNavWidth, shapeFor } from "@hypefy/tokens";
+import { breakpoints, columns, sideNavWidth, shapeFor, columnWidth } from "@hypefy/tokens";
 
 /**
  * The responsive shell: one navigation, two renderings.
@@ -30,6 +30,7 @@ import { breakpoints, columns, sideNavWidth, shapeFor } from "@hypefy/tokens";
  */
 
 const bottomNav = readFileSync("src/components/layout/BottomNav.tsx", "utf8");
+const swipeNav = readFileSync("src/components/layout/SwipeNav.tsx", "utf8");
 const sideNav = readFileSync("src/components/layout/SideNav.tsx", "utf8");
 const appLayout = readFileSync("src/app/(app)/layout.tsx", "utf8");
 const css = readFileSync("src/app/globals.css", "utf8");
@@ -210,6 +211,76 @@ describe("the column widths", () => {
     // to arrive on a desktop, and that shell was getting the phone column.
     expect(anonShell()).toContain(`md:max-w-[${columns.tablet}px]`);
     expect(anonShell()).toContain(`lg:max-w-[${columns.desktop}px]`);
+  });
+});
+
+describe("columnWidth is what the column actually measures", () => {
+  it("is the viewport when the viewport is narrower than the cap", () => {
+    // A 390px phone gets 390, not 480. SwipeNav travels the pages exactly
+    // this far, so a figure wider than the screen would overshoot.
+    expect(columnWidth(390)).toBe(390);
+    expect(columnWidth(360)).toBe(360);
+  });
+
+  it("is the cap for the shape once the viewport is wider", () => {
+    expect(columnWidth(480)).toBe(columns.phone);
+    expect(columnWidth(768)).toBe(columns.tablet);
+    expect(columnWidth(1024)).toBe(columns.desktop);
+    expect(columnWidth(1440)).toBe(columns.desktop);
+  });
+
+  it("never exceeds the viewport, at any width", () => {
+    for (const w of [1, 200, 390, 600, 767, 768, 900, 1023, 1024, 1920, 3840]) {
+      expect(columnWidth(w), `${w}px`).toBeLessThanOrEqual(w);
+    }
+  });
+
+  it("never goes to zero or negative, whatever it is handed", () => {
+    // It divides nothing, but it IS a travel distance and a commit
+    // denominator — a zero would make every swipe commit instantly.
+    for (const w of [0, -1, -9999, Number.NaN]) {
+      expect(columnWidth(w)).toBeGreaterThan(0);
+    }
+  });
+
+  it("grows with the viewport and never shrinks", () => {
+    let last = 0;
+    for (let w = 100; w <= 2000; w += 7) {
+      const now = columnWidth(w);
+      expect(now, `${w}px went backwards`).toBeGreaterThanOrEqual(last);
+      last = now;
+    }
+  });
+});
+
+describe("the sliding tabs agree with the column they slide", () => {
+  /**
+   * SwipeNav moves the outgoing and incoming tabs exactly one column apart
+   * and commits a swipe at a fraction of that distance. Both figures were
+   * the phone column, hard-coded — `Math.min(innerWidth, 480)` for travel
+   * and `window.innerWidth` for the commit. Widening the column made the
+   * first land the incoming tab 120px short at tablet, and the second always
+   * wrong on a wide screen: 28% of 1440px to commit a 680px page.
+   */
+  it("takes its travel distance from the token, not a literal", () => {
+    expect(swipeNav).toContain("columnWidth(window.innerWidth");
+    expect(code(swipeNav)).not.toContain("Math.min(window.innerWidth || 1, 480)");
+  });
+
+  it("measures the commit against the page, not the window", () => {
+    expect(swipeNav).toContain("const width = pageWidth();");
+    expect(code(swipeNav)).not.toContain("const width = window.innerWidth || 1;");
+  });
+
+  it("draws both travelling panes at the column's three widths", () => {
+    // The stand-in and the incoming tab. Narrower than the column they
+    // replace and a strip of the page underneath shows beside them.
+    const panes = swipeNav.match(/max-w-\[480px\][^"]*/g) ?? [];
+    expect(panes.length).toBe(2);
+    for (const p of panes) {
+      expect(p).toContain(`md:max-w-[${columns.tablet}px]`);
+      expect(p).toContain(`lg:max-w-[${columns.desktop}px]`);
+    }
   });
 });
 
