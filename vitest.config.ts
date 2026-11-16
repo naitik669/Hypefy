@@ -27,6 +27,14 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["tests/**/*.test.ts"],
+    /*
+     * Installs the web key-value store for the whole suite, the same way the
+     * root layout installs it in the browser. The modules that moved into
+     * @hypefy/core behind the Kv interface read through `kv()`, and without
+     * this their existing tests would have had to be edited to install one —
+     * which is exactly what the move was not allowed to require.
+     */
+    setupFiles: ["./tests/setup.ts"],
     // The E2EE modules are parked in the app (flag.ts defaults to off) but
     // still have to be proven correct, so their tests run with it on. The
     // one file that checks the OFF behaviour re-imports with the flag "off".

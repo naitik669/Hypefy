@@ -115,10 +115,10 @@ export function ListRowSkeleton({ avatarSize = 52 }: { avatarSize?: number }) {
   );
 }
 
-/** ReelsFeed: black stage above the nav (bottom-[72px]), author and caption low. */
+/** ReelsFeed: black stage above the nav (--nav-edge), author and caption low. */
 export function ReelSkeleton() {
   return (
-    <div className="fixed inset-x-0 top-0 bottom-[72px] z-10 mx-auto max-w-[480px] overflow-hidden bg-black">
+    <div className="fixed inset-x-0 top-0 bottom-[var(--nav-edge)] z-10 mx-auto app-column overflow-hidden bg-black">
       <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-4 pr-16">
         <div className="flex items-center gap-2.5">
           <AvatarSkeleton size={36} />
@@ -133,7 +133,7 @@ export function ReelSkeleton() {
 /** ShowViewer: black, progress segments along the top. */
 export function ShowSkeleton() {
   return (
-    <div className="fixed inset-0 z-30 mx-auto max-w-[480px] bg-black">
+    <div className="fixed inset-0 z-30 mx-auto app-column bg-black">
       <div className="absolute inset-x-0 top-0 flex gap-1 p-3 pt-[calc(var(--sat)+12px)]">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="h-[3px] flex-1 rounded-full bg-white/20" />
@@ -208,7 +208,7 @@ const BUBBLES: { mine: boolean; width: string }[] = [
 
 export function ChatThreadSkeleton() {
   return (
-    <div aria-busy="true" aria-label="Loading" className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col overflow-hidden bg-background">
+    <div aria-busy="true" aria-label="Loading" className="fixed inset-0 z-50 mx-auto flex app-column flex-col overflow-hidden bg-background">
       <header className="flex h-[calc(3.5rem+var(--sat))] items-center gap-2 border-b border-border/60 chrome-bar px-2 pt-[var(--sat)]">
         <span className="flex h-10 w-10 items-center justify-center text-foreground">
           <ChevronLeft size={24} />

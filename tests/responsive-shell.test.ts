@@ -285,34 +285,46 @@ describe("the column is defined once", () => {
    * fails here, and so does a file leaving the list without this comment
    * being updated.
    */
-  const LITERAL_HOLDOUTS = [
-    // Each still carries a react-hooks CORRECTNESS error — refs read during
-    // render, or setState inside an effect — in realtime, call or chat code.
-    // Those are not type-level and cannot be fixed blind: verifying them
-    // needs an account, and the call ones need two devices on a real call.
-    "src/components/calls/GroupCallProvider.tsx",
-    "src/components/messages/InAppNotifier.tsx",
-    "src/components/messages/RealChatView.tsx",
-    "src/components/shots/ReelsFeed.tsx",
-    // No debt of its own; paired with ReelsFeed, see below.
-    "src/components/skeletons/Skeletons.tsx",
-  ];
-
-  it("the literal survives only in the files the ratchet kept it in", () => {
+  /**
+   * No holdouts left — all 35 sites are on the class.
+   *
+   * There were five for a while, and the reason was the lint ratchet rather
+   * than the layout: CI required ZERO eslint errors in every changed file,
+   * so a file carrying pre-existing debt could not be touched at all, and
+   * the chat view and Shots feed stayed 480px on a desktop because their
+   * files were untouchable. That was a freeze, not a ratchet. It compares
+   * against a recorded baseline now (.eslint-debt.json), which blocks new
+   * debt without forbidding a one-line change — so the width fix landed
+   * without anyone having to pay 33 unrelated errors in chat and call code
+   * that cannot be verified without an account and two devices.
+   */
+  it("the literal is gone from the codebase entirely", () => {
     const offenders = sourceFiles()
       .filter((f) => readFileSync(f, "utf8").includes("max-w-[480px]"))
       .map((f) => f.split("\\").join("/"))
       .sort();
-    expect(offenders).toEqual([...LITERAL_HOLDOUTS].sort());
+    expect(offenders).toEqual([]);
   });
 
   it("and the chat's two frames still match each other exactly", () => {
-    // The reason Skeletons.tsx is on that list. If one of these is ever
-    // migrated the other must move in the same commit.
+    // Not about the literal: about the skeleton and the real view carrying
+    // the SAME frame, whatever it says, so the chat does not jump as it
+    // lands. They moved to the class in one commit for this reason.
     const chat = readFileSync("src/components/messages/RealChatView.tsx", "utf8");
     const skeleton = readFileSync("src/components/skeletons/Skeletons.tsx", "utf8");
-    const frame = "fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col overflow-hidden bg-background";
+    const frame = "fixed inset-0 z-50 mx-auto flex app-column flex-col overflow-hidden bg-background";
     expect(chat).toContain(frame);
+    expect(skeleton).toContain(frame);
+  });
+
+  it("the Shots stage and its skeleton agree too", () => {
+    // The other pair, and the other half of the same bug: a stage pinned at
+    // a bare 72px over a skeleton pinned at --nav-edge would differ by the
+    // phone's gesture inset at the moment the video appears.
+    const reels = readFileSync("src/components/shots/ReelsFeed.tsx", "utf8");
+    const skeleton = readFileSync("src/components/skeletons/Skeletons.tsx", "utf8");
+    const frame = "fixed inset-x-0 top-0 bottom-[var(--nav-edge)] z-10 mx-auto app-column";
+    expect(reels).toContain(frame);
     expect(skeleton).toContain(frame);
   });
 

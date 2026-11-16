@@ -303,7 +303,7 @@ export function InAppNotifier({ currentUserId }: { currentUserId: string }) {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-[calc(var(--sat)+8px)] z-[150] mx-auto flex w-full max-w-[480px] flex-col gap-2 px-3">
+    <div className="pointer-events-none fixed inset-x-0 top-[calc(var(--sat)+8px)] z-[150] mx-auto flex w-full app-column flex-col gap-2 px-3">
       {toasts.map((t) => (
         <div
           key={t.key}

@@ -562,7 +562,7 @@ export function ReelsFeed({
   return (
     <div
       ref={stageRef}
-      className="fixed inset-x-0 top-0 bottom-[72px] z-10 mx-auto max-w-[480px] touch-none overflow-hidden bg-black"
+      className="fixed inset-x-0 top-0 bottom-[var(--nav-edge)] z-10 mx-auto app-column touch-none overflow-hidden bg-black"
       onTouchStart={onSwipeTouchStart}
       onTouchMove={onSwipeTouchMove}
       onTouchEnd={onSwipeTouchEnd}
