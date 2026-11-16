@@ -135,6 +135,31 @@ describe("the rail replaces the bar rather than stacking with it", () => {
     expect(appLayout).toContain("pb-[var(--nav-space)]");
   });
 
+  /**
+   * The premise, asserted — not just the consequence.
+   *
+   * Zeroing --nav-space at lg is only correct if the bar is actually gone
+   * there. It was not: BottomNav had no lg:hidden, so the first version of
+   * this shipped a bar fixed to the bottom of the window over content that
+   * had stopped reserving any room for it. The test above passed throughout,
+   * because it checked that the variable changed and never that the thing it
+   * accounts for had.
+   */
+  it("the bar is hidden at exactly the breakpoint that stops reserving room for it", () => {
+    const bar = bottomNav.slice(bottomNav.indexOf("<nav className="));
+    const openTag = bar.slice(0, bar.indexOf(">"));
+    expect(openTag).toContain("fixed inset-x-0 bottom-0");
+    expect(openTag, "the bottom bar still renders at lg").toContain("lg:hidden");
+  });
+
+  it("and the rail appears at that same breakpoint, so one always exists", () => {
+    // Hidden below lg, shown at lg, in that order: if both hid at lg there
+    // would be no navigation at all on a wide screen, and each assertion
+    // above would still pass on its own.
+    expect(sideNav).toMatch(/\blg:flex\b/);
+    expect(sideNav).not.toMatch(/\blg:hidden\b/);
+  });
+
   it("the rail's width in CSS is the token's figure", () => {
     expect(css).toMatch(new RegExp(`--sidenav-w:\\s*${sideNavWidth}px`));
     expect(sideNav).toContain("var(--sidenav-w)");

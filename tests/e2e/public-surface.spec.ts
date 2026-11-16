@@ -271,6 +271,49 @@ test.describe("the breakpoint contract fires in a real browser", () => {
     expect(s.grip).not.toBe("none");
   });
 
+  /**
+   * The bar and the space it needs, checked together.
+   *
+   * These are two separate decisions in two separate files — `lg:hidden` on
+   * BottomNav and `--nav-space: 0` in globals.css — and they are only
+   * correct as a pair. The first version of this work had the second without
+   * the first: a bar fixed to the bottom of a 1440px window, over content
+   * that had stopped reserving any room for it.
+   */
+  const BAR_PROBE = `(() => {
+    const bar = document.createElement("div");
+    bar.className = "fixed inset-x-0 bottom-0 z-30 mx-auto flex h-[var(--nav-h)] w-full max-w-[480px] lg:hidden";
+    document.body.appendChild(bar);
+    const probe = document.createElement("div");
+    probe.style.height = "var(--nav-space)";
+    probe.style.position = "absolute";
+    probe.style.visibility = "hidden";
+    document.body.appendChild(probe);
+    const out = {
+      barDisplay: getComputedStyle(bar).display,
+      navSpace: probe.getBoundingClientRect().height,
+    };
+    bar.remove();
+    probe.remove();
+    return out;
+  })()`;
+
+  test("the bar and the room it needs disappear together at desktop", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/signin");
+    const s = await page.evaluate(BAR_PROBE);
+    expect(s.barDisplay).toBe("none");
+    expect(s.navSpace).toBe(0);
+  });
+
+  test("and both are present together below it", async ({ page }) => {
+    await page.setViewportSize({ width: 1023, height: 800 });
+    await page.goto("/signin");
+    const s = await page.evaluate(BAR_PROBE);
+    expect(s.barDisplay).not.toBe("none");
+    expect(s.navSpace).toBeGreaterThan(0);
+  });
+
   test("the rail's width is published for the shell to read", async ({ page }) => {
     await page.goto("/signin");
     const w = await page.evaluate(() =>
