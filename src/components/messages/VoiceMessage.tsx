@@ -134,13 +134,57 @@ export function VoiceMessage({ url, storedDuration, peaks, mine }: Props) {
     }
   }
 
-  function seek(e: React.MouseEvent<HTMLDivElement>) {
+  /** Move to a point in the note, 0..1. Clamped, so callers need not be. */
+  function seekTo(ratio: number) {
     const audio = audioRef.current;
     if (!audio || !audio.duration) return;
+    const r = Math.max(0, Math.min(1, ratio));
+    audio.currentTime = r * audio.duration;
+    setProgress(r);
+  }
+
+  function seek(e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    audio.currentTime = ratio * audio.duration;
-    setProgress(ratio);
+    seekTo((e.clientX - rect.left) / rect.width);
+  }
+
+  /**
+   * The same scrubbing, from the keyboard.
+   *
+   * The bars already said `role="slider"` with an aria-valuenow, and had
+   * neither a tabIndex nor a key handler — so the one thing a screen reader
+   * was told about them was the one thing that was not true. A keyboard user
+   * could play a voice note and never move within it.
+   *
+   * Arrow keys by a twentieth, Page keys by a fifth, Home and End to the
+   * ends: the ARIA slider pattern's own bindings, so nothing here has to be
+   * learned.
+   */
+  const STEP = 0.05;
+  const PAGE = 0.2;
+  function onScrubKey(e: React.KeyboardEvent<HTMLDivElement>) {
+    const by =
+      e.key === "ArrowRight" || e.key === "ArrowUp"
+        ? STEP
+        : e.key === "ArrowLeft" || e.key === "ArrowDown"
+          ? -STEP
+          : e.key === "PageUp"
+            ? PAGE
+            : e.key === "PageDown"
+              ? -PAGE
+              : null;
+    if (by !== null) {
+      e.preventDefault();
+      seekTo(progress + by);
+      return;
+    }
+    if (e.key === "Home") {
+      e.preventDefault();
+      seekTo(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      seekTo(1);
+    }
   }
 
   // Width follows the note's length; the bar count follows the width, so
@@ -182,10 +226,19 @@ export function VoiceMessage({ url, storedDuration, peaks, mine }: Props) {
         {/* Waveform bars (tap to seek) */}
         <div
           role="slider"
+          tabIndex={0}
           aria-label="Voice note scrubber"
+          // A slider has to say what the range IS, not only where it is.
+          // With valuenow alone a reader announces "50" out of nothing.
+          aria-valuemin={0}
+          aria-valuemax={100}
           aria-valuenow={Math.round(progress * 100)}
-          className="flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-[2px]"
+          // And a percentage is not what anybody wants to hear about a
+          // voice note. valuetext replaces it with the time.
+          aria-valuetext={`${fmt(displayTime)} of ${fmt(duration)}`}
+          className="flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-[2px] rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           onClick={seek}
+          onKeyDown={onScrubKey}
         >
           {shape.map((h, i) => (
             <div
