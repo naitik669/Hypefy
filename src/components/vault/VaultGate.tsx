@@ -108,7 +108,7 @@ export function VaultGate({
   }
 
   return (
-    <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col items-center justify-center gap-6 px-8" data-vault-gate>
+    <div className="relative mx-auto flex min-h-dvh w-full app-column flex-col items-center justify-center gap-6 px-8" data-vault-gate>
       {stepUpDialog}
       <button
         type="button"

@@ -112,6 +112,43 @@
 }
 
 /*
+  The app's content column, as one class.
+
+  This width was a literal at 35 call sites — `max-w-[480px]` — which is how
+  the shell ended up widening at tablet while thirteen full-screen surfaces
+  that stand in for it (the chat view, the call screen, a PIN gate, a story
+  viewer) stayed 480px and sat as a narrow strip over a 680px page. Adding
+  two more literals at each of the 35 would have made that worse, not better:
+  the next change needs 105 edits to stay consistent.
+
+  So the column is one class and the figures live here. @hypefy/tokens holds
+  the same three numbers for the Expo client, and tests/responsive-shell.test.ts
+  asserts the two agree in both directions — the same guarantee the palette
+  has, for the same reason.
+
+  Plain CSS rather than a Tailwind @utility: this is never composed with a
+  variant (there is no `hover:app-column`), and unlayered rules beat layered
+  utilities, which is what makes it safe to drop in beside the classes already
+  on these elements.
+
+  Anything that wants a different width — the admin desk's 1400px, a 280px
+  confirm — says so itself and does not use this.
+*/
+.app-column {
+  max-width: 480px;
+}
+@media (min-width: 768px) {
+  .app-column {
+    max-width: 600px;
+  }
+}
+@media (min-width: 1024px) {
+  .app-column {
+    max-width: 680px;
+  }
+}
+
+/*
   A sheet becomes a centred dialog where there is a mouse and room for one.
 
   BottomSheet is the overlay all 45 of them arrive in, and it is a sheet in

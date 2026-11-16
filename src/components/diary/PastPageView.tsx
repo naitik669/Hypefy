@@ -151,7 +151,7 @@ export function PastPageView({
       role="dialog"
       aria-modal
       aria-label={`Page from ${dayAndTime(page.writtenAt)}`}
-      className="fixed inset-0 z-[210] mx-auto flex max-w-[480px] flex-col bg-background"
+      className="fixed inset-0 z-[210] mx-auto flex app-column flex-col bg-background"
       {...shieldProps}
     >
       <div className="flex shrink-0 items-center gap-2 px-3 pb-1 pt-[calc(var(--sat)+10px)]">

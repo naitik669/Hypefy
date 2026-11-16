@@ -143,7 +143,7 @@ export function LeaveSheet({
         aria-modal="true"
         aria-label={`Leave this ${what}?`}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[480px] animate-rise rounded-t-3xl bg-elevated px-5 pb-[max(1.25rem,var(--sab))] pt-5"
+        className="w-full app-column animate-rise rounded-t-3xl bg-elevated px-5 pb-[max(1.25rem,var(--sab))] pt-5"
       >
         <p className="text-center text-base font-extrabold text-foreground">Leave this {what}?</p>
         <p className="mx-auto mt-1 max-w-[30ch] text-center text-xs text-muted">
@@ -203,7 +203,7 @@ export function PostLeaveSheet({
         aria-modal="true"
         aria-label="Leave this post?"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[480px] animate-rise rounded-t-3xl bg-elevated px-5 pb-[max(1.25rem,var(--sab))] pt-5"
+        className="w-full app-column animate-rise rounded-t-3xl bg-elevated px-5 pb-[max(1.25rem,var(--sab))] pt-5"
       >
         <p className="text-center text-base font-extrabold text-foreground">Leave this post?</p>
         <p className="mx-auto mt-1 max-w-[32ch] text-center text-xs text-muted">

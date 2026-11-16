@@ -330,7 +330,7 @@ export function SetupStepper({
       </div>
 
       {/* CTA */}
-      <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[480px] bg-gradient-to-t from-background via-background to-transparent px-6 pt-6 pb-8">
+      <div className="fixed inset-x-0 bottom-0 z-20 mx-auto app-column bg-gradient-to-t from-background via-background to-transparent px-6 pt-6 pb-8">
         {error && (
           <p className="mb-2 rounded-xl bg-danger/10 px-3 py-2 text-center text-xs text-danger">
             {error}

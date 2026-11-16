@@ -625,7 +625,7 @@ export function BottomSheet({
         aria-labelledby={title ? titleId : undefined}
         data-sheet=""
         data-expanded={expanded ? "" : undefined}
-        className="flex w-full max-w-[480px] flex-col rounded-t-3xl border-t border-border bg-elevated"
+        className="flex w-full app-column flex-col rounded-t-3xl border-t border-border bg-elevated"
         style={heights}
         onClick={(e) => e.stopPropagation()}
       >

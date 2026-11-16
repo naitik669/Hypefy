@@ -14,7 +14,7 @@ import Link from "next/link";
  */
 export default function NotFound() {
   return (
-    <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col items-center justify-center gap-3.5 overflow-hidden bg-background px-6 text-center">
+    <div className="relative mx-auto flex min-h-dvh w-full app-column flex-col items-center justify-center gap-3.5 overflow-hidden bg-background px-6 text-center">
       {/* The same few stars that drift behind the offline page. */}
       <span className="lost-star" style={{ top: "11%", left: "12%" }} />
       <span className="lost-star" style={{ top: "20%", right: "14%" }} />

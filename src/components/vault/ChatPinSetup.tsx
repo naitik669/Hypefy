@@ -65,7 +65,7 @@ export function ChatPinSetup({
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="fixed inset-0 z-[260] mx-auto flex max-w-[480px] flex-col items-center justify-center gap-6 bg-background px-8"
+      className="fixed inset-0 z-[260] mx-auto flex app-column flex-col items-center justify-center gap-6 bg-background px-8"
     >
       <button
         type="button"

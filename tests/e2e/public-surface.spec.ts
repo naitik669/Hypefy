@@ -314,6 +314,55 @@ test.describe("the breakpoint contract fires in a real browser", () => {
     expect(s.navSpace).toBeGreaterThan(0);
   });
 
+  /**
+   * `.app-column` resolving on a real element.
+   *
+   * The column width was `max-w-[480px]` at 35 sites and is now one class.
+   * It is plain unlayered CSS sitting beside Tailwind utilities on the same
+   * elements, and it only works because unlayered rules beat layered ones —
+   * which is a property of how the stylesheet is assembled, not of anything
+   * readable in the source. A Tailwind upgrade or an @layer wrapper would
+   * break every column in the app at once and no source-reading test would
+   * notice.
+   */
+  for (const [label, width, expected] of [
+    ["phone", 390, "480px"],
+    ["tablet", 800, "600px"],
+    ["desktop", 1440, "680px"],
+  ] as const) {
+    test(`the content column is ${expected} at ${label} (${width}px)`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/signin");
+      const got = await page.evaluate(() => {
+        // The shell's own class list, so the utilities that sit beside the
+        // class in the real markup are present and competing.
+        const d = document.createElement("div");
+        d.className = "relative mx-auto flex min-h-dvh w-full app-column flex-col bg-background";
+        document.body.appendChild(d);
+        const w = getComputedStyle(d).maxWidth;
+        d.remove();
+        return w;
+      });
+      expect(got).toBe(expected);
+    });
+  }
+
+  test("and the admin desk opts out of it entirely", async ({ page }) => {
+    // 1400px of tables, not a feed. If the class ever started applying to
+    // this, the one route allowed to use the whole window would lose it.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/signin");
+    const got = await page.evaluate(() => {
+      const d = document.createElement("div");
+      d.className = "mx-auto w-full max-w-[1400px]";
+      document.body.appendChild(d);
+      const w = getComputedStyle(d).maxWidth;
+      d.remove();
+      return w;
+    });
+    expect(got).toBe("1400px");
+  });
+
   test("the rail's width is published for the shell to read", async ({ page }) => {
     await page.goto("/signin");
     const w = await page.evaluate(() =>

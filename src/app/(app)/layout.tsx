@@ -54,7 +54,7 @@ export default async function AppLayout({
             exactly the traffic most likely to be on a desktop, and it was
             getting the phone column. No rail: there is nothing to navigate
             to without an account. */}
-        <div className="relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-background md:max-w-[600px] lg:max-w-[680px]">
+        <div className="relative mx-auto flex min-h-dvh w-full app-column flex-col bg-background">
           <TabScrollTop />
           <div className="flex-1">{children}</div>
         </div>
@@ -118,7 +118,7 @@ export default async function AppLayout({
    */
   const column = pathname.startsWith("/admin")
     ? "max-w-[1400px]"
-    : "max-w-[480px] md:max-w-[600px] lg:max-w-[680px]";
+    : "app-column";
 
   const suspendedNow =
     !!profile.suspendedAt &&

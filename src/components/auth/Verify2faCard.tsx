@@ -91,7 +91,7 @@ export function Verify2faCard() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col justify-center px-6 py-10">
+    <div className="mx-auto flex min-h-dvh w-full app-column flex-col justify-center px-6 py-10">
       <div className="flex flex-col gap-5">
         <div>
           <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-[16px] bg-accent/15 text-accent">

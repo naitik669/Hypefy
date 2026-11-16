@@ -56,7 +56,7 @@ export function ConsentBanner({ country }: { country: string | null }) {
 
   return (
     <div
-      className="fixed inset-x-0 z-[60] mx-auto w-full max-w-[480px] px-3"
+      className="fixed inset-x-0 z-[60] mx-auto w-full app-column px-3"
       style={{ bottom: "calc(var(--sab) + 12px)" }}
     >
       <section

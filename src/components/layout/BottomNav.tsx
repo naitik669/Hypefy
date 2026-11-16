@@ -216,7 +216,7 @@ export function BottomNav({
           itself for this bar, is overridden to 0 at the same breakpoint. The
           two have to agree, or the bar sits over content that reserved
           nothing for it. See tests/responsive-shell.test.ts. */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto flex h-[var(--nav-h)] w-full max-w-[480px] items-center justify-around border-t border-border/60 chrome-bar px-2 pb-[var(--sab)] lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto flex h-[var(--nav-h)] w-full app-column items-center justify-around border-t border-border/60 chrome-bar px-2 pb-[var(--sab)] lg:hidden">
         {/* Tap goes home; holding raises the shortcuts. Search lives here
             rather than as a second icon in the top bar, where it crowded the
             wordmark and looked bolted on. */}
