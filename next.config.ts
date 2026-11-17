@@ -17,8 +17,11 @@ const nextConfig: NextConfig = {
     staleTimes: {
       dynamic: 30,
     },
-    // Lets a chat slide in over the inbox and back out (messages/[threadId]/layout.tsx).
-    viewTransition: true,
+    // `experimental.viewTransition` was here, letting a chat slide in over
+    // the inbox and back out (messages/[threadId]/layout.tsx). The flag was
+    // removed in Next 16.3.0 — the bundled upgrade guide says so and says
+    // what to do: "Remove the flag. View transitions work in the App Router
+    // without configuration." So the behaviour stays and the flag goes.
     /**
      * Only load the icons actually used, rather than the whole barrel.
      *
