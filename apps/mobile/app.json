@@ -34,6 +34,12 @@
         "projectId": "63031c8b-ca59-4aca-b7d3-1f4ecd9e00a6"
       }
     },
-    "owner": "hypefy-platform"
+    "owner": "hypefy-platform",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/63031c8b-ca59-4aca-b7d3-1f4ecd9e00a6"
+    }
   }
 }
