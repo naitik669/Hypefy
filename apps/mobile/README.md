@@ -31,6 +31,20 @@ EXPO_PUBLIC_SUPABASE_URL=... EXPO_PUBLIC_SUPABASE_ANON_KEY=... npx expo start
 The client throws at startup without those two, on purpose — the alternative
 is an opaque network error on the first request.
 
+## Config for an EAS build
+
+`eas.json` carries both values in every build profile's `env`, so a cloud
+build needs nothing set up by hand. That failure is otherwise expensive: the
+app installs, then dies on launch, and finding out costs a whole EAS round
+trip. `tests/mobile-foundation.test.ts` ties the two together — whatever the
+source reads from `EXPO_PUBLIC_*`, every profile must supply — and refuses a
+profile carrying anything server-only.
+
+Putting the anon key in the repo is deliberate, not an oversight. It is
+public by design and bounded by RLS; the web already inlines the same string
+into every page it serves. The service-role key bypasses RLS and must never
+appear here — the test asserts that too.
+
 ## Why there is no NativeWind
 
 Tailwind 4 support exists only in NativeWind v5, which is a release candidate,

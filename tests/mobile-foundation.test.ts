@@ -289,6 +289,95 @@ describe("the monorepo wiring", () => {
   });
 });
 
+describe("the config an EAS build has to carry", () => {
+  /**
+   * supabase.ts throws at module scope when the Supabase values are absent,
+   * deliberately — an opaque network error on the sign-in screen is worse
+   * than a loud startup failure. The cost of that choice is that a build
+   * profile missing them produces an app which installs and then dies on
+   * launch, and the round trip to find out is a full EAS build.
+   *
+   * So the two are tied together here: whatever the app reads from
+   * EXPO_PUBLIC_*, every profile must supply.
+   */
+  const easPath = "apps/mobile/eas.json";
+
+  /** Every EXPO_PUBLIC_ name the mobile source actually reads. */
+  function referencedNames(): string[] {
+    const files = [
+      "apps/mobile/src/supabase.ts",
+      "apps/mobile/src/session-store.ts",
+      "apps/mobile/src/theme.ts",
+      "apps/mobile/src/fonts.ts",
+      "apps/mobile/app/_layout.tsx",
+      "apps/mobile/app/index.tsx",
+    ];
+    const found = new Set<string>();
+    for (const f of files) {
+      // Comments stripped first. A doc comment naming the variable has
+      // satisfied this kind of scan five times in this repo already.
+      const src = read(f).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+      for (const m of src.matchAll(/process\.env\.(EXPO_PUBLIC_[A-Z0-9_]+)/g)) {
+        found.add(m[1]);
+      }
+    }
+    return [...found].sort();
+  }
+
+  it("the app reads the two Supabase values and nothing else", () => {
+    expect(referencedNames()).toEqual([
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+      "EXPO_PUBLIC_SUPABASE_URL",
+    ]);
+  });
+
+  it("and every build profile supplies all of them", () => {
+    const eas = JSON.parse(read(easPath)) as {
+      build: Record<string, { env?: Record<string, string> }>;
+    };
+    const profiles = Object.keys(eas.build);
+    expect(profiles.length).toBeGreaterThan(0);
+
+    for (const name of profiles) {
+      const env = eas.build[name].env ?? {};
+      for (const key of referencedNames()) {
+        expect(env[key], `${name} is missing ${key}`).toBeTruthy();
+      }
+    }
+  });
+
+  it("the url points at this project and the key is the anon one", () => {
+    const eas = JSON.parse(read(easPath)) as {
+      build: Record<string, { env?: Record<string, string> }>;
+    };
+    for (const [name, profile] of Object.entries(eas.build)) {
+      const env = profile.env ?? {};
+      expect(env.EXPO_PUBLIC_SUPABASE_URL, name).toMatch(
+        /^https:\/\/[a-z0-9]+\.supabase\.co$/,
+      );
+      // The anon key is public by design and bounded by RLS — the web
+      // already inlines it into every page. The service-role key bypasses
+      // RLS entirely and must never reach a device.
+      expect(env.EXPO_PUBLIC_SUPABASE_ANON_KEY, name).toMatch(/^eyJ/);
+      expect(env.EXPO_PUBLIC_SUPABASE_ANON_KEY, name).not.toMatch(/service_role/);
+    }
+  });
+
+  it("and no profile smuggles a server-only secret", () => {
+    // A build profile's env is baked into the binary, which is readable.
+    const raw = read(easPath);
+    for (const forbidden of [
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "FCM_SERVICE_ACCOUNT",
+      "RAZORPAY",
+      "PRIVATE KEY",
+      "KEYSTORE_PASSWORD",
+    ]) {
+      expect(raw, `${forbidden} must not be in eas.json`).not.toContain(forbidden);
+    }
+  });
+});
+
 describe("what the tokens guarantee for both clients", () => {
   it("one accent, one background", () => {
     // Sanity that the import above is the real tokens module and not a
