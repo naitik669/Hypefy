@@ -23,6 +23,17 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "63031c8b-ca59-4aca-b7d3-1f4ecd9e00a6"
+      }
+    },
+    "owner": "hypefy-platform"
   }
 }
