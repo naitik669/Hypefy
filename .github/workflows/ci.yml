@@ -54,6 +54,30 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # The native client, with its OWN TypeScript. It is on 6.0 because
+      # Expo 58 pins that, while the web is on 5.9 — so the root tsconfig
+      # excludes apps/** and this is the only thing that checks it. Without
+      # a step of its own, mobile type errors reach main unnoticed.
+      - name: Typecheck the mobile app
+        run: npm run typecheck --workspace @hypefy/mobile
+
+      # And that it still BUNDLES, which typechecking does not prove: Metro
+      # has to resolve @hypefy/core, @hypefy/tokens and the font assets
+      # across the workspace, and a broken metro.config.js or a missing
+      # asset fails here rather than on somebody's device.
+      #
+      # Export, not a native build: no Android SDK, no signing, no EAS
+      # login needed. It produces the Hermes bundle, which is the part that
+      # can break from a change in this repo.
+      - name: Bundle the mobile app
+        run: npx expo export --platform android --output-dir /tmp/expo-export
+        working-directory: apps/mobile
+        env:
+          # The client throws at startup without these, and export
+          # evaluates module scope. Placeholders: nothing is contacted.
+          EXPO_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+
       - name: Unit tests
         run: npm test
 
