@@ -5,8 +5,12 @@
 -- returns no rows to anybody who is not the owner, and the grant is revoked
 -- as well, so the lock is on twice.
 --
--- Thirteen of them do both. rate_events does only the first: `anon` and
--- `authenticated` still hold SELECT on it. Nothing is exposed today, because
+-- Thirteen of them do both. rate_events does only the first, and by more
+-- than the obvious margin: `anon` and `authenticated` hold the FULL set —
+-- SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER. This
+-- comment said "SELECT" when it was written; the grants were read properly
+-- before applying it and that was understated. Nothing is exposed today,
+-- because
 -- the empty policy set denies every row — but the belt is missing while the
 -- braces hold, and the day somebody adds a permissive policy to this table
 -- for a dashboard, rate-limit history becomes world-readable with no second
@@ -15,8 +19,9 @@
 -- Verified safe before writing this:
 --   * no client call site anywhere — `from("rate_events")` appears 0 times in
 --     src/, and the name only survives in the generated database types
---   * the two functions that do read it, rate_limit() and ops_readiness(),
---     are both SECURITY DEFINER owned by postgres, so they run as the owner
+--   * the THREE functions that read it — rate_limit(), ip_rate_limit() and
+--     ops_readiness(); this said two, and ip_rate_limit() was missed —
+--     are all SECURITY DEFINER owned by postgres, so they run as the owner
 --     and the grant is nothing to do with them
 --
 -- A revoke can only ever remove reach, and there is no reader to lose.
