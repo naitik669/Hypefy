@@ -2,6 +2,11 @@
 
 # dependencies
 /node_modules
+# Every workspace, not only the root. `/node_modules` is rooted, so the
+# nested copies npm creates for a workspace with a conflicting version were
+# not covered — apps/mobile needs its own react and typescript, and without
+# this line a `git add -A` would commit about 1,100 packages.
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -52,3 +57,15 @@ supabase/.temp/
 
 # Throwaway preview routes used to check UI in a browser; never shipped.
 /src/app/zz-preview-*/
+
+# expo (apps/mobile)
+.expo/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+expo-env.d.ts

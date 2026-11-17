@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Hypefy",
+    "slug": "hypefy",
+    "scheme": "chat.hypefy",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "android": {
+      "package": "chat.hypefy.app",
+      "allowBackup": false,
+      "edgeToEdgeEnabled": true
+    },
+    "ios": {
+      "bundleIdentifier": "chat.hypefy.app",
+      "supportsTablet": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
