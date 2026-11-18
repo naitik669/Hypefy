@@ -569,6 +569,105 @@ describe("the front door leads somewhere now", () => {
   });
 });
 
+describe("a signed-in person can get back out", () => {
+  /*
+   * The test that was missing, and the defect it would have caught.
+   *
+   * Replacing the Phase 5 diagnostic screen removed the only sign-out in
+   * the app. Nothing noticed, because the entry router sends a session
+   * straight to the feed — so anyone who already had one could not reach
+   * the sign-in or sign-up screens that had just been built. Every test
+   * passed; none of them asked whether a signed-in person could leave.
+   *
+   * It took a device to find, which is the point the plan keeps making
+   * about native verification being the throughput limit. What it costs
+   * is one assertion, forever.
+   */
+  const BAR = ["home", "shots", "messages", "profile"] as const;
+
+  /**
+   * Source with comments AND imports gone.
+   *
+   * Both of the first two assertions here were written the obvious way and
+   * both survived mutation, for the same reason: removing
+   * `footer={<SignOutRow />}` from the Profile tab left the import and the
+   * doc comment that names it, so a search for "SignOutRow" in that file
+   * still hit. It is the comment trap with an import standing in for the
+   * comment — the eighth time something in this repo has matched a mention
+   * of code rather than the code.
+   */
+  function body(path: string): string {
+    return code(path)
+      .split("\n")
+      .filter((line) => !/^\s*import\b/.test(line))
+      .join("\n");
+  }
+
+  it("a destination in the bar actually RENDERS a sign-out", () => {
+    /*
+     * "It exists somewhere" is not the assertion that matters — the
+     * removed one existed too, on a screen nobody could reach any more.
+     * This asks whether a tab a signed-in person can tap renders it, as
+     * JSX, in the file's body.
+     */
+    const rendering = BAR.filter((tab) => {
+      const path = `apps/mobile/app/(tabs)/${tab}.tsx`;
+      return existsSync(path) && /<SignOutRow\s*\/?>/.test(body(path));
+    });
+    expect(rendering.length, "no bar destination renders a sign-out").toBeGreaterThan(0);
+  });
+
+  it("and the component it renders really signs out", () => {
+    // Rendering something named SignOutRow proves nothing on its own.
+    const src = body("apps/mobile/src/auth/SignOutRow.tsx");
+    expect(src).toMatch(/supabase\.auth\.signOut\(\)/);
+  });
+
+  it("it asks before it signs out", () => {
+    /*
+     * Anchored to the branch, not to the file. The first version asserted
+     * that the question and both labels appeared somewhere — all still
+     * true when the first tap was wired straight to signOut and the
+     * confirm step became unreachable. Mutation S3 found it.
+     */
+    const src = body("apps/mobile/src/auth/SignOutRow.tsx");
+    const start = src.indexOf("if (!asking)");
+    expect(start, "the two-step confirm is gone").toBeGreaterThan(-1);
+    const firstTap = src.slice(start, src.indexOf("return (", src.indexOf("}", start)));
+    expect(firstTap, "the first tap should only open the confirm").toMatch(/setAsking\(true\)/);
+    expect(firstTap, "the first tap signs out immediately").not.toMatch(/signOut\(/);
+
+    const confirm = src.slice(src.indexOf("Sign out of Hypefy?"));
+    expect(confirm).toMatch(/accessibilityLabel="Cancel"/);
+    expect(confirm).toMatch(/accessibilityLabel="Confirm sign out"/);
+    expect(confirm).toMatch(/signOut\(\)/);
+  });
+
+  it("and leaves rather than trusting a layout to notice", () => {
+    /*
+     * signOut clears the store; whether something re-reads it is a timing
+     * question, and this is the one action whose entire purpose is to
+     * leave. It navigates.
+     */
+    const src = code("apps/mobile/src/auth/SignOutRow.tsx");
+    expect(src).toMatch(/router\.replace\("\/onboarding"\)/);
+    // And says so if it could not, instead of appearing to work.
+    expect(src).toMatch(/setError\(err\.message\)/);
+  });
+
+  it("the placeholder can carry an action without pretending to be a screen", () => {
+    /*
+     * The Placeholder's own rule is that it shows no invented posts and no
+     * shimmer. A footer slot does not break that — it is the difference
+     * between honest-and-unfinished and a dead end that traps a session.
+     */
+    const src = code("apps/mobile/src/Placeholder.tsx");
+    expect(src).toMatch(/footer\?: React\.ReactNode/);
+    expect(src).toMatch(/\{footer\}/);
+    expect(src, "the placeholder started inventing content").not.toMatch(/shimmer|skeleton/i);
+  });
+});
+
 describe("what this screen deliberately does not do yet", () => {
   it("no second account, and no pretence of one", () => {
     /*
