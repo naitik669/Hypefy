@@ -393,34 +393,11 @@ describe("the posts slide's feed wall matches the website's", () => {
     }
   });
 
-  it("and travels the web's 7px", () => {
-    const css = read("src/app/globals.css");
-    const block = css.slice(css.indexOf("@keyframes float-y"));
-    expect(block.slice(0, 200)).toContain("translateY(-7px)");
-    expect(native()).toMatch(/FLOAT_Y = -7/);
-  });
-
-  it("the reveal runs in the web's order, at the web's spacing", () => {
+  it("the reveal runs in the web's order", () => {
     const web = webFn("MockPostStack");
     const orders = [...web.matchAll(/revealStyle\(active, (\d)\)/g)].map((m) => Number(m[1]));
     expect(orders, "the web's reveal order has changed").toEqual([4, 3, 4, 2, 5]);
-    const src = native();
-    expect([...src.matchAll(/order=\{(\d)\}/g)].map((m) => Number(m[1]))).toEqual(orders);
-
-    // The step itself, which sets how staggered the whole thing feels.
-    const gap = code(WEB).match(/const REVEAL_GAP = (\d+)/);
-    expect(gap, "the web no longer declares REVEAL_GAP").toBeTruthy();
-    expect(src).toMatch(new RegExp(`REVEAL_GAP = ${gap?.[1]}\\b`));
-    // 16px rise, 0.5s fade, 0.55s transform — all three off the web.
-    expect(web.length).toBeGreaterThan(0);
-    const reveal = code(WEB).slice(code(WEB).indexOf("function revealStyle("));
-    expect(reveal).toContain("translateY(16px)");
-    expect(src).toMatch(/outputRange: \[0, 16\]/);
-    expect(reveal).toContain("opacity 0.5s ease");
-    expect(src).toMatch(/duration: 500/);
-    expect(reveal).toContain("transform 0.55s cubic-bezier(0.16,1,0.3,1)");
-    expect(src).toMatch(/duration: 550/);
-    expect(src).toMatch(/Easing\.bezier\(0\.16, 1, 0\.3, 1\)/);
+    expect([...native().matchAll(/order=\{(\d)\}/g)].map((m) => Number(m[1]))).toEqual(orders);
   });
 
   it("the four neighbours are the web's four users, with the web's figures", () => {
@@ -535,7 +512,347 @@ describe("the posts slide's feed wall matches the website's", () => {
     const m = web.match(/var\(--color-background\) (\d+)%, transparent/);
     expect(m, "the web's fade no longer states its stop").toBeTruthy();
     const flipped = (100 - Number(m?.[1])) / 100;
-    expect(native()).toMatch(new RegExp(`offset: ${flipped}\\b`));
+    // Bounded by the comma that follows, not by \b — see the reels slide's
+    // gradient test for why a word boundary is the wrong tool on a decimal.
+    expect(native()).toMatch(new RegExp(`offset: ${String(flipped).replace(".", "\\.")},`));
+  });
+});
+
+describe("the slides' shared motion is the website's", () => {
+  /*
+   * Float, the two reveals and the star's pop are declared once on the web
+   * and shared by its five visuals, so they are one file here too — and
+   * asserted here rather than inside each slide's block, so a second copy
+   * appearing in a slide is visible as an unexplained duplicate.
+   */
+  const MOTION = "apps/mobile/src/onboarding/motion.tsx";
+  const motion = () => code(MOTION);
+  const web = () => code(WEB);
+
+  it("the bob travels the web's 7px", () => {
+    const css = read("src/app/globals.css");
+    const block = css.slice(css.indexOf("@keyframes float-y"));
+    expect(block.slice(0, 200)).toContain("translateY(-7px)");
+    expect(motion()).toMatch(/FLOAT_Y = -7/);
+  });
+
+  it("the stagger is the web's REVEAL_GAP, and reelReveal's own step agrees", () => {
+    const gap = web().match(/const REVEAL_GAP = (\d+)/);
+    expect(gap, "the web no longer declares REVEAL_GAP").toBeTruthy();
+    expect(motion()).toMatch(new RegExp(`REVEAL_GAP = ${gap?.[1]}\\b`));
+    /*
+     * The web writes the reels' step as a literal — `order * 170` inside
+     * reelReveal — rather than reusing REVEAL_GAP. They happen to agree,
+     * and this is the assertion that keeps them agreeing: one constant
+     * serves both slides here, so if the web ever changes only one of the
+     * two this fails rather than silently following the wrong one.
+     */
+    const reel = web().slice(web().indexOf("function reelReveal("));
+    expect(reel.slice(0, 200)).toContain(`order * ${gap?.[1]}`);
+  });
+
+  it("revealStyle's rise and both its timings", () => {
+    const reveal = web().slice(web().indexOf("function revealStyle("));
+    expect(reveal).toContain("translateY(16px)");
+    expect(reveal).toContain("opacity 0.5s ease");
+    expect(reveal).toContain("transform 0.55s cubic-bezier(0.16,1,0.3,1)");
+
+    const fn = motion().slice(motion().indexOf("export function Reveal("));
+    expect(fn).toMatch(/outputRange: \[0, 16\]/);
+    expect(fn).toMatch(/duration: 500/);
+    expect(fn).toMatch(/duration: 550/);
+    expect(fn).toMatch(/Easing\.bezier\(0\.16, 1, 0\.3, 1\)/);
+  });
+
+  it("reelReveal's rise, its scale and both its timings", () => {
+    const reel = web().slice(web().indexOf("function reelReveal("));
+    const block = reel.slice(0, reel.indexOf("\nfunction "));
+    expect(block).toContain("translateY(22px) scale(0.95)");
+    expect(block).toContain("opacity 0.55s ease");
+    expect(block).toContain("transform 0.6s cubic-bezier(0.16,1,0.3,1)");
+
+    const fn = motion().slice(motion().indexOf("export function ReelReveal("));
+    expect(fn).toMatch(/outputRange: \[0, 22\]/);
+    expect(fn).toMatch(/outputRange: \[1, 0\.95\]/);
+    expect(fn).toMatch(/duration: 550/);
+    expect(fn).toMatch(/duration: 600/);
+    expect(fn).toMatch(/Easing\.bezier\(0\.16, 1, 0\.3, 1\)/);
+  });
+
+  it("and the two reveals are not the same thing wearing two names", () => {
+    /*
+     * The web keeps them separate because the numbers differ. If a future
+     * edit collapses one into the other, this says so.
+     *
+     * Each slice is bounded at the next export, which the first version
+     * was not: slicing from `export function Reveal(` to the end of the
+     * file swept ReelReveal in with it, so the test failed on correct
+     * code. The same mistake as the stylesheet slicer on the posts slide.
+     */
+    const bounded = (name: string) => {
+      const src = motion();
+      const start = src.indexOf(`export function ${name}(`);
+      expect(start, `${name} is not exported from motion.tsx`).toBeGreaterThan(-1);
+      const rest = src.slice(start + 1);
+      const end = rest.indexOf("\nexport function ");
+      return end === -1 ? rest : rest.slice(0, end);
+    };
+    expect(bounded("Reveal")).not.toContain("outputRange: [0, 22]");
+    expect(bounded("ReelReveal")).not.toContain("outputRange: [0, 16]");
+  });
+
+  it("the star pops to the web's scale and tilt, over the web's duration", () => {
+    const css = read("src/app/globals.css");
+    const block = css.slice(css.indexOf("@keyframes star-pop"));
+    expect(block.slice(0, 300)).toContain("scale(1.2) rotate(10deg)");
+    const dur = block.match(/animation: star-pop ([\d.]+)s/);
+    expect(dur, "the web no longer states star-pop's duration").toBeTruthy();
+
+    const fn = motion().slice(motion().indexOf("export function StarPop("));
+    expect(fn).toMatch(/outputRange: \[1, 1\.2\]/);
+    expect(fn).toMatch(/outputRange: \["0deg", "10deg"\]/);
+    // There and back, so each leg is half.
+    expect(fn).toMatch(new RegExp(`leg = ${(Number(dur?.[1]) * 1000) / 2}\\b`));
+  });
+
+  it("and the blur every one of these leaves out is recorded as left out", () => {
+    /*
+     * The web's reveals fade in FROM a blur, and there is no filter in
+     * React Native. This asserts the omission is written down rather than
+     * forgotten — and that nobody has quietly added a fake for it.
+     */
+    expect(web()).toContain("blur(8px)");
+    expect(web()).toContain("blur(10px)");
+    expect(read(MOTION), "the missing blur is no longer explained").toMatch(
+      /no filter|expo-blur/i,
+    );
+    expect(motion(), "something is pretending to be the blur").not.toMatch(/blur/i);
+  });
+});
+
+describe("the shots slide's reels match the website's", () => {
+  function webFn(name: string): string {
+    const src = code(WEB);
+    const start = src.indexOf(`function ${name}(`);
+    expect(start, `the web no longer has a ${name}`).toBeGreaterThan(-1);
+    const rest = src.slice(start + 1);
+    const end = rest.indexOf("\nfunction ");
+    return end === -1 ? rest : rest.slice(0, end);
+  }
+
+  const native = () => code("apps/mobile/src/onboarding/MockReel.tsx");
+
+  it("the three cards are the web's three sizes, paired as the web pairs them", () => {
+    /*
+     * Width and height together, not as two sets of numbers: a height
+     * copied onto the wrong card gives a reel the wrong shape while every
+     * individual figure still appears in the file.
+     */
+    const web = webFn("MockReel");
+    const pairs = [...web.matchAll(/w=\{(\d+)\} h=\{(\d+)\}/g)].map(
+      (m) => [m[1], m[2]] as const,
+    );
+    expect(pairs.length, "the web no longer renders three reels").toBe(3);
+    for (const [w, h] of pairs) {
+      expect(native(), `no reel at ${w}x${h}`).toMatch(new RegExp(`w=\\{${w}\\} h=\\{${h}\\}`));
+    }
+  });
+
+  it("the hero is the only one that gets the star's pop", () => {
+    // The web passes `active` to one ReelCard. Pass it to all three and
+    // three stars tick out of sync for no reason.
+    const web = webFn("MockReel");
+    const withActive = [...web.matchAll(/w=\{(\d+)\} h=\{\d+\} active=\{active\}/g)].map(
+      (m) => m[1],
+    );
+    expect(withActive, "the web no longer marks exactly one reel active").toEqual(["188"]);
+    expect([...native().matchAll(/w=\{(\d+)\} h=\{\d+\} active=\{active\}/g)].map((m) => m[1])).toEqual(
+      withActive,
+    );
+  });
+
+  it("the two behind sit where the web puts them", () => {
+    const PLACEMENT: ReadonlyArray<readonly [string, string, RegExp]> = [
+      ["left", "-left-20", /left: -80/],
+      ["left", "top-7", /top: 28/],
+      ["left", "opacity-50", /opacity: 0\.5/],
+      ["right", "-right-20", /right: -80/],
+      ["right", "top-12", /top: 48/],
+      ["right", "opacity-45", /opacity: 0\.45/],
+    ];
+    const web = webFn("MockReel");
+    for (const [key, cls, re] of PLACEMENT) {
+      expect(web, `the web no longer uses ${cls}`).toContain(cls);
+      const src = native();
+      const start = src.indexOf(`  ${key}: {`);
+      expect(start, `${key} is not a style in MockReel`).toBeGreaterThan(-1);
+      const entry = src.slice(start, src.indexOf("},", start));
+      expect(entry, `${key} should carry ${cls}`).toMatch(re);
+    }
+  });
+
+  it("the hero sits above them", () => {
+    expect(webFn("MockReel")).toContain("z-10");
+    expect(native()).toMatch(/hero: \{ zIndex: 10/);
+  });
+
+  it("each reel bobs for the web's duration after the web's delay", () => {
+    const pairs = [...webFn("MockReel").matchAll(/<Float dur="([\d.]+)s" delay="([\d.]+)s">/g)].map(
+      (m) => [Number(m[1]) * 1000, Number(m[2]) * 1000] as const,
+    );
+    expect(pairs.length, "the web's reels no longer float").toBe(3);
+    for (const [dur, delay] of pairs) {
+      expect(native(), `no Float at ${dur}ms after ${delay}ms`).toMatch(
+        new RegExp(`dur=\\{${dur}\\} delay=\\{${delay}\\}`),
+      );
+    }
+  });
+
+  it("and reveals in the web's order", () => {
+    const orders = [...webFn("MockReel").matchAll(/reelReveal\(active, (\d)\)/g)].map((m) =>
+      Number(m[1]),
+    );
+    expect(orders, "the web's reel reveal order has changed").toEqual([3, 4, 2]);
+    expect([...native().matchAll(/order=\{(\d)\}/g)].map((m) => Number(m[1]))).toEqual(orders);
+  });
+
+  it("the card's inner proportions are the web's fractions of its width", () => {
+    // The web sizes the play disc and its glyph off `w`, which is what lets
+    // one set of numbers serve all three cards. Hard-coding either would
+    // make the two small reels wrong and only the hero right.
+    const card = webFn("ReelCard");
+    expect(card).toContain("width: w * 0.26");
+    expect(card).toContain("size={w * 0.13}");
+    expect(native()).toMatch(/PLAY_DISC = 0\.26/);
+    expect(native()).toMatch(/PLAY_GLYPH = 0\.13/);
+    expect(native()).toMatch(/w \* PLAY_DISC/);
+    expect(native()).toMatch(/w \* PLAY_GLYPH/);
+  });
+
+  it("the hype rail switches icon sizes at the web's own threshold", () => {
+    const card = webFn("ReelCard");
+    const threshold = card.match(/const big = w > (\d+)/);
+    expect(threshold, "the web no longer has a `big` threshold").toBeTruthy();
+    expect(native()).toMatch(new RegExp(`BIG_ABOVE = ${threshold?.[1]}\\b`));
+
+    // Three glyphs, each with a big size and a small one, paired.
+    const sizes = [...card.matchAll(/size=\{big \? (\d+) : (\d+)\}/g)].map(
+      (m) => [m[1], m[2]] as const,
+    );
+    expect(sizes.length, "the web's rail no longer sizes three glyphs").toBe(3);
+    for (const [b, s] of sizes) {
+      expect(native(), `no glyph at ${b}/${s}`).toMatch(
+        new RegExp(`size=\\{big \\? ${b} : ${s}\\}`),
+      );
+    }
+  });
+
+  it("the card's own measurements are the web's", () => {
+    const SIZES: ReadonlyArray<readonly [string, RegExp, string]> = [
+      ["rounded-[26px]", /borderRadius: 26/, "the card's radius"],
+      ["bottom-12", /bottom: 48/, "how high the hype rail sits"],
+      ["right-2.5", /right: 10/, "how far in it sits"],
+      ["h-7", /width: 28/, "the author's avatar"],
+      ["rounded-[9px]", /borderRadius: 9/, "its radius"],
+      ["ring-2", /borderWidth: 2/, "its ring"],
+      ["pr-11", /paddingRight: 44/, "the room the footer leaves the rail"],
+      ["text-[11px]", /fontSize: 11/, "the caption"],
+    ];
+    for (const [cls, re, what] of SIZES) {
+      expect(webFn("ReelCard"), `the web no longer uses ${cls}`).toContain(cls);
+      expect(native(), `${what} does not match`).toMatch(re);
+    }
+  });
+
+  it("the white-on-photograph opacities are the web's", () => {
+    const card = webFn("ReelCard");
+    expect(card).toContain("ring-white/60");
+    expect(native()).toContain("rgba(255, 255, 255, 0.6)");
+    expect(card).toContain("text-white/85");
+    expect(native()).toContain("rgba(255, 255, 255, 0.85)");
+    expect(card).toContain("bg-black/35");
+    expect(native()).toContain("rgba(0, 0, 0, 0.35)");
+  });
+
+  it("the darkening over the photograph is the web's three stops, flipped", () => {
+    /*
+     * `bg-gradient-to-t from-black/75 via-transparent to-black/10` reads
+     * UPWARD: 75% black at the bottom, clear in the middle, 10% at the
+     * top. This one reads downward, so the stops are reversed. Copied
+     * un-flipped it darkens the caption's sky and lightens the caption,
+     * which is the one thing the gradient exists to prevent.
+     */
+    const card = webFn("ReelCard");
+    const m = card.match(/bg-gradient-to-t from-black\/(\d+) via-transparent to-black\/(\d+)/);
+    expect(m, "the web's reel gradient no longer parses").toBeTruthy();
+    const bottom = Number(m?.[1]) / 100;
+    const top = Number(m?.[2]) / 100;
+    /*
+     * The stop is matched up to its terminating `,` or `}`, not with a
+     * word boundary. `opacity: 0\b` matched the 0 in `opacity: 0.3`,
+     * because a full stop is not a word character — so the mutation that
+     * darkened the middle of the gradient passed. R17 found it.
+     */
+    const stop = (offset: string, opacity: number) =>
+      new RegExp(
+        `offset: ${offset.replace(".", "\\.")}, color: "#000000", opacity: ${String(
+          opacity,
+        ).replace(".", "\\.")}\\s*[,}]`,
+      );
+    const src = native();
+    expect(src).toMatch(stop("0", top));
+    expect(src).toMatch(stop("1", bottom));
+    expect(src, "the middle is no longer clear").toMatch(stop("0.5", 0));
+  });
+
+  it("the three users are the web's three, with the web's captions and counts", () => {
+    const web = code(WEB);
+    const block = web.slice(web.indexOf("const HERO_REEL"), web.indexOf("function reelReveal"));
+    /*
+     * The fields are matched across newlines: HERO_REEL is written one
+     * field per line on both sides while BG_REELS' entries are each on one
+     * line, and a single-line regex silently found only the two.
+     */
+    const ROW = /handle: "(\w+)",[\s\S]*?caption: "([^"]+)",[\s\S]*?hypes: "([^"]+)"/g;
+    const rows = [...block.matchAll(ROW)].map((m) => [m[1], m[2], m[3]] as const);
+    expect(rows.length, "the web's reel data no longer parses").toBe(3);
+
+    const src = native();
+    const nativeBlock = src.slice(src.indexOf("const HERO_REEL"), src.indexOf("export function"));
+    const nativeRows = [...nativeBlock.matchAll(ROW)].map((m) => [m[1], m[2], m[3]] as const);
+    expect(nativeRows).toEqual(rows);
+  });
+
+  it("every reel has a photograph AND an author's face, as on the web", () => {
+    // The web's ReelData makes pfp optional and falls back to a gradient
+    // avatar; all three supply one, so this app needs no fallback. If the
+    // web ever drops one, the phone would render nothing there — hence the
+    // assertion rather than a silent assumption.
+    const web = code(WEB);
+    const block = web.slice(web.indexOf("const HERO_REEL"), web.indexOf("function reelReveal"));
+    expect([...block.matchAll(/img:/g)].length).toBe(3);
+    expect([...block.matchAll(/pfp:/g)].length).toBe(3);
+  });
+
+  it("uses the website's own image files rather than copies of them", () => {
+    const src = native();
+    const imports = [...src.matchAll(/from "([^"]*public\/onboarding\/[^"]+)"/g)].map((m) => m[1]);
+    expect(imports.length, "no shared onboarding images are imported").toBe(6);
+    for (const spec of imports) {
+      const file = spec.replace(/^(\.\.\/)+/, "");
+      expect(existsSync(file), `${file} is missing from the web's public folder`).toBe(true);
+    }
+    expect(src, "an image was copied into the app instead of shared").not.toMatch(
+      /assets\/onboarding/,
+    );
+  });
+
+  it("and every image it names is one the web's reels name", () => {
+    const web = code(WEB);
+    const block = web.slice(web.indexOf("const HERO_REEL"), web.indexOf("function reelReveal"));
+    for (const m of native().matchAll(/public\/onboarding\/([\w.-]+)"/g)) {
+      expect(block, `${m[1]} is not used by the web's reels`).toContain(m[1]);
+    }
   });
 });
 
@@ -607,15 +924,16 @@ describe("the gradient avatar is the website's gradient", () => {
 });
 
 describe("what is deliberately not done yet", () => {
-  it("the three remaining visuals are absent, not stubbed", () => {
-    // Welcome and posts are drawn. The other three slides render nothing in
-    // the slot, which is honest; a placeholder illustration would make the
-    // screen look finished and then have to come out.
+  it("the two remaining visuals are absent, not stubbed", () => {
+    // Welcome, posts and shots are drawn. The other two slides render
+    // nothing in the slot, which is honest; a placeholder illustration
+    // would make the screen look finished and then have to come out.
     const carousel = code(NATIVE);
     expect(carousel).toMatch(/slide === "welcome" \? \(\s*<WelcomeVisual \/>/);
     expect(carousel).toMatch(/slide === "posts" \? \(\s*<MockPostStack active=\{active\} \/>/);
+    expect(carousel).toMatch(/slide === "shots" \? \(\s*<MockReel active=\{active\} \/>/);
     expect(carousel).toMatch(/\) : null/);
-    for (const other of ["MockReel", "MockDiscover", "MockProfile"]) {
+    for (const other of ["MockDiscover", "MockProfile"]) {
       expect(carousel, `${other} appeared without being announced`).not.toContain(other);
     }
   });
