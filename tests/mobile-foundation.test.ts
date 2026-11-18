@@ -363,6 +363,52 @@ describe("the config an EAS build has to carry", () => {
     }
   });
 
+  it("over-the-air updates are pinned to the app version", () => {
+    /*
+     * expo-updates ships JS to installed apps without a store round trip,
+     * which is the difference between a one-minute fix and an hour-long
+     * rebuild. The hazard is serving an update to a binary that cannot run
+     * it: an OTA carries JS only, so any change to native code — a new
+     * module, a permission, a config plugin — needs a real build.
+     *
+     * `runtimeVersion.policy: "appVersion"` is what enforces that. The
+     * runtime version is derived from `version`, so a binary only accepts
+     * updates built against the same one, and bumping `version` for a
+     * native change cuts the old binaries off rather than feeding them JS
+     * they cannot execute.
+     */
+    const app = JSON.parse(read("apps/mobile/app.json")) as {
+      expo: {
+        version: string;
+        runtimeVersion?: { policy?: string };
+        updates?: { url?: string };
+        extra?: { eas?: { projectId?: string } };
+      };
+    };
+    expect(app.expo.runtimeVersion?.policy).toBe("appVersion");
+    expect(app.expo.version).toBeTruthy();
+
+    // The update URL must name THIS project. Pointing at another one
+    // would serve someone else's JS to these devices.
+    const projectId = app.expo.extra?.eas?.projectId;
+    expect(projectId).toBeTruthy();
+    expect(app.expo.updates?.url).toBe(`https://u.expo.dev/${projectId}`);
+  });
+
+  it("and every build profile names a channel, or it cannot be updated", () => {
+    // A profile with no channel produces a binary no `eas update` can
+    // reach — it would silently never receive a fix.
+    const eas = JSON.parse(read("apps/mobile/eas.json")) as {
+      build: Record<string, { channel?: string; developmentClient?: boolean }>;
+    };
+    for (const [name, profile] of Object.entries(eas.build)) {
+      // The development profile runs a dev client off a local server and
+      // has nothing to update.
+      if (profile.developmentClient) continue;
+      expect(profile.channel, `${name} has no channel`).toBeTruthy();
+    }
+  });
+
   it("and no profile smuggles a server-only secret", () => {
     // A build profile's env is baked into the binary, which is readable.
     const raw = read(easPath);

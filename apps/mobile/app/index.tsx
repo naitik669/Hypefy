@@ -10,6 +10,7 @@ import {
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { router } from "expo-router";
 import { supabase } from "@/supabase";
 import { base, palette, type, family, radius } from "@/theme";
 
@@ -192,14 +193,27 @@ export default function Index() {
             <Text style={base.title}>Session restored</Text>
             <Text style={[base.body, styles.gap]}>{state.email}</Text>
             <Text style={[base.body, styles.faint]}>expires {state.expires}</Text>
+
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Open Hypefy"
               style={styles.button}
+              onPress={() => router.replace("/home")}
+            >
+              <Text style={styles.buttonText}>Open Hypefy</Text>
+            </Pressable>
+
+            {/* Secondary, and deliberately so. This screen's job is the
+                Phase 5 diagnostic; signing out is how you re-run it, not
+                something anyone should hit by accident on the way in. */}
+            <Pressable
+              accessibilityRole="button"
+              style={styles.secondary}
               onPress={() => {
                 void supabase.auth.signOut().then(() => setState({ kind: "signed-out" }));
               }}
             >
-              <Text style={styles.buttonText}>Sign out</Text>
+              <Text style={styles.secondaryText}>Sign out</Text>
             </Pressable>
           </>
         )}
@@ -250,5 +264,18 @@ const styles = StyleSheet.create({
     color: palette.accentInk,
     fontFamily: family.bold,
     fontSize: type.sm,
+  },
+  secondary: {
+    marginTop: 10,
+    paddingHorizontal: 22,
+    // 44 of target even though it reads as a text link.
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  secondaryText: {
+    color: palette.muted,
+    fontFamily: family.medium,
+    fontSize: type.sm,
+    textAlign: "center",
   },
 });
