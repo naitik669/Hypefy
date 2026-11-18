@@ -856,6 +856,372 @@ describe("the shots slide's reels match the website's", () => {
   });
 });
 
+describe("the discover slide's constellation matches the website's", () => {
+  function webFn(name: string): string {
+    const src = code(WEB);
+    const start = src.indexOf(`function ${name}(`);
+    expect(start, `the web no longer has a ${name}`).toBeGreaterThan(-1);
+    const rest = src.slice(start + 1);
+    const end = rest.indexOf("\nfunction ");
+    return end === -1 ? rest : rest.slice(0, end);
+  }
+
+  const native = () => code("apps/mobile/src/onboarding/MockDiscover.tsx");
+
+  /** The web's DISCOVER_BUBBLES, parsed. */
+  const webBubbles = (() => {
+    const src = code(WEB);
+    const block = src.slice(src.indexOf("const DISCOVER_BUBBLES"), src.indexOf("function MockDiscover"));
+    return [
+      ...block.matchAll(
+        /deg: (-?\d+), size: (\d+), r: (\d+), dur: "([\d.]+)s", delay: "([\d.]+)s", img: "\/onboarding\/([\w.-]+)"/g,
+      ),
+    ].map((m) => ({
+      deg: Number(m[1]),
+      size: Number(m[2]),
+      r: Number(m[3]),
+      dur: Math.round(Number(m[4]) * 1000),
+      delay: Math.round(Number(m[5]) * 1000),
+      img: m[6],
+    }));
+  })();
+
+  /** The native BUBBLES, parsed the same way. */
+  const nativeBubbles = (() => {
+    const src = native();
+    const block = src.slice(src.indexOf("const BUBBLES"), src.indexOf("export function"));
+    return [
+      ...block.matchAll(
+        /deg: (-?\d+), size: (\d+), r: (\d+), dur: (\d+), delay: (\d+), img: (\w+)/g,
+      ),
+    ].map((m) => ({
+      deg: Number(m[1]),
+      size: Number(m[2]),
+      r: Number(m[3]),
+      dur: Number(m[4]),
+      delay: Number(m[5]),
+      binding: m[6],
+    }));
+  })();
+
+  it("there are ten faces on the ring, as there are on the web", () => {
+    expect(webBubbles.length, "the web's DISCOVER_BUBBLES no longer parse").toBe(10);
+    expect(nativeBubbles.length).toBe(10);
+  });
+
+  it("each one has the web's angle, size, orbit, duration and delay", () => {
+    /*
+     * Compared row by row rather than as five sets of numbers: a size
+     * copied onto the wrong angle leaves every figure present in the file
+     * and the constellation visibly lopsided. Ten rows, five fields, and
+     * the order is the web's.
+     */
+    expect(
+      nativeBubbles.map((b) => [b.deg, b.size, b.r, b.dur, b.delay]),
+    ).toEqual(webBubbles.map((b) => [b.deg, b.size, b.r, b.dur, b.delay]));
+  });
+
+  it("and the web's photograph, in the web's order", () => {
+    /*
+     * The native side imports each file under a name, so the row holds a
+     * binding rather than a path. The binding is resolved through the
+     * import list, which is what makes a swapped pair of faces visible.
+     */
+    const src = native();
+    const imports = new Map(
+      [...src.matchAll(/import (\w+) from "[^"]*public\/onboarding\/([\w.-]+)"/g)].map((m) => [
+        m[1],
+        m[2],
+      ]),
+    );
+    expect(nativeBubbles.map((b) => imports.get(b.binding))).toEqual(webBubbles.map((b) => b.img));
+  });
+
+  it("every face has a photograph, so none falls back to nothing", () => {
+    // The web's Bubble type allows a gradient-avatar fallback. All ten
+    // supply a picture, so this app has no fallback — and if the web ever
+    // drops one, a face here would render blank rather than degrade.
+    const src = code(WEB);
+    const block = src.slice(src.indexOf("const DISCOVER_BUBBLES"), src.indexOf("function MockDiscover"));
+    expect([...block.matchAll(/img: "/g)].length).toBe(10);
+    expect([...block.matchAll(/name: "/g)].length).toBe(0);
+  });
+
+  it("the disc, the hub and the ring are the web's measurements", () => {
+    const SIZES: ReadonlyArray<readonly [string, RegExp, string]> = [
+      ["h-[300px]", /BOX = 300/, "the disc's box"],
+      ["inset-3", /left: 12,/, "the ring's inset"],
+      ["h-[68px]", /HUB = 68/, "the hub"],
+      ["rounded-[22px]", /borderRadius: 22/, "the hub's radius"],
+      ["text-3xl", /fontSize: 30/, "the hub's wordmark"],
+      ["translate-x-\\[3px\\]".replace("\\[", "[").replace("\\]", "]"), /translateX: 3/, "its optical nudge"],
+      ["rounded-[28%]", /size \* 0\.28/, "a face's radius"],
+      ["ring-2", /borderWidth: 2/, "a face's ring"],
+      ["z-10", /zIndex: 10/, "the hub above the ring"],
+    ];
+    for (const [cls, re, what] of SIZES) {
+      expect(webFn("MockDiscover"), `the web no longer uses ${cls}`).toContain(cls);
+      expect(native(), `${what} does not match`).toMatch(re);
+    }
+  });
+
+  it("the hub's own colours are the web's, not tokens that look close", () => {
+    // #262626 and white/15 are literals on the web, chosen so the hub stays
+    // distinct from the disc behind it. `elevated` is #1e1e1e and would
+    // very nearly disappear into it.
+    expect(webFn("MockDiscover")).toContain("#262626");
+    expect(native()).toContain('"#262626"');
+    expect(webFn("MockDiscover")).toContain("ring-white/15");
+    expect(native()).toContain("rgba(255, 255, 255, 0.15)");
+  });
+
+  it("the disc's radial gradient is the web's centre and its three stops", () => {
+    const m = webFn("MockDiscover").match(
+      /radial-gradient\(circle at (\d+)% (\d+)%, (#[0-9a-f]{6}) 0%, (#[0-9a-f]{6}) (\d+)%, (#[0-9a-f]{6}) 100%\)/,
+    );
+    expect(m, "the web's disc gradient no longer parses").toBeTruthy();
+    const src = native();
+    expect(src).toMatch(new RegExp(`cx=\\{${Number(m?.[1]) / 100}\\}`));
+    expect(src).toMatch(new RegExp(`cy=\\{0\\.${m?.[2]}\\}`));
+    expect(src).toContain(`offset: 0, color: "${m?.[3]}"`);
+    expect(src).toContain(`offset: ${Number(m?.[5]) / 100}, color: "${m?.[4]}"`);
+    expect(src).toContain(`offset: 1, color: "${m?.[6]}"`);
+  });
+
+  it("the ring turns for the web's 48 seconds, and the faces turn back as fast", () => {
+    const css = read("src/app/globals.css");
+    const fwd = css.match(/animation: orbit (\d+)s linear infinite/);
+    const back = css.match(/animation: orbit-reverse (\d+)s linear infinite/);
+    expect(fwd, "the web no longer states orbit's duration").toBeTruthy();
+    expect(back?.[1], "the web's two orbits no longer agree").toBe(fwd?.[1]);
+    expect(native()).toMatch(new RegExp(`ORBIT_MS = ${fwd?.[1]}_000\\b`));
+    // One duration for both directions, so they cannot drift and leave the
+    // faces slowly tumbling.
+    expect([...native().matchAll(/duration=\{ORBIT_MS\}/g)].length).toBe(2);
+    expect(native()).toMatch(/<Orbit reverse duration=\{ORBIT_MS\}>/);
+  });
+
+  it("and a full turn each way, as the web's keyframes do", () => {
+    const css = read("src/app/globals.css");
+    expect(css.slice(css.indexOf("@keyframes orbit {"), css.indexOf(".animate-orbit"))).toContain(
+      "rotate(-360deg)",
+    );
+    const motion = code("apps/mobile/src/onboarding/motion.tsx");
+    expect(motion).toContain('reverse ? "-360deg" : "360deg"');
+  });
+
+  it("uses the website's own image files rather than copies of them", () => {
+    const src = native();
+    const imports = [...src.matchAll(/from "([^"]*public\/onboarding\/[^"]+)"/g)].map((m) => m[1]);
+    expect(imports.length, "the ten faces are not all imported").toBe(10);
+    for (const spec of imports) {
+      const file = spec.replace(/^(\.\.\/)+/, "");
+      expect(existsSync(file), `${file} is missing from the web's public folder`).toBe(true);
+    }
+    expect(src, "an image was copied into the app instead of shared").not.toMatch(
+      /assets\/onboarding/,
+    );
+  });
+});
+
+describe("the identity slide's profile card matches the website's", () => {
+  function webFn(name: string): string {
+    const src = code(WEB);
+    const start = src.indexOf(`function ${name}(`);
+    expect(start, `the web no longer has a ${name}`).toBeGreaterThan(-1);
+    const rest = src.slice(start + 1);
+    const end = rest.indexOf("\nfunction ");
+    return end === -1 ? rest : rest.slice(0, end);
+  }
+
+  const native = () => code("apps/mobile/src/onboarding/MockProfile.tsx");
+
+  /**
+   * One entry of the native stylesheet, sliced by name, braces counted.
+   *
+   * Per-element, because the card has two 36-high boxes and several bold
+   * runs: an assertion that a number or a weight appeared SOMEWHERE in the
+   * file passed while the one element being mutated was wrong. P21 and P23
+   * found that.
+   */
+  function nativeStyle(key: string): string {
+    const src = native();
+    const start = src.indexOf(`  ${key}: {`);
+    expect(start, `${key} is not a style in MockProfile`).toBeGreaterThan(-1);
+    let depth = 0;
+    for (let i = src.indexOf("{", start); i < src.length; i++) {
+      if (src[i] === "{") depth++;
+      else if (src[i] === "}" && --depth === 0) return src.slice(start, i + 1);
+    }
+    throw new Error(`${key}'s style never closes`);
+  }
+
+  it("the copy is the website's copy, word for word", () => {
+    /*
+     * Name, handle and bio. A profile that says something slightly
+     * different from the site is the most visible kind of drift there is,
+     * because it is the only part a reader can quote.
+     *
+     * Compared as whole text nodes, not with `toContain`: "@maya" is a
+     * prefix of "@mayarivera", so a plain containment check passed while
+     * the handle had grown (P15). The nodes are taken by removing the tags
+     * and trimming what is left, which also handles the web writing its
+     * bio on its own line inside the paragraph.
+     */
+    const nodes = (src: string) =>
+      src
+        .replace(/<[^>]*>/g, "\u0000")
+        .split("\u0000")
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+    const web = nodes(webFn("MockProfile"));
+    const phone = nodes(native());
+    for (const line of ["Maya Rivera", "@maya", "creator mode · late night energy ✦"]) {
+      expect(web, `the web no longer says exactly "${line}"`).toContain(line);
+      expect(phone, `the phone no longer says exactly "${line}"`).toContain(line);
+    }
+  });
+
+  it("the three tags are the web's three, in the web's order", () => {
+    const m = webFn("MockProfile").match(/const tags = \[([^\]]+)\]/);
+    expect(m, "the web no longer declares its tags").toBeTruthy();
+    const tags = [...(m?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+    expect(tags.length).toBe(3);
+    const nativeTags = [
+      ...(native().match(/const TAGS = \[([^\]]+)\]/)?.[1] ?? "").matchAll(/"([^"]+)"/g),
+    ].map((x) => x[1]);
+    expect(nativeTags).toEqual(tags);
+  });
+
+  it("the three stats are the web's figures against the web's labels", () => {
+    /*
+     * Figure and label as pairs, in order. "843 Posts" would otherwise
+     * pass a check that only asked whether 843 and Posts both appeared.
+     */
+    const pairs = [...webFn("MockProfile").matchAll(/<ProfileStat n="([^"]+)" l="([^"]+)" \/>/g)].map(
+      (m) => [m[1], m[2]] as const,
+    );
+    expect(pairs.length, "the web's stats no longer parse").toBe(3);
+    const nativePairs = [...native().matchAll(/\{ n: "([^"]+)", l: "([^"]+)" \}/g)].map(
+      (m) => [m[1], m[2]] as const,
+    );
+    expect(nativePairs).toEqual(pairs);
+  });
+
+  it("the four recent posts are the web's four, in the web's order", () => {
+    const src = code(WEB);
+    const block = webFn("MockProfile");
+    const webThumbs = [
+      ...(block.match(/const thumbs = \[([\s\S]*?)\]/)?.[1] ?? "").matchAll(
+        /"\/onboarding\/([\w.-]+)"/g,
+      ),
+    ].map((m) => m[1]);
+    expect(webThumbs.length, "the web's thumbs no longer parse").toBe(4);
+    expect(src.length).toBeGreaterThan(0);
+
+    const imports = new Map(
+      [...native().matchAll(/import (\w+) from "[^"]*public\/onboarding\/([\w.-]+)"/g)].map((m) => [
+        m[1],
+        m[2],
+      ]),
+    );
+    const nativeThumbs = [...(native().match(/const THUMBS = \[([^\]]+)\]/)?.[1] ?? "").matchAll(
+      /(\w+)/g,
+    )].map((m) => imports.get(m[1]));
+    expect(nativeThumbs).toEqual(webThumbs);
+  });
+
+  it("the measurements are the website's", () => {
+    const SIZES: ReadonlyArray<readonly [string, RegExp, string]> = [
+      ["w-[300px]", /CARD_W = 300/, "the card's width"],
+      ["rounded-[26px]", /borderRadius: 26/, "the card's radius"],
+      ["h-16", /height: 64, width: "100%"/, "the banner"],
+      ["-mt-9", /marginTop: -36/, "how far the avatar overlaps it"],
+      ["h-[68px]", /AVATAR = 68/, "the avatar"],
+      ["rounded-\\[22px\\]".replace("\\[", "[").replace("\\]", "]"), /borderRadius: 22/, "its radius"],
+      ["ring-4", /borderWidth: 4/, "its ring"],
+      ["text-[17px]", /fontSize: 17/, "the name"],
+      ["rounded-lg", /borderRadius: 8/, "a tag and a thumbnail"],
+    ];
+    for (const [cls, re, what] of SIZES) {
+      expect(webFn("MockProfile"), `the web no longer uses ${cls}`).toContain(cls);
+      expect(native(), `${what} does not match`).toMatch(re);
+    }
+  });
+
+  it("both action buttons are h-9, each checked in its own style", () => {
+    /*
+     * There are two 36-high boxes — the Edit profile button and the square
+     * share button beside it — so `/height: 36/` anywhere in the file was
+     * satisfied by whichever one was still right. P21 moved the primary
+     * button to 40 and passed.
+     */
+    expect(webFn("MockProfile")).toContain("h-9");
+    expect(nativeStyle("primary")).toMatch(/height: 36\b/);
+    expect(nativeStyle("secondary")).toMatch(/height: 36\b/);
+    expect(nativeStyle("secondary"), "the square button is no longer square").toMatch(/width: 36\b/);
+  });
+
+  it("the avatar's ring is the card's own colour, so it cuts the banner cleanly", () => {
+    // ring-surface, not white and not the border — the ring exists to make
+    // the avatar look punched out of the card.
+    expect(webFn("MockProfile")).toContain("ring-surface");
+    expect(native()).toMatch(/borderColor: palette\.surface/);
+  });
+
+  it("the banner's gradient is the web's two colours at the web's opacities", () => {
+    const m = webFn("MockProfile").match(
+      /linear-gradient\((\d+)deg, rgba\(163,230,53,([\d.]+)\), rgba\(109,40,217,([\d.]+)\) (\d+)%\), (#[0-9a-f]{6})/,
+    );
+    expect(m, "the web's banner gradient no longer parses").toBeTruthy();
+    const src = native();
+    // The accent and the violet, as hex with the web's alphas.
+    expect(src).toContain(`color: "#a3e635", opacity: ${Number(m?.[2])}`);
+    expect(src).toContain(`color: "#6d28d9", opacity: ${Number(m?.[3])}`);
+    expect(src).toMatch(new RegExp(`offset: ${Number(m?.[4]) / 100}, color: "#6d28d9"`));
+    // And the near-black ground it sits over.
+    expect(src).toContain(`backgroundColor: "${m?.[5]}"`);
+  });
+
+  it("the accent in that gradient is the palette's accent, spelled out", () => {
+    // SVG stops take a colour and an opacity separately, so the accent
+    // appears as a literal here where the rest of the app uses the token.
+    // This is the assertion that keeps the literal honest.
+    const tokens = read("packages/tokens/src/index.ts");
+    expect(tokens).toContain('accent: "#a3e635"');
+    expect(native()).toContain('color: "#a3e635"');
+  });
+
+  it("the bio and the name are different weights, as on the web", () => {
+    /*
+     * The weight is asserted inside the `name` entry, not with a lazy
+     * `name: \{[\s\S]*?family\.bold` over the whole file — that matched
+     * forward past a semibold name to the next bold run in the stylesheet,
+     * so P23 downgraded the name and passed.
+     */
+    const web = webFn("MockProfile");
+    expect(web).toContain("text-[17px] font-bold");
+    expect(web).toContain("text-foreground/90");
+    expect(nativeStyle("name")).toContain("family.bold");
+    expect(nativeStyle("bio")).toContain("family.normal");
+    expect(nativeStyle("bio")).toContain('"rgba(255, 255, 255, 0.9)"');
+  });
+
+  it("uses the website's own image files rather than copies of them", () => {
+    const src = native();
+    const imports = [...src.matchAll(/from "([^"]*public\/onboarding\/[^"]+)"/g)].map((m) => m[1]);
+    expect(imports.length, "the avatar and four thumbnails are not all imported").toBe(5);
+    for (const spec of imports) {
+      const file = spec.replace(/^(\.\.\/)+/, "");
+      expect(existsSync(file), `${file} is missing from the web's public folder`).toBe(true);
+    }
+    expect(src, "an image was copied into the app instead of shared").not.toMatch(
+      /assets\/onboarding/,
+    );
+  });
+});
+
 describe("the gradient avatar is the website's gradient", () => {
   it("uses the web Avatar's own saturation and lightness", () => {
     const web = read("src/components/ui/Avatar.tsx");
@@ -923,19 +1289,67 @@ describe("the gradient avatar is the website's gradient", () => {
   });
 });
 
-describe("what is deliberately not done yet", () => {
-  it("the two remaining visuals are absent, not stubbed", () => {
-    // Welcome, posts and shots are drawn. The other two slides render
-    // nothing in the slot, which is honest; a placeholder illustration
-    // would make the screen look finished and then have to come out.
+describe("every slide now has its visual", () => {
+  it("all five are rendered, and nothing is left empty", () => {
+    /*
+     * This replaces the assertion that counted what was still missing.
+     * It now says the opposite thing: every one of the web's five slides
+     * draws its own mock-up, and the slot is never empty — so a visual
+     * being dropped or a slide being added without one fails here.
+     */
     const carousel = code(NATIVE);
-    expect(carousel).toMatch(/slide === "welcome" \? \(\s*<WelcomeVisual \/>/);
-    expect(carousel).toMatch(/slide === "posts" \? \(\s*<MockPostStack active=\{active\} \/>/);
-    expect(carousel).toMatch(/slide === "shots" \? \(\s*<MockReel active=\{active\} \/>/);
-    expect(carousel).toMatch(/\) : null/);
-    for (const other of ["MockDiscover", "MockProfile"]) {
-      expect(carousel, `${other} appeared without being announced`).not.toContain(other);
+    const PER_SLIDE: ReadonlyArray<readonly [SlideId, string]> = [
+      ["welcome", "WelcomeVisual"],
+      ["posts", "MockPostStack"],
+      ["shots", "MockReel"],
+      ["discover", "MockDiscover"],
+      ["identity", "MockProfile"],
+    ];
+    expect(PER_SLIDE.map(([s]) => s), "the web's slides have changed").toEqual([...SLIDES]);
+    for (const [, component] of PER_SLIDE) {
+      expect(
+        existsSync(`apps/mobile/src/onboarding/${component}.tsx`),
+        `${component}.tsx is missing`,
+      ).toBe(true);
     }
+
+    /*
+     * The PAIRING is what is asserted, not merely that each component
+     * appears somewhere. The first version checked presence only, so a
+     * mutation that handed the discover slide the profile card and the
+     * identity slide the constellation passed — both were still rendered,
+     * just on each other's slide. C4 found it.
+     */
+    const slot = carousel.slice(
+      carousel.indexOf("styles.visualSlot"),
+      carousel.indexOf("styles.copySlot"),
+    );
+    const branches = [...slot.matchAll(/slide === "(\w+)" \? \(\s*<(\w+)/g)].map(
+      (m) => [m[1], m[2]] as const,
+    );
+    const fallback = slot.match(/\) : \(\s*<(\w+)/);
+    expect(fallback, "the slot no longer ends in a visual for the last slide").toBeTruthy();
+    expect([...branches, [PER_SLIDE.at(-1)?.[0], fallback?.[1]]]).toEqual(
+      PER_SLIDE.map(([s, c]) => [s, c]),
+    );
+
+    // And no `null` branch is left, so no slide can show nothing.
+    expect(slot, "a slide still renders nothing").not.toContain("null");
+  });
+
+  it("and the three that animate on arrival are told when they arrive", () => {
+    // The post wall, the reels and their stars reveal on a timeline that
+    // only starts when the slide is the one on screen; the discover ring
+    // and the profile card do not animate in, as on the web.
+    const carousel = code(NATIVE);
+    for (const c of ["MockPostStack", "MockReel"]) {
+      expect(carousel, `${c} is not given active`).toMatch(
+        new RegExp(`<${c} active=\\{active\\} />`),
+      );
+    }
+    const web = code(WEB);
+    expect(web).toMatch(/<MockDiscover \/>/);
+    expect(web).toMatch(/<MockProfile \/>/);
   });
 
   it("the visual slot is reserved and centred", () => {

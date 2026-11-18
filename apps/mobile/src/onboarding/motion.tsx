@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Animated, Easing, StyleSheet } from "react-native";
-import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from "react-native-svg";
 
 /**
  * The onboarding slides' shared motion, ported from the web's IntroCarousel.
@@ -248,4 +248,87 @@ export function Gradient({
       <Rect width="100%" height="100%" fill={`url(#${id})`} />
     </Svg>
   );
+}
+
+/**
+ * A CSS radial gradient, as SVG.
+ *
+ * Fills its parent like `Gradient` does. `cx`/`cy` are the web's `circle at
+ * x% y%`, as fractions.
+ *
+ * One approximation, stated because it is not exact: CSS's bare `circle`
+ * means `farthest-corner`, so its radius reaches the furthest corner of the
+ * box. SVG's `r` is a fraction of the box, and on a square box the furthest
+ * corner from a centre near the middle is about 0.7 of the side away — so
+ * `r` is given as that rather than 0.5, which would stop the gradient short
+ * and leave a visible ring where the last stop ends.
+ */
+export const FARTHEST_CORNER = 0.7;
+
+export function RadialFill({
+  cx,
+  cy,
+  stops,
+}: {
+  cx: number;
+  cy: number;
+  stops: ReadonlyArray<{ offset: number; color: string }>;
+}) {
+  const id = `r${cx}${cy}${stops[0].color.slice(1)}`;
+  return (
+    <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+      <Defs>
+        <RadialGradient
+          id={id}
+          cx={String(cx)}
+          cy={String(cy)}
+          r={String(FARTHEST_CORNER)}
+        >
+          {stops.map((s) => (
+            <Stop key={s.offset} offset={String(s.offset)} stopColor={s.color} />
+          ))}
+        </RadialGradient>
+      </Defs>
+      <Rect width="100%" height="100%" fill={`url(#${id})`} />
+    </Svg>
+  );
+}
+
+/**
+ * The web's `animate-orbit` / `animate-orbit-reverse` pair.
+ *
+ * The ring turns a full circle and every avatar on it turns the other way
+ * by the same amount, so faces stay upright while their positions travel.
+ * Both take the same duration, which is the whole point — a mismatch makes
+ * the avatars slowly tumble.
+ */
+export function Orbit({
+  reverse = false,
+  duration,
+  children,
+}: {
+  reverse?: boolean;
+  duration: number;
+  children: ReactNode;
+}) {
+  const [v] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    const run = Animated.loop(
+      Animated.timing(v, {
+        toValue: 1,
+        duration,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    run.start();
+    return () => run.stop();
+  }, [v, duration]);
+
+  const rotate = v.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", reverse ? "-360deg" : "360deg"],
+  });
+  return <Animated.View style={{ transform: [{ rotate }] }}>{children}</Animated.View>;
 }
