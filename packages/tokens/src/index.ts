@@ -74,7 +74,23 @@ export const layout = {
   navHeight: 72,
   /** Air between the bar and whatever scrolls above it, in px. */
   navGap: 12,
+  /**
+   * The top bar's own height, in px, before the safe-area inset.
+   *
+   * Here for the same reason navHeight is: two clients draw this bar and
+   * one figure decides it. It was `3.5rem` written into a Tailwind class in
+   * TopBar.tsx and nowhere else, which was fine while the web was the only
+   * client — a second one makes it the start of a drift, and a top bar that
+   * is 56 on one platform and 52 on the other is the kind of difference
+   * nobody files a bug about and everybody feels.
+   */
+  topBarHeight: 56,
 } as const;
+
+/** The room a fixed-header screen must leave above itself, given a safe-area inset. */
+export function topBarSpace(topInset: number): number {
+  return layout.topBarHeight + Math.max(0, topInset);
+}
 
 /** The room a scroll container must leave below itself, given a safe-area inset. */
 export function navSpace(bottomInset: number): number {

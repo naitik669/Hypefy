@@ -5,6 +5,7 @@ import { bottomBarDestinations, DESTINATIONS } from "@hypefy/core/navigation";
 import { layout } from "@hypefy/tokens";
 import { palette, type, family } from "@/theme";
 import { DestinationIcon } from "@/icons";
+import { TopBar } from "@/TopBar";
 
 /**
  * The app's navigation, built from the same list the web reads.
@@ -48,7 +49,16 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
+        /*
+         * A custom `header` rather than a title and `headerShown`. React
+         * Navigation renders what this returns verbatim and applies no
+         * safe-area padding of its own, which is what we want — TopBar
+         * reads the inset itself and adds it to the token height, the same
+         * sum the web writes as calc(var(--top-bar-h) + var(--sat)).
+         * Letting the navigator pad too would inset it twice.
+         */
+        headerShown: true,
+        header: () => <TopBar />,
         sceneStyle: { backgroundColor: palette.background },
         tabBarActiveTintColor: palette.accent,
         tabBarInactiveTintColor: palette.faint,
@@ -81,6 +91,12 @@ export default function TabsLayout() {
           options={{
             title: d.label,
             tabBarAccessibilityLabel: d.label,
+            /*
+             * Shots is full-bleed video and takes the whole screen, as it
+             * does on the web. A chrome bar sitting over it would cover
+             * the top of every clip.
+             */
+            headerShown: d.href !== "/shots",
             // `color` is nullable in the navigator's own types, so the
             // inactive tint stands in rather than passing null through to
             // a component that would render it as the platform default.

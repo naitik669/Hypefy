@@ -125,13 +125,21 @@ describe("the layout reads core rather than restating it", () => {
     expect(layout()).toMatch(/bottomBarDestinations\(\)/);
   });
 
-  it("and names no destination of its own", () => {
-    // Discover is the single exception: the layout has to single it out to
-    // register it with href: null, because "routable but not in the bar"
-    // is a navigator concept core has no opinion about.
-    const src = layout();
-    const quoted = [...src.matchAll(/"(\/[a-z-]+)"/g)].map((m) => m[1]);
-    expect(quoted).toEqual(["/discover"]);
+  it("and names only the two destinations it has a navigator reason to", () => {
+    /*
+     * The list is closed on purpose, so a third hard-coded href has to be
+     * justified here before it can ship. Both of these are navigator
+     * concepts core has no opinion about:
+     *
+     *   /discover — routable but not in the bar, so it is registered with
+     *     href: null rather than left out, which would make it unroutable.
+     *   /shots — full-bleed video, so the header is turned off for it.
+     *
+     * Anything else named here is a destination list growing a second
+     * copy, which is what reading from core was meant to prevent.
+     */
+    const quoted = [...new Set([...layout().matchAll(/"(\/[a-z-]+)"/g)].map((m) => m[1]))].sort();
+    expect(quoted).toEqual(["/discover", "/shots"]);
   });
 
   it("takes the bar's height from tokens, not a literal", () => {
@@ -144,6 +152,68 @@ describe("the layout reads core rather than restating it", () => {
 
   it("hides Discover from the bar instead of deleting it", () => {
     expect(layout()).toMatch(/href:\s*null/);
+  });
+});
+
+describe("Discover is reachable at all", () => {
+  /*
+   * The gap the tabs layout created. Discover is `bottomBar: false`, so it
+   * has a route and nothing navigates to it — on the web the compass in
+   * the top bar is one of two ways in, and the swipe right from the feed
+   * is the other. The swipe is later work, so the compass is currently the
+   * ONLY way, and a route nothing links to is indistinguishable from a
+   * route that does not exist.
+   */
+  const topBar = () => code("apps/mobile/src/TopBar.tsx");
+
+  it("the top bar navigates to it", () => {
+    expect(topBar()).toMatch(/router\.push\(\s*["'`]\/discover["'`]\s*\)/);
+  });
+
+  it("and says so to a screen reader", () => {
+    // An unlabelled icon button is a button announced as "button".
+    expect(topBar()).toMatch(/accessibilityLabel="Discover"/);
+  });
+
+  it("and the bar is actually mounted, not just written", () => {
+    // A component nobody renders is the same as no component. This is the
+    // assertion the other two are worthless without.
+    const layout = code(`${TABS_DIR}/_layout.tsx`);
+    expect(layout).toMatch(/header:\s*\(\)\s*=>\s*<TopBar\s*\/>/);
+    expect(layout).toMatch(/headerShown:\s*true/);
+  });
+
+  it("except on Shots, which is full-bleed", () => {
+    const layout = code(`${TABS_DIR}/_layout.tsx`);
+    expect(layout).toMatch(/headerShown:\s*d\.href\s*!==\s*"\/shots"/);
+  });
+
+  it("and Shots is therefore the one screen padding for its own notch", () => {
+    // The pair that has to agree. With a header the navigator starts the
+    // scene below it, so a screen padding for the inset as well would
+    // inset twice; without one, a screen that does not pad sits under the
+    // status bar. Exactly one tab is in the second case.
+    const owners = readdirSync(TABS_DIR)
+      .filter((f) => f.endsWith(".tsx") && f !== "_layout.tsx")
+      .filter((f) => /ownsTopInset/.test(code(`${TABS_DIR}/${f}`)))
+      .map((f) => f.replace(/\.tsx$/, ""));
+    expect(owners).toEqual(["shots"]);
+  });
+});
+
+describe("the top bar's height is the shared one", () => {
+  it("comes from tokens, not from a literal", () => {
+    const src = code("apps/mobile/src/TopBar.tsx");
+    expect(src).toMatch(/layout\.topBarHeight/);
+    // 56 is the token's value. Written out, it means the web could move
+    // the bar and this would not follow.
+    expect(src).not.toMatch(/\b56\b/);
+  });
+
+  it("and adds the safe-area inset, as the web's calc() does", () => {
+    expect(code("apps/mobile/src/TopBar.tsx")).toMatch(
+      /layout\.topBarHeight\s*\+\s*insets\.top/,
+    );
   });
 });
 
