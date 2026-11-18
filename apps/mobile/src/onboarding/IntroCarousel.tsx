@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowRight } from "lucide-react-native";
 import { palette, type, family, radius } from "@/theme";
 import { SLIDES, COPY, type SlideId } from "@/onboarding/slides";
+import { WelcomeVisual } from "@/onboarding/WelcomeVisual";
 
 /**
  * The onboarding carousel, ported from the web's IntroCarousel.
@@ -215,11 +216,13 @@ function Slide({ slide, active, width }: { slide: SlideId; active: boolean; widt
     <View style={[styles.slide, { width }]}>
       {/*
        * The visual's seat: `min-h-0 flex-1` on the web, so it takes every
-       * row the copy and footer do not. Empty until the five mock-ups are
-       * ported, and deliberately so — the alternative is filling it with
-       * something that has to come back out.
+       * row the copy and footer do not. Welcome is drawn; the other four
+       * mock-ups land next, and their slides stay empty until they do
+       * rather than borrowing a stand-in that has to come back out.
        */}
-      <View style={styles.visualSlot} />
+      <View style={styles.visualSlot}>
+        {slide === "welcome" ? <WelcomeVisual /> : null}
+      </View>
       <View style={styles.copySlot}>
         <Copy slide={slide} active={active} />
       </View>
@@ -262,7 +265,9 @@ const styles = StyleSheet.create({
   pager: { flex: 1, overflow: "hidden" },
   track: { flex: 1, flexDirection: "row" },
   slide: { flex: 1, paddingHorizontal: PAGE_X },
-  visualSlot: { flex: 1, minHeight: 0 },
+  // flex-1 min-h-0 flex items-center justify-center — the web's seat for
+  // the mock-up, centred in whatever room the copy and footer leave.
+  visualSlot: { flex: 1, minHeight: 0, alignItems: "center", justifyContent: "center" },
   copySlot: { paddingTop: 16, paddingBottom: 20 }, // pt-4 pb-5
   // The web fades and blurs an inactive slide; without a filter this is the
   // fade alone. Off-screen either way.
