@@ -100,6 +100,14 @@
      that swept the pads did not see it. */
   --nav-edge: calc(var(--nav-h) + var(--sab));
 
+  /* The top bar's own height, before the safe-area inset it pads by. It was
+     `3.5rem` inside a Tailwind class in TopBar.tsx and nowhere else, which
+     was fine while the web was the only client drawing this bar. The Expo
+     client draws it too now, and a bar that is 56 on one platform and 52 on
+     the other is a difference nobody files and everybody feels. Asserted
+     against @hypefy/tokens in both directions, like --nav-h. */
+  --top-bar-h: 56px;
+
   /* The side rail's width, used by SideNav and by the shell that leaves room
      for it. One number, because two would be a gap or an overlap. */
   --sidenav-w: 240px;

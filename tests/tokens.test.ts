@@ -4,6 +4,7 @@ import {
   colors,
   layout,
   navSpace,
+  topBarSpace,
   cssVarName,
   radii,
   radiusVarName,
@@ -90,6 +91,35 @@ describe("the chrome measurements", () => {
     // The gap is inside a calc() with the safe-area inset, so it is matched
     // as part of that expression rather than as a token of its own.
     expect(css).toContain(`calc(var(--nav-h) + var(--sab) + ${layout.navGap}px)`);
+    expect(css).toContain(`--top-bar-h: ${layout.topBarHeight}px`);
+  });
+
+  it("and the top bar's height is not also written out somewhere", () => {
+    /*
+     * The other direction. A token the CSS agrees with is worth nothing if
+     * a component still carries the figure itself — which is exactly how
+     * this one started: `h-[calc(3.5rem+var(--sat))]` in TopBar.tsx, with
+     * no variable anywhere.
+     *
+     * 3.5rem is 56px. Both spellings are checked because the literal that
+     * was there was the rem one, and a later edit reaching for px would
+     * read as a different number while being the same mistake.
+     */
+    const topBar = readFileSync("src/components/layout/TopBar.tsx", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(topBar).toContain("var(--top-bar-h)");
+    expect(topBar).not.toMatch(/3\.5rem/);
+    expect(topBar).not.toMatch(/\b56px\b/);
+    expect(topBar).not.toMatch(/\bh-14\b/);
+  });
+
+  it("topBarSpace is the bar plus the inset", () => {
+    expect(topBarSpace(0)).toBe(layout.topBarHeight);
+    expect(topBarSpace(47)).toBe(layout.topBarHeight + 47);
+    // Same guard navSpace has: a negative inset must not shrink the bar.
+    expect(topBarSpace(-20)).toBe(layout.topBarHeight);
   });
 
   it("navSpace is the bar plus the inset plus air", () => {
