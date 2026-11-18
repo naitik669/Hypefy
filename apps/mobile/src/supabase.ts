@@ -56,5 +56,11 @@ export const supabase = createClient(url, anonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: false,
+    // Explicit rather than relying on the library default: the Google
+    // flow depends on it. PKCE keeps a verifier in the SAME store as the
+    // session, and exchangeCodeForSession reads it back when the deep link
+    // returns — so the implicit flow here would not merely be weaker, it
+    // would have nothing to exchange.
+    flowType: "pkce",
   },
 });

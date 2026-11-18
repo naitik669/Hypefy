@@ -14,7 +14,7 @@ import { stashPendingOAuth } from "@/lib/pending-oauth";
 import { confirmRecovery, ensureEncryption } from "@/lib/e2ee/vault";
 import { E2EE_ENABLED } from "@/lib/e2ee/flag";
 import { RecoveryCodeScreen } from "@/components/e2ee/RecoveryCodeScreen";
-import { MIN_PASSWORD, signupMissing } from "@/lib/signup-check";
+import { MIN_AGE, MIN_PASSWORD, ageFromDob, signupMissing } from "@/lib/signup-check";
 
 type Mode = "signin" | "signup";
 
@@ -138,20 +138,13 @@ export function AuthCard({ mode }: { mode: Mode }) {
     return () => window.removeEventListener("pageshow", onShow);
   }, []);
 
-  // Age from the entered date of birth (null if unset/invalid).
-  const age = (() => {
-    if (!dob) return null;
-    const b = new Date(dob);
-    if (Number.isNaN(b.getTime())) return null;
-    const now = new Date();
-    let a = now.getFullYear() - b.getFullYear();
-    const m = now.getMonth() - b.getMonth();
-    if (m < 0 || (m === 0 && now.getDate() < b.getDate())) a--;
-    return a;
-  })();
-  // Signup can't proceed until the user is 13+ and has accepted the policies.
+  // Age from the entered date of birth (null if unset/invalid). The
+  // calculation is shared with the phone — see @hypefy/core/signup-check.
+  const age = ageFromDob(dob);
+  // Signup can't proceed until the user is old enough and has accepted the
+  // policies.
   const signupBlocked =
-    mode === "signup" && (!consent || age === null || age < 13);
+    mode === "signup" && (!consent || age === null || age < MIN_AGE);
   /** Which part is missing, said under the button instead of only greying it. */
   const missing = mode === "signup" ? signupMissing({ email, password, dob, age, consent }) : null;
 
@@ -236,8 +229,8 @@ export function AuthCard({ mode }: { mode: Mode }) {
         router.refresh();
       } else {
         // Age gate + consent — must pass before we create the account.
-        if (age === null || age < 13) {
-          setError("You must be at least 13 years old to use Hypefy.");
+        if (age === null || age < MIN_AGE) {
+          setError(`You must be at least ${MIN_AGE} years old to use Hypefy.`);
           setLoading(false);
           return;
         }
@@ -389,8 +382,8 @@ export function AuthCard({ mode }: { mode: Mode }) {
     setError(null);
     // Same age + consent gate applies to Google sign-up.
     if (mode === "signup") {
-      if (age === null || age < 13) {
-        setError("You must be at least 13 years old to use Hypefy.");
+      if (age === null || age < MIN_AGE) {
+        setError(`You must be at least ${MIN_AGE} years old to use Hypefy.`);
         return;
       }
       if (!consent) {
@@ -566,9 +559,9 @@ export function AuthCard({ mode }: { mode: Mode }) {
                 </label>
                 <DateOfBirthPicker id="dob" value={dob} onChange={setDob} />
               </div>
-              {age !== null && age < 13 && (
+              {age !== null && age < MIN_AGE && (
                 <p className="text-[11px] text-danger">
-                  You must be at least 13 years old to use Hypefy.
+                  You must be at least {MIN_AGE} years old to use Hypefy.
                 </p>
               )}
               <label className="flex items-start gap-2 text-[11px] leading-relaxed text-faint">

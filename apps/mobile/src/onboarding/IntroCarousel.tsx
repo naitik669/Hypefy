@@ -51,7 +51,15 @@ const PAGE_X = 28; // px-7 on each slide
 const BAR_X = 24; // px-6 on the top bar
 const SWIPE_THRESHOLD = 45; // the web's dx cutoff
 
-export function IntroCarousel({ onFinish }: { onFinish?: () => void }) {
+export function IntroCarousel({
+  onFinish,
+  onSignIn,
+}: {
+  onFinish?: () => void;
+  /** The last slide s "Sign in" link. Falls back to onFinish, which is
+   * sign-up — a link that does nothing at all would be worse. */
+  onSignIn?: () => void;
+}) {
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(0);
   const [width, setWidth] = useState(0);
@@ -194,7 +202,12 @@ export function IntroCarousel({ onFinish }: { onFinish?: () => void }) {
         </Pressable>
 
         {isLast && (
-          <Pressable accessibilityRole="button" onPress={() => onFinish?.()} style={styles.link}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Sign in"
+            onPress={() => (onSignIn ?? onFinish)?.()}
+            style={styles.link}
+          >
             <Text style={styles.subtleCentre}>
               Already have an account? <Text style={styles.linkStrong}>Sign in</Text>
             </Text>
