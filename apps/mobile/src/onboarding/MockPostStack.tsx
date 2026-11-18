@@ -1,9 +1,8 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native";
-import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { palette, type, family } from "@/theme";
 import { HypeIcon, CommentIcon, ShareIcon } from "@/glyphs";
 import { Avatar } from "@/avatar";
+import { Float, Gradient, Reveal } from "@/onboarding/motion";
 
 /**
  * The posts slide's feed wall — the hero post with four others bleeding off
@@ -42,11 +41,12 @@ import adaPfp from "../../../../public/onboarding/ada-pfp.webp";
 import maya from "../../../../public/onboarding/maya.webp";
 import postSample from "../../../../public/onboarding/post-sample.jpg";
 
-/** 170ms a step — the web's REVEAL_GAP. */
-const REVEAL_GAP = 170;
-
-/** The bob's travel: `float-y` goes to -7px and back. */
-const FLOAT_Y = -7;
+/*
+ * Float, Reveal and Gradient come from @/onboarding/motion — the reels
+ * slide needs the same bob and the same gradient primitive, and the web
+ * shares them too. The stagger (REVEAL_GAP) lives there as well, so this
+ * slide's timeline and the reels' cannot drift apart.
+ */
 
 /** h-[26px] w-[26px] on a background post's avatar. */
 const BG_AVATAR = 26;
@@ -206,129 +206,6 @@ function MockPostCard() {
         <ShareIcon size={22} color={palette.muted} />
       </View>
     </View>
-  );
-}
-
-/**
- * A CSS gradient, as SVG.
- *
- * It fills its parent, so the parent's size is the gradient's size and no
- * dimension is restated here. Each stop carries its own opacity because SVG
- * has no `transparent` keyword stop that interpolates the way CSS's does.
- */
-function Gradient({
-  x2,
-  y2,
-  stops,
-}: {
-  x2: number;
-  y2: number;
-  stops: ReadonlyArray<{ offset: number; color: string; opacity: number }>;
-}) {
-  const id = `g${x2}${y2}${stops.length}${stops[0].color.slice(1)}`;
-  return (
-    <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2={String(x2)} y2={String(y2)}>
-          {stops.map((s) => (
-            <Stop
-              key={s.offset}
-              offset={String(s.offset)}
-              stopColor={s.color}
-              stopOpacity={String(s.opacity)}
-            />
-          ))}
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill={`url(#${id})`} />
-    </Svg>
-  );
-}
-
-/**
- * The web's `animate-float-y` with a per-instance duration and delay.
- *
- * One cycle is up and back, so each leg is half the duration; the delay runs
- * once before the loop rather than before every cycle, which is what CSS's
- * animation-delay does and what `Animated.loop` wrapping the delay would
- * get wrong.
- */
-function Float({ dur, delay, children }: { dur: number; delay: number; children: ReactNode }) {
-  const [v] = useState(() => new Animated.Value(0));
-
-  useEffect(() => {
-    const leg = dur / 2;
-    const run = Animated.sequence([
-      Animated.delay(delay),
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(v, {
-            toValue: 1,
-            duration: leg,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(v, {
-            toValue: 0,
-            duration: leg,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ]),
-      ),
-    ]);
-    run.start();
-    return () => run.stop();
-  }, [v, dur, delay]);
-
-  const translateY = v.interpolate({ inputRange: [0, 1], outputRange: [0, FLOAT_Y] });
-  return <Animated.View style={{ transform: [{ translateY }] }}>{children}</Animated.View>;
-}
-
-/**
- * The web's `revealStyle` — a fade and a 16px rise, staggered by order.
- *
- * Two Animated values rather than one, because the web gives opacity and
- * transform different durations and different curves (0.5s ease against
- * 0.55s cubic-bezier(0.16,1,0.3,1)), and one value cannot carry both.
- */
-function Reveal({
-  active,
-  order,
-  children,
-}: {
-  active: boolean;
-  order: number;
-  children: ReactNode;
-}) {
-  const [fade] = useState(() => new Animated.Value(active ? 1 : 0));
-  const [rise] = useState(() => new Animated.Value(active ? 0 : 1));
-
-  useEffect(() => {
-    const delay = active ? order * REVEAL_GAP : 0;
-    Animated.parallel([
-      Animated.timing(fade, {
-        toValue: active ? 1 : 0,
-        duration: 500, // opacity 0.5s
-        delay,
-        easing: Easing.inOut(Easing.ease), // `ease`
-        useNativeDriver: true,
-      }),
-      Animated.timing(rise, {
-        toValue: active ? 0 : 1,
-        duration: 550, // transform 0.55s
-        delay,
-        easing: Easing.bezier(0.16, 1, 0.3, 1),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [active, order, fade, rise]);
-
-  const translateY = rise.interpolate({ inputRange: [0, 1], outputRange: [0, 16] });
-  return (
-    <Animated.View style={{ opacity: fade, transform: [{ translateY }] }}>
-      {children}
-    </Animated.View>
   );
 }
 
