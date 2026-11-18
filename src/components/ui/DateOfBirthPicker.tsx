@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Cake } from "lucide-react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { WheelColumn, WheelFrame, type WheelOption } from "@/components/ui/Wheel";
+import { MIN_DOB_YEAR, composeDob, daysInMonth, parseDob } from "@/lib/dob";
 
 const MONTHS_SHORT = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -14,17 +15,18 @@ const MONTHS_LONG = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-const MIN_YEAR = 1900;
-
-const daysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
-const pad2 = (n: number) => String(n).padStart(2, "0");
-
+/*
+ * The year floor, the month lengths and the parse moved to
+ * @hypefy/core/dob, because the phone's date-of-birth field needs the same
+ * rule about which dates exist. The two CONTROLS are deliberately
+ * different — a wheel in a sheet here, three number fields there — so what
+ * is shared is only the part that could disagree silently, and 31 February
+ * is refused identically by both.
+ */
 function parseValue(v: string): { y: number; m: number; d: number } | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
-  if (!match) return null;
-  const y = Number(match[1]), m = Number(match[2]) - 1, d = Number(match[3]);
-  if (m < 0 || m > 11 || d < 1 || d > daysInMonth(y, m)) return null;
-  return { y, m, d };
+  const parsed = parseDob(v);
+  if (!parsed) return null;
+  return { y: parsed.year, m: parsed.monthIndex, d: parsed.day };
 }
 
 /**
@@ -62,7 +64,7 @@ export function DateOfBirthPicker({
   // all, so there's no dead row to land on.
   const years = useMemo(() => {
     const out: WheelOption[] = [];
-    for (let yr = maxYear; yr >= MIN_YEAR; yr--) out.push({ value: yr, label: String(yr) });
+    for (let yr = maxYear; yr >= MIN_DOB_YEAR; yr--) out.push({ value: yr, label: String(yr) });
     return out;
   }, [maxYear]);
 
@@ -89,7 +91,7 @@ export function DateOfBirthPicker({
   }
 
   function commit() {
-    onChange(`${y}-${pad2(m + 1)}-${pad2(d)}`);
+    onChange(composeDob(y, m, d));
     setOpen(false);
   }
 
