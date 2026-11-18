@@ -1,34 +1,47 @@
 /**
  * The font files this app bundles, and what they are registered as.
  *
- * Only two, and that is a known gap rather than an oversight. The web loads
- * Plus Jakarta Sans as a VARIABLE font through next/font, so every weight it
- * uses works without naming any. React Native wants one registered family
- * per weight — a variable face with `fontWeight: "600"` is unreliable across
- * Android versions — so the web's single face becomes five files here.
+ * Five static faces, which is what React Native wants: one registered
+ * family per weight. The web loads Plus Jakarta Sans as a VARIABLE font
+ * through next/font with no weight list, so every weight it uses works
+ * without naming any — but a variable face with `fontWeight: "600"` is
+ * unreliable across Android versions, so the web's single file becomes
+ * five here.
  *
- * The repo has two: ExtraBold and Medium. They are there for satori, which
- * renders the OpenGraph profile card and needs static files. Rather than
- * reference three .ttf files that do not exist — a missing asset is a Metro
- * BUNDLING error, so the app would not start at all — the weights collapse
- * onto the nearest available face. See `family` in theme.ts.
+ * All five come from the same upstream the two originals did —
+ * github.com/tokotype/PlusJakartaSans, `fonts/ttf` — which is how they
+ * match: the sizes of ExtraBold and Medium are byte-for-byte what that
+ * repository serves, so the three added beside them are the same cut of
+ * the same design rather than a lookalike. OFL-licensed, and OFL.txt sits
+ * beside the files as that requires.
  *
- * What that costs: the six weights the web uses render as two here. Body
- * text at 500 and 400 is right; 600 and 700 come out at 800, which reads
- * heavier than the web does. Adding the three files fans it out with no
- * other change, and tests/mobile-theme.test.ts fails the moment a weight
- * points at a family that is not in this map.
+ * Previously only ExtraBold and Medium were here (they are the two satori
+ * needs for the OpenGraph card), so six web weights collapsed onto two and
+ * everything at 600 or 700 rendered at 800. That made the app read heavier
+ * than the site in a way no layout work could fix — weight is the most
+ * visible thing about type.
  *
- * Licensed under the OFL, and OFL.txt sits beside the files as that
- * requires.
+ * `tests/mobile-foundation.test.ts` — "every family named is one that is
+ * actually bundled" — fails the moment a weight in theme.ts points at a
+ * family that is not in this map, so renaming a face or adding a sixth
+ * cannot quietly break a weight. (An earlier version of this comment, and
+ * of theme.ts, pointed at a mobile-theme test file that has never existed.
+ * The guarantee was real; the pointer was not — which is why the suite now
+ * checks that a comment naming a test names one that is there.)
  */
 
+import regular from "../assets/fonts/PlusJakartaSans-Regular.ttf";
 import medium from "../assets/fonts/PlusJakartaSans-Medium.ttf";
+import semiBold from "../assets/fonts/PlusJakartaSans-SemiBold.ttf";
+import bold from "../assets/fonts/PlusJakartaSans-Bold.ttf";
 import extraBold from "../assets/fonts/PlusJakartaSans-ExtraBold.ttf";
 
 /** Registered family name -> the bundled file. */
 export const fontAssets = {
+  "PlusJakartaSans-Regular": regular,
   "PlusJakartaSans-Medium": medium,
+  "PlusJakartaSans-SemiBold": semiBold,
+  "PlusJakartaSans-Bold": bold,
   "PlusJakartaSans-ExtraBold": extraBold,
 } as const;
 

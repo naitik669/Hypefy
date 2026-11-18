@@ -5,7 +5,7 @@ import {
   bottomBarDestinations,
   sideNavDestinations,
 } from "@hypefy/core/navigation";
-import { ICONS, iconFor, mappedHrefs } from "../apps/mobile/src/icon-map";
+import { ICONS, specFor, mappedHrefs, FALLBACK } from "../apps/mobile/src/icon-map";
 
 /**
  * The native navigation, against the list both clients read.
@@ -99,20 +99,11 @@ describe("every destination has an icon", () => {
     }
   });
 
-  it("focused and unfocused are different faces, not the same one twice", () => {
-    for (const [href, pair] of Object.entries(ICONS)) {
-      expect(pair.on, href).not.toBe(pair.off);
-      expect(iconFor(href, true), href).toBe(pair.on);
-      expect(iconFor(href, false), href).toBe(pair.off);
-    }
-  });
-
   it("an unmapped href falls back rather than throwing", () => {
     // What happens when somebody adds a destination and forgets this file.
     // The test above fails in CI; this is the behaviour if it ever ships.
-    expect(() => iconFor("/not-a-destination", true)).not.toThrow();
-    expect(iconFor("/not-a-destination", true)).toBe("ellipse");
-    expect(iconFor("/not-a-destination", false)).toBe("ellipse-outline");
+    expect(() => specFor("/not-a-destination")).not.toThrow();
+    expect(specFor("/not-a-destination")).toEqual(FALLBACK);
   });
 });
 
