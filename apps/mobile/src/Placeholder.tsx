@@ -24,10 +24,21 @@ export function Placeholder({
   label,
   blurb,
   ownsTopInset = false,
+  footer,
 }: {
   href: string;
   label: string;
   blurb: string;
+  /**
+   * Anything this destination can actually DO while its screen is a
+   * placeholder.
+   *
+   * Profile uses it for sign-out, which the app had no path to at all
+   * until a signed-in device proved it. A placeholder being honest about
+   * being unfinished is right; being a dead end that traps someone in a
+   * session is not.
+   */
+  footer?: React.ReactNode;
   /**
    * True on a screen with no header of its own to pad for the notch.
    *
@@ -53,6 +64,7 @@ export function Placeholder({
         <Text style={base.title}>{label}</Text>
         <Text style={[base.body, styles.blurb]}>{blurb}</Text>
         <Text style={styles.phase}>Phase 6</Text>
+        {footer}
       </View>
     </View>
   );
