@@ -14,6 +14,7 @@ import { ArrowRight } from "lucide-react-native";
 import { palette, type, family, radius } from "@/theme";
 import { SLIDES, COPY, type SlideId } from "@/onboarding/slides";
 import { WelcomeVisual } from "@/onboarding/WelcomeVisual";
+import { MockPostStack } from "@/onboarding/MockPostStack";
 
 /**
  * The onboarding carousel, ported from the web's IntroCarousel.
@@ -34,11 +35,11 @@ import { WelcomeVisual } from "@/onboarding/WelcomeVisual";
  *    45px threshold and its one-slide-per-gesture rule. There is no wheel
  *    handler, because there is no wheel.
  *
- * The visuals — the phone mock-up, the post stack, the reels, the discover
- * bubbles — are the other 600 lines of the web component and land next,
- * one slide at a time. Until then the area they occupy is reserved at the
- * size they will take and left visibly empty, rather than filled with
- * something that would have to be removed.
+ * The visuals are the other 600 lines of the web component and land one
+ * slide at a time. The phone mock-up and the post wall are in; the reels,
+ * the discover bubbles and the profile card are not. Until they are, the
+ * area they occupy is reserved at the size they will take and left visibly
+ * empty, rather than filled with something that would have to be removed.
  */
 
 /** cubic-bezier(0.16, 1, 0.3, 1) — the web's slide easing, verbatim. */
@@ -216,12 +217,16 @@ function Slide({ slide, active, width }: { slide: SlideId; active: boolean; widt
     <View style={[styles.slide, { width }]}>
       {/*
        * The visual's seat: `min-h-0 flex-1` on the web, so it takes every
-       * row the copy and footer do not. Welcome is drawn; the other four
-       * mock-ups land next, and their slides stay empty until they do
-       * rather than borrowing a stand-in that has to come back out.
+       * row the copy and footer do not. Welcome and posts are drawn; the
+       * other three mock-ups land next, and their slides stay empty until
+       * they do rather than borrowing a stand-in that has to come back out.
        */}
       <View style={styles.visualSlot}>
-        {slide === "welcome" ? <WelcomeVisual /> : null}
+        {slide === "welcome" ? (
+          <WelcomeVisual />
+        ) : slide === "posts" ? (
+          <MockPostStack active={active} />
+        ) : null}
       </View>
       <View style={styles.copySlot}>
         <Copy slide={slide} active={active} />
