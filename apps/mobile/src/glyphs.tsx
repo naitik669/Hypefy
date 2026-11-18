@@ -1,4 +1,4 @@
-import Svg, { Path } from "react-native-svg";
+import Svg, { Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
 
 /**
  * Hypefy's own icons, the ones that are not Lucide or Phosphor.
@@ -106,6 +106,50 @@ export function ShareIcon({
         stroke={color}
         strokeWidth={strokeWidth}
         strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/**
+ * The verified badge — a squircle with a five-pointed star in it.
+ *
+ * The web's own note on this one is worth keeping: it used to be an
+ * eight-pointed seal around the same star, which is Instagram's
+ * silhouette, and it put thirteen points inside the fourteen pixels the
+ * badge is drawn at. A squircle has no points of its own, which leaves the
+ * star as the only shape with any.
+ *
+ * Two details keep it legible small, and both are copied rather than
+ * judged: the star's waist is 0.47, so a three-pixel point still carries
+ * weight, and the path is STROKED IN ITS OWN FILL, which is what rounds
+ * its ten corners. Drop the stroke and it reads as a sharp cutout.
+ *
+ * The gradient id is fixed, as it is on the web — every badge draws the
+ * same two stops, so sharing one definition is correct rather than a
+ * shortcut.
+ */
+const VERIFIED_LIT = "hypefy-verified-lit";
+
+export function VerifiedStar({ size = 16 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox={BOX} accessibilityLabel="Verified">
+      <Defs>
+        {/* Light down the face of the badge: bright at the top, deep below. */}
+        <LinearGradient id={VERIFIED_LIT} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#6AA4FF" />
+          <Stop offset="1" stopColor="#1B48CC" />
+        </LinearGradient>
+      </Defs>
+
+      <Rect x="2.5" y="2.5" width="19" height="19" rx="6.4" fill={`url(#${VERIFIED_LIT})`} />
+
+      <Path
+        d="M 12 5.8 L 13.7 9.65 L 17.9 10.08 L 14.76 12.9 L 15.64 17.02 L 12 14.9 L 8.36 17.02 L 9.24 12.9 L 6.1 10.08 L 10.3 9.65 Z"
+        fill="#fff"
+        stroke="#fff"
+        strokeWidth="1.5"
         strokeLinejoin="round"
       />
     </Svg>

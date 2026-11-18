@@ -16,6 +16,8 @@ import { SLIDES, COPY, type SlideId } from "@/onboarding/slides";
 import { WelcomeVisual } from "@/onboarding/WelcomeVisual";
 import { MockPostStack } from "@/onboarding/MockPostStack";
 import { MockReel } from "@/onboarding/MockReel";
+import { MockDiscover } from "@/onboarding/MockDiscover";
+import { MockProfile } from "@/onboarding/MockProfile";
 
 /**
  * The onboarding carousel, ported from the web's IntroCarousel.
@@ -36,12 +38,9 @@ import { MockReel } from "@/onboarding/MockReel";
  *    45px threshold and its one-slide-per-gesture rule. There is no wheel
  *    handler, because there is no wheel.
  *
- * The visuals are the other 600 lines of the web component and land one
- * slide at a time. The phone mock-up, the post wall and the reels are in;
- * the discover constellation and the profile card are not. Until they are,
- * the area they occupy is reserved at the size they will take and left
- * visibly empty, rather than filled with something that would have to be
- * removed.
+ * All five visuals — the phone mock-up, the post wall, the reels, the
+ * discover constellation and the profile card — are the other 600 lines of
+ * the web component and are all in.
  */
 
 /** cubic-bezier(0.16, 1, 0.3, 1) — the web's slide easing, verbatim. */
@@ -219,9 +218,7 @@ function Slide({ slide, active, width }: { slide: SlideId; active: boolean; widt
     <View style={[styles.slide, { width }]}>
       {/*
        * The visual's seat: `min-h-0 flex-1` on the web, so it takes every
-       * row the copy and footer do not. Welcome, posts and shots are drawn;
-       * the other two mock-ups land next, and their slides stay empty until
-       * they do rather than borrowing a stand-in that has to come back out.
+       * row the copy and footer do not. All five are drawn.
        */}
       <View style={styles.visualSlot}>
         {slide === "welcome" ? (
@@ -230,7 +227,11 @@ function Slide({ slide, active, width }: { slide: SlideId; active: boolean; widt
           <MockPostStack active={active} />
         ) : slide === "shots" ? (
           <MockReel active={active} />
-        ) : null}
+        ) : slide === "discover" ? (
+          <MockDiscover />
+        ) : (
+          <MockProfile />
+        )}
       </View>
       <View style={styles.copySlot}>
         <Copy slide={slide} active={active} />

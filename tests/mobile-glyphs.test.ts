@@ -95,6 +95,65 @@ describe("the hand-drawn icons match the website's", () => {
     }
   });
 
+  it("the verified badge's star is the web's star, rebuilt from its own array", () => {
+    /*
+     * This one cannot be a `toContain`, and that is the point: the web
+     * declares the star as an ARRAY of commands with a comment naming each
+     * vertex, joined with a space. So the path string the browser draws
+     * exists nowhere in the source — asserting the committed `d` appeared
+     * in the file would always fail, and the obvious "fix" is to loosen the
+     * test until it passes, which proves nothing.
+     *
+     * It is rebuilt the way the web builds it instead, so a vertex moved on
+     * the site fails here with the two paths printed side by side.
+     */
+    const web = read("src/components/ui/VerifiedStar.tsx");
+    const block = web.match(/const STAR = \[([\s\S]*?)\]\.join\(" "\)/);
+    expect(block, "the web's STAR is no longer an array joined with a space").toBeTruthy();
+    const commands = [...(block?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    expect(commands.length, "the star no longer has ten vertices and a close").toBe(11);
+    expect(commands.at(-1)).toBe("Z");
+
+    const committed = paths(nativeGlyph("VerifiedStar"));
+    expect(committed.length, "the badge committed more or fewer than one path").toBe(1);
+    expect(committed[0]).toBe(commands.join(" "));
+  });
+
+  it("the badge's squircle and its light are the web's", () => {
+    const web = read("src/components/ui/VerifiedStar.tsx");
+    const native = read(NATIVE);
+
+    // The plate: one rect, same box, same corner.
+    const rect = web.match(/<rect x="([\d.]+)" y="([\d.]+)" width="(\d+)" height="(\d+)" rx="([\d.]+)"/);
+    expect(rect, "the web's badge no longer draws a rounded rect").toBeTruthy();
+    expect(native).toContain(
+      `<Rect x="${rect?.[1]}" y="${rect?.[2]}" width="${rect?.[3]}" height="${rect?.[4]}" rx="${rect?.[5]}"`,
+    );
+
+    // The gradient: bright at the top, deep below, top to bottom.
+    const stops = [...web.matchAll(/stopColor="(#[0-9A-Fa-f]{6})"/g)].map((m) => m[1]);
+    expect(stops.length, "the web's badge no longer has two stops").toBe(2);
+    for (const c of stops) expect(native, `${c} is missing from the badge`).toContain(c);
+    expect(web).toContain('x1="0" y1="0" x2="0" y2="1"');
+    expect(native).toMatch(/LinearGradient id=\{VERIFIED_LIT\} x1="0" y1="0" x2="0" y2="1"/);
+  });
+
+  it("and the star is stroked in its own fill, which is what rounds its corners", () => {
+    /*
+     * Without the stroke the ten corners are sharp, and at sixteen pixels
+     * that reads as a different mark. The web's own comment says so; this
+     * asserts the phone kept it, and kept the same width.
+     */
+    const web = read("src/components/ui/VerifiedStar.tsx");
+    const m = web.match(/fill="#fff" stroke="#fff" strokeWidth="([\d.]+)" strokeLinejoin="round"/);
+    expect(m, "the web no longer strokes the star in its own fill").toBeTruthy();
+    const glyph = nativeGlyph("VerifiedStar");
+    expect(glyph).toContain('fill="#fff"');
+    expect(glyph).toContain('stroke="#fff"');
+    expect(glyph).toContain(`strokeWidth="${m?.[1]}"`);
+    expect(glyph).toContain('strokeLinejoin="round"');
+  });
+
   it("and the stroke joins are round on both sides", () => {
     // A mitre instead of a round join turns the star's points into
     // spikes. Cheap to assert, and invisible until somebody looks.
