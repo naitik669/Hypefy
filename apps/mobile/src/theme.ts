@@ -72,14 +72,15 @@ export const type = {
  * What it costs: 400 and 500 are right; 600 and 700 render at 800, which
  * reads heavier than the web. Adding Regular, SemiBold and Bold fans this
  * out with no other change — every name below must appear in fonts.ts, and
- * tests/mobile-theme.test.ts fails if one does not.
+ * tests/mobile-foundation.test.ts fails if one does not.
  */
 export const family = {
-  normal: "PlusJakartaSans-Medium",
+  normal: "PlusJakartaSans-Regular",
   medium: "PlusJakartaSans-Medium",
-  semibold: "PlusJakartaSans-ExtraBold",
-  bold: "PlusJakartaSans-ExtraBold",
+  semibold: "PlusJakartaSans-SemiBold",
+  bold: "PlusJakartaSans-Bold",
   extrabold: "PlusJakartaSans-ExtraBold",
+  // 900 clamps to 800, as `weights` does: the family has nothing heavier.
   black: "PlusJakartaSans-ExtraBold",
 } as const satisfies Record<keyof typeof weights, string>;
 

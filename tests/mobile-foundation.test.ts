@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { colors, radii, fonts, weights } from "@hypefy/tokens";
 import { NATIVE_AUTH_REDIRECT } from "@hypefy/core/native-auth-link";
 
@@ -286,6 +286,35 @@ describe("the monorepo wiring", () => {
     // nothing shared depends on a react version. core-boundary enforces it.
     expect(mobile.dependencies.react).toBe("19.3.0");
     expect(mobile.dependencies["react-native"]).toBe("0.88.1");
+  });
+});
+
+describe("comments that cite a test cite one that exists", () => {
+  it("every tests/… path named in the mobile source is a real file", () => {
+    /*
+     * fonts.ts claimed its guarantee was held by `tests/mobile-theme.ts`,
+     * which has never existed. The guarantee was real and lives in this
+     * file; the pointer was not. That is a quiet kind of wrong: it reads
+     * as evidence, it survives review, and the only way to find it is to
+     * go looking.
+     *
+     * Cheap to prevent, so prevented. This is the inverse of the trap
+     * that keeps appearing in this repo — there, a comment satisfied an
+     * assertion meant to read code; here, a comment asserts something
+     * about the test suite and nothing checked it back.
+     */
+    const files = readdirSync("apps/mobile/src")
+      .filter((f) => f.endsWith(".ts") || f.endsWith(".tsx"))
+      .map((f) => `apps/mobile/src/${f}`);
+    expect(files.length).toBeGreaterThan(0);
+
+    const missing: string[] = [];
+    for (const file of files) {
+      for (const m of read(file).matchAll(/tests\/[\w.-]+\.test\.tsx?/g)) {
+        if (!existsSync(m[0])) missing.push(`${file} cites ${m[0]}`);
+      }
+    }
+    expect(missing).toEqual([]);
   });
 });
 
