@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { SLIDES, COPY, titleOf, type SlideId } from "../apps/mobile/src/onboarding/slides";
 
 /**
@@ -160,8 +160,106 @@ describe("the measurements are the website's measurements", () => {
   });
 });
 
+describe("the welcome slide's mock-up matches the website's", () => {
+  const WEB_VISUAL = (() => {
+    const src = code(WEB);
+    const start = src.indexOf("function WelcomeVisual()");
+    expect(start, "the web no longer has a WelcomeVisual").toBeGreaterThan(-1);
+    const rest = src.slice(start + 1);
+    const end = rest.indexOf("\nfunction ");
+    return end === -1 ? rest : rest.slice(0, end);
+  })();
+
+  const native = () => code("apps/mobile/src/onboarding/WelcomeVisual.tsx");
+
+  /**
+   * The web class, verbatim, and what the native side must say.
+   *
+   * The class is matched with `toContain`, NOT by building a RegExp from
+   * it. The first version did the latter and `"w-[212px]"` became a
+   * character class — it matched `w-2` in `w-224px`, so the website could
+   * change the card's width and this test would shrug. Mutation M12 found
+   * it. A literal string needs no escaping and cannot be misread.
+   */
+  const SIZES: ReadonlyArray<readonly [string, RegExp, string]> = [
+    ["w-[212px]", /CARD_W = 212/, "the card's width"],
+    ["rounded-[28px]", /borderRadius: 28/, "the card's radius"],
+    ["h-[26px]", /RING_INNER = 26/, "a Shows ring"],
+    ["gap-2.5", /gap: 10/, "the gap between rings"],
+    ["text-[13px]", /fontSize: 13/, "the mock wordmark"],
+    ["text-[11px]", /fontSize: 11/, "the hype count"],
+    ["-right-6", /right: -24/, "how far the badge hangs off"],
+  ];
+
+  for (const [cls, nativeRe, what] of SIZES) {
+    it(`${what} — ${cls}`, () => {
+      expect(WEB_VISUAL, `the web no longer uses ${cls}`).toContain(cls);
+      expect(native(), `${what} does not match`).toMatch(nativeRe);
+    });
+  }
+
+  it("the badge sits 42% down, as it does on the web", () => {
+    expect(WEB_VISUAL).toContain("top-[42%]");
+    expect(native()).toMatch(/top: "42%"/);
+  });
+
+  it("uses the website's own image files rather than copies of them", () => {
+    /*
+     * Metro watches the workspace root, so these resolve across it and
+     * bundle — verified by `expo export`, which lists them from
+     * ../../public/onboarding. Copying them into the app would have meant
+     * ~600KB duplicated and two sets to keep in step; this way an image
+     * changed on the site is changed here by construction.
+     *
+     * The assertion is that the imports point OUT of the app. A copy
+     * appearing inside apps/mobile/assets would pass a naive "the image
+     * exists" check while reintroducing exactly the drift being avoided.
+     */
+    const src = native();
+    const imports = [...src.matchAll(/from "([^"]*public\/onboarding\/[^"]+)"/g)].map(
+      (m) => m[1],
+    );
+    expect(imports.length, "no shared onboarding images are imported").toBeGreaterThan(0);
+    for (const spec of imports) {
+      const file = spec.replace(/^(\.\.\/)+/, "");
+      expect(existsSync(file), `${file} is missing from the web's public folder`).toBe(true);
+    }
+    expect(src, "an image was copied into the app instead of shared").not.toMatch(
+      /assets\/onboarding/,
+    );
+  });
+
+  it("and every image it names is one the web's own visual names", () => {
+    for (const m of native().matchAll(/public\/onboarding\/([\w.-]+)"/g)) {
+      expect(WEB_VISUAL, `${m[1]} is not in the web's WelcomeVisual`).toContain(m[1]);
+    }
+  });
+
+  it("the glow is left out rather than faked", () => {
+    /*
+     * The web has `bg-accent/10` with `blur-3xl` behind the card. React
+     * Native has no filter, and a 10%-accent rectangle with hard edges
+     * looks worse than nothing — so it is absent, and recorded as absent.
+     * This fails if someone adds a hard-edged stand-in for it.
+     */
+    expect(WEB_VISUAL).toContain("blur-3xl");
+    expect(native()).not.toMatch(/glow/i);
+  });
+});
+
 describe("what is deliberately not done yet", () => {
-  it("the visual slot is reserved and empty, not filled with a stand-in", () => {
+  it("the four remaining visuals are absent, not stubbed", () => {
+    // Welcome is drawn. The other four slides render nothing in the slot,
+    // which is honest; a placeholder illustration would make the screen
+    // look finished and then have to come out.
+    const carousel = code(NATIVE);
+    expect(carousel).toMatch(/slide === "welcome" \? <WelcomeVisual \/> : null/);
+    for (const other of ["MockPostStack", "MockReel", "MockDiscover", "MockProfile"]) {
+      expect(carousel, `${other} appeared without being announced`).not.toContain(other);
+    }
+  });
+
+  it("the visual slot is reserved and centred", () => {
     /*
      * The five mock-ups are the other 600 lines of the web component. The
      * seat they will take is laid out now so the copy and footer sit where
