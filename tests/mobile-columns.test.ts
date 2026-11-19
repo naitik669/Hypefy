@@ -7,6 +7,7 @@ import { GRID_COLUMNS } from "../apps/mobile/src/profile/posts";
 import { DISCOVER_POST_COLUMNS } from "../apps/mobile/src/discover/load";
 import { SEARCH_POST_COLUMNS } from "../apps/mobile/src/search/load";
 import { SHOT_COLUMNS } from "../apps/mobile/src/shots/load";
+import { MESSAGE_COLUMNS } from "../apps/mobile/src/messages/load";
 
 /**
  * Every column the phone asks for exists.
@@ -76,6 +77,7 @@ const SELECTS: ReadonlyArray<readonly [string, string, string]> = [
   ["a profile", "profiles", PROFILE_COLUMNS],
   ["search", "posts", SEARCH_POST_COLUMNS],
   ["the reel", "shots", SHOT_COLUMNS],
+  ["a thread", "messages", MESSAGE_COLUMNS],
 ];
 
 describe("every column the phone selects exists in the schema", () => {
@@ -138,6 +140,7 @@ describe("a failed read is never mistaken for an empty one", () => {
     "apps/mobile/src/discover/load.ts",
     "apps/mobile/src/search/load.ts",
     "apps/mobile/src/shots/load.ts",
+    "apps/mobile/src/messages/load.ts",
   ];
 
   function body(path: string): string {
