@@ -1,5 +1,6 @@
-import { Tabs } from "expo-router";
-import { StyleSheet } from "react-native";
+import { Tabs, router } from "expo-router";
+import { Pressable, StyleSheet } from "react-native";
+import { Plus } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { bottomBarDestinations, DESTINATIONS } from "@hypefy/core/navigation";
 import { layout } from "@hypefy/tokens";
@@ -41,6 +42,47 @@ function routeName(href: string): string {
  * where `bottomBar: false` and `sideNav: true` say the same thing.
  */
 const OFF_BAR = DESTINATIONS.filter((d) => !d.bottomBar && d.href === "/discover");
+
+/**
+ * The create button, raised out of the bar.
+ *
+ * Not a destination — it is not in @hypefy/core's DESTINATIONS, and the
+ * web does not treat it as one either: its bottom bar renders a button
+ * between the destinations rather than a nav item, because creating is
+ * an action and the others are places.
+ *
+ * It sits in the `tabBarButton` of a screen registered with `href: null`,
+ * which is how a tab navigator takes a control that is not a tab. The
+ * raised look and the accent fill are the web's.
+ */
+function CreateButton() {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Create"
+      onPress={() => router.push("/create")}
+      style={({ pressed }) => [createStyles.button, pressed && createStyles.pressed]}
+    >
+      <Plus size={26} color={palette.accentInk} strokeWidth={2.6} />
+    </Pressable>
+  );
+}
+
+const createStyles = StyleSheet.create({
+  button: {
+    height: 44,
+    width: 68,
+    // -translate-y-1.5 on the web: it lifts out of the bar so it reads as
+    // an action rather than a fifth destination.
+    marginTop: -6,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+    backgroundColor: palette.accent,
+  },
+  pressed: { transform: [{ scale: 0.9 }] },
+});
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
@@ -111,6 +153,26 @@ export default function TabsLayout() {
           }}
         />
       ))}
+
+      {/*
+        * Creating is an ACTION, not a place: it is deliberately not in
+        * @hypefy/core's DESTINATIONS, and the web's bar renders a button
+        * between its nav items for the same reason.
+        *
+        * The route exists so the navigator has something to attach the
+        * button to, and redirects — the button pushes /create itself, so
+        * this is only reached if something navigates to the slot
+        * directly, and landing on a blank tab would be worse.
+        */}
+      <Tabs.Screen
+        name="create-slot"
+        options={{
+          tabBarButton: () => <CreateButton />,
+          // No header: the slot is never displayed, and a header flashing
+          // during a redirect is visible.
+          headerShown: false,
+        }}
+      />
 
       {OFF_BAR.map((d) => (
         <Tabs.Screen key={d.href} name={routeName(d.href)} options={{ href: null }} />
