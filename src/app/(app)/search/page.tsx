@@ -14,7 +14,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { type FeedPost } from "@/components/feed/FeedCard";
 import { PostResultsGrid } from "@/components/search/PostResultsGrid";
 import { ShotResultsGrid, type ShotResult } from "@/components/search/ShotResultsGrid";
-import { LEGACY_RECENT_KEY, latestOnly, recentSearchKey } from "@/lib/search-run";
+import { LEGACY_RECENT_KEY, latestOnly, recentSearchKey, searchScope, searchFailed } from "@/lib/search-run";
 import { ListRowSkeleton } from "@/components/skeletons/Skeletons";
 import { SearchDiscovery } from "@/components/search/SearchDiscovery";
 import Link from "next/link";
@@ -220,8 +220,15 @@ export default function SearchPage() {
     }
     const run = runs.begin();
     setSearched(true);
-    const isTag = trimmed.startsWith("#");
-    const isUser = trimmed.startsWith("@");
+    /*
+     * The two prefixes are in @hypefy/core/search-run now, because the
+     * Expo client asks the same questions — and two clients disagreeing
+     * about what "#" means would be invisible until somebody compared
+     * them side by side.
+     */
+    const scope = searchScope(trimmed);
+    const isTag = scope.kind === "tag";
+    const isUser = scope.kind === "user";
     const term = trimmed.replace(/^[#@]/, "").toLowerCase();
     if (!term) return;
 
@@ -268,8 +275,12 @@ export default function SearchPage() {
 
       // Every part that was asked for came back as an error: that is the
       // search failing, and must not be shown as "nothing matched".
-      const asked = [isTag ? null : peopleRes, isUser ? null : shotsRes, isUser ? null : postsRes].filter(Boolean);
-      setFailed(asked.length > 0 && asked.every((r) => r!.error));
+      const asked = [
+        scope.people ? peopleRes : null,
+        scope.shots ? shotsRes : null,
+        scope.posts ? postsRes : null,
+      ].filter((r): r is NonNullable<typeof r> => r !== null);
+      setFailed(searchFailed(asked));
 
       setPeople(
         ((peopleRes.data ?? []) as Profile[]).filter(

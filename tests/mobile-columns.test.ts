@@ -5,6 +5,7 @@ import { COMMENT_COLUMNS } from "../apps/mobile/src/comments/load";
 import { PROFILE_COLUMNS } from "../apps/mobile/src/profile/load";
 import { GRID_COLUMNS } from "../apps/mobile/src/profile/posts";
 import { DISCOVER_POST_COLUMNS } from "../apps/mobile/src/discover/load";
+import { SEARCH_POST_COLUMNS } from "../apps/mobile/src/search/load";
 
 /**
  * Every column the phone asks for exists.
@@ -72,6 +73,7 @@ const SELECTS: ReadonlyArray<readonly [string, string, string]> = [
   ["discover", "posts", DISCOVER_POST_COLUMNS],
   ["comments", "comments", COMMENT_COLUMNS],
   ["a profile", "profiles", PROFILE_COLUMNS],
+  ["search", "posts", SEARCH_POST_COLUMNS],
 ];
 
 describe("every column the phone selects exists in the schema", () => {
@@ -109,7 +111,7 @@ describe("every column the phone selects exists in the schema", () => {
      * column does.
      */
     const src = readFileSync(TYPES, "utf8");
-    for (const select of [POST_COLUMNS, DISCOVER_POST_COLUMNS]) {
+    for (const select of [POST_COLUMNS, DISCOVER_POST_COLUMNS, SEARCH_POST_COLUMNS]) {
       const m = select.match(/profiles!(\w+)\(/);
       expect(m, "the posts select no longer names its profile join").toBeTruthy();
       expect(
@@ -132,6 +134,7 @@ describe("a failed read is never mistaken for an empty one", () => {
     "apps/mobile/src/profile/load.ts",
     "apps/mobile/src/profile/posts.ts",
     "apps/mobile/src/discover/load.ts",
+    "apps/mobile/src/search/load.ts",
   ];
 
   function body(path: string): string {
@@ -175,9 +178,16 @@ describe("a failed read is never mistaken for an empty one", () => {
      * on its own does not say where to look, which is most of the cost of
      * diagnosing one.
      */
+    /*
+     * All three readers, not whichever one a given suite happens to hit:
+     * mutation S41 took the name out of `rows` while `row` and `count`
+     * kept it, and a single match stayed green.
+     */
     const src = body("apps/mobile/src/query.ts");
-    expect(src).toMatch(/\$\{what\}/);
-    expect(src).toMatch(/throw new Error/);
+    expect(
+      [...src.matchAll(/throw new Error\(`\$\{what\}: /g)].length,
+      "a reader throws without saying which query failed",
+    ).toBe(3);
     // A count is a read too, and a zero reads as "no followers".
     expect(src).toMatch(/export function count/);
   });
