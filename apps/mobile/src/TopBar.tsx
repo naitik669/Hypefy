@@ -61,9 +61,29 @@ export function TopBar() {
         Hypefy<Text style={styles.markDot}>.</Text>
       </Text>
 
-      {/* The bell's seat. Empty, and the same width as the left flank so
-          the wordmark sits on the centre line rather than near it. */}
-      <View style={[styles.flank, styles.flankEnd]} />
+      {/*
+        * The right flank, the same width as the left so the wordmark sits
+        * on the centre line rather than near it.
+        *
+        * It held the bell's empty seat: /notifications is not a
+        * destination and a bell that navigates nowhere is worse than
+        * none. Search takes the seat now — it is a real screen, and the
+        * web puts search in reach from everywhere too. The bell comes
+        * back here when notifications land.
+        */}
+      <View style={[styles.flank, styles.flankEnd]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Search"
+          hitSlop={8}
+          style={styles.action}
+          onPress={() => router.push("/search")}
+        >
+          {/* The glyph comes from the shared icon map, as Discover's does,
+              so both clients draw the same mark. */}
+          <DestinationIcon href="/search" focused={false} color={palette.foreground} size={22} />
+        </Pressable>
+      </View>
     </View>
   );
 }
