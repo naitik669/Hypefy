@@ -2,6 +2,7 @@ import { getBlockedIds } from "@hypefy/core/blocked";
 import { getFeedExclusions, isQuieted } from "@hypefy/core/feed-quiet";
 import { rankBatch } from "@hypefy/core/feed-rank";
 import { loadSeen } from "@hypefy/core/feed-seen";
+import { rows, row, count } from "../query";
 
 /**
  * The home feed's candidate set, assembled and ranked.
@@ -43,7 +44,7 @@ import { loadSeen } from "@hypefy/core/feed-seen";
 
 /** What the feed needs from a post, and nothing more. */
 export const POST_COLUMNS =
-  "id, user_id, caption, media_url, media_urls, created_at, hype_count, comment_count, save_count, share_count, hashtags, " +
+  "id, user_id, caption, image_url, image_urls, created_at, hype_count, comment_count, save_count, share_count, hashtags, " +
   "profiles!posts_user_id_fkey(id, display_name, username, avatar_hue, avatar_url, is_verified)";
 
 /** The web's two windows: guaranteed follows, then a wider firehose. */
@@ -65,8 +66,8 @@ export type FeedPost = {
   id: string;
   user_id: string;
   caption: string | null;
-  media_url: string | null;
-  media_urls: string[] | null;
+  image_url: string | null;
+  image_urls: string[] | null;
   created_at: string;
   hype_count: number | null;
   comment_count: number | null;
@@ -85,7 +86,7 @@ export type FeedPost = {
  * Each builder method returns the builder, and the builder is awaitable,
  * which is exactly how PostgREST's chain behaves.
  */
-type Rows = { data: unknown[] | null };
+type Rows = { data: unknown[] | null; error: unknown };
 
 type Builder = PromiseLike<Rows> & {
   select(columns: string): Builder;
@@ -112,12 +113,14 @@ async function followingOf(
   supabase: Queryable,
   userId: string,
 ): Promise<Set<string>> {
-  const { data } = await supabase
+  const result = await supabase
     .from("follows")
     .select("following_id")
     .eq("follower_id", userId)
     .limit(FOLLOW_CAP);
-  return new Set(((data ?? []) as { following_id: string }[]).map((r) => r.following_id));
+  return new Set(
+    rows<{ following_id: string }>(result, "follows").map((r) => r.following_id),
+  );
 }
 
 /** Supabase returns an embedded row as an object or a one-element array. */
@@ -208,13 +211,13 @@ export async function loadHyped(
   postIds: string[],
 ): Promise<Set<string>> {
   if (postIds.length === 0) return new Set();
-  const { data } = await supabase
+  const result = await supabase
     .from("hypes")
     .select("target_id")
     .eq("user_id", userId)
     .eq("target_type", "post")
     .in("target_id", postIds);
-  return new Set(((data ?? []) as { target_id: string }[]).map((r) => r.target_id));
+  return new Set(rows<{ target_id: string }>(result, "hypes").map((r) => r.target_id));
 }
 
 export async function loadFeed(
@@ -246,12 +249,12 @@ export async function loadFeed(
 
   for (const id of quiet.muted) blocked.add(id);
 
-  const rows = [
-    ...((followed.data ?? []) as Record<string, unknown>[]),
-    ...((global.data ?? []) as Record<string, unknown>[]),
+  const candidates = [
+    ...rows<Record<string, unknown>>(followed, "followed posts"),
+    ...rows<Record<string, unknown>>(global, "global posts"),
   ].map(normalisePost);
 
-  return assemble(rows, {
+  return assemble(candidates, {
     currentUserId: userId,
     following,
     blocked,

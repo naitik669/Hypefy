@@ -59,7 +59,7 @@ export function FeedCard({ post, hyped = false }: { post: FeedPost; hyped?: bool
   });
   const profile = post.profiles;
   const name = profile?.display_name || profile?.username || "Someone";
-  const media = post.media_urls?.[0] ?? post.media_url ?? null;
+  const media = post.image_urls?.[0] ?? post.image_url ?? null;
 
   return (
     <View style={styles.card}>
@@ -198,7 +198,7 @@ export function FeedCard({ post, hyped = false }: { post: FeedPost; hyped?: bool
  * post with no media and no caption is a row with nothing in it.
  */
 export function isRenderable(post: FeedPost): boolean {
-  const media = post.media_urls?.[0] ?? post.media_url ?? null;
+  const media = post.image_urls?.[0] ?? post.image_url ?? null;
   return Boolean(media) || Boolean(post.caption?.trim());
 }
 

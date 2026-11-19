@@ -1,5 +1,6 @@
 import { hueFromId } from "@hypefy/core/profile";
 import { isLocked, type FollowState } from "@hypefy/core/follow";
+import { row, count } from "../query";
 
 /**
  * A profile, its counts, and where the viewer stands with it.
@@ -73,8 +74,8 @@ export type ProfileView = {
   hue: number;
 };
 
-type Counted = { count: number | null };
-type Maybe = { data: unknown };
+type Counted = { count: number | null; error: unknown };
+type Maybe = { data: unknown; error: unknown };
 
 type Builder<T> = PromiseLike<T> & {
   select(columns: string, options?: { count: "exact"; head: true }): Builder<T>;
@@ -121,9 +122,9 @@ export async function loadStats(
       .eq("follower_id", userId),
   ]);
   return {
-    posts: (posts.count ?? 0) + (shots.count ?? 0),
-    followers: followers.count ?? 0,
-    following: following.count ?? 0,
+    posts: count(posts, "post count") + count(shots, "shot count"),
+    followers: count(followers, "follower count"),
+    following: count(following, "following count"),
   };
 }
 
@@ -154,8 +155,8 @@ export async function loadFollowState(
       .eq("target_id", targetId)
       .maybeSingle(),
   ]);
-  if (follow.data) return "following";
-  if (request.data) return "requested";
+  if (row(follow, "follow row")) return "following";
+  if (row(request, "follow request")) return "requested";
   return "none";
 }
 
@@ -171,7 +172,7 @@ export async function loadProfile(
   username: string,
   viewerId: string | null,
 ): Promise<ProfileView | null> {
-  const { data } = await supabase
+  const found = await supabase
     .from("profiles")
     .select(PROFILE_COLUMNS)
     // Lower-cased, as the web does: usernames are stored lower-case and a
@@ -180,7 +181,7 @@ export async function loadProfile(
     .eq("profile_completed", true)
     .maybeSingle();
 
-  const profile = one<ProfileRow>(data);
+  const profile = one<ProfileRow>(row(found, "profile"));
   if (!profile) return null;
 
   const isOwn = viewerId === profile.id;

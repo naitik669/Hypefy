@@ -373,7 +373,8 @@ describe("the three states, and what is not ported", () => {
     expect(src).toMatch(/ListFooterComponent/);
     expect(src).toMatch(/Showing the first {PAGE}/);
     expect(src, "the page size is written out a second time").not.toMatch(/PAGE_LABEL/);
-    expect(body(LOAD)).toMatch(/more: rows\.length === PAGE/);
+    // `rows` is @/query's reader now, so the page variable was renamed.
+    expect(body(LOAD)).toMatch(/more: page\.length === PAGE/);
   });
 
   it("a comment's hype is a count, not a button", () => {

@@ -152,8 +152,14 @@ describe("the counts are the website's counts", () => {
     const web = code(WEB);
     expect(web).toMatch(/from\("shots"\)[\s\S]{0,120}count: "exact"/);
     expect(web).toMatch(/\(postsRes\.count \?\? 0\) \+ \(shotsRes\.count \?\? 0\)/);
+    /*
+     * The phone reads its counts through @/query's `count`, which throws
+     * on an error instead of letting a refused query read as zero — so
+     * the sum is spelled with that rather than with `?? 0`. The
+     * arithmetic asserted is the same: posts plus shots.
+     */
     const src = body(LOAD);
-    expect(src).toMatch(/\(posts\.count \?\? 0\) \+ \(shots\.count \?\? 0\)/);
+    expect(src).toMatch(/count\(posts, "post count"\) \+ count\(shots, "shot count"\)/);
   });
 
   it("followers and following are the two directions of the same table", () => {
@@ -162,8 +168,8 @@ describe("the counts are the website's counts", () => {
     const src = body(LOAD);
     expect(src).toMatch(/\.eq\("following_id", userId\)/);
     expect(src).toMatch(/\.eq\("follower_id", userId\)/);
-    expect(src).toMatch(/followers: followers\.count \?\? 0/);
-    expect(src).toMatch(/following: following\.count \?\? 0/);
+    expect(src).toMatch(/followers: count\(followers, "follower count"\)/);
+    expect(src).toMatch(/following: count\(following, "following count"\)/);
   });
 
   it("and they are counted without fetching any rows", () => {
@@ -207,8 +213,8 @@ describe("the lookup is the website's lookup", () => {
     const src = body(LOAD);
     expect(src).toMatch(/from\("follows"\)/);
     expect(src).toMatch(/from\("follow_requests"\)/);
-    expect(src).toMatch(/if \(follow\.data\) return "following";/);
-    expect(src).toMatch(/if \(request\.data\) return "requested";/);
+    expect(src).toMatch(/if \(row\(follow, "follow row"\)\) return "following";/);
+    expect(src).toMatch(/if \(row\(request, "follow request"\)\) return "requested";/);
   });
 
   it("asks for the columns the screen renders, and no more", () => {
@@ -245,16 +251,16 @@ describe("the lookup is the website's lookup", () => {
     expect(src).toMatch(/\.order\("created_at", \{ ascending: false \}\)/);
     expect(src).toMatch(new RegExp(`\\.limit\\(GRID_LIMIT\\)`));
     expect(GRID_LIMIT % 3, "the grid limit does not fill whole rows of three").toBe(0);
-    for (const column of ["id", "media_url", "media_urls", "caption"]) {
+    for (const column of ["id", "image_url", "image_urls", "caption"]) {
       expect(GRID_COLUMNS).toMatch(new RegExp(`(^|[ ,])${column}[,\\s]|${column}$`));
     }
   });
 
   it("and a gallery's first picture is the tile", () => {
-    expect(firstMedia({ media_url: "a.jpg", media_urls: null })).toBe("a.jpg");
-    expect(firstMedia({ media_url: "a.jpg", media_urls: ["b.jpg", "c.jpg"] })).toBe("b.jpg");
-    expect(firstMedia({ media_url: null, media_urls: [] })).toBeNull();
-    expect(firstMedia({ media_url: null, media_urls: null })).toBeNull();
+    expect(firstMedia({ image_url: "a.jpg", image_urls: null })).toBe("a.jpg");
+    expect(firstMedia({ image_url: "a.jpg", image_urls: ["b.jpg", "c.jpg"] })).toBe("b.jpg");
+    expect(firstMedia({ image_url: null, image_urls: [] })).toBeNull();
+    expect(firstMedia({ image_url: null, image_urls: null })).toBeNull();
   });
 });
 

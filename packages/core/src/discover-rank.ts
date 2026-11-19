@@ -1,3 +1,4 @@
+import { postTags, tagAffinityFor } from "./feed-rank";
 /**
  * How Discover decides what to show first.
  *
@@ -111,3 +112,63 @@ export function baseScore(
   const hours = hoursOld(x.created_at, now);
   return engagementOf(x) * ageDecay(hours) + recencyBoost(hours);
 }
+
+/**
+ * The whole Discover score: what a thing is worth, plus what it is worth
+ * TO THIS READER.
+ *
+ * `baseScore` is about the post; the three boosts are about the person
+ * looking. They were written inline in the web's Discover page, and are
+ * here now that the phone ranks the same pool — because a Discover that
+ * ranks differently on two clients is the kind of difference nobody can
+ * point at, and the one that most looks like a bug in the other client.
+ *
+ * The caps are the reason this is worth sharing rather than retyping:
+ * author affinity is capped at 30 and tag affinity at 15 so that they
+ * enrich the ranking rather than dominate it, and a client that forgot a
+ * cap would quietly turn Discover into "more of whoever you clicked last".
+ */
+export function discoverScore(
+  x: {
+    created_at: string;
+    user_id: string;
+    hashtags?: string[] | null;
+    hype_count?: number | null;
+    comment_count?: number | null;
+    save_count?: number | null;
+    share_count?: number | null;
+  },
+  ctx: {
+    now: number;
+    /** The reader's own interests and profile tags, lower-cased, no `#`. */
+    interests: Set<string>;
+    /** get_affinity's author weights. */
+    authorAffinity: Record<string, number>;
+    /** get_affinity's tag weights. */
+    tagAffinity: Record<string, number>;
+    /** Tags the reader follows. */
+    followedTags: Set<string>;
+  },
+): number {
+  const tags = postTags(x);
+  const interestBoost =
+    ctx.interests.size > 0 && tags.some((t) => ctx.interests.has(t)) ? INTEREST_BOOST : 0;
+  const authorBoost = Math.min(
+    Math.max(ctx.authorAffinity[x.user_id] ?? 0, 0) * AFFINITY_WEIGHT,
+    AUTHOR_CAP,
+  );
+  const tagBoost = Math.min(
+    tagAffinityFor(x, ctx.tagAffinity, ctx.followedTags) * AFFINITY_WEIGHT,
+    TAG_CAP,
+  );
+  return baseScore(x, ctx.now) + interestBoost + authorBoost + tagBoost;
+}
+
+/** A post whose tags overlap the reader's interests. */
+export const INTEREST_BOOST = 12;
+/** Raw affinity weights are multiplied by this before being capped. */
+export const AFFINITY_WEIGHT = 1.5;
+/** As much as author affinity may ever add. */
+export const AUTHOR_CAP = 30;
+/** As much as tag affinity may ever add. */
+export const TAG_CAP = 15;

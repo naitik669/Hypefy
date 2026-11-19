@@ -60,8 +60,8 @@ function code(path: string): string {
 function post(over: Partial<FeedPost> & { id: string; user_id: string }): FeedPost {
   return {
     caption: "hello",
-    media_url: "https://example.test/a.jpg",
-    media_urls: null,
+    image_url: "https://example.test/a.jpg",
+    image_urls: null,
     created_at: "2026-11-18T12:00:00.000Z",
     hype_count: 0,
     comment_count: 0,
@@ -228,8 +228,8 @@ describe("the queries are the website's queries", () => {
       "id",
       "user_id",
       "caption",
-      "media_url",
-      "media_urls",
+      "image_url",
+      "image_urls",
       "created_at",
       "hype_count",
       "comment_count",

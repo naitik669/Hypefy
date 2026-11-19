@@ -1,4 +1,5 @@
 import { threadOf, type ThreadNode } from "@hypefy/core/comments";
+import { rows, row, count } from "../query";
 
 /**
  * A post's comments, fetched and threaded.
@@ -67,7 +68,7 @@ export const COMMENT_COLUMNS =
   "id, user_id, body, image_url, created_at, updated_at, pinned_at, parent_id, hype_count, " +
   "profiles(display_name, username, avatar_hue, avatar_url, is_verified)";
 
-type Rows = { data: unknown[] | null };
+type Rows = { data: unknown[] | null; error: unknown };
 
 type Builder = PromiseLike<Rows> & {
   select(columns: string): Builder;
@@ -102,7 +103,7 @@ export async function loadComments(
   supabase: Queryable,
   postId: string,
 ): Promise<{ comments: Comment[]; more: boolean }> {
-  const { data } = await supabase
+  const result = await supabase
     .from("comments")
     .select(COMMENT_COLUMNS)
     .eq("post_id", postId)
@@ -110,8 +111,8 @@ export async function loadComments(
     .order("created_at", { ascending: true })
     .limit(PAGE);
 
-  const rows = ((data ?? []) as Record<string, unknown>[]).map(normaliseComment);
-  return { comments: rows, more: rows.length === PAGE };
+  const page = rows<Record<string, unknown>>(result, "comments").map(normaliseComment);
+  return { comments: page, more: page.length === PAGE };
 }
 
 /** Roots with their replies, from core. */
