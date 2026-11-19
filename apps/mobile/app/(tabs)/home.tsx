@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { navSpace } from "@hypefy/tokens";
 import { supabase } from "@/supabase";
-import { loadFeed, type FeedPost } from "@/feed/load";
+import { loadFeed, loadHyped, type FeedPost } from "@/feed/load";
 import { FeedCard, isRenderable } from "@/feed/FeedCard";
 import { base, palette, type, family, radius } from "@/theme";
 
@@ -37,6 +37,7 @@ import { base, palette, type, family, radius } from "@/theme";
 export default function Home() {
   const insets = useSafeAreaInsets();
   const [posts, setPosts] = useState<FeedPost[] | null>(null);
+  const [hyped, setHyped] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -52,12 +53,18 @@ export default function Home() {
    * clear state, an effect may not.
    */
   const fetchFeed = useCallback(async (): Promise<
-    { kind: "posts"; posts: FeedPost[] } | { kind: "failed"; message: string } | { kind: "signed-out" }
+    { kind: "posts"; posts: FeedPost[]; hyped: Set<string> } | { kind: "failed"; message: string } | { kind: "signed-out" }
   > => {
     try {
       const { data, error: authError } = await supabase.auth.getUser();
       if (authError || !data.user) return { kind: "signed-out" };
-      return { kind: "posts", posts: await loadFeed(supabase as never, data.user.id) };
+      const posts = await loadFeed(supabase as never, data.user.id);
+      const hyped = await loadHyped(
+        supabase as never,
+        data.user.id,
+        posts.map((p) => p.id),
+      );
+      return { kind: "posts", posts, hyped };
     } catch (e) {
       return {
         kind: "failed",
@@ -82,6 +89,13 @@ export default function Home() {
       }
       setError(null);
       setPosts(result.posts);
+      /*
+       * Which of these the viewer has already hyped, so the star arrives
+       * filled rather than filling in a beat later. A card decides its own
+       * hype state from here on — the list hands it the starting value and
+       * does not hold it, because the card is what writes.
+       */
+      setHyped(result.hyped);
     },
     [],
   );
@@ -144,7 +158,7 @@ export default function Home() {
       <FlatList
         data={rows}
         keyExtractor={(p) => p.id}
-        renderItem={({ item }) => <FeedCard post={item} />}
+        renderItem={({ item }) => <FeedCard post={item} hyped={hyped.has(item.id)} />}
         contentContainerStyle={{ paddingBottom: navSpace(insets.bottom) }}
         refreshControl={
           <RefreshControl

@@ -188,6 +188,35 @@ export function assemble(
   });
 }
 
+/**
+ * Which of these posts the viewer has already hyped.
+ *
+ * Asked after ranking rather than before, and only for the posts that
+ * survived it: the web asks for its whole candidate window because it
+ * then uses the answer as a ranking signal too (an interacted post is
+ * demoted). This feed has no interaction signal yet, so the only consumer
+ * is the filled-in star — and asking for 190 ids when 40 are shown is a
+ * longer URL for nothing.
+ *
+ * `target_type` is part of the filter because `hypes` is shared with Shots
+ * and Shows; without it a hyped Shot with the same id would fill in a
+ * post's star.
+ */
+export async function loadHyped(
+  supabase: Queryable,
+  userId: string,
+  postIds: string[],
+): Promise<Set<string>> {
+  if (postIds.length === 0) return new Set();
+  const { data } = await supabase
+    .from("hypes")
+    .select("target_id")
+    .eq("user_id", userId)
+    .eq("target_type", "post")
+    .in("target_id", postIds);
+  return new Set(((data ?? []) as { target_id: string }[]).map((r) => r.target_id));
+}
+
 export async function loadFeed(
   supabase: Queryable,
   userId: string,

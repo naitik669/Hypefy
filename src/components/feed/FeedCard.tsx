@@ -47,7 +47,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { TrackChip } from "@/components/music/TrackChip";
 import { MusicMuteButton } from "@/components/music/MusicMuteButton";
 import { parseTrack } from "@/lib/music";
-import { hypeResult } from "@/lib/supabase/typed";
+import { optimistic, settle } from "@/lib/hype";
 import { isRehyped, setRehype, type DeckPerson } from "@/lib/rehype";
 import { useRehypeDeck } from "@/lib/use-rehype-deck";
 import { RehypeDeck } from "@/components/feed/RehypeDeck";
@@ -924,8 +924,13 @@ function FeedCardInner({
     const prev = hyped,
       prevCount = hypeCount;
     setHypePending(true);
-    setHyped(!prev);
-    setHypeCount((c) => c + (prev ? -1 : 1));
+    // The optimistic step comes from @hypefy/core/hype, which the phone
+    // uses too. It floors the count at zero: this column is denormalised
+    // and the feed read it seconds ago, so un-hyping from a stale 0 would
+    // otherwise show -1.
+    const guess = optimistic({ hyped: prev, count: prevCount });
+    setHyped(guess.hyped);
+    setHypeCount(guess.count);
     if (!prev) {
       haptics.success();
       setHypeBurst(true);
@@ -946,13 +951,13 @@ function FeedCardInner({
         p_owner_id: post.user_id,
       });
       if (error) throw error;
-      const res = hypeResult(data);
-      if (res) {
-        setHyped(res.hyped);
-        setHypeCount(res.hype_count);
-      }
+      // The server's answer wins; when it cannot be read the optimistic
+      // state stands, because the write itself did succeed.
+      const next = settle(guess, data);
+      setHyped(next.hyped);
+      setHypeCount(next.count);
       // Was this one placed for you? Asked after every hype; see GhostRise.
-      if (res ? res.hyped : !prev) void ghostRise.ask();
+      if (next.hyped) void ghostRise.ask();
     } catch {
       setHyped(prev);
       setHypeCount(prevCount);
