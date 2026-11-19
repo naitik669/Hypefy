@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
+import { usePushTaps } from "@/notifications/taps";
 import { palette, base } from "@/theme";
 
 /**
@@ -28,6 +29,9 @@ void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
+  // A tapped notification has to reach a screen, and the tap that LAUNCHED
+  // the app happened before any screen existed. See notifications/taps.ts.
+  usePushTaps();
 
   useEffect(() => {
     let cancelled = false;

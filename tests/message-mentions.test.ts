@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { extractMentions } from "@/lib/content-utils";
+import { notifTarget, webHref } from "@hypefy/core/notif-target";
 
 /**
  * Being named in a group chat tells you.
@@ -97,9 +98,11 @@ describe("where it lands, and what it costs", () => {
     // 'conversation' already goes to /messages/<id> in the list.
     expect(fn).toContain("'mention_message', 'conversation'");
     expect(fn).toContain("new.conversation_id");
-    expect(read("src/app/(app)/notifications/page.tsx")).toContain(
-      'if (n.target_type === "conversation" && n.target_id) return `/messages/${n.target_id}`;',
-    );
+    expect(
+      webHref(
+        notifTarget({ type: "mention_message", target_type: "conversation", target_id: "c9" }),
+      ),
+    ).toBe("/messages/c9");
   });
 
   it("and it obeys a preference that already existed", () => {

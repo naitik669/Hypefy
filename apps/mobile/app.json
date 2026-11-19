@@ -3,7 +3,7 @@
     "name": "Hypefy",
     "slug": "hypefy",
     "scheme": "chat.hypefy",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
@@ -21,6 +21,7 @@
       "expo-secure-store",
       "expo-font",
       "expo-video",
+      "expo-notifications",
       [
         "expo-camera",
         {

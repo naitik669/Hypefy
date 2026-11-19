@@ -10,6 +10,8 @@ import { readFileSync } from "node:fs";
  * `src/` exactly once, in a comment. The promise was true and useless.
  */
 
+import { notifTarget, webHref } from "@hypefy/core/notif-target";
+
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const page = read("src/app/(app)/shows/[showId]/answers/page.tsx");
 const poll = read("src/components/shows/ShowPoll.tsx");
@@ -53,13 +55,19 @@ describe("the screen that reads them", () => {
 
 describe("getting there", () => {
   it("the notification lands on the answers, not on the bare Show", () => {
-    // Its target_type is "show", so this has to be tested before the generic
-    // show branch — which is also why it is written above it.
-    const answerAt = notifications.indexOf('n.type === "show_answer"');
-    const showAt = notifications.indexOf('n.target_type === "show" && n.target_id');
-    expect(answerAt).toBeGreaterThan(-1);
-    expect(answerAt).toBeLessThan(showAt);
-    expect(notifications).toContain("`/shows/${n.target_id}/answers`");
+    /*
+     * Its target_type IS "show", so the ORDER of the two branches is the
+     * whole behaviour. That used to be checked by comparing their
+     * positions in the page's source; asking twice checks the same thing
+     * without depending on which file the rule lives in, and would fail
+     * the same way if the branches were ever swapped.
+     */
+    expect(
+      webHref(notifTarget({ type: "show_answer", target_type: "show", target_id: "w1" })),
+    ).toBe("/shows/w1/answers");
+    expect(
+      webHref(notifTarget({ type: "hype_show", target_type: "show", target_id: "w1" })),
+    ).toBe("/shows/w1");
   });
 
   it("and your own sticker is a way in rather than a box to fill", () => {

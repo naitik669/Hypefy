@@ -21,6 +21,7 @@ import {
  */
 
 const WEB = "src/app/(app)/search/page.tsx";
+const WEB_DISCOVER = "src/components/discover/DiscoverView.tsx";
 const LOAD = "apps/mobile/src/search/load.ts";
 const SCREEN = "apps/mobile/app/search.tsx";
 const TOPBAR = "apps/mobile/src/TopBar.tsx";
@@ -462,12 +463,35 @@ describe("the screen can be reached, and left", () => {
     expect(existsSync(SCREEN)).toBe(true);
   });
 
-  it("the top bar reaches it, from the seat the bell will take back", () => {
+  /*
+   * **The way in moved, and this test moved with it.** Search held the top
+   * bar's right seat while /notifications did not exist. It does now, the
+   * bell has that seat back — which is the website's arrangement — and
+   * search sits at the top of Discover, which is where the website has
+   * always had it: DiscoverView's first row is a read-only SearchBar with
+   * `href="/search"`.
+   *
+   * The guarantee this test is named for has not changed: search is
+   * reachable. What changed is from where, so the assertion is about the
+   * screen that now reaches it rather than about the one that used to.
+   */
+  it("Discover's field reaches it, as the website's does", () => {
+    const disc = body("apps/mobile/app/(tabs)/discover.tsx");
+    expect(disc).toMatch(/router\.push\("\/search"\)/);
+    // A field, not an icon — the website's is a pill with the placeholder
+    // inside it, and an icon here would be a different control.
+    expect(disc).toMatch(/Search people, posts, #tags/);
+    expect(code(WEB_DISCOVER)).toMatch(
+      /placeholder="Search people, posts, #tags" href="\/search"/,
+    );
+  });
+
+  it("and the top bar still reaches Discover, which is the only way to it", () => {
     const bar = body(TOPBAR);
-    expect(bar).toMatch(/router\.push\("\/search"\)/);
-    expect(bar).toMatch(/<DestinationIcon href="\/search"/);
-    // And Discover is still on the other flank.
     expect(bar).toMatch(/router\.push\("\/discover"\)/);
+    // Search is no longer here: two ways in would be fine, but a second
+    // icon in an 80pt flank beside the bell is not what the website has.
+    expect(bar).not.toMatch(/\/search/);
   });
 
   it("a result opens the thing it is", () => {

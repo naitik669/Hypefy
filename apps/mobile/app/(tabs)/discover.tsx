@@ -15,6 +15,7 @@ import { navSpace } from "@hypefy/tokens";
 import { formatCount } from "@hypefy/core/format";
 import { supabase } from "@/supabase";
 import { loadDiscover, type DiscoverData, type DiscoverProfile } from "@/discover/load";
+import { Search } from "lucide-react-native";
 import { Avatar } from "@/avatar";
 import { VerifiedStar } from "@/glyphs";
 import { base, palette, type, family, radius } from "@/theme";
@@ -31,6 +32,13 @@ import { base, palette, type, family, radius } from "@/theme";
  * Reached by the compass in the top bar, which is where the web puts it
  * too — it has never had a tab. `bottomBar: false` in @hypefy/core's
  * navigation says so, and the tabs layout registers it with `href: null`.
+ *
+ * **Search opens from the field at the top**, which is where the website
+ * puts it: DiscoverView's first row is a read-only SearchBar linking to
+ * /search. It used to be an icon in the top bar here, borrowing the seat
+ * the notification bell was always going to take — so the bell taking it
+ * back is what moved search to where the website already had it, rather
+ * than leaving the app with one way in fewer.
  *
  * A three-across grid rather than the web's masonry: the web measures
  * each image's aspect ratio and packs columns to it, which needs a
@@ -151,6 +159,23 @@ export default function Discover() {
         }}
         ListHeaderComponent={
           <View>
+            {/*
+              * A field that is not a field: it links rather than types, as
+              * the website's does with its `href`. Typing happens on the
+              * search screen, which owns the query, the debounce and the
+              * results — two places to type into one query is how a tap on
+              * a topic runs a search the box does not show.
+              */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Search people, posts and tags"
+              onPress={() => router.push("/search")}
+              style={({ pressed }) => [styles.searchPill, pressed && styles.searchPressed]}
+            >
+              <Search size={18} color={palette.muted} />
+              <Text style={styles.searchHint}>Search people, posts, #tags</Text>
+            </Pressable>
+
             {data.tags.length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.heading}>Trending</Text>
@@ -249,6 +274,24 @@ function PeopleRow({ title, people }: { title: string; people: DiscoverProfile[]
 }
 
 const styles = StyleSheet.create({
+  // The website's own pill: h-11, rounded-2xl, a border and the surface.
+  searchPill: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    height: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+  },
+  searchPressed: { opacity: 0.7 },
+  searchHint: { color: palette.faint, fontFamily: family.normal, fontSize: type.sm },
+
   section: { paddingTop: 14 },
   heading: {
     paddingHorizontal: 16,

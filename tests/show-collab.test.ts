@@ -34,6 +34,8 @@ import {
  * freed every Show without deleting any.
  */
 
+import { notifTarget, webHref } from "@hypefy/core/notif-target";
+
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const sql = read("supabase/migrations/0186_show_collabs.sql");
 const view = read("src/components/shows/CollabView.tsx");
@@ -302,10 +304,10 @@ describe("the screens around it", () => {
   });
 
   it("and the invite notification goes somewhere", () => {
-    // Every new target_type lands on "#" until somebody adds it here.
-    expect(notifications).toContain(
-      'if (n.target_type === "show_collab" && n.target_id) return `/shows/collab/${n.target_id}`;',
-    );
+    // Every new target_type is nowhere until somebody adds it to core.
+    expect(
+      webHref(notifTarget({ type: "show_collab", target_type: "show_collab", target_id: "k1" })),
+    ).toBe("/shows/collab/k1");
   });
 
   it("the Shows screen lists the ones you are in and the ones you were asked into", () => {
