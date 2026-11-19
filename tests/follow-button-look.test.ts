@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { followLabel } from "@/lib/follow";
 import { readFileSync } from "node:fs";
 
 /**
@@ -72,9 +73,32 @@ describe("a raised chip, not a slab", () => {
 });
 
 describe("the three words are unchanged", () => {
+  /*
+   * Asserted by CALLING the thing that chooses them, not by reading the
+   * ternary that used to be in this file.
+   *
+   * The words moved to @hypefy/core/follow when the Expo client needed
+   * them, and the old assertions were on the spelling — `'? "Following"'`
+   * — so they failed on a move that changed no behaviour. Checking the
+   * behaviour instead means this test now covers BOTH clients' words
+   * rather than one file's source, which is the thing it was named for.
+   */
   it("Follow, Requested, Following", () => {
-    expect(button).toContain('? "Following"');
-    expect(button).toContain('? "Requested"');
-    expect(button).toContain(": followLabel;");
+    expect(followLabel("none")).toBe("Follow");
+    expect(followLabel("following")).toBe("Following");
+    expect(followLabel("requested")).toBe("Requested");
+  });
+
+  it("and a surface may ask for its own word in place of Follow, only there", () => {
+    // The feed card passes one; "Following" and "Requested" are states and
+    // are never a caller's to rename.
+    expect(followLabel("none", "Follow back")).toBe("Follow back");
+    expect(followLabel("following", "Follow back")).toBe("Following");
+    expect(followLabel("requested", "Follow back")).toBe("Requested");
+  });
+
+  it("and the button still takes them from there", () => {
+    expect(button).toContain('from "@/lib/follow"');
+    expect(button).toContain("labelFor(state, followLabel)");
   });
 });

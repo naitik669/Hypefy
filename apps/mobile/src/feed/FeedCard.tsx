@@ -46,6 +46,12 @@ const SHARE = 21;
 const SAVE = 21;
 const AVATAR = 40;
 
+/** Opens a profile, when there is a username to open. */
+function openProfile(username: string | null | undefined) {
+  if (!username) return;
+  router.push({ pathname: "/u/[username]", params: { username } });
+}
+
 export function FeedCard({ post, hyped = false }: { post: FeedPost; hyped?: boolean }) {
   const hype = useHype(post.id, post.user_id, {
     hyped,
@@ -59,7 +65,25 @@ export function FeedCard({ post, hyped = false }: { post: FeedPost; hyped?: bool
     <View style={styles.card}>
       {/* Header */}
       <View style={styles.head}>
-        <Avatar name={name} hue={profile?.avatar_hue ?? 200} size={AVATAR} />
+        {/*
+         * Their face takes you to them, as it does on the web — where the
+         * same tap goes to their Show while one is live. Shows are not
+         * ported, so this always goes to the profile, which is the web's
+         * own fallback rather than a different destination.
+         *
+         * Disabled when the author has no username: /u/[username] has
+         * nothing to resolve, and a tap that lands on "no such profile"
+         * is worse than one that does nothing.
+         */}
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={`${name}'s profile`}
+          disabled={!profile?.username}
+          onPress={() => openProfile(profile?.username)}
+          style={({ pressed }) => [pressed && styles.pressed]}
+        >
+          <Avatar name={name} hue={profile?.avatar_hue ?? 200} size={AVATAR} />
+        </Pressable>
         <View style={styles.who}>
           {/*
            * Plain, as the web's card is, and its reason is worth keeping:
@@ -67,9 +91,17 @@ export function FeedCard({ post, hyped = false }: { post: FeedPost; hyped?: bool
            * subject. Six different faces down one scroll reads as six
            * different apps.
            */}
-          <Text style={styles.name} numberOfLines={1}>
-            {name}
-          </Text>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel={`${name}'s profile`}
+            disabled={!profile?.username}
+            onPress={() => openProfile(profile?.username)}
+            style={styles.nameTap}
+          >
+            <Text style={styles.name} numberOfLines={1}>
+              {name}
+            </Text>
+          </Pressable>
           {profile?.is_verified && <VerifiedStar size={14} />}
           <Text style={styles.when}>· {timeAgoShort(post.created_at)}</Text>
         </View>
@@ -188,6 +220,10 @@ const styles = StyleSheet.create({
   },
   // min-w-0 flex-1 items-center gap-1
   who: { flex: 1, flexDirection: "row", alignItems: "center", gap: 4 },
+  // The name's own tap target, which must not grow the row: it shrinks
+  // with the name rather than claiming the whole remaining width, so the
+  // timestamp beside it stays beside it.
+  nameTap: { flexShrink: 1 },
   name: {
     color: palette.foreground,
     fontFamily: family.semibold,
