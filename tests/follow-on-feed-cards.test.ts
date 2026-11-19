@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { followLabel } from "@/lib/follow";
 import { readFileSync } from "node:fs";
 
 /**
@@ -42,11 +43,16 @@ describe("the button on the card", () => {
   });
 
   it("and says Following once you do", () => {
-    // The three states live in FollowButton; this is the one that was asked
-    // for by name.
-    expect(button).toContain('state === "following"');
-    expect(button).toContain('? "Following"');
-    expect(button).toContain('? "Requested"');
+    /*
+     * The three states and their words live in @hypefy/core/follow now,
+     * shared with the Expo client. This asserted the ternary's spelling in
+     * FollowButton and so failed on a move that changed no behaviour; it
+     * calls the chooser instead, which is what "says Following" means.
+     */
+    expect(followLabel("following")).toBe("Following");
+    expect(followLabel("requested")).toBe("Requested");
+    // And the card's button is still the thing that renders it.
+    expect(button).toContain("labelFor(state, followLabel)");
   });
 });
 

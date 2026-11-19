@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/ToastProvider";
 
-type FollowState = "none" | "requested" | "following";
+/*
+ * The three states, the two actions they collapse to, and what each one
+ * says are now in @hypefy/core/follow, because the Expo client needs the
+ * same answers — above all that a follow of a PRIVATE account comes back
+ * as "requested", and that unfollow_user covers cancelling one.
+ */
+import { optimisticFollow, settleFollow, followAction, followLabel as labelFor, type FollowState } from "@/lib/follow";
 
 const FOLLOW_EVENT = "hypefy:follow";
 
@@ -56,8 +62,10 @@ export function FollowButton({
 
     // follow_user / unfollow_user are SECURITY DEFINER RPCs that own the follow
     // row + its notification, and gate private accounts behind a request.
-    if (prev === "none") {
-      announce("following"); // optimistic; corrected from the RPC's return
+    // Optimistic, then corrected from the RPC's return. Both the guess and
+    // which RPC to call come from @hypefy/core/follow.
+    announce(optimisticFollow(prev));
+    if (followAction(prev) === "follow_user") {
       const { data, error } = await supabase.rpc("follow_user", {
         p_target: targetUserId,
       });
@@ -66,9 +74,9 @@ export function FollowButton({
       if (error) {
         announce(prev);
         toast("Couldn't follow. Try again.", "error");
-      } else announce(data === "requested" ? "requested" : "following");
+      } else announce(settleFollow(data));
     } else {
-      announce("none"); // covers both unfollow and cancel-request
+      // unfollow_user covers both unfollowing and cancelling a request.
       const { error } = await supabase.rpc("unfollow_user", {
         p_target: targetUserId,
       });
@@ -80,12 +88,7 @@ export function FollowButton({
     setPending(false);
   }
 
-  const label =
-    state === "following"
-      ? "Following"
-      : state === "requested"
-      ? "Requested"
-      : followLabel;
+  const label = labelFor(state, followLabel);
   const filled = state === "none";
 
   /**
