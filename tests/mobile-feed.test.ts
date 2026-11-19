@@ -10,6 +10,7 @@ import {
   type FeedPost,
 } from "../apps/mobile/src/feed/load";
 import { rankBatch } from "../packages/core/src/feed-rank";
+import { optimistic, settle, doubleTap } from "../packages/core/src/hype";
 import { kvInstalled } from "../packages/core/src/kv";
 import { entryFor, routeFor } from "../apps/mobile/src/auth/entry";
 
@@ -328,11 +329,17 @@ describe("the card's measurements are the website's", () => {
      * `toFixed(` — so a hand-rolled divide-by-a-thousand that happened not
      * to use toFixed slipped past it. Mutation F25 found that.
      */
-    for (const field of ["hype_count", "comment_count", "share_count"]) {
+    // The two counts still read straight off the post.
+    for (const field of ["comment_count", "share_count"]) {
       expect(src, `${field} is not formatted by the shared function`).toContain(
         `formatCount(post.${field} ?? 0)`,
       );
     }
+    // The hype count comes from the hook now, because the card writes it —
+    // but it is still formatted by the same shared function.
+    expect(src, "the hype count is not formatted by the shared function").toContain(
+      "formatCount(hype.state.count)",
+    );
     expect(src).toContain("timeAgoShort(post.created_at)");
     // And nothing is doing the arithmetic beside it.
     expect(src, "the card is formatting counts itself").not.toMatch(/\/ 1000|toFixed\(/);
@@ -353,31 +360,52 @@ describe("the card's measurements are the website's", () => {
 });
 
 describe("what the card does not do yet, and does not pretend to", () => {
-  it("no action has a press handler", () => {
+  it("hype is the ONLY action with a press handler", () => {
     /*
-     * Hype, comment, share and save are all WRITES. A button that looks
-     * live and does nothing is worse than one that is plainly a count —
-     * and hyping in particular needs the optimistic update, the RPC and
-     * the particle animation, which is its own piece of work.
-     *
-     * The assertion is on the actions, not the file: the card has a menu
-     * seat and may gain other taps.
+     * Comment, share and save are still writes with nothing behind them. A
+     * button that looks live and does nothing is worse than a plain count,
+     * so they stay as counts — and this asserts exactly one of the four
+     * has become pressable, rather than "none has", which stopped being
+     * true the moment hyping worked.
      */
     const src = body(CARD);
     const actions = src.slice(src.indexOf("styles.actions"), src.indexOf("Caption"));
-    expect(actions, "an action gained a handler without being announced").not.toMatch(
-      /onPress/,
-    );
-    expect(actions, "an action became pressable without being announced").not.toMatch(
-      /<Pressable/,
-    );
+    expect(
+      [...actions.matchAll(/onPress/g)].length,
+      "an action gained a handler without being announced",
+    ).toBe(1);
+    expect(actions, "the one handler is not the hype one").toMatch(/onPress=\{hype\.toggle\}/);
+    expect(
+      [...actions.matchAll(/<Pressable/g)].length,
+      "an action became pressable without being announced",
+    ).toBe(1);
   });
 
   it("and the counts shown are the post's own, not invented", () => {
     const src = body(CARD);
-    for (const field of ["hype_count", "comment_count", "share_count"]) {
+    for (const field of ["comment_count", "share_count"]) {
       expect(src, `${field} is not read`).toContain(field);
     }
+    // The hype count starts from the post and is then the hook's.
+    expect(src).toContain("count: post.hype_count ?? 0");
+  });
+
+  it("the web's celebration is absent, and recorded as absent", () => {
+    /*
+     * The particle burst, the break animation when a hype is taken back,
+     * and the haptic tap are the reason hyping feels like something on the
+     * site. Approximating them badly would be worse than their absence, so
+     * they are a separate piece of work — and this fails if a stand-in
+     * appears without one.
+     */
+    expect(code(WEB_CARD)).toMatch(/HypeParticles|animate-hype-pop/);
+    const src = body(CARD);
+    expect(src, "something is standing in for the particle burst").not.toMatch(
+      /particle|burst|confetti/i,
+    );
+    expect(read(CARD), "the missing celebration is no longer explained").toMatch(
+      /particle burst/,
+    );
   });
 
   it("a row with neither media nor caption is skipped, not rendered empty", () => {
@@ -524,5 +552,168 @@ describe("the already-seen demotion is absent, and absent honestly", () => {
     expect(src).toMatch(/Ads, Ghost Share/);
     expect(src).toMatch(/Rehypes/);
     expect(src).toMatch(/Affinity and interests/);
+  });
+});
+
+describe("hyping is one rule for both clients", () => {
+  /*
+   * The first WRITE either client makes to the same row, which is why the
+   * three rules are in @hypefy/core/hype and called by both rather than
+   * written twice. Each one is a failure nobody would notice: a negative
+   * count, a client keeping its own guess after the server answered, or a
+   * rollback to "the opposite of now" instead of to what was there.
+   */
+
+  it("the optimistic step never shows a negative count", () => {
+    /*
+     * hype_count is denormalised and the feed read it seconds ago, so
+     * un-hyping from a stale 0 is not hypothetical. The server cannot
+     * produce -1, so a -1 on screen is always the client's own arithmetic.
+     */
+    expect(optimistic({ hyped: true, count: 0 })).toEqual({ hyped: false, count: 0 });
+    expect(optimistic({ hyped: true, count: 1 })).toEqual({ hyped: false, count: 0 });
+    expect(optimistic({ hyped: false, count: 0 })).toEqual({ hyped: true, count: 1 });
+    expect(optimistic({ hyped: false, count: 41 })).toEqual({ hyped: true, count: 42 });
+  });
+
+  it("the server's answer wins over the guess", () => {
+    // Two people hyping at once is the ordinary case, so the count that
+    // comes back is rarely the one the client predicted.
+    const guess = optimistic({ hyped: false, count: 5 });
+    expect(guess).toEqual({ hyped: true, count: 6 });
+    expect(settle(guess, { hyped: true, hype_count: 9 })).toEqual({ hyped: true, count: 9 });
+    // Including when it disagrees about the state itself.
+    expect(settle(guess, { hyped: false, hype_count: 4 })).toEqual({ hyped: false, count: 4 });
+  });
+
+  it("but an unreadable answer leaves the guess standing", () => {
+    /*
+     * The write succeeded — the RPC returned without error — so the one
+     * thing that would be wrong is to show it as not having happened. An
+     * older function or a shape change lands here.
+     */
+    const guess = optimistic({ hyped: false, count: 5 });
+    for (const raw of [null, undefined, "nope", 7, [], {}]) {
+      const out = settle(guess, raw as never);
+      expect(out.hyped, `settled wrongly on ${JSON.stringify(raw)}`).toBe(true);
+    }
+    // `{}` reads as hyped:false with a NaN count, which is not a count —
+    // so it is refused rather than rendered as "NaN".
+    expect(settle(guess, {} as never)).toEqual(guess);
+    expect(Number.isNaN(settle(guess, {} as never).count)).toBe(false);
+  });
+
+  it("and a negative count from the server is still floored", () => {
+    // Belt and braces: the column has no constraint saying otherwise, and
+    // "-1" rendered under a star is worse than "0".
+    expect(settle({ hyped: true, count: 1 }, { hyped: false, hype_count: -1 })).toEqual({
+      hyped: false,
+      count: 0,
+    });
+  });
+
+  it("a double-tap hypes and never un-hypes", () => {
+    /*
+     * The web's rule: a double-tap is a gesture of enthusiasm, and reading
+     * the second tap as "take it back" makes an affectionate gesture
+     * destructive.
+     */
+    expect(doubleTap({ hyped: false, count: 3 })).toEqual({
+      next: { hyped: true, count: 4 },
+      write: true,
+    });
+    const already = { hyped: true, count: 4 } as const;
+    expect(doubleTap(already)).toEqual({ next: already, write: false });
+  });
+
+  it("both clients call it rather than keeping their own arithmetic", () => {
+    const web = code(WEB_CARD);
+    expect(web, "the web no longer imports the shared hype rules").toMatch(
+      /import \{ optimistic, settle \} from "@\/lib\/hype"/,
+    );
+    expect(web, "the web is doing its own optimistic arithmetic again").not.toMatch(
+      /setHypeCount\(\(c\) => c \+ \(prev \? -1 : 1\)\)/,
+    );
+    expect(web).toMatch(/const guess = optimistic\(/);
+    expect(web).toMatch(/settle\(guess, data\)/);
+
+    const hook = code("apps/mobile/src/feed/useHype.ts");
+    expect(hook).toMatch(/from "@hypefy\/core\/hype"/);
+    expect(hook).toMatch(/optimistic\(before\)/);
+    expect(hook).toMatch(/settle\(guess, data\)/);
+  });
+
+  it("the phone calls the same RPC with the same three arguments", () => {
+    const web = code(WEB_CARD);
+    const hook = code("apps/mobile/src/feed/useHype.ts");
+    for (const arg of ["p_target_type", "p_target_id", "p_owner_id"]) {
+      expect(web, `the web no longer passes ${arg}`).toContain(arg);
+      expect(hook, `the phone does not pass ${arg}`).toContain(arg);
+    }
+    expect(web).toMatch(/rpc\("toggle_hype"/);
+    expect(hook).toMatch(/rpc\("toggle_hype"/);
+    // "post", not a Shot or a Show: `hypes` is shared across all three.
+    expect(hook).toMatch(/p_target_type: "post"/);
+  });
+
+  it("one tap at a time, and a failure restores what was there before", () => {
+    /*
+     * Two overlapping toggles on one row race, and whichever RPC answers
+     * last wins — so the count settles on a value neither tap asked for.
+     * The guard is what makes "roll back to before" and "roll back to the
+     * opposite of now" the same thing.
+     */
+    const hook = code("apps/mobile/src/feed/useHype.ts");
+    expect(hook).toMatch(/if \(pending\) return;/);
+    expect(hook).toMatch(/const before = state;/);
+    expect(hook, "the rollback does not restore the earlier state").toMatch(
+      /catch \{\s*setState\(before\);/,
+    );
+    expect(hook, "pending is never cleared, so one failure wedges the button").toMatch(
+      /finally \{\s*setPending\(false\);/,
+    );
+  });
+
+  it("and the star says whether it is yours, to a screen reader too", () => {
+    const src = body(CARD);
+    expect(src).toMatch(/accessibilityLabel=\{hype\.state\.hyped \? "Remove your hype" : "Hype this post"\}/);
+    expect(src).toMatch(/selected: hype\.state\.hyped/);
+    expect(src).toMatch(/busy: hype\.pending/);
+    // Filled and in the hype colour once it is yours, as the web's is.
+    expect(src).toMatch(/fill=\{hype\.state\.hyped \? palette\.hype : "none"\}/);
+    expect(code(WEB_CARD)).toMatch(/text-hype/);
+  });
+
+  it("the hypes query names the target type, or a Shot would fill a post's star", () => {
+    /*
+     * `hypes` is shared by posts, Shots and Shows. Without target_type a
+     * hyped Shot whose id matched a post would show that post as hyped —
+     * which is only possible because both are uuids, and is exactly the
+     * kind of thing that would look like a caching bug.
+     */
+    const src = body(LOAD);
+    expect(src).toMatch(/\.eq\("target_type", "post"\)/);
+    expect(src).toMatch(/\.eq\("user_id", userId\)/);
+    expect(code(WEB)).toMatch(/\.eq\("target_type", "post"\)/);
+  });
+
+  it("and asks for nothing when there is nothing to ask about", () => {
+    // An empty `.in()` is not a query worth sending, and PostgREST renders
+    // it awkwardly — the web says the same about its Shows query.
+    expect(body(LOAD)).toMatch(/if \(postIds\.length === 0\) return new Set\(\);/);
+  });
+
+  it("the answer actually reaches the card, so the star arrives filled", () => {
+    /*
+     * Loading the set and never passing it is a complete, silent failure:
+     * every post renders un-hyped, tapping one "works", and the next
+     * refresh fills in stars the viewer never tapped. Mutation H26
+     * replaced the lookup with `false` and nothing failed — the screen's
+     * assertions were about the list, not about what it hands each row.
+     */
+    const src = body(SCREEN);
+    expect(src).toMatch(/hyped=\{hyped\.has\(item\.id\)\}/);
+    expect(src, "the loaded set is never stored").toMatch(/setHyped\(result\.hyped\)/);
+    expect(src, "the set is never loaded").toMatch(/loadHyped\(/);
   });
 });

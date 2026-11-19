@@ -5,6 +5,7 @@ import { timeAgoShort } from "@hypefy/core/time";
 import { palette, type, family } from "@/theme";
 import { HypeIcon, CommentIcon, ShareIcon, VerifiedStar } from "@/glyphs";
 import { Avatar } from "@/avatar";
+import { useHype } from "@/feed/useHype";
 import type { FeedPost } from "@/feed/load";
 
 /**
@@ -19,12 +20,18 @@ import type { FeedPost } from "@/feed/load";
  * px-4 pt-3 with gap-5 between groups and gap-1.5 inside one, and the
  * icons at 23/22/21 as the web draws them.
  *
- * **The actions do not work yet, and they do not pretend to.** Every one of
- * them is a write — hype, comment, share, save — and a button that looks
- * live and does nothing is worse than one that says it is coming. They are
- * rendered as the counts they are, without press handlers, and a test
- * asserts no handler has quietly appeared. Hyping needs the optimistic
- * update, the RPC and the particle animation; it is its own piece of work.
+ * **Hyping works. The other three do not, and do not pretend to.**
+ * Comment, share and save are writes with no handler, rendered as the
+ * counts they are, and a test asserts none has quietly gained one — a
+ * button that looks live and does nothing is worse than a plain number.
+ *
+ * Hype goes through `useHype`, whose three rules live in
+ * @hypefy/core/hype and are shared with the web's own card. What is NOT
+ * here is the web's celebration: the particle burst, the break animation
+ * when a hype is taken back, and the haptic tap. Those are the reason
+ * hyping feels like something on the site, and they are deliberately a
+ * separate piece of work rather than approximated badly — the star fills,
+ * the count turns, and a failure puts both back.
  *
  * `formatCount` and `timeAgoShort` come from @hypefy/core, so "1.2k" and
  * "5m" are formatted by the same code on both clients rather than by two
@@ -38,7 +45,11 @@ const SHARE = 21;
 const SAVE = 21;
 const AVATAR = 40;
 
-export function FeedCard({ post }: { post: FeedPost }) {
+export function FeedCard({ post, hyped = false }: { post: FeedPost; hyped?: boolean }) {
+  const hype = useHype(post.id, post.user_id, {
+    hyped,
+    count: post.hype_count ?? 0,
+  });
   const profile = post.profiles;
   const name = profile?.display_name || profile?.username || "Someone";
   const media = post.media_urls?.[0] ?? post.media_url ?? null;
@@ -71,17 +82,42 @@ export function FeedCard({ post }: { post: FeedPost }) {
       {/* Media */}
       {media && (
         <View style={styles.media}>
-          <Image source={{ uri: media }} style={styles.mediaImage} resizeMode="cover" />
+          {/*
+            * Labelled, because an unlabelled photograph is the whole post
+            * to a screen reader. Alt text per post does not exist in the
+            * schema — it is on the launch list as a later feature — so the
+            * author is the one true thing there is to say, and the caption
+            * below is read as its own text.
+            */}
+          <Image
+            source={{ uri: media }}
+            style={styles.mediaImage}
+            resizeMode="cover"
+            accessibilityLabel={`Photo from ${name}`}
+          />
         </View>
       )}
 
       {/* Actions */}
       <View style={styles.actions}>
         <View style={styles.group}>
-          <View style={styles.action}>
-            <HypeIcon size={HYPE} color={palette.foreground} />
-            <Text style={styles.count}>{formatCount(post.hype_count ?? 0)}</Text>
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={hype.state.hyped ? "Remove your hype" : "Hype this post"}
+            accessibilityState={{ selected: hype.state.hyped, busy: hype.pending }}
+            hitSlop={8}
+            onPress={hype.toggle}
+            style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+          >
+            <HypeIcon
+              size={HYPE}
+              color={hype.state.hyped ? palette.hype : palette.foreground}
+              fill={hype.state.hyped ? palette.hype : "none"}
+            />
+            <Text style={[styles.count, hype.state.hyped && styles.countOn]}>
+              {formatCount(hype.state.count)}
+            </Text>
+          </Pressable>
           <View style={styles.action}>
             <CommentIcon size={COMMENT} color={palette.foreground} strokeWidth={2.2} />
             <Text style={styles.count}>{formatCount(post.comment_count ?? 0)}</Text>
@@ -174,12 +210,16 @@ const styles = StyleSheet.create({
   },
   group: { flexDirection: "row", alignItems: "center", gap: 20 }, // gap-5
   action: { flexDirection: "row", alignItems: "center", gap: 6 }, // gap-1.5
+  // active:scale-90, which is what the web's own hype button presses to.
+  pressed: { transform: [{ scale: 0.9 }] },
   count: {
     color: palette.foreground,
     fontFamily: family.semibold,
     fontSize: type.sm, // text-sm font-semibold
     fontVariant: ["tabular-nums"], // tabular-nums
   },
+  // text-hype once it is yours, as the web's count turns.
+  countOn: { color: palette.hype },
 
   // px-4 pt-2 text-sm leading-snug
   caption: {

@@ -111,14 +111,30 @@ describe("the ghost on a hype", () => {
 
 describe("where it is wired", () => {
   const read = (p: string) => readFileSync(p, "utf8");
+  /*
+   * The third element is the condition that file guards the ask with.
+   *
+   * It used to be one literal for all three. FeedCard's hype path now
+   * takes its settled state from @hypefy/core/hype — shared with the Expo
+   * client, which needed the same three rules — so the fallback that
+   * `res ? res.hyped : !prev` existed for is inside `settle` instead, and
+   * the condition is simply "did this end up hyped". The INTENT is
+   * unchanged and is what the test name says; only this one file's spelling
+   * of it moved, so the expectation is per-file rather than loosened for
+   * everybody.
+   */
   it.each([
-    ["src/components/shots/ReelsFeed.tsx", 'useGhostRise("shot", reel.id)'],
-    ["src/components/feed/ShotFeedCard.tsx", 'useGhostRise("shot", shot.id)'],
-    ["src/components/feed/FeedCard.tsx", 'useGhostRise("post", post.id)'],
-  ])("%s asks only after a hype that was given, not one taken back", (file, hook) => {
+    ["src/components/shots/ReelsFeed.tsx", 'useGhostRise("shot", reel.id)', "if (res ? res.hyped : !prev) void ghostRise.ask();"],
+    ["src/components/feed/ShotFeedCard.tsx", 'useGhostRise("shot", shot.id)', "if (res ? res.hyped : !prev) void ghostRise.ask();"],
+    ["src/components/feed/FeedCard.tsx", 'useGhostRise("post", post.id)', "if (next.hyped) void ghostRise.ask();"],
+  ])("%s asks only after a hype that was given, not one taken back", (file, hook, guard) => {
     const src = read(file);
     expect(src).toContain(hook);
-    expect(src).toContain("if (res ? res.hyped : !prev) void ghostRise.ask();");
+    expect(src).toContain(guard);
+    // Whatever the spelling, the ask is never made unconditionally.
+    expect(src, `${file} asks after every hype, including one taken back`).not.toContain(
+      "void ghostRise.ask();\n    } catch",
+    );
     expect(src).toContain("{ghostRise.rising && <GhostRise");
   });
 
