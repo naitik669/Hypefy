@@ -1,12 +1,29 @@
-name: Android
+name: Android (Capacitor shell — retired)
 
-# Every push to main produces a build testers can install. The web layer
-# already updates itself on deploy (the shell loads hypefy.chat), so this
-# exists only for changes to the native shell — plugins, permissions,
-# manifest, icons — which a Vercel deploy cannot reach.
+# **This builds the OLD app, and it must never produce a Play artifact.**
+#
+# It was written when the Capacitor shell WAS Hypefy on Android: a WebView
+# pointed at app.hypefy.chat, so the only reason to build it was a change to
+# the native wrapper that a Vercel deploy could not reach.
+#
+# Phase 6 replaced it. The app is `apps/mobile` (Expo), built by EAS, and
+# EAS signs with credentials it stores itself — which is why 1.0.0, 1.1.0 and
+# 1.2.0 all signed correctly with no secret in this repository.
+#
+# **The dangerous state this now guards against.** `KEYSTORE_BASE64` is read
+# by nothing but `android/app/build.gradle`. Set it, and this workflow starts
+# producing a correctly-signed, Play-publishable App Bundle of the RETIRED
+# WEBVIEW APP — the wrong application, properly signed, previously labelled
+# "the Play Store artifact" and built on every merge. A wrong app that is
+# correctly signed is far more likely to be uploaded by mistake than one Play
+# rejects outright. So the bundle is gone and the secret is now a hard
+# failure here rather than a warning.
+#
+# It builds an APK only, for Firebase App Distribution, and only when somebody
+# asks for one. Play's artifact comes from `eas build --profile production`.
 on:
-  push:
-    branches: [main]
+  # Manual only. On every push it produced an installable build of an app
+  # nobody should install, which is worse than producing nothing.
   workflow_dispatch:
 
 jobs:
@@ -81,12 +98,15 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         # Belt and braces: the exec bit is set in git, but a Windows
         # checkout can drop it again and the failure (exit 126) is opaque.
-        # Both outputs, because they are not interchangeable: Play accepts
-        # only an .aab, and only an .apk can be sideloaded or sent through
-        # Firebase App Distribution.
+        #
+        # An APK only. The .aab used to be built here as well, because Play
+        # accepts nothing else — which is exactly why it has no business
+        # being produced from the retired shell. Play's bundle comes from
+        # EAS; an APK is only sideloaded or sent through Firebase App
+        # Distribution, neither of which can reach the store.
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleRelease bundleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
       # Always kept, so a build is retrievable even when distribution is not
       # configured yet or the upload step fails.
@@ -101,23 +121,18 @@ jobs:
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
-      # The Play Store artifact. Google has required an App Bundle for new
-      # apps since 2021, so assembleRelease alone can never produce a
-      # publishable build.
-      - uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          retention-days: 3
-          name: hypefy-aab
-          path: android/app/build/outputs/bundle/release/*.aab
-          if-no-files-found: error
-
-      # Say so in the run summary rather than letting Play reject the
-      # upload with a signature error that reads like a Play problem.
-      - name: Warn when the bundle is debug-signed
-        if: env.KEYSTORE_BASE64 == ''
+      # Inverted from what this used to say, because what is dangerous has
+      # inverted. It warned when the keystore was ABSENT, on the reasoning
+      # that Play would reject a debug-signed bundle — true, and a rejection
+      # is a safe failure. Now that Play's artifact comes from EAS, the
+      # keystore being PRESENT is the problem: it signs the retired WebView
+      # app with the real upload key, and nothing downstream can tell that
+      # apart from the app anybody meant to ship.
+      - name: Refuse to sign the retired shell with the release keystore
+        if: env.KEYSTORE_BASE64 != ''
         run: |
-          echo "::warning title=Debug-signed bundle::hypefy-aab is signed with the debug key and Google Play will reject it. Set KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD to produce an upload-signed bundle."
+          echo "::error title=Release keystore set on the retired shell::KEYSTORE_BASE64 is set, so this workflow would sign the Capacitor WebView app with the real upload key. That app is retired; Play's artifact comes from 'eas build --profile production', which signs with credentials EAS stores. Remove the KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD secrets from this repository — EAS does not read them — or delete this workflow along with android/."
+          exit 1
 
       # The same treatment for Firebase. google-services.json used to be
       # committed, so this step's "if set" was harmless — the file was there
