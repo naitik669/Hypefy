@@ -1,5 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { MoreHorizontal, Bookmark } from "lucide-react-native";
+import { router } from "expo-router";
 import { formatCount } from "@hypefy/core/format";
 import { timeAgoShort } from "@hypefy/core/time";
 import { palette, type, family } from "@/theme";
@@ -118,10 +119,24 @@ export function FeedCard({ post, hyped = false }: { post: FeedPost; hyped?: bool
               {formatCount(hype.state.count)}
             </Text>
           </Pressable>
-          <View style={styles.action}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Comments, ${formatCount(post.comment_count ?? 0)}`}
+            hitSlop={8}
+            onPress={() =>
+              router.push({
+                pathname: "/post/[id]/comments",
+                // The post's AUTHOR, carried through: create_comment writes
+                // the notification and needs to know who to tell. The
+                // screen refuses to post without it rather than guessing.
+                params: { id: post.id, owner: post.user_id },
+              })
+            }
+            style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+          >
             <CommentIcon size={COMMENT} color={palette.foreground} strokeWidth={2.2} />
             <Text style={styles.count}>{formatCount(post.comment_count ?? 0)}</Text>
-          </View>
+          </Pressable>
           <View style={styles.action}>
             <ShareIcon size={SHARE} color={palette.foreground} />
             <Text style={styles.count}>{formatCount(post.share_count ?? 0)}</Text>
