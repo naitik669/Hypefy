@@ -360,25 +360,33 @@ describe("the card's measurements are the website's", () => {
 });
 
 describe("what the card does not do yet, and does not pretend to", () => {
-  it("hype is the ONLY action with a press handler", () => {
+  it("hype and comments are the ONLY actions with a press handler", () => {
     /*
-     * Comment, share and save are still writes with nothing behind them. A
-     * button that looks live and does nothing is worse than a plain count,
-     * so they stay as counts — and this asserts exactly one of the four
-     * has become pressable, rather than "none has", which stopped being
-     * true the moment hyping worked.
+     * Share and save are still writes with nothing behind them. A button
+     * that looks live and does nothing is worse than a plain count, so
+     * they stay as counts.
+     *
+     * The count in this assertion has now moved twice — "none", then
+     * "one", now "two" — and each move was a real change in what the
+     * screen can do. That is the point: a test describing an absence has
+     * to be re-read when the screen gains a capability, not just re-run,
+     * or it goes on passing while saying something false.
      */
     const src = body(CARD);
     const actions = src.slice(src.indexOf("styles.actions"), src.indexOf("Caption"));
     expect(
       [...actions.matchAll(/onPress/g)].length,
       "an action gained a handler without being announced",
-    ).toBe(1);
-    expect(actions, "the one handler is not the hype one").toMatch(/onPress=\{hype\.toggle\}/);
+    ).toBe(2);
+    expect(actions, "hyping is no longer wired").toMatch(/onPress=\{hype\.toggle\}/);
+    expect(actions, "comments are no longer reachable").toMatch(/router\.push\(/);
     expect(
       [...actions.matchAll(/<Pressable/g)].length,
       "an action became pressable without being announced",
-    ).toBe(1);
+    ).toBe(2);
+    // Share and save, still inert.
+    expect(actions).toMatch(/<View style=\{styles\.action\}>\s*<ShareIcon/);
+    expect(actions).toMatch(/<View style=\{styles\.action\}>\s*<Bookmark/);
   });
 
   it("and the counts shown are the post's own, not invented", () => {

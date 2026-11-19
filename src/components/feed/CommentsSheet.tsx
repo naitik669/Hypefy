@@ -23,6 +23,7 @@ import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { ZoomViewer } from "@/components/ui/ZoomViewer";
 import { GifPicker } from "@/components/messages/GifPicker";
 import { formatCount } from "@/lib/format";
+import { mediaBody, threadOf as threadOfNodes } from "@/lib/comments";
 import {
   useMentionHashtag,
   applySuggestion,
@@ -61,22 +62,31 @@ const FOCUS_MAX_PAGES = 10;
  *     they drifted apart — replies quietly had no delete.
  */
 
-/**
- * A body that is really a picture.
+/*
+ * `mediaBody` and `threadOf` were defined here and are now in
+ * @hypefy/core/comments, because the Expo client needs the same answers.
+ * The threading especially is not a formatting detail — it decides whether
+ * a reply is ever seen by anyone, and two clients disagreeing about that
+ * would show different conversations for the same post.
  *
- * GIFs have always been stored in the body, which was read as "starts with
- * https://" — so a comment that was nothing but a link to a page rendered as
- * a broken image, and you could not post a link at all. Now it has to look
- * like an image: one of the GIF hosts the picker uses, or a URL ending in an
- * image's extension. Photos do not come through here; they have a column.
+ * Both are re-exported from this module so every existing importer keeps
+ * working unchanged, including tests/comment-photos.test.ts.
  */
-export function mediaBody(body: string): string | null {
-  const t = body.trim();
-  if (!t.startsWith("https://") || /\s/.test(t)) return null;
-  const isMedia =
-    /^https:\/\/(media[0-9]*\.tenor\.com|c\.tenor\.com|media[0-9]*\.giphy\.com|i\.giphy\.com)\//.test(t) ||
-    /\.(gif|png|jpe?g|webp)(\?|#|$)/i.test(t);
-  return isMedia ? t : null;
+export { mediaBody } from "@/lib/comments";
+
+/**
+ * This module's own `threadOf`, still typed to this module's `Node`.
+ *
+ * Core's is generic over anything with an id, a parent and a pinned_at,
+ * which is what lets the Expo client pass its own row type. Re-exporting
+ * that generic directly changed this module's public type, and
+ * tests/comments.test.ts derives its fixture shape from it with
+ * `Parameters<typeof threadOf>[0][number]` — so the fixtures stopped
+ * compiling. Moving code must not make tests change; the wrapper is how
+ * that stays true.
+ */
+export function threadOf(items: Node[]): { root: Node; replies: Node[] }[] {
+  return threadOfNodes(items);
 }
 
 /* --- Types ---------------------------------------------------------------- */
@@ -109,62 +119,6 @@ type Node = {
   reported: boolean;
   profiles: Profile | null;
 };
-
-/* --- Helpers -------------------------------------------------------------- */
-/**
- * Roots in posting order, with each root's replies attached.
- *
- * Flat state rather than a tree in state: a tree has to be walked and cloned
- * to change one node, which is how a single hype ended up re-rendering the
- * whole thread. A flat array replaces exactly one element, every other node
- * keeps its identity, and the memoised rows below skip.
- */
-export function threadOf(items: Node[]): { root: Node; replies: Node[] }[] {
-  const byId = new Map(items.map((c) => [c.id, c]));
-
-  /**
-   * The top-level comment this one belongs under.
-   *
-   * Walked all the way up rather than taking parent_id at face value. The
-   * thread is one level deep on screen, but nothing stops a reply pointing
-   * at another reply — the old code nested those a second level down and
-   * then rendered only one level, so a reply to a reply was written,
-   * stored, and never seen again by anyone.
-   *
-   * A reply whose parent is missing (deleted, or never loaded) becomes its
-   * own root rather than being dropped, for the same reason.
-   */
-  function rootOf(c: Node): Node {
-    let cur = c;
-    const seen = new Set<string>([cur.id]);
-    while (cur.parent_id) {
-      const parent = byId.get(cur.parent_id);
-      // Missing parent, or a cycle in the data — stop rather than loop.
-      if (!parent || seen.has(parent.id)) break;
-      seen.add(parent.id);
-      cur = parent;
-    }
-    return cur;
-  }
-
-  const replies = new Map<string, Node[]>();
-  const roots: Node[] = [];
-
-  for (const c of items) {
-    const root = rootOf(c);
-    if (root.id === c.id) {
-      roots.push(c);
-      continue;
-    }
-    const list = replies.get(root.id);
-    if (list) list.push(c);
-    else replies.set(root.id, [c]);
-  }
-  // The one the author pinned reads first, whenever it was written.
-  // Everything else keeps the order it was posted in.
-  roots.sort((a, b) => (a.pinned_at ? 0 : 1) - (b.pinned_at ? 0 : 1));
-  return roots.map((root) => ({ root, replies: replies.get(root.id) ?? [] }));
-}
 
 /* --- Main component ------------------------------------------------------- */
 export function CommentsSheet({
