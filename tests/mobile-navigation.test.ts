@@ -180,13 +180,22 @@ describe("Discover is reachable at all", () => {
   });
 
   it("and Shots is therefore the one screen padding for its own notch", () => {
-    // The pair that has to agree. With a header the navigator starts the
-    // scene below it, so a screen padding for the inset as well would
-    // inset twice; without one, a screen that does not pad sits under the
-    // status bar. Exactly one tab is in the second case.
+    /*
+     * The pair that has to agree. With a header the navigator starts the
+     * scene below it, so a screen padding for the inset as well would
+     * inset twice; without one, a screen that does not pad sits under the
+     * status bar. Exactly one tab is in the second case.
+     *
+     * Two mechanisms now, which is why this matches either: a Placeholder
+     * takes `ownsTopInset`, and a real screen reads `insets.top` itself.
+     * Shots stopped being a Placeholder when the video player landed, and
+     * asserting only the prop would have called that a regression — the
+     * guarantee is "exactly one tab pads for the notch", not "exactly one
+     * tab passes this prop".
+     */
     const owners = readdirSync(TABS_DIR)
       .filter((f) => f.endsWith(".tsx") && f !== "_layout.tsx")
-      .filter((f) => /ownsTopInset/.test(code(`${TABS_DIR}/${f}`)))
+      .filter((f) => /ownsTopInset|insets\.top/.test(code(`${TABS_DIR}/${f}`)))
       .map((f) => f.replace(/\.tsx$/, ""));
     expect(owners).toEqual(["shots"]);
   });
