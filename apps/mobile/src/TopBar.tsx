@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { layout } from "@hypefy/tokens";
 import { palette, type, family } from "@/theme";
 import { DestinationIcon } from "@/icons";
+import { NotificationBell } from "@/notifications/Bell";
 
 /**
  * The top bar, ported from the web's structure rather than its code.
@@ -22,10 +23,6 @@ import { DestinationIcon } from "@/icons";
  *
  * What is deliberately NOT here yet:
  *
- *  - The notification bell. /notifications is not in core's DESTINATIONS,
- *    and a bell that navigates nowhere is worse than no bell. The slot is
- *    reserved at the width the bell will take, so adding it later moves
- *    nothing else.
  *  - The feed switcher. It needs feed tabs, which need a feed. The
  *    wordmark stands in the centre until then — not as a placeholder
  *    pretending to be a control, but as the thing that is actually true
@@ -65,24 +62,14 @@ export function TopBar() {
         * The right flank, the same width as the left so the wordmark sits
         * on the centre line rather than near it.
         *
-        * It held the bell's empty seat: /notifications is not a
-        * destination and a bell that navigates nowhere is worse than
-        * none. Search takes the seat now — it is a real screen, and the
-        * web puts search in reach from everywhere too. The bell comes
-        * back here when notifications land.
+        * The bell has it, which is the website's arrangement: one control
+        * on the right, and it is this one. Search held the seat while
+        * /notifications did not exist; now that it does, search sits at
+        * the top of Discover instead — which is where the website puts
+        * it, as a field rather than an icon.
         */}
       <View style={[styles.flank, styles.flankEnd]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Search"
-          hitSlop={8}
-          style={styles.action}
-          onPress={() => router.push("/search")}
-        >
-          {/* The glyph comes from the shared icon map, as Discover's does,
-              so both clients draw the same mark. */}
-          <DestinationIcon href="/search" focused={false} color={palette.foreground} size={22} />
-        </Pressable>
+        <NotificationBell />
       </View>
     </View>
   );

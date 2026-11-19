@@ -1,5 +1,6 @@
 import "server-only";
 import { createSign } from "node:crypto";
+import { PUSH_CHANNEL_ID } from "@hypefy/core/push-channel";
 
 /**
  * Minimal FCM HTTP v1 sender.
@@ -118,6 +119,12 @@ export async function sendFcm(
               notification: {
                 // Matches the app's accent so the status bar icon is tinted.
                 color: "#a3e635",
+                // The channel the native app creates. Unnamed, Firebase
+                // posts to a fallback channel of its own making called
+                // "Miscellaneous", at an importance nobody chose — so a
+                // message can arrive with no sound and no banner and
+                // nothing to point at. One constant, both ends.
+                channel_id: PUSH_CHANNEL_ID,
                 ...(notification.tag ? { tag: notification.tag } : {}),
               },
             },

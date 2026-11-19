@@ -18,8 +18,17 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { scheduleUndoable } from "@/lib/undoable";
 import { TuneSheet } from "@/components/notifications/TuneSheet";
 import { InterestCard } from "@/components/notifications/InterestCard";
-import { levelOf, needsYou, sectionOf, spotlightDecision, type ActivityPrefs, type LevelKey } from "@/lib/activity-prefs";
+import { needsYou, sectionOf, spotlightDecision, type ActivityPrefs } from "@/lib/activity-prefs";
 import { parsePrivateProfile } from "@/lib/profile";
+import {
+  actorSummary,
+  groupNotifs as coreGroupNotifs,
+  hasNoActor,
+  MUTE_EXEMPT,
+  shownNotifs,
+  type NotifGroup,
+} from "@hypefy/core/notif-group";
+import { notifTarget, webHref } from "@hypefy/core/notif-target";
 
 export type Notif = {
   id: string;
@@ -47,82 +56,19 @@ export type Notif = {
   parent?: { kind: "post" | "shot"; id: string } | null;
 };
 
-/** One or more notifications collapsed into a single row (same type + target). */
-type Group = {
-  key: string;
-  type: string;
-  ids: string[];
-  actors: NonNullable<Notif["actor"]>[];
-  actorCount: number; // distinct actors, may exceed actors.length (cap for the stack)
-  body: string;
-  isRead: boolean;
-  latestAt: string;
-  thumb: Notif["thumb"];
-  href: string;
-  /** Actor id of the first notification — for actionable types (follow_request) */
-  actorId: string | null;
-};
-
-
-/** Kept when muting someone: not "activity", and not something to miss. */
-const MUTE_EXEMPT = new Set(["new_message", "dm_post_shared", "incoming_call", "missed_call", "follow_request", "security_alert"]);
-
-/** Which Tune level a notification answers to, as the server decides it. */
-function levelKeyOf(type: string): LevelKey | null {
-  // A rehype is not a hype: it has its own level (0113).
-  if (type === "repost") return "rehypes";
-  if (type.startsWith("hype_")) return "hypes";
-  if (type.startsWith("comment_")) return "comments";
-  if (type.startsWith("mention_")) return "mentions";
-  if (type === "follow" || type === "follow_accepted") return "follows";
-  if (type === "dm_post_shared") return "shares";
-  return null;
-}
-
 /**
- * What Activity shows, given the Tune sheet. The server already keeps new
- * rows out; this hides the ones that arrived before a change, so switching
- * something off takes effect on screen at once. Spotlight pages wait for an
- * answer: until then the newest one is only the example the question uses.
+ * One or more notifications collapsed into a single row.
+ *
+ * The rules live in @hypefy/core/notif-group so the phone counts actors,
+ * windows groups and refuses to collapse the same kinds. The one local part
+ * is the destination: core answers with a PLACE, and this client turns it
+ * into its own path.
  */
-export function shownNotifs(list: Notif[], prefs: ActivityPrefs): Notif[] {
-  const muted = new Set(prefs.muted ?? []);
-  const spotlight = spotlightDecision(prefs);
-  return list.filter((n) => {
-    if (n.actor_id && muted.has(n.actor_id) && !MUTE_EXEMPT.has(n.type)) return false;
-    if (n.type === "spotlight_page" && spotlight !== "yes") return false;
-    if (n.type === "milestone" && prefs.milestones === false) return false;
-    if (n.type === "show_posted" && prefs.shows_posted === false) return false;
-    if (n.type === "back_after" && prefs.back_after === false) return false;
-    const key = levelKeyOf(n.type);
-    return !key || levelOf(prefs, key) !== "off";
-  });
-}
+type Group = NotifGroup<NonNullable<Notif["actor"]>> & { href: string };
 
-/** Types where bundling several rows into one loses information the user needs
- *  to act on individually — never collapse these. */
-const NEVER_GROUP = new Set([
-  "incoming_call",
-  "new_message",
-  "dm_post_shared",
-  "follow_request",
-  // Every sign-in is its own event. Collapsing two into "1 other" hides the
-  // one you didn't make, which is the entire point of the alert.
-  "security_alert",
-  "trial_reminder",
-  // "Passed 100" and "passed 500" are two pieces of news.
-  "milestone",
-]);
 
-/**
- * Comments, replies and mentions each carry words someone wrote to you.
- * Folded into "Aman and 2 others commented", two of the three comments were
- * never shown, on the one kind of notification this screen marks as needing
- * an answer. Each stays a row of its own.
- */
-function saysSomething(type: string): boolean {
-  return type.startsWith("comment_") || type.startsWith("mention_");
-}
+export { shownNotifs };
+
 
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -183,52 +129,7 @@ export function mediaThumb(
 }
 
 export function notifHref(n: Notif): string {
-  // A security alert has no actor and no target — it is about the account
-  // itself, so it opens the page where you can act on it.
-  if (n.type === "security_alert") return "/settings/security";
-  // Invitations wait at the top of the Library, where they are answered.
-  if (n.type === "playlist_invite") return "/library";
-  // About your own plan, from Hypefy rather than a person.
-  if (n.type === "trial_reminder") return "/settings/subscription";
-
-  // A reaction to your Diary opens the Diary page, where yours is. It used to
-  // open your profile, back when the same note was a status bubble there —
-  // which is switched off, so that link now lands on nothing.
-  if (n.type === "note_reaction") return "/messages/diary";
-
-  // Opens Spotlight on that friend's page.
-  if (n.type === "spotlight_page")
-    return n.target_id ? `/messages/spotlight?page=${n.target_id}` : "/messages/spotlight";
-
-  if (
-    n.type === "follow" || n.type === "referral_joined" ||
-    n.type === "follow_request" || n.type === "follow_accepted"
-  )
-    return n.actor?.username ? `/u/${n.actor.username}` : "#";
-
-  // The conversation is the point of a call notification; the log is not.
-  if (n.type === "incoming_call" || n.type === "missed_call")
-    return n.target_id ? `/messages/${n.target_id}` : "/calls";
-
-  if (n.target_type === "post" && n.target_id) return `/p/${n.target_id}`;
-  if (n.target_type === "shot" && n.target_id) return `/shots/${n.target_id}`;
-  // Somebody answered a question sticker. Its target_type is "show", so this
-  // has to come first: landing on the Show itself was landing on the one
-  // screen that cannot show you the answer.
-  if (n.type === "show_answer" && n.target_id) return `/shows/${n.target_id}/answers`;
-  if (n.target_type === "show" && n.target_id) return `/shows/${n.target_id}`;
-  // An invitation to a shared Show. Without this it falls through to
-  // "#" below — a notification that goes nowhere, which is how every
-  // new target_type arrives if nobody adds it here.
-  if (n.target_type === "show_collab" && n.target_id) return `/shows/collab/${n.target_id}`;
-  if (n.target_type === "conversation" && n.target_id) return `/messages/${n.target_id}`;
-  if (n.target_type === "comment" && n.parent)
-    return n.parent.kind === "post"
-      ? // Land on the comment itself, not just the post it is on. The post
-        // page opens the thread and scrolls to it.
-        `/p/${n.parent.id}?comment=${n.target_id}`
-      : `/shots/${n.parent.id}`;
-  return "#";
+  return webHref(notifTarget(n));
 }
 
 /**
@@ -243,69 +144,14 @@ export function notifHref(n: Notif): string {
  * follow ever: "Aman and 5 others followed you", the five from a month ago.
  * Older ones start a group of their own further down.
  */
-const GROUP_WINDOW_MS = 24 * 60 * 60 * 1000;
-
+/**
+ * Collapsed rows, each with this client's own path for the place core named.
+ */
 export function groupNotifs(list: Notif[]): Group[] {
-  const order: string[] = [];
-  /** The open group for each kind of notification: the newest one. */
-  const byKey = new Map<string, Group & { seenActorIds: Set<string> }>();
-  const groups = new Map<string, Group & { seenActorIds: Set<string> }>();
-
-  for (const n of list) {
-    const groupable = !NEVER_GROUP.has(n.type) && !saysSomething(n.type) && n.target_id;
-    const kind = groupable ? `${n.type}|${n.target_type}|${n.target_id}` : `solo-${n.id}`;
-
-    let g = byKey.get(kind);
-    const at = new Date(n.created_at).getTime();
-    if (g && new Date(g.latestAt).getTime() - at > GROUP_WINDOW_MS) g = undefined;
-    if (!g) {
-      const key = order.includes(kind) ? `${kind}#${n.id}` : kind;
-      g = {
-        key,
-        type: n.type,
-        ids: [],
-        actors: [],
-        actorCount: 0,
-        body: n.body ?? "interacted with your content",
-        isRead: true,
-        latestAt: n.created_at,
-        thumb: n.thumb ?? null,
-        href: notifHref(n),
-        actorId: n.actor_id ?? null,
-        seenActorIds: new Set(),
-      };
-      byKey.set(kind, g);
-      order.push(key);
-      groups.set(key, g);
-    }
-
-    g.ids.push(n.id);
-    if (!n.is_read) g.isRead = false;
-    if (!g.thumb && n.thumb) g.thumb = n.thumb;
-
-    // By account. This used to be by username, then by display name: two
-    // different people who share a display name and have no username yet
-    // were counted as one, and "and 2 others" came up one short.
-    const actorId = n.actor_id ?? n.actor?.username ?? `anon-${n.id}`;
-    if (!g.seenActorIds.has(actorId)) {
-      g.seenActorIds.add(actorId);
-      g.actorCount += 1;
-      if (g.actors.length < 3 && n.actor) g.actors.push(n.actor);
-    }
-  }
-
-  return order.map((k) => {
-    const { seenActorIds: _drop, ...g } = groups.get(k)!;
-    return g;
-  });
-}
-
-/** "Aman", "Aman and Leo", or "Aman and 4 others" */
-function actorSummary(g: Group): string {
-  const names = g.actors.map((a) => a.display_name ?? a.username ?? "Someone");
-  if (g.actorCount <= 1) return names[0] ?? "Someone";
-  if (g.actorCount === 2) return `${names[0]} and ${names[1] ?? "1 other"}`;
-  return `${names[0]} and ${g.actorCount - 1} others`;
+  return coreGroupNotifs<Notif, NonNullable<Notif["actor"]>>(list).map((g) => ({
+    ...g,
+    href: webHref(g.target),
+  }));
 }
 
 export default function NotificationsPage() {
@@ -337,7 +183,12 @@ export default function NotificationsPage() {
     const [postsRes, shotsRes, showsRes, commentsRes] = await Promise.all([
       postIds.length ? supabase.from("posts").select("id, image_url, image_urls").in("id", postIds) : Promise.resolve({ data: [] as any[] }),
       shotIds.length ? supabase.from("shots").select("id, media_url, poster_url").in("id", shotIds) : Promise.resolve({ data: [] as any[] }),
-      showIds.length ? supabase.from("shows").select("id, media_url").in("id", showIds) : Promise.resolve({ data: [] as any[] }),
+      // poster_url as well as media_url. mediaThumb prefers the poster and
+      // Shows have had one since 0213 — as the comment above says — but
+      // this select stopped at media_url, so the poster was never fetched
+      // and every video Show rendered an empty square. Found while porting
+      // Activity to the phone, which asks for both.
+      showIds.length ? supabase.from("shows").select("id, media_url, poster_url").in("id", showIds) : Promise.resolve({ data: [] as any[] }),
       commentIds.length ? supabase.from("comments").select("id, post_id, shot_id").in("id", commentIds) : Promise.resolve({ data: [] as any[] }),
     ]);
 
@@ -880,7 +731,7 @@ function NotifRow({
   const showCluster = g.actors.length > 1;
   const isFollowType = g.type === "follow" || g.type === "follow_accepted";
   /** Nobody did these: they are about your account or your work. */
-  const noActor = g.type === "security_alert" || g.type === "trial_reminder" || g.type === "milestone";
+  const noActor = hasNoActor(g.type);
 
   return (
     <div

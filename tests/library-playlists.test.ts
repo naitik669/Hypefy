@@ -4,6 +4,7 @@ import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { readFileSync, readdirSync } from "node:fs";
 import { toFolder } from "@/lib/folders";
+import { notifTarget, webHref } from "@hypefy/core/notif-target";
 import {
   nextInQueue,
   playlistError,
@@ -157,7 +158,11 @@ describe("the rename", () => {
   });
 
   it("an invitation's notification opens the Library", () => {
-    expect(read("src/app/(app)/notifications/page.tsx")).toContain('if (n.type === "playlist_invite") return "/library";');
+    // Asked rather than read: the rule lives in core, where both clients
+    // get the same answer.
+    expect(
+      webHref(notifTarget({ type: "playlist_invite", target_type: null, target_id: null })),
+    ).toBe("/library");
   });
 
   it("only its owner is offered Delete; someone who joined cannot open one they only were invited to", () => {

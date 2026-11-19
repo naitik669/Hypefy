@@ -8,6 +8,13 @@ import { DISCOVER_POST_COLUMNS } from "../apps/mobile/src/discover/load";
 import { SEARCH_POST_COLUMNS } from "../apps/mobile/src/search/load";
 import { SHOT_COLUMNS } from "../apps/mobile/src/shots/load";
 import { MESSAGE_COLUMNS } from "../apps/mobile/src/messages/load";
+import {
+  NOTIF_COLUMNS,
+  POST_THUMB_COLUMNS,
+  SHOT_THUMB_COLUMNS,
+  SHOW_THUMB_COLUMNS,
+  COMMENT_PARENT_COLUMNS,
+} from "../apps/mobile/src/notifications/load";
 
 /**
  * Every column the phone asks for exists.
@@ -78,6 +85,13 @@ const SELECTS: ReadonlyArray<readonly [string, string, string]> = [
   ["search", "posts", SEARCH_POST_COLUMNS],
   ["the reel", "shots", SHOT_COLUMNS],
   ["a thread", "messages", MESSAGE_COLUMNS],
+  ["activity", "notifications", NOTIF_COLUMNS],
+  // Activity's four thumbnail reads, each naming a different table's
+  // picture column — which is precisely the mix-up this file exists for.
+  ["an activity row's post", "posts", POST_THUMB_COLUMNS],
+  ["an activity row's Shot", "shots", SHOT_THUMB_COLUMNS],
+  ["an activity row's Show", "shows", SHOW_THUMB_COLUMNS],
+  ["an activity row's comment", "comments", COMMENT_PARENT_COLUMNS],
 ];
 
 describe("every column the phone selects exists in the schema", () => {
@@ -141,6 +155,7 @@ describe("a failed read is never mistaken for an empty one", () => {
     "apps/mobile/src/search/load.ts",
     "apps/mobile/src/shots/load.ts",
     "apps/mobile/src/messages/load.ts",
+    "apps/mobile/src/notifications/load.ts",
   ];
 
   function body(path: string): string {

@@ -4,6 +4,7 @@ import { createClient as createSupabase } from "@supabase/supabase-js";
 import webpush from "web-push";
 import { sendFcm, fcmConfigured } from "@/lib/fcm";
 import { isPushEndpointAllowed, secretMatches } from "@/lib/api-guard";
+import { pushTarget, webHref } from "@hypefy/core/notif-target";
 
 /**
  * POST /api/push — called by a Supabase pg_net trigger on notifications INSERT.
@@ -63,16 +64,35 @@ function pushCopy(type: string, actor: string, body: string | null) {
   }
 }
 
-function pushUrl(n: { type: string; target_type: string | null; target_id: string | null }, actorUsername: string | null) {
-  // Straight to where you can act on it — turn 2FA on, or sign the other
-  // devices out.
-  if (n.type === "security_alert") return "/settings/security";
-  if (n.type === "follow") return actorUsername ? `/u/${actorUsername}` : "/notifications";
-  if (n.type === "spotlight_page" && n.target_id) return `/messages/spotlight?page=${n.target_id}`;
-  if (n.target_type === "show" && n.target_id) return `/shows/${n.target_id}`;
-  if (n.target_type === "post" && n.target_id) return `/p/${n.target_id}`;
-  if (n.target_type === "shot" && n.target_id) return `/shots/${n.target_id}`;
-  return "/notifications";
+/**
+ * Where tapping a push lands — the SAME rule Activity's rows use.
+ *
+ * This was a third copy of that rule, and it had drifted in five ways, each
+ * one a push that opened the wrong screen:
+ *
+ *  - A new message, a call and a missed call all fell through to Activity,
+ *    holding the conversation id they should have opened. Tapping a DM
+ *    notification did not open the DM.
+ *  - "Somebody answered your question sticker" opened the Show, which is the
+ *    one screen that cannot show you the answer — the exact mistake Activity
+ *    already fixed for its own rows.
+ *  - follow_accepted, follow_request and referral_joined went to Activity
+ *    while plain follow went to the profile, though all four are about a
+ *    person.
+ *  - A Diary reaction, a playlist invitation and a trial reminder each had a
+ *    page to go to and went to Activity instead.
+ *  - A shared-Show invitation had no branch at all.
+ *
+ * None of it was visible from this file: it reads as a reasonable list. It
+ * only shows up beside the other copy, which is the argument for there being
+ * one. Activity stays the fallback for a notification with nowhere to go —
+ * that part was right, and pushTarget keeps it.
+ */
+function pushUrl(
+  n: { type: string; target_type: string | null; target_id: string | null },
+  actorUsername: string | null,
+) {
+  return webHref(pushTarget({ ...n, actor: { username: actorUsername } }));
 }
 
 export async function POST(req: NextRequest) {
