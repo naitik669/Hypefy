@@ -196,9 +196,9 @@ export default function ProfileScreen() {
         numColumns={3}
         renderItem={({ item }) => (
           <View style={styles.cell}>
-            {item.media_url ? (
+            {item.image_url ? (
               <Image
-                source={{ uri: item.media_url }}
+                source={{ uri: item.image_url }}
                 style={styles.cellImage}
                 resizeMode="cover"
                 accessibilityLabel={`Post by ${name}`}

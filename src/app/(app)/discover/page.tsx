@@ -3,9 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DiscoverView } from "@/components/discover/DiscoverView";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
-import { diversify, tagAffinityFor } from "@/lib/feed-rank";
+import { diversify } from "@/lib/feed-rank";
 import { getBlockedIds } from "@/lib/blocked";
-import { baseScore } from "@/lib/discover-rank";
+import { discoverScore } from "@/lib/discover-rank";
 import { one as unwrap, jsonRecord } from "@/lib/supabase/typed";
 
 /** Flatten a row's embedded `profiles` join from `T | T[]` down to `T | null`. */
@@ -14,6 +14,18 @@ function one(p: any) {
 }
 
 
+/*
+ * The score moved to @hypefy/core/discover-rank as `discoverScore`,
+ * because the Expo client ranks the same pool — and a Discover that ranks
+ * differently on two clients is the difference nobody can point at, and
+ * the one that most looks like a bug in the other client.
+ *
+ * This stays as a thin wrapper so the call sites below are unchanged.
+ * baseScore decays engagement by age; it used to add the raw counts, so a
+ * Shot from June with eight hypes scored 44 against 5 for one posted
+ * yesterday and every new Shot sat at the bottom of Discover. See
+ * discover-rank.ts for the measurement.
+ */
 function score(
   x: any,
   now: number,
@@ -22,21 +34,13 @@ function score(
   tagAff: Record<string, number>,
   followedTags: Set<string>
 ) {
-  const tags = ((x.hashtags ?? []) as string[]).map((t) =>
-    t.replace(/^#/, "").toLowerCase()
-  );
-  const interestBoost =
-    interests.size > 0 && tags.some((t) => interests.has(t)) ? 12 : 0;
-  const authorBoost = Math.min(
-    Math.max(authorAff[x.user_id] ?? 0, 0) * 1.5,
-    30
-  );
-  const tagBoost = Math.min(tagAffinityFor(x, tagAff, followedTags) * 1.5, 15);
-  // baseScore decays engagement by age; this used to add the raw counts,
-  // so a Shot from June with eight hypes scored 44 against 5 for one
-  // posted yesterday, and every new Shot sat at the bottom of Discover.
-  // See src/lib/discover-rank.ts for the measurement.
-  return baseScore(x, now) + interestBoost + authorBoost + tagBoost;
+  return discoverScore(x, {
+    now,
+    interests,
+    authorAffinity: authorAff,
+    tagAffinity: tagAff,
+    followedTags,
+  });
 }
 
 export default async function DiscoverPage() {

@@ -148,12 +148,22 @@ describe("Discover ranks new work where it can be found", () => {
   });
 
   it("and Discover actually uses the shared score", () => {
-    // The arithmetic above can be perfect while the page keeps its own
-    // formula — which is the state it was in: a local recencyBoost and the
-    // raw counts added inline.
-    expect(discover).toContain("baseScore(x, now)");
+    /*
+     * The arithmetic above can be perfect while the page keeps its own
+     * formula — which is the state it was in: a local recencyBoost and
+     * the raw counts added inline.
+     *
+     * The call is `discoverScore` now rather than `baseScore` directly.
+     * The whole score moved into @hypefy/core/discover-rank when the Expo
+     * client needed it — baseScore plus the three personal boosts, caps
+     * included — so the page calls one function where it used to call one
+     * and add three terms. Same assertion, one level up.
+     */
+    expect(discover).toContain("discoverScore(x, {");
     expect(discover).not.toContain("(x.hype_count ?? 0) * 3");
     expect(discover).not.toContain("function recencyBoost");
+    // And the boosts are not back inline beside it.
+    expect(discover).not.toContain("interests.size > 0 && tags.some");
   });
 
   it("one person's four Shots do not take the top four slots", () => {
