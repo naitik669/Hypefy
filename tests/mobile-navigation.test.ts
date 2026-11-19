@@ -61,6 +61,23 @@ describe("every destination the bar shows has somewhere to go", () => {
     expect(existsSync(`${TABS_DIR}/discover.tsx`)).toBe(true);
   });
 
+  /**
+   * Route files in (tabs) that are deliberately not destinations.
+   *
+   * The list is closed, and an entry has to earn its place here: the
+   * point of the test below is that a screen nothing can reach will rot
+   * unnoticed, so an exception must name what DOES reach it.
+   *
+   *   create-slot — creating is an action, not a place, which is why it
+   *     is not in core's DESTINATIONS and why the web renders a button
+   *     between its nav items rather than a nav item. The slot exists
+   *     only so the navigator has something to attach that button to,
+   *     and the assertion below is that the button is really there.
+   */
+  const NOT_DESTINATIONS: Readonly<Record<string, string>> = {
+    "create-slot": "tabBarButton: () => <CreateButton />",
+  };
+
   it("and no route file exists that core does not know about", () => {
     // The other direction. A screen with no destination is unreachable
     // from the bar and will rot unnoticed.
@@ -70,7 +87,24 @@ describe("every destination the bar shows has somewhere to go", () => {
       .map((f) => f.replace(/\.tsx$/, ""));
     expect(files.length).toBeGreaterThan(0);
     for (const f of files) {
+      if (f in NOT_DESTINATIONS) continue;
       expect(known.has(f), `${f}.tsx has no destination in core`).toBe(true);
+    }
+  });
+
+  it("and each exception is reached by the thing it says reaches it", () => {
+    /*
+     * An exception that merely claims to be reachable is the same rot
+     * with a note attached. Each one names the layout code that puts it
+     * in front of somebody, and that code has to exist.
+     */
+    const layoutSrc = code(`${TABS_DIR}/_layout.tsx`);
+    for (const [file, reached] of Object.entries(NOT_DESTINATIONS)) {
+      expect(
+        existsSync(`${TABS_DIR}/${file}.tsx`),
+        `${file} is listed as an exception but has no route file`,
+      ).toBe(true);
+      expect(layoutSrc, `nothing in the layout reaches ${file}`).toContain(reached);
     }
   });
 });
@@ -125,12 +159,16 @@ describe("the layout reads core rather than restating it", () => {
      *   /discover — routable but not in the bar, so it is registered with
      *     href: null rather than left out, which would make it unroutable.
      *   /shots — full-bleed video, so the header is turned off for it.
+     *   /create — an ACTION rather than a destination, and so deliberately
+     *     absent from core's list. The web's bar renders a button between
+     *     its nav items for the same reason; this is where that button
+     *     goes.
      *
      * Anything else named here is a destination list growing a second
      * copy, which is what reading from core was meant to prevent.
      */
     const quoted = [...new Set([...layout().matchAll(/"(\/[a-z-]+)"/g)].map((m) => m[1]))].sort();
-    expect(quoted).toEqual(["/discover", "/shots"]);
+    expect(quoted).toEqual(["/create", "/discover", "/shots"]);
   });
 
   it("takes the bar's height from tokens, not a literal", () => {
