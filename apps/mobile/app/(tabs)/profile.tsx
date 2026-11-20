@@ -24,6 +24,24 @@ import { base, palette, type, family, radius } from "@/theme";
  * and without it a signed-in device cannot reach the sign-in screens at
  * all — see #78, which is exactly how that was found.
  */
+/**
+ * **The blurb does not say where buying happens, and that is a store-policy
+ * line rather than a wording preference.**
+ *
+ * It used to read "the marketplace browses here; buying stays on the web",
+ * which is the exact copy the WEBSITE deliberately removed.
+ * `blockedReason("app")` says only "Not available in the app", and
+ * src/lib/marketplace.ts records why in its own comment: both stores refuse
+ * an app that points people at a purchase outside their billing, and that
+ * line used to send them to the website.
+ *
+ * The website was fixed and tested. This client was written afterwards and
+ * said it anyway, because the test read three web components and knew
+ * nothing about a second app. It covers this file now — see
+ * tests/marketplace.test.ts.
+ */
+const BLURB =
+  "Frames, nameplates, avatar decorations — the customisation the product is actually about.";
 export default function ProfileTab() {
   const [username, setUsername] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -100,7 +118,7 @@ export default function ProfileTab() {
     <Placeholder
       href="/profile"
       label="Your profile"
-      blurb="Frames, nameplates, avatar decorations — the customisation the product is actually about. The marketplace browses here; buying stays on the web."
+      blurb={BLURB}
       footer={
         <>
           <Pressable
