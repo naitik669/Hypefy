@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import {
   CATEGORY_PAGES,
   buildItems,
@@ -199,6 +199,62 @@ describe("what the button on an item does", () => {
       const src = readFileSync(`src/components/billing/${f}`, "utf8");
       expect(src, f).not.toMatch(/on the website/i);
       expect(src, f).not.toContain("Payments are coming soon");
+    }
+  });
+
+  it("and the rule reaches the second client, which it did not", () => {
+    /*
+     * **A real gap, found by reading rather than by a failure.** The three
+     * assertions above are about three WEB components. The Expo app was
+     * written months later and its Profile tab said "the marketplace
+     * browses here; buying stays on the web" — the exact copy the website
+     * had deliberately removed, in the one client that is actually
+     * submitted to a store.
+     *
+     * Nothing could have caught it: the check named the files it knew
+     * about. A rule that is a store-policy position has to be stated over
+     * every client, not over the files that existed when it was written.
+     */
+    const mobile = [
+      "apps/mobile/app/(tabs)/profile.tsx",
+      "apps/mobile/src/Placeholder.tsx",
+    ].filter((p) => existsSync(p));
+    expect(mobile.length, "the phone's profile screen has moved").toBeGreaterThan(0);
+    for (const p of mobile) {
+      const src = readFileSync(p, "utf8")
+        // The explanation of the rule lives beside the code it governs, and
+        // would otherwise break the rule's own assertion — the comment trap,
+        // which this repository has now hit nine times.
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      expect(src, p).not.toMatch(/buying stays on the web/i);
+      expect(src, p).not.toMatch(/on the website/i);
+      expect(src, p).not.toMatch(/buy (it )?on the web/i);
+    }
+  });
+
+  it("and forbids an outbound link, not merely the word for one", () => {
+    /*
+     * The scope error, in the assertions above. They forbid specific COPY.
+     * A "Claim" button whose href is https://app.hypefy.chat/marketplace
+     * contains none of those words and passes every one of them — while
+     * being the thing the policy is actually about, and while taking on
+     * Play's service fee and its October 2026 transaction-reporting
+     * obligation, neither of which anybody would notice had begun.
+     *
+     * So: no link to this product's own site anywhere in the billing UI.
+     * Relative links are fine — they stay inside whichever client is
+     * rendering them.
+     */
+    const SITE = /https?:\/\/(?:[\w-]+\.)*hypefy\.chat/i;
+    for (const f of ["MarketBrowse.tsx", "MarketPreviewSheet.tsx", "PremiumPlans.tsx"]) {
+      const src = readFileSync(`src/components/billing/${f}`, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      expect(src, `${f} links out to a purchase`).not.toMatch(SITE);
+      // `window.open` and a native browser plugin are the other two ways
+      // out, and neither reads as a link in a review of the diff.
+      expect(src, `${f} opens an external window`).not.toMatch(/window\.open|Browser\.open/);
     }
   });
 
