@@ -131,9 +131,25 @@ describe("where it is wired", () => {
     const src = read(file);
     expect(src).toContain(hook);
     expect(src).toContain(guard);
-    // Whatever the spelling, the ask is never made unconditionally.
-    expect(src, `${file} asks after every hype, including one taken back`).not.toContain(
-      "void ghostRise.ask();\n    } catch",
+    /*
+     * Whatever the spelling, the ask is never made unconditionally.
+     *
+     * [DEFECT, and it was this assertion.] It read
+     * not.toContain("void ghostRise.ask();\n    } catch"), which fails on the
+     * CORRECT file: the guarded call ends the line, so the guarded version
+     * contains that text too. It was meant to catch `void ghostRise.ask();`
+     * standing alone on its own line, and instead forbade the thing it was
+     * protecting.
+     *
+     * It went unseen because a Windows working copy is CRLF, where a pattern
+     * written with \n matches nothing and the negative assertion passes
+     * vacuously. So it was green on every local run and red on every CI run
+     * from 19 Nov. .gitattributes now pins LF so the two agree; this is the
+     * assertion the name always described — no line that is NOTHING BUT the
+     * ask, which is what unconditional looks like.
+     */
+    expect(src, `${file} asks after every hype, including one taken back`).not.toMatch(
+      /^\s*void ghostRise\.ask\(\);\s*$/m,
     );
     expect(src).toContain("{ghostRise.rising && <GhostRise");
   });
