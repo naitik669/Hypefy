@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Frame, Image as ImageIcon, Loader2, Palette, Type, X } from "lucide-react";
 import { VerifiedStar } from "@/components/ui/VerifiedStar";
 import { useToast } from "@/components/ui/ToastProvider";
-import { isNative } from "@/lib/native";
+import { useFeature } from "@/lib/use-feature";
 import { safeBack } from "@/lib/safe-back";
 import { formatInr, PLANS, TRIAL_DAYS, type PlanId } from "@/lib/billing/plans";
 import { subscribe } from "@/lib/billing/checkout";
 import { CommentIcon } from "@/components/ui/CommentIcon";
-
-const noop = () => () => {};
 
 /** The two plans side by side, row by row. `verified` is whether the ₹99 plan has it; Premium has them all. */
 const ROWS: { icon: React.ReactNode; name: string; sub: string; verified: boolean }[] = [
@@ -45,7 +43,10 @@ export function PremiumPlans({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const native = useSyncExternalStore(noop, isNative, () => false);
+  // The purchase rule, not a platform check: the stores require their own
+  // billing for digital goods and Hypefy bills through Razorpay, so the
+  // registry answers for every client at once.
+  const native = useFeature("purchase").state === "unavailable";
   const [busy, setBusy] = useState<PlanId | null>(null);
 
   const premium = PLANS.premium;

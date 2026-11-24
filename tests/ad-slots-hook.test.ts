@@ -23,6 +23,20 @@ import { hydrateRoot, createRoot, type Root } from "react-dom/client";
 // through Capacitor.
 vi.mock("@/lib/native", () => ({ isNative: () => false }));
 
+/**
+ * Whether ads may be shown at all is the registry's `ads` entry now, not a
+ * platform check — AdSense's terms bar it from an app, which is policy rather
+ * than a fact about this browser.
+ *
+ * `blocked.value` drives which environment the real registry is resolved
+ * against, so the answers below are the product's own.
+ */
+const blocked = vi.hoisted(() => ({ value: false }));
+vi.mock("@/lib/use-feature", async () => {
+  const { verdictHere } = await import("./helpers/feature-seam");
+  return { useFeature: (id: Parameters<typeof verdictHere>[0]) => verdictHere(id, blocked.value) };
+});
+
 const ENV = { ...process.env };
 
 beforeEach(() => {
@@ -62,6 +76,7 @@ describe("useAdFill", () => {
     expect(host.querySelector("#fill")?.textContent).toBe("house");
     await act(async () => root?.unmount());
   });
+
 });
 
 describe("useAdSlots", () => {

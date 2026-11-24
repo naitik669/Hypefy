@@ -1,6 +1,7 @@
 import { DECORATIONS, NAME_FONTS, NAME_GLOWS, type Tier } from "@/lib/cosmetics";
 import { NAMEPLATES } from "@/lib/nameplates";
 import { BUBBLE_STYLES } from "@/lib/bubble-styles";
+import { FEATURES } from "@hypefy/core/feature-registry";
 
 /**
  * Everything the Marketplace lists, in one shape, with the filter and sort
@@ -269,7 +270,10 @@ export function itemAction(
  * their own billing, and the line used to send them to the website.
  */
 export function blockedReason(why: "app" | "soon"): string {
-  return why === "app" ? "Not available in the app" : "Coming soon";
+  // The words for "app" are the registry's, not a second copy of them. The
+  // line used to send people to the website and was changed because both
+  // stores refuse that; a rule with store consequences should exist once.
+  return why === "app" ? FEATURES.purchase.reason.androidNative : "Coming soon";
 }
 
 /**

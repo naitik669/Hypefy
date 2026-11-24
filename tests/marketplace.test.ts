@@ -103,6 +103,15 @@ describe("filter and sort", () => {
 
 const native = vi.hoisted(() => ({ value: false }));
 vi.mock("@/lib/native", () => ({ isNative: () => native.value }));
+/**
+ * The components ask the registry now, not Capacitor. See
+ * tests/helpers/feature-seam.ts for why mocking isNative() had stopped
+ * meaning anything.
+ */
+vi.mock("@/lib/use-feature", async () => {
+  const { verdictHere } = await import("./helpers/feature-seam");
+  return { useFeature: (id: Parameters<typeof verdictHere>[0]) => verdictHere(id, native.value) };
+});
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push() {}, refresh() {} }) }));
 vi.mock("@/components/ui/ToastProvider", () => ({ useToast: () => () => {} }));
 /** Every change to what you wear, as [patch, your id]. */
@@ -479,7 +488,9 @@ describe("the Marketplace pages", () => {
     expect(sheet()!.getAttribute("aria-label")).toBe("Preview of Crown");
   });
 
-  it("sells nothing inside the Android app, but still previews everything", async () => {
+  it("sells nothing where the stores forbid it, but still previews everything", async () => {
+    // `native.value` now drives which environment the registry is resolved
+    // against, rather than what isNative() returns.
     native.value = true;
     await category("frames");
     expect(tile("Flames").querySelector('button[aria-label^="Claim Flames"]')).toBeNull();
