@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import {
+  isHealthKind,
+  MAX_HEALTH_PER_SESSION,
+  MAX_PER_SESSION,
+  newBudget,
+  nextReport,
+  REPORT_KINDS,
+} from "../packages/core/src/client-report";
 
 /**
  * The freeze, and being able to see it.
@@ -112,10 +120,44 @@ describe("a freeze leaves a trace now", () => {
   it("every report carries the two counts this work is about", () => {
     expect(reporter).toContain('nodes: document.getElementsByTagName("*").length');
     expect(reporter).toContain('videos: document.getElementsByTagName("video").length');
+    /*
+     * **And they are actually attached to what is sent.** Asserting that
+     * `vitals()` EXISTS said nothing about it being used: a mutation that
+     * posted the payload without spreading it kept both lines above, and
+     * every health report would have arrived with no node count and no
+     * video count — the two measurements this whole investigation is
+     * about, and the reason a freeze can be explained rather than just
+     * noticed.
+     */
+    expect(reporter).toContain("post({ ...payload, ...vitals() })");
   });
 
+  /*
+   * **Behavioural now, where it read the reporter's source.** The budget
+   * moved to @hypefy/core/client-report when the phone needed the same one
+   * — the relay rate-limits per IP, so the two clients share one quota and
+   * cannot be allowed to set their own caps. Asking it covers both clients
+   * rather than one file's spelling, which is what the name claimed all
+   * along.
+   */
   it("health reports have their own budget, so they cannot drown the errors", () => {
-    expect(reporter).toContain("if (health >= MAX_HEALTH_PER_SESSION) return;");
+    const b = newBudget();
+    // Spend the whole error budget first: a session that throws five times
+    // is exactly the session whose freeze matters most.
+    for (let i = 0; i < MAX_PER_SESSION; i++) {
+      expect(nextReport(b, { kind: "error", message: `boom ${i}` })).not.toBeNull();
+    }
+    expect(nextReport(b, { kind: "error", message: "one too many" })).toBeNull();
+    // And the health budget is untouched by that.
+    for (let i = 0; i < MAX_HEALTH_PER_SESSION; i++) {
+      expect(nextReport(b, { kind: "longtask", message: `blocked ${i}` })).not.toBeNull();
+    }
+    expect(nextReport(b, { kind: "longtask", message: "blocked again" })).toBeNull();
+  });
+
+  it("and the reporter reads that budget rather than keeping its own", () => {
+    expect(reporter).toContain("nextReport(budget, {");
+    expect(reporter).not.toMatch(/MAX_HEALTH_PER_SESSION = \d/);
   });
 
   it("observing longtask does not break the browsers that lack it", () => {
@@ -132,12 +174,21 @@ describe("a freeze leaves a trace now", () => {
   });
 
   it("the relay keeps freezes separable from exceptions", () => {
-    expect(relay).toContain('const KINDS = ["error", "unhandledrejection", "longtask", "memory"] as const;');
-    expect(relay).toContain('const health = kind === "longtask" || kind === "memory";');
+    // The four kinds and the symptom/failure split moved to core with the
+    // budget, so both clients tag the same way — a phone inventing a fifth
+    // kind is a bucket in Sentry nobody is looking at. Asked, not read.
+    expect(REPORT_KINDS).toEqual(["error", "unhandledrejection", "longtask", "memory"]);
+    expect(isHealthKind("longtask")).toBe(true);
+    expect(isHealthKind("memory")).toBe(true);
+    expect(isHealthKind("error")).toBe(false);
+    expect(isHealthKind("unhandledrejection")).toBe(false);
+    // The relay still decides the level from that split, which is what
+    // keeps a stall out of the error stream.
+    expect(relay).toContain("const health = isHealthKind(kind);");
     expect(relay).toContain('level: health ? "warning" : "error",');
   });
 
   it("and an unknown kind cannot be injected as a tag", () => {
-    expect(relay).toContain("KINDS.find((k) => k === body?.kind) ?? \"error\"");
+    expect(relay).toContain('REPORT_KINDS.find((k) => k === body?.kind) ?? "error"');
   });
 });

@@ -1,20 +1,20 @@
 "use client";
 
 import { useEffect } from "react";
+import {
+  HEALTH_EVERY_MS,
+  LONG_TASK_MS,
+  newBudget,
+  nextReport,
+  RISES_BEFORE_REPORTING,
+} from "@hypefy/core/client-report";
 
-const MAX_PER_SESSION = 5;
-
-/** Health reports are rarer and quieter than errors; they get their own budget. */
-const MAX_HEALTH_PER_SESSION = 3;
-
-/** A task this long has already dropped frames; past a second it reads as a freeze. */
-const LONG_TASK_MS = 1000;
-
-/** How often to look at the heap. Rare on purpose: this runs for every signed-in user. */
-const HEALTH_EVERY_MS = 30_000;
-
-/** Consecutive rises in used heap before we call it growth rather than noise. */
-const RISES_BEFORE_REPORTING = 4;
+/*
+ * The budget and the payload rules moved to @hypefy/core/client-report when
+ * the phone needed the same ones. They are shared because the relay's rate
+ * limit is PER IP: a phone reporting freely on the same network would
+ * starve this client of the reports that matter. See that module.
+ */
 
 /** Chromium-only, and not in every build, so it is read defensively. */
 type MaybeMemory = { memory?: { usedJSHeapSize?: number } };
@@ -59,9 +59,7 @@ function vitals() {
  */
 export function ClientErrorReporter() {
   useEffect(() => {
-    const seen = new Set<string>();
-    let sent = 0;
-    let health = 0;
+    const budget = newBudget();
 
     function post(body: Record<string, unknown>) {
       try {
@@ -78,18 +76,13 @@ export function ClientErrorReporter() {
     }
 
     function report(kind: "error" | "unhandledrejection", message: string, stack?: string) {
-      if (!message || sent >= MAX_PER_SESSION) return;
-      const key = message.slice(0, 200);
-      if (seen.has(key)) return;
-      seen.add(key);
-      sent++;
-      post({ kind, message: message.slice(0, 500), stack: (stack ?? "").slice(0, 4000) });
+      const payload = nextReport(budget, { kind, message, stack });
+      if (payload) post(payload);
     }
 
     function reportHealth(kind: "longtask" | "memory", message: string) {
-      if (health >= MAX_HEALTH_PER_SESSION) return;
-      health++;
-      post({ kind, message, ...vitals() });
+      const payload = nextReport(budget, { kind, message });
+      if (payload) post({ ...payload, ...vitals() });
     }
 
     function onError(e: ErrorEvent) {
