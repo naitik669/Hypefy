@@ -25,9 +25,9 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Hypefy uses the camera to record Shots and take photos for posts.",
-          "microphonePermission": "Hypefy uses the microphone to record sound with your Shots.",
-          "recordAudioAndroid": true
+          "cameraPermission": "Hypefy uses the camera to take photos for your posts.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
         }
       ]
     ],

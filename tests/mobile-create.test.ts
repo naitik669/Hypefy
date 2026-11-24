@@ -192,13 +192,27 @@ describe("the camera asks for permission like a phone should", () => {
   });
 
   it("and the manifest carries the strings a store review reads", () => {
+    /*
+     * **The microphone rationale is gone, and its absence is the
+     * assertion now.** It was set up here in preparation for video
+     * capture, which was then deliberately left out — so the app was
+     * declaring a microphone permission, and a reason for it, for a
+     * feature it does not have. Play wants a demonstrable in-app use, and
+     * a social app asking for the microphone with no voice feature is a
+     * review risk as well as a trust problem.
+     *
+     * The pairing lives in tests/mobile-permissions.test.ts, which fails
+     * both ways: when a permission is requested without its feature, and
+     * when the feature arrives without the permission. So the day video
+     * capture lands, that is what says to put this back.
+     */
     const app = JSON.parse(read("apps/mobile/app.json"));
     const camera = app.expo.plugins.find(
       (p: unknown) => Array.isArray(p) && p[0] === "expo-camera",
     );
     expect(camera, "expo-camera is not configured as a plugin").toBeTruthy();
     expect(camera[1].cameraPermission).toMatch(/Hypefy/);
-    expect(camera[1].microphonePermission).toMatch(/Hypefy/);
+    expect(camera[1].microphonePermission, "nothing records audio").toBeUndefined();
   });
 });
 
