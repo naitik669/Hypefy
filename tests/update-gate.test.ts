@@ -116,34 +116,70 @@ describe("the update screen", () => {
   });
 });
 
-describe("web only", () => {
+describe("the invitation to buy", () => {
+  /**
+   * This was WebOnly, a platform check, and is now FeatureOnly resolving the
+   * registry's `purchase` entry. The tests changed with it, deliberately:
+   *
+   * "shows nothing in the app" cannot be asserted through this component any
+   * more, and that is an improvement rather than a loss. It used to be
+   * asserted by mocking isNative() to true — a mock of a function that now
+   * answers false in every client that exists, since the Capacitor shell is
+   * retired. The guarantee itself moved to tests/feature-consumers.test.ts,
+   * where it is proved against the phone's own adapter, which says
+   * `native: true` by construction and cannot be mocked into saying
+   * otherwise.
+   *
+   * What is still this component's job, and is still asserted here: it shows
+   * the chip where buying is possible, and shows nothing in the page the
+   * server sends, so no client flashes an offer and withdraws it.
+   */
   async function show() {
-    const { WebOnly } = await import("@/components/native/WebOnly");
-    await act(async () => root.render(createElement(WebOnly, null, createElement("b", { id: "chip" }, "Get verified"))));
+    const { FeatureOnly } = await import("@/components/features/FeatureOnly");
+    await act(async () =>
+      root.render(
+        createElement(FeatureOnly, { id: "purchase" }, createElement("b", { id: "chip" }, "Get verified")),
+      ),
+    );
   }
 
-  it("shows its children on the web", async () => {
-    env.native = false;
+  it("shows its children where buying is possible", async () => {
     await show();
     expect(host.querySelector("#chip")).toBeTruthy();
   });
 
-  it("shows nothing in the app", async () => {
-    env.native = true;
-    await show();
-    expect(host.querySelector("#chip")).toBeNull();
+  it("is in the page the server sends, because every client that gets it can buy", async () => {
+    /**
+     * REVERSED from what WebOnly asserted, and the reason is a client that
+     * stopped existing.
+     *
+     * WebOnly rendered nothing on the server so the Android WebView would
+     * never flash an offer it could not honour — the shell served this exact
+     * bundle inside the app. The shell is retired. Nothing loads this bundle
+     * in an app any more, so hiding the chip for every web visitor and then
+     * revealing it is a layout shift paid for a client that is gone.
+     *
+     * The server snapshot is the phone shape, where buying is allowed, so the
+     * chip is in the first paint. It also makes this component consistent
+     * with the other five call sites, which all answered "not in an app" on
+     * the server already.
+     *
+     * The protection for the client that really cannot sell is not a guess
+     * made on the server: the phone resolves the same registry through its own
+     * adapter, which says native by construction. That is asserted in
+     * tests/feature-consumers.test.ts.
+     */
+    const { FeatureOnly } = await import("@/components/features/FeatureOnly");
+    expect(
+      renderToString(
+        createElement(FeatureOnly, { id: "purchase" }, createElement("b", null, "Get verified")),
+      ),
+    ).toContain("Get verified");
   });
 
-  it("is hidden in the page the server sends, so the app never flashes it", async () => {
-    env.native = false;
-    const { WebOnly } = await import("@/components/native/WebOnly");
-    expect(renderToString(createElement(WebOnly, null, createElement("b", null, "Get verified")))).not.toContain(
-      "Get verified",
-    );
-  });
-
-  it("wraps Get verified on your own profile", () => {
+  it("wraps Get verified on your own profile, and names the rule it obeys", () => {
     const src = readFileSync("src/components/profile/ProfileHeader.tsx", "utf8");
-    expect(src).toMatch(/<WebOnly>\s*<Link\s+href="\/premium"/);
+    expect(src).toMatch(/<FeatureOnly id="purchase">\s*<Link\s+href="\/premium"/);
+    expect(src, "a platform check came back").not.toMatch(/WebOnly|isNative/);
   });
 });

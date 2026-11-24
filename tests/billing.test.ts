@@ -91,6 +91,15 @@ describe("the subscription line", () => {
 
 const native = vi.hoisted(() => ({ value: false }));
 vi.mock("@/lib/native", () => ({ isNative: () => native.value }));
+/**
+ * The components ask the registry now, not Capacitor. See
+ * tests/helpers/feature-seam.ts for why mocking isNative() had stopped
+ * meaning anything.
+ */
+vi.mock("@/lib/use-feature", async () => {
+  const { verdictHere } = await import("./helpers/feature-seam");
+  return { useFeature: (id: Parameters<typeof verdictHere>[0]) => verdictHere(id, native.value) };
+});
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push() {}, refresh() {} }) }));
 vi.mock("@/components/ui/ToastProvider", () => ({ useToast: () => () => {} }));
 

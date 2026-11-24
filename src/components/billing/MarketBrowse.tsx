@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Eye, Loader2, Search, Sparkles, X } from "lucide-react";
@@ -26,9 +26,7 @@ import {
 } from "@/lib/marketplace";
 import { formatInr } from "@/lib/billing/plans";
 import { buyItem } from "@/lib/billing/checkout";
-import { isNative } from "@/lib/native";
-
-const noop = () => () => {};
+import { useFeature } from "@/lib/use-feature";
 
 /**
  * One category of the Marketplace: everything in it as a grid.
@@ -67,7 +65,10 @@ export function MarketBrowse({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const native = useSyncExternalStore(noop, isNative, () => false);
+  // The purchase rule, not a platform check: the stores require their own
+  // billing for digital goods and Hypefy bills through Razorpay, so the
+  // registry answers for every client at once.
+  const native = useFeature("purchase").state === "unavailable";
   const [owned, setOwned] = useState(initialOwned);
   const [previewing, setPreviewing] = useState<MarketItem | null>(null);
   /** The item being paid for, so only its own button spins. */

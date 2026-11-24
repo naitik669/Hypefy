@@ -10,8 +10,8 @@ import { sqlNull } from "@/lib/supabase/typed";
 import { CHAT_THEMES, bubbleCss, type ChatTheme } from "@/lib/chat-themes";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { blockedReason, unlocked as isUnlocked } from "@/lib/marketplace";
+import { useFeature } from "@/lib/use-feature";
 import { buyItem } from "@/lib/billing/checkout";
-import { isNative } from "@/lib/native";
 import { formatInr } from "@/lib/billing/plans";
 
 /**
@@ -40,6 +40,7 @@ export function ChatThemePicker({
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
+  const purchase = useFeature("purchase");
 
   const unlocked = (t: ChatTheme) =>
     isUnlocked(t.tier, t.id, owned, isPremium);
@@ -59,8 +60,11 @@ export function ChatThemePicker({
       router.push("/premium");
       return;
     }
-    if (isNative()) {
-      toast(blockedReason("app"), "plain");
+    // The reason comes from the registry rather than being written here,
+    // so the app and the website cannot end up saying different things
+    // about the same rule.
+    if (purchase.state === "unavailable") {
+      toast(purchase.reason ?? blockedReason("app"), "plain");
       return;
     }
     setBusy(theme.id);

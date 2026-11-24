@@ -1,0 +1,15 @@
+# Line endings are LF everywhere, including on Windows checkouts.
+#
+# This is not a style preference. Many tests in this repo assert on source as
+# TEXT, and some of those patterns span a line break. With a CRLF working copy
+# a pattern written with \n matches nothing, so the assertion passes
+# vacuously on Windows and only means something on CI — which is how
+# tests/ghost-rise.test.ts came to fail every CI run from 19 Nov while every
+# local run reported green, and how five pull requests were merged onto a red
+# main without anybody noticing.
+#
+# Green locally and red in CI is the worst way round: the instinct is to
+# distrust the local change. The same hazard was recorded for Node versions in
+# Phase 6; this is the second instance, and the fix for both is to make the
+# two environments the same rather than to remember the difference.
+* text=auto eol=lf

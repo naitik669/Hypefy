@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Check, ChevronLeft, Loader2, Search } from "lucide-react";
@@ -10,7 +10,7 @@ import { GhostShareIcon } from "@/components/ui/GhostShareIcon";
 import { useToast } from "@/components/ui/ToastProvider";
 import { shieldProps, useOverlayShield } from "@/lib/overlay-shield";
 import { haptics } from "@/lib/haptics";
-import { isNative } from "@/lib/native";
+import { useFeature } from "@/lib/use-feature";
 import { timeAgoShort } from "@/lib/time";
 import {
   feedName,
@@ -24,8 +24,6 @@ import {
   type GhostStatus,
   type GhostTarget,
 } from "@/lib/ghost-share";
-
-const noop = () => () => {};
 
 /** "3h ago"; and for the first minute, "just now" rather than "now ago". */
 function placedWhen(at: string): string {
@@ -68,7 +66,10 @@ export function GhostShareFlow({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const toast = useToast();
-  const native = useSyncExternalStore(noop, isNative, () => false);
+  // The purchase rule, not a platform check: the stores require their own
+  // billing for digital goods and Hypefy bills through Razorpay, so the
+  // registry answers for every client at once.
+  const native = useFeature("purchase").state === "unavailable";
   const left = ghostLeft(status);
 
   const [step, setStep] = useState<"pick" | "confirm" | "sent" | "limit">(left > 0 ? "pick" : "limit");

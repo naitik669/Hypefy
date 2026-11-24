@@ -9,7 +9,7 @@ import { DisplayName } from "@/components/ui/DisplayName";
 import { HyperStar } from "@/components/ui/HyperStar";
 import { MutualHyperBadge } from "@/components/ui/MutualHyperBadge";
 import { AnthemChip } from "@/components/profile/AnthemChip";
-import { WebOnly } from "@/components/native/WebOnly";
+import { FeatureOnly } from "@/components/features/FeatureOnly";
 import {
   ProfileStatusBubble,
   type ProfileNote,
@@ -163,14 +163,14 @@ export function ProfileHeader({
                 accept it. Hidden until the page knows where it is running,
                 so the app never shows it for a moment and takes it back. */}
             {!verified && currentUserId === userId && (
-              <WebOnly>
+              <FeatureOnly id="purchase">
                 <Link
                   href="/premium"
                   className="ml-1 rounded-full border border-verified/30 px-2 py-0.5 text-[11px] font-bold text-verified transition-colors hover:bg-verified/10"
                 >
                   Get verified
                 </Link>
-              </WebOnly>
+              </FeatureOnly>
             )}
           </span>
           {(username || pronouns) && (

@@ -10,7 +10,7 @@ import {
 } from "@/lib/feed-mix";
 import { adBudgetLeft, adFill, type AdFill } from "@/lib/ads";
 import { consentRevision, currentConsent, subscribeConsent } from "@/lib/consent";
-import { isNative } from "@/lib/native";
+import { useFeature } from "@/lib/use-feature";
 
 const NO_ADS: PlacedAd[] = [];
 const never = () => () => {};
@@ -18,10 +18,14 @@ const never = () => () => {};
 /**
  * What fills an ad slot for this reader.
  *
- * "off" on the server and through hydration, the real answer only after,
- * because isNative() answers false during SSR — Capacitor is absent on the
- * server — which is exactly the wrong answer to act on. A slot decided there
- * would ship an ad tag into the Play Store app and then have to take it back.
+ * "off" on the server and through hydration, the real answer only after:
+ * the server cannot know which client is asking, and answering "ads are fine
+ * here" there would ship an ad tag into a store app and then take it back.
+ * The registry's server snapshot is the restrictive one for that reason.
+ *
+ * Whether ads may be shown at all is the registry's `ads` entry — AdSense's
+ * terms bar it from an app, which is a policy rule and not a fact about this
+ * browser. What is still decided here is consent and country.
  *
  * useSyncExternalStore rather than an effect that sets state: it is React's
  * own shape for "one value on the server, another in the browser", and it
@@ -31,12 +35,13 @@ export function useAdFill(country: string | null): AdFill {
   // Subscribed to consent changes, so answering the cookie banner switches
   // the slots over at once rather than on the next page load.
   useSyncExternalStore(subscribeConsent, consentRevision, () => 0);
+  const adsBlocked = useFeature("ads").state === "unavailable";
   return useSyncExternalStore(
     never,
     () =>
       adFill({
         country,
-        native: isNative(),
+        native: adsBlocked,
         adsConsent: currentConsent(country).ads,
       }),
     () => "off"
