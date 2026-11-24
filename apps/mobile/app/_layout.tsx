@@ -5,6 +5,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import { usePushTaps } from "@/notifications/taps";
+import { startReporting } from "@/report";
+import { siteOrigin } from "@/site";
 import { palette, base } from "@/theme";
 
 /**
@@ -26,6 +28,21 @@ import { palette, base } from "@/theme";
 // Held until the fonts are ready. Failing to prevent auto-hide is not worth
 // crashing over — the worst case is a frame of unstyled text.
 void SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/*
+ * Reporting starts at MODULE scope, before any component renders.
+ *
+ * An error thrown while this file is still evaluating — a bad import, a
+ * module that throws at load, the font loader failing in a way the catch
+ * below does not cover — happens before any effect runs. Starting the
+ * reporter in a useEffect would miss exactly the crashes that are hardest
+ * to diagnose, because they leave nothing on screen to describe.
+ *
+ * Nothing tears this down: the root layout lives as long as the process,
+ * and a reporter that stopped when it unmounted would stop at the moment
+ * something had gone wrong enough to unmount it.
+ */
+startReporting({ site: siteOrigin() });
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);

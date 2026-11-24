@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { ipRateLimited } from "@/lib/api-guard";
+import {
+  isHealthKind,
+  MAX_MESSAGE,
+  MAX_STACK,
+  MAX_URL,
+  REPORT_KINDS,
+  type ReportKind,
+} from "@hypefy/core/client-report";
 
 /**
  * POST /api/client-error
@@ -22,11 +30,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const message = String(body?.message ?? "").slice(0, 500);
+    // The same limits the clients truncate to, from the module they read
+    // them from — so a change in one place cannot leave the relay quietly
+    // cutting more or less than the sender expected.
+    const message = String(body?.message ?? "").slice(0, MAX_MESSAGE);
     if (!message) return NextResponse.json({ ok: false }, { status: 400 });
 
-    const stack = String(body?.stack ?? "").slice(0, 4000);
-    const url = String(body?.url ?? "").slice(0, 300);
+    const stack = String(body?.stack ?? "").slice(0, MAX_STACK);
+    const url = String(body?.url ?? "").slice(0, MAX_URL);
 
     /**
      * Four kinds now, not two.
@@ -38,10 +49,8 @@ export async function POST(req: NextRequest) {
      * are a symptom rather than a failure — and because mixing them
      * into the error stream would bury the exceptions.
      */
-    const KINDS = ["error", "unhandledrejection", "longtask", "memory"] as const;
-    type Kind = (typeof KINDS)[number];
-    const kind: Kind = KINDS.find((k) => k === body?.kind) ?? "error";
-    const health = kind === "longtask" || kind === "memory";
+    const kind: ReportKind = REPORT_KINDS.find((k) => k === body?.kind) ?? "error";
+    const health = isHealthKind(kind);
 
     // The two counts the crash work is about, when the client sent them.
     const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);

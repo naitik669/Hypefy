@@ -47,6 +47,33 @@ const OPEN_PATHS = [
   "/api/version",
   "/auth/callback",
 
+  /*
+   * **The two write-only relays, which the gate had been silently
+   * breaking.**
+   *
+   * Found by POSTing to production rather than by reading the code: both
+   * answered 401. The gate 401s every `/api/` path without a cookie, and
+   * neither of these was on this list.
+   *
+   * `/api/client-error`'s own comment says it is "deliberately NOT
+   * auth-gated: the errors most worth catching happen on /signup and
+   * /signin, where nobody is signed in yet. Requiring a session would
+   * silently drop exactly those." The gate was doing precisely that, and
+   * the reporter's `.catch(() => {})` — correct, since reporting must
+   * never throw — meant nothing anywhere said so. Every client error since
+   * the gate went up was posted into a 401 and lost.
+   *
+   * `/api/csp-report` is the collector added for the saved-accounts
+   * finding, so the report-only Content-Security-Policy has been
+   * collecting nothing either.
+   *
+   * Safe, and narrow: both are write-only, both answer with nothing but
+   * `{ ok }`, and both already limit by IP (20 an hour and 60 an hour). An
+   * uninvited visitor gains no read of anything.
+   */
+  "/api/client-error",
+  "/api/csp-report",
+
   // The front door.
   //
   // The wall used to stand here, and standing here it made the whole site
