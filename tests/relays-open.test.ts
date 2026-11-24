@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { isOpenPath } from "@/lib/invite-gate";
+import { nativeReturnUrl } from "@hypefy/core/native-auth-link";
 
 /**
  * A relay nobody is signed in to must get past the invite wall.
@@ -104,6 +105,40 @@ describe("every unauthenticated relay is open on the invite gate", () => {
       );
       // No GET: a relay that could be read would be a different decision.
       expect(src, `${route} answers GET`).not.toMatch(/export async function GET/);
+    }
+  });
+
+  it("and every other website path the phone uses, for the same reason", () => {
+    /*
+     * **The phone cannot pass the wall, ever.** The gate cookie is set by
+     * typing a code into /gate in a browser; the app has no such page and
+     * no such cookie. So this is not "mostly broken for app users" — any
+     * site path the app touches either works for everyone or works for
+     * nobody.
+     *
+     * Derived rather than listed, as the cron test does it. The app builds
+     * these three ways: a template on `siteOrigin()`, the shared
+     * `nativeReturnUrl` helper, and the reporter's constant. The helper is
+     * CALLED rather than pattern-matched, because it is a function and a
+     * regex over its call site would only prove the call exists.
+     */
+    const sources = [
+      "apps/mobile/src/auth/AuthCard.tsx",
+      "apps/mobile/app/_layout.tsx",
+      "apps/mobile/src/report.ts",
+    ];
+    const templated = sources.flatMap((p) =>
+      [...read(p).matchAll(/\$\{siteOrigin\(\)\}(\/[^`?"']*)/g)].map((m) => m[1]),
+    );
+    const viaHelper = new URL(nativeReturnUrl("https://app.hypefy.chat")).pathname;
+
+    const paths = [...new Set([...templated, viaHelper, ...mobileReporterPaths()])];
+    // Not vacuous: the app really does reach the site, in more than one way.
+    expect(paths.length, "no website paths were found in the app").toBeGreaterThan(1);
+    expect(paths).toContain("/auth/callback");
+
+    for (const path of paths) {
+      expect(isOpenPath(path), `${path} is gated, and the app can never pass the gate`).toBe(true);
     }
   });
 
