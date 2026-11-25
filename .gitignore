@@ -69,3 +69,7 @@ web-build/
 *.mobileprovision
 *.orig.*
 expo-env.d.ts
+
+# Firebase config for the Expo app. Never committed: EAS builds get it from
+# the GOOGLE_SERVICES_JSON file variable (see apps/mobile/app.config.ts).
+apps/mobile/google-services.json
