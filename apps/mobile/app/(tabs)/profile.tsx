@@ -129,6 +129,16 @@ export default function ProfileTab() {
           >
             <Text style={styles.openText}>Open @{username}</Text>
           </Pressable>
+          {/* Where the website keeps it: profile, then Settings. The public
+              /delete-account page tells people to go exactly this way. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            onPress={() => router.push("/settings")}
+            style={({ pressed }) => [styles.settings, pressed && styles.pressed]}
+          >
+            <Text style={styles.settingsText}>Settings</Text>
+          </Pressable>
           <SignOutRow />
         </>
       }
@@ -150,4 +160,16 @@ const styles = StyleSheet.create({
   },
   pressed: { transform: [{ scale: 0.98 }] },
   openText: { color: palette.accentInk, fontFamily: family.bold, fontSize: type.sm },
+  settings: {
+    marginTop: 12,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingHorizontal: 22,
+    minHeight: 44,
+    minWidth: 140,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  settingsText: { color: palette.foreground, fontFamily: family.semibold, fontSize: type.sm },
 });

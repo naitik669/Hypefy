@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { isOpenPath } from "@/lib/invite-gate";
 import { nativeReturnUrl } from "@hypefy/core/native-auth-link";
+import { DELETE_ACCOUNT_PATH } from "@hypefy/core/account-delete";
 
 /**
  * A relay nobody is signed in to must get past the invite wall.
@@ -51,6 +52,22 @@ function cspReportPaths(): string[] {
 }
 
 /** Where the phone posts. It has no cookie at all, ever. */
+/** Every TypeScript source in the Expo app, outside node_modules. */
+function mobileSources(): string[] {
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      if (name === "node_modules" || name.startsWith(".")) continue;
+      const path = `${dir}/${name}`;
+      if (statSync(path).isDirectory()) walk(path);
+      else if (/\.tsx?$/.test(name)) out.push(path);
+    }
+  };
+  walk("apps/mobile/app");
+  walk("apps/mobile/src");
+  return out;
+}
+
 function mobileReporterPaths(): string[] {
   const src = read("apps/mobile/src/report.ts");
   return [...src.matchAll(/REPORT_PATH = ["'](\/[^"']+)["']/g)].map((m) => m[1]);
@@ -122,20 +139,25 @@ describe("every unauthenticated relay is open on the invite gate", () => {
      * CALLED rather than pattern-matched, because it is a function and a
      * regex over its call site would only prove the call exists.
      */
-    const sources = [
-      "apps/mobile/src/auth/AuthCard.tsx",
-      "apps/mobile/app/_layout.tsx",
-      "apps/mobile/src/report.ts",
-    ];
+    // Every file in the app, not a list of the ones known to reach the
+    // site: a list is how a fifth path gets added without anyone noticing.
+    const sources = mobileSources();
     const templated = sources.flatMap((p) =>
       [...read(p).matchAll(/\$\{siteOrigin\(\)\}(\/[^`?"']*)/g)].map((m) => m[1]),
     );
     const viaHelper = new URL(nativeReturnUrl("https://app.hypefy.chat")).pathname;
+    // Account deletion builds its URL inside @hypefy/core from a constant,
+    // so it is found by the app CALLING the function that uses it.
+    const deletes = sources.some((p) => /\bdeleteMyAccount\(/.test(read(p)))
+      ? [DELETE_ACCOUNT_PATH]
+      : [];
 
-    const paths = [...new Set([...templated, viaHelper, ...mobileReporterPaths()])];
+    const paths = [...new Set([...templated, viaHelper, ...mobileReporterPaths(), ...deletes])];
     // Not vacuous: the app really does reach the site, in more than one way.
     expect(paths.length, "no website paths were found in the app").toBeGreaterThan(1);
     expect(paths).toContain("/auth/callback");
+    // The store-mandated button, which a gate would turn into a certain 401.
+    expect(paths).toContain(DELETE_ACCOUNT_PATH);
 
     for (const path of paths) {
       expect(isOpenPath(path), `${path} is gated, and the app can never pass the gate`).toBe(true);
@@ -147,6 +169,9 @@ describe("every unauthenticated relay is open on the invite gate", () => {
     // everything, every assertion above would pass and the wall would be
     // gone.
     expect(isOpenPath("/api/billing/order")).toBe(false);
-    expect(isOpenPath("/api/account/delete")).toBe(false);
+    // (Not /api/account/delete any more: the phone needs it, and the route
+    // authenticates the caller itself — see invite-gate.ts.)
+    expect(isOpenPath("/api/music")).toBe(false);
+    expect(isOpenPath("/api/spotify/auth")).toBe(false);
   });
 });
