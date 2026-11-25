@@ -6,11 +6,16 @@
     "version": "1.2.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
+    "icon": "./assets/images/icon.png",
     "newArchEnabled": true,
     "android": {
       "package": "chat.hypefy.app",
       "allowBackup": false,
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/mark.png",
+        "backgroundColor": "#000000"
+      }
     },
     "ios": {
       "bundleIdentifier": "chat.hypefy.app",
@@ -21,6 +26,15 @@
       "expo-secure-store",
       "expo-font",
       "expo-video",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/mark.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#0a0a0a"
+        }
+      ],
       "expo-notifications",
       [
         "expo-camera",
