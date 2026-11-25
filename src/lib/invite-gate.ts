@@ -74,6 +74,18 @@ const OPEN_PATHS = [
   "/api/client-error",
   "/api/csp-report",
 
+  /*
+   * In-app account deletion, from the phone.
+   *
+   * The phone can never carry the gate cookie (see above), and Google Play
+   * requires deletion to work INSIDE the app — so gating this route would
+   * make the store-mandated button a guaranteed 401. Opening it opens
+   * nothing: the route answers 401 to any caller without a valid session or
+   * access token of its own, and 403 to an account with a second factor
+   * that has not presented it. The only person it can delete is the caller.
+   */
+  "/api/account/delete",
+
   // The front door.
   //
   // The wall used to stand here, and standing here it made the whole site

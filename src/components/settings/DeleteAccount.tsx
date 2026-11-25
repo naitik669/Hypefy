@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Trash2, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useStepUp } from "@/components/auth/StepUpDialog";
+import { confirmWord as wordFor, isArmed, requestAccountDeletion } from "@hypefy/core/account-delete";
 
 /**
  * Danger zone: permanent account deletion. Requires typing the username
@@ -15,14 +16,15 @@ export function DeleteAccount({ username }: { username: string | null }) {
   const supabase = createClient();
   const router = useRouter();
   const { requireStepUp, stepUpDialog } = useStepUp();
-  const confirmWord = username ?? "delete";
+  // One rule for both clients: @hypefy/core/account-delete.
+  const confirmWord = wordFor(username);
 
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const armed = typed.trim().toLowerCase() === confirmWord.toLowerCase();
+  const armed = isArmed(typed, username);
 
   async function destroy() {
     if (!armed || busy) return;
@@ -32,10 +34,10 @@ export function DeleteAccount({ username }: { username: string | null }) {
     if (!(await requireStepUp({ maxAge: 0 }))) return;
     setBusy(true);
     setError(null);
-    const res = await fetch("/api/account/delete", { method: "POST" });
-    if (!res.ok) {
-      const json = await res.json().catch(() => ({}));
-      setError(json.error ?? "Deletion failed. Try again.");
+    // Same origin, so the session cookie is the credential and no token is sent.
+    const result = await requestAccountDeletion({ site: "", transport: (url, init) => fetch(url, init) });
+    if (!result.ok) {
+      setError(result.error);
       setBusy(false);
       return;
     }
