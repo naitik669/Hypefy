@@ -66,8 +66,10 @@ describe("the timeframes are the statutory ones", () => {
 describe("it describes machinery that exists", () => {
   it("points at the in-app report flow as the fast route", () => {
     expect(page).toContain("Report");
-    // Which writes to `reports` and lands in the admin queue.
-    expect(read("src/components/ui/ReportSheet.tsx")).toContain('from("reports")');
+    // Which writes to `reports` and lands in the admin queue. The write
+    // moved into core so the phone's report goes through the same code.
+    expect(read("src/components/ui/ReportSheet.tsx")).toMatch(/await submitReport\(/);
+    expect(read("packages/core/src/safety.ts")).toContain('from("reports").insert(');
     expect(() => read("src/app/(app)/admin/reports/page.tsx")).not.toThrow();
   });
 

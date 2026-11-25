@@ -40,6 +40,7 @@ export default function Home() {
   const [hyped, setHyped] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [viewerId, setViewerId] = useState<string | null>(null);
 
   /**
    * Fetches, and sets no state at all.
@@ -53,7 +54,7 @@ export default function Home() {
    * clear state, an effect may not.
    */
   const fetchFeed = useCallback(async (): Promise<
-    { kind: "posts"; posts: FeedPost[]; hyped: Set<string> } | { kind: "failed"; message: string } | { kind: "signed-out" }
+    { kind: "posts"; posts: FeedPost[]; hyped: Set<string>; viewerId: string } | { kind: "failed"; message: string } | { kind: "signed-out" }
   > => {
     try {
       const { data, error: authError } = await supabase.auth.getUser();
@@ -64,7 +65,7 @@ export default function Home() {
         data.user.id,
         posts.map((p) => p.id),
       );
-      return { kind: "posts", posts, hyped };
+      return { kind: "posts", posts, hyped, viewerId: data.user.id };
     } catch (e) {
       return {
         kind: "failed",
@@ -88,6 +89,7 @@ export default function Home() {
         return;
       }
       setError(null);
+      setViewerId(result.viewerId);
       setPosts(result.posts);
       /*
        * Which of these the viewer has already hyped, so the star arrives
@@ -153,12 +155,27 @@ export default function Home() {
 
   const rows = posts.filter(isRenderable);
 
+  /*
+   * A block takes every post of theirs off the screen at once, as the web's
+   * refresh after a block does. The next load leaves them out anyway,
+   * because the feed's blocked set is read both ways.
+   */
+  const dropAuthor = (userId: string) =>
+    setPosts((prev) => prev?.filter((p) => p.user_id !== userId) ?? prev);
+
   return (
     <View style={base.screen}>
       <FlatList
         data={rows}
         keyExtractor={(p) => p.id}
-        renderItem={({ item }) => <FeedCard post={item} hyped={hyped.has(item.id)} />}
+        renderItem={({ item }) => (
+          <FeedCard
+            post={item}
+            hyped={hyped.has(item.id)}
+            viewerId={viewerId}
+            onBlocked={dropAuthor}
+          />
+        )}
         contentContainerStyle={{ paddingBottom: navSpace(insets.bottom) }}
         refreshControl={
           <RefreshControl

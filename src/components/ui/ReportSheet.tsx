@@ -4,30 +4,15 @@ import { useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import {
+  REPORT_LABELS,
+  REPORT_REASONS,
+  submitReport,
+  type ReportTarget,
+} from "@hypefy/core/safety";
 
-export const REPORT_REASONS = [
-  "Spam",
-  "Harassment or bullying",
-  "Hate or abuse",
-  "Scam or fraud",
-  "Nudity or sexual content",
-  "Violence or dangerous acts",
-  "Misinformation",
-  "Other",
-];
-
-// Must stay in sync with the reports.target_type check constraint.
-export type ReportTarget = "post" | "shot" | "show" | "comment" | "message" | "profile" | "conversation";
-
-const LABELS: Record<ReportTarget, string> = {
-  post: "post",
-  shot: "Shot",
-  show: "Show",
-  comment: "comment",
-  message: "message",
-  profile: "account",
-  conversation: "group",
-};
+// The reasons, labels and the write itself are shared with the phone.
+export { REPORT_REASONS, type ReportTarget } from "@hypefy/core/safety";
 
 /**
  * Reusable report flow. Asks for a reason (and optional details),
@@ -64,17 +49,16 @@ export function ReportSheet({
   async function submit() {
     if (!reason || submitting) return;
     setSubmitting(true);
-    const { error } = await supabase.from("reports").insert({
-      reporter_id: currentUserId,
-      target_type: targetType,
-      target_id: targetId,
+    const result = await submitReport(supabase as never, {
+      reporterId: currentUserId,
+      targetType,
+      targetId,
       reason,
-      details: details.trim() || null,
-      status: "open",
+      details,
     });
     setSubmitting(false);
-    // 23505 = unique violation → already reported. Treat as success.
-    if (error && error.code !== "23505") {
+    // A repeat report counts as sent; submitReport decides that.
+    if (!result.ok) {
       setReason(null);
       return;
     }
@@ -84,18 +68,18 @@ export function ReportSheet({
   }
 
   return (
-    <BottomSheet open={open} onClose={() => { onClose(); reset(); }} title={`Report ${LABELS[targetType]}`}>
+    <BottomSheet open={open} onClose={() => { onClose(); reset(); }} title={`Report ${REPORT_LABELS[targetType]}`}>
       {done ? (
         <div className="flex flex-col items-center gap-2 py-8">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent">
             <Check size={26} />
           </span>
           <p className="text-sm font-semibold">Thanks for reporting</p>
-          <p className="text-center text-xs text-muted">Our team will review this {LABELS[targetType]}.</p>
+          <p className="text-center text-xs text-muted">Our team will review this {REPORT_LABELS[targetType]}.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-1 pb-3">
-          <p className="pb-1 text-xs text-muted">Why are you reporting this {LABELS[targetType]}?</p>
+          <p className="pb-1 text-xs text-muted">Why are you reporting this {REPORT_LABELS[targetType]}?</p>
           {REPORT_REASONS.map((rr) => (
             <button
               key={rr}

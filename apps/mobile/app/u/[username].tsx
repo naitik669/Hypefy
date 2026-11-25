@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
-import { ArrowLeft, Lock } from "lucide-react-native";
+import { ArrowLeft, Lock, MoreHorizontal } from "lucide-react-native";
 import { formatCount } from "@hypefy/core/format";
 import { pronounLabel } from "@hypefy/core/profile";
 import {
@@ -28,6 +28,7 @@ import { toHex, alphaOf } from "@/profile/css-color";
 import { Avatar } from "@/avatar";
 import { VerifiedStar } from "@/glyphs";
 import { Gradient } from "@/onboarding/motion";
+import { SafetyMenu } from "@/safety/SafetyMenu";
 import { base, palette, type, family, radius } from "@/theme";
 
 /**
@@ -58,6 +59,8 @@ export default function ProfileScreen() {
   const [state, setState] = useState<FollowState>("none");
   const [pending, setPending] = useState(false);
   const [followError, setFollowError] = useState<string | null>(null);
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -74,7 +77,7 @@ export default function ProfileScreen() {
       const grid = found.locked
         ? []
         : await loadUserPosts(supabase as never, found.profile.id);
-      return { kind: "ok" as const, view: found, posts: grid };
+      return { kind: "ok" as const, view: found, posts: grid, viewerId };
     } catch (e) {
       return {
         kind: "failed" as const,
@@ -96,6 +99,7 @@ export default function ProfileScreen() {
     setMissing(false);
     setView(result.view);
     setPosts(result.posts);
+    setViewerId(result.viewerId);
     setState(result.view.state);
   }, []);
 
@@ -189,7 +193,38 @@ export default function ProfileScreen() {
   const tags = p.profile_tags ?? [];
 
   return (
-    <Shell insets={insets} title={p.username ? `@${p.username}` : "Profile"}>
+    <Shell
+      insets={insets}
+      title={p.username ? `@${p.username}` : "Profile"}
+      right={
+        /*
+         * The web's overflow on someone else's profile: block or unblock,
+         * and report the account. Only the safety rows are ported; Hype
+         * buddies and mute sit beside them there and are not here yet.
+         */
+        view.isOwn || !viewerId ? undefined : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="More options"
+            hitSlop={10}
+            onPress={() => setMenuOpen(true)}
+            style={styles.back}
+          >
+            <MoreHorizontal size={22} color={palette.foreground} />
+          </Pressable>
+        )
+      }
+    >
+      {!view.isOwn && viewerId && (
+        <SafetyMenu
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          target={{ type: "profile", id: p.id, authorId: p.id, username: p.username }}
+          viewerId={viewerId}
+          // As on the web: once blocked, their profile is no place to be.
+          onBlocked={() => router.replace("/home")}
+        />
+      )}
       <FlatList
         data={view.locked ? [] : posts}
         keyExtractor={(post) => post.id}
@@ -328,10 +363,13 @@ export default function ProfileScreen() {
 function Shell({
   insets,
   title,
+  right,
   children,
 }: {
   insets: { top: number };
   title: string;
+  /** The bar's right seat; empty by default, to keep the title centred. */
+  right?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -349,7 +387,7 @@ function Shell({
         <Text style={styles.barTitle} numberOfLines={1}>
           {title}
         </Text>
-        <View style={styles.back} />
+        {right ?? <View style={styles.back} />}
       </View>
       {children}
     </View>
