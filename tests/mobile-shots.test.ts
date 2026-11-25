@@ -344,13 +344,20 @@ describe("the screen can be reached, and what it does not do", () => {
   });
 
   it("sharing is a count, not a button", () => {
+    /*
+     * The rail's handlers went from two to three when the More button
+     * (report and block, tests/mobile-safety.test.ts) arrived. Share is
+     * still the one with none.
+     */
     const src = body(SCREEN);
     const rail = src.slice(src.indexOf("styles.rail,"), src.indexOf("styles.foot,"));
     expect(rail.length, "the rail block could not be found").toBeGreaterThan(0);
     expect(
       [...rail.matchAll(/onPress/g)].length,
       "an action gained a handler without being announced",
-    ).toBe(2);
+    ).toBe(3);
+    expect(rail).toMatch(/onPress=\{\(\) => setMenuOpen\(true\)\}/);
+    expect(rail).toMatch(/<View style=\{styles\.railItem\}>\s*<ShareIcon/);
   });
 
   it("the author opens their profile, and nothing happens without a username", () => {

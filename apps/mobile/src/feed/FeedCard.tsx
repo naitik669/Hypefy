@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { MoreHorizontal, Bookmark } from "lucide-react-native";
 import { router } from "expo-router";
@@ -8,6 +9,8 @@ import { HypeIcon, CommentIcon, ShareIcon, VerifiedStar } from "@/glyphs";
 import { Avatar } from "@/avatar";
 import { useHype } from "@/feed/useHype";
 import type { FeedPost } from "@/feed/load";
+import { SafetyMenu } from "@/safety/SafetyMenu";
+import { safetyRows } from "@/safety/menu";
 
 /**
  * One post in the feed, ported from the web's FeedCard.
@@ -52,7 +55,20 @@ function openProfile(username: string | null | undefined) {
   router.push({ pathname: "/u/[username]", params: { username } });
 }
 
-export function FeedCard({ post, hyped = false }: { post: FeedPost; hyped?: boolean }) {
+export function FeedCard({
+  post,
+  hyped = false,
+  viewerId = null,
+  onBlocked,
+}: {
+  post: FeedPost;
+  hyped?: boolean;
+  /** The signed-in user. Without it there is no menu: nobody to report as. */
+  viewerId?: string | null;
+  /** A block was written; the list drops this author's posts. */
+  onBlocked?: (userId: string) => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const hype = useHype(post.id, post.user_id, {
     hyped,
     count: post.hype_count ?? 0,
@@ -60,6 +76,13 @@ export function FeedCard({ post, hyped = false }: { post: FeedPost; hyped?: bool
   const profile = post.profiles;
   const name = profile?.display_name || profile?.username || "Someone";
   const media = post.image_urls?.[0] ?? post.image_url ?? null;
+  const target = {
+    type: "post" as const,
+    id: post.id,
+    authorId: post.user_id,
+    username: profile?.username,
+  };
+  const hasMenu = safetyRows(target, viewerId).length > 0;
 
   return (
     <View style={styles.card}>
@@ -105,12 +128,35 @@ export function FeedCard({ post, hyped = false }: { post: FeedPost; hyped?: bool
           {profile?.is_verified && <VerifiedStar size={14} />}
           <Text style={styles.when}>· {timeAgoShort(post.created_at)}</Text>
         </View>
-        {/* The menu's seat, reserved and inert: its sheet is not ported, and
-            a button that opens nothing is worse than an empty space. */}
-        <View style={styles.menu}>
-          <MoreHorizontal size={20} color={palette.muted} />
-        </View>
+        {/*
+         * Report and block, which Play's user-generated-content policy
+         * requires on every post. Your own post has no menu: the web gives
+         * its owner an owner's menu, and that is not ported, so the seat
+         * stays empty rather than opening onto nothing.
+         */}
+        {hasMenu ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="More options"
+            hitSlop={6}
+            onPress={() => setMenuOpen(true)}
+            style={({ pressed }) => [styles.menu, pressed && styles.pressed]}
+          >
+            <MoreHorizontal size={20} color={palette.muted} />
+          </Pressable>
+        ) : (
+          <View style={styles.menu} />
+        )}
       </View>
+      {hasMenu && (
+        <SafetyMenu
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          target={target}
+          viewerId={viewerId}
+          onBlocked={onBlocked}
+        />
+      )}
 
       {/* Media */}
       {media && (

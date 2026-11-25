@@ -27,6 +27,8 @@ import {
 import { Avatar } from "@/avatar";
 import { VerifiedStar, HypeIcon } from "@/glyphs";
 import { base, palette, type, family, radius } from "@/theme";
+import { SafetyMenu } from "@/safety/SafetyMenu";
+import { safetyRows } from "@/safety/menu";
 
 /**
  * A post's comments — the first screen that is not a tab, and the first
@@ -55,13 +57,25 @@ export default function Comments() {
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  /** The comment being reported, held down to open the menu as on the web. */
+  const [held, setHeld] = useState<Comment | null>(null);
 
   const fetchAll = useCallback(async (): Promise<
-    { kind: "ok"; comments: Comment[]; more: boolean } | { kind: "failed"; message: string }
+    | { kind: "ok"; comments: Comment[]; more: boolean; viewerId: string | null }
+    | { kind: "failed"; message: string }
   > => {
     try {
-      const page = await loadComments(supabase as never, id);
-      return { kind: "ok", comments: page.comments, more: page.more };
+      const [page, auth] = await Promise.all([
+        loadComments(supabase as never, id),
+        supabase.auth.getUser(),
+      ]);
+      return {
+        kind: "ok",
+        comments: page.comments,
+        more: page.more,
+        viewerId: auth.data.user?.id ?? null,
+      };
     } catch (e) {
       return {
         kind: "failed",
@@ -78,6 +92,7 @@ export default function Comments() {
         return;
       }
       setError(null);
+      setViewerId(result.viewerId);
       setComments(result.comments);
       setMore(result.more);
     },
@@ -131,6 +146,12 @@ export default function Comments() {
   }, [body, owner, id, apply, fetchAll]);
 
   const rows = comments ? thread(comments) : [];
+
+  /** Opens the menu only when it has something in it: never on your own. */
+  const hold = (node: Comment) => {
+    const target = { type: "comment" as const, id: node.id, authorId: node.user_id };
+    if (safetyRows(target, viewerId).length > 0) setHeld(node);
+  };
   const total = comments?.length ?? 0;
 
   return (
@@ -177,9 +198,9 @@ export default function Comments() {
           keyExtractor={(r) => r.root.id}
           renderItem={({ item }) => (
             <View>
-              <Row node={item.root} />
+              <Row node={item.root} onHold={hold} />
               {item.replies.map((reply) => (
-                <Row key={reply.id} node={reply} reply />
+                <Row key={reply.id} node={reply} reply onHold={hold} />
               ))}
             </View>
           )}
@@ -207,6 +228,25 @@ export default function Comments() {
             ) : undefined
           }
           initialNumToRender={12}
+        />
+      )}
+
+      {/*
+       * Report, as the web's held-comment actions offer it — and only
+       * Report: block lives on posts, Shots and profiles there too. Your
+       * own comment gets no menu, so holding it does nothing.
+       */}
+      {held && (
+        <SafetyMenu
+          open
+          onClose={() => setHeld(null)}
+          target={{
+            type: "comment",
+            id: held.id,
+            authorId: held.user_id,
+            username: held.profiles?.username,
+          }}
+          viewerId={viewerId}
         />
       )}
 
@@ -248,11 +288,24 @@ export default function Comments() {
   );
 }
 
-function Row({ node, reply = false }: { node: Comment; reply?: boolean }) {
+function Row({
+  node,
+  reply = false,
+  onHold,
+}: {
+  node: Comment;
+  reply?: boolean;
+  onHold: (node: Comment) => void;
+}) {
   const profile = node.profiles;
   const name = profile?.display_name || profile?.username || "Someone";
   return (
-    <View style={[styles.row, reply && styles.rowReply]}>
+    <Pressable
+      accessibilityHint="Hold for options"
+      onLongPress={() => onHold(node)}
+      delayLongPress={350}
+      style={[styles.row, reply && styles.rowReply]}
+    >
       <Avatar name={name} hue={profile?.avatar_hue ?? 200} size={reply ? 28 : 34} />
       <View style={styles.rowBody}>
         <View style={styles.rowHead}>
@@ -273,7 +326,7 @@ function Row({ node, reply = false }: { node: Comment; reply?: boolean }) {
           </View>
         )}
       </View>
-    </View>
+    </Pressable>
   );
 }
 

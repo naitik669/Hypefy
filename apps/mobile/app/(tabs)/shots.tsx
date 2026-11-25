@@ -19,6 +19,9 @@ import { loadShots, trimOf, type Shot } from "@/shots/load";
 import { Avatar } from "@/avatar";
 import { HypeIcon, CommentIcon, ShareIcon, VerifiedStar } from "@/glyphs";
 import { useHype } from "@/feed/useHype";
+import { MoreHorizontal } from "lucide-react-native";
+import { SafetyMenu } from "@/safety/SafetyMenu";
+import { safetyRows } from "@/safety/menu";
 import { base, palette, type, family, radius } from "@/theme";
 
 /**
@@ -48,6 +51,7 @@ export default function Shots() {
   const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState(0);
   const [focused, setFocused] = useState(true);
+  const [viewerId, setViewerId] = useState<string | null>(null);
 
   /*
    * Shots is the one tab with no header, so it pads for its own notch —
@@ -57,12 +61,16 @@ export default function Shots() {
   const pageHeight = height - navSpace(insets.bottom);
 
   const fetchAll = useCallback(async (): Promise<
-    { kind: "ok"; shots: Shot[] } | { kind: "failed"; message: string } | { kind: "signed-out" }
+    { kind: "ok"; shots: Shot[]; viewerId: string } | { kind: "failed"; message: string } | { kind: "signed-out" }
   > => {
     try {
       const { data, error: authError } = await supabase.auth.getUser();
       if (authError || !data.user) return { kind: "signed-out" };
-      return { kind: "ok", shots: await loadShots(supabase as never, data.user.id) };
+      return {
+        kind: "ok",
+        shots: await loadShots(supabase as never, data.user.id),
+        viewerId: data.user.id,
+      };
     } catch (e) {
       return {
         kind: "failed",
@@ -81,6 +89,7 @@ export default function Shots() {
       return;
     }
     setError(null);
+    setViewerId(result.viewerId);
     setShots(result.shots);
   }, []);
 
@@ -194,6 +203,11 @@ export default function Shots() {
             height={pageHeight}
             topInset={insets.top}
             active={index === current && focused}
+            viewerId={viewerId}
+            // A block takes their Shots out of the reel at once.
+            onBlocked={(userId) =>
+              setShots((prev) => prev?.filter((s) => s.user_id !== userId) ?? prev)
+            }
           />
         )}
         pagingEnabled
@@ -224,12 +238,17 @@ function Reel({
   height,
   topInset,
   active,
+  viewerId,
+  onBlocked,
 }: {
   shot: Shot;
   height: number;
   topInset: number;
   active: boolean;
+  viewerId: string | null;
+  onBlocked: (userId: string) => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const trim = trimOf(shot);
   const hype = useHype(shot.id, shot.user_id, {
     hyped: false,
@@ -266,6 +285,13 @@ function Reel({
 
   const profile = shot.profiles;
   const name = profile?.display_name || profile?.username || "Someone";
+  const target = {
+    type: "shot" as const,
+    id: shot.id,
+    authorId: shot.user_id,
+    username: profile?.username,
+  };
+  const hasMenu = safetyRows(target, viewerId).length > 0;
 
   return (
     <View style={[styles.page, { height }]}>
@@ -328,7 +354,30 @@ function Reel({
         <View style={styles.railItem}>
           <ShareIcon size={25} color={palette.foreground} />
         </View>
+
+        {/* More: report the Shot or block its author, the web's viewer
+            menu. Not on your own Shot, whose owner menu is not ported. */}
+        {hasMenu && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="More"
+            hitSlop={8}
+            onPress={() => setMenuOpen(true)}
+            style={styles.railItem}
+          >
+            <MoreHorizontal size={30} color={palette.foreground} />
+          </Pressable>
+        )}
       </View>
+      {hasMenu && (
+        <SafetyMenu
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          target={target}
+          viewerId={viewerId}
+          onBlocked={onBlocked}
+        />
+      )}
 
       {/* Author and caption */}
       <View style={[styles.foot, { paddingBottom: 24 }]}>
