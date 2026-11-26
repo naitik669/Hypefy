@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bookmark, Check, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, EyeOff, Pencil, Archive, MessageCircle, MessageCircleOff } from "lucide-react";
+import { Bookmark, Check, Volume2, VolumeX, Play, Pause, ChevronLeft, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, EyeOff, Pencil, Archive, MessageCircle, MessageCircleOff } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { setArchived, setCommentsOff } from "@/lib/post-controls";
@@ -126,6 +126,7 @@ import { BLANK_POSTER } from "@/lib/blank-poster";
 import { CommentIcon } from "@/components/ui/CommentIcon";
 import { claimPreview, originalTrackFor, parseTrack } from "@/lib/music";
 import { ShotSound } from "@/components/music/ShotSound";
+import { ShotSoundMenu } from "@/components/shots/ShotSoundMenu";
 import { ShotsEndCard, type NewCheck } from "@/components/shots/ShotsEndCard";
 import { chapterBreak, forgetSeenAtOpen, markShotSeen, orderReel, seenAtOpen, SEEN_AFTER_MS, THIN_REEL } from "@/lib/shots-seen";
 import { hideContent, muteUser, QUIET_COPY } from "@/lib/feed-quiet";
@@ -967,6 +968,8 @@ function ReelCard({
   const cardRouter = useRouter();
   const [ownerMenuOpen, setOwnerMenuOpen] = useState(false);
   const [viewerMenuOpen, setViewerMenuOpen] = useState(false);
+  /** The sound's card: what the disc at the foot of the rail opens. */
+  const [soundMenuOpen, setSoundMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(false);
 
@@ -1692,19 +1695,20 @@ function ReelCard({
           inside the box, so it still covered the rail, and at the same z-20 it
           came later in the DOM and so won every hit test. It is exactly tall
           enough to reach the last button in this rail and no further, which is
-          why More was dead while Hype, Comment, Share and Save all worked. */}
+          why the bottom one was dead while every button above it worked. */}
       <div
-        className="absolute bottom-6 right-3 z-30 flex flex-col items-center gap-5"
+        className="absolute bottom-6 right-3 z-30 flex flex-col items-center gap-2"
         hidden={commentsOpen}
       >
         <RailButton
-          label={hypeCount > 0 ? formatCount(hypeCount) : "Hype"}
+          label="Hype"
+          count={hypeCount > 0 ? formatCount(hypeCount) : undefined}
           onClick={toggleHype}
           disabled={hypePending}
         >
           <span className="relative">
             <HypeIcon
-              size={32}
+              size={29}
               className={`${
                 hypeBurst
                   ? "animate-hype-burst"
@@ -1715,16 +1719,17 @@ function ReelCard({
               fill={hyped ? "currentColor" : "none"}
             />
             {showParticles && <HypeParticles size={10} />}
-            {hypeBreak && <HypeBreak size={32} />}
+            {hypeBreak && <HypeBreak size={29} />}
             {ghostRise.rising && <GhostRise size={30} />}
           </span>
         </RailButton>
 
         <RailButton
-          label={commentCount > 0 ? formatCount(commentCount) : "Comment"}
+          label="Comments"
+          count={commentCount > 0 ? formatCount(commentCount) : undefined}
           onClick={() => setCommentsOpen(true)}
         >
-          <CommentIcon size={31} className="text-white" />
+          <CommentIcon size={28} className="text-white" />
         </RailButton>
 
         {/* Hold to send it straight to the people you share with most. */}
@@ -1735,18 +1740,18 @@ function ReelCard({
           // The rail is against the right edge, so the row of faces unrolls
           // to the left from the button rather than off the screen.
           align="end"
-          className="flex flex-col items-center gap-1 transition-transform active:scale-90"
+          className="flex h-11 flex-col items-center justify-center transition-transform active:scale-90"
         >
-          <ShareIcon size={29} weight="bold" className="text-white" />
-          <span className="text-xs font-semibold tabular-nums text-white drop-shadow">Share</span>
+          <ShareIcon size={27} weight="bold" className="text-white" />
         </ShareButton>
 
         <RailButton
-          label={rehypeCount > 0 ? formatCount(rehypeCount) : rehyped ? "Rehyped" : "Rehype"}
+          label={rehyped ? "Rehyped" : "Rehype"}
+          count={rehypeCount > 0 ? formatCount(rehypeCount) : undefined}
           onClick={toggleRehype}
           disabled={rehypePending}
         >
-          <RehypeIcon size={31} active={rehyped} pulse={rehypePulse} className={rehyped ? "" : "text-white"} />
+          <RehypeIcon size={28} active={rehyped} pulse={rehypePulse} className={rehyped ? "" : "text-white"} />
         </RailButton>
 
         <button
@@ -1755,36 +1760,36 @@ function ReelCard({
           {...saveMenus.handlers}
           aria-label={saved ? "In your Library. Tap for playlists, hold to file" : "Save"}
           aria-haspopup="menu"
-          className="flex flex-col items-center gap-1 transition-transform active:scale-90"
+          className="flex h-11 flex-col items-center justify-center transition-transform active:scale-90"
           // A press that starts here is a tap or a hold-and-slide, never a swipe.
           style={{ touchAction: "none", WebkitTouchCallout: "none" }}
         >
           <Bookmark
-            size={30}
+            size={28}
             className={saved ? "text-accent" : "text-white"}
             fill={saved ? "currentColor" : "none"}
           />
-          <span className="text-xs font-semibold tabular-nums text-white drop-shadow">Save</span>
         </button>
 
-        {/* Was `{isOwner && …}`, so a viewer watching someone else's Shot had
-            no menu at all — no report, no block, no way out. Shots are the
-            most viral surface here and were the only one with no safety
-            valve. Owners get their own actions; everyone else gets the ones
-            that matter to them. */}
-        <RailButton
-          label="More"
-          onClick={() =>
-            isOwner ? setOwnerMenuOpen(true) : setViewerMenuOpen(true)
-          }
-        >
-          <MoreHorizontal size={30} className="text-white" />
-        </RailButton>
-
-        {/* The sound, where a thumb looks for it: under the dots. The
-            record turns with the Shot and its name unrolls out of the case
-            when you arrive, then rolls back. */}
-        <ShotSound track={sound} playing={isActive && playing} active={isActive} />
+        {/* The sound, and the menu, in one button.
+            There is no three-dots button in this rail any more. It sat
+            directly above the sound's disc — two small round things stacked
+            in a column — and together they were most of what made this rail
+            as tall as it was. The disc opens ShotSoundMenu, which carries
+            the sound on to its page and holds the actions the dots used to
+            open. Everything with a confirmation behind it, and everything an
+            owner can do to their own Shot, still lives in the sheets below:
+            the menu's ⋯ opens them, unchanged.
+            The viewer's half of that menu matters: before it existed a
+            viewer watching someone else's Shot had no report, no block and
+            no way out, on the most viral surface here. */}
+        <ShotSound
+          track={sound}
+          playing={isActive && playing}
+          active={isActive}
+          onActivate={() => setSoundMenuOpen(true)}
+          expanded={soundMenuOpen}
+        />
       </div>
 
       {/* Author and caption, which also stand down. Both describe the
@@ -1880,6 +1885,21 @@ function ReelCard({
           <p className="text-sm font-semibold text-white/80">Shot deleted</p>
         </div>
       )}
+
+      {/* What the disc opens: the sound, and the actions that need no
+          confirming. Its ⋯ hands over to the sheets below. */}
+      <ShotSoundMenu
+        track={sound}
+        open={soundMenuOpen}
+        onClose={() => setSoundMenuOpen(false)}
+        isOwner={isOwner}
+        who={handle ? `@${handle}` : name}
+        onCopyLink={() => void copyLink()}
+        onNotInterested={() => void notInterested()}
+        onMute={() => void muteAuthor()}
+        onReport={() => setReportOpen(true)}
+        onMore={() => (isOwner ? setOwnerMenuOpen(true) : setViewerMenuOpen(true))}
+      />
 
       {/* Viewer actions — report the Shot, or block its author. */}
       {viewerMenuOpen && (
@@ -2250,15 +2270,32 @@ function ReelCard({
   );
 }
 
-function RailButton({
+/**
+ * One thing to do to a Shot: the icon, and its number under it.
+ *
+ * The word used to be under every icon — "Hype", "Comment", "Share",
+ * "Rehype", "Save", "More" — and six stacked icon-and-word pairs took up
+ * most of the right-hand side of the video. The words are gone and only the
+ * count is left, which is the part that changes and the part people look
+ * for. A count of nothing is nothing: an icon on its own, not a zero.
+ *
+ * `label` is now the only name this button has, so it is required and it
+ * goes on aria-label. Without the word underneath, a button with no label
+ * is a button a screen reader announces as "button".
+ */
+export function RailButton({
   children,
   label,
+  count,
   onClick,
   disabled,
   hold,
 }: {
   children: React.ReactNode;
+  /** What it does. The accessible name — there is no visible one. */
   label: string;
+  /** How many, already formatted. Left out when there are none. */
+  count?: string;
   onClick: () => void;
   disabled?: boolean;
   /** Long-press handlers, from useLongPress. */
@@ -2270,12 +2307,15 @@ function RailButton({
       {...hold}
       onClick={onClick}
       disabled={disabled}
-      className="flex flex-col items-center gap-1 transition-transform active:scale-90 disabled:opacity-60"
+      aria-label={count ? `${label}, ${count}` : label}
+      className="flex min-h-11 flex-col items-center justify-center gap-0.5 transition-transform active:scale-90 disabled:opacity-60"
     >
       {children}
-      <span className="text-xs font-semibold tabular-nums text-white drop-shadow">
-        {label}
-      </span>
+      {count && (
+        <span className="text-[11px] font-bold tabular-nums leading-none text-white drop-shadow">
+          {count}
+        </span>
+      )}
     </button>
   );
 }
