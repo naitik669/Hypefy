@@ -7,7 +7,6 @@ import { EmptyScene, SceneLine, ctaClass } from "@/components/empty/EmptyScene";
 import { ClapperArt, FrameArt } from "@/components/empty/scenes";
 import { RehypesGrid } from "@/components/profile/RehypesGrid";
 import { PostsGrid, ShotsGrid } from "@/components/profile/ProfileGrids";
-import { underHeaderStyle, useHideOnScroll } from "@/lib/use-hide-on-scroll";
 
 /** Saved is not a tab: it has its own page, behind the bookmark at the top of
  *  the profile, which paginates where the tab stopped at 30. */
@@ -20,16 +19,17 @@ const tabs: { key: Tab; Icon: typeof Grid3x3 }[] = [
 ];
 
 export function ProfileTabs({ userId }: { userId: string }) {
-  // Rides with the header: this row is attached to it, so when the header
-  // slides away this goes with it instead of staying pinned 56px down with
-  // the page scrolling in the gap above it.
-  const headerHidden = useHideOnScroll();
   const [tab, setTab] = useState<Tab>("Posts");
 
   return (
     <div className="mt-2">
-      {/* Tab bar — thin hairline dividers, blends with the page background */}
-      <div style={underHeaderStyle(headerHidden)} className="sticky z-10 flex border-y border-border chrome-bar">
+      {/* Tab bar — pinned to the top of the screen while the grid scrolls.
+          The profile has no header above it, so there is nothing to sit
+          under or ride with: it sticks at the status-bar inset and stays.
+          It used to borrow underHeaderStyle, which pinned it 56px down for a
+          header that is not there and, once you scrolled, slid it up over the
+          showcase and off the screen. */}
+      <div className="sticky top-[var(--sat)] z-10 flex border-y border-border chrome-bar">
         {tabs.map(({ key, Icon }) => (
           <button
             key={key}
