@@ -20,11 +20,14 @@ import { readMyChoices } from "@hypefy/core/chat-poll-votes";
 export function PollBubble({
   poll,
   messageId,
+  viewerId,
   mine,
   onError,
 }: {
   poll: Poll;
   messageId: string;
+  /** The signed-in user. Only their votes are ticked. */
+  viewerId: string;
   mine: boolean;
   onError: (message: string) => void;
 }) {
@@ -34,17 +37,23 @@ export function PollBubble({
 
   useEffect(() => {
     let live = true;
-    (async () => {
-      const mineNow = await readMyChoices(supabase, messageId);
-      if (!live) return;
-      setChosen(mineNow);
-    })();
+    readMyChoices(supabase, messageId, viewerId)
+      .then((mineNow) => {
+        if (live) setChosen(mineNow);
+      })
+      .catch((e: unknown) => {
+        if (live) onError(e instanceof Error ? e.message : "Couldn't load your vote");
+      });
     return () => {
       live = false;
     };
     // Read once per poll: afterwards this component is the only thing that
     // changes your own choices, and it keeps them itself.
-  }, [messageId, supabase]);
+    // onError is left out on purpose: the thread passes a fresh arrow every
+    // render, and re-reading the votes on each render would undo a tick made
+    // since the last read.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messageId, viewerId, supabase]);
 
   async function choose(i: number) {
     if (busy !== null) return;
