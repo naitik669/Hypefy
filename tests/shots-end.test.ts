@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { readFileSync } from "node:fs";
 import {
   chapterBreak,
+  reelEnds,
   SEEN_CAP,
   forgetSeenAtOpen,
   markShotSeen,
@@ -194,41 +195,65 @@ describe("the card at the end", () => {
     host.remove();
   });
 
-  it("leads with Make a Shot only when the reel is nearly empty", async () => {
+  it("fills in Make a Shot only when the reel is nearly empty", async () => {
     await mount({ variant: "end", thin: true, total: 2 });
     expect(leading()).toHaveLength(1);
     expect(leading()[0].getAttribute("href")).toBe("/create?mode=shot");
     expect(host.textContent).toContain("add one of yours");
   });
 
-  it("but a short reel that is not empty leads with Watch again", async () => {
+  it("but a short reel that is not empty does not shout Make a Shot", async () => {
     // Reported as a bug, and it was one. THIN_REEL is 20, so nine Shots
     // counted as "thin" and the card led with a big Make a Shot — which
     // reads as "there are no Shots", to somebody who has just watched nine.
     await mount({ variant: "end", thin: true, total: 9 });
-    expect(leading()).toHaveLength(1);
-    expect(leading()[0].textContent).toContain("Watch again");
+    expect(leading()).toHaveLength(0);
     expect(q("[data-end-make]")).toBeTruthy();
+    // Watch again is the band at the foot, not a button competing with it.
+    expect(q("[data-end-again]")!.textContent).toContain("Watch again");
   });
 
   it("and says how many there were, so it cannot read as an empty reel", async () => {
     await mount({ variant: "end", thin: true, total: 9 });
-    expect(host.textContent).toContain("all 9 Shots");
+    expect(host.textContent).toContain("All 9 on Hypefy");
     // Still honest that the catalogue is small, just not as the headline.
     expect(host.textContent).toContain("add one of yours");
   });
 
   it("counting one Shot in the singular", async () => {
     await mount({ variant: "end", thin: true, total: 1 });
-    expect(host.textContent).toContain("all 1 Shot for now");
-    expect(host.textContent).not.toContain("1 Shots");
+    expect(host.textContent).toContain("That\u2019s the only Shot");
+    expect(host.textContent).not.toContain("every Shot");
   });
 
-  it("leads with Watch again once there is plenty", async () => {
-    await mount({ variant: "end", thin: false });
-    expect(leading()).toHaveLength(1);
-    expect(leading()[0].textContent).toContain("Watch again");
-    expect(q("[data-end-make]")).toBeTruthy();
+  /*
+   * The two cards are one family: the end of the reel used to be a
+   * full-stop screen, which is the card everybody reaches while Hypefy has
+   * nine Shots, and is what was being read as "there is nothing here".
+   */
+  it("the end of the reel is the same shape as the chapter break", async () => {
+    await mount({
+      variant: "end",
+      thin: false,
+      total: 9,
+      abovePoster: "https://cdn.test/last.jpg",
+      belowPoster: "https://cdn.test/first.jpg",
+    });
+    expect(host.textContent).toContain("The last Shot");
+    const styles = [...host.querySelectorAll<HTMLElement>("[style]")].map((e) => e.getAttribute("style") ?? "");
+    // Above is where the reel ended; below is what Watch again plays.
+    expect(styles.some((x) => x.includes("https://cdn.test/last.jpg"))).toBe(true);
+    expect(styles.some((x) => x.includes("https://cdn.test/first.jpg"))).toBe(true);
+    expect(q("[data-end-again]")!.getAttribute("style")).toContain("https://cdn.test/first.jpg");
+  });
+
+  it("no longer opens with the same words as the card mid-reel", async () => {
+    await mount({ variant: "end", thin: false, total: 9 });
+    const end = host.textContent ?? "";
+    await mount({ variant: "caught-up", thin: false, newCount: 4, watchedCount: 5 });
+    const mid = host.textContent ?? "";
+    expect(mid).toContain("You\u2019re all caught up");
+    expect(end).not.toContain("You\u2019re all caught up");
   });
 
   it("Watch again and Check for new do what they say", async () => {
@@ -285,16 +310,32 @@ describe("the card at the end", () => {
     expect(q("[data-end-continue]")).not.toBeNull();
   });
 
-  it("the end of the reel is untouched by all that", async () => {
+  it("the end of the reel still offers Watch again and a check for new", async () => {
     await mount({ variant: "end", thin: false, total: 9 });
-    expect(host.textContent).toContain("That's all 9 Shots for now.");
     expect(q("[data-end-again]")).not.toBeNull();
     expect(q("[data-end-check]")).not.toBeNull();
+    expect(q("[data-end-continue]")).toBeNull();
   });
 
   it("points somewhere to find more people", async () => {
     await mount({ variant: "end", thin: false });
     expect([...host.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toContain("/discover");
+  });
+});
+
+describe("the two ends of the reel", () => {
+  const p = (poster: string | null) => ({ poster_url: poster });
+
+  it("takes the last Shot and the first, which is what Watch again plays", () => {
+    expect(reelEnds([p("A.jpg"), p("B.jpg"), p("C.jpg")])).toEqual({
+      lastPoster: "C.jpg",
+      firstPoster: "A.jpg",
+    });
+  });
+
+  it("a reel of one is both ends of itself, and an empty one has neither", () => {
+    expect(reelEnds([p("only.jpg")])).toEqual({ lastPoster: "only.jpg", firstPoster: "only.jpg" });
+    expect(reelEnds([])).toEqual({ lastPoster: null, firstPoster: null });
   });
 });
 
@@ -359,7 +400,20 @@ describe("where it is wired", () => {
   it("the card is counted over the Shots, never the reel with its ads in it", () => {
     expect(reel).toContain("chapterBreak(order.items, order.caughtUpBefore)");
     expect(reel).toContain("newCount={chapter.newCount}");
-    expect(reel).toContain("belowPoster={chapter.belowPoster}");
+    expect(reel).toContain("chapter.belowPoster}");
+  });
+
+  /*
+   * Each card shows the Shots at its own place in the reel: the chapter
+   * break the two it sits between, the end card where the reel ran out and
+   * the Shot it starts over on. One pair for both would put the wrong
+   * Shots on one of them.
+   */
+  it("each card shows the Shots at its own place in the reel", () => {
+    const body = reel.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
+    expect(body).toContain("reelEnds(order.items)");
+    expect(body).toContain('abovePoster={item.kind === "end" ? ends.lastPoster : chapter.abovePoster}');
+    expect(body).toContain('belowPoster={item.kind === "end" ? ends.firstPoster : chapter.belowPoster}');
   });
 
   /*

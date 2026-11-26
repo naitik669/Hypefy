@@ -153,3 +153,19 @@ export function chapterBreak<T extends { id: string; poster_url?: string | null 
     belowPoster: posts[at]?.poster_url ?? null,
   };
 }
+
+/**
+ * The reel's two ends, for the card after the last Shot.
+ *
+ * Above it is where the reel ran out; below it is the Shot "Watch again"
+ * starts over on, so the lower band is the truth about what comes next
+ * rather than a decoration. One Shot in the reel is both.
+ */
+export function reelEnds<T extends { poster_url?: string | null }>(
+  posts: readonly T[],
+): { lastPoster: string | null; firstPoster: string | null } {
+  return {
+    lastPoster: posts[posts.length - 1]?.poster_url ?? null,
+    firstPoster: posts[0]?.poster_url ?? null,
+  };
+}
