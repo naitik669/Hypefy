@@ -128,7 +128,7 @@ import { claimPreview, originalTrackFor, parseTrack } from "@/lib/music";
 import { ShotSound } from "@/components/music/ShotSound";
 import { ShotSoundMenu } from "@/components/shots/ShotSoundMenu";
 import { ShotsEndCard, type NewCheck } from "@/components/shots/ShotsEndCard";
-import { chapterBreak, forgetSeenAtOpen, markShotSeen, orderReel, seenAtOpen, SEEN_AFTER_MS, THIN_REEL } from "@/lib/shots-seen";
+import { chapterBreak, reelEnds, forgetSeenAtOpen, markShotSeen, orderReel, seenAtOpen, SEEN_AFTER_MS, THIN_REEL } from "@/lib/shots-seen";
 import { hideContent, muteUser, QUIET_COPY } from "@/lib/feed-quiet";
 import { HypeIcon } from "@/components/ui/HypeIcon";
 
@@ -422,6 +422,8 @@ export function ReelsFeed({
     () => chapterBreak(order.items, order.caughtUpBefore),
     [order.items, order.caughtUpBefore],
   );
+  /** And the same two bands for the card after the last Shot; see reelEnds. */
+  const ends = useMemo(() => reelEnds(order.items), [order.items]);
 
   // A Shot that has been on screen a moment has been watched.
   const activeShotId = (() => {
@@ -656,8 +658,8 @@ export function ReelsFeed({
               onContinue={() => setActiveIdx(i + 1)}
               newCount={chapter.newCount}
               watchedCount={chapter.watchedCount}
-              abovePoster={chapter.abovePoster}
-              belowPoster={chapter.belowPoster}
+              abovePoster={item.kind === "end" ? ends.lastPoster : chapter.abovePoster}
+              belowPoster={item.kind === "end" ? ends.firstPoster : chapter.belowPoster}
             />
           ) : item.kind === "ad" ? (
             <ShotAdCard
