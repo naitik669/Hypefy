@@ -98,7 +98,7 @@ export async function findSound(supabase: Db, rawId: string): Promise<Sound | nu
       ? supabase
           .from("shots")
           .select(
-            "id, user_id, media_url, poster_url, caption, trim_start, profiles(username, display_name, avatar_url, is_private)",
+            "id, user_id, media_url, poster_url, caption, trim_start, profiles!shots_user_id_fkey(username, display_name, avatar_url, is_private)",
           )
           .eq("id", sourceId)
           .is("removed_at", null)

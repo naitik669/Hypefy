@@ -119,7 +119,7 @@ export function RehypesGrid({
         .limit(PAGE);
       let sq = supabase
         .from("shot_reposts")
-        .select("created_at, shots(id, media_url, poster_url, caption, profiles(username))")
+        .select("created_at, shots(id, media_url, poster_url, caption, profiles!shots_user_id_fkey(username))")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(PAGE);

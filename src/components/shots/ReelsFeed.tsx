@@ -166,7 +166,7 @@ export type Reel = {
 };
 
 const MORE_SHOT_COLS =
-  "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, duration_secs, trim_start, trim_end, track, profiles(display_name, avatar_hue, username, avatar_url)";
+  "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, duration_secs, trim_start, trim_end, track, profiles!shots_user_id_fkey(display_name, avatar_hue, username, avatar_url)";
 
 const noSubscribe = () => () => {};
 const noSeen = () => null;
@@ -344,7 +344,7 @@ export function ReelsFeed({
     supabase
       .from("shots")
       .select(
-        "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, duration_secs, trim_start, trim_end, track, profiles(display_name, avatar_hue, username, avatar_url)"
+        "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, duration_secs, trim_start, trim_end, track, profiles!shots_user_id_fkey(display_name, avatar_hue, username, avatar_url)"
       )
       .lt("created_at", oldest)
       // Same as the first page on the server. Without it the second page

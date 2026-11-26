@@ -158,7 +158,24 @@ describe("where a Shot's sound is wired", () => {
     "src/app/(app)/home/page.tsx",
     "src/components/shots/ReelsFeed.tsx",
   ])("%s fetches the song with the Shot", (file) => {
-    expect(read(file)).toMatch(/trim_end, track, profiles\(|repost_count, track, profiles\(/);
+    /*
+     * The guarantee is that the Shot is fetched WITH its song, so the pill
+     * can render without a second round trip. This used to be asserted by
+     * matching the two columns either side of `track` in the select string.
+     * That broke when `profiles(` became `profiles!shots_user_id_fkey(` -
+     * a change which moved no column and dropped nothing, and left four
+     * tests failing on correct code, which is the shape most likely to get
+     * "fixed" by reverting the fix.
+     *
+     * So it reads the select the Shot is fetched by - the string that asks
+     * for media_url - and asks whether track is in it. Dropping the column
+     * still fails; respelling its neighbours no longer does.
+     */
+    const selects = [...read(file).matchAll(/"([^"\n]*media_url[^"\n]*)"/g)].map((m) => m[1]);
+    expect(selects.length, "no select fetching a Shot found in this file").toBeGreaterThan(0);
+    for (const sel of selects) {
+      expect(sel.split(/[(,]/).map((c) => c.trim())).toContain("track");
+    }
   });
 
   it("the reel plays the song while its Shot is on screen, playing and not muted", () => {
