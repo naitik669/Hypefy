@@ -12,7 +12,7 @@
   "src/app/(app)/settings/account/page.tsx": 1,
   "src/app/(app)/settings/privacy/page.tsx": 5,
   "src/app/(app)/shots/[shotId]/page.tsx": 2,
-  "src/app/(app)/shots/page.tsx": 3,
+  "src/app/(app)/shots/page.tsx": 2,
   "src/app/(app)/shows/[showId]/page.tsx": 1,
   "src/app/(app)/u/[username]/page.tsx": 8,
   "src/app/api/push/route.ts": 3,

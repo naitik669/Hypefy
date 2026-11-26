@@ -200,15 +200,29 @@ describe("a failed read is never mistaken for an empty one", () => {
      * diagnosing one.
      */
     /*
-     * All three readers, not whichever one a given suite happens to hit:
+     * Every reader, not whichever one a given suite happens to hit:
      * mutation S41 took the name out of `rows` while `row` and `count`
      * kept it, and a single match stayed green.
+     *
+     * The helper moved to packages/core when the WEBSITE hit the same
+     * defect in November — a refused query and an empty table being one
+     * value — so both clients now read through it. Counting named throws
+     * against total throws rather than against the literal 3 means adding
+     * a reader cannot quietly add an unnamed one.
      */
-    const src = body("apps/mobile/src/query.ts");
-    expect(
-      [...src.matchAll(/throw new Error\(`\$\{what\}: /g)].length,
-      "a reader throws without saying which query failed",
-    ).toBe(3);
+    const src = body("packages/core/src/query.ts");
+    const throws = [...src.matchAll(/throw new Error\(/g)].length;
+    const named = [...src.matchAll(/throw new Error\(`\$\{what\}: /g)].length;
+    expect(throws, "no reader throws at all").toBeGreaterThanOrEqual(3);
+    expect(named, "a reader throws without saying which query failed").toBe(throws);
+    // The optional read is the one most likely to go quiet again, so it
+    // has to name the query too.
+    expect(src, "tolerate swallows the message it exists to surface").toMatch(
+      /console[.]error\(`\[query\] optional read failed/,
+    );
+    // And the phone still reaches it, or this file is checking nothing the
+    // phone uses.
+    expect(body("apps/mobile/src/query.ts")).toMatch(/@hypefy\/core\/query/);
     // A count is a read too, and a zero reads as "no followers".
     expect(src).toMatch(/export function count/);
   });

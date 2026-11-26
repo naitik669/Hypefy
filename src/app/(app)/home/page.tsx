@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { must, tolerate } from "@hypefy/core/query";
 import { TopBar } from "@/components/layout/TopBar";
 import { HideOnScroll } from "@/components/layout/HideOnScroll";
 import { isRestricted } from "@/lib/show-audience";
@@ -56,7 +57,7 @@ export default async function HomePage() {
   // profiles table for anyone to read, its owner included.
   const privateProfile = getPrivateProfile(supabase);
 
-  const [{ data: followRows }, { data: requestRows }, blockedIds, quiet] = await Promise.all([
+  const [followRes, requestRes, blockedIds, quiet] = await Promise.all([
     // Capped, like close_friends below, and for a harder reason
     // than volume: every one of these ids is spread into `.in("user_id", …)`
     // further down, which PostgREST renders as a comma-separated value in a
@@ -82,6 +83,12 @@ export default async function HomePage() {
     // People this person muted, and single posts and Shots they hid.
     getFeedExclusions(supabase),
   ]);
+
+  // Who you follow decides whose posts are guaranteed a place. Reading it
+  // wrong does not make the feed empty - it makes it somebody elses - so
+  // this one throws rather than quietly falling back to the firehose.
+  const followRows = must(followRes, "who you follow");
+  const requestRows = tolerate(requestRes, "your pending follow requests");
   // On this page a muted person is left out exactly as a blocked one is:
   // their posts, Shots and Shows, here and in every batch loaded after. So
   // they join the same set. (Muting does nothing else; see lib/feed-quiet.)
@@ -96,15 +103,15 @@ export default async function HomePage() {
 
   // Fire all remaining queries concurrently.
   const [
-    { data: followedPosts },
-    { data: rawPosts },
-    { data: myProfile },
-    { data: myShows },
-    { data: activeShows },
-    { data: followedReposts },
-    { data: affinityData },
-    { data: followedTagRows },
-    { data: shotRows },
+    followedPostsRes,
+    rawPostsRes,
+    myProfileRes,
+    myShowsRes,
+    activeShowsRes,
+    followedRepostsRes,
+    affinityRes,
+    followedTagRes,
+    shotRes,
   ] = await Promise.all([
     // Posts from people I follow (+ my own): guaranteed present even when
     // the global firehose has scrolled past them.
@@ -165,7 +172,7 @@ export default async function HomePage() {
           .in("user_id", [...followingIds])
           .order("created_at", { ascending: false })
           .limit(50)
-      : Promise.resolve({ data: [] as any[] }),
+      : Promise.resolve({ data: [] as any[], error: null }),
     // Recent rehypes by people I follow: the posts they rehyped join the feed
     followingIds.size > 0
       ? supabase
@@ -176,7 +183,7 @@ export default async function HomePage() {
           .in("user_id", [...followingIds])
           .order("created_at", { ascending: false })
           .limit(20)
-      : Promise.resolve({ data: [] as any[] }),
+      : Promise.resolve({ data: [] as any[], error: null }),
     // Interaction affinity (authors + tags I engage with) for personalization
     supabase.rpc("get_affinity", { p_lookback_days: 60 }),
     // Hashtags I follow
@@ -197,13 +204,33 @@ export default async function HomePage() {
       .limit(30),
   ]);
 
+  /*
+   * The two post queries ARE the feed. If either is refused there is no
+   * feed to show, and rendering the empty state would repeat exactly the
+   * mistake that hid a broken Shots reel for twelve days — the route error
+   * boundary says so instead, and offers a retry.
+   */
+  const followedPosts = must(followedPostsRes, "posts from people you follow");
+  const rawPosts = must(rawPostsRes, "the global post window");
+
+  /*
+   * The rest shape and decorate the feed: Shows, reposts, affinity, the
+   * Shots strip. A plainer feed beats no feed, so these degrade — but
+   * tolerate writes the database message to the server log, so a failure
+   * here is findable rather than merely survivable.
+   */
+  const myProfile = tolerate(myProfileRes, "your own profile");
+  const myShows = tolerate(myShowsRes, "your Shows");
+  const activeShows = tolerate(activeShowsRes, "Shows from people you follow");
+  const followedReposts = tolerate(followedRepostsRes, "reposts from people you follow");
+  const affinityData = tolerate(affinityRes, "affinity scores");
+  const followedTagRows = tolerate(followedTagRes, "the tags you follow");
+  const shotRows = tolerate(shotRes, "the Shots strip");
+
   // The people behind the Hypers feed tab — fetched lightly here (just ids)
   // since FeedList only needs them to scope its own query when that tab is
   // first opened.
-  const [
-    { data: hyperRows },
-    { data: reverseHyperRows },
-  ] = await Promise.all([
+  const [hyperRes, reverseHyperRes] = await Promise.all([
     supabase
       .from("close_friends")
       .select("friend_id")
@@ -220,6 +247,10 @@ export default async function HomePage() {
       .eq("friend_id", user.id)
       .limit(1000),
   ]);
+
+  // Who you Hype with decorates cards; it does not decide the feed.
+  const hyperRows = tolerate(hyperRes, "the people you Hype with");
+  const reverseHyperRows = tolerate(reverseHyperRes, "people who Hype with you");
   const hyperIds = (hyperRows ?? []).map((r: any) => r.friend_id as string);
   const reverseHyperIds = (reverseHyperRows ?? []).map(
     (r: any) => r.user_id as string
@@ -242,12 +273,15 @@ export default async function HomePage() {
    * Read through RLS, so can_see_show's membership clause is what
    * actually decides; this only avoids asking for rows it would refuse.
    */
-  const { data: myCollabs } = await supabase
-    .from("show_collab_members")
-    .select("collab_id")
-    .eq("user_id", user.id)
-    .not("joined_at", "is", null)
-    .limit(40);
+  const myCollabs = tolerate(
+    await supabase
+      .from("show_collab_members")
+      .select("collab_id")
+      .eq("user_id", user.id)
+      .not("joined_at", "is", null)
+      .limit(40),
+    "the Show collabs you joined",
+  );
 
   const collabIds = (myCollabs ?? []).map((m) => m.collab_id);
 
@@ -288,14 +322,17 @@ export default async function HomePage() {
   });
 
   const activeShowIds = allActiveShows.map((s) => s.id);
-  const { data: myViews } =
+  const myViews =
     activeShowIds.length > 0
-      ? await supabase
-          .from("show_views")
-          .select("show_id")
-          .eq("viewer_id", user.id)
-          .in("show_id", activeShowIds)
-      : { data: [] as any[] };
+      ? tolerate(
+          await supabase
+            .from("show_views")
+            .select("show_id")
+            .eq("viewer_id", user.id)
+            .in("show_id", activeShowIds),
+          "which Shows you have already seen",
+        )
+      : ([] as any[]);
   const viewedShowIds = new Set(
     (myViews ?? []).map((v: any) => v.show_id as string)
   );
@@ -312,7 +349,10 @@ export default async function HomePage() {
   // put in with the rest, so it is scored and shaped exactly as they are.
   const ghostId = ((await ghostClaim).data as string | null) ?? null;
   if (ghostId && !byId.has(ghostId)) {
-    const { data: placed } = await supabase.from("posts").select(POST_COLS).eq("id", ghostId).maybeSingle();
+    const placed = tolerate(
+      await supabase.from("posts").select(POST_COLS).eq("id", ghostId).maybeSingle(),
+      "the Ghost Shared post",
+    );
     const [row] = normalise(placed ? [placed] : []);
     if (row && !blockedIds.has(row.user_id) && !quiet.posts.has(row.id)) byId.set(row.id, row);
   }
@@ -382,14 +422,19 @@ export default async function HomePage() {
             .eq("viewer_id", user.id)
             .in("post_id", candidateIds),
         ]
-      : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
+      : [
+          { data: [], error: null },
+          { data: [], error: null },
+          { data: [], error: null },
+          { data: [], error: null },
+        ]
   );
 
-  const viewedIds = new Set((viewedRes.data ?? []).map((v: any) => v.post_id));
-  const hypedIds = new Set((hypesRes.data ?? []).map((h: any) => h.target_id));
-  const savedIds = new Set((savedRes.data ?? []).map((s: any) => s.post_id));
+  const viewedIds = new Set((tolerate(viewedRes, "posts you have already seen") ?? []).map((v: any) => v.post_id));
+  const hypedIds = new Set((tolerate(hypesRes, "posts you have hyped") ?? []).map((h: any) => h.target_id));
+  const savedIds = new Set((tolerate(savedRes, "posts you have saved") ?? []).map((s: any) => s.post_id));
   const commentedIds = new Set(
-    (commentedRes.data ?? []).map((c: any) => c.post_id).filter(Boolean)
+    (tolerate(commentedRes, "posts you have commented on") ?? []).map((c: any) => c.post_id).filter(Boolean)
   );
 
   // Rank by blended score; recency breaks ties. Then diversify authors.
@@ -441,14 +486,17 @@ export default async function HomePage() {
   // exactly as high as one you had not and kept returning to the top.
   // Same shape as the post impressions above, one table along.
   const shotIds = ((shotRows ?? []) as { id: string }[]).map((s) => s.id);
-  const { data: watchedRows } =
+  const watchedRows =
     shotIds.length > 0
-      ? await supabase
-          .from("shot_views")
-          .select("shot_id")
-          .eq("viewer_id", user.id)
-          .in("shot_id", shotIds)
-      : { data: [] };
+      ? tolerate(
+          await supabase
+            .from("shot_views")
+            .select("shot_id")
+            .eq("viewer_id", user.id)
+            .in("shot_id", shotIds),
+          "which Shots you have already watched",
+        )
+      : [];
   const watchedShotIds = new Set(
     (watchedRows ?? []).map((v: { shot_id: string }) => v.shot_id)
   );
