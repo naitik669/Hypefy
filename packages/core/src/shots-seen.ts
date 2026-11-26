@@ -41,8 +41,28 @@ function readIds(): string[] {
 // reel is left, so the next visit reads afresh.
 let atOpen: SeenAtOpen | null = null;
 
-export function seenAtOpen(): SeenAtOpen {
-  atOpen ??= { ids: new Set(readIds()), day: Math.floor(Date.now() / 86_400_000) };
+/**
+ * `account` is what the signed-in person's account has on record as watched
+ * (shot_views), when the page could read it. It wins over this device's list.
+ *
+ * The device list marks a Shot once it has been on screen SEEN_AFTER_MS,
+ * whether or not it ever played; shot_views only counts one that played
+ * (recordWatch). A Shot that sat paused, buffering, or under a sheet was
+ * "watched" here and unwatched there, so it was put after "You're all caught
+ * up" while it had never been seen. The device list also never forgot what
+ * "Clear watch history" forgot, and belonged to the browser, not the person:
+ * a second account on the same browser inherited it. Null (signed out, or the
+ * read failed) falls back to the device list.
+ *
+ * What was watched since this tab loaded is added to the account's record:
+ * the page that read it may be an older render than the last visit, and a
+ * Shot watched a minute ago must not come back as new.
+ */
+export function seenAtOpen(account?: readonly string[] | null): SeenAtOpen {
+  atOpen ??= {
+    ids: account ? new Set([...account, ...watchedThisTab]) : new Set(readIds()),
+    day: Math.floor(Date.now() / 86_400_000),
+  };
   return atOpen;
 }
 
@@ -50,7 +70,11 @@ export function forgetSeenAtOpen() {
   atOpen = null;
 }
 
+/** Shots marked since this tab loaded. Memory only: see seenAtOpen. */
+const watchedThisTab = new Set<string>();
+
 export function markShotSeen(id: string) {
+  watchedThisTab.add(id);
   try {
     const ids = readIds().filter((x) => x !== id);
     ids.push(id);

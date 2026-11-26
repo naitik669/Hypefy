@@ -144,6 +144,7 @@ export default async function ShotsPage() {
 
   // What you have already watched, for the penalty above.
   const candidateShotIds = [...byId.keys()];
+  // Null: signed out, or the read failed. Not the same as "watched nothing".
   const watchedRows =
     user && candidateShotIds.length > 0
       ? tolerate(
@@ -153,9 +154,11 @@ export default async function ShotsPage() {
             .eq("viewer_id", user.id)
             .in("shot_id", candidateShotIds),
           "which Shots you have already watched",
-        ) ?? []
-      : [];
-  const watched = new Set(watchedRows.map((v) => v.shot_id));
+        )
+      : user
+        ? []
+        : null;
+  const watched = new Set((watchedRows ?? []).map((v) => v.shot_id));
 
   const ranked = diversify(
     [...byId.values()]
@@ -190,6 +193,14 @@ export default async function ShotsPage() {
   return (
     // The rows carry exactly the columns selected above (and the RPC builds
     // the same shape), which is what a Reel is.
-    <ReelsFeed reels={reels as unknown as Reel[]} currentUserId={user?.id ?? null} remember {...adContext} />
+    <ReelsFeed
+      reels={reels as unknown as Reel[]}
+      currentUserId={user?.id ?? null}
+      remember
+      // Where "You're all caught up" goes is decided by this, the account's
+      // record, not by the browser's own list. See seenAtOpen.
+      watchedIds={watchedRows ? [...watched] : null}
+      {...adContext}
+    />
   );
 }
