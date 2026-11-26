@@ -38,13 +38,31 @@ describe("the speaker says what it really does", () => {
 });
 
 describe("on a Shot", () => {
-  it("the record is round inside its square case", () => {
-    // Filling the case with the cover made it read as a thumbnail, which is
-    // the one thing it is not.
+  it("the cover is printed on a disc, on a black sleeve", () => {
+    // It was a plate with a hole punched in it over a full-bleed cover,
+    // meant to read as a record caged behind the front of a machine. At
+    // 44px it read as a dark blob with a bright dot in it. The disc is the
+    // whole of what you see now: artwork edge to edge, a clear hub in the
+    // middle, and the square behind it is a sleeve.
     expect(box).toContain("data-sound-disc");
-    expect(box).toContain("data-sound-plate");
-    // A plate with a hole in it, not a frame around a square cover.
-    expect(box).toContain("radial-gradient(circle at 50% 50%, transparent 0 ");
+    expect(box).toContain("data-sound-hub");
+    expect(box).not.toContain("data-sound-plate");
+    expect(box).toContain("bg-black");
+  });
+
+  it("and the light on it does not go round with it", () => {
+    // The one thing that makes a spinning circle read as a CD: on a real
+    // disc the rainbow is the light, so it stays where the light is while
+    // the disc turns underneath. Both sit outside the element that spins.
+    const spun = box.slice(box.indexOf("data-sound-disc"), box.indexOf("data-sound-sheen"));
+    expect(spun).toContain("animate-[spin_3600ms_linear_infinite]");
+    for (const still of ["data-sound-sheen", "data-sound-glare", "data-sound-hub"]) {
+      const at = box.indexOf(still);
+      expect(at, still).toBeGreaterThan(0);
+      // Nothing between the attribute and the end of its own element asks
+      // for the animation.
+      expect(box.slice(at, box.indexOf("/>", at)), still).not.toContain("animate-[spin");
+    }
   });
 
   it("it turns only while the song is playing", () => {
@@ -60,11 +78,14 @@ describe("on a Shot", () => {
     expect(box).toContain("motion-reduce:animate-none");
   });
 
-  it("tapping it opens the sound's page, and nothing else", () => {
-    // No reveal on a Shot: the name is already beside the caption, and
-    // there is no room to slide a title across the video.
+  it("tapping it opens the sound's page, unless its caller wants the menu", () => {
+    // On a Shot the disc is also the way into that Shot's menu, which is
+    // why the three dots are gone from the rail — so there it is a button
+    // that opens ShotSoundMenu, and the menu carries the link on. Anywhere
+    // that passes no handler keeps the plain link.
     expect(box).toContain("href={soundHref(track.id)}");
-    expect(box).not.toContain("onClick={() => set");
+    expect(box).toContain("if (onActivate) {");
+    expect(box).toContain('aria-haspopup="menu"');
   });
 });
 
@@ -117,7 +138,7 @@ describe("a Shot's sound", () => {
   const shot = read("src/components/music/ShotSound.tsx");
 
   it("turns with the Shot rather than with the song", () => {
-    expect(shot).toContain("<SoundBox track={track} spinning={playing} />");
+    expect(shot).toContain("<SoundBox track={track} spinning={playing}");
   });
 
   it("introduces itself once on arrival, then rolls back", () => {

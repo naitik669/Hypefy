@@ -184,7 +184,7 @@ describe("where a Shot's sound is wired", () => {
     expect(src).toContain("return claimPreview(track, { loop: true, audible: true });");
     // With a song, the clip's own sound stays off.
     expect(src).toContain("muted={muted || !!track}");
-    expect(src).toContain("<ShotSound track={sound}");
+    expect(src).toMatch(/<ShotSound\s+track=\{sound\}/);
   });
 
   it("a Shot card in the feed does the same, and never asks the video for sound", () => {

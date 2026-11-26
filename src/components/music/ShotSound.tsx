@@ -34,12 +34,18 @@ export function ShotSound({
   track,
   playing,
   active,
+  onActivate,
+  expanded,
 }: {
   track: Track;
   /** The Shot is running. The disc turns with it, not with the song. */
   playing: boolean;
   /** This is the Shot being looked at: the cue to introduce the sound. */
   active: boolean;
+  /** What pressing the disc opens — on a Shot, the sound's own menu. */
+  onActivate?: () => void;
+  /** Whether that menu is open. */
+  expanded?: boolean;
 }) {
   const [revealed, setRevealed] = useState(false);
   /**
@@ -100,7 +106,7 @@ export function ShotSound({
         </div>
       </div>
 
-      <SoundBox track={track} spinning={playing} />
+      <SoundBox track={track} spinning={playing} onActivate={onActivate} expanded={expanded} />
     </div>
   );
 }
