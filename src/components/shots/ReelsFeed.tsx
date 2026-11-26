@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bookmark, Check, Volume2, VolumeX, Play, Pause, ChevronLeft, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, EyeOff, Pencil, Archive, MessageCircle, MessageCircleOff } from "lucide-react";
@@ -314,10 +314,62 @@ export function ReelsFeed({
    *  tab swipe: the reel must not move, and above all must not read the dip
    *  of a sideways thumb as "pull down to leave Shots". */
   const swipeAxis = useRef<null | "x" | "y">(null);
-  /** Live finger offset in px, null when no finger is down. Doubles as the
-   *  "is dragging" flag, which is what decides whether the transform
-   *  animates: following a finger must be instant, settling must not. */
-  const [drag, setDrag] = useState<number | null>(null);
+  /**
+   * Live finger offset in px, null when no finger is down. Doubles as the
+   * "is dragging" flag, which is what decides whether the transform
+   * animates: following a finger must be instant, settling must not.
+   *
+   * A ref and not state. It used to be state, and `touchmove` fires on
+   * every frame of a swipe, so every frame re-rendered the whole feed —
+   * five mounted Shots, their rails, their sheets — to move one transform.
+   * React could not keep up with a finger, which is the whole of why the
+   * swipe did not feel smooth. The finger now writes straight to the track
+   * below and a gesture causes no render at all until it is released.
+   */
+  const drag = useRef<number | null>(null);
+  /**
+   * The one element that moves. Every slide sits at its own fixed offset
+   * inside it, so there is a single transform to write rather than one per
+   * mounted Shot, and the drag and the settle are one continuous value on
+   * one element rather than a handoff between two.
+   */
+  const trackRef = useRef<HTMLDivElement>(null);
+  /** Where the track sits with slide `idx` on screen and the finger `dy`
+   *  from where it started. The same string React renders, so an
+   *  imperative write and the next render cannot disagree. */
+  const trackAt = (idx: number, dy = 0) =>
+    `translate3d(0, calc(${-idx * 100}% + ${dy}px), 0)`;
+  const SETTLE = "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)";
+  /** Follow the finger: no transition, and no React in the loop. */
+  const trackTo = (dy: number) => {
+    const el = trackRef.current;
+    if (!el) return;
+    el.style.transition = "none";
+    el.style.transform = trackAt(activeIdx, dy);
+  };
+  /**
+   * A render that lands mid-swipe would otherwise write the settled
+   * position over the finger's and snap the reel out from under it: the
+   * offset is in a ref, so React's own style knows nothing about it. Other
+   * things still re-render this feed while a finger is down — a page of
+   * Shots arriving, a sheet closing, the mute changing — so the live
+   * position is put back before the browser paints. No deps: it has to run
+   * after every render, and it does nothing at all unless a finger is down.
+   */
+  useLayoutEffect(() => {
+    if (drag.current !== null) trackTo(drag.current);
+  });
+
+  /** Let go: hand the element back the animated value. React writes the
+   *  same thing on the render that `setActiveIdx` causes, and writes
+   *  nothing at all when the swipe was not committed — which is exactly
+   *  when this is the only thing that puts the reel back. */
+  const trackSettle = (idx: number) => {
+    const el = trackRef.current;
+    if (!el) return;
+    el.style.transition = SETTLE;
+    el.style.transform = trackAt(idx);
+  };
   const swipeStartedAt = useRef(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const fetchingMore = useRef(false);
@@ -481,7 +533,7 @@ export function ReelsFeed({
     swipeTouchStartX.current = e.touches[0].clientX;
     swipeAxis.current = null;
     swipeStartedAt.current = Date.now();
-    setDrag(0);
+    drag.current = 0;
   }
 
   /**
@@ -492,16 +544,18 @@ export function ReelsFeed({
    * no indication a swipe was even being registered.
    */
   function onSwipeTouchMove(e: React.TouchEvent) {
-    if (sheetOpen || drag === null) return;
+    if (sheetOpen || drag.current === null) return;
     // Opened mid-swipe: put the reel back rather than carrying on under it.
     if (overlayCount() > 0) {
-      setDrag(null);
+      drag.current = null;
+      trackSettle(activeIdx);
       return;
     }
     // A second finger landing mid-swipe turns the gesture into a pinch.
     // Abandon the drag rather than letting the reel slide while it scales.
     if (e.touches.length !== 1) {
-      setDrag(null);
+      drag.current = null;
+      trackSettle(activeIdx);
       return;
     }
     let dy = e.touches[0].clientY - swipeTouchStartY.current;
@@ -510,7 +564,8 @@ export function ReelsFeed({
       if (swipeAxis.current === null) return;
     }
     if (swipeAxis.current === "x") {
-      setDrag(null);
+      drag.current = null;
+      trackSettle(activeIdx);
       return;
     }
 
@@ -520,7 +575,8 @@ export function ReelsFeed({
     const atEnd = activeIdx === slides.length - 1 && dy < 0;
     if (atEnd) dy *= 0.3;
 
-    setDrag(dy);
+    drag.current = dy;
+    trackTo(dy);
   }
 
   /**
@@ -558,8 +614,8 @@ export function ReelsFeed({
 
   function onSwipeTouchEnd() {
     if (sheetOpen) return;
-    const dy = drag ?? 0;
-    setDrag(null);
+    const dy = drag.current ?? 0;
+    drag.current = null;
     const outcome = reelSwipeOutcome({
       axis: swipeAxis.current,
       dy,
@@ -567,14 +623,27 @@ export function ReelsFeed({
       elapsed: Date.now() - swipeStartedAt.current,
       first: activeIdx === 0,
     });
+    // Where the track is going, animated from wherever the finger left it.
+    // Settled first and in the same tick as the state change, so the two
+    // cannot describe different positions for a frame.
     if (outcome === "next") {
       // Pulled up on the end card: that is asking whether there is more.
       if (activeIdx === slides.length - 1 && slides[activeIdx]?.kind === "end") void checkForNew();
-      setActiveIdx((i) => Math.min(i + 1, slides.length - 1));
+      const to = Math.min(activeIdx + 1, slides.length - 1);
+      trackSettle(to);
+      setActiveIdx(to);
+    } else if (outcome === "prev") {
+      trackSettle(activeIdx - 1);
+      setActiveIdx(activeIdx - 1);
+    } else if (outcome === "leave") {
+      // Pulling down on the first reel leaves Shots.
+      trackSettle(activeIdx);
+      safeBack(router);
+    } else {
+      // Not committed: nothing changes, so this is the only thing that puts
+      // the reel back where it was.
+      trackSettle(activeIdx);
     }
-    else if (outcome === "prev") setActiveIdx((i) => i - 1);
-    // Pulling down on the first reel leaves Shots.
-    else if (outcome === "leave") safeBack(router);
   }
 
   return (
@@ -584,7 +653,10 @@ export function ReelsFeed({
       onTouchStart={onSwipeTouchStart}
       onTouchMove={onSwipeTouchMove}
       onTouchEnd={onSwipeTouchEnd}
-      onTouchCancel={() => setDrag(null)}
+      onTouchCancel={() => {
+        drag.current = null;
+        trackSettle(activeIdx);
+      }}
       onKeyDown={onStageKeyDown}
       tabIndex={0}
       role="region"
@@ -615,11 +687,20 @@ export function ReelsFeed({
         </button>
       </div>
 
-      {/* Absolute-positioned reels: each fills the container, translated by index offset */}
+      {/* The track. One element carries the whole position of the feed —
+          the finger writes to it directly, and the settle after a release
+          is the same transform animating on the same element. Every reel
+          used to carry `i - activeIdx` plus the live drag in its own
+          transform, which meant five style objects rebuilt by React on
+          every frame of a swipe. */}
+      <div
+        ref={trackRef}
+        className="absolute inset-0 will-change-transform"
+        style={{ transform: trackAt(activeIdx), transition: SETTLE }}
+      >
       {slides.map((item, i) =>
         // Outside the window nothing is mounted at all. The ones that
-        // remain still position themselves from `i - activeIdx`, so the
-        // arithmetic below is untouched by the gap.
+        // remain sit at their own fixed offset, so the gap changes nothing.
         Math.abs(i - activeIdx) > SLIDE_WINDOW ? null : (
         <div
           key={
@@ -631,21 +712,12 @@ export function ReelsFeed({
                   ? item.kind
                   : i
           }
-          className={`absolute inset-0 will-change-transform ${
+          className={`absolute inset-0 ${
             i === activeIdx ? "" : "pointer-events-none"
           }`}
-          style={{
-            transform: `translateY(calc(${i - activeIdx} * 100% + ${
-              drag ?? 0
-            }px))`,
-            // No transition while a finger is down — the reel has to track it
-            // exactly. On release the settle is shorter than the old 0.4s,
-            // which read as sluggish once the drag itself became live.
-            transition:
-              drag === null
-                ? "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)"
-                : "none",
-          }}
+          // Fixed: a slide's place in the feed, which does not change when
+          // the feed moves. Nothing here is rewritten by a swipe.
+          style={{ transform: `translate3d(0, ${i * 100}%, 0)` }}
         >
           {item.kind === "caught-up" || item.kind === "end" ? (
             <ShotsEndCard
@@ -694,6 +766,7 @@ export function ReelsFeed({
         </div>
         ),
       )}
+      </div>
     </div>
   );
 }
@@ -837,6 +910,26 @@ function ReelCard({
    * cap into a long ellipse at low progress.
    */
   const fillRef = useRef<HTMLDivElement>(null);
+  /**
+   * Dragging the line to move through the Shot.
+   *
+   * State, not a ref, because the bar has to look different while it is
+   * held: three pixels is enough to read as progress and not nearly enough
+   * to grab, so it grows under the finger and the time appears above it.
+   * That is twice per gesture, not once per frame — the seeking itself is
+   * written straight to the video and the bar, like the frame loop is.
+   */
+  const [scrubbing, setScrubbing] = useState(false);
+  /** The strip the finger actually lands on, and what the position is
+   *  measured against. Much taller than the line it holds. */
+  const scrubRef = useRef<HTMLDivElement>(null);
+  const timeRef = useRef<HTMLSpanElement>(null);
+  /** Whether to start it again afterwards: scrubbing a paused Shot should
+   *  leave it paused. */
+  const resumeAfter = useRef(false);
+  /** The line's own height. It triples under a finger so there is something
+   *  to see being held, and so the fill's round cap reads as a handle. */
+  const barH = scrubbing ? PROGRESS_H * 3 : PROGRESS_H;
   const paint = useCallback((p: number) => {
     const el = fillRef.current;
     if (!el) return;
@@ -872,6 +965,60 @@ function ReelCard({
     });
     return () => cancelAnimationFrame(raf);
   }, [isActive, playing, paint, window0.start, window0.end]);
+
+  /** mm:ss, for the only place a Shot's length is ever written down. */
+  const clock = (sec: number) => {
+    const t = Math.max(0, Math.floor(sec));
+    return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+  };
+
+  /**
+   * Put the Shot where the finger is.
+   *
+   * Measured against the strip rather than the window, so it is right
+   * whatever the column is doing, and clamped just short of the end:
+   * `timeupdate` sends anything at or past the trimmed end back to the
+   * start, and a scrub to the far right is not a request to replay.
+   */
+  const seekToX = (clientX: number) => {
+    const el = videoRef.current;
+    const strip = scrubRef.current;
+    if (!el || !strip) return;
+    const r = strip.getBoundingClientRect();
+    const p = Math.min(1, Math.max(0, (clientX - r.left) / Math.max(1, r.width)));
+    const from = window0.start;
+    const to = window0.end ?? el.duration;
+    if (!(to > from)) return;
+    const span = to - from;
+    el.currentTime = Math.min(from + p * span, to - 0.05);
+    paint(p);
+    // Written to the node, not through state: this runs on every frame of
+    // the drag, and the whole point of the bar being a ref is that it does
+    // not re-render the Shot sixty times a second.
+    if (timeRef.current) timeRef.current.textContent = `${clock(p * span)} / ${clock(span)}`;
+  };
+
+  /**
+   * Held. The video stops while the finger is down — a Shot that keeps
+   * running under a scrub fights the finger for the position — and
+   * `playing` is deliberately left alone: it is the feed's idea of whether
+   * this Shot is running, and a scrub is not a pause.
+   */
+  const scrubStart = (clientX: number) => {
+    const el = videoRef.current;
+    if (!el) return;
+    resumeAfter.current = !el.paused;
+    el.pause();
+    setScrubbing(true);
+    seekToX(clientX);
+  };
+
+  const scrubEnd = () => {
+    setScrubbing(false);
+    const el = videoRef.current;
+    if (el && resumeAfter.current) void el.play().catch(() => {});
+    resumeAfter.current = false;
+  };
   const [buffering, setBuffering] = useState(false);
 
   const name = reel.profiles?.display_name ?? reel.profiles?.username ?? "User";
@@ -1913,22 +2060,59 @@ function ReelCard({
 
       {/* Playback progress — thin accent bar hugging the bottom edge of the
           video, which is no longer the bottom of the screen once the video
-          has stepped aside for the comments. */}
+          has stepped aside for the comments. Also how you move through the
+          Shot: the line is the handle, and the strip over it is the part a
+          thumb can actually hit. */}
       <div
-        className="pointer-events-none absolute inset-x-0 z-30 overflow-hidden rounded-full bg-white/15"
+        className="pointer-events-none absolute inset-x-0 z-30"
         style={
           commentsOpen
-            ? { top: `calc(${VIDEO_H} - ${PROGRESS_H}px)`, height: PROGRESS_H }
-            : { bottom: 0, height: PROGRESS_H }
+            ? { top: `calc(${VIDEO_H} - ${barH}px)`, height: barH }
+            : { bottom: 0, height: barH }
         }
       >
-        {/* Full width, slid in from the left, so the end that moves carries
-            the bar's own round cap. No transition: it is moved every frame. */}
+        {/* The real target: 28px of nothing, bottom-aligned on a 3px line.
+            Pointer events so a mouse works too, and the touch events are
+            stopped here so the feed's vertical swipe never sees a scrub —
+            which keeps the two gestures from having to know about each
+            other at all. */}
         <div
-          ref={fillRef}
-          className="h-full w-full rounded-full bg-accent will-change-transform"
-          style={{ transform: "translate3d(-100%, 0, 0)" }}
+          ref={scrubRef}
+          aria-hidden
+          className="pointer-events-auto absolute inset-x-0 bottom-0 z-10 h-7 touch-none"
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            scrubStart(e.clientX);
+          }}
+          onPointerMove={(e) => {
+            if (scrubbing) seekToX(e.clientX);
+          }}
+          onPointerUp={scrubEnd}
+          onPointerCancel={scrubEnd}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
         />
+        {scrubbing && (
+          <span
+            ref={timeRef}
+            className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-black/80 px-2.5 py-1 text-[11px] font-bold tabular-nums text-white"
+          />
+        )}
+        <div
+          className={`absolute inset-x-0 bottom-0 overflow-hidden rounded-full transition-[height,background-color] duration-150 ${
+            scrubbing ? "bg-white/30" : "bg-white/15"
+          }`}
+          style={{ height: barH }}
+        >
+          {/* Full width, slid in from the left, so the end that moves carries
+              the bar's own round cap. No transition: it is moved every frame. */}
+          <div
+            ref={fillRef}
+            className="h-full w-full rounded-full bg-accent will-change-transform"
+            style={{ transform: "translate3d(-100%, 0, 0)" }}
+          />
+        </div>
       </div>
 
       {/* Deleted confirmation */}
