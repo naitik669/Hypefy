@@ -145,8 +145,6 @@ const ATTACHED = [
   "src/components/messages/ConversationMedia.tsx",
   "src/components/profile/ActivityScreen.tsx",
   "src/components/profile/PeopleList.tsx",
-  "src/components/profile/ProfileTabs.tsx",
-  "src/components/profile/PublicProfileTabs.tsx",
   "src/components/profile/RequestsView.tsx",
 ];
 
@@ -175,5 +173,56 @@ describe("rows attached to the header", () => {
     // exact shape of the bug.
     const stuck = tsxFiles().filter((f) => /className="[^"]*\bsticky top-14\b/.test(read(f)));
     expect(stuck, stuck.join(", ")).toEqual([]);
+  });
+});
+
+/**
+ * The profile tab strips are not attached to a header: the profile has none.
+ *
+ * They were on the ATTACHED list, so they sat 56px down for a header that
+ * isn't there and, once the page scrolled, slid up over the showcase and off
+ * the screen with it. Reported on the own profile ("as we scroll the profile
+ * the posts, shots, rehype tab moves up too"). They pin at the top of the
+ * screen, below the status-bar inset, and stay while the grid scrolls.
+ */
+const PROFILE_TABS = [
+  "src/components/profile/ProfileTabs.tsx",
+  "src/components/profile/PublicProfileTabs.tsx",
+];
+
+/** Comments and imports out, so neither can satisfy or defeat a check. */
+function code(src: string): string {
+  return src
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/^import[\s\S]*?;\s*$/gm, "");
+}
+
+describe("profile tab strips", () => {
+  it.each(PROFILE_TABS)("%s pins its one sticky row at the top inset", (f) => {
+    const src = code(read(f));
+    const sticky = src.match(/className="[^"]*\bsticky\b[^"]*"/g) ?? [];
+    expect(sticky, f).toHaveLength(1);
+    const classes = (sticky[0] ?? "").slice('className="'.length, -1).split(/\s+/);
+    expect(classes, f).toContain("top-[var(--sat)]");
+    // Opaque enough to read over the grid scrolling under it.
+    expect(classes, f).toContain("chrome-bar");
+  });
+
+  it.each(PROFILE_TABS)("%s does not move with a header that isn't there", (f) => {
+    const src = code(read(f));
+    expect(src, f).not.toMatch(/underHeaderStyle\s*\(/);
+    expect(src, f).not.toMatch(/useHideOnScroll\s*\(/);
+    expect(src, f).not.toMatch(/translateY/);
+    expect(src, f).not.toMatch(/style=\{/);
+  });
+
+  it("the profile pages draw no header for them to sit under", () => {
+    for (const f of ["src/app/(app)/profile/page.tsx", "src/app/(app)/u/[username]/page.tsx"]) {
+      const src = code(read(f));
+      expect(src, f).not.toContain("<PageHeader");
+      expect(src, f).not.toContain("<HideOnScroll");
+    }
   });
 });
