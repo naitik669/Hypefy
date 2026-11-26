@@ -797,12 +797,56 @@ function ReelCard({
   const iconTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** False until the video has painted something — poster or first frame. */
   const [frameReady, setFrameReady] = useState(false);
-  const [progress, setProgress] = useState(0); // 0..1 playback position
+  /**
+   * The playback line is painted straight onto its own element rather than
+   * held in state. It moves every frame it is on screen, and a Shot that
+   * re-renders sixty times a second to move a 3px bar is the whole of why
+   * the line used to stutter: it only ever advanced when `timeupdate` fired,
+   * which browsers do about four times a second, so the bar jumped a
+   * quarter-second at a time and a `width` transition could not hide it.
+   *
+   * It is a translate, not a width: width is layout, and the one device this
+   * has to be smooth on does not composite it. The bar sits full-width in a
+   * clipped track and slides in from the left, which also leaves its own
+   * rounded cap on the moving end — scaling it instead would stretch that
+   * cap into a long ellipse at low progress.
+   */
+  const fillRef = useRef<HTMLDivElement>(null);
+  const paint = useCallback((p: number) => {
+    const el = fillRef.current;
+    if (!el) return;
+    const at = Number.isFinite(p) ? Math.min(1, Math.max(0, p)) : 0;
+    el.style.transform = `translate3d(${(at - 1) * 100}%, 0, 0)`;
+  }, []);
   /**
    * The slice of the file this Shot is. Its author chose it in the composer;
    * the file itself was never cut, so the player is what enforces it.
    */
   const window0 = playbackWindow(reel);
+
+  /**
+   * The line, advanced once per frame while the Shot runs. Started and
+   * stopped with playback so a paused or off-screen Shot costs nothing, and
+   * painted once on the way in so a pause or a seek lands on the bar too.
+   *
+   * Progress runs across the trimmed window rather than the file: its author
+   * chose that slice, so the bar fills as the Shot plays rather than creeping
+   * through a minute of video nobody is going to see.
+   */
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    const from = window0.start;
+    const to = window0.end ?? el.duration;
+    const at = () => paint(to > from ? (el.currentTime - from) / (to - from) : 0);
+    at();
+    if (!isActive || !playing) return;
+    let raf = requestAnimationFrame(function step() {
+      at();
+      raf = requestAnimationFrame(step);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isActive, playing, paint, window0.start, window0.end]);
   const [buffering, setBuffering] = useState(false);
 
   const name = reel.profiles?.display_name ?? reel.profiles?.username ?? "User";
@@ -1081,7 +1125,7 @@ function ReelCard({
       el.pause();
       el.currentTime = window0.start; // rewind so it restarts clean when revisited
       setPlaying(false);
-      setProgress(0);
+      paint(0);
       // Do not leave a glyph mid-fade on a reel nobody is looking at.
       if (iconTimer.current) clearTimeout(iconTimer.current);
       setIconShown(false);
@@ -1535,12 +1579,12 @@ function ReelCard({
         onLoadedData={() => setFrameReady(true)}
         onTimeUpdate={(e) => {
           const v = e.currentTarget;
-          // Progress runs across the trimmed window, not the file, so the bar
-          // fills as the Shot plays rather than creeping through a minute of
-          // video nobody is going to see.
           const from = window0.start;
           const to = window0.end ?? v.duration;
-          if (to > from) setProgress(Math.min(1, Math.max(0, (v.currentTime - from) / (to - from))));
+          // The bar is painted from a frame loop, not from here: this fires
+          // about four times a second, which is what made it choppy. A seek
+          // while paused still needs it moved, though, and that is this.
+          if (to > from && !playing) paint((v.currentTime - from) / (to - from));
           // Watch time, folded in against the trimmed window. The loop below
           // pulls currentTime back to the start, which reads as a replay.
           if (to > from) {
@@ -1821,19 +1865,19 @@ function ReelCard({
           video, which is no longer the bottom of the screen once the video
           has stepped aside for the comments. */}
       <div
-        className="pointer-events-none absolute inset-x-0 z-30 h-[3px] bg-white/15"
+        className="pointer-events-none absolute inset-x-0 z-30 overflow-hidden rounded-full bg-white/15"
         style={
           commentsOpen
-            ? { top: `calc(${VIDEO_H} - ${PROGRESS_H}px)` }
-            : { bottom: 0 }
+            ? { top: `calc(${VIDEO_H} - ${PROGRESS_H}px)`, height: PROGRESS_H }
+            : { bottom: 0, height: PROGRESS_H }
         }
       >
+        {/* Full width, slid in from the left, so the end that moves carries
+            the bar's own round cap. No transition: it is moved every frame. */}
         <div
-          className="h-full bg-accent"
-          style={{
-            width: `${Math.round(progress * 100)}%`,
-            transition: "width 0.15s linear",
-          }}
+          ref={fillRef}
+          className="h-full w-full rounded-full bg-accent will-change-transform"
+          style={{ transform: "translate3d(-100%, 0, 0)" }}
         />
       </div>
 

@@ -149,13 +149,69 @@ describe("a Shot's sound", () => {
   it("and is simply not shown once you have swiped away", () => {
     // Derived, not stored: leaving the Shot hides the name without an
     // effect reaching for setState to put it back.
-    expect(shot).toContain("const open = revealed && active && playing;");
+    expect(shot).toContain("const open = revealed && active;");
   });
 
-  it("it is anchored to the case, not to the rail", () => {
-    // Absolutely positioned off the case's own edge, so it cannot widen the
-    // column it sits in and nothing has to know where that column is.
-    expect(shot).toContain("absolute right-full");
+  it("introduces itself on arrival only, and not again on every pause", () => {
+    // Keyed to `active` and the track, never to playback: with `playing` in
+    // here, tapping to pause and tapping to resume replayed the whole
+    // three-second announcement at someone who only wanted the Shot to stop.
+    const effect = shot.slice(shot.indexOf("useEffect(() => {"));
+    expect(effect.slice(0, effect.indexOf("}, ["))).toContain("if (!active) return;");
+    expect(effect).toContain("}, [active, track.id]);");
+    expect(effect).not.toContain("}, [active, playing");
+  });
+
+  it("it is anchored to the case, not to the rail, and sits behind it", () => {
+    // Absolutely positioned over the case's own box, so it cannot widen the
+    // column it sits in and nothing has to know where that column is. Under
+    // the case rather than beside it: the ground runs on under the disc, so
+    // there is no gap and no seam between the name and the case it came out
+    // of, and the padding is what keeps the words clear of the disc.
+    expect(shot).toContain("absolute right-0");
+    expect(shot).not.toContain("right-full");
+    expect(shot).not.toContain("mr-1.5");
+    expect(shot).toContain("pr-12");
     expect(shot).toContain("pointer-events-none");
+    // The case is painted over the ground, which is the whole trick.
+    const ground = shot.indexOf("absolute right-0");
+    const box = shot.indexOf("<SoundBox");
+    expect(ground).toBeLessThan(box);
+    expect(shot.slice(ground, box)).toContain("z-0");
+    expect(shot.slice(ground, box)).toContain('<span className="relative z-10 block">');
+  });
+});
+
+describe("the line that says how much of the Shot is left", () => {
+  const reel = read("src/components/shots/ReelsFeed.tsx");
+
+  it("advances every frame rather than four times a second", () => {
+    // `timeupdate` fires about 4Hz. The bar was moved from there and given a
+    // 150ms width transition to cover the gap, which it could not: the line
+    // visibly jumped a quarter-second at a time. It is driven off the frame
+    // clock now, and stopped when the Shot is not running.
+    expect(reel).toContain("requestAnimationFrame(function step()");
+    expect(reel).toContain("cancelAnimationFrame(raf)");
+    expect(reel).toContain("if (!isActive || !playing) return;");
+  });
+
+  it("on a transform, and not through a render of the whole Shot", () => {
+    // Width is layout, and the device this has to be smooth on does not
+    // composite it. Sixty renders a second of a Shot to move 3px is the
+    // other half of the same mistake, so the bar is painted on its own ref.
+    expect(reel).toContain("const fillRef = useRef<HTMLDivElement>(null);");
+    expect(reel).toMatch(/el\.style\.transform = `translate3d\(\$\{\(at - 1\) \* 100}%/);
+    expect(reel).not.toContain("setProgress");
+    expect(reel).not.toContain('transition: "width');
+  });
+
+  it("and the end that moves is round", () => {
+    // Which is why it slides a full-width bar in rather than scaling one:
+    // scaleX would stretch a 1.5px cap into a long ellipse at low progress.
+    const bar = reel.slice(reel.indexOf("{/* Playback progress"));
+    const el = bar.slice(0, bar.indexOf("/>"));
+    expect(el).toContain("overflow-hidden rounded-full");
+    expect(el).toContain("h-full w-full rounded-full bg-accent");
+    expect(el).not.toContain("width:");
   });
 });
