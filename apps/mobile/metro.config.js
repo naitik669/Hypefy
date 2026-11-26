@@ -1,3 +1,11 @@
+/* eslint-disable @typescript-eslint/no-require-imports --
+ * Metro loads this file itself, as CommonJS, before any bundler or
+ * transpiler is involved. `import` here is not a style choice the rule can
+ * win: it would simply fail to load, and the app would not build. Disabled
+ * for the file with the reason rather than recorded as debt, because debt
+ * implies somebody could one day pay it.
+ */
+
 // Metro, taught about the monorepo.
 //
 // Two things it does not work out for itself. It only watches the folder it

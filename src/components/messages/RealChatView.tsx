@@ -818,7 +818,7 @@ export function RealChatView({
   async function hydrateShot(msgId: string, shotId: string) {
     const { data } = await supabase
       .from("shots")
-      .select("id, media_url, poster_url, caption, profiles(username, display_name, avatar_hue, avatar_url)")
+      .select("id, media_url, poster_url, caption, profiles!shots_user_id_fkey(username, display_name, avatar_hue, avatar_url)")
       .eq("id", shotId)
       .maybeSingle();
     if (!data) return;

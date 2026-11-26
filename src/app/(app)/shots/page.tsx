@@ -10,7 +10,7 @@ import { getAdContext } from "@/lib/ads-server";
 
 /** What a Shot in the feed is made of. One list, so every Shot in it has the same fields. */
 const SHOT_COLS =
-  "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, save_count, repost_count, duration_secs, trim_start, trim_end, track, profiles(display_name, avatar_hue, avatar_url, username)";
+  "id, user_id, media_url, poster_url, caption, created_at, hype_count, comment_count, save_count, repost_count, duration_secs, trim_start, trim_end, track, profiles!shots_user_id_fkey(display_name, avatar_hue, avatar_url, username)";
 
 /**
  * How far a Shot you have already watched drops.
