@@ -36,10 +36,16 @@ import { HypeIcon } from "@/components/ui/HypeIcon";
 
 /** Space between faces, as a share of the face size. */
 const GAP = 1 / 3;
-/** How far each seat is lifted, as a share of the face size — the wave. */
-const RAISE = [0, 0.7, 0.25];
-/** Each seat's tilt, degrees. */
-const TILT = [-6, 5, -3];
+/**
+ * How far each seat is lifted, as a share of the face size — the wave.
+ *
+ * Halved. At 0.7 the middle face sat most of its own height above its
+ * neighbours, which over a video read as three faces falling down a
+ * staircase rather than one loose row.
+ */
+const RAISE = [0, 0.5, 0.2];
+/** Each seat's tilt, degrees. Eased off with the wave, for the same reason. */
+const TILT = [-5, 4, -2];
 /** Drag this far from the seat and the row gathers into a bubble. */
 const GATHER_PX = 64;
 /** How far the others lean after a drag before that — just enough to feel tied together. */
@@ -163,13 +169,14 @@ export function RehypeDeck({
   bounds,
   onPick,
   mark = "rehype",
-  markScale = 0.58,
+  markScale = 0.5,
 }: {
   seated: DeckPerson[];
   size?: number;
   /**
-   * The mark's size as a share of the face. A Shot is held closer and
-   * drawn over moving video, so it asks for a bigger one than a post does.
+   * The mark's size as a share of the face. Half, because the mark is a
+   * bare glyph now: the old plate had padding inside it, so the drawing
+   * was always smaller than the box it was given.
    */
   markScale?: number;
   /**
@@ -436,14 +443,26 @@ export function RehypeDeck({
  * and url(#…) resolves across the document rather than within one element.
  */
 const HYPE_GRAD = "hypeStarGrad";
+const REHYPE_GRAD = "rehypeLoopGrad";
 
 function HypeGradientDefs() {
   return (
     <svg width="0" height="0" aria-hidden className="absolute">
       <defs>
+        {/* Three stops, not two. Two ran straight from lit to deep and the
+            middle of the star — which is most of it at 17px — sat on the
+            blend rather than on the gold. */}
         <linearGradient id={HYPE_GRAD} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="var(--color-hype-lit)" />
+          <stop offset="0" stopColor="var(--color-hype-pale)" />
+          <stop offset="0.55" stopColor="var(--color-hype)" />
           <stop offset="1" stopColor="var(--color-hype-deep)" />
+        </linearGradient>
+        {/* The lime turns towards green instead of falling towards olive.
+            At 17px a gradient has about five pixels to travel, so the ends
+            have to differ in hue to read as a gradient at all. */}
+        <linearGradient id={REHYPE_GRAD} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="var(--color-accent-lit)" />
+          <stop offset="1" stopColor="var(--color-accent-turn)" />
         </linearGradient>
       </defs>
     </svg>
@@ -474,32 +493,21 @@ function DeckMark({ size, scale, mark }: { size: number; scale: number; mark: "r
     );
   }
 
-  const box = Math.round(size * scale);
   return (
     <span
-      className="absolute -bottom-1 -right-1 flex items-center justify-center rounded-[30%] text-white"
-      style={{
-        width: box,
-        height: box,
-        // Brand lime falling to the deep end. The light corner is real
-        // lime, which is the point of it.
-        background:
-          "linear-gradient(135deg, var(--color-accent), var(--color-accent-deep))",
-      }}
+      // No plate. It was a lime square — the only square in a deck of
+      // squircles, the biggest thing in the row, and a white loop on it
+      // at 1.5:1. The loop is drawn in the lime itself now, and the
+      // shadow is what holds it off whatever the video is doing.
+      className="absolute -bottom-1.5 -right-1.5 flex drop-shadow-[0_1px_2.5px_rgba(0,0,0,0.95)]"
       aria-hidden
     >
       {/* The rehype button's own loop, so the mark and the button are one
-          drawing rather than two. Inactive: active would paint it lime,
-          and on a lime plate that is a loop you cannot see.
-
-          The shadow is doing real work, not decoration. White on brand
-          lime is 1.5:1, and the gradient's light end sits exactly under
-          the upper arrow — without something behind it that arrow
-          dissolves into the plate. */}
+          drawing rather than two. */}
       <RehypeIcon
-        size={Math.round(box * 0.68)}
-        strokeWidth={2.8}
-        className="text-white"
+        size={Math.round(size * scale)}
+        strokeWidth={3}
+        stroke={`url(#${REHYPE_GRAD})`}
       />
     </span>
   );

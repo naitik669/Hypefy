@@ -45,11 +45,19 @@ export const colors = {
   /** Brand: electric lime, deepened for calm on black. */
   accent: "#a3e635",
   accentDeep: "#3f6212",
+  /**
+   * The two ends of the lime where it TURNS rather than darkens: the
+   * rehype mark's gradient. Running the lime to `accentDeep` instead
+   * made olive, which is what made the old mark look muddy.
+   */
+  accentLit: "#bef264",
+  accentTurn: "#22c55e",
   /** Text on accent fills. */
   accentInk: "#0a0a0a",
 
-  /** The active Hype star. */
+  /** The active Hype star, and the three stops of its gradient. */
   hype: "#ffd000",
+  hypePale: "#fff0a8",
   hypeLit: "#ffe066",
   hypeDeep: "#b07800",
 

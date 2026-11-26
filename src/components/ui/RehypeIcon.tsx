@@ -16,6 +16,7 @@ export function RehypeIcon({
   className = "",
   strokeWidth = 2.2,
   pulse = 0,
+  stroke = "currentColor",
 }: {
   size?: number;
   active?: boolean;
@@ -23,6 +24,12 @@ export function RehypeIcon({
   strokeWidth?: number;
   /** Increment on each tap to replay the motion. */
   pulse?: number;
+  /**
+   * "currentColor" everywhere it is a button. The deck passes a url(#id)
+   * instead: on a face the mark has no plate behind it any more, and the
+   * gradient in the line is what it has in place of one.
+   */
+  stroke?: string;
 }) {
   const motion = pulse === 0 ? "" : active ? "rehype-on" : "rehype-off";
   return (
@@ -33,7 +40,7 @@ export function RehypeIcon({
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke="currentColor"
+      stroke={stroke}
       strokeWidth={active ? strokeWidth + 0.4 : strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
