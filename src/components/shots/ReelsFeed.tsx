@@ -28,7 +28,6 @@ import { ShareButton } from "@/components/feed/QuickShare";
 import { HypeParticles } from "@/components/feed/HypeParticles";
 import { HypeBreak } from "@/components/feed/HypeBreak";
 import { GhostRise, useGhostRise } from "@/components/ghost/GhostRise";
-import { HypeProofLine } from "@/components/hype/HypeProofLine";
 import { hypersToDeck } from "@/lib/hype-proof";
 import { mergeDecks } from "@/lib/rehype";
 import { playbackWindow } from "@/lib/shot-trim";
@@ -1986,9 +1985,8 @@ function ReelCard({
       </div>
 
       {/* Author and caption, which also stand down. Both describe the
-          Shot, and they would be sitting directly on top of a panel that
-          describes it better — the hype line worst of all, naming people who
-          reacted immediately above a list of people reacting. */}
+          Shot, and with the comments up they would be sitting directly on
+          top of a panel that describes it better. */}
       <div
         className="absolute inset-x-0 bottom-0 z-20 flex flex-col gap-2 p-4 pr-16"
         hidden={commentsOpen}
@@ -2025,26 +2023,24 @@ function ReelCard({
             {handle ? `@${handle}` : name}
           </span>
         </Link>
+        {/* One line, not two. A Shot is the video: the caption is a label
+            on it, and two lines of label over the picture is the caption
+            competing with what it describes. `more` opens the rest in
+            place for the captions that have more to say. */}
         {caption && !commentsOpen && (
           <ExpandableText
-            clampClass="line-clamp-2"
+            clampClass="line-clamp-1"
             className="text-sm text-white/90 drop-shadow"
             moreClassName="text-white/80"
           >
             {reel.caption}
           </ExpandableText>
         )}
-        {/* Under the caption, and quieter than it: the caption is what the
-            author said, this is a footnote about it. The faces are on the
-            deck above, so this carries only the names. */}
-        {proof && (
-          <HypeProofLine
-            glass
-            previewers={proof.previewers}
-            total={hypeCount}
-            onOpen={() => setHypedBySheet(true)}
-          />
-        )}
+        {/* No hype line under the caption. It named the same people the
+            deck above it is already showing — "AMAN, MEHUL & 1 other hyped
+            this" directly beneath their own two faces — so the bottom of
+            every Shot said the same thing twice. The faces carry it, and
+            tapping one still opens the full list. */}
       </div>
 
       {proof && (
