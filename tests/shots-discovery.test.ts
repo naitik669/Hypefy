@@ -51,16 +51,17 @@ describe("the end card cannot read as an empty reel", () => {
   it("it says how many there were", () => {
     // Reported as "it says no more shots, create one" while nine existed.
     // The old copy was "That's every Shot for now. The reel is short: add one
-    // of yours." next to a filled Make a Shot button.
-    expect(endCard).toContain("That's all ${total} Shot${total === 1 ? \"\" : \"s\"} for now.");
+    // of yours." next to a filled Make a Shot button. The count is said out
+    // loud; the card was later reshaped, and it is still said out loud.
+    expect(endCard).toContain("{`All ${total} on Hypefy.`}");
     expect(endCard).not.toContain("That's every Shot for now. The reel is short");
   });
 
-  it("and Make a Shot leads only when the reel is nearly empty", () => {
+  it("and Make a Shot is filled in only when the reel is nearly empty", () => {
     // THIN_REEL is 20, so nine Shots counted as thin and the card led with
     // Make a Shot. `bare` is the narrower question the button should ask.
     expect(endCard).toContain("const bare = total < 5;");
-    expect(endCard).toContain("className={bare ? main : quiet}");
+    expect(endCard).toContain('bare ? "bg-accent text-accent-ink" : "bg-white/10 text-white"');
   });
 
   it("the count comes from the reel rather than being assumed", () => {
