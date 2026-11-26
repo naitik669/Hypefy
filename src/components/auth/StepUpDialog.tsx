@@ -5,6 +5,12 @@ import { createPortal } from "react-dom";
 import { ShieldCheck, Loader2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { shieldProps } from "@/lib/overlay-shield";
+import {
+  sendStepUpCode,
+  stepUpMethod,
+  verifyStepUpCode,
+  type StepUpMethod,
+} from "@hypefy/core/step-up";
 
 /** How long a completed step-up counts for. */
 const FRESH_MS = 5 * 60_000;
@@ -18,8 +24,10 @@ const STAMP_KEY = "hypefy.stepup.at";
  * unattended unlocked phone walks through, and none of those four are
  * reversible by the person they happen to.
  *
- * Uses the second factor when there is one, and the password when there isn't,
- * so it works for every account rather than only the careful ones.
+ * Uses the second factor when there is one, the password when there isn't,
+ * and an emailed code for an account that has no password at all (signed up
+ * with Google), so it works for every account rather than only the careful
+ * ones. Which one is decided in @hypefy/core/step-up.
  */
 export function useStepUp() {
   const supabase = createClient();
@@ -68,31 +76,49 @@ function StepUpPrompt({
   supabase: ReturnType<typeof createClient>;
   onDone: (ok: boolean) => void;
 }) {
-  const [mode, setMode] = useState<"loading" | "totp" | "password">("loading");
+  const [mode, setMode] = useState<"loading" | StepUpMethod>("loading");
+  const [email, setEmail] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
   const [factorId, setFactorId] = useState<string | null>(null);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Which challenge to show depends on whether this account has a factor.
+  // Which challenge to show depends on whether this account has a factor,
+  // and failing that, whether it has a password.
   useEffect(() => {
     let live = true;
-    supabase.auth.mfa.listFactors().then(({ data }) => {
-      if (!live) return;
-      const verified = (data?.all ?? []).find(
-        (f) => f.factor_type === "totp" && f.status === "verified"
-      );
-      if (verified) {
-        setFactorId(verified.id);
-        setMode("totp");
-      } else {
-        setMode("password");
-      }
-    });
+    Promise.all([supabase.auth.mfa.listFactors(), supabase.auth.getUser()]).then(
+      async ([{ data: factors }, { data: { user } }]) => {
+        if (!live) return;
+        const all = factors?.all ?? [];
+        const method = stepUpMethod({ factors: all, identities: user?.identities });
+        if (method === "totp") {
+          const verified = all.find((f) => f.factor_type === "totp" && f.status === "verified");
+          setFactorId(verified?.id ?? null);
+        }
+        if (method === "email_code") {
+          const address = user?.email ?? "";
+          setEmail(address);
+          const sent = await sendStepUpCode(supabase.auth, address);
+          if (!live) return;
+          if (sent.ok) setNotice(`We sent a code to ${address}.`);
+          else setError(sent.error);
+        }
+        setMode(method);
+      },
+    );
     return () => {
       live = false;
     };
   }, [supabase]);
+
+  async function resend() {
+    setError(null);
+    const sent = await sendStepUpCode(supabase.auth, email);
+    if (sent.ok) setNotice(`New code sent to ${email}.`);
+    else setError(sent.error);
+  }
 
   async function submit() {
     if (!value.trim()) return;
@@ -114,6 +140,19 @@ function StepUpPrompt({
       return;
     }
 
+    // Emailed code, for accounts with no factor and no password.
+    if (mode === "email_code") {
+      const checked = await verifyStepUpCode(supabase.auth, email, value);
+      setBusy(false);
+      if (!checked.ok) {
+        setError(checked.error);
+        setValue("");
+        return;
+      }
+      onDone(true);
+      return;
+    }
+
     // Password path, for accounts with no factor.
     //
     // NOTE: signInWithPassword mints a NEW session, at aal1. That is harmless
@@ -123,9 +162,8 @@ function StepUpPrompt({
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const email = user?.email ?? "";
     const { error: err } = await supabase.auth.signInWithPassword({
-      email,
+      email: user?.email ?? "",
       password: value,
     });
     setBusy(false);
@@ -136,6 +174,8 @@ function StepUpPrompt({
     }
     onDone(true);
   }
+
+  const isCode = mode === "totp" || mode === "email_code";
 
   const body = (
     <div
@@ -152,7 +192,9 @@ function StepUpPrompt({
             <p className="mt-0.5 text-xs leading-snug text-muted">
               {mode === "totp"
                 ? "Enter the current code from your authenticator app."
-                : "Enter your password to continue."}
+                : mode === "email_code"
+                  ? "Enter the code we emailed you."
+                  : "Enter your password to continue."}
             </p>
           </div>
           <button
@@ -174,31 +216,38 @@ function StepUpPrompt({
           <>
             <input
               autoFocus
-              type={mode === "totp" ? "text" : "password"}
-              inputMode={mode === "totp" ? "numeric" : undefined}
-              autoComplete={
-                mode === "totp" ? "one-time-code" : "current-password"
-              }
-              maxLength={mode === "totp" ? 6 : undefined}
+              type={isCode ? "text" : "password"}
+              inputMode={isCode ? "numeric" : undefined}
+              autoComplete={isCode ? "one-time-code" : "current-password"}
+              // Supabase email codes are 6 digits by default and can be set to 8.
+              maxLength={mode === "totp" ? 6 : mode === "email_code" ? 8 : undefined}
               value={value}
               onChange={(e) =>
                 setValue(
-                  mode === "totp"
-                    ? e.target.value.replace(/\D/g, "")
-                    : e.target.value
+                  isCode ? e.target.value.replace(/\D/g, "") : e.target.value
                 )
               }
               onKeyDown={(e) => {
                 if (e.key === "Enter") submit();
               }}
-              placeholder={mode === "totp" ? "000000" : "Your password"}
+              placeholder={isCode ? "000000" : "Your password"}
               className={`w-full rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-white/25 ${
-                mode === "totp"
+                isCode
                   ? "text-center font-mono text-lg tracking-[0.3em]"
                   : "text-sm"
               }`}
             />
+            {notice && !error && <p className="mt-2 text-xs text-muted">{notice}</p>}
             {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+            {mode === "email_code" && (
+              <button
+                type="button"
+                onClick={resend}
+                className="mt-2 text-xs font-semibold text-accent"
+              >
+                Send a new code
+              </button>
+            )}
             <div className="mt-4 flex gap-2">
               <button
                 type="button"

@@ -110,6 +110,29 @@ export async function submitReport(
 }
 
 /**
+ * Reports one message through the `report_message` RPC.
+ *
+ * The RPC already treats a repeat report as success (on conflict do
+ * nothing), so an error here is a real refusal: not a member of the chat, a
+ * message that has gone, no session. The chat used to word every error as
+ * "Report already sent", which told someone whose report was refused that it
+ * had gone through. The swallowed-failure shape: a refusal that looks like a
+ * duplicate.
+ */
+export async function reportMessage(
+  supabase: SafetyClient,
+  input: { messageId: string; reason: string },
+): Promise<SafetyOutcome> {
+  if (!input.messageId) return { ok: false, error: "Nothing to report." };
+  if (!input.reason.trim()) return { ok: false, error: "Pick a reason." };
+  const { error } = await supabase.rpc("report_message", {
+    p_message_id: input.messageId,
+    p_reason: input.reason,
+  });
+  return error ? { ok: false, error: "Couldn't send the report. Try again." } : { ok: true };
+}
+
+/**
  * Blocks someone through the `block_user` RPC, which is idempotent and
  * refuses a self-block on the server. Refused here too, so the client never
  * shows "Blocked" for a block that was never written.
