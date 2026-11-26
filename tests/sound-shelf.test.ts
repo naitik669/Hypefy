@@ -264,18 +264,23 @@ describe("the top of a sound's page", () => {
 });
 
 describe("the sound's box on the reel", () => {
-  it("sits under the three dots, and every Shot has one", () => {
+  it("is the foot of the rail, and every Shot has one", () => {
     const src = readFileSync("src/components/shots/ReelsFeed.tsx", "utf8");
-    const dots = src.indexOf('<MoreHorizontal size={30} className="text-white" />');
-    const box = src.indexOf("<ShotSound track={sound}");
-    expect(dots).toBeGreaterThan(0);
-    expect(box).toBeGreaterThan(dots);
-    expect(src.slice(dots, box)).not.toContain("<RailButton");
+    // It used to sit under a three-dots button. That button is gone: the
+    // disc is the menu now (see shot-sound-menu.test.ts), so the disc is
+    // the last thing in the rail rather than the second-to-last.
+    const rail = src.slice(
+      src.indexOf('className="absolute bottom-6 right-3 z-30'),
+      src.indexOf("{/* Author and caption"),
+    );
+    const box = rail.indexOf("<ShotSound");
+    expect(box).toBeGreaterThan(0);
+    expect(rail.slice(box)).not.toContain("<RailButton");
     // A Shot without a song still has a sound: its own.
     expect(src).toContain("() => track ?? originalTrackFor(reel)");
     // Its name is not a second pill under the caption any more: it unrolls
     // out of the case, so the sound has one home on the screen.
-    expect(src).toContain("<ShotSound track={sound}");
+    expect(src).toMatch(/<ShotSound\s+track=\{sound\}/);
     expect(src).not.toContain("<SoundPill track={sound} glass />");
   });
 
