@@ -24,11 +24,22 @@ const LEAD_MS = 450;
  * mattered on.
  *
  * It is anchored to the case rather than to the screen: absolutely
- * positioned off the case's own left edge, so it cannot widen the rail it
- * sits in, and nothing has to know where the rail happens to be. It draws
- * over the caption for the couple of seconds it is out, which is the one
- * place it overlaps anything, and it is the rail's z-order that puts it
- * there rather than a guess.
+ * positioned over the case's own box, so it cannot widen the rail it sits
+ * in, and nothing has to know where the rail happens to be. It draws over
+ * the caption for the couple of seconds it is out, which is the one place it
+ * overlaps anything, and it is the rail's z-order that puts it there rather
+ * than a guess.
+ *
+ * It comes out from *behind* the case, not from beside it: the ground runs
+ * all the way under the disc and the case is painted on top of it, so there
+ * is no seam and no gap between the two. That is what the padding on the
+ * right is for — it keeps the words clear of the disc the ground is tucked
+ * under.
+ *
+ * It introduces itself on arrival, keyed to `active` alone. Keying it to
+ * playback as well meant every pause and unpause replayed the whole
+ * announcement, which is three seconds of the name sliding out at a person
+ * who tapped the screen to make the Shot stop.
  */
 export function ShotSound({
   track,
@@ -52,10 +63,10 @@ export function ShotSound({
    * Derived rather than stored, so leaving the Shot hides the name without
    * an effect reaching for setState to put it back.
    */
-  const open = revealed && active && playing;
+  const open = revealed && active;
 
   useEffect(() => {
-    if (!active || !playing) return;
+    if (!active) return;
     // Cleared first, and in a timer rather than in the effect body: a Shot
     // left in the middle of its reveal keeps `revealed` true, and coming
     // back to it would otherwise flash the name out with no roll.
@@ -69,15 +80,16 @@ export function ShotSound({
       clearTimeout(out);
       clearTimeout(back);
     };
-  }, [active, playing, track.id]);
+  }, [active, track.id]);
 
   const ease = "cubic-bezier(.22,1,.36,1)";
 
   return (
     <div className="relative">
-      {/* Off the case's own edge, so the rail's width never changes. */}
-      <div className="pointer-events-none absolute right-full top-1/2 mr-1.5 -translate-y-1/2">
-        <div className="relative flex h-8 max-w-[172px] items-center whitespace-nowrap px-3 text-[11px] text-white">
+      {/* Over the case's own box, so the rail's width never changes, and
+          under it, so the ground disappears behind the disc. */}
+      <div className="pointer-events-none absolute right-0 top-1/2 z-0 -translate-y-1/2">
+        <div className="relative flex h-8 max-w-[216px] items-center whitespace-nowrap pl-3 pr-12 text-[11px] text-white">
           {/* The ground, growing out of the case. */}
           <span
             aria-hidden
@@ -106,7 +118,11 @@ export function ShotSound({
         </div>
       </div>
 
-      <SoundBox track={track} spinning={playing} onActivate={onActivate} expanded={expanded} />
+      {/* On top of the ground, which is what makes the ground look tucked
+          in behind it rather than butted up against it. */}
+      <span className="relative z-10 block">
+        <SoundBox track={track} spinning={playing} onActivate={onActivate} expanded={expanded} />
+      </span>
     </div>
   );
 }

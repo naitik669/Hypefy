@@ -856,6 +856,52 @@ html[data-dm-leave]::view-transition-old(root) {
   animation: menu-pop-out 0.13s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
+/* A Shot's sound card grows out of the disc that opened it.
+   transform-origin is deliberately NOT set here: the card sets it inline to
+   the middle of its own close button, which sits exactly where the disc was,
+   so the card appears to be the disc opening out and the cross appears to be
+   the disc still sitting there. A fixed origin here would override that.
+   The curve overshoots (1.46 on the third control point) — that bit of
+   springing past full size is what reads as "popped open" rather than
+   "faded in". */
+@keyframes sound-card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.16);
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-sound-card-in {
+  animation: sound-card-in 0.26s cubic-bezier(0.34, 1.46, 0.64, 1);
+}
+/* Back into the disc, and quicker: a dismissal that mirrors the entrance
+   reads as lag. No overshoot going in — it would bulge before shrinking. */
+@keyframes sound-card-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.16);
+  }
+}
+.animate-sound-card-out {
+  animation: sound-card-out 0.16s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-sound-card-in,
+  .animate-sound-card-out {
+    animation: none;
+  }
+}
+
 /* Rows of the chat attachment menu. Surface colours are Tailwind tokens on
    the element itself; only the press feedback needs to live here, because
    it must use the standalone `scale` property rather than `transform`.

@@ -222,3 +222,84 @@ describe("a button in the rail", () => {
     expect((await rail({})).className).toContain("min-h-11");
   });
 });
+
+describe("the card grows out of the disc, and goes back into it", () => {
+  /** Must match EXIT_MS in the component and the CSS it names. */
+  const EXIT_MS = 160;
+  const DISC = 44;
+
+  it("leaves a cross of exactly the disc's size, pinned to the card's own corner", async () => {
+    // The card's bottom-right corner is the rail's bottom-right corner, so
+    // a disc-sized button in that corner covers the disc's own box: you
+    // press the disc and a cross is sitting where it was. In the row with
+    // the other icons it drifted, because that row's contents change with
+    // who is looking.
+    await mount({});
+    const cross = [...host.querySelectorAll<HTMLElement>('[aria-label="Close"]')].at(-1)!;
+    expect(cross.style.width).toBe(`${DISC}px`);
+    expect(cross.style.height).toBe(`${DISC}px`);
+    expect(cross.className).toContain("absolute bottom-0 right-0");
+    expect(cross.parentElement).toBe(card());
+  });
+
+  it("and scales from the middle of that cross", async () => {
+    await mount({});
+    expect(card()!.style.transformOrigin).toBe(
+      `calc(100% - ${DISC / 2}px) calc(100% - ${DISC / 2}px)`,
+    );
+    expect(card()!.className).toContain("animate-sound-card-in");
+  });
+
+  it("stays on screen long enough to shrink back in", async () => {
+    vi.useFakeTimers();
+    try {
+      const s = spies();
+      await mount(s);
+      await mount({ ...s, open: false });
+      // Still there, playing the way out.
+      expect(card()).not.toBeNull();
+      expect(card()!.className).toContain("animate-sound-card-out");
+      expect(card()!.className).not.toContain("animate-sound-card-in");
+      // And taking no taps on the way: the Shot underneath is already back.
+      const scrim = host.querySelector<HTMLButtonElement>('[aria-label="Close"]')!;
+      expect(scrim.disabled).toBe(true);
+      await act(async () => {
+        vi.advanceTimersByTime(EXIT_MS);
+      });
+      expect(card()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("and is whole again if it is reopened mid-shrink", async () => {
+    vi.useFakeTimers();
+    try {
+      const s = spies();
+      await mount(s);
+      await mount({ ...s, open: false });
+      await act(async () => {
+        vi.advanceTimersByTime(EXIT_MS / 2);
+      });
+      await mount({ ...s, open: true });
+      expect(card()!.className).toContain("animate-sound-card-in");
+      // The timer from the aborted exit must not take the card away.
+      await act(async () => {
+        vi.advanceTimersByTime(EXIT_MS * 2);
+      });
+      expect(card()).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("holds still for anyone who asked for less motion", () => {
+    const css = readFileSync("src/app/globals.css", "utf8").replace(/\r\n/g, "\n");
+    const at = css.indexOf(".animate-sound-card-in,");
+    expect(at).toBeGreaterThan(0);
+    // The rule above it is the reduced-motion query, and it turns both off.
+    expect(css.slice(css.lastIndexOf("@media", at), css.indexOf("}", css.indexOf("animation: none", at))))
+      .toContain("prefers-reduced-motion: reduce");
+    expect(css).toContain(".animate-sound-card-out {\n  animation: sound-card-out 0.16s");
+  });
+});
