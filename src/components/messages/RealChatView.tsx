@@ -2643,6 +2643,7 @@ export function RealChatView({
                           <PollBubble
                             poll={readPoll(m)!}
                             messageId={m.id}
+                            viewerId={currentUserId}
                             mine={mine}
                             onError={(msg) => showToast(msg)}
                           />

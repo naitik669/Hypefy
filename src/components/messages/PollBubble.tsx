@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { type Poll, barWidth, voteLabel } from "@/lib/chat-poll";
+import { readMyChoices } from "@hypefy/core/chat-poll-votes";
 
 /**
  * A poll in the thread.
@@ -19,11 +20,14 @@ import { type Poll, barWidth, voteLabel } from "@/lib/chat-poll";
 export function PollBubble({
   poll,
   messageId,
+  viewerId,
   mine,
   onError,
 }: {
   poll: Poll;
   messageId: string;
+  /** The signed-in user. Only their votes are ticked. */
+  viewerId: string;
   mine: boolean;
   onError: (message: string) => void;
 }) {
@@ -33,20 +37,23 @@ export function PollBubble({
 
   useEffect(() => {
     let live = true;
-    (async () => {
-      const { data } = await supabase
-        .from("message_poll_votes")
-        .select("choice")
-        .eq("message_id", messageId);
-      if (!live || !data) return;
-      setChosen(new Set(data.map((r) => r.choice)));
-    })();
+    readMyChoices(supabase, messageId, viewerId)
+      .then((mineNow) => {
+        if (live) setChosen(mineNow);
+      })
+      .catch((e: unknown) => {
+        if (live) onError(e instanceof Error ? e.message : "Couldn't load your vote");
+      });
     return () => {
       live = false;
     };
     // Read once per poll: afterwards this component is the only thing that
     // changes your own choices, and it keeps them itself.
-  }, [messageId, supabase]);
+    // onError is left out on purpose: the thread passes a fresh arrow every
+    // render, and re-reading the votes on each render would undo a tick made
+    // since the last read.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messageId, viewerId, supabase]);
 
   async function choose(i: number) {
     if (busy !== null) return;
