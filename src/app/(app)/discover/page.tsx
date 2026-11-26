@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DiscoverView } from "@/components/discover/DiscoverView";
-import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { diversify } from "@/lib/feed-rank";
 import { getBlockedIds } from "@/lib/blocked";
 import { discoverScore } from "@/lib/discover-rank";
@@ -249,23 +248,23 @@ export default async function DiscoverPage() {
           compass on Home — not a tab you can simply be on. It was the only
           PageHeader in the app without it. */}
       <PageHeader title="Discover" showBack />
-      <PullToRefresh>
-        {/* Search lives inside DiscoverView now, on one row with the filter
-            that replaced the category chips. */}
-        <DiscoverView
-          currentUserId={user.id}
-          rankedPosts={rankedPosts}
-          feedCursor={feedCursor}
-          blockedIds={[...blockedIds]}
-          trendingPosts={trendingPosts}
-          trendingShots={trendingShots}
-          feedShots={feedShots}
-          people={(people ?? []) as any[]}
-          newPeople={newPeople}
-          categoryRails={categoryRails}
-          tags={tags}
-        />
-      </PullToRefresh>
+      {/* Search lives inside DiscoverView now, on one row with the filter
+          that replaced the category chips. So does the pull-to-refresh: a
+          pull has to reshuffle the feed as well as re-ask the server, and
+          the reshuffle seed is client state in DiscoverView. */}
+      <DiscoverView
+        currentUserId={user.id}
+        rankedPosts={rankedPosts}
+        feedCursor={feedCursor}
+        blockedIds={[...blockedIds]}
+        trendingPosts={trendingPosts}
+        trendingShots={trendingShots}
+        feedShots={feedShots}
+        people={(people ?? []) as any[]}
+        newPeople={newPeople}
+        categoryRails={categoryRails}
+        tags={tags}
+      />
     </>
   );
 }
