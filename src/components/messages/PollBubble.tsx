@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { type Poll, barWidth, voteLabel } from "@/lib/chat-poll";
+import { readMyChoices } from "@hypefy/core/chat-poll-votes";
 
 /**
  * A poll in the thread.
@@ -34,12 +35,9 @@ export function PollBubble({
   useEffect(() => {
     let live = true;
     (async () => {
-      const { data } = await supabase
-        .from("message_poll_votes")
-        .select("choice")
-        .eq("message_id", messageId);
-      if (!live || !data) return;
-      setChosen(new Set(data.map((r) => r.choice)));
+      const mineNow = await readMyChoices(supabase, messageId);
+      if (!live) return;
+      setChosen(mineNow);
     })();
     return () => {
       live = false;
