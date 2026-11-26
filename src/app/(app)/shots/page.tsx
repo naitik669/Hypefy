@@ -7,6 +7,7 @@ import { placeGhost } from "@/lib/ghost-place";
 import { getFeedExclusions, isQuieted, NO_EXCLUSIONS } from "@/lib/feed-quiet";
 import { one, jsonRecord } from "@/lib/supabase/typed";
 import { getAdContext } from "@/lib/ads-server";
+import { rows, tolerate } from "@hypefy/core/query";
 
 /** What a Shot in the feed is made of. One list, so every Shot in it has the same fields. */
 const SHOT_COLS =
@@ -67,7 +68,7 @@ export default async function ShotsPage() {
   } = await supabase.auth.getUser();
 
   // Candidate window + interaction affinity, ranked into a personalized reel.
-  const [{ data: shots }, affRes, adContext, rehypesRes, ghostRes, quiet] = await Promise.all([
+  const [shotsRes, affRes, adContext, rehypesRes, ghostRes, quiet] = await Promise.all([
     supabase
       .from("shots")
       .select(SHOT_COLS)
@@ -79,7 +80,7 @@ export default async function ShotsPage() {
       .is("removed_at", null)
       .order("created_at", { ascending: false })
       .limit(80),
-    user ? supabase.rpc("get_affinity", { p_lookback_days: 60 }) : Promise.resolve({ data: null }),
+    user ? supabase.rpc("get_affinity", { p_lookback_days: 60 }) : Promise.resolve({ data: null, error: null }),
     // In parallel with the reel, not after it: the date-of-birth lookup is
     // one more round trip, and it should not add to the time to first frame.
     getAdContext(supabase, user?.id),
@@ -87,24 +88,38 @@ export default async function ShotsPage() {
     // the follow list first would put a round trip before the first frame.
     user
       ? supabase.rpc("followed_shot_rehypes", { p_limit: 20 })
-      : Promise.resolve({ data: null }),
+      : Promise.resolve({ data: null, error: null }),
     // A Shot that someone this person follows, and is followed by, chose for
     // them (Ghost Share, 0119). At most one, and only its id: who chose it is
     // not something this page is ever told. See src/lib/ghost-place.ts.
-    user ? supabase.rpc("claim_ghost_share", { p_kind: "shot" }) : Promise.resolve({ data: null }),
+    user ? supabase.rpc("claim_ghost_share", { p_kind: "shot" }) : Promise.resolve({ data: null, error: null }),
     // People this person muted, and Shots they chose not to see again.
     user ? getFeedExclusions(supabase) : Promise.resolve(NO_EXCLUSIONS),
   ]);
-  const ghostId = (ghostRes.data as string | null) ?? null;
+  /*
+   * The reel itself throws. A reel that cannot be read is not an empty
+   * reel, and saying "The reel is empty" when PostgREST refused the query
+   * is what hid a twelve-day outage: the route error boundary says "That
+   * didnt load" and offers a retry, which is the truth.
+   */
+  const shots = rows<FeedShot>(shotsRes, "the Shots reel");
 
-  const authorAff = jsonRecord((affRes.data as any)?.authors);
+  /*
+   * Everything below is enrichment — who you watch, what your friends
+   * rehyped, a Ghost Share. A reel ranked a little worse beats no reel, so
+   * these degrade. They do NOT degrade quietly: tolerate puts the database
+   * message in the server log.
+   */
+  const ghostId = (tolerate(ghostRes, "a Ghost Share") as string | null) ?? null;
+
+  const authorAff = jsonRecord((tolerate(affRes, "affinity scores") as { authors?: Parameters<typeof jsonRecord>[0] } | null)?.authors);
   const now = Date.now();
 
   // One entry per Shot: a rehyped Shot already in the window keeps its row
   // and gains the label, rather than appearing twice.
   const byId = new Map<string, FeedShot>();
-  for (const s of (shots ?? []) as unknown as FeedShot[]) byId.set(s.id, { ...s, profiles: one(s.profiles as never) });
-  for (const r of ((rehypesRes.data ?? []) as RehypeRow[])) {
+  for (const s of shots) byId.set(s.id, { ...s, profiles: one(s.profiles as never) });
+  for (const r of ((tolerate(rehypesRes, "rehypes from people you follow") ?? []) as RehypeRow[])) {
     const shot = r.shot as FeedShot | null;
     if (!shot?.id) continue;
     byId.set(shot.id, {
@@ -117,7 +132,10 @@ export default async function ShotsPage() {
   // Outside the newest eighty: fetched, and put in with the rest so that it
   // is scored and shaped exactly as they are.
   if (ghostId && !byId.has(ghostId)) {
-    const { data: placed } = await supabase.from("shots").select(SHOT_COLS).eq("id", ghostId).maybeSingle();
+    const placed = tolerate(
+      await supabase.from("shots").select(SHOT_COLS).eq("id", ghostId).maybeSingle(),
+      "the Ghost Shared Shot",
+    );
     if (placed) {
       const row = placed as unknown as FeedShot;
       byId.set(row.id, { ...row, profiles: one(row.profiles as never) });
@@ -126,17 +144,18 @@ export default async function ShotsPage() {
 
   // What you have already watched, for the penalty above.
   const candidateShotIds = [...byId.keys()];
-  const { data: watchedRows } =
+  const watchedRows =
     user && candidateShotIds.length > 0
-      ? await supabase
-          .from("shot_views")
-          .select("shot_id")
-          .eq("viewer_id", user.id)
-          .in("shot_id", candidateShotIds)
-      : { data: [] };
-  const watched = new Set(
-    (watchedRows ?? []).map((v: { shot_id: string }) => v.shot_id)
-  );
+      ? tolerate(
+          await supabase
+            .from("shot_views")
+            .select("shot_id")
+            .eq("viewer_id", user.id)
+            .in("shot_id", candidateShotIds),
+          "which Shots you have already watched",
+        ) ?? []
+      : [];
+  const watched = new Set(watchedRows.map((v) => v.shot_id));
 
   const ranked = diversify(
     [...byId.values()]
