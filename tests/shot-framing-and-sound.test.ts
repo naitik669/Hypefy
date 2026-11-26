@@ -57,3 +57,21 @@ describe("the caption screen can be heard", () => {
     expect(preview).toContain("const [previewMuted, setPreviewMuted] = useState(true);");
   });
 });
+
+describe("the author's face over the video", () => {
+  it("has no stroke drawn round it", () => {
+    // A plain white ring, and an unconditional one: it never marked live,
+    // unseen or anything else, so there was nothing to read in it. On a
+    // squircle over moving video it read as a sticker pasted on.
+    const row = reels.slice(reels.indexOf("<Avatar"), reels.indexOf("/>", reels.indexOf("<Avatar")));
+    expect(row).not.toContain("ring-");
+    expect(row).not.toContain("outline");
+  });
+
+  it("but is still kept off a bright frame", () => {
+    // Which is what the ring was really doing. A shadow does it without
+    // drawing a line — the same job the handle next to it does.
+    const row = reels.slice(reels.indexOf("<Avatar"), reels.indexOf("/>", reels.indexOf("<Avatar")));
+    expect(row).toContain("shadow-[0_1px_8px_rgba(0,0,0,0.55)]");
+  });
+});

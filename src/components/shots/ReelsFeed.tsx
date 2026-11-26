@@ -1822,7 +1822,13 @@ function ReelCard({
             hue={hue}
             size={38}
             src={reel.profiles?.avatar_url ?? undefined}
-            className="ring-2 ring-white/70"
+            // No ring. It was a plain white stroke that meant nothing —
+            // unconditional, so it was never a live or unseen mark — and on
+            // a squircle over video it read as a sticker cut out and pasted
+            // on. What it was really doing was keeping the face off a bright
+            // frame, and a shadow does that without drawing a line: the same
+            // job the handle beside it does with `drop-shadow`.
+            className="shadow-[0_1px_8px_rgba(0,0,0,0.55)]"
           />
           <span className="text-sm font-bold text-white drop-shadow">
             {handle ? `@${handle}` : name}
