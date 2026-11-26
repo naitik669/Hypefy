@@ -61,6 +61,40 @@ describe("remembering what was watched", () => {
     expect(kept[kept.length - 1]).toBe(`s${SEEN_CAP + 4}`);
   });
 
+  /*
+   * 26 Nov 2026: Naitik got "You're all caught up" with a Shot still unwatched
+   * (743af00e…: shot_views had no row for him, RLS served it to him). This
+   * device's list called it watched, because it marks a Shot after 1.5s on
+   * screen whether or not it played, while the account's record (shot_views)
+   * only counts one that played. The account's record is the one to believe.
+   */
+  it("believes the account's record over this device's list when it has one", () => {
+    // Marked on an earlier visit: in this device's list, not in this tab.
+    localStorage.setItem("hypefy_shots_seen", JSON.stringify(["unwatched"]));
+    const open = seenAtOpen(["watched"]);
+    expect(open.ids.has("watched")).toBe(true);
+    expect(open.ids.has("unwatched")).toBe(false);
+    const reel = orderReel(shots("watched", "unwatched", "new"), open);
+    // Nothing the account has not watched may come after the card.
+    expect(idsOf(reel.items)).toEqual(["unwatched", "new", "watched"]);
+    expect(reel.caughtUpBefore).toBe("watched");
+  });
+
+  it("adds what was watched since the tab loaded to the account's record", () => {
+    // The page's record can be an older render than this visit.
+    markShotSeen("just-now");
+    const open = seenAtOpen(["earlier"]);
+    expect(open.ids.has("earlier")).toBe(true);
+    expect(open.ids.has("just-now")).toBe(true);
+  });
+
+  it("falls back to this device's list when there is no account record", () => {
+    markShotSeen("a");
+    expect([...seenAtOpen(null).ids]).toEqual(["a"]);
+    forgetSeenAtOpen();
+    expect([...seenAtOpen().ids]).toEqual(["a"]);
+  });
+
   it("survives rubbish in storage", () => {
     localStorage.setItem("hypefy_shots_seen", "{not json");
     forgetSeenAtOpen();
@@ -228,7 +262,15 @@ describe("where it is wired", () => {
   it("only the Shots tab remembers; a linked Shot opens on that Shot", () => {
     expect(readFileSync("src/app/(app)/shots/page.tsx", "utf8")).toMatch(/<ReelsFeed[^>]*\bremember\b/);
     expect(readFileSync("src/app/(app)/shots/[shotId]/page.tsx", "utf8")).not.toMatch(/<ReelsFeed[^>]*\bremember\b/);
-    expect(reel).toContain("useSyncExternalStore(noSubscribe, remember ? seenAtOpen : noSeen, noSeen)");
+    expect(reel).toContain("useSyncExternalStore(noSubscribe, remember ? seenFromAccount : noSeen, noSeen)");
+    expect(reel).toContain("const seenFromAccount = useCallback(() => seenAtOpen(watchedIds), [watchedIds]);");
+  });
+
+  it("the Shots tab hands the reel the account's record, null only when it has none", () => {
+    const page = readFileSync("src/app/(app)/shots/page.tsx", "utf8").replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
+    expect(page).toMatch(/<ReelsFeed[^>]*watchedIds=\{watchedRows \? \[\.\.\.watched\] : null\}/);
+    // Signed in with nothing to look up is "watched nothing", not "unknown".
+    expect(page).toMatch(/: user\s*\?\s*\[\]\s*:\s*null;/);
   });
 
   it("the cards are slides of their own, counted by the swipe", () => {

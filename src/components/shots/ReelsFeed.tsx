@@ -231,6 +231,7 @@ export function ReelsFeed({
   adCountry = null,
   adPersonalised = false,
   remember = false,
+  watchedIds = null,
 }: {
   reels: Reel[];
   currentUserId: string | null;
@@ -244,6 +245,11 @@ export function ReelsFeed({
    * link, which has to open on that Shot.
    */
   remember?: boolean;
+  /**
+   * The Shots this account has watched (shot_views), read by the page. Null
+   * when signed out or unreadable: the device's own list is used instead.
+   */
+  watchedIds?: readonly string[] | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -251,7 +257,10 @@ export function ReelsFeed({
 
   // What had been watched when the reel was opened. Null on the server and
   // for a linked Shot: the order is then exactly as it was given.
-  const seen = useSyncExternalStore(noSubscribe, remember ? seenAtOpen : noSeen, noSeen);
+  // The account's record when there is one, not this device's list; see
+  // seenAtOpen. Read once per visit, like the list was.
+  const seenFromAccount = useCallback(() => seenAtOpen(watchedIds), [watchedIds]);
+  const seen = useSyncExternalStore(noSubscribe, remember ? seenFromAccount : noSeen, noSeen);
   useEffect(() => forgetSeenAtOpen, []);
   /** "Watch again" was pressed this many times: each is a new shuffle. */
   const [round, setRound] = useState(0);
