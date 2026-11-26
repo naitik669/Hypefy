@@ -2295,3 +2295,34 @@ html[data-splash="off"] #hypefy-splash {
     animation: none !important;
   }
 }
+
+/* The "watched before" badge on the first Shot past the caught-up card.
+   It times itself out in CSS rather than on a timer in React: a setState
+   in an effect for something purely visual costs a cascading render on
+   every swipe into that Shot. `both` leaves it at the last frame, which
+   is hidden, so it never sits parked over the video. */
+@keyframes watched-pill {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  8%,
+  72% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.watched-pill {
+  animation: watched-pill 3400ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .watched-pill {
+    animation: watched-pill 3400ms steps(1, end) both;
+  }
+}

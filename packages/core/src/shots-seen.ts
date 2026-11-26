@@ -122,3 +122,34 @@ export function orderReel<T extends { id: string }>(items: T[], seen: SeenAtOpen
   if (fresh.length === 0) return { items: shuffled(watched, `day-${seen.day}`), caughtUpBefore: null };
   return { items: [...fresh, ...watched], caughtUpBefore: watched[0]?.id ?? null };
 }
+
+export type ChapterBreak = {
+  /** New Shots watched before the card. */
+  newCount: number;
+  /** Already-watched Shots that follow it. */
+  watchedCount: number;
+  /** The Shot above the card, and the one below: the card shows both. */
+  abovePoster: string | null;
+  belowPoster: string | null;
+};
+
+/**
+ * What the card between the new Shots and the watched ones says and shows.
+ *
+ * Counted over the Shots alone, never the reel as rendered: an ad spliced
+ * in beside them is not a Shot anybody watched, and counting one would have
+ * the card claim a Shot more than there was.
+ */
+export function chapterBreak<T extends { id: string; poster_url?: string | null }>(
+  posts: readonly T[],
+  caughtUpBefore: string | null,
+): ChapterBreak {
+  const at = caughtUpBefore ? posts.findIndex((p) => p.id === caughtUpBefore) : -1;
+  if (at < 0) return { newCount: 0, watchedCount: 0, abovePoster: null, belowPoster: null };
+  return {
+    newCount: at,
+    watchedCount: posts.length - at,
+    abovePoster: posts[at - 1]?.poster_url ?? null,
+    belowPoster: posts[at]?.poster_url ?? null,
+  };
+}
