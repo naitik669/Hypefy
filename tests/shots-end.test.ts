@@ -277,7 +277,9 @@ describe("where it is wired", () => {
     expect(reel).toContain('if (item.kind === "post" && item.post.id === order.caughtUpBefore) out.push({ kind: "caught-up" });');
     expect(reel).toContain('if (seen && noMore && items.length > 0) out.push({ kind: "end" });');
     expect(reel).toContain("const atEnd = activeIdx === slides.length - 1 && dy < 0;");
-    expect(reel).toContain("setActiveIdx((i) => Math.min(i + 1, slides.length - 1));");
+    // Still clamped to the last slide; the swipe now names the index it is
+    // going to, because the track has to be animated to the same place.
+    expect(reel).toContain("const to = Math.min(activeIdx + 1, slides.length - 1);");
   });
 
   it("a Shot counts as watched after a moment on screen, not at a glance", () => {

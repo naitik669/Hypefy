@@ -284,3 +284,81 @@ describe("a pinch holds the page still and clears the furniture", () => {
     expect(feed).toContain("{images.length > 1 && !zooming && (");
   });
 });
+
+describe("swiping the Shots feed moves one element, not the whole feed", () => {
+  const reel = readFileSync("src/components/shots/ReelsFeed.tsx", "utf8").replace(/\r\n/g, "\n");
+
+  it("the finger writes to the track, not to React", () => {
+    // `touchmove` fires on every frame of a swipe. Holding the offset in
+    // state meant every one of those frames re-rendered the whole feed —
+    // five mounted Shots with their rails and sheets — to move a single
+    // transform, and React cannot keep up with a finger. That is the whole
+    // of why the swipe did not feel smooth.
+    expect(reel).toContain("const drag = useRef<number | null>(null);");
+    expect(reel).not.toContain("setDrag");
+    expect(reel).not.toContain("useState<number | null>(null)");
+    // The move handler touches the DOM and no state at all.
+    const move = reel.slice(
+      reel.indexOf("function onSwipeTouchMove"),
+      reel.indexOf("function step("),
+    );
+    expect(move.length).toBeGreaterThan(200);
+    expect(move).toContain("trackTo(dy)");
+    expect(move).not.toContain("setActiveIdx");
+  });
+
+  it("and one transform carries the whole feed", () => {
+    // Each slide used to carry `i - activeIdx` plus the live drag in its
+    // own transform, so a swipe rebuilt a style object per mounted Shot.
+    // A slide's offset is now fixed and only the track moves.
+    expect(reel).toContain("translate3d(0, calc(${-idx * 100}% + ${dy}px), 0)");
+    expect(reel).toContain("style={{ transform: `translate3d(0, ${i * 100}%, 0)` }}");
+    expect(reel).toContain("style={{ transform: trackAt(activeIdx), transition: SETTLE }}");
+  });
+
+  it("every way a gesture can end puts the reel somewhere definite", () => {
+    // Including the one that changes no state: an uncommitted swipe leaves
+    // `activeIdx` alone, so React writes nothing and the settle is the only
+    // thing that takes the reel back off the finger's last position.
+    const end = reel.slice(
+      reel.indexOf("function onSwipeTouchEnd"),
+      reel.indexOf("return (", reel.indexOf("function onSwipeTouchEnd")),
+    );
+    expect(end.length).toBeGreaterThan(200);
+    // next, prev, leave, and not-committed.
+    expect(end.match(/trackSettle\(/g)?.length).toBe(4);
+    // A cancelled or hijacked gesture settles too, rather than leaving the
+    // feed parked mid-swipe.
+    expect(reel).toContain("onTouchCancel={() => {");
+    const move = reel.slice(
+      reel.indexOf("function onSwipeTouchMove"),
+      reel.indexOf("function step("),
+    );
+    expect(move.match(/trackSettle\(activeIdx\)/g)?.length).toBe(3);
+  });
+
+  it("the settle is one value, written the same way by both hands", () => {
+    // An imperative write and the next render must not describe different
+    // positions for a frame, which is what a handoff between two elements
+    // would risk.
+    expect(reel).toContain("el.style.transition = SETTLE;");
+    expect(reel).toContain("el.style.transform = trackAt(idx);");
+    expect(reel).toContain('const SETTLE = "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)";');
+  });
+});
+
+describe("a render that lands mid-swipe does not snap the reel", () => {
+  const reel = readFileSync("src/components/shots/ReelsFeed.tsx", "utf8").replace(/\r\n/g, "\n");
+
+  it("the track's rendered position reads the live finger offset", () => {
+    // The offset lives in a ref so the finger causes no renders — but other
+    // things still do. A page of Shots arriving, a sheet closing or the mute
+    // changing all re-render the feed, and if React wrote the settled
+    // position while a finger was down the reel would jump out from under
+    // it. So the render reads the same ref the finger writes.
+    // Before the browser paints, so the snap is never seen. Reading the ref
+    // in the render itself would be the obvious shape and the repo's lint
+    // rejects it outright (`Cannot access refs during render`).
+    expect(reel).toContain("useLayoutEffect(() => {\n    if (drag.current !== null) trackTo(drag.current);\n  });");
+  });
+});

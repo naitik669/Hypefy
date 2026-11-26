@@ -209,9 +209,76 @@ describe("the line that says how much of the Shot is left", () => {
     // Which is why it slides a full-width bar in rather than scaling one:
     // scaleX would stretch a 1.5px cap into a long ellipse at low progress.
     const bar = reel.slice(reel.indexOf("{/* Playback progress"));
-    const el = bar.slice(0, bar.indexOf("/>"));
+    // The track, from where the line itself starts rather than from the
+    // strip that now sits over it.
+    const el = bar.slice(bar.indexOf("overflow-hidden"), bar.indexOf("</div>", bar.indexOf("ref={fillRef}")));
     expect(el).toContain("overflow-hidden rounded-full");
     expect(el).toContain("h-full w-full rounded-full bg-accent");
     expect(el).not.toContain("width:");
+  });
+});
+
+describe("dragging the line moves through the Shot", () => {
+  const reel = read("src/components/shots/ReelsFeed.tsx");
+  const bar = reel.slice(reel.indexOf("{/* Playback progress"));
+
+  it("the finger lands on a strip, not on three pixels of line", () => {
+    // 3px is enough to read as progress and nowhere near enough to grab.
+    // The target is 28px of nothing, bottom-aligned on the line.
+    expect(bar).toContain('className="pointer-events-auto absolute inset-x-0 bottom-0 z-10 h-7 touch-none"');
+    expect(bar).toContain("ref={scrubRef}");
+  });
+
+  it("and the feed's swipe never sees the gesture", () => {
+    // The reel pages on a vertical drag and this is a horizontal one on the
+    // same surface. Stopping the touch events here means the two gestures
+    // never have to know about each other — and in particular that none of
+    // the swipe's own axis logic has to be touched to make room for this.
+    expect(bar).toContain("onTouchStart={(e) => e.stopPropagation()}");
+    expect(bar).toContain("onTouchMove={(e) => e.stopPropagation()}");
+    expect(bar).toContain("onTouchEnd={(e) => e.stopPropagation()}");
+    // Captured, so a finger that slides off the strip keeps scrubbing.
+    expect(bar).toContain("e.currentTarget.setPointerCapture(e.pointerId)");
+  });
+
+  it("the Shot stops while it is held, and goes on if it was going", () => {
+    // A Shot still running under a scrub fights the finger for the
+    // position. Scrubbing a Shot that was already paused must leave it
+    // paused, which is why what to do afterwards is read from the video.
+    const fn = reel.slice(reel.indexOf("const scrubStart ="), reel.indexOf("const scrubEnd ="));
+    expect(fn).toContain("resumeAfter.current = !el.paused;");
+    expect(fn).toContain("el.pause();");
+    expect(reel).toContain("if (el && resumeAfter.current) void el.play().catch(() => {});");
+    // `playing` is the feed's idea of whether this Shot is running. A scrub
+    // is not a pause, and touching it here would ripple into the feed.
+    const held = reel.slice(
+      reel.indexOf("const scrubStart ="),
+      reel.indexOf("resumeAfter.current = false;"),
+    );
+    expect(held.length).toBeGreaterThan(200);
+    expect(held).not.toContain("setPlaying");
+  });
+
+  it("the position is measured off the strip and stops short of the end", () => {
+    // Measured against the element rather than the window, so the column's
+    // width is not a thing this has to know. And clamped: `timeupdate`
+    // sends anything at or past the trimmed end back to the start, and a
+    // scrub to the far right is not a request to replay.
+    const fn = reel.slice(reel.indexOf("const seekToX ="), reel.indexOf("const scrubStart ="));
+    expect(fn).toContain("strip.getBoundingClientRect()");
+    expect(fn).toContain("el.currentTime = Math.min(from + p * span, to - 0.05);");
+    // Across the trimmed window, like the bar itself.
+    expect(fn).toContain("const to = window0.end ?? el.duration;");
+  });
+
+  it("it grows under the finger, and says where it is", () => {
+    // Something has to show it is being held, and the only place a Shot's
+    // length is ever written down is here, while you are looking for a spot.
+    expect(reel).toContain("const barH = scrubbing ? PROGRESS_H * 3 : PROGRESS_H;");
+    expect(bar).toContain("scrubbing ? \"bg-white/30\" : \"bg-white/15\"");
+    expect(bar).toContain("{scrubbing && (");
+    // The clock is written to the node, not through state: this runs on
+    // every frame of the drag.
+    expect(reel).toContain("timeRef.current.textContent = `${clock(p * span)} / ${clock(span)}`;");
   });
 });
