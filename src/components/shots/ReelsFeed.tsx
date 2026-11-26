@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bookmark, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, EyeOff, Pencil, Archive, MessageCircle, MessageCircleOff } from "lucide-react";
+import { Bookmark, Check, Volume2, VolumeX, Play, Pause, ChevronLeft, MoreHorizontal, Trash2, BookmarkCheck, Loader2, Flag, Ban, Link2, Share2, EyeOff, Pencil, Archive, MessageCircle, MessageCircleOff } from "lucide-react";
 import { ShareIcon } from "@/components/ui/ShareIcon";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { setArchived, setCommentsOff } from "@/lib/post-controls";
@@ -127,7 +127,7 @@ import { CommentIcon } from "@/components/ui/CommentIcon";
 import { claimPreview, originalTrackFor, parseTrack } from "@/lib/music";
 import { ShotSound } from "@/components/music/ShotSound";
 import { ShotsEndCard, type NewCheck } from "@/components/shots/ShotsEndCard";
-import { forgetSeenAtOpen, markShotSeen, orderReel, seenAtOpen, SEEN_AFTER_MS, THIN_REEL } from "@/lib/shots-seen";
+import { chapterBreak, forgetSeenAtOpen, markShotSeen, orderReel, seenAtOpen, SEEN_AFTER_MS, THIN_REEL } from "@/lib/shots-seen";
 import { hideContent, muteUser, QUIET_COPY } from "@/lib/feed-quiet";
 import { HypeIcon } from "@/components/ui/HypeIcon";
 
@@ -416,6 +416,12 @@ export function ReelsFeed({
     return out;
   }, [items, order.caughtUpBefore, seen, noMore]);
 
+  /** What the card between the two stretches says and shows; see chapterBreak. */
+  const chapter = useMemo(
+    () => chapterBreak(order.items, order.caughtUpBefore),
+    [order.items, order.caughtUpBefore],
+  );
+
   // A Shot that has been on screen a moment has been watched.
   const activeShotId = (() => {
     const s = slides[activeIdx];
@@ -647,6 +653,10 @@ export function ReelsFeed({
               onAgain={watchAgain}
               onCheck={() => void checkForNew()}
               onContinue={() => setActiveIdx(i + 1)}
+              newCount={chapter.newCount}
+              watchedCount={chapter.watchedCount}
+              abovePoster={chapter.abovePoster}
+              belowPoster={chapter.belowPoster}
             />
           ) : item.kind === "ad" ? (
             <ShotAdCard
@@ -669,6 +679,10 @@ export function ReelsFeed({
             onBack={() => safeBack(router)}
             // Only the active reel can raise a sheet, so only it reports.
             onSheetChange={i === activeIdx ? setSheetOpen : undefined}
+            // Only the Shot the card sits above: the one swiping up from it
+            // lands on. On every watched Shot after it the badge would say
+            // the same thing over and over, which is noise, not a signpost.
+            watchedBefore={item.post.id === order.caughtUpBefore}
             // Buffer the current reel + its immediate neighbours so swiping to
             // the next one is instant; keep the rest at metadata only.
             preload={Math.abs(i - activeIdx) <= 1 ? "auto" : "metadata"}
@@ -691,6 +705,7 @@ function ReelCard({
   onBack,
   onSheetChange,
   preload = "metadata",
+  watchedBefore = false,
 }: {
   reel: Reel;
   currentUserId: string | null;
@@ -700,6 +715,14 @@ function ReelCard({
   isActive: boolean;
   onBack: () => void;
   onSheetChange?: (open: boolean) => void;
+  /**
+   * The first Shot after the "caught up" card: say so, briefly.
+   *
+   * Swiping up off that card lands on a Shot that looks exactly like a new
+   * one, and the card is gone by then — so without this the reader has
+   * nothing telling them they are now in the part they have seen.
+   */
+  watchedBefore?: boolean;
   preload?: "auto" | "metadata" | "none";
 }) {
   const supabase = createClient();
@@ -1629,6 +1652,25 @@ function ReelCard({
       >
         <ChevronLeft size={22} />
       </button>
+
+      {/* "You have seen this one": the signpost the caught-up card hands on
+          to. Centred between the back and mute buttons, clear of both. It
+          is mounted only while this Shot is the one on screen, so the
+          animation starts when it is swiped onto and not before; it fades
+          itself out (see .watched-pill). */}
+      {watchedBefore && isActive && (
+        <div className="watched-pill pointer-events-none absolute inset-x-0 top-[calc(1rem+var(--sat))] z-20 flex justify-center">
+          <span
+            data-watched-pill
+            className="flex h-9 items-center gap-2 rounded-full border border-accent/35 bg-black/80 pl-2.5 pr-3.5 text-xs font-bold text-white backdrop-blur-sm"
+          >
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-ink">
+              <Check size={12} strokeWidth={3.4} />
+            </span>
+            Watched before
+          </span>
+        </div>
+      )}
 
       {/* Mute toggle — top-right */}
       <button

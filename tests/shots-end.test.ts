@@ -4,6 +4,7 @@ import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { readFileSync } from "node:fs";
 import {
+  chapterBreak,
   SEEN_CAP,
   forgetSeenAtOpen,
   markShotSeen,
@@ -158,6 +159,10 @@ describe("the card at the end", () => {
     /** How many Shots the reel held. Defaults to a reel that is not bare. */
     total?: number;
     check?: "idle" | "checking" | "none";
+    newCount?: number;
+    watchedCount?: number;
+    abovePoster?: string | null;
+    belowPoster?: string | null;
   }) {
     const { ShotsEndCard } = await import("@/components/shots/ShotsEndCard");
     await act(async () =>
@@ -241,18 +246,89 @@ describe("the card at the end", () => {
     expect((q("[data-end-check]") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("between new and watched, offers to keep going and nothing about checking", async () => {
-    await mount({ variant: "caught-up", thin: true });
-    expect(host.textContent).toContain("The ones you've watched are below");
+  it("between new and watched, it is a divider: no Watch again, no checking", async () => {
+    await mount({ variant: "caught-up", thin: true, newCount: 4, watchedCount: 5 });
     await act(async () => q("[data-end-continue]")!.click());
     expect(onContinue).toHaveBeenCalledTimes(1);
     expect(q("[data-end-check]")).toBeNull();
     expect(q("[data-end-again]")).toBeNull();
   });
 
+  it("says how many were watched and how many follow, in the right number", async () => {
+    await mount({ variant: "caught-up", thin: true, newCount: 4, watchedCount: 5 });
+    expect(host.textContent).toContain("All 4 new Shots watched.");
+    expect(host.textContent).toContain("Below are 5 Shots from before.");
+    await mount({ variant: "caught-up", thin: true, newCount: 1, watchedCount: 1 });
+    expect(host.textContent).toContain("That new Shot watched.");
+    expect(host.textContent).toContain("Below is 1 Shot from before.");
+  });
+
+  /*
+   * The two bands are what make it a chapter break rather than a wall: the
+   * Shot just watched above, the next one below. Without a poster each is
+   * still a band, so the card never collapses to a plain screen.
+   */
+  it("shows the Shots either side of it, and still has both bands without posters", async () => {
+    await mount({
+      variant: "caught-up",
+      thin: true,
+      newCount: 4,
+      watchedCount: 5,
+      abovePoster: "https://cdn.test/above.jpg",
+      belowPoster: "https://cdn.test/below.jpg",
+    });
+    const styles = [...host.querySelectorAll<HTMLElement>("[style]")].map((e) => e.getAttribute("style") ?? "");
+    expect(styles.some((x) => x.includes("https://cdn.test/above.jpg"))).toBe(true);
+    expect(styles.some((x) => x.includes("https://cdn.test/below.jpg"))).toBe(true);
+    await mount({ variant: "caught-up", thin: true, newCount: 4, watchedCount: 5 });
+    expect(host.textContent).toContain("Last new Shot");
+    expect(q("[data-end-continue]")).not.toBeNull();
+  });
+
+  it("the end of the reel is untouched by all that", async () => {
+    await mount({ variant: "end", thin: false, total: 9 });
+    expect(host.textContent).toContain("That's all 9 Shots for now.");
+    expect(q("[data-end-again]")).not.toBeNull();
+    expect(q("[data-end-check]")).not.toBeNull();
+  });
+
   it("points somewhere to find more people", async () => {
     await mount({ variant: "end", thin: false });
     expect([...host.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toContain("/discover");
+  });
+});
+
+describe("what the chapter break says", () => {
+  const p = (id: string, poster: string | null = null) => ({ id, poster_url: poster });
+
+  it("counts the new ones before it and the watched ones from it", () => {
+    const got = chapterBreak([p("a"), p("b"), p("c"), p("d")], "c");
+    expect(got.newCount).toBe(2);
+    expect(got.watchedCount).toBe(2);
+  });
+
+  it("takes its two posters from the Shots either side, not from the marked one alone", () => {
+    const got = chapterBreak([p("a", "A.jpg"), p("b", "B.jpg"), p("c", "C.jpg")], "c");
+    expect(got.abovePoster).toBe("B.jpg");
+    expect(got.belowPoster).toBe("C.jpg");
+  });
+
+  it("has nothing to say when the reel is all new or all watched", () => {
+    expect(chapterBreak([p("a"), p("b")], null)).toEqual({
+      newCount: 0,
+      watchedCount: 0,
+      abovePoster: null,
+      belowPoster: null,
+    });
+    // A marker for a Shot no longer in the reel is the same nothing.
+    expect(chapterBreak([p("a")], "gone").newCount).toBe(0);
+  });
+
+  it("survives a Shot with no poster", () => {
+    const got = chapterBreak([p("a"), p("b")], "b");
+    expect(got.abovePoster).toBeNull();
+    expect(got.belowPoster).toBeNull();
+    expect(got.watchedCount).toBe(1);
   });
 });
 
@@ -278,6 +354,35 @@ describe("where it is wired", () => {
     expect(reel).toContain('if (seen && noMore && items.length > 0) out.push({ kind: "end" });');
     expect(reel).toContain("const atEnd = activeIdx === slides.length - 1 && dy < 0;");
     expect(reel).toContain("setActiveIdx((i) => Math.min(i + 1, slides.length - 1));");
+  });
+
+  it("the card is counted over the Shots, never the reel with its ads in it", () => {
+    expect(reel).toContain("chapterBreak(order.items, order.caughtUpBefore)");
+    expect(reel).toContain("newCount={chapter.newCount}");
+    expect(reel).toContain("belowPoster={chapter.belowPoster}");
+  });
+
+  /*
+   * Swiping up off the card lands on a Shot that looks exactly like a new
+   * one, with the card gone. The badge is the handover — on that Shot only,
+   * since on every watched Shot after it it would be noise.
+   */
+  it("the badge is on the first watched Shot only, and fades by itself", () => {
+    const body = reel.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
+    expect(body).toContain("watchedBefore={item.post.id === order.caughtUpBefore}");
+    expect(body).toContain("{watchedBefore && isActive && (");
+    expect(body).toContain("data-watched-pill");
+    // It fades itself out, and ends hidden rather than parked on the video.
+    const css = readFileSync("src/app/globals.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(body).toContain('className="watched-pill');
+    expect(css).toMatch(/@keyframes watched-pill\s*\{[^}]*0%\s*\{\s*opacity:\s*0/);
+    expect(css).toMatch(/@keyframes watched-pill[\s\S]*?100%\s*\{\s*opacity:\s*0;/);
+    // Every rule that runs it, the reduced-motion one included: one of them
+    // keeping `both` while the other lost it would leave the badge parked
+    // on the video for whichever readers got that rule.
+    const rules = [...css.matchAll(/\.watched-pill\s*\{\s*animation:([^;]*);/g)].map((m) => m[1]);
+    expect(rules.length).toBe(2);
+    for (const r of rules) expect(r).toMatch(/\bwatched-pill\s+\d+ms\b[\s\S]*\bboth\b/);
   });
 
   it("a Shot counts as watched after a moment on screen, not at a glance", () => {
