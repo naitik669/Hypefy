@@ -208,10 +208,12 @@ describe("where the two crowds sit", () => {
   });
 });
 
-describe("the line under a Shot's caption", () => {
+describe("the hype line, and where it is no longer", () => {
   const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
   const line = read("src/components/hype/HypeProofLine.tsx");
   const reel = read("src/components/shots/ReelsFeed.tsx");
+  const feedShot = read("src/components/feed/ShotFeedCard.tsx");
+  const card = read("src/components/feed/FeedCard.tsx");
 
   it("carries names only — the deck above it has the faces", () => {
     // The same people twice on one screen is worse than either alone.
@@ -229,15 +231,45 @@ describe("the line under a Shot's caption", () => {
 
   it("and is dimmer than the caption it sits under", () => {
     // The caption is what the author said; this is a footnote about it.
-    expect(reel).toContain('className="text-sm text-white/90 drop-shadow"');
     expect(line).toContain("text-white/55");
   });
 
-  it("sits below the caption, not above it", () => {
-    const caption = reel.indexOf("{caption && !commentsOpen && (");
-    const proof = reel.indexOf("<HypeProofLine");
-    expect(caption).toBeGreaterThan(-1);
-    expect(proof).toBeGreaterThan(caption);
+  it("still sits under a post and under a Shot in the feed", () => {
+    // Removing it from the reel is not removing it: on a card you are
+    // scrolling past, the names are the whole signal.
+    expect(card, "post").toContain("<HypeProofLine");
+    expect(feedShot, "Shot card in the feed").toContain("<HypeProofLine");
+  });
+
+  it("but never in the reel, where the deck is already saying it", () => {
+    // Reported watching a Shot: the faces of the two people who hyped it,
+    // and immediately beneath them "AMAN, MEHUL & 1 other hyped this".
+    // One screen, one Shot, the same people twice.
+    expect(reel).not.toContain("<HypeProofLine");
+    expect(reel).not.toContain("components/hype/HypeProofLine");
+  });
+
+  it("and the full list is still reachable from the faces themselves", () => {
+    // The line was one way in. It must not have been the only one.
+    expect(reel).toContain("setHypedBySheet(true)");
+    expect(reel).toContain("<HypedBySheet");
+  });
+});
+
+describe("a Shot's caption is a label on the video, not a paragraph", () => {
+  const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
+  const reel = read("src/components/shots/ReelsFeed.tsx");
+
+  it("one line in the reel, where the video is the thing", () => {
+    expect(reel).toContain('clampClass="line-clamp-1"');
+    expect(reel).not.toContain('clampClass="line-clamp-2"');
+  });
+
+  it("and the rest is still one tap away rather than cut off", () => {
+    // Clamping to a line must not mean losing what the author wrote.
+    const at = reel.indexOf('clampClass="line-clamp-1"');
+    expect(at).toBeGreaterThan(-1);
+    expect(reel.slice(at - 200, at)).toContain("<ExpandableText");
   });
 });
 
