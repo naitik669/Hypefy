@@ -6,6 +6,7 @@ import Link from "next/link";
 import { tagHref } from "@/lib/tag-lookup";
 import { Zap, Play, Compass, Hash } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { DiscoverFilter } from "@/components/discover/DiscoverFilter";
 import { ShotPreview } from "@/components/shots/ShotPreview";
@@ -118,20 +119,27 @@ export function DiscoverView({
       // "Check back soon" was the only dead end left in the app: every other
       // empty state offers an action, and this one is likely a new account's
       // first sight of Discover. Posting is the thing that actually fills it.
-      <EmptyState
-        icon={Compass}
-        title="Nothing to discover yet"
-        text="Discover fills up as people post. Be the reason it does."
-        ctaLabel="Create a post"
-        ctaHref="/create/post"
-      />
+      <PullToRefresh onRefresh={refreshFeed}>
+        <EmptyState
+          icon={Compass}
+          title="Nothing to discover yet"
+          text="Discover fills up as people post. Be the reason it does."
+          ctaLabel="Create a post"
+          ctaHref="/create/post"
+        />
+      </PullToRefresh>
     );
   }
 
   const topic = categoryRails.find((c) => c.label === cat);
 
   return (
-    <>
+    // The pull lives here rather than in the server page because it has to
+    // bump refreshCount, the reshuffle seed. From the page it could only call
+    // router.refresh(), which on a catalogue with nothing new returns the
+    // identical ranking, so a pull brought back the same grid in the same
+    // order (26 Nov 2026: 34 posts, newest 21 days old).
+    <PullToRefresh onRefresh={refreshFeed}>
 {/* Search, and the categories behind one button beside it.
           They used to be a scrolling row of chips under the search bar: ten
           of them, most off the right edge, taking a band of every screen to
@@ -256,7 +264,7 @@ export function DiscoverView({
             <EmptyState icon={Hash} title="No tags trending" text="Throw #tags on your posts and start a wave." />
           ))}
       </div>
-    </>
+    </PullToRefresh>
   );
 }
 
