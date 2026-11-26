@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Check, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useStepUp } from "@/components/auth/StepUpDialog";
 import { afterPasswordChange } from "@/lib/e2ee/vault";
 import { E2EE_ENABLED } from "@/lib/e2ee/flag";
+import { hasPasswordIdentity } from "@hypefy/core/step-up";
 
 export function AccountForms({ currentEmail }: { currentEmail: string }) {
   const supabase = createClient();
@@ -44,6 +45,19 @@ export function AccountForms({ currentEmail }: { currentEmail: string }) {
   }
 
   // ── Password change ──
+  // An account made with Google has no password, so there is no "current
+  // password" to ask for: it sets its first one, confirmed by the emailed
+  // code the step-up sends. null until the identities have been read.
+  const [hasPassword, setHasPassword] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (live) setHasPassword(hasPasswordIdentity(user?.identities));
+    });
+    return () => {
+      live = false;
+    };
+  }, [supabase]);
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -52,7 +66,25 @@ export function AccountForms({ currentEmail }: { currentEmail: string }) {
     null
   );
 
+  async function setFirstPassword() {
+    if (pwBusy || newPw.length < 8) return;
+    setPwMsg(null);
+    if (!(await requireStepUp({ maxAge: 0 }))) return;
+    setPwBusy(true);
+    const { error } = await supabase.auth.updateUser({ password: newPw });
+    setPwBusy(false);
+    if (error) {
+      setPwMsg({ ok: false, text: error.message });
+      return;
+    }
+    setHasPassword(true);
+    setNewPw("");
+    setPwMsg({ ok: true, text: "Password set. You can sign in with it as well as Google." });
+    await supabase.rpc("log_security_alert", { p_body: "A password was added to your account" });
+  }
+
   async function changePassword() {
+    if (hasPassword === false) return setFirstPassword();
     if (pwBusy || !currentPw || newPw.length < 8) return;
     setPwBusy(true);
     setPwMsg(null);
@@ -164,14 +196,21 @@ export function AccountForms({ currentEmail }: { currentEmail: string }) {
         </p>
 
         <div className="mt-3 flex flex-col gap-2">
-          <input
-            type="password"
-            value={currentPw}
-            onChange={(e) => setCurrentPw(e.target.value)}
-            placeholder="Current password"
-            autoComplete="current-password"
-            className="input"
-          />
+          {hasPassword === false ? (
+            <p className="text-xs text-muted">
+              You sign in with Google, so there&apos;s no password yet. Set one
+              and you can sign in with either.
+            </p>
+          ) : (
+            <input
+              type="password"
+              value={currentPw}
+              onChange={(e) => setCurrentPw(e.target.value)}
+              placeholder="Current password"
+              autoComplete="current-password"
+              className="input"
+            />
+          )}
           <div className="relative">
             <input
               type={showPw ? "text" : "password"}
@@ -193,11 +232,13 @@ export function AccountForms({ currentEmail }: { currentEmail: string }) {
           <button
             type="button"
             onClick={changePassword}
-            disabled={pwBusy || !currentPw || newPw.length < 8}
+            disabled={pwBusy || (hasPassword !== false && !currentPw) || newPw.length < 8}
             className="flex h-10 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink disabled:opacity-50"
           >
             {pwBusy ? (
               <Loader2 size={15} className="animate-spin" />
+            ) : hasPassword === false ? (
+              "Set password"
             ) : (
               "Change password"
             )}

@@ -25,6 +25,7 @@ import { packTrack, unpackTrack } from "@/lib/music-message";
 import { EmptyThread } from "@/components/messages/EmptyThread";
 import type { Track } from "@/lib/music";
 import { ReportSheet } from "@/components/ui/ReportSheet";
+import { reportMessage } from "@hypefy/core/safety";
 import { FloatingMenu, MenuItem, MenuDivider } from "@/components/ui/FloatingMenu";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CaptureGuard } from "@/components/native/CaptureGuard";
@@ -511,7 +512,10 @@ export function RealChatView({
       showToast("Couldn't block user");
       return;
     }
-    showToast("Blocked & reported");
+    // Just "Blocked": block_message_request blocks and files no report, so
+    // saying "reported" told people a moderator would look when none would.
+    // Reporting is its own action, on a message or from the chat's info.
+    showToast("Blocked");
     setTimeout(() => router.push("/messages"), 600);
   }
 
@@ -1886,8 +1890,8 @@ export function RealChatView({
     if (!reportMsg) return;
     const m = reportMsg;
     setReportMsg(null);
-    const { error } = await supabase.rpc("report_message", { p_message_id: m.id, p_reason: reason, p_details: undefined });
-    showToast(error ? "Report already sent" : "Report sent");
+    const sent = await reportMessage(supabase as never, { messageId: m.id, reason });
+    showToast(sent.ok ? "Report sent" : sent.error);
   }
 
   /**
