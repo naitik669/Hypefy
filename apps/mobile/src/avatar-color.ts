@@ -7,14 +7,22 @@
  * be called, and a wrong conversion fails rather than looks right.
  *
  * The web's Avatar fills the squircle with
- * `linear-gradient(140deg, hsl(h 75% 52%), hsl(h+50 70% 38%))`. Those four
- * numbers and the +50 are the web's; everything else is arithmetic.
+ * `linear-gradient(145deg, hsl(h 72% 64%) 0%, hsl(h 63% 57%) 45%,
+ * hsl(h+36 63% 57%) 100%)`. Those numbers and the +36 are the web's;
+ * everything else is arithmetic.
+ *
+ * Three stops, not two, since the web stopped draining the lightness and
+ * started carrying the hue instead: the middle one is where the turn
+ * begins, and a two-stop copy of it reads as a different colour by the
+ * bottom corner.
  */
 
 /** The web's first stop: saturation and lightness. */
-export const STOP_FROM = { s: 75, l: 52 } as const;
-/** The web's second stop, at a hue 50 further round. */
-export const STOP_TO = { s: 70, l: 38, hueShift: 50 } as const;
+export const STOP_FROM = { s: 72, l: 64 } as const;
+/** The web's middle stop, at 45%, still on the starting hue. */
+export const STOP_MID = { s: 63, l: 57, at: 0.45 } as const;
+/** The web's last stop, at a hue 36 further round. */
+export const STOP_TO = { s: 63, l: 57, hueShift: 36 } as const;
 
 /**
  * `hsl(h s% l%)` as `#rrggbb`.
@@ -49,10 +57,11 @@ export function hslToHex(h: number, s: number, l: number): string {
   return `#${byte(rgb[0])}${byte(rgb[1])}${byte(rgb[2])}`;
 }
 
-/** The two stops the web interpolates between, for one hue. */
-export function avatarStops(hue: number): readonly [string, string] {
+/** The three stops the web interpolates between, for one hue. */
+export function avatarStops(hue: number): readonly [string, string, string] {
   return [
     hslToHex(hue, STOP_FROM.s, STOP_FROM.l),
+    hslToHex(hue, STOP_MID.s, STOP_MID.l),
     hslToHex((hue + STOP_TO.hueShift) % 360, STOP_TO.s, STOP_TO.l),
   ];
 }

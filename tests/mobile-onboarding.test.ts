@@ -5,6 +5,7 @@ import {
   hslToHex,
   avatarStops,
   STOP_FROM,
+  STOP_MID,
   STOP_TO,
 } from "../apps/mobile/src/avatar-color";
 
@@ -1224,16 +1225,25 @@ describe("the identity slide's profile card matches the website's", () => {
 
 describe("the gradient avatar is the website's gradient", () => {
   it("uses the web Avatar's own saturation and lightness", () => {
+    // Three stops since the web stopped draining the lightness and started
+    // carrying the hue instead. A two-stop copy of it reads as a different
+    // colour by the bottom corner, which is why the middle one is asserted
+    // too rather than left to the renderer to guess.
     const web = read("src/components/ui/Avatar.tsx");
     const m = web.match(
-      /linear-gradient\(140deg, hsl\(\$\{hue\} (\d+)% (\d+)%\), hsl\(\$\{\(hue \+ (\d+)\) % 360\} (\d+)% (\d+)%\)\)/,
+      /linear-gradient\(\d+deg, hsl\(\$\{hue\} (\d+)% (\d+)%\) 0%, hsl\(\$\{hue\} (\d+)% (\d+)%\) (\d+)%, hsl\(\$\{\(hue \+ (\d+)\) % 360\} (\d+)% (\d+)%\) 100%\)/,
     );
     expect(m, "the web's Avatar gradient no longer parses").toBeTruthy();
     expect(STOP_FROM).toEqual({ s: Number(m?.[1]), l: Number(m?.[2]) });
+    expect(STOP_MID).toEqual({
+      s: Number(m?.[3]),
+      l: Number(m?.[4]),
+      at: Number(m?.[5]) / 100,
+    });
     expect(STOP_TO).toEqual({
-      s: Number(m?.[4]),
-      l: Number(m?.[5]),
-      hueShift: Number(m?.[3]),
+      s: Number(m?.[7]),
+      l: Number(m?.[8]),
+      hueShift: Number(m?.[6]),
     });
   });
 
@@ -1278,8 +1288,10 @@ describe("the gradient avatar is the website's gradient", () => {
     expect(hslToHex(-40, 100, 50)).toBe(hslToHex(320, 100, 50));
   });
 
-  it("and nia's second stop is the wrapped hue, not the raw one", () => {
-    expect(avatarStops(330)[1]).toBe(hslToHex(20, STOP_TO.s, STOP_TO.l));
+  it("and nia's last stop is the wrapped hue, not the raw one", () => {
+    // 330 + 36 is 366, which is 6. The middle stop stays on her own hue.
+    expect(avatarStops(330)[2]).toBe(hslToHex(6, STOP_TO.s, STOP_TO.l));
+    expect(avatarStops(330)[1]).toBe(hslToHex(330, STOP_MID.s, STOP_MID.l));
   });
 
   it("and the two users without a photograph get different gradients", () => {

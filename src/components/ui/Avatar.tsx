@@ -37,9 +37,18 @@ export function Avatar({
       style={{
         width: size,
         height: size,
+        /*
+         * The gradient TURNS rather than darkens: same lightness and
+         * saturation at both ends, the hue carried round by 36°.
+         *
+         * It used to run from 52% lightness to 38% at a lower saturation,
+         * which on half the hues landed in olive or mud — the thing that
+         * made a row of faces over a video look cheap. Holding the
+         * lightness keeps every hue the colour it started as.
+         */
         background: src
           ? undefined
-          : `linear-gradient(140deg, hsl(${hue} 75% 52%), hsl(${(hue + 50) % 360} 70% 38%))`,
+          : `linear-gradient(145deg, hsl(${hue} 72% 64%) 0%, hsl(${hue} 63% 57%) 45%, hsl(${(hue + 36) % 360} 63% 57%) 100%)`,
       }}
     >
       {src ? (
@@ -71,8 +80,10 @@ export function Avatar({
         )
       ) : (
         <span
-          className="font-bold text-white/95"
-          style={{ fontSize: size * 0.4 }}
+          // The gradient no longer falls to a dark end, so the letter has
+          // less to sit against: the shadow is what carries it now.
+          className="font-bold text-white"
+          style={{ fontSize: size * 0.4, textShadow: "0 1px 2px rgba(0,0,0,0.38)" }}
         >
           {initial}
         </span>

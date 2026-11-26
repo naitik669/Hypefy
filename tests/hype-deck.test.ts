@@ -66,6 +66,12 @@ describe("turning hypers into faces", () => {
 
 describe("the mark on the face", () => {
   const deck = readFileSync("src/components/feed/RehypeDeck.tsx", "utf8");
+  const markFn = deck.slice(deck.indexOf("function DeckMark"));
+  // Both branches say "No plate" now, so the split is on the sentence only
+  // the rehype one has.
+  const split = markFn.indexOf("It was a lime square");
+  const hype = markFn.slice(0, split);
+  const rehype = markFn.slice(split);
 
   it("is the deck's own, told which glyph to wear", () => {
     // One deck, two marks. A second copy of the float-and-throw code would
@@ -79,81 +85,83 @@ describe("the mark on the face", () => {
     // its path — it comes from a round join on a stroke the same colour as
     // the fill, at that weight. Reusing the component is the only way the
     // two stay the same shape.
-    const hype = deck.slice(deck.indexOf('if (mark === "hype")'), deck.indexOf("const box ="));
-    // HypeIcon now, not lucide's Star: the mark the deck shares with the
-    // button is the app's own, so "reuse the component" means that one.
     expect(hype).toContain("<HypeIcon");
     expect(hype).toContain("strokeWidth={2.2}");
     const card = readFileSync("src/components/feed/FeedCard.tsx", "utf8");
     expect(card, "the button's own weight").toContain("strokeWidth={2.2}");
   });
 
-  it("its gradient is two tokens, not two hexes in a component", () => {
-    expect(deck).toContain("var(--color-hype-lit)");
+  it("the gold has a middle, not just two ends", () => {
+    // Two stops ran straight from lit to deep, so the middle of the star —
+    // which is most of it at 17px — sat on the blend rather than on gold.
+    expect(deck).toContain("var(--color-hype-pale)");
+    expect(deck).toContain("var(--color-hype)");
     expect(deck).toContain("var(--color-hype-deep)");
     const css = readFileSync("src/app/globals.css", "utf8");
-    expect(css).toContain("--color-hype-lit:");
+    expect(css).toContain("--color-hype-pale:");
     expect(css).toContain("--color-hype-deep:");
   });
 
-  it("and one definition serves every star on the page", () => {
+  it("and every gradient is tokens, not hexes in a component", () => {
+    const defs = deck.slice(deck.indexOf("function HypeGradientDefs"), deck.indexOf("function DeckMark"));
+    expect(defs).not.toMatch(/#[0-9a-fA-F]{6}/);
+  });
+
+  it("one definition serves every mark on the page", () => {
     // A per-instance id would mean one copy of an identical gradient per
-    // face. VerifiedStar already settled this; same fixed id here.
+    // face. VerifiedStar already settled this; same fixed ids here.
     expect(deck).toContain('const HYPE_GRAD = "hypeStarGrad"');
+    expect(deck).toContain('const REHYPE_GRAD = "rehypeLoopGrad"');
     expect(deck.match(/<HypeGradientDefs \/>/g)?.length).toBe(1);
   });
 
-  it("the stroke matches the fill, or the points go spiky", () => {
+  it("the star's stroke matches its fill, or the points go spiky", () => {
     // The curve is a round join on a same-coloured stroke. A stroke of any
     // other colour reshapes the star rather than just recolouring its edge.
-    const hype = deck.slice(deck.indexOf('if (mark === "hype")'), deck.indexOf("const box ="));
     expect(hype).toContain("fill={`url(#${HYPE_GRAD})`}");
     expect(hype).toContain("stroke={`url(#${HYPE_GRAD})`}");
   });
 
-  it("sits bare on the face — no plate, and no shadow under it", () => {
-    const hype = deck.slice(deck.indexOf('if (mark === "hype")'), deck.indexOf("const box ="));
+  it("the star sits bare on the face — no plate, no shadow", () => {
+    // A star is legible as itself. What stands in for a shadow is the
+    // gradient's deep end.
     expect(hype).not.toContain("bg-black/55");
     expect(hype).not.toContain("drop-shadow");
     expect(hype).not.toContain("boxShadow");
   });
 
-  it("nothing in the row drops a shadow at all", () => {
-    // Not under the faces, not behind the star, not on the white loop.
-    // The faces lost theirs too, so the row sits on the photo rather than
-    // hovering over it.
-    const code = deck
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
-    expect(code).not.toContain("drop-shadow");
-    expect(code).not.toContain("boxShadow");
+  it("and the rehype has lost its plate too", () => {
+    // It was a lime square: the only square in a deck of squircles, the
+    // biggest thing in the row, carrying a white loop at 1.5:1.
+    expect(rehype).not.toContain("rounded-[30%]");
+    expect(rehype).not.toContain("background:");
+    expect(rehype).not.toContain("width: box");
   });
 
-  it("the rehype keeps a plate, now in the lime that is already its colour", () => {
-    // RehypeIcon paints itself text-accent when active, so lime is the
-    // rehype colour exactly as gold is the hype colour.
-    const rehype = deck.slice(deck.indexOf("const box ="));
-    expect(rehype).toContain("var(--color-accent)");
-    expect(rehype).toContain("var(--color-accent-deep)");
-    expect(rehype).not.toMatch(/#[0-9a-fA-F]{6}/);
+  it("the loop is drawn in the lime itself", () => {
+    // Which is what it has instead of a plate. A white loop with nothing
+    // behind it would be a white loop on whatever the video is doing.
+    expect(rehype).toContain("stroke={`url(#${REHYPE_GRAD})`}");
+    expect(rehype).not.toContain("text-white");
   });
 
-  it("and the deep end of that lime is a token, not a hex in a component", () => {
+  it("and that lime turns rather than darkens", () => {
+    // Running it to --color-accent-deep made olive, which is what made the
+    // old mark look muddy. At 17px the ends must differ in hue to read as
+    // a gradient at all.
+    const defs = deck.slice(deck.indexOf("function HypeGradientDefs"), deck.indexOf("function DeckMark"));
+    expect(defs).toContain("var(--color-accent-turn)");
+    expect(defs).not.toContain("var(--color-accent-deep)");
     const css = readFileSync("src/app/globals.css", "utf8");
-    expect(css).toContain("--color-accent-deep:");
+    expect(css).toContain("--color-accent-lit:");
+    expect(css).toContain("--color-accent-turn:");
   });
 
-  it("the white loop stands on its own, with nothing behind it", () => {
-    // It had a 1.2px edge, because white on #a3e635 is 1.5:1 and the
-    // gradient's light corner sits right under the upper arrow. The edge
-    // is gone by choice — no shadows anywhere in the row — so the loop's
-    // legibility now rests entirely on where the gradient's light end
-    // falls. If that arrow ever washes out, this is the line that explains
-    // why, and darkening the light stop is the fix that keeps the rule.
-    const rehype = deck.slice(deck.indexOf("const box ="));
-    expect(rehype).not.toContain("drop-shadow");
-    expect(rehype).toContain("text-white");
+  it("so it carries the row's one shadow, because nothing is behind it", () => {
+    // The star keeps its mass from the gradient's deep end; a lime line on
+    // a bright frame has nothing to fall back on.
+    expect(rehype).toContain("drop-shadow-");
+    expect(hype).not.toContain("drop-shadow");
   });
 
   it("and the loop is the rehype button's own, not a copy of its path", () => {
@@ -163,16 +171,14 @@ describe("the mark on the face", () => {
     expect(deck).not.toContain("M13 18H7a2 2 0 0 1-2-2V6");
   });
 
-  it("drawn inactive, because active paints it lime on a lime plate", () => {
-    // Comments stripped: the one above this code explains the trap and
-    // would satisfy the assertion on its own.
-    const code = deck
-      .slice(deck.indexOf("const box ="))
+  it("drawn inactive, so the gradient is what colours it", () => {
+    // `active` paints the icon text-accent, which would override the
+    // gradient stroke with one flat lime.
+    const code = rehype
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
       .replace(/^\s*\/\/.*$/gm, "");
     expect(code).not.toContain("active");
-    expect(code).toContain("text-white");
   });
 });
 
@@ -273,6 +279,33 @@ describe("a Shot's caption is a label on the video, not a paragraph", () => {
   });
 });
 
+describe("the face behind the letter", () => {
+  const avatar = readFileSync("src/components/ui/Avatar.tsx", "utf8");
+
+  it("the gradient turns the hue instead of draining it", () => {
+    // It ran 52% lightness to 38% at a lower saturation, which on half the
+    // hues landed in olive or mud. Holding both and carrying the hue round
+    // keeps every avatar the colour it started as.
+    const stops = [...avatar.matchAll(/hsl\(\$\{[^}]+\} (\d+)% (\d+)%\)/g)].map((m) => ({
+      sat: Number(m[1]),
+      light: Number(m[2]),
+    }));
+    expect(stops.length, "three stops").toBe(3);
+    const lightest = Math.max(...stops.map((c) => c.light));
+    const darkest = Math.min(...stops.map((c) => c.light));
+    expect(lightest - darkest, "lightness travelled").toBeLessThanOrEqual(10);
+    expect(darkest, "never falls to mud").toBeGreaterThanOrEqual(50);
+    expect(Math.min(...stops.map((c) => c.sat)), "saturation held").toBeGreaterThanOrEqual(60);
+    expect(avatar, "the hue carried round").toContain("(hue + 36) % 360");
+  });
+
+  it("and the letter keeps a shadow, since the dark end is gone", () => {
+    // White on a 57% hue is about 3.6:1, and an initial at 40% of a 34px
+    // face is not large text. The shadow is what carries it.
+    expect(avatar).toContain("textShadow");
+  });
+});
+
 describe("how the faces float", () => {
   const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
   const deck = read("src/components/feed/RehypeDeck.tsx");
@@ -302,24 +335,38 @@ describe("how the faces float", () => {
     expect(deck).toContain("  size = 42,");
   });
 
-  it("and bigger again in a Shot, which is held closer", () => {
-    // The default does not reach the reel: it passes its own, so the
-    // default growing would leave the Shot's faces behind.
+  it("the wave between the seats is a lean, not a staircase", () => {
+    // At 0.7 the middle face sat most of its own height above its
+    // neighbours. Over video that read as three faces falling downstairs.
+    const raise = deck.match(/const RAISE = \[([^\]]+)\]/)?.[1].split(",").map(Number);
+    expect(raise, "RAISE not found").toBeTruthy();
+    expect(Math.max(...raise!), "the highest seat").toBeLessThanOrEqual(0.5);
+    const tilt = deck.match(/const TILT = \[([^\]]+)\]/)?.[1].split(",").map(Number);
+    expect(Math.max(...tilt!.map(Math.abs)), "the steepest tilt").toBeLessThanOrEqual(5);
+  });
+
+  it("and SMALLER in a Shot, not bigger", () => {
+    // It was 44, bigger than a post's, on the theory that a Shot is held
+    // closer. Over video that made the three faces the loudest thing on
+    // the screen, which is what was reported about this corner.
     const reel = read("src/components/shots/ReelsFeed.tsx");
-    const size = Number(reel.match(/<RehypeDeck[\s\S]{0,200}?size=\{(\d+)\}/)?.[1]);
-    expect(size, "shot face size").toBeGreaterThanOrEqual(44);
+    const shot = Number(reel.match(/<RehypeDeck[\s\S]{0,400}?size=\{(\d+)\}/)?.[1]);
+    const post = Number(deck.match(/ {2}size = (\d+),/)?.[1]);
+    expect(shot, "shot face size").toBe(34);
+    expect(shot, "smaller than a post's").toBeLessThan(post);
   });
 
   it("the mark grows with the face rather than sitting at one size", () => {
-    expect(deck).toContain("size={Math.round(size * scale)}");
-    expect(deck).toContain("const box = Math.round(size * scale);");
-    expect(deck).toContain("markScale = 0.58");
+    expect(deck.match(/size=\{Math\.round\(size \* scale\)\}/g)?.length, "both marks").toBe(2);
+    expect(deck).toContain("markScale = 0.5");
   });
 
-  it("and is proportionally bigger in a Shot, not just bigger with it", () => {
+  it("at the same proportion on a Shot as on a post", () => {
+    // They differed while the Shot's mark was a plate and the post's was
+    // not. Both are bare glyphs now, so one number is right for both.
     const reel = read("src/components/shots/ReelsFeed.tsx");
     const shot = Number(reel.match(/markScale=\{([\d.]+)\}/)?.[1]);
     const post = Number(deck.match(/markScale = ([\d.]+)/)?.[1]);
-    expect(shot, "shot markScale").toBeGreaterThan(post);
+    expect(shot, "shot markScale").toBe(post);
   });
 });
