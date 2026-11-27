@@ -46,6 +46,10 @@ const OPEN_PATHS = [
   "/api/gate",
   "/api/version",
   "/auth/callback",
+  // Google's return page for the ID-token sign-in (src/lib/google-id-token.ts).
+  // Open for the same reason as the callback. It does nothing without a
+  // token that answers a request this tab made.
+  "/auth/google",
 
   /*
    * **The two write-only relays, which the gate had been silently
