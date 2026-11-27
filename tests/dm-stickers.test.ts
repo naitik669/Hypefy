@@ -34,6 +34,7 @@ const strip = (s: string) =>
     .replace(/\s--\s.*$/gm, "");
 
 const UID = "11111111-2222-3333-4444-555555555555";
+const CONVO = "99999999-8888-7777-6666-555555555555";
 const SID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const PATH = `${UID}/99999999-8888-7777-6666-555555555555.webp`;
 
@@ -419,6 +420,8 @@ describe("the composer", () => {
 // ── Rendering ──────────────────────────────────────────────────────────
 
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
+const studio = vi.hoisted(() => ({ open: vi.fn() }));
+vi.mock("@/lib/cutout/studio-href", () => ({ openStickerStudio: studio.open }));
 vi.mock("@/components/messages/GifPicker", () => ({
   GifPicker: ({ onSelect }: { onSelect: (u: string) => void }) =>
     createElement("button", { "data-gif": true, onClick: () => onSelect("https://gif/x.gif") }, "a gif"),
@@ -455,8 +458,8 @@ afterEach(async () => {
 async function drawer(props: Record<string, unknown> = {}) {
   store.fake = true;
   const { StickerDrawer } = await import("@/components/stickers/StickerDrawer");
-  const h = { onSticker: vi.fn(), onGif: vi.fn(), onError: vi.fn() };
-  await act(async () => root.render(createElement(StickerDrawer, { currentUserId: UID, ...h, ...props })));
+  const h = { onSticker: vi.fn(), onGif: vi.fn() };
+  await act(async () => root.render(createElement(StickerDrawer, { currentUserId: UID, conversationId: CONVO, ...h, ...props })));
   return h;
 }
 
@@ -471,6 +474,15 @@ describe("the drawer", () => {
     expect(create.className).not.toMatch(/accent/);
     expect(create.querySelector("svg")).not.toBe(null);
     expect(tiles).toHaveLength(2);
+  });
+
+  it("Create opens the cutout studio for this conversation", async () => {
+    store.mine = { ok: true, value: [] };
+    studio.open.mockClear();
+    await drawer();
+    await act(async () => (host.querySelector('[aria-label="Create a sticker"]') as HTMLElement).click());
+    expect(studio.open).toHaveBeenCalledOnce();
+    expect(studio.open).toHaveBeenCalledWith(CONVO);
   });
 
   it("a tile sends that sticker", async () => {
