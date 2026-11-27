@@ -107,8 +107,13 @@ function clickableNonInteractive(): Hit[] {
  * The ones still worth looking at sit in files held by the lint ratchet
  * (CallProvider, FeedCard, InAppNotifier, RealChatView), which cannot be
  * touched until their react-hooks debt is paid.
+ *
+ * 27 Nov: 46. PackMaker (making a sticker pack) adds one of each kind: the
+ * full-screen backdrop that closes it, which Escape and its own X/Close
+ * buttons also do, and the sheet's stopPropagation so a click inside does
+ * not reach that backdrop.
  */
-const CEILING = 44;
+const CEILING = 46;
 
 describe("keyboard reach", () => {
   it("the scanner finds these at all", () => {
