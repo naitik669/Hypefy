@@ -46,7 +46,7 @@ import { one } from "@/lib/supabase/typed";
 import { LinkCard } from "./LinkCard";
 import { PollBubble } from "./PollBubble";
 import { SwipeRow } from "./SwipeRow";
-import { canEdit, swipeAction, type SwipeAction } from "@/lib/chat-gestures";
+import { canEdit, contextMenuOpensHold, holdMoved, swipeAction, type SwipeAction } from "@/lib/chat-gestures";
 import { PollComposer, type StickerDraft } from "./PollComposer";
 import { ChatStickerCard } from "./ChatStickers";
 import { readChatSticker } from "@hypefy/core/chat-stickers";
@@ -573,6 +573,8 @@ export function RealChatView({
   // an incoming message yanks the view down.
   const nearBottomRef = useRef(true);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Where the press began and with what, for the hold's slop and contextmenu. */
+  const pressStart = useRef<{ x: number; y: number; type: string } | null>(null);
   const suppressClick = useRef(false);
   const idsRef = useRef<string[]>([]);
   const messagesRef = useRef<ChatMsg[]>(initialMessages);
@@ -2105,6 +2107,7 @@ export function RealChatView({
       return;
     }
     if (m.is_unsent) return;
+    pressStart.current = { x: e.clientX, y: e.clientY, type: e.pointerType };
 
     // ── Double-tap → ⭐ star reaction ────────────────────────────────────────
     // 300ms window fires before the 420ms long-press, so no conflict.
@@ -2157,6 +2160,22 @@ export function RealChatView({
   }
   function onPressEnd() {
     if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
+  }
+  /** A finger that drifts a little is still holding; past HOLD_SLOP_PX it is not. */
+  function onPressMove(e: React.PointerEvent) {
+    const s = pressStart.current;
+    if (!s) return;
+    if (holdMoved(e.clientX - s.x, e.clientY - s.y)) onPressEnd();
+  }
+  /**
+   * Right-click (and the keyboard menu key) open the menu here. A touch
+   * holds through the timer only: Android fires contextmenu on a long touch
+   * even after it has become a swipe.
+   */
+  function onHoldContextMenu(m: ChatMsg, e: React.MouseEvent) {
+    e.preventDefault();
+    if (!contextMenuOpensHold(pressStart.current?.type ?? null)) return;
+    setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() });
   }
 
   return (
@@ -2542,10 +2561,10 @@ export function RealChatView({
                           onMore={(rect) => setMenu({ msg: m, rect })}
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
-                          onPointerMove={onPressEnd}
+                          onPointerMove={onPressMove}
                           onPointerLeave={onPressEnd}
                           onClick={(e) => { if (suppressClick.current) { e.preventDefault(); suppressClick.current = false; } }}
-                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          onContextMenu={(e) => onHoldContextMenu(m, e)}
                         />)
                       ) : m.kind === "shot" && m.shot ? (
                         withForwarded(m, "shot",
@@ -2555,18 +2574,18 @@ export function RealChatView({
                           onMore={(rect) => setMenu({ msg: m, rect })}
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
-                          onPointerMove={onPressEnd}
+                          onPointerMove={onPressMove}
                           onPointerLeave={onPressEnd}
                           onClick={(e) => { if (suppressClick.current) { e.preventDefault(); suppressClick.current = false; } }}
-                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          onContextMenu={(e) => onHoldContextMenu(m, e)}
                         />)
                       ) : m.kind === "page_reply" && pageSnapshot(m.metadata) ? (
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
-                          onPointerMove={onPressEnd}
+                          onPointerMove={onPressMove}
                           onPointerLeave={onPressEnd}
-                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          onContextMenu={(e) => onHoldContextMenu(m, e)}
                           className="relative select-none"
                         >
                           <PageReplyEmbed
@@ -2591,10 +2610,10 @@ export function RealChatView({
                           className="w-[230px] max-w-full"
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
-                          onPointerMove={onPressEnd}
+                          onPointerMove={onPressMove}
                           onPointerLeave={onPressEnd}
                           onClickCapture={(e) => { if (suppressClick.current) { e.preventDefault(); e.stopPropagation(); suppressClick.current = false; } }}
-                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          onContextMenu={(e) => onHoldContextMenu(m, e)}
                         >
                           <TrackChip track={unpackTrack(m.body)!} />
                         </div>
@@ -2636,10 +2655,10 @@ export function RealChatView({
                             rel="noopener noreferrer"
                             onPointerDown={(e) => onPressStart(m, e)}
                             onPointerUp={onPressEnd}
-                            onPointerMove={onPressEnd}
+                            onPointerMove={onPressMove}
                             onPointerLeave={onPressEnd}
                             onClick={(e) => { if (suppressClick.current) { e.preventDefault(); suppressClick.current = false; } }}
-                            onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                            onContextMenu={(e) => onHoldContextMenu(m, e)}
                             className={`relative flex items-center gap-2.5 rounded-2xl px-3 py-2.5 ${
                               mine ? "rounded-br-md bg-accent text-accent-ink" : "rounded-bl-md bg-surface text-foreground"
                             }`}
@@ -2664,9 +2683,9 @@ export function RealChatView({
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
-                          onPointerMove={onPressEnd}
+                          onPointerMove={onPressMove}
                           onPointerLeave={onPressEnd}
-                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          onContextMenu={(e) => onHoldContextMenu(m, e)}
                           className={`relative flex py-1.5 ${mine ? "justify-end" : "justify-start"}`}
                           data-sticker
                         >
@@ -2682,9 +2701,9 @@ export function RealChatView({
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
-                          onPointerMove={onPressEnd}
+                          onPointerMove={onPressMove}
                           onPointerLeave={onPressEnd}
-                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          onContextMenu={(e) => onHoldContextMenu(m, e)}
                           // A single photo opens full-screen, as a photo in a
                           // folder always has. It had no tap at all. Not a
                           // GIF: that already plays where it is.
@@ -2717,9 +2736,9 @@ export function RealChatView({
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
-                          onPointerMove={onPressEnd}
+                          onPointerMove={onPressMove}
                           onPointerLeave={onPressEnd}
-                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          onContextMenu={(e) => onHoldContextMenu(m, e)}
                           className="relative"
                         >
                           <MediaFolder
@@ -2739,9 +2758,9 @@ export function RealChatView({
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
-                          onPointerMove={onPressEnd}
+                          onPointerMove={onPressMove}
                           onPointerLeave={onPressEnd}
-                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          onContextMenu={(e) => onHoldContextMenu(m, e)}
                           className="relative overflow-hidden rounded-2xl bg-black"
                           style={{ width: MEDIA_W, maxWidth: "100%" }}
                         >
@@ -2773,9 +2792,9 @@ export function RealChatView({
                           <div
                             onPointerDown={(e) => onPressStart(m, e)}
                             onPointerUp={onPressEnd}
-                            onPointerMove={onPressEnd}
+                            onPointerMove={onPressMove}
                             onPointerLeave={onPressEnd}
-                            onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                            onContextMenu={(e) => onHoldContextMenu(m, e)}
                             className="relative"
                           >
                             <VoiceMessage url={voiceUrl} storedDuration={voiceDuration} peaks={voicePeaks} mine={mine} />
@@ -2790,9 +2809,9 @@ export function RealChatView({
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
-                          onPointerMove={onPressEnd}
+                          onPointerMove={onPressMove}
                           onPointerLeave={onPressEnd}
-                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          onContextMenu={(e) => onHoldContextMenu(m, e)}
                           className="relative"
                         >
                           <PollBubble
@@ -2809,9 +2828,9 @@ export function RealChatView({
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
-                          onPointerMove={onPressEnd}
+                          onPointerMove={onPressMove}
                           onPointerLeave={onPressEnd}
-                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          onContextMenu={(e) => onHoldContextMenu(m, e)}
                           className="relative"
                         >
                           <ChatStickerCard
@@ -2829,9 +2848,9 @@ export function RealChatView({
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
                           onPointerUp={onPressEnd}
-                          onPointerMove={onPressEnd}
+                          onPointerMove={onPressMove}
                           onPointerLeave={onPressEnd}
-                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          onContextMenu={(e) => onHoldContextMenu(m, e)}
                           className={`relative min-w-[80px] max-w-full cursor-default select-none rounded-2xl px-3.5 pt-2 pb-5 text-sm ${
                             mine ? "rounded-br-md" : "rounded-bl-md"
                           } ${
