@@ -54,9 +54,10 @@ import { isMissingFunction } from "@hypefy/core/chat-sticker-answers";
 import { readPoll } from "@/lib/chat-poll";
 import { firstPreviewable } from "@/lib/link-preview";
 import { ForwardSheet } from "@/components/messages/ForwardSheet";
-import { canPin } from "@/lib/chat-pins";
+import { canPin, foldsOnScroll, PIN_BANNER_MS } from "@/lib/chat-pins";
 import { randomObjectName } from "@/lib/object-name";
 import { PinPane, usePinPane } from "@/components/messages/PinPane";
+import { PinBanner } from "@/components/messages/PinBanner";
 import { ChatThemeDecor } from "@/components/messages/ChatThemeDecor";
 import { bubbleCss, findChatTheme } from "@/lib/chat-themes";
 import { ChatAmbient } from "@/components/messages/ChatAmbient";
@@ -941,8 +942,26 @@ export function RealChatView({
   }
 
   // Track scroll position: load older near the top, remember near-bottom.
+  /**
+   * The pin banner (PinBanner): the strip shows when the chat opens and
+   * folds into the edge tab after PIN_BANNER_MS, or on the first scroll
+   * once the thread has settled.
+   */
+  // Held as the chat it was folded in, so opening another chat starts
+  // unfolded without resetting state from an effect.
+  const [pinFoldedIn, setPinFoldedIn] = useState<string | null>(null);
+  const pinFolded = pinFoldedIn === conversationId;
+  const pinOpenedAt = useRef(0);
+  useEffect(() => {
+    // The event clock, so the scroll handler can compare e.timeStamp to it.
+    pinOpenedAt.current = performance.now();
+    const t = setTimeout(() => setPinFoldedIn(conversationId), PIN_BANNER_MS);
+    return () => clearTimeout(t);
+  }, [conversationId]);
+
   function onMessagesScroll(e: React.UIEvent<HTMLDivElement>) {
     const el = e.currentTarget;
+    if (!pinFolded && foldsOnScroll(e.timeStamp - pinOpenedAt.current)) setPinFoldedIn(conversationId);
     // In a column-reverse scroller the offset counts from the bottom (0 at
     // the newest message, negative going up in current browsers).
     const fromBottom = Math.abs(el.scrollTop);
@@ -2012,6 +2031,15 @@ export function RealChatView({
    * scrolling while a sideways drag owns the finger.
    */
   const pinPane = usePinPane(scrollContainerRef);
+  const pinPeople: Record<string, { name: string }> = isGroup
+    ? Object.fromEntries((group?.members ?? []).map((m) => [m.id, { name: m.name }]))
+    : { [other.id]: { name: other.name } };
+  // Read the banner's pins again when one is pinned or unpinned here, and
+  // when the board closes (it can unpin).
+  const pinKey = useMemo(
+    () => messages.filter((m) => m.pinned_at).map((m) => m.id).join(",") + (pinPane.isOpen ? "|board" : ""),
+    [messages, pinPane.isOpen],
+  );
 
   function copy(m: ChatMsg) {
     if (m.body) { navigator.clipboard.writeText(m.body).catch(() => {}); showToast("Copied"); }
@@ -2239,6 +2267,19 @@ export function RealChatView({
           </FloatingMenu>
         </div>
       </header>
+
+      {/* The newest pin, over the top of the thread so folding it never
+          moves a message. Under the pin board, which covers it. */}
+      <div className="relative z-20 h-0">
+        <PinBanner
+          conversationId={conversationId}
+          me={currentUserId}
+          nameOf={(id) => pinPeople[id]?.name ?? null}
+          folded={pinFolded}
+          refreshKey={pinKey}
+          onOpen={() => { setPinFoldedIn(conversationId); pinPane.open(); }}
+        />
+      </div>
 
       {/* Messages — clicking here closes the GIF picker.
           Scrolls from the bottom (column-reverse), so a chat opens on its
@@ -3589,7 +3630,7 @@ export function RealChatView({
         pane={pinPane}
         conversationId={conversationId}
         me={currentUserId}
-        people={isGroup ? Object.fromEntries((group?.members ?? []).map((m) => [m.id, { name: m.name }])) : { [other.id]: { name: other.name } }}
+        people={pinPeople}
         isGroup={isGroup}
         onOpenMessage={(id) => void goToMessage({ id } as FoundMessage)}
       />
