@@ -8,6 +8,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/ToastProvider";
+import { forwardSticker } from "@/lib/sticker-store";
 
 type Friend = {
   id: string;
@@ -22,6 +23,8 @@ export type ForwardableMsg = {
   body: string | null;
   post_id?: string | null;
   shot_id?: string | null;
+  /** A sticker is forwarded by which sticker it is (send_sticker, 0220). */
+  metadata?: unknown;
 };
 
 /**
@@ -102,6 +105,16 @@ export function ForwardSheet({
     // at once: they arrive as a run of messages, and firing them together
     // would let the server decide what order a conversation happened in.
     for (const one of sending) {
+      // A sticker has no body to copy: it goes again as the same sticker.
+      if (one.kind === "sticker") {
+        const sent = await forwardSticker(supabase, convId, one);
+        if (!sent.ok) {
+          setBusy(null);
+          toast(sent.error, "error");
+          return;
+        }
+        continue;
+      }
       const { error } = await supabase.rpc("send_message", {
         p_conversation_id: convId,
         p_body: one.body ?? undefined,

@@ -29,6 +29,7 @@ const KIND_VERB: Record<string, string> = {
   post: "shared a post",
   shot: "shared a Shot",
   gif: "sent a GIF",
+  sticker: "sent a sticker",
   image: "sent a photo",
   video: "sent a video",
   voice: "sent a voice note",

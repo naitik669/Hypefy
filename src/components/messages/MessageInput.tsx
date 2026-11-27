@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 import { useMentionHashtag, applySuggestion, SuggestionDropdown } from "@/components/ui/MentionHashtagPicker";
 import { readDraft, writeDraft } from "@/lib/chat-drafts";
 
@@ -49,6 +49,7 @@ export function MessageInput({
   onTyping,
   onHasTextChange,
   onValueChange,
+  trailing,
 }: {
   ref?: Ref<MessageInputHandle>;
   currentUserId: string;
@@ -61,6 +62,9 @@ export function MessageInput({
   onEnter: () => void;
   onTyping: () => void;
   onHasTextChange: (hasText: boolean) => void;
+  /** A button that sits inside the box at its right edge — the Stickers &
+   *  GIFs button (D6 C), which lives in the field rather than beside it. */
+  trailing?: ReactNode;
   /**
    * Given only when the thread needs the value itself as it is typed, which
    * is one case: a folder of photos shows its caption on the message while
@@ -143,8 +147,9 @@ export function MessageInput({
         onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && onEnter()}
         placeholder={placeholder}
         maxLength={maxLength}
-        className="h-11 w-full rounded-2xl bg-surface px-4 text-sm outline-none placeholder:text-faint focus:border-white/25"
+        className={`h-11 w-full rounded-2xl bg-surface pl-4 text-sm outline-none placeholder:text-faint focus:border-white/25 ${trailing ? "pr-11" : "pr-4"}`}
       />
+      {trailing && <div className="absolute inset-y-0 right-1.5 flex items-center">{trailing}</div>}
       <SuggestionDropdown
         suggestions={suggestions}
         onSelect={(s) => {

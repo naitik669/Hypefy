@@ -267,6 +267,9 @@ describe("thumbnails in scrolling lists are deferred", () => {
     ["src/components/shows/ShowWidgetPickers.tsx", "{item.thumb}", 1],
     ["src/components/messages/SharedPostCard.tsx", "{image}", 1],
     ["src/components/messages/SharedShotCard.tsx", "{shot.poster_url}", 1],
+    // A sticker: in the thread, and in the drawer's grid, both of which
+    // scroll — so most of them are off-screen most of the time.
+    ["src/components/stickers/StickerImage.tsx", "{stickerUrl(SUPABASE_URL, sticker.path)}", 1],
   ];
 
   it.each(deferred)("%s defers %s", (file, srcExpr, count) => {
@@ -293,8 +296,8 @@ describe("thumbnails in scrolling lists are deferred", () => {
     const lazy = walk("src")
       .flatMap((f: string) => read(f).match(/<img[\s\S]*?\/>/g) ?? [])
       .filter((tag: string) => tag.includes('loading="lazy"'));
-    expect(lazy).toHaveLength(38);
-    expect(deferred.reduce((n, [, , c]) => n + c, 0)).toBe(17);
+    expect(lazy).toHaveLength(39);
+    expect(deferred.reduce((n, [, , c]) => n + c, 0)).toBe(18);
   });
 
   it("a chat image defers by default but lets its caller decide", () => {

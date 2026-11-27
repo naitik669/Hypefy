@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock, AlertCircle, Search, Pin as PinIcon, BarChart2 } from "lucide-react";
+import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock, AlertCircle, Search, Pin as PinIcon, BarChart2, Sticker as StickerIcon } from "lucide-react";
 import { SendIcon, ShareIcon } from "@/components/ui/ShareIcon";
 import { FACES_SHOWN, lastMine, readMarkers, receiptFor } from "@/lib/chat-receipts";
 import { ChatSearch, type FoundMessage } from "@/components/messages/ChatSearch";
@@ -18,7 +18,10 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { VoiceRecorder } from "@/components/messages/VoiceRecorder";
 import { PageReplyEmbed, pageSnapshot } from "@/components/diary/PageReplyEmbed";
 import { VoiceMessage } from "@/components/messages/VoiceMessage";
-import { GifPicker } from "@/components/messages/GifPicker";
+import { StickerDrawer } from "@/components/stickers/StickerDrawer";
+import { StickerImage } from "@/components/stickers/StickerImage";
+import { readSticker, stickerTilt, type Sticker } from "@hypefy/core/stickers";
+import { sendSticker as sendStickerRpc } from "@/lib/sticker-store";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { TrackChip } from "@/components/music/TrackChip";
 import { packTrack, unpackTrack } from "@/lib/music-message";
@@ -149,7 +152,7 @@ export {
  *  and the one row that genuinely needs a caveat (View once) gets it at
  *  the point of sending, in the composer preview. */
 const ATTACH_OPTIONS: {
-  mode: "camera" | "media" | "oneshot" | "document" | "gif" | "music" | "poll";
+  mode: "camera" | "media" | "oneshot" | "document" | "music" | "poll";
   icon: React.ReactNode;
   label: string;
 }[] = [
@@ -157,8 +160,9 @@ const ATTACH_OPTIONS: {
   { mode: "media", icon: <ImageIcon size={16} />, label: "Photo or video" },
   { mode: "oneshot", icon: <Eye size={16} />, label: "View once" },
   { mode: "document", icon: <FileText size={16} />, label: "Document" },
-  { mode: "gif", icon: <span className="text-[9px] font-black tracking-wider">GIF</span>, label: "GIF" },
-  // A song is an attachment, like a photo or a GIF — not a thing of its own.
+  // No GIF here: GIFs live in the Stickers & GIFs drawer beside the text
+  // box (D6 C, Naitik 27 Nov), so the menu is six entries, not seven.
+  // A song is an attachment, like a photo — not a thing of its own.
   { mode: "music", icon: <Music size={16} />, label: "Music" },
   // "where are we eating" in a group of six is twenty messages and no
   // answer, so a poll sits with the other things you attach to a chat.
@@ -416,7 +420,10 @@ export function RealChatView({
   const [foundId, setFoundId] = useState<string | null>(null);
   const [voiceMode, setVoiceMode] = useState(false);
   const [starBurstId, setStarBurstId] = useState<string | null>(null);
-  const [gifPickerOpen, setGifPickerOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  /** Which tab the drawer opens on when something other than its own
+   *  button opens it — the photo picker's GIF tab opens it on GIFs. */
+  const [drawerTab, setDrawerTab] = useState<"stickers" | "gifs" | undefined>(undefined);
   const [songPickerOpen, setSongPickerOpen] = useState(false);
   const [attachment, setAttachment] = useState<{
     file: File;
@@ -1370,6 +1377,26 @@ export function RealChatView({
       void deliverMedia(failed.id, files, failed._caption ?? "", failed.reply_to_id);
       return;
     }
+    // A sticker has no body: it is sent by which sticker it is.
+    if (failed.kind === "sticker") {
+      const st = readSticker(failed);
+      if (!st) return;
+      setMessages((p) => p.map((m) => (m.id === failed.id ? { ...m, _status: "pending" as const } : m)));
+      const sent = await sendStickerRpc(supabase, conversationId, st.id, { replyToId: failed.reply_to_id });
+      if (!sent.ok) {
+        recordAttempt(currentUserId, failed.id);
+        keepFailed(failed);
+        showToast("Still couldn't send. Check your connection.");
+        return;
+      }
+      const real = sent.value as ChatMsg;
+      setMessages((p) =>
+        p.some((m) => m.id === real.id)
+          ? p.filter((m) => m.id !== failed.id)
+          : p.map((m) => (m.id === failed.id ? { ...m, ...real, _status: undefined } : m)),
+      );
+      return;
+    }
     // A OneShot has no body by design — the image is private.
     if (!failed.body && failed.kind !== "oneshot") return;
     setMessages((p) => p.map((m) => (m.id === failed.id ? { ...m, _status: "pending" as const } : m)));
@@ -1507,7 +1534,7 @@ export function RealChatView({
 
   /** Send a GIF (selected from the picker) as a message. */
   async function sendGif(gifUrl: string) {
-    setGifPickerOpen(false);
+    setDrawerOpen(false);
     if (sending) return;
     setSending(true);
     const replyId = replyTo?.id ?? null;
@@ -1530,6 +1557,36 @@ export function RealChatView({
       showToast("Couldn't send GIF.");
     } else {
       const real = data as ChatMsg;
+      setMessages((p) => p.some((m) => m.id === real.id) ? p.filter((m) => m.id !== tempId) : p.map((m) => m.id === tempId ? { ...m, ...real, _status: undefined } : m));
+    }
+    setSending(false);
+  }
+
+  /** Send a sticker. The server copies its file and edge from the sticker
+   *  row (send_sticker, 0220); the optimistic copy carries the same shape so
+   *  it draws the same way before the answer comes back. */
+  async function sendSticker(sticker: Sticker) {
+    setDrawerOpen(false);
+    if (sending) return;
+    setSending(true);
+    const replyId = replyTo?.id ?? null;
+    setReplyTo(null);
+
+    const tempId = `temp-${Date.now()}`;
+    const optimistic: ChatMsg = {
+      id: tempId, body: null, sender_id: currentUserId, kind: "sticker",
+      post_id: null, reply_to_id: replyId, is_unsent: false,
+      created_at: new Date().toISOString(), _status: "pending",
+      metadata: { sticker_id: sticker.id, path: sticker.path, edge: sticker.edge, w: sticker.width, h: sticker.height },
+    };
+    setMessages((p) => [...p, optimistic]);
+
+    const sent = await sendStickerRpc(supabase, conversationId, sticker.id, { replyToId: replyId });
+    if (!sent.ok) {
+      keepFailed(optimistic);
+      showToast("Couldn't send sticker.");
+    } else {
+      const real = sent.value as ChatMsg;
       setMessages((p) => p.some((m) => m.id === real.id) ? p.filter((m) => m.id !== tempId) : p.map((m) => m.id === tempId ? { ...m, ...real, _status: undefined } : m));
     }
     setSending(false);
@@ -1573,7 +1630,7 @@ export function RealChatView({
     const file = e.target.files?.[0];
     e.target.value = ""; // reset so the same file can be re-picked
     if (!file) return;
-    setGifPickerOpen(false);
+    setDrawerOpen(false);
 
     const mode = pickMode.current;
     const isVideo = file.type.startsWith("video/");
@@ -2164,7 +2221,7 @@ export function RealChatView({
         {...pinPane.threadHandlers}
         className="relative isolate flex flex-1 flex-col-reverse overflow-y-auto px-4 py-4"
         style={theme ? { background: theme.background } : undefined}
-        onClick={() => { if (gifPickerOpen) setGifPickerOpen(false); }}
+        onClick={() => { if (drawerOpen) setDrawerOpen(false); }}
       >
         {theme?.ambient && <ChatAmbient kind={theme.ambient} />}
         {/* shrink-0: allowed to shrink, it would stop at the scroller's height
@@ -2526,7 +2583,27 @@ export function RealChatView({
                             <Download size={15} className={`shrink-0 ${mine ? "text-accent-ink/70" : "text-muted"}`} />
                           </ChatLink>
                         );
-                      })() : (m.kind === "gif" || m.kind === "image") && m.body ? (
+                      })() : m.kind === "sticker" && readSticker(m) ? (
+                        /* Sticker (D2 B): the picture alone — no bubble, no
+                           shadow, turned by a hash of its id so it never
+                           jitters. Time and tick sit under it. */
+                        <div
+                          onPointerDown={(e) => onPressStart(m, e)}
+                          onPointerUp={onPressEnd}
+                          onPointerMove={onPressEnd}
+                          onPointerLeave={onPressEnd}
+                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          className={`relative flex py-1.5 ${mine ? "justify-end" : "justify-start"}`}
+                          data-sticker
+                        >
+                          <StickerImage sticker={readSticker(m)!} tilt={stickerTilt(m.id)} />
+                          {starBurstId === m.id && (
+                            <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                              <HypeIcon size={44} className="animate-hype-pop fill-current text-hype drop-shadow-[0_2px_12px_rgba(255,208,0,0.7)]" />
+                            </span>
+                          )}
+                        </div>
+                      ) : (m.kind === "gif" || m.kind === "image") && m.body ? (
                         /* GIF / image — media bubble with time+status pill overlay */
                         <div
                           onPointerDown={(e) => onPressStart(m, e)}
@@ -2745,7 +2822,7 @@ export function RealChatView({
 
                       {/* External time+status — for voice, document, post, and shot cards.
                           Plain text, gif, image, and video bubbles embed the time+tick inside themselves. */}
-                      {(m.kind === "voice" || m.kind === "document" || m.kind === "album" || m.kind === "page_reply" || (m.kind === "poll" && !m.is_unsent) || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
+                      {(m.kind === "voice" || (m.kind === "sticker" && !m.is_unsent) || m.kind === "document" || m.kind === "album" || m.kind === "page_reply" || (m.kind === "poll" && !m.is_unsent) || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
                         (showTime || (mine && (m._status === "failed" || (m.kind === "album" && m._status === "pending")))) && (
                         <div className={`flex items-center gap-1 px-1 pt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
                           {showTime && (
@@ -2868,10 +2945,16 @@ export function RealChatView({
           </div>
         )}
 
-        {/* ── GIF picker panel — slides in just above the input row ── */}
-        {gifPickerOpen && !voiceMode && (
+        {/* ── Stickers & GIFs drawer — slides in just above the input row ── */}
+        {drawerOpen && !voiceMode && (
           <div className="mb-2">
-            <GifPicker onSelect={sendGif} />
+            <StickerDrawer
+              currentUserId={currentUserId}
+              startTab={drawerTab}
+              onSticker={(s) => void sendSticker(s)}
+              onGif={sendGif}
+              onError={(msg) => showToast(msg)}
+            />
           </div>
         )}
 
@@ -3018,7 +3101,7 @@ export function RealChatView({
                     h.opened = true;
                     h.timer = null;
                     haptics.tap();
-                    setGifPickerOpen(false);
+                    setDrawerOpen(false);
                     setAttachMenu(true);
                   }, ATTACH_HOLD_MS);
                 }}
@@ -3033,7 +3116,7 @@ export function RealChatView({
                 onClick={() => {
                   // The press that opened the menu doesn't also open the sheet.
                   if (attachHold.current.opened) { attachHold.current.opened = false; return; }
-                  setGifPickerOpen(false);
+                  setDrawerOpen(false);
                   if (attachMenu) { setAttachMenu(false); return; }
                   setPickerOpen(true);
                 }}
@@ -3064,7 +3147,6 @@ export function RealChatView({
                     onClick={() => {
                       setAttachMenu(false);
                       if (o.mode === "poll") setPollOpen(true);
-                      else if (o.mode === "gif") setGifPickerOpen(true);
                       else if (o.mode === "music") setSongPickerOpen(true);
                       else if (o.mode === "camera") pickerApi.current?.openCamera();
                       else if (o.mode === "media") mediaInputRef.current?.click();
@@ -3099,29 +3181,30 @@ export function RealChatView({
               onTyping={emitTyping}
               onHasTextChange={setHasText}
               onValueChange={editing?.kind === "album" ? setCaptionPreview : undefined}
+              trailing={
+                // Stickers & GIFs (D6 C): the GIF pill's slot, inside the
+                // field, under the same rule — only while the box is empty.
+                !hasText && !attachment && !editing ? (
+                  <button
+                    type="button"
+                    onClick={() => { setDrawerTab(undefined); setDrawerOpen((v) => !v); }}
+                    aria-label="Stickers and GIFs"
+                    aria-expanded={drawerOpen}
+                    className={`flex h-[34px] w-[34px] items-center justify-center rounded-xl transition active:scale-90 ${
+                      drawerOpen ? "bg-accent/[0.12] text-accent" : "text-muted hover:text-foreground"
+                    }`}
+                  >
+                    <StickerIcon size={20} />
+                  </button>
+                ) : undefined
+              }
             />
-
-            {/* GIF toggle — only when no text and no attachment */}
-            {!hasText && !attachment && !editing && (
-              <button
-                type="button"
-                onClick={() => setGifPickerOpen((v) => !v)}
-                aria-label="GIF picker"
-                className={`flex h-9 shrink-0 items-center justify-center rounded-full px-2.5 text-[11px] font-black tracking-wider transition active:scale-90 ${
-                  gifPickerOpen
-                    ? "bg-accent text-accent-ink"
-                    : "bg-surface text-muted hover:text-foreground"
-                }`}
-              >
-                GIF
-              </button>
-            )}
 
             {/* Mic — only when no text and no attachment */}
             {!hasText && !attachment && !editing && (
               <button
                 type="button"
-                onClick={() => { setGifPickerOpen(false); setVoiceMode(true); }}
+                onClick={() => { setDrawerOpen(false); setVoiceMode(true); }}
                 aria-label="Record voice note"
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-surface text-muted transition hover:bg-elevated hover:text-foreground active:scale-90"
               >
@@ -3219,7 +3302,7 @@ export function RealChatView({
         recents={chatMedia}
         onSend={sendMedia}
         onFile={() => openPicker("document")}
-        onGif={() => setGifPickerOpen(true)}
+        onGif={() => { setDrawerTab("gifs"); setDrawerOpen(true); }}
         onViewOnce={() => openPicker("oneshot")}
         onRejected={(msg) => showToast(msg)}
         apiRef={pickerApi}

@@ -82,6 +82,14 @@ export type ChatMsg = {
     multi?: boolean;
     tally?: unknown;
     voters?: number;
+    /** A sticker (send_sticker, 0220): which one, where its file is, how its
+     *  edge is drawn and its size, all copied by the server from the row.
+     *  Loose on purpose — readSticker checks the shape. */
+    sticker_id?: string;
+    path?: string;
+    edge?: string;
+    w?: number;
+    h?: number;
   } | null;
   /** Client-only: set on optimistic messages before server confirms */
   _status?: "pending" | "failed";
@@ -152,6 +160,7 @@ export function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string 
   if (isEncrypted(m.body)) return "Encrypted message";
   switch (m.kind) {
     case "gif": return "GIF";
+    case "sticker": return "Sticker";
     case "image": return "Photo";
     case "video": return "Video";
     case "voice": return "Voice note";
