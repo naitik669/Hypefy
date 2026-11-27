@@ -3649,6 +3649,39 @@ export type Database = {
         }
         Relationships: []
       }
+      stickers: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          edge: string
+          height: number
+          id: string
+          owner_id: string
+          path: string
+          width: number
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          edge?: string
+          height: number
+          id?: string
+          owner_id: string
+          path: string
+          width: number
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          edge?: string
+          height?: number
+          id?: string
+          owner_id?: string
+          path?: string
+          width?: number
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean
@@ -4700,6 +4733,15 @@ export type Database = {
           p_options: string[]
           p_question: string
           p_reply_to_id?: string
+        }
+        Returns: Json
+      }
+      send_sticker: {
+        Args: {
+          p_conversation_id: string
+          p_forwarded?: boolean
+          p_reply_to_id?: string
+          p_sticker_id: string
         }
         Returns: Json
       }

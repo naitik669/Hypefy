@@ -211,7 +211,8 @@ describe("the paperclip", () => {
     await act(async () => { press(clip, "pointerdown"); await new Promise((r) => setTimeout(r, 450)); });
     await act(async () => { press(clip, "pointerup"); clip.click(); });
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((b) => b.lastElementChild?.textContent);
-    expect(items).toEqual(["Camera", "Photo or video", "View once", "Document", "GIF", "Music", "Poll"]);
+    // No GIF: it lives in the Stickers & GIFs drawer now (D6 C, 27 Nov).
+    expect(items).toEqual(["Camera", "Photo or video", "View once", "Document", "Music", "Poll"]);
     expect(document.querySelector("[data-picker-grid]")).toBeNull();
   });
 

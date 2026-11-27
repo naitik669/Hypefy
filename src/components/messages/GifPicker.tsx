@@ -17,6 +17,8 @@ export interface GifResult {
 
 interface Props {
   onSelect: (gifUrl: string) => void;
+  /** Inside the Stickers & GIFs drawer, which draws the frame itself. */
+  embedded?: boolean;
 }
 
 // ── Categories ────────────────────────────────────────────────────────────────
@@ -91,7 +93,7 @@ async function apiFetch(
  * Search bar overrides the active category while typing.
  * Requires GIPHY_API_KEY (server-only) — fetches via /api/gifs proxy.
  */
-export function GifPicker({ onSelect }: Props) {
+export function GifPicker({ onSelect, embedded = false }: Props) {
   const [activeCat, setActiveCat] = useState("trending");
   const [search, setSearch] = useState("");
   const [gifs, setGifs] = useState<GifResult[]>([]);
@@ -201,7 +203,13 @@ export function GifPicker({ onSelect }: Props) {
   const sectionLabel = isSearching ? "Results" : CATEGORIES.find((c) => c.id === activeCat)?.label ?? "Trending";
 
   return (
-    <div className="flex h-[340px] flex-col overflow-hidden rounded-2xl border border-border bg-elevated shadow-2xl">
+    <div
+      className={
+        embedded
+          ? "flex h-full flex-col overflow-hidden"
+          : "flex h-[340px] flex-col overflow-hidden rounded-2xl border border-border bg-elevated shadow-2xl"
+      }
+    >
 
       {/* ── Search bar ── */}
       <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-3 py-2 focus-within:border-white/25">

@@ -115,16 +115,16 @@ async function mount(initialMessages: unknown[] = []) {
 }
 
 describe("sending a song", () => {
-  it("is one of the paperclip's options, beside GIF", async () => {
+  it("is one of the paperclip's options, after Document", async () => {
     await mount();
     await holdAttach();
     const labels = [...document.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent ?? "");
     expect(labels).toContain("Music");
-    // GIF draws its own label as the icon too, so its text reads twice.
-    expect(labels.some((l) => l.includes("GIF"))).toBe(true);
-    // Right after GIF, which is what "beside" means here. Not last:
+    // It sat beside GIF until GIF moved into the Stickers & GIFs drawer
+    // (D6 C, 27 Nov), which leaves it right after Document. Not last:
     // the menu grows, and a poll went on the end of it.
-    expect(labels.indexOf("Music")).toBe(labels.findIndex((l) => l.includes("GIF")) + 1);
+    expect(labels.some((l) => l.includes("GIF"))).toBe(false);
+    expect(labels.indexOf("Music")).toBe(labels.indexOf("Document") + 1);
   });
 
   it("sends the track as the message body, with no upload and no migration", async () => {
