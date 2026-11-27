@@ -312,6 +312,9 @@ describe("where the storage modules ended up", () => {
     // native equivalent — there is no "until the tab closes" on a phone.
     "src/lib/chat-media-url.ts": "sessionStorage",
     "src/lib/pending-oauth.ts": "sessionStorage",
+    // Web-only by design: a one-tab nonce for the website's Google
+    // redirect, and it navigates window.location.
+    "src/lib/google-id-token.ts": "sessionStorage",
     "src/lib/sound.ts": "sessionStorage",
     // Reaches for the DOM or navigator as well, so it is platform code.
     "src/lib/camera.ts": "also DOM/navigator",

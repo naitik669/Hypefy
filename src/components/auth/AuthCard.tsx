@@ -10,6 +10,7 @@ import { upsertSavedAccount } from "@/lib/saved-accounts";
 import { DateOfBirthPicker } from "@/components/ui/DateOfBirthPicker";
 import { isNative } from "@/lib/native";
 import { startNativeGoogleSignIn } from "@/lib/native-auth";
+import { googleClientId, startGoogleIdTokenSignIn } from "@/lib/google-id-token";
 import { stashPendingOAuth } from "@/lib/pending-oauth";
 import { confirmRecovery, ensureEncryption } from "@/lib/e2ee/vault";
 import { E2EE_ENABLED } from "@/lib/e2ee/flag";
@@ -420,6 +421,18 @@ export function AuthCard({ mode }: { mode: Mode }) {
       // ever runs here, and the button would stay on "Redirecting…"
       // until the app was killed.
       setGoogleLoading(false);
+      return;
+    }
+
+    // Our own redirect page, so Google's screen names hypefy.chat rather
+    // than the Supabase project domain. See src/lib/google-id-token.ts.
+    const clientId = googleClientId();
+    if (clientId) {
+      const message = await startGoogleIdTokenSignIn(clientId);
+      if (message) {
+        setError(message);
+        setGoogleLoading(false);
+      }
       return;
     }
 
