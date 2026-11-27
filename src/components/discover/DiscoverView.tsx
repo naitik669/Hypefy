@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { tagHref } from "@/lib/tag-lookup";
-import { Zap, Play, Compass, Hash } from "lucide-react";
+import { Zap, Play, Compass, Hash, ChevronRight } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { SearchBar } from "@/components/ui/SearchBar";
@@ -209,6 +209,7 @@ export function DiscoverView({
             <EmptyState icon={Play} title="No Shots fired yet" text="Be the first one on the reel." />
           ))}
 
+        {cat === "People" && <PeopleGridLink />}
         {cat === "People" &&
           (people.length > 0 || newPeople.length > 0 ? (
             <>
@@ -354,6 +355,22 @@ function ShotTile({ shot, currentUserId }: { shot: Shot; currentUserId: string }
       </div>
     </Link>
     </GridPeek>
+  );
+}
+
+/** The way into the People grid, at the top of the People chip. */
+function PeopleGridLink() {
+  return (
+    <Link
+      href="/people"
+      className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-card border border-white/[0.09] bg-surface px-4 py-3.5 transition hover:bg-elevated"
+    >
+      <span className="min-w-0">
+        <span className="block text-[15px] font-extrabold tracking-tight">Find your people to hype with!</span>
+        <span className="mt-0.5 block text-xs text-muted">Swipe through people picked for you</span>
+      </span>
+      <ChevronRight size={18} className="shrink-0 text-muted" aria-hidden />
+    </Link>
   );
 }
 
