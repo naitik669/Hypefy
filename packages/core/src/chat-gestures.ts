@@ -1,17 +1,19 @@
 /**
  * Swiping a message.
  *
- * Four gestures, mirrored around whose message it is:
+ * Right is always reply. Left carries the thing you can only do to that
+ * kind of message:
  *
  *            your own                 theirs
- *   right    reply                    forward
- *   left     edit (45 minutes)        reply
+ *   right    reply                    reply
+ *   left     edit (45 minutes)        forward
  *
- * Reply is on the outward swipe either way — away from the bubble's own
- * side — so it is the same physical movement in a one-to-one however the
- * thread is arranged. The other direction carries the thing you can only
- * do to that kind of message: your own words can be changed, somebody
- * else's can only be passed on.
+ * Forward on the left swipe opens the same picker as the hold menu's
+ * Forward. It sends nothing by itself: a thumb going the wrong way lands on
+ * a list of chats to choose from, which a tap outside closes. That is why
+ * it can sit on a gesture at all. (It was once taken off the gesture for
+ * fear of sending a chat by accident; Naitik asked for it back on 27 Nov
+ * 2026, and the picker is the guard.)
  *
  * Every gesture here is also in the hold menu, which has a focusable
  * single-pointer button on every row. A swipe is a shortcut, never the only
@@ -36,7 +38,7 @@ export const SWIPE_MAX_PX = 76;
  */
 export const SWIPE_SLOP_PX = 12;
 
-export type SwipeAction = "reply" | "edit";
+export type SwipeAction = "reply" | "edit" | "forward";
 
 /** The kinds whose content can actually be changed after sending. */
 export function editableKind(kind: string): boolean {
@@ -103,19 +105,18 @@ export function swipeAction(
     return canEdit(m, myId, now) ? "edit" : null;
   }
 
-  // Either way on somebody else's message is reply. Forwarding used to
-  // sit on the other direction, which made the gesture something you had
-  // to aim: the thing you nearly always want was on one side only, and
-  // getting it wrong sent a chat to somebody rather than quoting them.
-  // Reply is the answer to a message; it does not need a correct half.
-  // Forwarding is still a tap away in the hold menu, where it cannot be
-  // reached by accident.
-  return "reply";
+  if (direction === "right") return "reply";
+  // A view-once photo cannot be passed on: send_message refuses a oneshot
+  // with no storage path, so offering it here would open a picker whose
+  // every choice fails.
+  return m.kind === "oneshot" ? null : "forward";
 }
 
 /** What the revealed icon is announced as. */
 export function swipeLabel(action: SwipeAction): string {
-  return action === "reply" ? "Reply" : "Edit";
+  if (action === "reply") return "Reply";
+  if (action === "forward") return "Forward";
+  return "Edit";
 }
 
 /**

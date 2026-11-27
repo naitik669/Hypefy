@@ -17,8 +17,8 @@ import {
  * Swiping a message.
  *
  *            your own                 theirs
- *   right    reply                    forward
- *   left     edit (45 minutes)        reply
+ *   right    reply                    reply
+ *   left     edit (45 minutes)        forward
  */
 
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
@@ -82,16 +82,15 @@ describe("your own message", () => {
 describe("a message you received", () => {
   const theirs = (over: Record<string, unknown> = {}) => msg({ sender_id: "them", ...over });
 
-  it("swipe left replies — the mirror of your own", () => {
-    expect(swipeAction(theirs(), "me", "left", NOW)).toBe("reply");
+  it("swipe right replies, the same as on your own", () => {
+    expect(swipeAction(theirs(), "me", "right", NOW)).toBe("reply");
   });
 
-  it("and so does swipe right — either way, on anybody else's message", () => {
-    // Forwarding used to sit on this side, which made the gesture
-    // something you had to aim: the thing you nearly always want was on
-    // one half only, and missing it sent the message to somebody instead
-    // of quoting them.
-    expect(swipeAction(theirs(), "me", "right", NOW)).toBe("reply");
+  it("swipe left forwards (27 Nov 2026: it used to reply both ways)", () => {
+    // Changed on request. Both directions replied, so the left half did
+    // nothing the right half did not. It opens the forward picker, which
+    // sends nothing until a chat is chosen.
+    expect(swipeAction(theirs(), "me", "left", NOW)).toBe("forward");
   });
 
   it("and nothing about it is editable, however new it is", () => {
@@ -99,21 +98,17 @@ describe("a message you received", () => {
     expect(canEdit(theirs({ created_at: ago(1) }), "me", NOW)).toBe(false);
   });
 
-  it("a view-once photo answers both ways too", () => {
-    // It used to refuse a right swipe, because that meant forward and
-    // send_message rejects a oneshot with no storage path. Replying to
-    // one was always allowed on the other side, so now both agree.
+  it("a view-once photo replies, but cannot be forwarded", () => {
+    // send_message refuses a oneshot with no storage path, so a left swipe
+    // would open a picker whose every choice fails. The row stays still.
     expect(swipeAction(theirs({ kind: "oneshot" }), "me", "right", NOW)).toBe("reply");
-    expect(swipeAction(theirs({ kind: "oneshot" }), "me", "left", NOW)).toBe("reply");
+    expect(swipeAction(theirs({ kind: "oneshot" }), "me", "left", NOW)).toBe(null);
   });
 
-  it("there is no half of a received message that does anything else", () => {
-    // The property, rather than two examples of it: whatever the kind,
-    // neither direction can produce anything but a reply.
-    for (const kind of ["text", "image", "video", "album", "voice", "document", "gif", "poll", "post", "shot", "oneshot"]) {
-      for (const d of ["left", "right"] as const) {
-        expect(swipeAction(theirs({ kind }), "me", d, NOW)).toBe("reply");
-      }
+  it("every other kind: right replies, left forwards", () => {
+    for (const kind of ["text", "image", "video", "album", "voice", "document", "gif", "poll", "post", "shot"]) {
+      expect(swipeAction(theirs({ kind }), "me", "right", NOW)).toBe("reply");
+      expect(swipeAction(theirs({ kind }), "me", "left", NOW)).toBe("forward");
     }
   });
 });
@@ -147,7 +142,7 @@ describe("attachments swipe like anything else", () => {
   it("a photo, a folder, a voice note, a document, a poll and a shared post all answer", () => {
     // Nothing about the gesture is gated on the body being words.
     for (const kind of ["image", "video", "album", "voice", "document", "gif", "poll", "post", "shot"]) {
-      expect(swipeAction(msg({ kind, sender_id: "them" }), "me", "left", NOW)).toBe("reply");
+      expect(swipeAction(msg({ kind, sender_id: "them" }), "me", "left", NOW)).toBe("forward");
       expect(swipeAction(msg({ kind, sender_id: "them" }), "me", "right", NOW)).toBe("reply");
       expect(swipeAction(msg({ kind }), "me", "right", NOW)).toBe("reply");
     }
@@ -194,14 +189,26 @@ describe("the distances", () => {
   it("every action has words for the screen reader", () => {
     expect(swipeLabel("reply")).toBe("Reply");
     expect(swipeLabel("edit")).toBe("Edit");
+    expect(swipeLabel("forward")).toBe("Forward");
   });
 
-  it("and forwarding is not one of them, but is still reachable", () => {
-    // It left the gesture, not the app: the hold menu still offers it,
-    // where it cannot be reached by a thumb going the wrong way.
-    const gestures = read("packages/core/src/chat-gestures.ts");
-    expect(gestures).not.toContain('"forward"');
-    expect(read("src/components/messages/RealChatView.tsx")).toContain('label="Forward"');
+  it("a forward swipe opens the picker, the same one the hold menu uses", () => {
+    // The step, in the body of doSwipe: comments stripped so a note that
+    // mentions setForwardMsg cannot satisfy it.
+    const chat = strip(read("src/components/messages/RealChatView.tsx"));
+    const fn = chat.slice(chat.indexOf("function doSwipe("));
+    const body = fn.slice(0, fn.indexOf("\n  }\n"));
+    expect(body).toContain('if (action === "forward") { setForwardMsg(m); return; }');
+    // and that state is what opens the single-message ForwardSheet.
+    expect(chat).toContain("<ForwardSheet open={!!forwardMsg}");
+  });
+
+  it("and the forward swipe shows the Forward mark, not the reply arrow", () => {
+    const row = strip(read("src/components/messages/SwipeRow.tsx"));
+    const fn = row.slice(row.indexOf("function SwipeGlyph("));
+    const glyph = fn.slice(0, fn.indexOf("function reducedMotion"));
+    const fwd = glyph.slice(glyph.indexOf('if (action === "forward")'));
+    expect(fwd.slice(0, fwd.indexOf("return <Pencil"))).toContain("<ShareIcon");
   });
 });
 
