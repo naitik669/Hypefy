@@ -140,3 +140,30 @@ export function swipeTravel(distance: number): number {
   const over = Math.max(0, dist - SWIPE_TRIGGER_PX);
   return Math.min(dist - (over * 2) / 3, SWIPE_MAX_PX);
 }
+
+/**
+ * How far a finger may drift and still be holding.
+ *
+ * Under the swipe slop, so a swipe has stopped being a hold before it is
+ * claimed. Was zero: any pointermove cancelled the hold timer, so a still
+ * finger's jitter killed it and the browser's own long-press (contextmenu)
+ * opened the menu later instead, whatever the gesture had become.
+ */
+export const HOLD_SLOP_PX = 8;
+
+/** Has the finger moved far enough that this is no longer a hold? */
+export function holdMoved(dx: number, dy: number): boolean {
+  return Math.hypot(dx, dy) > HOLD_SLOP_PX;
+}
+
+/**
+ * Should the browser's contextmenu event open the hold menu?
+ *
+ * Only for a mouse (right-click) or no pointer at all (the keyboard's menu
+ * key). Android fires contextmenu on a long touch even when that touch went
+ * on to be a swipe, which is how swiping an attachment opened the menu
+ * (27 Nov 2026). A touch or pen holds through the timer alone.
+ */
+export function contextMenuOpensHold(pointerType: string | null): boolean {
+  return pointerType === null || pointerType === "mouse";
+}
