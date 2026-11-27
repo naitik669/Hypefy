@@ -73,3 +73,7 @@ expo-env.d.ts
 # Firebase config for the Expo app. Never committed: EAS builds get it from
 # the GOOGLE_SERVICES_JSON file variable (see apps/mobile/app.config.ts).
 apps/mobile/google-services.json
+
+# The cutout studio's ONNX runtime, copied from node_modules by
+# scripts/copy-cutout-runtime.mjs before every build and dev server.
+public/cutout/ort/
