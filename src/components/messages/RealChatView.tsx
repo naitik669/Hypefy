@@ -47,7 +47,10 @@ import { LinkCard } from "./LinkCard";
 import { PollBubble } from "./PollBubble";
 import { SwipeRow } from "./SwipeRow";
 import { canEdit, swipeAction, type SwipeAction } from "@/lib/chat-gestures";
-import { PollComposer } from "./PollComposer";
+import { PollComposer, type StickerDraft } from "./PollComposer";
+import { ChatStickerCard } from "./ChatStickers";
+import { readChatSticker } from "@hypefy/core/chat-stickers";
+import { isMissingFunction } from "@hypefy/core/chat-sticker-answers";
 import { readPoll } from "@/lib/chat-poll";
 import { firstPreviewable } from "@/lib/link-preview";
 import { ForwardSheet } from "@/components/messages/ForwardSheet";
@@ -1365,6 +1368,36 @@ export function RealChatView({
       // The server's words, not ours: it is the one that knows whether this
       // was a blocked conversation, too many options or a lost connection.
       showToast(error?.message ?? "Couldn't send that poll.");
+      return;
+    }
+    const real = data as ChatMsg;
+    setMessages((p) => (p.some((m) => m.id === real.id) ? p : [...p, real]));
+  }
+
+  /**
+   * Put a quiz, hype slider, question or countdown in the thread (0221).
+   * Not optimistic, for the reason a poll is not: the card is what the
+   * server builds.
+   */
+  async function sendInteractive(draft: StickerDraft) {
+    const { data, error } = await supabase.rpc("send_dm_sticker", {
+      p_conversation_id: conversationId,
+      p_kind: draft.kind,
+      p_text: draft.text,
+      p_options: draft.kind === "quiz" ? draft.options : undefined,
+      p_answer: draft.kind === "quiz" ? draft.answer : undefined,
+      p_at: draft.kind === "countdown" ? draft.at : undefined,
+      p_reply_to_id: replyTo?.id ?? undefined,
+    });
+    setReplyTo(null);
+    if (error || !data) {
+      // Before 0221 is run on the live database the function is not there.
+      // That is a fact about the server, not a failure of yours.
+      showToast(
+        isMissingFunction(error)
+          ? "Quizzes, sliders, questions and countdowns arrive with the next update."
+          : (error?.message ?? "Couldn't send that."),
+      );
       return;
     }
     const real = data as ChatMsg;
@@ -2726,6 +2759,27 @@ export function RealChatView({
                             messageId={m.id}
                             viewerId={currentUserId}
                             mine={mine}
+                            askerName={isGroup ? senderName(m.sender_id) : peerName}
+                            memberCount={isGroup ? group!.memberCount : 2}
+                            onError={(msg) => showToast(msg)}
+                          />
+                        </div>
+                      ) : readChatSticker(m) ? (
+                        <div
+                          onPointerDown={(e) => onPressStart(m, e)}
+                          onPointerUp={onPressEnd}
+                          onPointerMove={onPressEnd}
+                          onPointerLeave={onPressEnd}
+                          onContextMenu={(e) => { e.preventDefault(); setMenu({ msg: m, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}
+                          className="relative"
+                        >
+                          <ChatStickerCard
+                            sticker={readChatSticker(m)!}
+                            messageId={m.id}
+                            viewerId={currentUserId}
+                            mine={mine}
+                            askerName={isGroup ? senderName(m.sender_id) : peerName}
+                            memberCount={isGroup ? group!.memberCount : 2}
                             onError={(msg) => showToast(msg)}
                           />
                         </div>
@@ -2822,7 +2876,7 @@ export function RealChatView({
 
                       {/* External time+status — for voice, document, post, and shot cards.
                           Plain text, gif, image, and video bubbles embed the time+tick inside themselves. */}
-                      {(m.kind === "voice" || (m.kind === "sticker" && !m.is_unsent) || m.kind === "document" || m.kind === "album" || m.kind === "page_reply" || (m.kind === "poll" && !m.is_unsent) || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
+                      {(m.kind === "voice" || (m.kind === "sticker" && !m.is_unsent) || m.kind === "document" || m.kind === "album" || m.kind === "page_reply" || (m.kind === "poll" && !m.is_unsent) || !!readChatSticker(m) || (m.kind === "post" && m.post) || (m.kind === "shot" && m.shot)) &&
                         (showTime || (mine && (m._status === "failed" || (m.kind === "album" && m._status === "pending")))) && (
                         <div className={`flex items-center gap-1 px-1 pt-0.5 ${mine ? "justify-end" : "justify-start"}`}>
                           {showTime && (
@@ -3488,6 +3542,7 @@ export function RealChatView({
         open={pollOpen}
         onClose={() => setPollOpen(false)}
         onSend={sendPoll}
+        onSendSticker={(d) => void sendInteractive(d)}
       />
       <ForwardSheet open={!!forwardMsg} onClose={() => setForwardMsg(null)} msg={forwardMsg} />
       <ForwardSheet

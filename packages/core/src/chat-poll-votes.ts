@@ -10,9 +10,12 @@ import { rows } from "./query";
  * does no fetching.
  *
  * Filtered by user as well as by message, and the user filter is not
- * optional: RLS lets every member read every member's votes (0174, on
- * purpose), so without it the read returns the whole conversation's choices
- * and every one of them would be ticked as yours. That shipped once.
+ * optional. Until 0221, RLS let every member read every member's votes
+ * (0174, on purpose), so without the filter the read returned the whole
+ * conversation's choices and ticked every one of them as yours. That shipped
+ * once. 0221 narrows the policy to your own rows (design D5 B: names only for
+ * whoever asked), and the filter stays so this read is right whatever the
+ * policy says next.
  *
  * Read through `rows`, so a refused query throws instead of looking like a
  * poll you have not voted on — which would also make your next press of

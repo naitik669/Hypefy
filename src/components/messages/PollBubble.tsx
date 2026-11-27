@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { type Poll, barWidth, voteLabel } from "@/lib/chat-poll";
+import { type Poll, barWidth } from "@/lib/chat-poll";
 import { readMyChoices } from "@hypefy/core/chat-poll-votes";
+import { answeredLabel } from "@hypefy/core/chat-stickers";
+import { StickerFace, StickerResultsSheet } from "./ChatStickers";
 
 /**
  * A poll in the thread.
@@ -16,12 +18,18 @@ import { readMyChoices } from "@hypefy/core/chat-poll-votes";
  *
  * Which options are *yours* is the one thing metadata cannot say, since it
  * is the same row for everybody. That is read once from the votes table.
+ *
+ * Who voted for what is the asker's alone since 0221 (design D5 B: counts
+ * for everyone, names for whoever asked). The card says so on its face, and
+ * the asker's copy opens the results sheet.
  */
 export function PollBubble({
   poll,
   messageId,
   viewerId,
   mine,
+  askerName,
+  memberCount,
   onError,
 }: {
   poll: Poll;
@@ -29,11 +37,16 @@ export function PollBubble({
   /** The signed-in user. Only their votes are ticked. */
   viewerId: string;
   mine: boolean;
+  /** The sender's name as this viewer knows them, for "Only Anup sees who voted". */
+  askerName: string;
+  /** People in the conversation, the viewer included. */
+  memberCount: number;
   onError: (message: string) => void;
 }) {
   const supabase = createClient();
   const [chosen, setChosen] = useState<ReadonlySet<number>>(new Set());
   const [busy, setBusy] = useState<number | null>(null);
+  const [sheet, setSheet] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -90,61 +103,72 @@ export function PollBubble({
   }
 
   const voted = chosen.size > 0;
+  // The asker sees the counts without voting: it is their question, and the
+  // results are the reason they asked (show-stickers.ts, `revealed`).
+  const shown = voted || mine;
 
   return (
-    <div
-      className={`flex w-[250px] flex-col gap-2 rounded-2xl px-3.5 py-3 ${
-        mine ? "bg-accent/15" : "bg-surface"
-      }`}
-    >
-      <div className="flex flex-col gap-0.5">
-        <span className="text-[14px] font-bold leading-snug text-foreground">{poll.question}</span>
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">
-          {poll.multi ? "Pick any · " : ""}
-          {voteLabel(poll.voters)}
-        </span>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        {poll.options.map((option, i) => {
-          const ticked = chosen.has(i);
-          return (
-            <button
-              key={`${i}-${option}`}
-              type="button"
-              onClick={() => choose(i)}
-              aria-pressed={ticked}
-              className="relative flex items-center gap-2 overflow-hidden rounded-xl border border-border px-2.5 py-2 text-left transition active:scale-[0.98] disabled:opacity-60"
-              disabled={busy !== null}
-            >
-              {/* The bar is behind the words, not beside them: a row that is
-                  both the control and the result has no room for a track. */}
-              <span
-                aria-hidden
-                className="absolute inset-y-0 left-0 bg-accent/20 transition-[width] duration-300"
-                style={{ width: `${voted ? barWidth(poll.tally, i) : 0}%` }}
-              />
-              <span
-                className={`relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                  ticked ? "border-accent bg-accent text-accent-ink" : "border-border"
+    <>
+      <StickerFace
+        kind="poll"
+        question={poll.question}
+        mine={mine}
+        askerName={askerName}
+        onSeeWho={() => setSheet(true)}
+        foot={`${poll.multi ? "Pick any · " : ""}${answeredLabel("poll", poll.voters, memberCount)}`}
+      >
+        <div className="flex flex-col gap-1.5">
+          {poll.options.map((option, i) => {
+            const ticked = chosen.has(i);
+            return (
+              <button
+                key={`${i}-${option}`}
+                type="button"
+                onClick={() => choose(i)}
+                aria-pressed={ticked}
+                className={`relative flex items-center gap-2 overflow-hidden rounded-[13px] border px-2.5 py-2 text-left transition active:scale-[0.98] disabled:opacity-60 ${
+                  ticked ? "border-accent/60" : "border-border"
                 }`}
+                disabled={busy !== null}
               >
-                {ticked && <Check size={11} strokeWidth={3.2} aria-hidden />}
-              </span>
-              <span className="relative min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
-                {option}
-              </span>
-              {/* Counts appear once you have voted. Showing them first turns
-                  a question into a bandwagon. */}
-              {voted && (
-                <span className="relative shrink-0 text-[11px] font-bold tabular-nums text-muted">
-                  {poll.tally[i]}
+                {/* The bar is behind the words, not beside them: a row that is
+                    both the control and the result has no room for a track. */}
+                <span
+                  aria-hidden
+                  className="absolute inset-y-0 left-0 bg-accent/20 transition-[width] duration-300"
+                  style={{ width: `${shown ? barWidth(poll.tally, i) : 0}%` }}
+                />
+                <span
+                  className={`relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                    ticked ? "border-accent bg-accent text-accent-ink" : "border-border"
+                  }`}
+                >
+                  {ticked && <Check size={11} strokeWidth={3.2} aria-hidden />}
                 </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+                <span className="relative min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
+                  {option}
+                </span>
+                {/* Counts appear once you have voted. Showing them first turns
+                    a question into a bandwagon. */}
+                {shown && (
+                  <span className="relative shrink-0 text-[11px] font-bold tabular-nums text-muted">
+                    {poll.tally[i]}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </StickerFace>
+      {mine && (
+        <StickerResultsSheet
+          open={sheet}
+          onClose={() => setSheet(false)}
+          messageId={messageId}
+          title="Who voted · your poll"
+          describe={(r) => r.choices.map((c) => poll.options[c] ?? `Option ${c + 1}`).join(", ")}
+        />
+      )}
+    </>
   );
 }
