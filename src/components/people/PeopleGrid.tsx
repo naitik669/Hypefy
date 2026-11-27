@@ -177,6 +177,12 @@ export function PeopleGrid({ people }: { people: PeopleSuggestion[] }) {
  * in miniature. The face is the app's squircle Avatar, not a circle: the
  * rounded square is Hypefy's, and a circle here would be the one round face
  * in the app.
+ *
+ * Follow is the app's own FollowButton, the raised grey chip, and not the
+ * lime pill the design mock drew. The app took lime off Follow buttons on
+ * purpose (lime already means hype, the slider's average and the rehype
+ * mark; see tests/follow-button-look.test.ts), and a page of four or eight
+ * lime pills would undo that on the one screen made of Follow buttons.
  */
 function PersonTile({ person: p, onHide }: { person: PeopleSuggestion; onHide: () => void }) {
   const href = p.username ? `/u/${p.username}` : "#";
