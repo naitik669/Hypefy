@@ -150,6 +150,28 @@ describe("loadPeopleSuggestions", () => {
     );
   });
 
+  it("leaves out the app's excluded accounts, and the real list is keyed on ids", async () => {
+    const { client } = fakeDb(network());
+    const out = (await loadPeopleSuggestions(client, "me", NOW, new Set(["chugli"]))).map((x) => x.id);
+    expect(out).not.toContain("chugli");
+    expect(out).toContain("spidey");
+  });
+
+  it("by default excludes the listed test and impersonation accounts, by id", async () => {
+    const { PEOPLE_EXCLUDED_IDS } = await import("@/lib/people-excluded");
+    const fakeModi = "d66a4861-0b57-476d-98f0-214fed7d558d";
+    const testAcct = "e7f50710-b0a0-4af2-927f-36d3c4aed041";
+    expect(PEOPLE_EXCLUDED_IDS.has(fakeModi)).toBe(true);
+    expect(PEOPLE_EXCLUDED_IDS.has(testAcct)).toBe(true);
+    const { client } = fakeDb({
+      profiles: [p("me"), p(fakeModi), p(testAcct), p("real")],
+      follows: [],
+      hypes: [],
+      follow_requests: [],
+    });
+    expect((await loadPeopleSuggestions(client, "me", NOW)).map((x) => x.id)).toEqual(["real"]);
+  });
+
   it("a failed candidate read is an error, not an empty page that says nobody is here", async () => {
     const { client } = fakeDb(network(), { failTable: "profiles" });
     await expect(loadPeopleSuggestions(client, "me", NOW)).rejects.toBeTruthy();

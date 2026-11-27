@@ -96,6 +96,16 @@ describe("who may be suggested at all", () => {
   });
 });
 
+describe("the app's own exclusions", () => {
+  it("keep an account off the list without touching anyone else", () => {
+    const out = rankPeople([person("test"), person("real")], signals({ excluded: new Set(["test"]) }));
+    expect(ids(out)).toEqual(["real"]);
+  });
+  it("are optional: no set means nobody extra is left out", () => {
+    expect(ids(rankPeople([person("a")], signals({ excluded: undefined })))).toEqual(["a"]);
+  });
+});
+
 describe("isSuspended", () => {
   it("is false with no suspension, true with no end, and ends when the end passes", () => {
     expect(isSuspended(person("x"), NOW)).toBe(false);

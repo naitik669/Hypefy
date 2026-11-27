@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getBlockedIds } from "@/lib/blocked";
+import { PEOPLE_EXCLUDED_IDS } from "@/lib/people-excluded";
 import {
   countSharedHypes,
   rankPeople,
@@ -35,7 +36,8 @@ const PROFILE_COLS =
 export async function loadPeopleSuggestions(
   supabase: SupabaseClient,
   me: string,
-  now = Date.now()
+  now = Date.now(),
+  excluded: ReadonlySet<string> = PEOPLE_EXCLUDED_IDS
 ): Promise<PeopleSuggestion[]> {
   const [followingRes, followersRes, requestedRes, myHypesRes, candidatesRes, blocked] = await Promise.all([
     supabase.from("follows").select("following_id").eq("follower_id", me),
@@ -122,6 +124,7 @@ export async function loadPeopleSuggestions(
     requested,
     followers,
     blocked,
+    excluded,
     followsOfFollowing: (fofRes.data ?? []) as { follower_id: string; following_id: string }[],
     sharedHypes: countSharedHypes(
       me,

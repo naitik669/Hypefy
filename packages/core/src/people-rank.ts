@@ -59,6 +59,12 @@ export type PeopleSignals = {
   followers: ReadonlySet<string>;
   /** Blocked in either direction. */
   blocked: ReadonlySet<string>;
+  /**
+   * Accounts kept off the People page by the app, not by the viewer: test
+   * accounts and accounts under review. Optional so a caller that has none
+   * passes nothing.
+   */
+  excluded?: ReadonlySet<string>;
   /** Rows of `follows` whose follower is someone I follow. */
   followsOfFollowing: readonly { follower_id: string; following_id: string }[];
   /** How many of the things I hyped each person also hyped. */
@@ -111,6 +117,7 @@ export function isSuggestable(c: PeopleCandidate, s: PeopleSignals): boolean {
     !s.following.has(c.id) &&
     !s.requested.has(c.id) &&
     !s.blocked.has(c.id) &&
+    !s.excluded?.has(c.id) &&
     !isSuspended(c, s.now)
   );
 }
