@@ -191,5 +191,5 @@ export function fileSize(bytes: number | undefined): string {
 
 /** The columns the Shared screens read. Kept here so the two pages ask for the same thing. */
 export const SHARED_SELECT =
-  "id, kind, body, sender_id, created_at, post_id, shot_id, post:posts(id, image_url, image_urls, profiles!posts_user_id_fkey(username)), shot:shots(id, media_url, poster_url, profiles(username))";
+  "id, kind, body, sender_id, created_at, post_id, shot_id, post:posts(id, image_url, image_urls, profiles!posts_user_id_fkey(username)), shot:shots(id, media_url, poster_url, profiles!shots_user_id_fkey(username))";
 export const SHARED_KINDS = ["image", "video", "album", "post", "shot", "voice", "document"];
