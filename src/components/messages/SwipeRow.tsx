@@ -69,6 +69,7 @@ export function SwipeRow({
   onClaim: () => void;
   children: React.ReactNode;
 }) {
+  const root = useRef<HTMLDivElement | null>(null);
   const slider = useRef<HTMLDivElement | null>(null);
   const glyph = useRef<HTMLSpanElement | null>(null);
   const plate = useRef<HTMLSpanElement | null>(null);
@@ -190,6 +191,9 @@ export function SwipeRow({
     // Mouse drags are not a gesture anybody makes on a desktop thread, and
     // a stray drag with the button down would fire actions.
     if (e.pointerType === "mouse") return;
+    // Told to the pin board, whose touchstart comes after this: a row that
+    // does something on a left swipe keeps it (see pinSwipeYields).
+    if (root.current) root.current.dataset.swipeTakesLeft = actionFor("left") ? "1" : "";
     start.current = { x: e.clientX, y: e.clientY };
   }
 
@@ -263,7 +267,7 @@ export function SwipeRow({
   }
 
   return (
-    <div className="relative">
+    <div ref={root} className="relative">
       {showing && (
         <span
           aria-hidden

@@ -335,6 +335,24 @@ export function pinSwipeOutcome(g: {
 }
 
 /**
+ * Should the pin board leave this touch alone?
+ *
+ * A left swipe on the thread opens the board, and a left swipe on somebody
+ * else's message forwards it. The board claimed at 10px and the message at
+ * 12px, so the board won on every message, photo and Shot. A row that has
+ * something on its left swipe marks itself on pointerdown (which fires
+ * before touchstart), and the board gives way there. A row with nothing on
+ * its left, and the empty thread, still open the board; an open board
+ * always takes its own swipe back.
+ */
+export function pinSwipeYields(target: EventTarget | null, open: boolean): boolean {
+  if (open) return false;
+  const el = target as Element | null;
+  if (!el || typeof el.closest !== "function") return false;
+  return el.closest('[data-swipe-takes-left="1"]') !== null;
+}
+
+/**
  * Which axis this drag belongs to, or null while it is still ambiguous.
  *
  * Biased towards vertical, like SwipeNav: both panes scroll, and stealing a

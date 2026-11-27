@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { haptics } from "@/lib/haptics";
 import { useOverlayBackButton } from "@/lib/overlay-stack";
 import { PinBoard } from "@/components/messages/PinBoard";
-import { pinAxis, pinDragProgress, pinSwipeOutcome } from "@/lib/chat-pins";
+import { pinAxis, pinDragProgress, pinSwipeOutcome, pinSwipeYields } from "@/lib/chat-pins";
 import { canNavigate } from "@/components/layout/SwipeNav";
 
 /**
@@ -98,6 +98,8 @@ export function usePinPane(threadScroller: React.RefObject<HTMLElement | null>) 
       drag.current = null;
       return;
     }
+    // A message that swipes left itself (forward, edit) keeps the gesture.
+    if (pinSwipeYields(e.target, openRef.current)) { drag.current = null; return; }
     drag.current = { x: t.clientX, y: t.clientY, at: Date.now(), axis: null, multi: false };
   }
 
