@@ -436,6 +436,32 @@ const store = vi.hoisted(() => ({
   star: { ok: true, value: true } as { ok: boolean; value?: boolean; error?: string },
   starCalls: [] as unknown[][],
 }));
+const packStore = vi.hoisted(() => ({
+  packs: { ok: true, value: [] as unknown[] } as { ok: boolean; value?: unknown[]; error?: string },
+  calls: [] as unknown[][],
+  /** What each write answers; a pack object, or a failure. */
+  answer: null as null | { ok: boolean; value?: unknown; error?: string },
+  answers: [] as { ok: boolean; value?: unknown; error?: string }[],
+}));
+vi.mock("@/lib/sticker-pack-store", async (orig) => {
+  const real = await orig<typeof import("@/lib/sticker-pack-store")>();
+  const rec = (name: string) => (...a: unknown[]) => {
+    packStore.calls.push([name, ...a.slice(1)]);
+    return Promise.resolve(packStore.answers.shift() ?? packStore.answer ?? { ok: true, value: null });
+  };
+  return {
+    ...real,
+    listMyPacks: (...a: Parameters<typeof real.listMyPacks>) => (store.fake ? Promise.resolve(packStore.packs) : real.listMyPacks(...a)),
+    listReceivedStickers: (...a: Parameters<typeof real.listReceivedStickers>) => (store.fake ? Promise.resolve({ ok: true, value: [] }) : real.listReceivedStickers(...a)),
+    addToPack: (...a: Parameters<typeof real.addToPack>) => (store.fake ? rec("addToPack")(...a) : real.addToPack(...a)),
+    removeFromPack: (...a: Parameters<typeof real.removeFromPack>) => (store.fake ? rec("removeFromPack")(...a) : real.removeFromPack(...a)),
+    renamePack: (...a: Parameters<typeof real.renamePack>) => (store.fake ? rec("renamePack")(...a) : real.renamePack(...a)),
+    deletePack: (...a: Parameters<typeof real.deletePack>) => (store.fake ? rec("deletePack")(...a) : real.deletePack(...a)),
+    unsavePack: (...a: Parameters<typeof real.unsavePack>) => (store.fake ? rec("unsavePack")(...a) : real.unsavePack(...a)),
+    markPackSeen: (...a: Parameters<typeof real.markPackSeen>) => (store.fake ? rec("markPackSeen")(...a) : real.markPackSeen(...a)),
+    createPack: (...a: Parameters<typeof real.createPack>) => (store.fake ? rec("createPack")(...a) : real.createPack(...a)),
+  };
+});
 vi.mock("@/lib/sticker-store", async (orig) => {
   const real = await orig<typeof import("@/lib/sticker-store")>();
   return {
@@ -480,6 +506,10 @@ describe("the drawer", () => {
     store.favourites = { ok: true, value: [] };
     store.star = { ok: true, value: true };
     store.starCalls = [];
+    packStore.packs = { ok: true, value: [] };
+    packStore.calls = [];
+    packStore.answer = null;
+    packStore.answers = [];
   });
 
   it("Create is the first tile, dark grey with a plus, not lime", async () => {
@@ -557,13 +587,18 @@ describe("the drawer's rail", () => {
     store.favourites = { ok: true, value: [] };
     store.star = { ok: true, value: true };
     store.starCalls = [];
+    packStore.packs = { ok: true, value: [] };
+    packStore.calls = [];
+    packStore.answer = null;
+    packStore.answers = [];
   });
 
   it("is Recent, Favourites, Yours, in that order, the same on both rails", async () => {
     await drawer();
     const rails = railButtons();
     expect(rails).toHaveLength(2);
-    for (const r of rails) expect(r.map(([l]) => l)).toEqual(["Recent", "Favourites", "Yours"]);
+    // With no packs yet: the three shelves, then the plus (part 2).
+    for (const r of rails) expect(r.map(([l]) => l)).toEqual(["Recent", "Favourites", "Yours", "New pack"]);
   });
 
   it("replaces the chips: no text chips are left", async () => {
@@ -614,8 +649,11 @@ describe("the drawer's rail", () => {
       for (const b of nav.querySelectorAll("button")) expect(b.className).not.toMatch(/accent|lime|#a3e635|163,\s*230/i);
     }
     const src = strip(read("src/components/stickers/StickerDrawer.tsx"));
-    const rail = src.slice(src.indexOf("function Rail("));
-    expect(rail).not.toMatch(/accent|lime|#a3e635/i);
+    // Lime is left for the newly-added-pack dot only (canvas, 27 Nov), so
+    // that one element is taken out before looking.
+    const rail = src.slice(src.indexOf("function Rail(")).replace(/\{p\?\.fresh && <span data-fresh[^\n]*\n/, "");
+    expect(rail.match(/#a3e635/g)).toBe(null);
+    expect(rail).not.toMatch(/accent|lime/i);
   });
 
   it("is not drawn on the GIFs tab", async () => {
@@ -639,6 +677,10 @@ describe("favourites", () => {
     store.favourites = { ok: true, value: [] };
     store.star = { ok: true, value: true };
     store.starCalls = [];
+    packStore.packs = { ok: true, value: [] };
+    packStore.calls = [];
+    packStore.answer = null;
+    packStore.answers = [];
   });
 
   /** jsdom has no PointerEvent; React reads pointerType off the event. */
@@ -795,5 +837,318 @@ describe("a sticker in the thread", () => {
     expect(img.style.transform).toBe("rotate(2.4deg)");
     expect(img.width).toBe(132);
     expect(img.height).toBe(88);
+  });
+});
+
+// ── Packs in the drawer (0224, part 2) ──────────────────────────────────
+
+const S1 = readStickerRow(row)!;
+const S2 = readStickerRow({ id: "cccccccc-bbbb-cccc-dddd-eeeeeeeeeeee", path: `${UID}/cccccccc-8888-7777-6666-555555555555.webp`, edge: "stroke", width: 100, height: 100 })!;
+const S3 = readStickerRow({ id: "dddddddd-bbbb-cccc-dddd-eeeeeeeeeeee", path: `${UID}/dddddddd-8888-7777-6666-555555555555.webp`, edge: "stroke", width: 100, height: 100 })!;
+const ME = { id: UID, username: "me", displayName: "Me" };
+const AMAN = { id: "abababab-0000-0000-0000-000000000000", username: "aman", displayName: "AMAN" };
+const pk = (over: Partial<import("@hypefy/core/sticker-packs").StickerPack>) => ({
+  id: "pppppppp-0000-0000-0000-000000000001".replace(/p/g, "a"),
+  name: "Soft hours",
+  code: "K7Q2M9XD",
+  audience: "link" as const,
+  coverStickerId: null,
+  owner: ME,
+  mine: true,
+  saved: false,
+  fresh: false,
+  stickers: [S1, S2],
+  ...over,
+});
+const OWN = pk({});
+const OWN2 = pk({ id: "bbbbbbbb-0000-0000-0000-000000000002", name: "Pets", stickers: [S3, S2] });
+const THEIRS = pk({ id: "cccccccc-0000-0000-0000-000000000003", name: "Late nights", owner: AMAN, mine: false, saved: true, fresh: true, stickers: [S3, S1] });
+
+describe("packs on the rail", () => {
+  beforeEach(() => {
+    store.mine = { ok: true, value: [S1, S2, S3] };
+    store.recent = { ok: true, value: [] };
+    store.favourites = { ok: true, value: [] };
+    store.star = { ok: true, value: true };
+    store.starCalls = [];
+    packStore.packs = { ok: true, value: [OWN, OWN2, THEIRS] };
+    packStore.calls = [];
+    packStore.answer = null;
+    packStore.answers = [];
+  });
+
+  const open = async (label: string) =>
+    act(async () => (host.querySelector(`nav [aria-label="${label}"]`) as HTMLElement).click());
+
+  it("a cover per pack after the three shelves, then the plus, on both rails", async () => {
+    await drawer();
+    for (const r of railButtons()) {
+      expect(r.map(([l]) => l)).toEqual(["Recent", "Favourites", "Yours", "Soft hours", "Pets", "Late nights", "New pack"]);
+    }
+    const cover = host.querySelector('nav [aria-label="Pets"] img') as HTMLImageElement;
+    expect(cover.src).toContain(S3.path.split("/")[1]);
+  });
+
+  it("a newly added pack has a dot until it is opened, and opening it says so to the server", async () => {
+    await drawer();
+    // One dot on each rail (desktop column and phone row).
+    expect(host.querySelectorAll('nav [aria-label="Late nights"] [data-fresh]')).toHaveLength(2);
+    expect(host.querySelectorAll('nav [aria-label="Soft hours"] [data-fresh]')).toHaveLength(0);
+    await open("Late nights");
+    expect(packStore.calls).toContainEqual(["markPackSeen", THEIRS.id]);
+    expect(host.querySelectorAll("nav [data-fresh]")).toHaveLength(0);
+  });
+
+  it("opening one you have seen does not write anything", async () => {
+    await drawer();
+    await open("Pets");
+    expect(packStore.calls).toEqual([]);
+  });
+
+  it("your own pack: its name, yours, an Add tile first, no Create", async () => {
+    await drawer();
+    await open("Soft hours");
+    expect(host.querySelector("[data-pack-header]")!.textContent).toBe("Soft hours2 stickers · yours");
+    const tiles = host.querySelectorAll(".grid > *");
+    expect(tiles[0].getAttribute("aria-label")).toBe("Add stickers to this pack");
+    expect(host.querySelector('[aria-label="Create a sticker"]')).toBe(null);
+    expect(host.querySelectorAll('[aria-label="Send sticker"]')).toHaveLength(2);
+  });
+
+  it("someone else's pack: who made it, and neither Add nor Create", async () => {
+    await drawer();
+    await open("Late nights");
+    expect(host.querySelector("[data-pack-header]")!.textContent).toMatch(/by AMAN/);
+    expect(host.querySelector('[aria-label="Add stickers to this pack"]')).toBe(null);
+    expect(host.querySelector('[aria-label="Create a sticker"]')).toBe(null);
+  });
+
+  it("someone else's pack offers Remove pack, not Rename or Delete; removing takes it off the rail", async () => {
+    await drawer();
+    await open("Late nights");
+    await act(async () => (host.querySelector('[aria-label="Pack options"]') as HTMLElement).click());
+    const items = [...host.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent);
+    expect(items).toEqual(["Remove pack"]);
+    await act(async () => (host.querySelector('[role="menuitem"]') as HTMLElement).click());
+    expect(packStore.calls).toContainEqual(["unsavePack", THEIRS.id]);
+    expect(host.querySelector('nav [aria-label="Late nights"]')).toBe(null);
+    for (const r of railButtons()) expect(r[0]).toEqual(["Recent", "true"]);
+  });
+
+  it("your own offers Rename and Delete; delete asks first, then takes it away", async () => {
+    await drawer();
+    await open("Soft hours");
+    await act(async () => (host.querySelector('[aria-label="Pack options"]') as HTMLElement).click());
+    expect([...host.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent)).toEqual(["Rename", "Delete pack"]);
+    await act(async () => ([...host.querySelectorAll('[role="menuitem"]')][1] as HTMLElement).click());
+    expect(packStore.calls).toEqual([]);
+    const dialog = host.querySelector('[role="dialog"][aria-label="Delete pack"]')!;
+    expect(dialog.textContent).toMatch(/leaves everyone's drawer/);
+    await act(async () => ([...dialog.querySelectorAll("button")].find((b) => b.textContent === "Delete") as HTMLElement).click());
+    expect(packStore.calls).toEqual([["deletePack", OWN.id]]);
+    expect(host.querySelector('nav [aria-label="Soft hours"]')).toBe(null);
+  });
+
+  it("a refused delete keeps the pack and says why", async () => {
+    packStore.answer = { ok: false, error: "No such pack" };
+    await drawer();
+    await open("Soft hours");
+    await act(async () => (host.querySelector('[aria-label="Pack options"]') as HTMLElement).click());
+    await act(async () => ([...host.querySelectorAll('[role="menuitem"]')][1] as HTMLElement).click());
+    const dialog = host.querySelector('[role="dialog"]')!;
+    await act(async () => ([...dialog.querySelectorAll("button")].find((b) => b.textContent === "Delete") as HTMLElement).click());
+    expect(host.querySelector('[role="dialog"]')!.textContent).toMatch(/No such pack/);
+    expect(host.querySelectorAll('nav [aria-label="Soft hours"]')).toHaveLength(2);
+  });
+
+  async function holdFirst() {
+    const tile = host.querySelector('[aria-label="Send sticker"]') as HTMLElement;
+    await act(async () => { tile.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })); });
+    return [...host.querySelectorAll('[role="menuitem"]')] as HTMLElement[];
+  }
+
+  it("in your own pack a held sticker can be moved or taken out", async () => {
+    await drawer();
+    await open("Soft hours");
+    expect((await holdFirst()).map((b) => b.textContent)).toEqual(["Add to favourites", "Move to another pack", "Take out of this pack"]);
+  });
+
+  it("in someone else's pack it cannot be taken out, only added to yours", async () => {
+    await drawer();
+    await open("Late nights");
+    expect((await holdFirst()).map((b) => b.textContent)).toEqual(["Add to favourites", "Add to a pack"]);
+  });
+
+  it("taking one out asks the server to take it out of this pack — never to delete it", async () => {
+    packStore.answer = { ok: true, value: { ...OWN, stickers: [S2] } };
+    await drawer();
+    await open("Soft hours");
+    const items = await holdFirst();
+    await act(async () => items[2].click());
+    expect(packStore.calls).toEqual([["removeFromPack", OWN.id, S1.id]]);
+    expect(host.querySelectorAll('[aria-label="Send sticker"]')).toHaveLength(1);
+    await open("Yours");
+    expect(host.querySelectorAll('[aria-label="Send sticker"]')).toHaveLength(3);
+  });
+
+  it("a refused take-out leaves the pack as it was and says why", async () => {
+    packStore.answer = { ok: false, error: "A pack has 2 to 30 stickers." };
+    await drawer();
+    await open("Soft hours");
+    await act(async () => (await holdFirst())[2].click());
+    expect(host.querySelector('[role="menu"]')!.textContent).toMatch(/2 to 30/);
+    expect(host.querySelectorAll('[aria-label="Send sticker"]')).toHaveLength(2);
+  });
+
+  it("moving adds to the other pack first, then takes it out of this one", async () => {
+    packStore.answers = [
+      { ok: true, value: { ...OWN2, stickers: [S3, S2, S1] } },
+      { ok: true, value: { ...OWN, stickers: [S2] } },
+    ];
+    await drawer();
+    await open("Soft hours");
+    await act(async () => (await holdFirst())[1].click());
+    const targets = [...host.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent);
+    expect(targets).toEqual(["Pets"]);
+    await act(async () => (host.querySelector('[role="menuitem"]') as HTMLElement).click());
+    expect(packStore.calls).toEqual([["addToPack", OWN2.id, [S1.id]], ["removeFromPack", OWN.id, S1.id]]);
+  });
+
+  it("if adding to the other pack is refused, nothing is taken out of this one", async () => {
+    packStore.answers = [{ ok: false, error: "A pack has 2 to 30 stickers." }];
+    await drawer();
+    await open("Soft hours");
+    await act(async () => (await holdFirst())[1].click());
+    await act(async () => (host.querySelector('[role="menuitem"]') as HTMLElement).click());
+    expect(packStore.calls).toEqual([["addToPack", OWN2.id, [S1.id]]]);
+    expect(host.querySelectorAll('[aria-label="Send sticker"]')).toHaveLength(2);
+  });
+
+  it("adding from someone else's pack does not touch theirs", async () => {
+    packStore.answer = { ok: true, value: { ...OWN, stickers: [S1, S2, S3] } };
+    await drawer();
+    await open("Late nights");
+    await act(async () => (await holdFirst())[1].click());
+    await act(async () => ([...host.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent === "Soft hours") as HTMLElement).click());
+    expect(packStore.calls.filter(([n]) => n !== "markPackSeen")).toEqual([["addToPack", OWN.id, [S3.id]]]);
+  });
+
+  it("a refused packs read is a failure, not an empty rail", async () => {
+    packStore.packs = { ok: false, error: "permission denied" };
+    await drawer();
+    expect(host.textContent).toMatch(/Couldn't load your stickers/);
+  });
+});
+
+describe("making a pack", () => {
+  beforeEach(() => {
+    store.mine = { ok: true, value: [S1, S2, S3] };
+    store.recent = { ok: true, value: [] };
+    store.favourites = { ok: true, value: [] };
+    packStore.packs = { ok: true, value: [OWN] };
+    packStore.calls = [];
+    packStore.answer = null;
+    packStore.answers = [];
+  });
+
+  const doc = () => document.body;
+  const dialog = () => doc().querySelector('[role="dialog"]') as HTMLElement;
+  const button = (text: string | RegExp) =>
+    [...dialog().querySelectorAll("button")].find((b) => (typeof text === "string" ? b.textContent === text : text.test(b.textContent ?? ""))) as HTMLButtonElement;
+  const tick = async (i: number) => act(async () => (dialog().querySelectorAll("button[aria-pressed]")[i] as HTMLElement).click());
+
+  async function startNew() {
+    await drawer();
+    await act(async () => (host.querySelector('nav [aria-label="New pack"]') as HTMLElement).click());
+    await act(async () => {});
+  }
+
+  it("the plus opens it, on Yours, with no new-sticker step", async () => {
+    await startNew();
+    expect(dialog().getAttribute("aria-label")).toBe("New pack");
+    expect([...dialog().querySelectorAll('[role="tab"]')].map((t) => t.textContent)).toEqual(["Yours", "Saved", "In packs"]);
+    expect(dialog().querySelector('[role="tab"][aria-selected="true"]')!.textContent).toBe("Yours");
+    expect(dialog().querySelectorAll("button[aria-pressed]")).toHaveLength(3);
+    expect(dialog().textContent).not.toMatch(/Create a sticker|Cut one out/);
+  });
+
+  it("Escape closes it — the keyboard's way past the backdrop", async () => {
+    await startNew();
+    expect(dialog()).not.toBe(null);
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
+    expect(dialog()).toBe(null);
+  });
+
+  it("Next waits for two", async () => {
+    await startNew();
+    expect(button(/^Next/).disabled).toBe(true);
+    await tick(0);
+    expect(dialog().textContent).toMatch(/1 picked · 2 to 30/);
+    expect(button(/^Next/).disabled).toBe(true);
+    await tick(1);
+    expect(button(/^Next/).disabled).toBe(false);
+    await tick(1);
+    expect(button(/^Next/).disabled).toBe(true);
+  });
+
+  it("In packs offers what is in your packs", async () => {
+    await startNew();
+    await act(async () => ([...dialog().querySelectorAll('[role="tab"]')][2] as HTMLElement).click());
+    expect(dialog().querySelectorAll("button[aria-pressed]")).toHaveLength(OWN.stickers.length);
+  });
+
+  it("creating sends the trimmed name, who can add it, the stickers in the order picked, and the cover", async () => {
+    packStore.answer = { ok: true, value: { ...OWN, id: "eeeeeeee-0000-0000-0000-000000000009", name: "Dogs", stickers: [S3, S1] } };
+    await startNew();
+    await tick(2);
+    await tick(0);
+    await act(async () => button(/^Next/).click());
+    const name = dialog().querySelector("#pack-name") as HTMLInputElement;
+    expect(button("Create pack").disabled).toBe(true);
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      set.call(name, "  Dogs ");
+      name.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => (dialog().querySelector('[role="radio"]:not([aria-checked="true"])') as HTMLElement).click());
+    // put the second-picked one in front
+    await act(async () => (dialog().querySelectorAll('[aria-label="Put on the front of the cover"]')[0] as HTMLElement).click());
+    await act(async () => button("Create pack").click());
+    expect(packStore.calls).toEqual([
+      ["createPack", { name: "Dogs", audience: "people", stickerIds: [S3.id, S1.id], coverStickerId: S1.id }],
+    ]);
+    expect(dialog().textContent).toMatch(/It is in your stickers already/);
+    // and it is on the rail, selected
+    expect(host.querySelector('nav [aria-label="Dogs"]')!.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("a refused create keeps the sheet open with the server's words", async () => {
+    packStore.answer = { ok: false, error: "You have 50 packs already. Delete one first." };
+    await startNew();
+    await tick(0);
+    await tick(1);
+    await act(async () => button(/^Next/).click());
+    const name = dialog().querySelector("#pack-name") as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(name, "X");
+      name.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => button("Create pack").click());
+    expect(dialog().querySelector('[role="alert"]')!.textContent).toMatch(/50 packs/);
+    expect(host.querySelector('nav [aria-label="X"]')).toBe(null);
+  });
+
+  it("adding to your pack leaves out what is in it and sends only what was picked", async () => {
+    packStore.answer = { ok: true, value: { ...OWN, stickers: [S1, S2, S3] } };
+    await drawer();
+    await act(async () => (host.querySelector('nav [aria-label="Soft hours"]') as HTMLElement).click());
+    await act(async () => (host.querySelector('[aria-label="Add stickers to this pack"]') as HTMLElement).click());
+    await act(async () => {});
+    expect(dialog().getAttribute("aria-label")).toBe("Add to Soft hours");
+    expect(dialog().querySelectorAll("button[aria-pressed]")).toHaveLength(1);
+    await tick(0);
+    await act(async () => button(/^Add 1 sticker$/).click());
+    expect(packStore.calls).toEqual([["addToPack", OWN.id, [S3.id]]]);
+    expect(host.querySelectorAll('[aria-label="Send sticker"]')).toHaveLength(3);
   });
 });

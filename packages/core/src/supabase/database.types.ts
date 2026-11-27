@@ -4802,6 +4802,29 @@ export type Database = {
         }
         Returns: Json
       }
+      my_sticker_packs: { Args: never; Returns: Json }
+      sticker_pack_by_code: { Args: { p_code: string }; Returns: Json }
+      create_sticker_pack: {
+        Args: {
+          p_audience: string
+          p_cover_sticker_id?: string
+          p_name: string
+          p_sticker_ids: string[]
+        }
+        Returns: Json
+      }
+      rename_sticker_pack: { Args: { p_name: string; p_pack_id: string }; Returns: Json }
+      delete_sticker_pack: { Args: { p_pack_id: string }; Returns: undefined }
+      add_stickers_to_pack: { Args: { p_pack_id: string; p_sticker_ids: string[] }; Returns: Json }
+      remove_sticker_from_pack: { Args: { p_pack_id: string; p_sticker_id: string }; Returns: Json }
+      save_sticker_pack: { Args: { p_code: string }; Returns: Json }
+      unsave_sticker_pack: { Args: { p_pack_id: string }; Returns: undefined }
+      mark_sticker_pack_seen: { Args: { p_pack_id: string }; Returns: undefined }
+      send_sticker_pack: {
+        Args: { p_conversation_id: string; p_pack_id: string; p_reply_to_id?: string }
+        Returns: Json
+      }
+      can_open_sticker_pack: { Args: { p_pack_id: string }; Returns: boolean }
       set_sticker_favourite: {
         Args: { p_on: boolean; p_sticker_id: string }
         Returns: boolean

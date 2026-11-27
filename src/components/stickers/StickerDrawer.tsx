@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Clock, Plus, Star, User } from "lucide-react";
+import { Clock, MoreHorizontal, Plus, Star, User } from "lucide-react";
 import type { Sticker } from "@hypefy/core/stickers";
 import {
   FIRST_SHELF,
@@ -9,10 +9,12 @@ import {
   emptyShelfText,
   railItems,
   sameShelf,
+  settleShelf,
   type FixedShelf,
   type RailItem,
   type Shelf,
 } from "@hypefy/core/sticker-rail";
+import { checkPackName, packByline, packCover, type StickerPack } from "@hypefy/core/sticker-packs";
 import { createClient } from "@/lib/supabase/client";
 import {
   listFavouriteStickers,
@@ -20,8 +22,18 @@ import {
   listRecentStickers,
   setStickerFavourite,
 } from "@/lib/sticker-store";
+import {
+  addToPack,
+  deletePack,
+  listMyPacks,
+  markPackSeen,
+  removeFromPack,
+  renamePack,
+  unsavePack,
+} from "@/lib/sticker-pack-store";
 import { GifPicker } from "@/components/messages/GifPicker";
 import { StickerImage } from "@/components/stickers/StickerImage";
+import { PackMaker } from "@/components/stickers/PackMaker";
 import { openStickerStudio } from "@/lib/cutout/studio-href";
 
 type Tab = "stickers" | "gifs";
@@ -34,6 +46,12 @@ const HOLD_MS = 450;
 
 const SHELF_ICON: Record<FixedShelf, typeof Clock> = { recent: Clock, favourites: Star, yours: User };
 
+type Menu =
+  | { kind: "sticker"; sticker: Sticker; x: number; y: number; choosePack?: boolean }
+  | { kind: "pack"; x: number; y: number };
+
+type Dialog = { kind: "rename"; pack: StickerPack } | { kind: "delete"; pack: StickerPack } | null;
+
 /**
  * The Stickers & GIFs drawer (D1 C + D6 C, with the rail from "Packs & the
  * drawer rail", 27 Nov).
@@ -44,11 +62,17 @@ const SHELF_ICON: Record<FixedShelf, typeof Clock> = { recent: Clock, favourites
  * in the place the chips used to be — Naitik's screenshot, 27 Nov. The rail
  * is sticker groups only, so it is not drawn on the GIFs tab.
  *
- * The first tile is always Create, in dark grey with a plus — not lime
- * (Naitik, 27 Nov) — so making a sticker is as close as sending one.
+ * Rail order: Recent, Favourites, Yours, a cover per pack, then the dashed
+ * plus that starts a new pack. A pack someone else made, newly added, has a
+ * lime dot until it is opened.
  *
- * Holding a tile (or right-clicking it) opens its menu: for now, add to or
- * take out of your favourites.
+ * The first tile is Create, dark grey with a plus — not lime (Naitik, 27
+ * Nov). In your own pack it is Add instead, and someone else's pack has
+ * neither: you can't change a pack that isn't yours.
+ *
+ * Holding a tile (or right-clicking it) opens its menu: favourites, adding
+ * it to one of your packs, and — in your own pack — moving it or taking it
+ * out. Taking a sticker out of a pack never deletes it.
  */
 export function StickerDrawer({
   currentUserId,
@@ -73,19 +97,23 @@ export function StickerDrawer({
   const [mine, setMine] = useState<Sticker[] | null>(null);
   const [recent, setRecent] = useState<Sticker[] | null>(null);
   const [favourites, setFavourites] = useState<Sticker[] | null>(null);
+  const [packs, setPacks] = useState<StickerPack[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const [menu, setMenu] = useState<{ sticker: Sticker; x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<Menu | null>(null);
   const [menuError, setMenuError] = useState<string | null>(null);
+  const [maker, setMaker] = useState<{ addTo?: StickerPack } | null>(null);
+  const [dialog, setDialog] = useState<Dialog>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
-    const [a, b, c] = await Promise.all([
+    const [a, b, c, d] = await Promise.all([
       listMyStickers(supabase, currentUserId),
       listRecentStickers(supabase, currentUserId),
       listFavouriteStickers(supabase),
+      listMyPacks(supabase),
     ]);
     // Said, not swallowed: an empty grid would read as "you have none".
-    const bad = [a, b, c].find((r) => !r.ok);
+    const bad = [a, b, c, d].find((r) => !r.ok);
     if (bad && !bad.ok) {
       setFailed(bad.error);
       return;
@@ -94,6 +122,7 @@ export function StickerDrawer({
     if (a.ok) setMine(a.value);
     if (b.ok) setRecent(b.value);
     if (c.ok) setFavourites(c.value);
+    if (d.ok) setPacks(d.value);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the client is recreated each render; the user is what matters
   }, [currentUserId]);
 
@@ -109,29 +138,62 @@ export function StickerDrawer({
     return () => window.removeEventListener("keydown", close);
   }, [menu]);
 
-  const shown = shelf.kind === "recent" ? recent : shelf.kind === "favourites" ? favourites : shelf.kind === "yours" ? mine : [];
-  const label = shelf.kind === "pack" ? "" : SHELF_LABEL[shelf.kind];
-  const items = railItems([], false);
+  const allPacks = packs ?? [];
+  const current = settleShelf(shelf, allPacks);
+  const pack = current.kind === "pack" ? allPacks.find((p) => p.id === current.packId) ?? null : null;
+  const ownPacks = allPacks.filter((p) => p.mine);
+  const shown =
+    current.kind === "recent" ? recent
+    : current.kind === "favourites" ? favourites
+    : current.kind === "yours" ? mine
+    : packs === null ? null
+    : pack?.stickers ?? [];
+  const items = railItems(allPacks.map((p) => ({ id: p.id, name: p.name })), true);
   const isFavourite = (id: string) => !!favourites?.some((f) => f.id === id);
 
-  function openMenu(sticker: Sticker, target: HTMLElement) {
+  function pick(s: Shelf) {
+    setShelf(s);
+    setMenu(null);
+    if (s.kind !== "pack") return;
+    const p = allPacks.find((x) => x.id === s.packId);
+    if (p?.fresh) {
+      void markPackSeen(supabase, p.id);
+      setPacks((prev) => (prev ?? []).map((x) => (x.id === p.id ? { ...x, fresh: false } : x)));
+    }
+  }
+
+  /** Put the server's answer for one pack in place, or add it to the end. */
+  function placePack(p: StickerPack) {
+    setPacks((prev) => {
+      const list = prev ?? [];
+      return list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [...list, p];
+    });
+  }
+  function dropPack(id: string) {
+    setPacks((prev) => (prev ?? []).filter((x) => x.id !== id));
+    setShelf(FIRST_SHELF);
+  }
+
+  function at(target: HTMLElement) {
     const box = boxRef.current?.getBoundingClientRect();
     const r = target.getBoundingClientRect();
-    if (!box) return;
+    if (!box) return { x: 8, y: 8 };
+    // Under the thing, kept inside the drawer.
+    return {
+      x: Math.min(Math.max(8, r.left - box.left), Math.max(8, box.width - 228)),
+      y: Math.min(r.bottom - box.top + 6, Math.max(8, box.height - 200)),
+    };
+  }
+
+  function openMenu(sticker: Sticker, target: HTMLElement) {
     setMenuError(null);
-    // Under the tile, kept inside the drawer.
-    const x = Math.min(Math.max(8, r.left - box.left), Math.max(8, box.width - 208));
-    const y = Math.min(r.bottom - box.top + 6, Math.max(8, box.height - 64));
-    setMenu({ sticker, x, y });
+    setMenu({ kind: "sticker", sticker, ...at(target) });
   }
 
   async function toggleFavourite(s: Sticker) {
     const want = !isFavourite(s.id);
     const res = await setStickerFavourite(supabase, s.id, want);
-    if (!res.ok) {
-      setMenuError(res.error);
-      return;
-    }
+    if (!res.ok) return setMenuError(res.error);
     setFavourites((prev) => {
       const rest = (prev ?? []).filter((f) => f.id !== s.id);
       return res.value ? [s, ...rest] : rest;
@@ -139,8 +201,46 @@ export function StickerDrawer({
     setMenu(null);
   }
 
+  async function putIn(target: StickerPack, s: Sticker) {
+    const res = await addToPack(supabase, target.id, [s.id]);
+    if (!res.ok) return setMenuError(res.error);
+    placePack(res.value);
+    // "Move": out of the pack it was held in, once it is safely in the other.
+    if (pack?.mine && pack.id !== target.id) {
+      const out = await removeFromPack(supabase, pack.id, s.id);
+      if (!out.ok) return setMenuError(`It's in ${target.name} now, but ${out.error}`);
+      placePack(out.value);
+    }
+    setMenu(null);
+  }
+
+  async function takeOut(s: Sticker) {
+    if (!pack) return;
+    const res = await removeFromPack(supabase, pack.id, s.id);
+    if (!res.ok) return setMenuError(res.error);
+    placePack(res.value);
+    setMenu(null);
+  }
+
+  async function removePack(p: StickerPack) {
+    const res = await unsavePack(supabase, p.id);
+    if (!res.ok) return setMenuError(res.error);
+    setMenu(null);
+    dropPack(p.id);
+  }
+
+  const label = current.kind === "pack" ? "" : SHELF_LABEL[current.kind];
+  const lead = current.kind !== "pack" ? "create" : pack?.mine ? "add" : null;
+
   const rail = (vertical: boolean) => (
-    <Rail items={items} shelf={shelf} vertical={vertical} onPick={(s) => { setShelf(s); setMenu(null); }} />
+    <Rail
+      items={items}
+      shelf={current}
+      packs={allPacks}
+      vertical={vertical}
+      onPick={pick}
+      onNew={() => { setMenu(null); setMaker({}); }}
+    />
   );
 
   return (
@@ -179,10 +279,28 @@ export function StickerDrawer({
             {/* Phone: the same icons, in a row where the chips were. */}
             <div className="sm:hidden">{rail(false)}</div>
 
-            <p className="shrink-0 px-4 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted sm:pt-3.5">
-              {label}
-              {shown && shown.length > 0 ? ` · ${shown.length}` : ""}
-            </p>
+            {pack ? (
+              <div className="flex shrink-0 items-center gap-2.5 px-4 pb-2.5 pt-1 sm:pt-3.5" data-pack-header>
+                <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                  <b className="truncate text-[14.5px] font-extrabold">{pack.name}</b>
+                  <span className="text-[11.5px] font-semibold text-muted">{packByline(pack)}</span>
+                </span>
+                <button
+                  type="button"
+                  aria-label="Pack options"
+                  aria-haspopup="menu"
+                  onClick={(e) => { setMenuError(null); setMenu({ kind: "pack", ...at(e.currentTarget) }); }}
+                  className="flex h-[34px] w-[34px] items-center justify-center rounded-xl bg-surface text-muted hover:text-foreground"
+                >
+                  <MoreHorizontal size={17} />
+                </button>
+              </div>
+            ) : (
+              <p className="shrink-0 px-4 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted sm:pt-3.5">
+                {label}
+                {shown && shown.length > 0 ? ` · ${shown.length}` : ""}
+              </p>
+            )}
 
             <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
               {failed ? (
@@ -194,18 +312,32 @@ export function StickerDrawer({
                 </div>
               ) : (
                 <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5 lg:grid-cols-6">
-                  {/* Create: always first, dark grey with a plus. */}
-                  <button
-                    type="button"
-                    onClick={() => openStickerStudio(conversationId)}
-                    aria-label="Create a sticker"
-                    className="flex aspect-square flex-col items-center justify-center gap-1.5 rounded-[14px] border border-[#2f2f2f] bg-[#242424] text-[11.5px] font-extrabold text-[#d8d8d8] transition hover:bg-[#2a2a2a] active:scale-95"
-                  >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#333] text-[#eaeaea]">
-                      <Plus size={16} />
-                    </span>
-                    Create
-                  </button>
+                  {lead === "create" && (
+                    /* Create: always first, dark grey with a plus. */
+                    <button
+                      type="button"
+                      onClick={() => openStickerStudio(conversationId)}
+                      aria-label="Create a sticker"
+                      className="flex aspect-square flex-col items-center justify-center gap-1.5 rounded-[14px] border border-[#2f2f2f] bg-[#242424] text-[11.5px] font-extrabold text-[#d8d8d8] transition hover:bg-[#2a2a2a] active:scale-95"
+                    >
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#333] text-[#eaeaea]">
+                        <Plus size={16} />
+                      </span>
+                      Create
+                    </button>
+                  )}
+                  {lead === "add" && pack && (
+                    /* Add: your own pack only. The same picker, minus what is in it. */
+                    <button
+                      type="button"
+                      onClick={() => setMaker({ addTo: pack })}
+                      aria-label="Add stickers to this pack"
+                      className="flex aspect-square flex-col items-center justify-center gap-1.5 rounded-[14px] border-[1.5px] border-dashed border-[#3a3a3a] text-[10.5px] font-extrabold text-[#a3e635] transition hover:bg-white/[0.03] active:scale-95"
+                    >
+                      <Plus size={18} />
+                      Add
+                    </button>
+                  )}
                   {shown === null
                     ? Array.from({ length: 3 }, (_, i) => (
                         <span key={i} className="aspect-square animate-pulse rounded-[14px] bg-white/[0.025]" />
@@ -216,7 +348,7 @@ export function StickerDrawer({
                 </div>
               )}
               {!failed && shown !== null && shown.length === 0 && (
-                <p className="px-2 pt-4 text-center text-xs text-faint">{emptyShelfText(shelf)}</p>
+                <p className="px-2 pt-4 text-center text-xs text-faint">{emptyShelfText(current)}</p>
               )}
             </div>
           </>
@@ -228,22 +360,160 @@ export function StickerDrawer({
           <button type="button" aria-label="Close menu" className="absolute inset-0 z-10 cursor-default" onClick={() => setMenu(null)} />
           <div
             role="menu"
-            className="absolute z-20 w-[200px] overflow-hidden rounded-2xl bg-surface p-1 shadow-xl ring-1 ring-border"
+            className="absolute z-20 max-h-[260px] w-[220px] overflow-y-auto rounded-2xl bg-surface p-1 shadow-xl ring-1 ring-border"
             style={{ left: menu.x, top: menu.y }}
           >
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => void toggleFavourite(menu.sticker)}
-              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold text-foreground hover:bg-white/5"
-            >
-              <Star size={16} aria-hidden />
-              {isFavourite(menu.sticker.id) ? "Remove from favourites" : "Add to favourites"}
-            </button>
-            {menuError && <p className="px-3 pb-2 text-[11.5px] text-danger">{menuError}</p>}
+            {menu.kind === "sticker" && !menu.choosePack && (
+              <>
+                <MenuItem onClick={() => void toggleFavourite(menu.sticker)}>
+                  {isFavourite(menu.sticker.id) ? "Remove from favourites" : "Add to favourites"}
+                </MenuItem>
+                {ownPacks.some((p) => p.id !== pack?.id) && (
+                  <MenuItem onClick={() => setMenu({ ...menu, choosePack: true })}>
+                    {pack?.mine ? "Move to another pack" : "Add to a pack"}
+                  </MenuItem>
+                )}
+                {pack?.mine && (
+                  <MenuItem danger onClick={() => void takeOut(menu.sticker)}>Take out of this pack</MenuItem>
+                )}
+              </>
+            )}
+            {menu.kind === "sticker" && menu.choosePack &&
+              ownPacks
+                .filter((p) => p.id !== pack?.id)
+                .map((p) => (
+                  <MenuItem key={p.id} onClick={() => void putIn(p, menu.sticker)}>
+                    {p.name}
+                  </MenuItem>
+                ))}
+            {menu.kind === "pack" && pack && (pack.mine ? (
+              <>
+                <MenuItem onClick={() => { setMenu(null); setDialog({ kind: "rename", pack }); }}>Rename</MenuItem>
+                <MenuItem danger onClick={() => { setMenu(null); setDialog({ kind: "delete", pack }); }}>Delete pack</MenuItem>
+              </>
+            ) : (
+              <MenuItem danger onClick={() => void removePack(pack)}>Remove pack</MenuItem>
+            ))}
+            {menuError && <p role="alert" className="px-3 pb-2 text-[11.5px] text-danger">{menuError}</p>}
           </div>
         </>
       )}
+
+      {dialog && (
+        <PackDialog
+          dialog={dialog}
+          onCancel={() => setDialog(null)}
+          onRename={async (name) => {
+            const res = await renamePack(supabase, dialog.pack.id, name);
+            if (!res.ok) return res.error;
+            placePack(res.value);
+            setDialog(null);
+            return null;
+          }}
+          onDelete={async () => {
+            const res = await deletePack(supabase, dialog.pack.id);
+            if (!res.ok) return res.error;
+            dropPack(dialog.pack.id);
+            setDialog(null);
+            return null;
+          }}
+        />
+      )}
+
+      {maker && (
+        <PackMaker
+          currentUserId={currentUserId}
+          yours={mine ?? []}
+          favourites={favourites ?? []}
+          packs={allPacks}
+          addTo={maker.addTo}
+          onMade={(p) => { placePack(p); setShelf({ kind: "pack", packId: p.id }); }}
+          onClose={() => setMaker(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function MenuItem({ children, onClick, danger }: { children: React.ReactNode; onClick: () => void; danger?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold hover:bg-white/5 ${danger ? "text-danger" : "text-foreground"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Rename and delete, inside the drawer. Each answers with an error to show, or null. */
+function PackDialog({
+  dialog,
+  onCancel,
+  onRename,
+  onDelete,
+}: {
+  dialog: NonNullable<Dialog>;
+  onCancel: () => void;
+  onRename: (name: string) => Promise<string | null>;
+  onDelete: () => Promise<string | null>;
+}) {
+  const [name, setName] = useState(dialog.pack.name);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function go() {
+    setError(null);
+    let err: string | null;
+    if (dialog.kind === "rename") {
+      const n = checkPackName(name);
+      if (!n.ok) return setError(n.error);
+      setBusy(true);
+      err = await onRename(n.name);
+    } else {
+      setBusy(true);
+      err = await onDelete();
+    }
+    setBusy(false);
+    if (err) setError(err);
+  }
+
+  return (
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/55 p-4">
+      <div role="dialog" aria-modal="true" aria-label={dialog.kind === "rename" ? "Rename pack" : "Delete pack"} className="w-full max-w-[320px] rounded-2xl bg-surface p-4 ring-1 ring-border">
+        {dialog.kind === "rename" ? (
+          <>
+            <label htmlFor="pack-rename" className="text-[13px] font-extrabold">Rename pack</label>
+            <input
+              id="pack-rename"
+              value={name}
+              maxLength={40}
+              autoFocus
+              onChange={(e) => setName(e.target.value)}
+              className="mt-2.5 h-11 w-full rounded-xl border border-border bg-background px-3 text-[14px] text-foreground outline-none focus:border-white/25"
+            />
+          </>
+        ) : (
+          <>
+            <p className="text-[13px] font-extrabold">Delete {dialog.pack.name}?</p>
+            <p className="mt-1.5 text-[12px] leading-snug text-muted">It leaves everyone&apos;s drawer, including people who added it. The stickers in it stay.</p>
+          </>
+        )}
+        {error && <p role="alert" className="mt-2 text-[12px] text-danger">{error}</p>}
+        <div className="mt-3.5 flex justify-end gap-2">
+          <button type="button" onClick={onCancel} className="h-9 rounded-xl px-3.5 text-[13px] font-bold text-muted hover:text-foreground">Cancel</button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void go()}
+            className={`h-9 rounded-xl px-3.5 text-[13px] font-extrabold disabled:opacity-40 ${dialog.kind === "delete" ? "bg-danger text-white" : "bg-foreground text-background"}`}
+          >
+            {dialog.kind === "rename" ? "Save" : "Delete"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -296,20 +566,26 @@ function StickerTile({ sticker, onSend, onHold }: { sticker: Sticker; onSend: ()
 /**
  * The rail. Vertical: a 62px column with 42px buttons. Horizontal: 40px
  * buttons in a row. The selected one sits on light grey — not lime
- * (Naitik, 27 Nov, overriding the drawn lime square).
+ * (Naitik, 27 Nov, overriding the drawn lime square). Lime is left for the
+ * new-pack dot only.
  */
 function Rail({
   items,
   shelf,
+  packs,
   vertical,
   onPick,
+  onNew,
 }: {
   items: RailItem[];
   shelf: Shelf;
+  packs: readonly StickerPack[];
   vertical: boolean;
   onPick: (s: Shelf) => void;
+  onNew: () => void;
 }) {
   const size = vertical ? "h-[42px] w-[42px]" : "h-10 w-10";
+  const img = vertical ? 30 : 28;
   return (
     <nav
       aria-label="Sticker groups"
@@ -323,10 +599,25 @@ function Rail({
         if (it.kind === "sep") {
           return <span key={`sep-${i}`} aria-hidden className={vertical ? "my-[3px] h-px w-[26px] shrink-0 bg-white/10" : "mx-0.5 h-6 w-px shrink-0 bg-white/10"} />;
         }
-        if (it.kind === "new") return null; // packs arrive with the next part
+        if (it.kind === "new") {
+          return (
+            <button
+              key="new"
+              type="button"
+              aria-label={it.label}
+              title={it.label}
+              onClick={onNew}
+              className={`flex ${size} shrink-0 items-center justify-center rounded-[13px] border-[1.5px] border-dashed border-[#3a3a3a] text-[#8a8a8a] transition hover:text-foreground`}
+            >
+              <Plus size={18} strokeWidth={2.2} aria-hidden />
+            </button>
+          );
+        }
         const target: Shelf = it.kind === "shelf" ? { kind: it.shelf } : { kind: "pack", packId: it.packId };
         const on = sameShelf(shelf, target);
-        const Icon = it.kind === "shelf" ? SHELF_ICON[it.shelf] : Star;
+        const p = it.kind === "pack" ? packs.find((x) => x.id === it.packId) : undefined;
+        const front = p ? packCover(p.stickers, p.coverStickerId, 1)[0] : undefined;
+        const Icon = it.kind === "shelf" ? SHELF_ICON[it.shelf] : null;
         return (
           <button
             key={it.kind === "shelf" ? it.shelf : it.packId}
@@ -335,11 +626,18 @@ function Rail({
             aria-pressed={on}
             title={it.label}
             onClick={() => onPick(target)}
-            className={`flex ${size} shrink-0 items-center justify-center rounded-[13px] transition ${
-              on ? RAIL_ON : `${vertical ? "" : "bg-surface"} text-muted hover:text-foreground`
+            className={`relative flex ${size} shrink-0 items-center justify-center rounded-[13px] transition ${
+              on ? RAIL_ON : `${p ? "bg-[#1a1a1a]" : vertical ? "" : "bg-surface"} text-muted hover:text-foreground`
             }`}
           >
-            <Icon size={18} strokeWidth={2.2} aria-hidden />
+            {Icon ? (
+              <Icon size={18} strokeWidth={2.2} aria-hidden />
+            ) : front ? (
+              <StickerImage sticker={front} box={{ width: img, height: img }} />
+            ) : (
+              <span aria-hidden className="text-[13px] font-extrabold">{it.label.slice(0, 1)}</span>
+            )}
+            {p?.fresh && <span data-fresh aria-label="New" className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#a3e635] ring-2 ring-elevated" />}
           </button>
         );
       })}
