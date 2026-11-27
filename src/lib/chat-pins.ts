@@ -366,3 +366,102 @@ export function pinAxis(dx: number, dy: number, threshold = 10): null | "x" | "y
 /** The columns the pin board reads. */
 export const PIN_SELECT =
   "id, kind, body, sender_id, created_at, pinned_at, pinned_by, post:posts(id, image_url, image_urls, profiles!posts_user_id_fkey(username)), shot:shots(id, media_url, poster_url, profiles!shots_user_id_fkey(username))";
+
+/* ── The pin banner ──────────────────────────────────────────────────────
+ *
+ * Naitik, 27 Nov 2026 (design B with A's strip): opening a chat that has
+ * pins shows the newest one as a strip under the header. After
+ * PIN_BANNER_MS, or the first scroll, it folds into a tab on the right
+ * edge of the screen, which is where the pin board slides in from; tapping
+ * either opens the board.
+ */
+
+/** How long the strip stays before it folds into the tab. */
+export const PIN_BANNER_MS = 3000;
+
+/**
+ * Scrolls this soon after opening are the thread settling, not a person:
+ * folding on them would hide the strip before anyone saw it.
+ */
+export const PIN_BANNER_SETTLE_MS = 500;
+
+/** The strip's headline: what the thing is, in words. */
+export function bannerTitle(pin: Pin): string {
+  const c = pin.card;
+  switch (c.shape) {
+    case "photo":
+      if (c.more > 0) return `${c.more + 1} photos`;
+      if (pin.label === "GIF") return "GIF";
+      return c.motion ? "Video" : "Attachment";
+    case "share":
+      return c.of === "shot" ? "Shot" : "Post";
+    case "voice":
+      return "Voice note";
+    case "track":
+      return "Music";
+    case "file":
+      return c.name;
+    case "note":
+      return c.text;
+  }
+}
+
+/** The picture beside it, when there is one. */
+export function bannerThumb(pin: Pin): string | null {
+  const c = pin.card;
+  if (c.shape === "photo") return c.motion ? null : c.url;
+  if (c.shape === "share") return c.thumb;
+  return null;
+}
+
+/** "Pinned by Aman · 1 of 3". "you" for the reader; the count only when there is more than one. */
+export function bannerLine(pin: Pin, me: string, nameOf: (id: string) => string | null, total: number): string {
+  const by = pin.pinnedBy === me ? "you" : pin.pinnedBy ? nameOf(pin.pinnedBy) : null;
+  const head = by ? `Pinned by ${by}` : "Pinned";
+  return total > 1 ? `${head} · 1 of ${total}` : head;
+}
+
+/** What shows: nothing without pins, the strip until it folds, then the tab. */
+export function pinBannerMode(count: number, folded: boolean): "none" | "banner" | "tab" {
+  if (count <= 0) return "none";
+  return folded ? "tab" : "banner";
+}
+
+/** Fold on a scroll only once the thread has settled after opening. */
+export function foldsOnScroll(sinceOpenMs: number): boolean {
+  return sinceOpenMs >= PIN_BANNER_SETTLE_MS;
+}
+
+type PinQuery = {
+  select(cols: string): PinQuery;
+  eq(col: string, v: unknown): PinQuery;
+  not(col: string, op: string, v: unknown): PinQuery;
+  is(col: string, v: unknown): PinQuery;
+  order(col: string, o: { ascending: boolean }): PinQuery;
+  limit(n: number): PromiseLike<{ data: unknown[] | null; error: unknown }>;
+};
+
+/**
+ * The banner's read. The same rows the board shows, filtered the same way
+ * (still pinned, not unsent, not removed), so the count on the tab is the
+ * number of cards the board will open on. RLS limits it to the reader's
+ * own chats. A failed read is no pins: the banner is a shortcut, and the
+ * board is still in the header menu.
+ */
+export async function loadBannerPins(
+  client: { from(table: string): PinQuery },
+  conversationId: string,
+  me: string,
+): Promise<Pin[]> {
+  const { data, error } = await client
+    .from("messages")
+    .select(PIN_SELECT)
+    .eq("conversation_id", conversationId)
+    .not("pinned_at", "is", null)
+    .eq("is_unsent", false)
+    .is("removed_at", null)
+    .order("pinned_at", { ascending: false })
+    .limit(MAX_PINNED_MESSAGES);
+  if (error) return [];
+  return toPins((data ?? []) as PinRow[], me);
+}
