@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { safeBack } from "@/lib/safe-back";
-import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock, AlertCircle, Search, Pin as PinIcon, BarChart2, Sticker as StickerIcon } from "lucide-react";
+import { ChevronLeft, Reply, Copy, Trash2, Flag, Users, Phone, Video, MoreVertical, UserCircle, BellOff, Ban, X, Mic, Paperclip, LogOut, Pencil, Eye, EyeOff, FileText, Download, Check, Camera, Music, Image as ImageIcon, Lock, Unlock, AlertCircle, Search, Pin as PinIcon, BarChart2, Sticker as StickerIcon, Star } from "lucide-react";
 import { SendIcon, ShareIcon } from "@/components/ui/ShareIcon";
 import { FACES_SHOWN, lastMine, readMarkers, receiptFor } from "@/lib/chat-receipts";
 import { ChatSearch, type FoundMessage } from "@/components/messages/ChatSearch";
@@ -21,7 +21,7 @@ import { VoiceMessage } from "@/components/messages/VoiceMessage";
 import { StickerDrawer } from "@/components/stickers/StickerDrawer";
 import { StickerImage } from "@/components/stickers/StickerImage";
 import { readSticker, stickerTilt, type Sticker } from "@hypefy/core/stickers";
-import { sendSticker as sendStickerRpc } from "@/lib/sticker-store";
+import { sendSticker as sendStickerRpc, setStickerFavourite } from "@/lib/sticker-store";
 import { TrackPicker } from "@/components/music/TrackPicker";
 import { TrackChip } from "@/components/music/TrackChip";
 import { packTrack, unpackTrack } from "@/lib/music-message";
@@ -425,9 +425,10 @@ export function RealChatView({
   const [voiceMode, setVoiceMode] = useState(false);
   const [starBurstId, setStarBurstId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  /** Which tab the drawer opens on when something other than its own
-   *  button opens it — the photo picker's GIF tab opens it on GIFs. */
-  const [drawerTab, setDrawerTab] = useState<"stickers" | "gifs" | undefined>(undefined);
+  /** Which tab the drawer opens on. Its own button always opens Stickers
+   *  (on Recent) — never GIFs, and never wherever it was left (Naitik,
+   *  27 Nov); only the photo picker's GIF tab opens it on GIFs. */
+  const [drawerTab, setDrawerTab] = useState<"stickers" | "gifs">("stickers");
   const [songPickerOpen, setSongPickerOpen] = useState(false);
   const [attachment, setAttachment] = useState<{
     file: File;
@@ -3301,7 +3302,7 @@ export function RealChatView({
                 !hasText && !attachment && !editing ? (
                   <button
                     type="button"
-                    onClick={() => { setDrawerTab(undefined); setDrawerOpen((v) => !v); }}
+                    onClick={() => { setDrawerTab("stickers"); setDrawerOpen((v) => !v); }}
                     aria-label="Stickers and GIFs"
                     aria-expanded={drawerOpen}
                     className={`flex h-[34px] w-[34px] items-center justify-center rounded-xl transition active:scale-90 ${
@@ -3526,6 +3527,24 @@ export function RealChatView({
                     <CtxItem icon={<ShareIcon size={17} weight="bold" />} label="Forward" onClick={() => { setForwardMsg(menu.msg); setMenu(null); }} />
                   )}
                   {menu.msg.body && menu.msg.kind !== "album" && <CtxItem icon={<Copy size={17} />} label="Copy" onClick={() => { copy(menu.msg); setMenu(null); }} />}
+                  {(() => {
+                    // Keep a sticker somebody sent: it goes on the drawer's
+                    // Favourites shelf, and can then go into a pack.
+                    const st = readSticker(menu.msg);
+                    if (!st) return null;
+                    return (
+                      <CtxItem
+                        icon={<Star size={17} />}
+                        label="Add to favourites"
+                        onClick={() => {
+                          setMenu(null);
+                          void setStickerFavourite(supabase, st.id, true).then((r) =>
+                            showToast(r.ok ? "Added to your favourites" : "Couldn't add it to your favourites"),
+                          );
+                        }}
+                      />
+                    );
+                  })()}
                   {canPin(menu.msg.kind, menu.msg.is_unsent) && !menu.msg.id.startsWith("temp-") && (
                     <CtxItem
                       icon={<PinIcon size={17} />}

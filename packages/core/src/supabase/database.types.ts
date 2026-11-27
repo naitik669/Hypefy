@@ -4802,6 +4802,24 @@ export type Database = {
         }
         Returns: Json
       }
+      set_sticker_favourite: {
+        Args: { p_on: boolean; p_sticker_id: string }
+        Returns: boolean
+      }
+      my_favourite_stickers: {
+        Args: never
+        Returns: {
+          edge: string
+          height: number
+          id: string
+          path: string
+          width: number
+        }[]
+      }
+      can_see_sticker: {
+        Args: { p_sticker_id: string }
+        Returns: boolean
+      }
       send_sticker: {
         Args: {
           p_conversation_id: string
