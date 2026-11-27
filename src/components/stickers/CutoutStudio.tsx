@@ -412,7 +412,7 @@ export function CutoutStudio({
             ref={photoCanvasRef}
             className="absolute inset-0 h-full w-full transition-opacity"
             style={{
-              opacity: stage === "cutting" ? 0.55 : comparing ? 1 : editing ? 0.2 : 0,
+              opacity: stage === "cutting" ? 0.9 : comparing ? 1 : editing ? 0.2 : 0,
             }}
             aria-hidden="true"
           />
@@ -426,6 +426,15 @@ export function CutoutStudio({
             role="img"
             aria-label="Your sticker"
           />
+          {/* While the model works: a scan line sweeping the photo, instead
+              of a spinner (Naitik, 27 Nov). Inside the frame, so it covers
+              the picture and nothing else. */}
+          {stage === "cutting" && (
+            <div className="sticker-scan pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+              <span className="sticker-scan-grid" />
+              <span className="sticker-scan-beam" />
+            </div>
+          )}
         </div>
         {cursor && editing && (
           <span
@@ -453,14 +462,10 @@ export function CutoutStudio({
             <X size={20} />
           </button>
         )}
-        <span className={pill} aria-live="polite">
+        {stage === "cutting" && !progress && <span className="sr-only" aria-live="polite">Cutting it out</span>}
+        <span className={stage === "cutting" && !progress ? "hidden" : pill} aria-live="polite">
           {stage === "pick" && "New sticker"}
-          {stage === "cutting" && (
-            <>
-              <Loader2 size={14} className="animate-spin text-accent" />
-              {progress ? `Getting the cutter ready · ${progress}` : "Cutting it out…"}
-            </>
-          )}
+          {stage === "cutting" && progress && `Getting the cutter ready · ${progress}`}
           {stage === "cut" && (
             <>
               <Check size={14} className="text-accent" />
