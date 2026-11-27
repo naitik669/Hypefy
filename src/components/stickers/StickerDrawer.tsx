@@ -27,7 +27,7 @@ import { openStickerStudio } from "@/lib/cutout/studio-href";
 type Tab = "stickers" | "gifs";
 
 /** The selected rail button: light grey behind it, never lime (Naitik, 27 Nov). */
-export const RAIL_ON = "bg-white/[0.14] text-foreground";
+export const RAIL_ON = "bg-white/[0.10] text-[#e4e4e4]";
 
 /** How long a finger has to stay on a tile before it counts as a hold. */
 const HOLD_MS = 450;

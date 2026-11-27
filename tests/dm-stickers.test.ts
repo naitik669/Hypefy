@@ -606,9 +606,10 @@ describe("the drawer's rail", () => {
     for (const nav of host.querySelectorAll('nav[aria-label="Sticker groups"]')) {
       const [on, ...off] = [...nav.querySelectorAll("button")];
       expect(on.getAttribute("aria-pressed")).toBe("true");
-      expect(on.className).toMatch(/(^|\s)bg-white\/\[0\.14\](\s|$)/);
-      expect(on.className).toMatch(/(^|\s)text-foreground(\s|$)/);
-      for (const b of off) expect(b.className).not.toMatch(/bg-white\/\[0\.14\]/);
+      // The canvas's values: rgba(255,255,255,.10) behind, icon #e4e4e4.
+      expect(on.className).toMatch(/(^|\s)bg-white\/\[0\.10\](\s|$)/);
+      expect(on.className).toMatch(/(^|\s)text-\[#e4e4e4\](\s|$)/);
+      for (const b of off) expect(b.className).not.toMatch(/bg-white\/\[0\.10\]|#e4e4e4/);
       // Every state, written out: hover and focus included, both rails.
       for (const b of nav.querySelectorAll("button")) expect(b.className).not.toMatch(/accent|lime|#a3e635|163,\s*230/i);
     }
