@@ -13,7 +13,7 @@ import {
   stickerTilt,
   stickerUrl,
 } from "@hypefy/core/stickers";
-import { forwardSticker, listMyStickers, listRecentStickers, saveSticker, sendSticker } from "@/lib/sticker-store";
+import { forwardSticker, listFavouriteStickers, listMyStickers, listRecentStickers, saveSticker, sendSticker, setStickerFavourite } from "@/lib/sticker-store";
 import { msgSnippet } from "@/lib/chat-thread";
 
 /**
@@ -431,6 +431,10 @@ const store = vi.hoisted(() => ({
   fake: false,
   mine: { ok: true, value: [] as unknown[] } as { ok: boolean; value?: unknown[]; error?: string },
   recent: { ok: true, value: [] as unknown[] } as { ok: boolean; value?: unknown[]; error?: string },
+  favourites: { ok: true, value: [] as unknown[] } as { ok: boolean; value?: unknown[]; error?: string },
+  /** What set_sticker_favourite answers, and what it was asked. */
+  star: { ok: true, value: true } as { ok: boolean; value?: boolean; error?: string },
+  starCalls: [] as unknown[][],
 }));
 vi.mock("@/lib/sticker-store", async (orig) => {
   const real = await orig<typeof import("@/lib/sticker-store")>();
@@ -438,6 +442,12 @@ vi.mock("@/lib/sticker-store", async (orig) => {
     ...real,
     listMyStickers: (...a: Parameters<typeof real.listMyStickers>) => (store.fake ? Promise.resolve(store.mine) : real.listMyStickers(...a)),
     listRecentStickers: (...a: Parameters<typeof real.listRecentStickers>) => (store.fake ? Promise.resolve(store.recent) : real.listRecentStickers(...a)),
+    listFavouriteStickers: (...a: Parameters<typeof real.listFavouriteStickers>) => (store.fake ? Promise.resolve(store.favourites) : real.listFavouriteStickers(...a)),
+    setStickerFavourite: (...a: Parameters<typeof real.setStickerFavourite>) => {
+      if (!store.fake) return real.setStickerFavourite(...a);
+      store.starCalls.push(a.slice(1));
+      return Promise.resolve(store.star);
+    },
   };
 });
 
@@ -464,8 +474,17 @@ async function drawer(props: Record<string, unknown> = {}) {
 }
 
 describe("the drawer", () => {
+  beforeEach(() => {
+    store.mine = { ok: true, value: [] };
+    store.recent = { ok: true, value: [] };
+    store.favourites = { ok: true, value: [] };
+    store.star = { ok: true, value: true };
+    store.starCalls = [];
+  });
+
   it("Create is the first tile, dark grey with a plus, not lime", async () => {
-    store.mine = { ok: true, value: [readStickerRow(row)] };
+    // The drawer opens on Recent (27 Nov rail design), so that is the shelf drawn.
+    store.recent = { ok: true, value: [readStickerRow(row)] };
     await drawer();
     const tiles = host.querySelectorAll(".grid > *");
     const create = tiles[0] as HTMLElement;
@@ -486,7 +505,7 @@ describe("the drawer", () => {
   });
 
   it("a tile sends that sticker", async () => {
-    store.mine = { ok: true, value: [readStickerRow(row)] };
+    store.recent = { ok: true, value: [readStickerRow(row)] };
     const h = await drawer();
     await act(async () => (host.querySelector('[aria-label="Send sticker"]') as HTMLElement).click());
     expect(h.onSticker).toHaveBeenCalledWith(readStickerRow(row));
@@ -512,6 +531,237 @@ describe("the drawer", () => {
   it("opens on GIFs when asked to", async () => {
     await drawer({ startTab: "gifs" });
     expect(host.querySelector("[data-gif]")).not.toBe(null);
+  });
+  it("a refused Favourites read is a failure too, not an empty shelf", async () => {
+    store.favourites = { ok: false, error: "permission denied" };
+    await drawer();
+    expect(host.textContent).toMatch(/Couldn't load your stickers/);
+  });
+});
+
+// ── The rail (27 Nov, "Packs & the drawer rail") ────────────────────────
+
+const OTHER = { id: "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee", path: `${UID}/bbbbbbbb-8888-7777-6666-555555555555.webp`, edge: "clean", width: 100, height: 100 };
+
+/** The rail buttons in document order, as [label, pressed]. Both rails
+ *  (desktop column, phone row) are in the DOM; CSS shows one of them. */
+const railButtons = () =>
+  [...host.querySelectorAll('nav[aria-label="Sticker groups"]')].map((nav) =>
+    [...nav.querySelectorAll("button")].map((b) => [b.getAttribute("aria-label"), b.getAttribute("aria-pressed")]),
+  );
+
+describe("the drawer's rail", () => {
+  beforeEach(() => {
+    store.mine = { ok: true, value: [] };
+    store.recent = { ok: true, value: [] };
+    store.favourites = { ok: true, value: [] };
+    store.star = { ok: true, value: true };
+    store.starCalls = [];
+  });
+
+  it("is Recent, Favourites, Yours, in that order, the same on both rails", async () => {
+    await drawer();
+    const rails = railButtons();
+    expect(rails).toHaveLength(2);
+    for (const r of rails) expect(r.map(([l]) => l)).toEqual(["Recent", "Favourites", "Yours"]);
+  });
+
+  it("replaces the chips: no text chips are left", async () => {
+    await drawer();
+    for (const nav of host.querySelectorAll('nav[aria-label="Sticker groups"]')) {
+      for (const b of nav.querySelectorAll("button")) expect(b.textContent).toBe("");
+    }
+  });
+
+  it("opens on Recent", async () => {
+    store.recent = { ok: true, value: [readStickerRow(row)] };
+    store.mine = { ok: true, value: [readStickerRow(OTHER)] };
+    await drawer();
+    for (const r of railButtons()) expect(r[0]).toEqual(["Recent", "true"]);
+    expect(host.querySelector("p")!.textContent).toBe("Recent · 1");
+    expect(host.querySelectorAll('[aria-label="Send sticker"]')).toHaveLength(1);
+  });
+
+  it("opens on Stickers even if GIFs was the last tab used", async () => {
+    localStorage.setItem("hypefy:sticker-drawer:tab", "gifs");
+    await drawer();
+    expect(host.querySelector("[data-gif]")).toBe(null);
+    expect(host.querySelector('[role="tab"][aria-selected="true"]')!.textContent).toBe("Stickers");
+  });
+
+  it("picking a shelf shows that shelf", async () => {
+    store.mine = { ok: true, value: [readStickerRow(row), readStickerRow(OTHER)] };
+    store.favourites = { ok: true, value: [readStickerRow(OTHER)] };
+    await drawer();
+    const yours = host.querySelector('nav [aria-label="Yours"]') as HTMLElement;
+    await act(async () => yours.click());
+    expect(host.querySelector("p")!.textContent).toBe("Yours · 2");
+    await act(async () => (host.querySelector('nav [aria-label="Favourites"]') as HTMLElement).click());
+    expect(host.querySelector("p")!.textContent).toBe("Favourites · 1");
+    for (const r of railButtons()) expect(r.find(([l]) => l === "Favourites")![1]).toBe("true");
+  });
+
+  it("the selected one sits on light grey, and nothing on the rail is lime", async () => {
+    await drawer();
+    for (const nav of host.querySelectorAll('nav[aria-label="Sticker groups"]')) {
+      const [on, ...off] = [...nav.querySelectorAll("button")];
+      expect(on.getAttribute("aria-pressed")).toBe("true");
+      // The canvas's values: rgba(255,255,255,.10) behind, icon #e4e4e4.
+      expect(on.className).toMatch(/(^|\s)bg-white\/\[0\.10\](\s|$)/);
+      expect(on.className).toMatch(/(^|\s)text-\[#e4e4e4\](\s|$)/);
+      for (const b of off) expect(b.className).not.toMatch(/bg-white\/\[0\.10\]|#e4e4e4/);
+      // Every state, written out: hover and focus included, both rails.
+      for (const b of nav.querySelectorAll("button")) expect(b.className).not.toMatch(/accent|lime|#a3e635|163,\s*230/i);
+    }
+    const src = strip(read("src/components/stickers/StickerDrawer.tsx"));
+    const rail = src.slice(src.indexOf("function Rail("));
+    expect(rail).not.toMatch(/accent|lime|#a3e635/i);
+  });
+
+  it("is not drawn on the GIFs tab", async () => {
+    await drawer();
+    await act(async () => (host.querySelectorAll('[role="tab"]')[1] as HTMLElement).click());
+    expect(host.querySelectorAll('nav[aria-label="Sticker groups"]')).toHaveLength(0);
+  });
+
+  it("the composer's sticker button asks for Stickers, every time", () => {
+    const chat = strip(read("src/components/messages/RealChatView.tsx"));
+    const at = chat.indexOf('aria-label="Stickers and GIFs"');
+    const button = chat.slice(chat.lastIndexOf("<button", at), at);
+    expect(button).toMatch(/onClick=\{\(\) => \{ setDrawerTab\("stickers"\); setDrawerOpen\(\(v\) => !v\); \}\}/);
+  });
+});
+
+describe("favourites", () => {
+  beforeEach(() => {
+    store.mine = { ok: true, value: [] };
+    store.recent = { ok: true, value: [readStickerRow(row)] };
+    store.favourites = { ok: true, value: [] };
+    store.star = { ok: true, value: true };
+    store.starCalls = [];
+  });
+
+  /** jsdom has no PointerEvent; React reads pointerType off the event. */
+  const touch = (type: string) => {
+    const ev = new MouseEvent(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, "pointerType", { value: "touch" });
+    return ev;
+  };
+
+  async function hold() {
+    const tile = host.querySelector('[aria-label="Send sticker"]') as HTMLElement;
+    await act(async () => { tile.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })); });
+    return host.querySelector('[role="menu"]') as HTMLElement | null;
+  }
+
+  it("right-click opens the tile's menu instead of sending it", async () => {
+    const h = await drawer();
+    const menu = await hold();
+    expect(menu).not.toBe(null);
+    expect(menu!.textContent).toBe("Add to favourites");
+    expect(h.onSticker).not.toHaveBeenCalled();
+  });
+
+  it("a long press opens it too, and the lift that ends the press does not send", async () => {
+    vi.useFakeTimers();
+    try {
+      const h = await drawer();
+      const tile = host.querySelector('[aria-label="Send sticker"]') as HTMLElement;
+      await act(async () => { tile.dispatchEvent(touch("pointerdown")); });
+      await act(async () => { vi.advanceTimersByTime(460); });
+      expect(host.querySelector('[role="menu"]')).not.toBe(null);
+      await act(async () => { tile.dispatchEvent(touch("pointerup")); tile.click(); });
+      expect(h.onSticker).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a short tap still sends", async () => {
+    vi.useFakeTimers();
+    try {
+      const h = await drawer();
+      const tile = host.querySelector('[aria-label="Send sticker"]') as HTMLElement;
+      await act(async () => { tile.dispatchEvent(touch("pointerdown")); });
+      await act(async () => { vi.advanceTimersByTime(200); });
+      await act(async () => { tile.dispatchEvent(touch("pointerup")); tile.click(); });
+      await act(async () => { vi.advanceTimersByTime(500); });
+      expect(host.querySelector('[role="menu"]')).toBe(null);
+      expect(h.onSticker).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Add to favourites stars it, and it is on the Favourites shelf", async () => {
+    await drawer();
+    const menu = await hold();
+    await act(async () => (menu!.querySelector("button") as HTMLElement).click());
+    expect(store.starCalls).toEqual([[SID, true]]);
+    expect(host.querySelector('[role="menu"]')).toBe(null);
+    await act(async () => (host.querySelector('nav [aria-label="Favourites"]') as HTMLElement).click());
+    expect(host.querySelector("p")!.textContent).toBe("Favourites · 1");
+  });
+
+  it("a starred one offers Remove, and removing takes it off the shelf", async () => {
+    store.favourites = { ok: true, value: [readStickerRow(row)] };
+    store.star = { ok: true, value: false };
+    await drawer();
+    const menu = await hold();
+    expect(menu!.textContent).toBe("Remove from favourites");
+    await act(async () => (menu!.querySelector("button") as HTMLElement).click());
+    expect(store.starCalls).toEqual([[SID, false]]);
+    await act(async () => (host.querySelector('nav [aria-label="Favourites"]') as HTMLElement).click());
+    expect(host.querySelectorAll('[aria-label="Send sticker"]')).toHaveLength(0);
+  });
+
+  it("a refused star says so and leaves the shelf as it was", async () => {
+    store.star = { ok: false, error: "No such sticker" };
+    await drawer();
+    const menu = await hold();
+    await act(async () => (menu!.querySelector("button") as HTMLElement).click());
+    expect(host.querySelector('[role="menu"]')!.textContent).toMatch(/No such sticker/);
+    await act(async () => (host.querySelector('nav [aria-label="Favourites"]') as HTMLElement).click());
+    expect(host.querySelectorAll('[aria-label="Send sticker"]')).toHaveLength(0);
+  });
+
+  it("the shelf shows what the server answered, not what was asked", async () => {
+    store.star = { ok: true, value: false };
+    await drawer();
+    const menu = await hold();
+    await act(async () => (menu!.querySelector("button") as HTMLElement).click());
+    await act(async () => (host.querySelector('nav [aria-label="Favourites"]') as HTMLElement).click());
+    expect(host.querySelectorAll('[aria-label="Send sticker"]')).toHaveLength(0);
+  });
+
+  it("a sticker in the thread can be kept from its hold menu", () => {
+    const chat = strip(read("src/components/messages/RealChatView.tsx"));
+    const at = chat.indexOf('label="Add to favourites"');
+    expect(at).toBeGreaterThan(-1);
+    const block = chat.slice(chat.lastIndexOf("const st = readSticker(menu.msg);", at), at + 400);
+    expect(block).toMatch(/if \(!st\) return null;/);
+    expect(block).toMatch(/setStickerFavourite\(supabase, st\.id, true\)/);
+  });
+});
+
+describe("the favourites calls", () => {
+  beforeEach(() => { store.fake = false; });
+  it("reads through my_favourite_stickers, and a refusal is a failure", async () => {
+    const ok = fakeClient({ rpc: { data: [row, { id: "x" }], error: null } });
+    const r = await listFavouriteStickers(ok.client);
+    expect(ok.calls).toEqual([{ op: "rpc", args: ["my_favourite_stickers"] }]);
+    expect(r).toEqual({ ok: true, value: [readStickerRow(row)] });
+    const bad = fakeClient({ rpc: { data: null, error: { message: "permission denied" } } });
+    expect(await listFavouriteStickers(bad.client)).toEqual({ ok: false, error: "permission denied" });
+  });
+
+  it("starring says which sticker and on or off, and answers with the server's word", async () => {
+    const f = fakeClient({ rpc: { data: false, error: null } });
+    const r = await setStickerFavourite(f.client, SID, true);
+    expect(f.calls).toEqual([{ op: "rpc", args: ["set_sticker_favourite", { p_sticker_id: SID, p_on: true }] }]);
+    expect(r).toEqual({ ok: true, value: false });
+    const bad = fakeClient({ rpc: { data: null, error: { message: "No such sticker" } } });
+    expect(await setStickerFavourite(bad.client, SID, true)).toEqual({ ok: false, error: "No such sticker" });
   });
 });
 

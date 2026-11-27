@@ -94,6 +94,10 @@ describe("where it replaced lucide's", () => {
       "src/app/(app)/settings/page.tsx",
       // Saving a GIF, which is not hype at all.
       "src/components/messages/GifPicker.tsx",
+      // Favouriting a sticker (the drawer rail's Favourites shelf, 27 Nov
+      // design): keeping a picture, not hyping anyone.
+      "src/components/stickers/StickerDrawer.tsx",
+      "src/components/messages/RealChatView.tsx",
     ]);
     const offenders = tsxFiles()
       .map((f) => f.split("\\").join("/"))

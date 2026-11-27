@@ -126,3 +126,25 @@ export async function forwardSticker(
   if (!sticker) return { ok: false, error: "That sticker can't be forwarded." };
   return sendSticker(supabase, conversationId, sticker.id, { forwarded: true });
 }
+
+/** Your favourites, newest first (0223). Somebody else's sticker can be one. */
+export async function listFavouriteStickers(supabase: Client): Promise<StickerResult<Sticker[]>> {
+  const { data, error } = await supabase.rpc("my_favourite_stickers");
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, value: (data ?? []).map(readStickerRow).filter((s): s is Sticker => s !== null) };
+}
+
+/**
+ * Star or unstar a sticker. Answers with whether it is a favourite now, as
+ * the server says — never what was asked for, so a refused star cannot
+ * leave a tile looking starred.
+ */
+export async function setStickerFavourite(
+  supabase: Client,
+  stickerId: string,
+  on: boolean,
+): Promise<StickerResult<boolean>> {
+  const { data, error } = await supabase.rpc("set_sticker_favourite", { p_sticker_id: stickerId, p_on: on });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, value: data === true };
+}
