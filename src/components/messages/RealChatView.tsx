@@ -2289,7 +2289,8 @@ export function RealChatView({
                   >
                   <div className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}>
                     {!mine && (
-                      <span className="w-7 shrink-0" data-msg-face={face || undefined}>
+                      // Still while the bubble beside it is swiped: see SwipeRow.
+                      <span className="w-7 shrink-0" data-msg-face={face || undefined} data-swipe-still>
                         {face && (
                           // Raised past whatever hangs under the bubble, so
                           // it is level with the bubble and not the reaction.
@@ -2309,7 +2310,7 @@ export function RealChatView({
                         )}
                       </span>
                     )}
-                    <div className={`flex max-w-[80%] flex-col ${mine ? "items-end" : "items-start"}`}>
+                    <div data-swipe-body className={`flex max-w-[80%] flex-col ${mine ? "items-end" : "items-start"}`}>
                       {/* On the board, and said so here: otherwise the only
                           way to know a message is pinned is to go and look. */}
                       {m.pinned_at && (
