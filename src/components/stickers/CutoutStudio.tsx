@@ -12,12 +12,14 @@
  * blur behind it; nothing is docked below the photo, so the photo keeps the
  * whole screen. A sticker has no name: there is no field for one.
  *
- * Web only (platform reason): the cut runs a WebAssembly model the Expo app
- * cannot load, so the phone app has no studio before launch.
+ * Web only for now: the cut is done by the server (/api/stickers/cutout), with
+ * an on-device WebAssembly model as the fallback. The Expo app could call the
+ * same route, but has no studio screen yet.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { X, ChevronLeft, Check, Paintbrush, Eraser, Undo2, RotateCcw, Eye, Camera, Image as ImageIcon, Loader2, Square } from "lucide-react";
-import { CutoutEngine, decodePhoto, exportSticker, type Photo } from "@/lib/cutout/engine";
+import { CutoutEngine, decodePhoto, exportSticker, serverCut, type Photo } from "@/lib/cutout/engine";
+import { cutWithFallback } from "@/lib/cutout/cut";
 import { applyMaskAlpha, keptBounds, paintSegment, MaskHistory, type Rect } from "@/lib/cutout/mask";
 import { MODEL_BYTES, type Progress } from "@/lib/cutout/model-loader";
 import { STUDIO_LAYOUT, stageAfterCut, type StudioLayout } from "@/lib/cutout/studio-layout";
@@ -92,23 +94,10 @@ export function CutoutStudio({
   const pickRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
-  // Start the download and the runtime while the person is still choosing a
-  // photo: on a first visit that hides most of the 46 MB wait.
-  useEffect(() => {
-    const engine = new CutoutEngine();
-    engineRef.current = engine;
-    let live = true;
-    engine
-      .prepare((p) => live && setDownload(p))
-      .then(() => live && setEngineReady(true))
-      .catch(() => {
-        // Surfaced when a cut is attempted; picking still works meanwhile.
-      });
-    return () => {
-      live = false;
-      engine.dispose();
-    };
-  }, []);
+  // The device model is only the fallback now (the server cuts first), so
+  // nothing is downloaded up front; it is made, and its 46 MB fetched, only
+  // if a cut has to fall back to it.
+  useEffect(() => () => engineRef.current?.dispose(), []);
 
   useEffect(() => {
     const el = stageRef.current;
@@ -161,13 +150,14 @@ export function CutoutStudio({
           ?.getContext("2d")
           ?.putImageData(new ImageData(new Uint8ClampedArray(photo.rgba), photo.w, photo.h), 0, 0);
       });
-      const engine = engineRef.current ?? new CutoutEngine();
-      engineRef.current = engine;
       try {
-        await engine.prepare((p) => setDownload(p));
-        setEngineReady(true);
         const t0 = performance.now();
-        const mask = await engine.cut(photo);
+        const { mask } = await cutWithFallback(photo, {
+          server: serverCut,
+          device: () => (engineRef.current ??= new CutoutEngine()),
+          onProgress: (p) => setDownload(p),
+        });
+        setEngineReady(true);
         setCutMs(performance.now() - t0);
         maskRef.current = mask;
         autoMaskRef.current = mask.slice();
