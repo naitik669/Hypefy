@@ -71,6 +71,13 @@ export function SwipeRow({
 }) {
   const root = useRef<HTMLDivElement | null>(null);
   const slider = useRef<HTMLDivElement | null>(null);
+  /**
+   * What actually moves: the part marked data-swipe-body, or the whole row
+   * if nothing is marked. The sender's avatar sits outside the body and
+   * stays put (Naitik, 27 Nov 2026: the face sliding with the bubble read
+   * as the whole person being dragged). Resolved at the claim.
+   */
+  const mover = useRef<HTMLElement | null>(null);
   const glyph = useRef<HTMLSpanElement | null>(null);
   const plate = useRef<HTMLSpanElement | null>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -101,9 +108,11 @@ export function SwipeRow({
 
   // Which glyph is showing, and on which side. The one piece of this that
   // has to be rendered, so it is set once per gesture and never during it.
-  const [showing, setShowing] = useState<{ action: SwipeAction; side: "left" | "right" } | null>(
-    null,
-  );
+  const [showing, setShowing] = useState<{
+    action: SwipeAction;
+    side: "left" | "right";
+    inset: number;
+  } | null>(null);
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
@@ -130,7 +139,7 @@ export function SwipeRow({
     if (frame.current) return;
     frame.current = requestAnimationFrame(() => {
       frame.current = 0;
-      const el = slider.current;
+      const el = mover.current;
       if (!el) return;
       el.style.transform = `translate3d(${want.current}px, 0, 0)`;
       const g = glyph.current;
@@ -167,7 +176,7 @@ export function SwipeRow({
       // the first one's tidying land on top of it.
       if (gen.current === mine) setShowing(null);
     }, 240);
-    const el = slider.current;
+    const el = mover.current;
     if (el) {
       el.style.transition = reducedMotion()
         ? "none"
@@ -176,7 +185,7 @@ export function SwipeRow({
       // Dropped after the journey back, not during it: a layer promoted on
       // every row of a long thread is memory nobody asked for.
       window.setTimeout(() => {
-        if (slider.current === el) el.style.willChange = "";
+        if (mover.current === el) el.style.willChange = "";
       }, 240);
     }
     start.current = null;
@@ -223,14 +232,22 @@ export function SwipeRow({
       // has to follow the finger, not finish the previous animation. Its
       // colour keeps its own transition, which is not per-frame.
       if (g) g.style.transition = GLYPH_EASE;
-      const el = slider.current;
+      mover.current =
+        slider.current?.querySelector<HTMLElement>("[data-swipe-body]") ?? slider.current;
+      const el = mover.current;
       if (el) {
         // Set once, here. Writing the transition string on every move was a
         // style recalculation per frame for no change.
         el.style.transition = "none";
         el.style.willChange = "transform";
       }
-      setShowing({ action: next, side: side.current });
+      // The mark sits in the gap the bubble opens. On a received message
+      // that gap starts after the avatar, which no longer moves, so the
+      // mark is placed past it rather than on top of it.
+      const still = slider.current?.querySelector<HTMLElement>("[data-swipe-still]");
+      const inset =
+        side.current === "left" && still ? still.offsetLeft + still.offsetWidth + 4 : 12;
+      setShowing({ action: next, side: side.current, inset });
       onClaim();
       e.currentTarget.setPointerCapture?.(e.pointerId);
     }
@@ -271,9 +288,8 @@ export function SwipeRow({
       {showing && (
         <span
           aria-hidden
-          className={`pointer-events-none absolute inset-y-0 my-auto flex h-9 w-9 items-center justify-center ${
-            showing.side === "left" ? "left-3" : "right-3"
-          }`}
+          className="pointer-events-none absolute inset-y-0 my-auto flex h-9 w-9 items-center justify-center"
+          style={{ [showing.side]: showing.inset }}
         >
           {/* The plate. A squircle, not a circle — the same corner the
               avatars and the music case use, so the mark belongs to Hypefy

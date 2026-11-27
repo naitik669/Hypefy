@@ -270,7 +270,7 @@ describe("the gesture itself", () => {
     // A layer kept on every row of a long thread is memory nobody asked
     // for; promoted only while something is actually moving.
     expect(row).toContain('el.style.willChange = "transform";');
-    expect(row).toContain('if (slider.current === el) el.style.willChange = "";');
+    expect(row).toContain('if (mover.current === el) el.style.willChange = "";');
   });
 
   it("and the transition is set once, not on every frame", () => {

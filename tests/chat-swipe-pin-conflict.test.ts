@@ -66,3 +66,32 @@ describe("the wiring", () => {
   });
 });
 
+describe("the avatar stays where it is", () => {
+  const sw = strip(read("src/components/messages/SwipeRow.tsx"));
+  const chat = read("src/components/messages/RealChatView.tsx");
+
+  it("only the marked body moves, not the whole row", () => {
+    expect(sw).toContain('slider.current?.querySelector<HTMLElement>("[data-swipe-body]") ?? slider.current');
+    const paint = sw.slice(sw.indexOf("function schedule()"), sw.indexOf("function settle()"));
+    expect(paint).toContain("const el = mover.current;");
+    expect(paint).not.toContain("slider.current");
+    const settle = sw.slice(sw.indexOf("function settle()"), sw.indexOf("function onPointerDown("));
+    expect(settle).toContain("const el = mover.current;");
+  });
+
+  it("the bubble column is the body, and the avatar is outside it", () => {
+    const open = chat.indexOf("<SwipeRow");
+    const inside = chat.slice(open, chat.indexOf("</SwipeRow>"));
+    const face = inside.indexOf("data-msg-face=");
+    const body = inside.indexOf("data-swipe-body");
+    expect(face).toBeGreaterThan(-1);
+    expect(body).toBeGreaterThan(face);
+    expect(inside.slice(face, body)).toContain("data-swipe-still");
+  });
+
+  it("and the mark sits past the avatar, not on top of it", () => {
+    expect(sw).toContain('slider.current?.querySelector<HTMLElement>("[data-swipe-still]")');
+    expect(sw).toContain("style={{ [showing.side]: showing.inset }}");
+    expect(sw).toContain('side.current === "left" && still ? still.offsetLeft + still.offsetWidth + 4 : 12');
+  });
+});
