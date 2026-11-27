@@ -8,7 +8,7 @@
  * Web only. The Expo app cannot run this WebAssembly runtime, so the phone
  * app has no cutout before launch — it would need ML Kit or a server route.
  */
-import { MODEL_SIZE, fitWithin, toModelInput, predictionToMask, keptBounds, cutoutPixels, type Rect } from "./mask";
+import { MODEL_SIZE, fitWithin, toModelInput, predictionToMask, keptBounds, cutoutPixels, maskFromImage, type Rect } from "./mask";
 import { loadModelBytes, pruneOldModels, type Progress } from "./model-loader";
 import { encodeSticker, STICKER_MAX_SIDE, type EncodedSticker } from "./encode";
 
@@ -114,6 +114,33 @@ export class CutoutEngine {
     for (const p of this.pending.values()) p.reject(new Error("closed"));
     this.pending.clear();
   }
+}
+
+/**
+ * Cut on the server: the photo at work resolution goes up as a JPEG, the
+ * mask comes back as a greyscale PNG and is scaled to the photo's size.
+ * Throws on any failure, so the caller can fall back to the device.
+ */
+export async function serverCut(photo: Photo): Promise<Uint8ClampedArray> {
+  const canvas = document.createElement("canvas");
+  canvas.width = photo.w;
+  canvas.height = photo.h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d canvas");
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(photo.rgba), photo.w, photo.h), 0, 0);
+  const jpeg = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.9));
+  if (!jpeg) throw new Error("could not encode the photo");
+  const res = await fetch("/api/stickers/cutout", { method: "POST", body: jpeg, headers: { "content-type": "image/jpeg" } });
+  if (!res.ok) throw new Error(`cutout server ${res.status}`);
+  const bmp = await createImageBitmap(await res.blob());
+  const out = document.createElement("canvas");
+  out.width = photo.w;
+  out.height = photo.h;
+  const octx = out.getContext("2d", { willReadFrequently: true });
+  if (!octx) throw new Error("no 2d canvas");
+  octx.drawImage(bmp, 0, 0, photo.w, photo.h);
+  bmp.close();
+  return maskFromImage(octx.getImageData(0, 0, photo.w, photo.h).data);
 }
 
 /** Draw RGBA pixels into a canvas and encode it with the browser's encoder. */

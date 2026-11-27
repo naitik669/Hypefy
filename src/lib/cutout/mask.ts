@@ -228,3 +228,15 @@ export class MaskHistory {
     this.stack = [];
   }
 }
+
+/**
+ * A greyscale mask image (as the cutout server returns it, drawn into a
+ * canvas) → a mask. White is kept. The red channel is the grey level; an
+ * image that also carries transparency keeps only what is opaque.
+ */
+export function maskFromImage(rgba: Uint8ClampedArray): Uint8ClampedArray {
+  const n = rgba.length / 4;
+  const mask = new Uint8ClampedArray(n);
+  for (let i = 0; i < n; i++) mask[i] = Math.round((rgba[i * 4] * rgba[i * 4 + 3]) / 255);
+  return mask;
+}
