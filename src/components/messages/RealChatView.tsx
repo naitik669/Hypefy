@@ -1967,6 +1967,9 @@ export function RealChatView({
    */
   function doSwipe(m: ChatMsg, action: SwipeAction) {
     if (action === "reply") { setReplyTo(m); return; }
+    // The same picker the hold menu's Forward opens: nothing is sent until
+    // a chat is chosen in it.
+    if (action === "forward") { setForwardMsg(m); return; }
     startEdit(m);
   }
 

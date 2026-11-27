@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Reply, Pencil } from "lucide-react";
+import { ShareIcon } from "@/components/ui/ShareIcon";
 import {
   SWIPE_SLOP_PX,
   SWIPE_TRIGGER_PX,
@@ -319,10 +320,22 @@ export function SwipeRow({
 /**
  * The arrow itself, taking its colour from the layer around it — so the
  * one write that turns it deep-lime needs to touch nothing else.
+ *
+ * Reply curls back to the left, towards the message it answers. Forward is
+ * the hold menu's own Forward glyph, the arrow bending round to the right,
+ * so a swipe shows the same mark as the menu item it stands in for and the
+ * two directions point opposite ways.
  */
 function SwipeGlyph({ action }: { action: SwipeAction }) {
   const label = swipeLabel(action);
   if (action === "reply") return <Reply size={19} strokeWidth={2.4} aria-label={label} />;
+  if (action === "forward")
+    return (
+      // ShareIcon is aria-hidden itself, so the name goes on a wrapper.
+      <span role="img" aria-label={label} className="flex">
+        <ShareIcon size={19} weight="bold" />
+      </span>
+    );
   return <Pencil size={17} strokeWidth={2.4} aria-label={label} />;
 }
 
