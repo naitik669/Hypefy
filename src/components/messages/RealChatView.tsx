@@ -3004,10 +3004,10 @@ export function RealChatView({
           <div className="mb-2">
             <StickerDrawer
               currentUserId={currentUserId}
+              conversationId={conversationId}
               startTab={drawerTab}
               onSticker={(s) => void sendSticker(s)}
               onGif={sendGif}
-              onError={(msg) => showToast(msg)}
             />
           </div>
         )}

@@ -90,6 +90,9 @@ export async function updateSession(request: NextRequest) {
     "/settings",
     "/premium",
     "/marketplace",
+    // The cutout sticker studio (src/app/stickers/new), outside the (app)
+    // shell, so nothing else guards it.
+    "/stickers",
   ];
   const { pathname } = request.nextUrl;
   const isProtected =

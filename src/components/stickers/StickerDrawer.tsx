@@ -1,14 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Clock, Loader2, Plus } from "lucide-react";
-import type { Sticker, StickerEdge } from "@hypefy/core/stickers";
+import { useCallback, useEffect, useState } from "react";
+import { Clock, Plus } from "lucide-react";
+import type { Sticker } from "@hypefy/core/stickers";
 import { createClient } from "@/lib/supabase/client";
-import { listMyStickers, listRecentStickers, saveSticker } from "@/lib/sticker-store";
-import { canBecomeSticker, prepareStickerImage, type PreparedSticker } from "@/lib/sticker-image";
+import { listMyStickers, listRecentStickers } from "@/lib/sticker-store";
 import { GifPicker } from "@/components/messages/GifPicker";
 import { StickerImage } from "@/components/stickers/StickerImage";
-import { StickerSaveSheet } from "@/components/stickers/StickerSaveSheet";
+import { openStickerStudio } from "@/lib/cutout/studio-href";
 
 type Tab = "stickers" | "gifs";
 type Shelf = "recent" | "yours";
@@ -35,19 +34,20 @@ function readTab(): Tab {
  */
 export function StickerDrawer({
   currentUserId,
+  conversationId,
   startTab,
   onSticker,
   onGif,
-  onError,
 }: {
   currentUserId: string;
+  /** Where Create's finished sticker is sent. */
+  conversationId: string;
   /** Open on this tab rather than the one last used. */
   startTab?: Tab;
   /** Send this sticker. */
   onSticker: (s: Sticker) => void;
   /** Send this GIF. */
   onGif: (url: string) => void;
-  onError: (message: string) => void;
 }) {
   const supabase = createClient();
   // Read once, as the drawer mounts: it only ever mounts after a tap, so
@@ -57,10 +57,6 @@ export function StickerDrawer({
   const [mine, setMine] = useState<Sticker[] | null>(null);
   const [recent, setRecent] = useState<Sticker[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const [draft, setDraft] = useState<(PreparedSticker & { url: string }) | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [preparing, setPreparing] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     const [a, b] = await Promise.all([
@@ -83,43 +79,9 @@ export function StickerDrawer({
     void load();
   }, [load]);
 
-  // The object URL lives exactly as long as the draft does.
-  useEffect(() => () => { if (draft) URL.revokeObjectURL(draft.url); }, [draft]);
-
   function pickTab(t: Tab) {
     setTab(t);
     try { localStorage.setItem(TAB_KEY, t); } catch { /* private mode: not remembered */ }
-  }
-
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    if (!canBecomeSticker(file.type)) { onError("Pick a photo to make a sticker."); return; }
-    setPreparing(true);
-    try {
-      const prepared = await prepareStickerImage(file);
-      setDraft({ ...prepared, url: URL.createObjectURL(prepared.blob) });
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "Couldn't open that picture.");
-    } finally {
-      setPreparing(false);
-    }
-  }
-
-  async function keep(edge: StickerEdge, thenSend: boolean) {
-    if (!draft || busy) return;
-    setBusy(true);
-    const saved = await saveSticker(supabase, currentUserId, draft.blob, edge, {
-      width: draft.width,
-      height: draft.height,
-    });
-    setBusy(false);
-    if (!saved.ok) { onError(saved.error); return; }
-    setDraft(null);
-    setMine((m) => [saved.value, ...(m ?? [])]);
-    setShelf("yours");
-    if (thenSend) onSticker(saved.value);
   }
 
   const shown = shelf === "recent" ? recent : mine;
@@ -185,13 +147,12 @@ export function StickerDrawer({
                 {/* Create: always first, dark grey with a plus. */}
                 <button
                   type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={preparing}
+                  onClick={() => openStickerStudio(conversationId)}
                   aria-label="Create a sticker"
                   className="flex aspect-square flex-col items-center justify-center gap-1.5 rounded-[14px] border border-[#2f2f2f] bg-[#242424] text-[11.5px] font-extrabold text-[#d8d8d8] transition hover:bg-[#2a2a2a] active:scale-95"
                 >
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#333] text-[#eaeaea]">
-                    {preparing ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                    <Plus size={16} />
                   </span>
                   Create
                 </button>
@@ -219,18 +180,6 @@ export function StickerDrawer({
             )}
           </div>
         </>
-      )}
-
-      <input ref={fileRef} type="file" accept="image/png,image/webp,image/jpeg,image/heic,image/heif,image/avif" className="hidden" onChange={onFile} />
-
-      {draft && (
-        <StickerSaveSheet
-          image={draft.url}
-          busy={busy}
-          onClose={() => setDraft(null)}
-          onSave={(edge) => void keep(edge, false)}
-          onSend={(edge) => void keep(edge, true)}
-        />
       )}
     </div>
   );

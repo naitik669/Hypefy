@@ -49,6 +49,43 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      /*
+       * The cutout sticker studio, and nothing else, is cross-origin
+       * isolated: that is what lets its WebAssembly model run on several
+       * threads (3-4 s a photo instead of ~11 s, measured). Isolation stops
+       * cross-origin images and scripts that do not opt in, so it would
+       * break avatars, embeds and checkout if it reached any other page.
+       * See src/app/stickers/new/page.tsx for why the page is entered and
+       * left with full navigations.
+       */
+      {
+        source: "/stickers/new",
+        headers: [
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+        ],
+      },
+      /*
+       * The studio's worker and runtime need the same headers as the page.
+       * Measured, not assumed: with COEP on the page alone, an isolated page
+       * refuses to start the worker at all, and the cut never runs.
+       */
+      {
+        source: "/cutout/:path*",
+        headers: [
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+        ],
+      },
+      /*
+       * The 46 MB model never changes under its name (a new model gets a new
+       * file name, see src/lib/cutout/model-loader.ts), so it caches for good.
+       */
+      {
+        source: "/cutout/isnet-general-use-q8.onnx",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
       {
         source: "/(.*)",
         headers: [
