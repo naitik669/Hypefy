@@ -2372,3 +2372,44 @@ html[data-splash="off"] #hypefy-splash {
   border-radius: 50%;
   background: #fff;
 }
+
+/*
+ * The studio's "cutting" state: a lime scan line sweeping the photo top to
+ * bottom and back, with a faint grid and a glow trailing it, in place of a
+ * spinner. Reduced motion gets a slow glow instead of a moving line.
+ */
+.sticker-scan-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(163, 230, 53, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(163, 230, 53, 0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.sticker-scan-beam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 34%;
+  background: linear-gradient(180deg, transparent 0%, rgba(163, 230, 53, 0.04) 40%, rgba(163, 230, 53, 0.28) 96%, #d9f99d 99%, transparent 100%);
+  box-shadow: 0 10px 22px -6px rgba(163, 230, 53, 0.55);
+  animation: sticker-scan 2.2s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+@keyframes sticker-scan {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(194%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sticker-scan-beam {
+    top: 0;
+    height: 100%;
+    background: rgba(163, 230, 53, 0.1);
+    box-shadow: none;
+    animation: sticker-scan-calm 2.4s ease-in-out infinite alternate;
+  }
+  @keyframes sticker-scan-calm {
+    from { opacity: 0.3; }
+    to { opacity: 1; }
+  }
+}

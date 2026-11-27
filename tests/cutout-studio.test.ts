@@ -15,19 +15,33 @@ const W = 20;
 const H = 10;
 const engine = vi.hoisted(() => ({
   mask: null as Uint8ClampedArray | null,
+  /** Set to keep the cut running, so the cutting state can be looked at. */
+  hold: null as Promise<void> | null,
+  /** What the server answers: a mask, or null for "unavailable". */
+  server: null as Uint8ClampedArray | null,
+  devicesMade: 0,
   exported: [] as Uint8ClampedArray[],
 }));
 
 vi.mock("@/lib/cutout/engine", () => ({
   CutoutEngine: class {
     threads = 4;
+    constructor() {
+      engine.devicesMade++;
+    }
     prepare() {
       return Promise.resolve(4);
     }
-    cut() {
-      return Promise.resolve(engine.mask!.slice());
+    async cut() {
+      if (engine.hold) await engine.hold;
+      return engine.mask!.slice();
     }
     dispose() {}
+  },
+  serverCut: async () => {
+    if (engine.hold) await engine.hold;
+    if (!engine.server) throw new Error("503");
+    return engine.server.slice();
   },
   decodePhoto: async () => ({ rgba: new Uint8ClampedArray(W * H * 4).fill(200), w: W, h: H }),
   exportSticker: async (_photo: unknown, mask: Uint8ClampedArray) => {
@@ -65,6 +79,9 @@ beforeEach(() => {
   host = document.createElement("div");
   document.body.appendChild(host);
   engine.exported = [];
+  engine.hold = null;
+  engine.server = null;
+  engine.devicesMade = 0;
   // The whole picture kept, by default.
   engine.mask = new Uint8ClampedArray(W * H).fill(255);
 });
@@ -214,6 +231,37 @@ describe("CutoutStudio", () => {
     const sent = engine.exported.at(-1)!;
     expect(sent[0]).toBe(0);
     expect(sent[W * H - 1]).toBe(255);
+  });
+
+  it("while it cuts, the photo is scanned by a moving line, with no spinner and no pill", async () => {
+    let release = () => {};
+    engine.hold = new Promise<void>((r) => (release = r));
+    await open();
+    expect(host.querySelector(".sticker-scan .sticker-scan-beam")).not.toBeNull();
+    expect(host.querySelector(".animate-spin")).toBeNull();
+    expect(host.textContent).not.toContain("Cutting it out…");
+    await act(async () => {
+      release();
+      await new Promise((r) => setTimeout(r, 5));
+    });
+    expect(host.querySelector(".sticker-scan")).toBeNull();
+    expect(button("Edit the cut")).not.toBeNull();
+  });
+
+  it("cuts on the server when it answers, and never starts the 46 MB device model", async () => {
+    engine.server = new Uint8ClampedArray(W * H).fill(255);
+    engine.server[0] = 0;
+    const { onSend } = await open();
+    expect(engine.devicesMade).toBe(0);
+    await click(button("Send"));
+    expect(onSend).toHaveBeenCalledOnce();
+    expect(engine.exported.at(-1)![0]).toBe(0);
+  });
+
+  it("falls back to the device model when the server can't cut", async () => {
+    await open();
+    expect(engine.devicesMade).toBe(1);
+    expect(button("Edit the cut")).not.toBeNull();
   });
 
   it("layout E puts the tools on the picture as soon as the cut lands", async () => {
