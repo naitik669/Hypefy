@@ -3472,22 +3472,23 @@ export function RealChatView({
 
       {/* Long-press context menu (reactions + actions), anchored to the message */}
       {menu && (() => {
-        const r = menu.rect;
+        // One place, always (Naitik, 27 Nov 2026): it used to hang off the
+        // held bubble, above or below by where the bubble was and sideways
+        // by its edge, so a tall photo put it somewhere new every time.
+        // Docked to the bottom on the sender's side instead.
         const mine = menu.msg.sender_id === currentUserId;
-        const above = r.top > 240;
-        const vw = typeof window !== "undefined" ? window.innerWidth : 480;
-        const pos: React.CSSProperties = { top: above ? r.top : r.bottom };
-        if (mine) pos.right = Math.max(8, vw - r.right);
-        else pos.left = Math.max(8, r.left);
+        const pos: React.CSSProperties = { bottom: "calc(var(--sab) + 16px)" };
+        if (mine) pos.right = 12;
+        else pos.left = 12;
         return (
           <>
             <div
-              className="fixed inset-0 z-[205]"
+              className="fixed inset-0 z-[205] bg-black/40"
               onPointerDown={() => setMenu(null)}
               onClick={() => setMenu(null)}
             />
             <div className="fixed z-[206]" style={pos}>
-              <div className={above ? "-translate-y-full pb-2" : "pt-2"}>
+              <div>
                 {/* Quick reactions */}
                 <div className={`mb-2 flex w-fit gap-0.5 rounded-pill bg-elevated p-1 shadow-xl ring-1 ring-border ${mine ? "ml-auto" : ""}`}>
                   {QUICK.map((e) => (

@@ -85,3 +85,19 @@ describe("the rows use them", () => {
   });
 });
 
+describe("the menu opens in one place", () => {
+  const chat = strip(read("src/components/messages/RealChatView.tsx"));
+  const at = chat.indexOf("{menu && (() => {");
+  const block = chat.slice(at, chat.indexOf("<div className={`w-44", at));
+
+  it("docked to the bottom of the screen, whatever was held and wherever it was", () => {
+    expect(block).toContain('const pos: React.CSSProperties = { bottom: "calc(var(--sab) + 16px)" };');
+    expect(block).not.toContain("menu.rect");
+    expect(block).not.toContain("above");
+  });
+
+  it("on the sender's side: yours right, theirs left", () => {
+    expect(block).toContain("if (mine) pos.right = 12;");
+    expect(block).toContain("else pos.left = 12;");
+  });
+});
