@@ -229,7 +229,7 @@ export const MSG_PAGE = 30;
 export const SEARCH_REACH_PAGES = 12;
 /** Select used for both the initial server load and client pagination. */
 export const MSG_SELECT =
-  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, pinned_at, post:posts(id, user_id, caption, image_url, image_urls, aspect_ratio, profiles!posts_user_id_fkey(username, display_name, avatar_hue, avatar_url)), shot:shots(id, user_id, media_url, poster_url, caption, profiles(username, display_name, avatar_hue, avatar_url))";
+  "id, body, sender_id, kind, post_id, shot_id, reply_to_id, is_unsent, metadata, created_at, pinned_at, post:posts(id, user_id, caption, image_url, image_urls, aspect_ratio, profiles!posts_user_id_fkey(username, display_name, avatar_hue, avatar_url)), shot:shots(id, user_id, media_url, poster_url, caption, profiles!shots_user_id_fkey(username, display_name, avatar_hue, avatar_url))";
 
 /** Flatten Supabase's nested post/shot+profile joins into ChatMsg shape. */
 export function mapMessageRow(m: any): ChatMsg {

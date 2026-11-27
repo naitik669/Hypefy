@@ -365,4 +365,4 @@ export function pinAxis(dx: number, dy: number, threshold = 10): null | "x" | "y
 
 /** The columns the pin board reads. */
 export const PIN_SELECT =
-  "id, kind, body, sender_id, created_at, pinned_at, pinned_by, post:posts(id, image_url, image_urls, profiles!posts_user_id_fkey(username)), shot:shots(id, media_url, poster_url, profiles(username))";
+  "id, kind, body, sender_id, created_at, pinned_at, pinned_by, post:posts(id, image_url, image_urls, profiles!posts_user_id_fkey(username)), shot:shots(id, media_url, poster_url, profiles!shots_user_id_fkey(username))";

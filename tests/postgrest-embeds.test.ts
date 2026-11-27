@@ -91,14 +91,28 @@ function embeds(): Embed[] {
     .split("\n")
     .filter((f) => /[.](ts|tsx)$/.test(f));
   const out: Embed[] = [];
+  const sources = new Map<string, string>();
   for (const file of files) {
-    let src: string;
     try {
-      src = stripComments(readFileSync(file, "utf8"));
+      sources.set(file, stripComments(readFileSync(file, "utf8")));
     } catch {
       continue;
     }
-    const consts = new Map<string, string>();
+  }
+  /*
+   * Exported select strings, from every file. The pin board selects
+   * PIN_SELECT imported from src/lib/chat-pins.ts; reading only the calling
+   * file's own constants skipped it, and its bare `shots(... profiles(...))`
+   * went unseen while every inline select was checked (found 27 Nov 2026).
+   */
+  const exported = new Map<string, string>();
+  for (const src of sources.values()) {
+    for (const m of src.matchAll(/export\s+const\s+(\w+)\s*(?::\s*string)?\s*=\s*\n?\s*"([^"]*)"/g)) {
+      exported.set(m[1], m[2]);
+    }
+  }
+  for (const [file, src] of sources) {
+    const consts = new Map<string, string>(exported);
     for (const m of src.matchAll(/const\s+(\w+)\s*(?::\s*string)?\s*=\s*\n?\s*"([^"]*)"/g)) {
       consts.set(m[1], m[2]);
     }
@@ -160,6 +174,14 @@ describe("a select that embeds another table says which relationship it means", 
         e.child === "profiles",
     );
     expect(nested.map((e) => e.named), "the nested shots -> profiles embed went unseen").toEqual([true]);
+  });
+
+  it("follows a select string imported from another file", () => {
+    // The pin board's select lives in chat-pins.ts and is used in PinBoard.tsx.
+    const found = embeds().filter(
+      (e) => e.file === "src/components/messages/PinBoard.tsx" && e.parent === "shots" && e.child === "profiles",
+    );
+    expect(found.length, "the pin board's imported select went unscanned").toBeGreaterThan(0);
   });
 
   it("leaves no embed for PostgREST to guess at", () => {
