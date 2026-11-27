@@ -601,6 +601,22 @@ describe("the drawer's rail", () => {
     for (const r of railButtons()) expect(r.find(([l]) => l === "Favourites")![1]).toBe("true");
   });
 
+  it("the selected one sits on light grey, and nothing on the rail is lime", async () => {
+    await drawer();
+    for (const nav of host.querySelectorAll('nav[aria-label="Sticker groups"]')) {
+      const [on, ...off] = [...nav.querySelectorAll("button")];
+      expect(on.getAttribute("aria-pressed")).toBe("true");
+      expect(on.className).toMatch(/(^|\s)bg-white\/\[0\.14\](\s|$)/);
+      expect(on.className).toMatch(/(^|\s)text-foreground(\s|$)/);
+      for (const b of off) expect(b.className).not.toMatch(/bg-white\/\[0\.14\]/);
+      // Every state, written out: hover and focus included, both rails.
+      for (const b of nav.querySelectorAll("button")) expect(b.className).not.toMatch(/accent|lime|#a3e635|163,\s*230/i);
+    }
+    const src = strip(read("src/components/stickers/StickerDrawer.tsx"));
+    const rail = src.slice(src.indexOf("function Rail("));
+    expect(rail).not.toMatch(/accent|lime|#a3e635/i);
+  });
+
   it("is not drawn on the GIFs tab", async () => {
     await drawer();
     await act(async () => (host.querySelectorAll('[role="tab"]')[1] as HTMLElement).click());

@@ -26,6 +26,9 @@ import { openStickerStudio } from "@/lib/cutout/studio-href";
 
 type Tab = "stickers" | "gifs";
 
+/** The selected rail button: light grey behind it, never lime (Naitik, 27 Nov). */
+export const RAIL_ON = "bg-white/[0.14] text-foreground";
+
 /** How long a finger has to stay on a tile before it counts as a hold. */
 const HOLD_MS = 450;
 
@@ -292,7 +295,8 @@ function StickerTile({ sticker, onSend, onHold }: { sticker: Sticker; onSend: ()
 
 /**
  * The rail. Vertical: a 62px column with 42px buttons. Horizontal: 40px
- * buttons in a row. The selected one sits in a lime-tinted rounded square.
+ * buttons in a row. The selected one sits on light grey — not lime
+ * (Naitik, 27 Nov, overriding the drawn lime square).
  */
 function Rail({
   items,
@@ -332,7 +336,7 @@ function Rail({
             title={it.label}
             onClick={() => onPick(target)}
             className={`flex ${size} shrink-0 items-center justify-center rounded-[13px] transition ${
-              on ? "bg-accent/[0.14] text-accent" : `${vertical ? "" : "bg-surface"} text-muted hover:text-foreground`
+              on ? RAIL_ON : `${vertical ? "" : "bg-surface"} text-muted hover:text-foreground`
             }`}
           >
             <Icon size={18} strokeWidth={2.2} aria-hidden />
