@@ -17,6 +17,8 @@ import {
  */
 
 const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
+/** Comments gone, so an assertion cannot be satisfied by one. */
+const code = (s: string) => s.replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 const strip = (s: string) =>
   s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*(--|\/\/).*$/gm, "");
 
@@ -216,14 +218,25 @@ describe("the poll in the thread", () => {
     expect(fail).toContain("else next.delete(i);");
   });
 
-  it("counts appear once you have voted, not before", () => {
-    expect(bubble).toContain("const voted = chosen.size > 0;");
-    expect(bubble).toContain("{voted && (");
+  it("counts appear once you have voted, not before — unless you asked", () => {
+    // Changed 27 Nov with 0221 (design D5 B): the asker sees the counts
+    // without voting, as a Show's author always has (show-stickers.ts,
+    // `revealed`). Everyone else still earns them by voting.
+    const body = code(bubble);
+    expect(body).toContain("const voted = chosen.size > 0;");
+    expect(body).toContain("const shown = voted || mine;");
+    expect(body).toContain("{shown && (");
+    expect(body).toContain("width: `${shown ? barWidth(poll.tally, i) : 0}%`");
   });
 
   it("the composer cannot offer a state the server refuses", () => {
-    expect(composer).toContain("disabled={!ready}");
-    expect(composer).toContain("const ready = pollReady(question, options);");
+    // The sheet writes quizzes, sliders, questions and countdowns too since
+    // 0221, so the button asks the check for whichever is being written; for
+    // a poll that is still pollReady.
+    const body = code(composer);
+    expect(body).toContain("disabled={!canSend}");
+    expect(body).toContain("const ready = pollReady(question, options);");
+    expect(body).toMatch(/const canSend =\s*kind === "poll"\s*\? ready/);
     expect(composer).toContain("options.length > MIN_POLL_OPTIONS");
     expect(composer).toContain("options.length < MAX_POLL_OPTIONS");
   });

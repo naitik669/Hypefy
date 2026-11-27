@@ -158,6 +158,11 @@ const KIND_VERB: Record<string, string> = {
   oneshot: "sent a view once photo",
   document: "sent a document",
   album: "sent photos",
+  poll: "sent a poll",
+  quiz: "sent a quiz",
+  slider: "sent a hype slider",
+  question: "asked a question",
+  countdown: "started a countdown",
 };
 
 function cap(s: string) {

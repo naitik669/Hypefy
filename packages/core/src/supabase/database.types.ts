@@ -1284,6 +1284,38 @@ export type Database = {
           },
         ]
       }
+      message_sticker_answers: {
+        Row: {
+          body: string | null
+          created_at: string
+          message_id: string
+          user_id: string
+          value: number | null
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          message_id: string
+          user_id: string
+          value?: number | null
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          message_id?: string
+          user_id?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_sticker_answers_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_reactions: {
         Row: {
           created_at: string
@@ -3916,6 +3948,14 @@ export type Database = {
         Returns: undefined
       }
       age_ok: { Args: never; Returns: boolean }
+      answer_dm_question: {
+        Args: { p_body: string; p_message_id: string }
+        Returns: Json
+      }
+      answer_dm_quiz: {
+        Args: { p_choice: number; p_message_id: string }
+        Returns: Json
+      }
       answer_show_question: {
         Args: { p_body: string; p_layer_id: string; p_show_id: string }
         Returns: undefined
@@ -4031,6 +4071,20 @@ export type Database = {
       deliver_due_messages: { Args: never; Returns: number }
       deny_follow_request: { Args: { p_requester: string }; Returns: undefined }
       disconnect_spotify: { Args: never; Returns: undefined }
+      dm_sticker_results: {
+        Args: { p_message_id: string }
+        Returns: {
+          answered_at: string
+          avatar_hue: number
+          avatar_url: string
+          body: string
+          choices: number[]
+          display_name: string
+          user_id: string
+          username: string
+          value: number
+        }[]
+      }
       drop_password_wrapper: { Args: never; Returns: undefined }
       edit_album_caption: {
         Args: { p_caption: string; p_message_id: string }
@@ -4708,6 +4762,18 @@ export type Database = {
         Returns: undefined
       }
       send_hype_summaries: { Args: never; Returns: undefined }
+      send_dm_sticker: {
+        Args: {
+          p_answer?: number
+          p_at?: string
+          p_conversation_id: string
+          p_kind: string
+          p_options?: string[]
+          p_reply_to_id?: string
+          p_text: string
+        }
+        Returns: Json
+      }
       send_message: {
         Args: {
           p_body?: string
@@ -4848,6 +4914,10 @@ export type Database = {
           p_subject_id: string
         }
         Returns: undefined
+      }
+      set_dm_slider: {
+        Args: { p_message_id: string; p_value: number }
+        Returns: Json
       }
       set_show_slider: {
         Args: { p_layer_id: string; p_show_id: string; p_value: number }

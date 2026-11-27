@@ -171,6 +171,10 @@ export function msgSnippet(m: { is_unsent?: boolean; kind: string; body: string 
     case "album": return albumSnippet(m.body);
     case "page_reply": return m.body ? `Page reply: ${m.body}` : "Page reply";
     case "poll": return m.body ? `Poll: ${m.body}` : "Poll";
+    case "quiz": return m.body ? `Quiz: ${m.body}` : "Quiz";
+    case "slider": return m.body ? `Hype slider: ${m.body}` : "Hype slider";
+    case "question": return m.body ? `Question: ${m.body}` : "Question";
+    case "countdown": return m.body ? `Countdown: ${m.body}` : "Countdown";
     case "document": {
       try { return JSON.parse(m.body ?? "")?.name ?? "Document"; } catch { return "Document"; }
     }
